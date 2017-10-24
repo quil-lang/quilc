@@ -20,13 +20,19 @@ from within the `CL-QUIL` root directory.  This deposits the binary into the roo
 
 ## Invocation
 
-`quilc` takes no command-line arguments.  It reads ProtoQuil in from standard-in and writes ProtoQuil to standard-out. The program is precedes and followed by a pragma of the form
+`quilc` takes no command-line arguments.  It reads ProtoQuil in from standard-in and writes ProtoQuil to standard-out. The program is preceded by a pragma of the form
 
 ```
-PRAGMA REWIRING "#(n0 n1 ... n7)"
+PRAGMA EXPECTED_REWIRING "#(n0 n1 ... n7)"
 ```
 
-which indicates that the `j`th logical qubit from standard-in can be found on the `nj`th physical qubit on standard-out.  The preceding pragma indicates the remapping for state preparation, and the following pragma indicates the remapping for read-out.
+which means that any state preparation intended for the logical `j`th qubit should instead be done on the `nj`th physical qubit. Similarly, the program is followed by a pragma of the form
+
+```
+PRAGMA CURRENT_REWIRING "#(m0 m1 ... m7)"
+```
+
+which indicates that readout intended for the `j`th logical qubit should be measured from the `mj`th physical qubit.
 
 ## An example Python hook
 
