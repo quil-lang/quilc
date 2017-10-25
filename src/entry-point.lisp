@@ -18,7 +18,7 @@
 (defparameter *compute-runtime* nil)
 (defparameter *compute-matrix-reps* nil)
 
-(defconstant +option-spec+
+(defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
     (("compute-runtime" #\t) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
@@ -58,7 +58,7 @@
   (format t "Usage:~%")
   (format t "  ~A [options]~%" *program-name*)
   (format t "Options:~%")
-  (command-line-arguments:show-option-help +option-spec+ :sort-names t))
+  (command-line-arguments:show-option-help *option-spec* :sort-names t))
 
 (defun process-options (&key (compute-gate-depth nil)
                              (compute-runtime nil)
@@ -78,7 +78,7 @@
   (setf *program-name* (pop argv))
   (handler-case
       (command-line-arguments:handle-command-line
-       +option-spec+
+       *option-spec*
        'process-options
        :command-line argv
        :name "quilc"
