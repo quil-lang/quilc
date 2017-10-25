@@ -8,6 +8,7 @@
   :version (:read-file-form "VERSION.txt")
   :pathname "src/"
   :depends-on (#:cl-ppcre
+               #:command-line-arguments
                #:magicl
                #:cl-quil
               )
