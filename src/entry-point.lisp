@@ -71,6 +71,49 @@
   (setf *compute-runtime* compute-runtime)
   (setf *compute-matrix-reps* compute-matrix-reps))
 
+(defun print-matrix-representations (initial-l2p processed-quil final-l2p program)
+  (let* ((original-matrix (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program))
+         (initial-l2p (quil::trim-rewiring initial-l2p))
+         (final-l2p (quil::trim-rewiring final-l2p))
+         (raw-new-matrix (quil::make-matrix-from-quil processed-quil program))
+         (qubit-count (max (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
+                           (length initial-l2p)
+                           (length final-l2p)))
+         (wire-out (apply #'quil::kq-gate-on-lines
+                          (quil::rewiring-to-permutation-matrix-p2l final-l2p)
+                          qubit-count
+                          (alexandria:iota (length final-l2p) :start (1- (length final-l2p)) :step -1)))
+         (wire-in (apply #'quil::kq-gate-on-lines
+                         (quil::rewiring-to-permutation-matrix-l2p initial-l2p)
+                         qubit-count
+                         (alexandria:iota (length initial-l2p) :start (1- (length initial-l2p)) :step -1)))
+         (stretched-raw-new-matrix (apply #'quil::kq-gate-on-lines
+                                          raw-new-matrix
+                                          qubit-count
+                                          (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
+                                                           :start (- (integer-length (magicl:matrix-rows raw-new-matrix)) 2)
+                                                           :step -1)))
+         (new-matrix
+           (reduce #'magicl:multiply-complex-matrices
+                   (list
+                    wire-out
+                    stretched-raw-new-matrix
+                    wire-in))))
+    (format *error-output* "~%#Matrix read off from input code~%")
+    (print-matrix-with-comment-hashes original-matrix *error-output*)
+    (format *error-output* "~%#Matrix read off from compiled code~%")
+    (print-matrix-with-comment-hashes new-matrix *error-output*)
+    (format *error-output* "~%")
+    (finish-output *standard-output*)
+    (finish-output *error-output*)))
+
+(defun print-gate-depth (lschedule)
+  (format *debug-io* "# Compiled gate depth: ~d~%" (quil::lscheduler-calculate-depth lschedule)))
+
+(defun print-program-runtime (lschedule chip-specification)
+  (format *debug-io* "# Compiled program duration: ~5d~%" (quil::lscheduler-calculate-duration lschedule chip-specification)))
+
+
 (defun entry-point (argv)
   (handler-case (%entry-point argv)
     (sb-sys:interactive-interrupt (c)
@@ -98,7 +141,6 @@
     ;; slurp the program from *standard-in*
     (let* ((program-text (slurp-lines))
            (program (quil::parse-quil program-text))
-           (original-matrix (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program))
            (chip-specification (quil::build-8Q-chip)))
       ;; do the compilation
       (multiple-value-bind (initial-l2p processed-quil final-l2p)
@@ -116,42 +158,9 @@
           (let ((lschedule (make-instance 'quil::lscheduler-empty)))
             (quil::append-instructions-to-lschedule lschedule processed-quil)
             (when *compute-gate-depth*
-              (format *debug-io* "# Compiled gate depth: ~d~%" (quil::lscheduler-calculate-depth lschedule)))
+              (print-gate-depth lschedule))
             (when *compute-runtime*
-              (format *debug-io* "# Compiled program duration: ~5d~%" (quil::lscheduler-calculate-duration lschedule chip-specification)))))
+              (print-program-runtime lschedule chip-specification))))
         
         (when *compute-matrix-reps*
-          ;; do the slurps and check that you get the same matrix in and out
-          (let* ((initial-l2p (quil::trim-rewiring initial-l2p))
-                 (final-l2p (quil::trim-rewiring final-l2p))
-                 (raw-new-matrix (quil::make-matrix-from-quil processed-quil program))
-                 (qubit-count (max (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
-                                   (length initial-l2p)
-                                   (length final-l2p)))
-                 (wire-out (apply #'quil::kq-gate-on-lines
-                                  (quil::rewiring-to-permutation-matrix-p2l final-l2p)
-                                  qubit-count
-                                  (alexandria:iota (length final-l2p) :start (1- (length final-l2p)) :step -1)))
-                 (wire-in (apply #'quil::kq-gate-on-lines
-                                 (quil::rewiring-to-permutation-matrix-l2p initial-l2p)
-                                 qubit-count
-                                 (alexandria:iota (length initial-l2p) :start (1- (length initial-l2p)) :step -1)))
-                 (stretched-raw-new-matrix (apply #'quil::kq-gate-on-lines
-                                                  raw-new-matrix
-                                                  qubit-count
-                                                  (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
-                                                                   :start (- (integer-length (magicl:matrix-rows raw-new-matrix)) 2)
-                                                                   :step -1)))
-                 (new-matrix
-                   (reduce #'magicl:multiply-complex-matrices
-                           (list
-                            wire-out
-                            stretched-raw-new-matrix
-                            wire-in))))
-            (format *error-output* "~%#Matrix read off from input code~%")
-            (print-matrix-with-comment-hashes original-matrix *error-output*)
-            (format *error-output* "~%#Matrix read off from compiled code~%")
-            (print-matrix-with-comment-hashes new-matrix *error-output*)
-            (format *error-output* "~%")
-            (finish-output *standard-output*)
-            (finish-output *error-output*)))))))
+          (print-matrix-representations initial-l2p processed-quil final-l2p program))))))
