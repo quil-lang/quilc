@@ -7,7 +7,8 @@
   :author "Eric Peterson <eric@rigetti.com>"
   :version (:read-file-form "VERSION.txt")
   :pathname "src/"
-  :depends-on (#:magicl
+  :depends-on (#:cl-ppcre
+               #:magicl
                #:cl-quil
               )
   :around-compile (lambda (compile)
