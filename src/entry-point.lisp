@@ -71,22 +71,27 @@
   (setf *compute-runtime* compute-runtime)
   (setf *compute-matrix-reps* compute-matrix-reps))
 
-
-
 (defun entry-point (argv)
+  (handler-case (%entry-point argv)
+    (sb-sys:interactive-interrupt (c)
+      (declare (ignore c))
+      (uiop:quit 0))
+    (error (c)
+      (format *error-output* "~&! ! ! Error: ~A~%" c)
+      (uiop:quit 1))))
+
+(defun %entry-point (argv)
   ;; grab the CLI arguments
   (setf *program-name* (pop argv))
-  (handler-case
-      (command-line-arguments:handle-command-line
-       *option-spec*
-       'process-options
-       :command-line argv
-       :name "quilc"
-       :positional-arity 0
-       :rest-arity nil)
-    (error (c)
-      (format *error-output* "~&Error raised: ~A~%" c)
-      (uiop:quit 1)))
+
+  (command-line-arguments:handle-command-line
+   *option-spec*
+   'process-options
+   :command-line argv
+   :name "quilc"
+   :positional-arity 0
+   :rest-arity nil)
+
   ;; rebind the MAGICL libraries
   (magicl:with-blapack
     (reload-foreign-libraries)

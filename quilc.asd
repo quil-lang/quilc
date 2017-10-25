@@ -11,12 +11,10 @@
                #:command-line-arguments
                #:magicl
                #:cl-quil
-              )
+               #:uiop)
   :around-compile (lambda (compile)
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
                       (funcall compile)))
   :serial t
   :components ((:file "package")
-               (:file "entry-point")
-              )
-)
+               (:file "entry-point")))
