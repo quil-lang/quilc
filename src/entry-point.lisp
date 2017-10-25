@@ -28,6 +28,14 @@
         (cffi:load-foreign-library 'magicl.foreign-libraries::liblapack)
         (cffi:load-foreign-library 'magicl.foreign-libraries::libexpokit))))
 
+(defun print-matrix-with-comment-hashes (matrix &optional (stream *standard-output*))
+  (format stream "~d"
+          (cl-ppcre:regex-replace-all
+           (coerce #(#\Newline) 'string)
+           (with-output-to-string (s)
+             (princ matrix s))
+           (coerce #(#\Newline #\#) 'string))))
+
 ;; eventually, we will want this to look at argv for a filename from which it
 ;; can parse a chip/ISA specification. for now, we're going to bake such a
 ;; specification in.
@@ -83,11 +91,9 @@
                          stretched-raw-new-matrix
                          wire-in))))
           (format *error-output* "~%#Matrix read off from input code~%")
-          (princ original-matrix
-                 *error-output*)
+          (print-matrix-with-comment-hashes original-matrix *error-output*)
           (format *error-output* "~%#Matrix read off from compiled code~%")
-          (princ (quil::scale-out-matrix-phases new-matrix original-matrix)
-                 *error-output*)
+          (print-matrix-with-comment-hashes new-matrix *error-output*)
           (format *error-output* "~%")
           (finish-output *standard-output*)
           (finish-output *error-output*))))))
