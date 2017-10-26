@@ -18,12 +18,18 @@
 (defparameter *compute-runtime* nil)
 (defparameter *compute-matrix-reps* nil)
 (defparameter *topological-swaps* nil)
+(defparameter *compute-gate-volume* nil)
+(defparameter *whitelist-gates* nil)
+(defparameter *blacklist-gates* nil)
 
 (defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
+    (("compute-gate-volume" #\v) :type boolean :optional t :documentation "prints copmiled circuit gate volume")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
+    (("gate-blacklist") :type string :optional t :documentation "ignore these gates during count")
+    (("gate-whitelist") :type string :optional t :documentation "include only these gates during count")
     (("help" #\? #\h) :optional t :documentation "prints this help information and exits")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -63,16 +69,26 @@
   (command-line-arguments:show-option-help *option-spec* :sort-names t))
 
 (defun process-options (&key (compute-gate-depth nil)
+                             (compute-gate-volume nil)
                              (compute-runtime nil)
                              (compute-matrix-reps nil)
                              (show-topological-overhead nil)
+                             (gate-blacklist nil)
+                             (gate-whitelist nil)
                              (help nil))
   (when help
     (show-help)
     (uiop:quit 0))
   (setf *compute-gate-depth* compute-gate-depth)
+  (setf *compute-gate-volume* compute-gate-volume)
   (setf *compute-runtime* compute-runtime)
   (setf *compute-matrix-reps* compute-matrix-reps)
+  (setf *gate-blacklist* 
+        (when gate-blacklist
+          (split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
+  (setf *gate-whitelist* 
+        (when gate-whitelist
+          (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
   (setf *topological-swaps* show-topological-overhead))
 
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p program)
@@ -112,13 +128,29 @@
     (finish-output *error-output*)))
 
 (defun print-gate-depth (lschedule)
-  (format *debug-io* "# Compiled gate depth: ~d~%" (quil::lscheduler-calculate-depth lschedule)))
+  (format *debug-io*
+          "# Compiled gate depth: ~d~%"
+          (quil::lscheduler-calculate-depth lschedule
+                                            :blacklist *gate-blacklist*
+                                            :whitelist *gate-whitelist*)))
+
+(defun print-gate-volume (lschedule)
+  (format *debug-io*
+          "# Compiled gate volume: ~d~%"
+          (quil::lscheduler-calculate-volume lschedule
+                                             :blacklist *gate-blacklist*
+                                             :whitelist *gate-whitelist*)))
 
 (defun print-program-runtime (lschedule chip-specification)
-  (format *debug-io* "# Compiled program duration: ~5d~%" (quil::lscheduler-calculate-duration lschedule chip-specification)))
+  (format *debug-io*
+          "# Compiled program duration: ~5d~%"
+          (quil::lscheduler-calculate-duration lschedule
+                                               chip-specification)))
 
 (defun print-topological-swap-count (topological-swaps)
-  (format *debug-io* "# SWAPs incurred by topological considerations: ~d~%" topological-swaps))
+  (format *debug-io*
+          "# SWAPs incurred by topological considerations: ~d~%"
+          topological-swaps))
 
 
 (defun entry-point (argv)
@@ -163,12 +195,16 @@
         (when *topological-swaps*
           (print-topological-swap-count topological-swaps))
         
-        (when (or *compute-gate-depth* *compute-runtime*)
+        (when (or *compute-gate-depth*
+                  *compute-gate-volume*
+                  *compute-runtime*)
           ;; calculate some statistics based on logical scheduling
           (let ((lschedule (make-instance 'quil::lscheduler-empty)))
             (quil::append-instructions-to-lschedule lschedule processed-quil)
             (when *compute-gate-depth*
               (print-gate-depth lschedule))
+            (when *compute-gate-volume*
+              (print-gate-volume lschedule))
             (when *compute-runtime*
               (print-program-runtime lschedule chip-specification))))
         
