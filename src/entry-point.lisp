@@ -17,11 +17,13 @@
 (defparameter *compute-gate-depth* nil)
 (defparameter *compute-runtime* nil)
 (defparameter *compute-matrix-reps* nil)
+(defparameter *topological-swaps* nil)
 
 (defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
-    (("compute-runtime" #\t) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
+    (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
+    (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("help" #\? #\h) :optional t :documentation "prints this help information and exits")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -63,13 +65,15 @@
 (defun process-options (&key (compute-gate-depth nil)
                              (compute-runtime nil)
                              (compute-matrix-reps nil)
+                             (show-topological-overhead nil)
                              (help nil))
   (when help
     (show-help)
     (uiop:quit 0))
   (setf *compute-gate-depth* compute-gate-depth)
   (setf *compute-runtime* compute-runtime)
-  (setf *compute-matrix-reps* compute-matrix-reps))
+  (setf *compute-matrix-reps* compute-matrix-reps)
+  (setf *topological-swaps* show-topological-overhead))
 
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p program)
   (let* ((original-matrix (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program))
@@ -113,6 +117,9 @@
 (defun print-program-runtime (lschedule chip-specification)
   (format *debug-io* "# Compiled program duration: ~5d~%" (quil::lscheduler-calculate-duration lschedule chip-specification)))
 
+(defun print-topological-swap-count (topological-swaps)
+  (format *debug-io* "# SWAPs incurred by topological considerations: ~d~%" topological-swaps))
+
 
 (defun entry-point (argv)
   (handler-case (%entry-point argv)
@@ -143,7 +150,7 @@
            (program (quil::parse-quil program-text))
            (chip-specification (quil::build-8Q-chip)))
       ;; do the compilation
-      (multiple-value-bind (initial-l2p processed-quil final-l2p)
+      (multiple-value-bind (initial-l2p processed-quil final-l2p topological-swaps)
           (quil::compiler-hook program chip-specification)
         ;; now that we've compiled the program, we have various things to output
         ;; one thing we're always going to want to output is the program itself.
@@ -152,6 +159,9 @@
         (print-quil-list processed-quil *standard-output*)
         (let ((*print-pretty* nil))
           (format *standard-output* "PRAGMA CURRENT_REWIRING \"~s\"~%" final-l2p))
+        
+        (when *topological-swaps*
+          (print-topological-swap-count topological-swaps))
         
         (when (or *compute-gate-depth* *compute-runtime*)
           ;; calculate some statistics based on logical scheduling
