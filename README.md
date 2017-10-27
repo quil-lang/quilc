@@ -1,5 +1,7 @@
 # `quilc` README
 
+[![Build Status](http://bamboo.lab.rigetti.com/plugins/servlet/wittified/build-status/QCS-QUILC)](http://bamboo.lab.rigetti.com/browse/QCS-QUILC)
+
 ## Specification
 
 `quilc` is a program that reads arbitrary[^qubit-restriction] ProtoQuil from standard in and writes Quil to standard out which can be directly instantiated on an 8Q chip arranged in a ring topology with the native gate set {±X/2, RZ, CZ}.[^future-plans]
