@@ -21,6 +21,7 @@
 (defparameter *compute-gate-volume* nil)
 (defparameter *whitelist-gates* nil)
 (defparameter *blacklist-gates* nil)
+(defparameter *without-pretty-printing* nil)
 
 (defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
@@ -30,6 +31,7 @@
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "ignore these gates during count")
     (("gate-whitelist") :type string :optional t :documentation "include only these gates during count")
+    (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     (("help" #\? #\h) :optional t :documentation "prints this help information and exits")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -75,6 +77,7 @@
                              (show-topological-overhead nil)
                              (gate-blacklist nil)
                              (gate-whitelist nil)
+                             (without-pretty-printing nil)
                              (help nil))
   (when help
     (show-help)
@@ -83,6 +86,7 @@
   (setf *compute-gate-volume* compute-gate-volume)
   (setf *compute-runtime* compute-runtime)
   (setf *compute-matrix-reps* compute-matrix-reps)
+  (setf *without-pretty-printing* without-pretty-printing)
   (setf *gate-blacklist* 
         (when gate-blacklist
           (split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
@@ -119,6 +123,7 @@
                     wire-out
                     stretched-raw-new-matrix
                     wire-in))))
+    (setf new-matrix (quil::scale-out-matrix-phases new-matrix original-matrix))
     (format *error-output* "~%#Matrix read off from input code~%")
     (print-matrix-with-comment-hashes original-matrix *error-output*)
     (format *error-output* "~%#Matrix read off from compiled code~%")
@@ -188,7 +193,8 @@
         ;; one thing we're always going to want to output is the program itself.
         (let ((*print-pretty* nil))
           (format *standard-output* "PRAGMA EXPECTED_REWIRING \"~s\"~%" initial-l2p))
-        (print-quil-list processed-quil *standard-output*)
+        (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
+          (print-quil-list processed-quil *standard-output*))
         (let ((*print-pretty* nil))
           (format *standard-output* "PRAGMA CURRENT_REWIRING \"~s\"~%" final-l2p))
         
