@@ -22,16 +22,18 @@
 (defparameter *whitelist-gates* nil)
 (defparameter *blacklist-gates* nil)
 (defparameter *without-pretty-printing* nil)
+(defparameter *verbose* nil)
 
 (defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
-    (("compute-gate-volume" #\v) :type boolean :optional t :documentation "prints copmiled circuit gate volume")
+    (("compute-gate-volume") :type boolean :optional t :documentation "prints copmiled circuit gate volume")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "ignore these gates during count")
     (("gate-whitelist") :type string :optional t :documentation "include only these gates during count")
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
+    (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
     (("help" #\? #\h) :optional t :documentation "prints this help information and exits")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -78,6 +80,7 @@
                              (gate-blacklist nil)
                              (gate-whitelist nil)
                              (without-pretty-printing nil)
+                             (verbose nil)
                              (help nil))
   (when help
     (show-help)
@@ -93,7 +96,9 @@
   (setf *gate-whitelist* 
         (when gate-whitelist
           (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
-  (setf *topological-swaps* show-topological-overhead))
+  (setf *topological-swaps* show-topological-overhead)
+  (setf *verbose*
+        (when verbose *debug-io*)))
 
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p program)
   (let* ((original-matrix (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program))
@@ -178,6 +183,8 @@
    :name "quilc"
    :positional-arity 0
    :rest-arity nil)
+  
+  (princ *verbose*)
 
   ;; rebind the MAGICL libraries
   (magicl:with-blapack
@@ -185,7 +192,8 @@
     ;; slurp the program from *standard-in*
     (let* ((program-text (slurp-lines))
            (program (quil::parse-quil program-text))
-           (chip-specification (quil::build-8Q-chip)))
+           (chip-specification (quil::build-8Q-chip))
+           (quil::*compiler-noise-target* *verbose*))
       ;; do the compilation
       (multiple-value-bind (initial-l2p processed-quil final-l2p topological-swaps)
           (quil::compiler-hook program chip-specification)
