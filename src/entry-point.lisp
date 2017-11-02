@@ -106,6 +106,7 @@
          (final-l2p (quil::trim-rewiring final-l2p))
          (raw-new-matrix (quil::make-matrix-from-quil processed-quil program))
          (qubit-count (max (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
+                           (1- (integer-length (magicl:matrix-rows original-matrix)))
                            (length initial-l2p)
                            (length final-l2p)))
          (wire-out (apply #'quil::kq-gate-on-lines
