@@ -184,8 +184,6 @@
    :positional-arity 0
    :rest-arity nil)
   
-  (princ *verbose*)
-
   ;; rebind the MAGICL libraries
   (magicl:with-blapack
     (reload-foreign-libraries)
