@@ -192,7 +192,7 @@
     (let* ((program-text (slurp-lines))
            (program (quil::parse-quil program-text))
            (chip-specification (quil::build-8Q-chip))
-           (quil::*compiler-noise-target* *verbose*))
+           (quil::*compiler-noise-stream* *verbose*))
       ;; do the compilation
       (multiple-value-bind (initial-l2p processed-quil final-l2p topological-swaps)
           (quil::compiler-hook program chip-specification)
