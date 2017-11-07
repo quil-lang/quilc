@@ -197,6 +197,7 @@
     ;; slurp the program from *standard-in*
     (let* ((program-text (slurp-lines))
            (program (quil::parse-quil program-text))
+           (reference-program (quil::parse-quil program-text))
            (chip-specification (quil::build-8Q-chip))
            (quil::*compiler-noise-stream* *verbose*))
       ;; do the compilation
@@ -228,4 +229,4 @@
               (print-program-runtime lschedule chip-specification))))
         
         (when *compute-matrix-reps*
-          (print-matrix-representations initial-l2p processed-quil final-l2p program))))))
+          (print-matrix-representations initial-l2p processed-quil final-l2p reference-program))))))
