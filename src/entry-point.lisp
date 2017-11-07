@@ -233,13 +233,6 @@
    :positional-arity 0
    :rest-arity nil)
   
-  (princ *quil-stream*)
-  (terpri)
-  (princ *json-stream*)
-  (terpri)
-  (princ *human-readable-stream*)
-  (terpri)
-  
   ;; rebind the MAGICL libraries
   (magicl:with-blapack
     (reload-foreign-libraries)
