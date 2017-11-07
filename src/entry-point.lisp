@@ -123,15 +123,21 @@
                                           (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
                                                            :start (- (integer-length (magicl:matrix-rows raw-new-matrix)) 2)
                                                            :step -1)))
+         (stretched-original-matrix (apply #'quil::kq-gate-on-lines
+                                           original-matrix
+                                           qubit-count
+                                           (alexandria:iota (1- (integer-length (magicl:matrix-rows original-matrix)))
+                                                            :start (- (integer-length (magicl:matrix-rows original-matrix)) 2)
+                                                            :step -1)))
          (new-matrix
            (reduce #'magicl:multiply-complex-matrices
                    (list
                     wire-out
                     stretched-raw-new-matrix
                     wire-in))))
-    (setf new-matrix (quil::scale-out-matrix-phases new-matrix original-matrix))
+    (setf new-matrix (quil::scale-out-matrix-phases new-matrix stretched-original-matrix))
     (format *error-output* "~%#Matrix read off from input code~%")
-    (print-matrix-with-comment-hashes original-matrix *error-output*)
+    (print-matrix-with-comment-hashes stretched-original-matrix *error-output*)
     (format *error-output* "~%#Matrix read off from compiled code~%")
     (print-matrix-with-comment-hashes new-matrix *error-output*)
     (format *error-output* "~%")
