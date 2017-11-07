@@ -19,14 +19,21 @@
 (defparameter *compute-matrix-reps* nil)
 (defparameter *topological-swaps* nil)
 (defparameter *compute-gate-volume* nil)
-(defparameter *whitelist-gates* nil)
-(defparameter *blacklist-gates* nil)
+(defparameter *gate-whitelist* nil)
+(defparameter *gate-blacklist* nil)
 (defparameter *without-pretty-printing* nil)
-(defparameter *verbose* nil)
+(defparameter *verbose* (make-broadcast-stream))
+
+;; NOTE: these can't have default values b/c they don't survive serialization
+(defparameter *json-stream* (make-broadcast-stream))
+(defparameter *human-readable-stream* (make-broadcast-stream))
+(defparameter *quil-stream* (make-broadcast-stream))
+
+(defparameter *statistics-dictionary* (make-hash-table :test #'equal))
 
 (defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
-    (("compute-gate-volume") :type boolean :optional t :documentation "prints copmiled circuit gate volume")
+    (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
@@ -34,7 +41,8 @@
     (("gate-whitelist") :type string :optional t :documentation "include only these gates during count")
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
-    (("help" #\? #\h) :optional t :documentation "prints this help information and exits")))
+    (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
+    (("help" #\? #\h) :optional t :documentation "print this help information and exit")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
@@ -81,6 +89,7 @@
                              (gate-whitelist nil)
                              (without-pretty-printing nil)
                              (verbose nil)
+                             (json-serialize nil)
                              (help nil))
   (when help
     (show-help)
@@ -97,8 +106,17 @@
         (when gate-whitelist
           (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
   (setf *topological-swaps* show-topological-overhead)
+  (cond
+    (json-serialize
+     (setf *json-stream* *standard-output*)
+     (setf *human-readable-stream* (make-broadcast-stream))
+     (setf *quil-stream* (make-broadcast-stream)))
+    (t
+     (setf *json-stream* (make-broadcast-stream))
+     (setf *human-readable-stream* *error-output*)
+     (setf *quil-stream* *standard-output*)))
   (setf *verbose*
-        (when verbose *debug-io*)))
+        (when verbose *human-readable-stream*)))
 
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p program)
   (let* ((original-matrix (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program))
@@ -136,38 +154,62 @@
                     stretched-raw-new-matrix
                     wire-in))))
     (setf new-matrix (quil::scale-out-matrix-phases new-matrix stretched-original-matrix))
-    (format *error-output* "~%#Matrix read off from input code~%")
-    (print-matrix-with-comment-hashes stretched-original-matrix *error-output*)
-    (format *error-output* "~%#Matrix read off from compiled code~%")
-    (print-matrix-with-comment-hashes new-matrix *error-output*)
-    (format *error-output* "~%")
+    (format *human-readable-stream* "~%#Matrix read off from input code~%")
+    (print-matrix-with-comment-hashes stretched-original-matrix *human-readable-stream*)
+    (setf (gethash "original_matrix" *statistics-dictionary*)
+          (with-output-to-string (s)
+            (print-matrix-with-comment-hashes stretched-original-matrix s)))
+    (format *human-readable-stream* "~%#Matrix read off from compiled code~%")
+    (print-matrix-with-comment-hashes new-matrix *human-readable-stream*)
+    (setf (gethash "compiled_matrix" *statistics-dictionary*)
+          (with-output-to-string (s)
+            (print-matrix-with-comment-hashes new-matrix s)))
+    (format *human-readable-stream* "~%")
     (finish-output *standard-output*)
-    (finish-output *error-output*)))
+    (finish-output *human-readable-stream*)))
 
 (defun print-gate-depth (lschedule)
-  (format *debug-io*
-          "# Compiled gate depth: ~d~%"
-          (quil::lscheduler-calculate-depth lschedule
-                                            :blacklist *gate-blacklist*
-                                            :whitelist *gate-whitelist*)))
+  (let ((depth (quil::lscheduler-calculate-depth lschedule
+                                                 :blacklist *gate-blacklist*
+                                                 :whitelist *gate-whitelist*)))
+    (setf (gethash "gate_depth" *statistics-dictionary*) depth)
+    (format *human-readable-stream*
+            "# Compiled gate depth: ~d~%"
+            depth)))
 
 (defun print-gate-volume (lschedule)
-  (format *debug-io*
-          "# Compiled gate volume: ~d~%"
-          (quil::lscheduler-calculate-volume lschedule
-                                             :blacklist *gate-blacklist*
-                                             :whitelist *gate-whitelist*)))
+  (let ((volume (quil::lscheduler-calculate-volume lschedule
+                                                   :blacklist *gate-blacklist*
+                                                   :whitelist *gate-whitelist*)))
+    (setf (gethash "gate_volume" *statistics-dictionary*) volume)
+    (format *human-readable-stream*
+            "# Compiled gate volume: ~d~%"
+            volume)))
 
 (defun print-program-runtime (lschedule chip-specification)
-  (format *debug-io*
-          "# Compiled program duration: ~5d~%"
-          (quil::lscheduler-calculate-duration lschedule
-                                               chip-specification)))
+  (let ((duration (quil::lscheduler-calculate-duration lschedule
+                                                       chip-specification)))
+    (setf (gethash "program_duration" *statistics-dictionary*) duration)
+    (format *human-readable-stream*
+            "# Compiled program duration: ~5d~%"
+            duration)))
 
 (defun print-topological-swap-count (topological-swaps)
-  (format *debug-io*
+  (setf (gethash "topological_swaps" *statistics-dictionary*) topological-swaps)
+  (format *human-readable-stream*
           "# SWAPs incurred by topological considerations: ~d~%"
           topological-swaps))
+
+(defun print-program (initial-l2p processed-quil final-l2p &optional (stream *standard-output*))
+  (let ((*print-pretty* nil))
+    (format stream "PRAGMA EXPECTED_REWIRING \"~s\"~%" initial-l2p))
+  (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
+    (print-quil-list processed-quil stream))
+  (let ((*print-pretty* nil))
+    (format stream "PRAGMA CURRENT_REWIRING \"~s\"~%" final-l2p)))
+
+(defun publish-json-statistics ()
+  (yason:encode *statistics-dictionary* *json-stream*))
 
 
 (defun entry-point (argv)
@@ -191,6 +233,13 @@
    :positional-arity 0
    :rest-arity nil)
   
+  (princ *quil-stream*)
+  (terpri)
+  (princ *json-stream*)
+  (terpri)
+  (princ *human-readable-stream*)
+  (terpri)
+  
   ;; rebind the MAGICL libraries
   (magicl:with-blapack
     (reload-foreign-libraries)
@@ -205,12 +254,12 @@
           (quil::compiler-hook program chip-specification)
         ;; now that we've compiled the program, we have various things to output
         ;; one thing we're always going to want to output is the program itself.
-        (let ((*print-pretty* nil))
-          (format *standard-output* "PRAGMA EXPECTED_REWIRING \"~s\"~%" initial-l2p))
-        (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
-          (print-quil-list processed-quil *standard-output*))
-        (let ((*print-pretty* nil))
-          (format *standard-output* "PRAGMA CURRENT_REWIRING \"~s\"~%" final-l2p))
+        (let ((program-as-string (with-output-to-string (s)
+                                   (print-program initial-l2p processed-quil final-l2p s))))
+          (setf (gethash "processed_program" *statistics-dictionary*)
+                program-as-string)
+          (write-string program-as-string *quil-stream*))
+        
         
         (when *topological-swaps*
           (print-topological-swap-count topological-swaps))
@@ -229,4 +278,6 @@
               (print-program-runtime lschedule chip-specification))))
         
         (when *compute-matrix-reps*
-          (print-matrix-representations initial-l2p processed-quil final-l2p reference-program))))))
+          (print-matrix-representations initial-l2p processed-quil final-l2p reference-program))
+        
+        (publish-json-statistics)))))
