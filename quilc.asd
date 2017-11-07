@@ -10,8 +10,8 @@
   :depends-on (#:cl-ppcre
                #:split-sequence
                #:command-line-arguments
-               #:magicl
-               #:cl-quil
+               (:version #:magicl "0.1.0")
+               (:version #:cl-quil "0.8.0")
                #:uiop)
   :around-compile (lambda (compile)
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
