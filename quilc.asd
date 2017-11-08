@@ -14,6 +14,7 @@
                (:version #:magicl "0.1.0")
                (:version #:cl-quil "0.8.0")
                #:uiop)
+  :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
                       (funcall compile)))
