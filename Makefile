@@ -21,5 +21,10 @@ quilc-unsafe:
 		 --compress-core \
 		 --entry quilc::%entry-point
 
+test:
+	sbcl --noinform --non-interactive \
+		 --eval "(ql:quickload :quilc-tests)" \
+		 --eval "(asdf:test-system :quilc)"
+
 clean:
 	rm -f quilc build-output.log

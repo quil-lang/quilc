@@ -9,4 +9,5 @@
 set -ex
 
 docker rm -f quilc || true
+docker rm -f quilc-tests || true
 docker system prune -af || true
