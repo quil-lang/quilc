@@ -37,8 +37,8 @@
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
-    (("gate-blacklist") :type string :optional t :documentation "ignore these gates during count")
-    (("gate-whitelist") :type string :optional t :documentation "include only these gates during count")
+    (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
+    (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
@@ -169,18 +169,14 @@
     (finish-output *human-readable-stream*)))
 
 (defun print-gate-depth (lschedule)
-  (let ((depth (quil::lscheduler-calculate-depth lschedule
-                                                 :blacklist *gate-blacklist*
-                                                 :whitelist *gate-whitelist*)))
+  (let ((depth (quil::lscheduler-calculate-depth lschedule)))
     (setf (gethash "gate_depth" *statistics-dictionary*) depth)
     (format *human-readable-stream*
             "# Compiled gate depth: ~d~%"
             depth)))
 
 (defun print-gate-volume (lschedule)
-  (let ((volume (quil::lscheduler-calculate-volume lschedule
-                                                   :blacklist *gate-blacklist*
-                                                   :whitelist *gate-whitelist*)))
+  (let ((volume (quil::lscheduler-calculate-volume lschedule)))
     (setf (gethash "gate_volume" *statistics-dictionary*) volume)
     (format *human-readable-stream*
             "# Compiled gate volume: ~d~%"
@@ -262,7 +258,15 @@
                   *compute-runtime*)
           ;; calculate some statistics based on logical scheduling
           (let ((lschedule (make-instance 'quil::lscheduler-empty)))
-            (quil::append-instructions-to-lschedule lschedule processed-quil)
+            (dolist (instr processed-quil)
+              (when (and (not (member (quil::application-operator instr)
+                                      *gate-blacklist*
+                                      :test #'string=))
+                         (or (null *gate-whitelist*)
+                             (member (quil::application-operator instr)
+                                     *gate-whitelist*
+                                     :test #'string=)))
+                (quil::append-instruction-to-lschedule lschedule instr)))
             (when *compute-gate-depth*
               (print-gate-depth lschedule))
             (when *compute-gate-volume*
