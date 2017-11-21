@@ -1,13 +1,16 @@
 # Makefile for Docker images
 
+.PHONY: all
+all: quilc quilc-tests
+
 .PHONY: quilc
-quilc:
-	docker build -t docker.lab.rigetti.com/qcs/quilc -f Dockerfile ../
+quilc: Dockerfile
+	docker build -t quilc -f Dockerfile ../
 
 .PHONY: quilc-tests
-quilc-tests:
-	docker build -t docker.lab.rigetti.com/qcs/quilc-tests -f Dockerfile.test ../
+quilc-tests: Dockerfile.test
+	docker build -t quilc-tests -f Dockerfile.test ../
 
 .PHONY: clean
-clean:
-	./cleanup.sh
+clean: clean.sh
+	./clean.sh
