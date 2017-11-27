@@ -22,6 +22,7 @@
 (defparameter *gate-whitelist* nil)
 (defparameter *gate-blacklist* nil)
 (defparameter *without-pretty-printing* nil)
+(defparameter *ISA-descriptor* nil)
 (defparameter *verbose* (make-broadcast-stream))
 
 ;; NOTE: these can't have default values b/c they don't survive serialization
@@ -42,6 +43,7 @@
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
+    (("isa") :type string :optional t :documentation "set ISA to one of 8Q, 20Q, 16QMUX")
     (("help" #\? #\h) :optional t :documentation "print this help information and exit")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -90,6 +92,7 @@
                              (without-pretty-printing nil)
                              (verbose nil)
                              (json-serialize nil)
+                             (isa nil)
                              (help nil))
   (when help
     (show-help)
@@ -115,6 +118,17 @@
      (setf *json-stream* (make-broadcast-stream))
      (setf *human-readable-stream* *error-output*)
      (setf *quil-stream* *standard-output*)))
+  (setf *isa-descriptor*
+        (cond
+          ((or (null isa)
+               (string= isa "8Q"))
+           (quil::build-8Q-chip))
+          ((string= isa "20Q")
+           (quil::build-skew-rectangular-chip 0 4 5))
+          ((string= isa "16QMUX")
+           (quil::build-nQ-trivalent-chip 1 1 8 4))
+          (t
+           (quil::build-8Q-chip))))
   (setf *verbose*
         (when verbose *human-readable-stream*)))
 
@@ -236,7 +250,7 @@
     (let* ((program-text (slurp-lines))
            (program (quil::parse-quil program-text))
            (reference-program (quil::parse-quil program-text))
-           (chip-specification (quil::build-8Q-chip))
+           (chip-specification *isa-descriptor*)
            (quil::*compiler-noise-stream* *verbose*))
       ;; do the compilation
       (multiple-value-bind (initial-l2p processed-quil final-l2p topological-swaps)
