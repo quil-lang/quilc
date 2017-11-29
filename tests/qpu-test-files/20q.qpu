@@ -1,0 +1,109 @@
+{
+	id: {
+	    name: "20Q chip",
+	    version: "0.0",
+	    timestamp: "20171128151400"
+	},
+	logical-hardware: [
+	    [
+	        {},
+	        {},
+	        {},
+	        {
+	            dead: "true"
+	        },
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {},
+	        {
+	            dead: "true"
+	        },
+	        {},
+	        {},
+	        {},
+	        {}
+	    ],
+	    [
+	        {
+	            action-qubits: [0, 5]
+	        },
+	        {
+	            action-qubits: [0, 6]
+	        },
+	        {
+	            action-qubits: [1, 6]
+	        },
+	        {
+	            action-qubits: [1, 7]
+	        },
+	        {
+	            action-qubits: [2, 7]
+	        },
+	        {
+	            action-qubits: [2, 8]
+	        },
+	        {
+	            action-qubits: [3, 8]
+	        },
+	        {
+	            action-qubits: [3, 9]
+	        },
+	        {
+	            action-qubits: [4, 9]
+	        },
+	        {
+	            action-qubits: [5, 10]
+	        },
+	        {
+	            action-qubits: [6, 11],
+	            dead: "true"
+	        },
+	        {
+	            action-qubits: [7, 12],
+	            dead: "true"
+	        },
+	        {
+	            action-qubits: [8, 13],
+	            dead: "true"
+	        },
+	        {
+	            action-qubits: [9, 14]
+	        },
+	        {
+	            action-qubits: [10, 15]
+	        },
+	        {
+	            action-qubits: [10, 16]
+	        },
+	        {
+	            action-qubits: [11, 16]
+	        },
+	        {
+	            action-qubits: [11, 17]
+	        },
+	        {
+	            action-qubits: [12, 17]
+	        },
+	        {
+	            action-qubits: [12, 18]
+	        },
+	        {
+	            action-qubits: [13, 18]
+	        },
+	        {
+	            action-qubits: [13, 19]
+	        },
+	        {
+	            action-qubits: [14, 19]
+	        }
+	    ]
+	]
+}

@@ -43,7 +43,7 @@
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
-    (("isa") :type string :optional t :documentation "set ISA to one of 8Q, 20Q, 16QMUX")
+    (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
     (("help" #\? #\h) :optional t :documentation "print this help information and exit")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -127,8 +127,12 @@
            (quil::build-skew-rectangular-chip 0 4 5))
           ((string= isa "16QMUX")
            (quil::build-nQ-trivalent-chip 1 1 8 4))
+          ((probe-file isa)
+           (quil::qpu-hash-table-to-chip-specification
+            (with-open-file (s isa)
+              (yason:parse s))))
           (t
-           (quil::build-8Q-chip))))
+           (error "ISA descriptor does not name a known template or an extant file."))))
   (setf *verbose*
         (when verbose *human-readable-stream*)))
 
