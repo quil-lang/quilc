@@ -1,5 +1,9 @@
 # `quilc` release notes
 
+## Version 0.4.0
+
+* introduce --isa command-line option
+
 ## Version 0.3.0
 
 * add command line arguments
