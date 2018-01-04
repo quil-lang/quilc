@@ -1,0 +1,35 @@
+{
+	"id": {
+	    "name": "Mixed architecture chip",
+	    "version": "0.0",
+	    "timestamp": "20180104103600"
+	},
+	"logical-hardware": [
+	    [
+	        {
+                    "qubit-id": 0,
+                    "type": "Xhalves"
+                },
+	        {
+                    "qubit-id": 1
+                },
+	        {
+                    "qubit-id": 2
+                }
+	    ],
+	    [
+	        {
+	            "action-qubits": [0, 1],
+                    "type": "CZ"
+	        },
+	        {
+	            "action-qubits": [1, 2],
+                    "type": "ISWAP"
+	        },
+	        {
+	            "action-qubits": [2, 0],
+                    "type": "CPHASE"
+	        }
+            ]
+	]
+}
