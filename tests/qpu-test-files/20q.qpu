@@ -6,28 +6,67 @@
 	},
 	"logical-hardware": [
 	    [
-	        {},
-	        {},
-	        {},
 	        {
+                    "qubit-id": 0
+                },
+	        {
+                    "qubit-id": 1
+                },
+	        {
+                    "qubit-id": 2
+                },
+	        {
+                    "qubit-id": 3,
 	            "dead": "true"
 	        },
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {},
-	        {}
+	        {
+                    "qubit-id": 4
+                },
+	        {
+                    "qubit-id": 5
+                },
+	        {
+                    "qubit-id": 6
+                },
+	        {
+                    "qubit-id": 7
+                },
+	        {
+                    "qubit-id": 8
+                },
+	        {
+                    "qubit-id": 9
+                },
+	        {
+                    "qubit-id": 10
+                },
+	        {
+                    "qubit-id": 11
+                },
+	        {
+                    "qubit-id": 12
+                },
+	        {
+                    "qubit-id": 13
+                },
+	        {
+                    "qubit-id": 14
+                },
+	        {
+                    "qubit-id": 15
+                },
+	        {
+                    "qubit-id": 16
+                },
+	        {
+                    "qubit-id": 17
+                },
+	        {
+                    "qubit-id": 18
+                },
+	        {
+                    "qubit-id": 19
+                }
 	    ],
 	    [
 	        {
