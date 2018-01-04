@@ -24,6 +24,7 @@
 (defparameter *without-pretty-printing* nil)
 (defparameter *ISA-descriptor* nil)
 (defparameter *verbose* (make-broadcast-stream))
+(defparameter *protoquil* nil)
 
 ;; NOTE: these can't have default values b/c they don't survive serialization
 (defparameter *json-stream* (make-broadcast-stream))
@@ -44,6 +45,7 @@
     (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
+    (("protoquil" #\p) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\? #\h) :optional t :documentation "print this help information and exit")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -93,6 +95,7 @@
                              (verbose nil)
                              (json-serialize nil)
                              (isa nil)
+                             (protoquil nil)
                              (help nil))
   (when help
     (show-help)
@@ -109,6 +112,7 @@
         (when gate-whitelist
           (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
   (setf *topological-swaps* show-topological-overhead)
+  (setf *protoquil* protoquil)
   (cond
     (json-serialize
      (setf *json-stream* *standard-output*)
@@ -259,12 +263,27 @@
            (chip-specification *isa-descriptor*)
            (quil::*compiler-noise-stream* *verbose*))
       ;; do the compilation
-      (multiple-value-bind (initial-l2p processed-quil final-l2p topological-swaps)
+      (multiple-value-bind (processed-program topological-swaps)
           (quil::compiler-hook program chip-specification)
+        
+        ;; compiler-hook, by default, outputs the result of a program compilation
+        ;; with MEASUREs and a HALT instruction appended. if we're supposed to
+        ;; output protoQuil, we need to strip these instructions from the output,
+        ;; trusting the user to append these on their own.
+        (when *protoquil*
+          (setf (quil::parsed-program-executable-code processed-program)
+                (coerce
+                 (loop :for instr :across (quil::parsed-program-executable-code processed-program)
+                       :unless (or (typep instr 'quil::measure)
+                                   (typep instr 'quil::halt))
+                         :collect instr)
+                 'vector)))
+        
         ;; now that we've compiled the program, we have various things to output
         ;; one thing we're always going to want to output is the program itself.
-        (let ((program-as-string (with-output-to-string (s)
-                                   (print-program initial-l2p processed-quil final-l2p s))))
+        (let ((program-as-string
+                (with-output-to-string (s)
+                  (quil::print-parsed-program processed-program s))))
           (setf (gethash "processed_program" *statistics-dictionary*)
                 program-as-string)
           (write-string program-as-string *quil-stream*))
@@ -273,20 +292,22 @@
         (when *topological-swaps*
           (print-topological-swap-count topological-swaps))
         
-        (when (or *compute-gate-depth*
-                  *compute-gate-volume*
-                  *compute-runtime*)
+        (when (and *protoquil*
+                   (or *compute-gate-depth*
+                       *compute-gate-volume*
+                       *compute-runtime*))
           ;; calculate some statistics based on logical scheduling
           (let ((lschedule (make-instance 'quil::lscheduler-empty)))
-            (dolist (instr processed-quil)
-              (when (and (not (member (quil::application-operator instr)
-                                      *gate-blacklist*
-                                      :test #'string=))
-                         (or (null *gate-whitelist*)
-                             (member (quil::application-operator instr)
-                                     *gate-whitelist*
-                                     :test #'string=)))
-                (quil::append-instruction-to-lschedule lschedule instr)))
+            (loop :for instr :across (quil::parsed-program-executable-code processed-program)
+                  :when (and (typep instr 'quil::gate-application)
+                             (not (member (quil::application-operator instr)
+                                          *gate-blacklist*
+                                          :test #'string=))
+                             (or (null *gate-whitelist*)
+                                 (member (quil::application-operator instr)
+                                         *gate-whitelist*
+                                         :test #'string=)))
+                    :do (quil::append-instruction-to-lschedule lschedule instr))
             (when *compute-gate-depth*
               (print-gate-depth lschedule))
             (when *compute-gate-volume*
@@ -294,7 +315,16 @@
             (when *compute-runtime*
               (print-program-runtime lschedule chip-specification))))
         
-        (when *compute-matrix-reps*
-          (print-matrix-representations initial-l2p processed-quil final-l2p reference-program))
+        (when (and *protoquil* *compute-matrix-reps*)
+          (let ((processed-quil (quil::parsed-program-executable-code processed-program))
+                (initial-l2p (with-input-from-string (s (quil::pragma-freeform-string (aref (quil::parsed-program-executable-code processed-program) 0)))
+                               (read s)))
+                (final-l2p (with-input-from-string (s (quil::pragma-freeform-string (aref (quil::parsed-program-executable-code processed-program)
+                                                                                    (1- (length (quil::parsed-program-executable-code processed-program))))))
+                               (read s))))
+            (print-matrix-representations initial-l2p
+                                          (coerce processed-quil 'list)
+                                          final-l2p
+                                          reference-program)))
         
         (publish-json-statistics)))))

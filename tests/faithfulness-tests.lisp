@@ -21,4 +21,4 @@
       (with-open-file (*standard-input* file :direction :input)
         (locally
             (declare #+sbcl(sb-ext:muffle-conditions common-lisp:style-warning))
-          (quilc::%entry-point (list "quilc" "-m")))))))
+          (quilc::%entry-point (list "quilc" "-mp")))))))
