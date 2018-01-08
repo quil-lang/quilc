@@ -1,5 +1,9 @@
 # `quilc` release notes
 
+## Version 0.5.0
+
+No new features; just some fiddling to match the new requirements of the underlying CL-Quil library.
+
 ## Version 0.4.0
 
 * introduce --isa command-line option
