@@ -134,7 +134,9 @@
           (t
            (error "ISA descriptor does not name a known template or an extant file."))))
   (setf *verbose*
-        (when verbose *human-readable-stream*)))
+        (cond
+          (verbose *human-readable-stream*)
+          (t (make-broadcast-stream)))))
 
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p program)
   (let* ((original-matrix (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program))
