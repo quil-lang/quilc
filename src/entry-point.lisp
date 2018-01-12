@@ -13,6 +13,47 @@
 
 (in-package #:quilc)
 
+
+;; load and store bits of version information at compile time
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun system-version (system-designator)
+    (let ((sys (asdf:find-system system-designator nil)))
+      (if (and sys (slot-boundp sys 'asdf:version))
+          (asdf:component-version sys)
+          "unknown")))
+
+  (defun git-hash (system)
+    "Get the short git hash of the system SYSTEM."
+    (let ((sys-path (namestring (asdf:system-source-directory system))))
+      (multiple-value-bind (output err-output status)
+          (uiop:run-program `("git" "-C" ,sys-path "rev-parse" "--short" "HEAD")
+                            :output '(:string :stripped t)
+                            :ignore-error-status t)
+        (declare (ignore err-output))
+        (if (not (zerop status))
+            "unknown"
+            output)))))
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (alexandria:define-constant +QUILC-VERSION+
+      (system-version '#:quilc)
+    :test #'string=
+    :documentation "The version of the quilc application.")
+
+  (alexandria:define-constant +CL-QUIL-VERSION+
+      (system-version '#:cl-quil)
+    :test #'string=
+    :documentation "The version of the CL-Quil library.")
+
+  (alexandria:define-constant +GIT-HASH+
+      (git-hash '#:quilc)
+    :test #'string=
+    :documentation "The git hash of the quilc repo.")
+  )
+
+
+
+
 (defparameter *program-name* "quilc")
 (defparameter *compute-gate-depth* nil)
 (defparameter *compute-runtime* nil)
@@ -46,7 +87,8 @@
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
     (("protoquil" #\p) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
-    (("help" #\? #\h) :optional t :documentation "print this help information and exit")))
+    (("help" #\? #\h) :optional t :documentation "print this help information and exit")
+    (("version" #\v) :optional t :documentation "print version information")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
@@ -84,6 +126,9 @@
   (format t "Options:~%")
   (command-line-arguments:show-option-help *option-spec* :sort-names t))
 
+(defun show-version ()
+  (format t "~A (cl-quil: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
+
 (defun process-options (&key (compute-gate-depth nil)
                              (compute-gate-volume nil)
                              (compute-runtime nil)
@@ -96,9 +141,13 @@
                              (json-serialize nil)
                              (isa nil)
                              (protoquil nil)
+                             (version nil)
                              (help nil))
   (when help
     (show-help)
+    (uiop:quit 0))
+  (when version
+    (show-version)
     (uiop:quit 0))
   (setf *compute-gate-depth* compute-gate-depth)
   (setf *compute-gate-volume* compute-gate-volume)
