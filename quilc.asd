@@ -12,7 +12,7 @@
                #:command-line-arguments
                #:yason
                (:version #:magicl "0.1.0")
-               (:version #:cl-quil "0.11.0")
+               (:version #:cl-quil "0.11.1")
                #:uiop)
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
