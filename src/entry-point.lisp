@@ -83,7 +83,7 @@
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
     (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
-    (("verbose" #\v) :type boolean :optional t :documentation "verbose compiler trace output")
+    (("verbose") :type boolean :optional t :documentation "verbose compiler trace output")
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
     (("protoquil" #\p) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
