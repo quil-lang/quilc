@@ -13,11 +13,15 @@
                #:yason
                (:version #:magicl "0.1.0")
                (:version #:cl-quil "0.11.1")
-               #:uiop)
+               #:uiop
+               #:hunchentoot
+               )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
                       (funcall compile)))
   :serial t
   :components ((:file "package")
+               (:file "server")
+               (:file "printers")
                (:file "entry-point")))
