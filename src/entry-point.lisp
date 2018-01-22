@@ -157,6 +157,18 @@
       (format *error-output* "~&! ! ! Error: ~A~%" c)
       (uiop:quit 1))))
 
+(defun %entry-point (argv)
+  ;; grab the CLI arguments
+  (setf *program-name* (pop argv))
+  
+  (command-line-arguments:handle-command-line
+       *option-spec*
+       'process-options
+       :command-line argv
+       :name "quilc"
+       :positional-arity 0
+       :rest-arity nil))
+
 (defun process-options (&key (compute-gate-depth nil)
                              (compute-gate-volume nil)
                              (compute-runtime nil)
