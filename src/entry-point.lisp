@@ -76,10 +76,10 @@
 (defparameter *statistics-dictionary* (make-hash-table :test #'equal))
 
 (defparameter *option-spec*
-  '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth")
+  '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -p")
     (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume")
-    (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime")
-    (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison")
+    (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -p")
+    (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -p")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
     (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
