@@ -115,23 +115,19 @@
     ;;   quil-instructions: string,
     ;;   isa: string }
     ;; we decode what we need, but we keep the object around to pass through.
-    (let* ((quil-program (quil::safely-parse-quil-string (gethash "quil-instructions" json)))
+    (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
+                                  (gethash "quil-instructions" json)))
+           (quil-program (quil::safely-parse-quil-string quil-instructions))
            (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
                                 (gethash "isa" json)))
            (*protoquil* t)
            (*statistics-dictionary* (process-program quil-program chip-specification)))
 
-      ;; store the old program and isa for later
-      (setf (gethash "uncompiled-program" *statistics-dictionary*)
-            (gethash "quil-instructions" json))
-      (setf (gethash "isa" *statistics-dictionary*)
-            (gethash "isa" json))
       ;; update the program with the compiled version
-      (setf (gethash "quil-instructions" json)
+      (setf (gethash "compiled-quil" json)
             (gethash "processed_program" *statistics-dictionary*))
       ;; remove the compiled program from the metadata
       (remhash "processed_program" *statistics-dictionary*)
-      (remhash "isa" json)
       ;; if we're in protoquil mode, update the readout addresses
       (when *protoquil*
         (let ((l2p (gethash "final-rewiring" *statistics-dictionary*)))
