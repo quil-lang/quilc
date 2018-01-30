@@ -271,12 +271,10 @@
          (*statistics-dictionary* (make-hash-table :test 'equal)))
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
-        (quil::compiler-hook program chip-specification)
+        (quil::compiler-hook program chip-specification :protoquil *protoquil*)
       
-      ;; compiler-hook, by default, outputs the result of a program compilation
-      ;; with MEASUREs and a HALT instruction appended. if we're supposed to
-      ;; output protoQuil, we need to strip these instructions from the output,
-      ;; trusting the user to append these on their own.
+      ;; if we're supposed to output protoQuil, we need to strip the final HALT
+      ;; instructios from the output
       (when *protoquil*
         (setf (quil::parsed-program-executable-code processed-program)
               (coerce
@@ -285,8 +283,7 @@
                               (string= "CURRENT_REWIRING" (first (cl-quil::pragma-words instr))))
                        :do (setf (gethash "final-rewiring" *statistics-dictionary*)
                                  (with-input-from-string (s (cl-quil::pragma-freeform-string instr)) (read s)))
-                     :unless (or (typep instr 'quil::measure)
-                                 (typep instr 'quil::halt))
+                     :unless (typep instr 'quil::halt)
                        :collect instr)
                'vector)))
       
