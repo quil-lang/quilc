@@ -91,6 +91,7 @@
     (("help" #\? #\h) :optional t :documentation "print this help information and exit")
     (("server-mode" #\S) :type boolean :optional t :documentation "run as a server")
     (("port") :type integer :optional t :documentation "port to run the server on")
+    (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
     (("version" #\v) :optional t :documentation "print version information")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -184,6 +185,7 @@
                              (version nil)
                              (server-mode nil)
                              (port *server-port*)
+                             time-limit
                              (help nil))
   (when help
     (show-help)
@@ -191,6 +193,9 @@
   (when version
     (show-version)
     (uiop:quit 0))
+  
+  (when (plusp time-limit)
+    (setf *time-limit* (/ time-limit 1000.0d0)))
   
   (setf *compute-gate-depth* compute-gate-depth)
   (setf *compute-gate-volume* compute-gate-volume)

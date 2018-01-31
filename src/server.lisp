@@ -9,7 +9,8 @@
 (defvar *app* nil)
 (defparameter *server-port* 6000)
 (defparameter *server-host* "0.0.0.0")
-(defparameter *time-limit* 60)
+(defparameter *time-limit* 60
+  "Timeout in seconds.")
 
 (declaim (special *protoquil*))
 
@@ -115,28 +116,29 @@
     ;;   quil-instructions: string,
     ;;   isa: string }
     ;; we decode what we need, but we keep the object around to pass through.
-    (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
-                                  (gethash "quil-instructions" json)))
-           (quil-program (quil::safely-parse-quil-string quil-instructions))
-           (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
-                                (gethash "isa" json)))
-           (*protoquil* t)
-           (*statistics-dictionary* (process-program quil-program chip-specification)))
+    (with-timeout
+        (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
+                                      (gethash "quil-instructions" json)))
+               (quil-program (quil::safely-parse-quil-string quil-instructions))
+               (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
+                                    (gethash "isa" json)))
+               (*protoquil* t)
+               (*statistics-dictionary* (process-program quil-program chip-specification)))
 
-      ;; update the program with the compiled version
-      (setf (gethash "compiled-quil" json)
-            (gethash "processed_program" *statistics-dictionary*))
-      ;; remove the compiled program from the metadata
-      (remhash "processed_program" *statistics-dictionary*)
-      ;; if we're in protoquil mode, update the readout addresses
-      (when *protoquil*
-        (let ((l2p (gethash "final-rewiring" *statistics-dictionary*)))
-          (setf (gethash "addresses" json)
-                (mapcar (lambda (index) (quil::apply-rewiring-l2p l2p index))
-                        (gethash "addresses" json)))))
-      ;; store the statistics alongside the return data
-      (setf (gethash "metadata" json)
-            *statistics-dictionary*)
-      ;; finally, return the string-ified JSON
-      (with-output-to-string (s)
-        (yason:encode json s)))))
+          ;; update the program with the compiled version
+          (setf (gethash "compiled-quil" json)
+                (gethash "processed_program" *statistics-dictionary*))
+          ;; remove the compiled program from the metadata
+          (remhash "processed_program" *statistics-dictionary*)
+          ;; if we're in protoquil mode, update the readout addresses
+          (when *protoquil*
+            (let ((l2p (gethash "final-rewiring" *statistics-dictionary*)))
+              (setf (gethash "addresses" json)
+                    (mapcar (lambda (index) (quil::apply-rewiring-l2p l2p index))
+                            (gethash "addresses" json)))))
+          ;; store the statistics alongside the return data
+          (setf (gethash "metadata" json)
+                *statistics-dictionary*)
+          ;; finally, return the string-ified JSON
+          (with-output-to-string (s)
+            (yason:encode json s))))))
