@@ -131,11 +131,13 @@
           ;; remove the compiled program from the metadata
           (remhash "processed_program" *statistics-dictionary*)
           ;; if we're in protoquil mode, update the readout addresses
-          (when *protoquil*
+          (when (and *protoquil*
+                     (string= "MULTISHOT_MEASURE" (gethash "type" json))
+                     (gethash "qubits" json))
             (let ((l2p (gethash "final-rewiring" *statistics-dictionary*)))
-              (setf (gethash "addresses" json)
+              (setf (gethash "qubits" json)
                     (mapcar (lambda (index) (quil::apply-rewiring-l2p l2p index))
-                            (gethash "addresses" json)))))
+                            (gethash "qubits" json)))))
           ;; store the statistics alongside the return data
           (setf (gethash "metadata" json)
                 *statistics-dictionary*)
