@@ -1,5 +1,11 @@
 # `quilc` release notes
 
+## Version 0.7.1
+
+* improved protoquil support
+* support for server-mode timeouts
+* new server communication schema
+
 ## Version 0.7.0
 
 * introduce --server-mode
