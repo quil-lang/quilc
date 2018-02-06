@@ -1,11 +1,11 @@
-# Heap space for QVM in MiB.
-QVM_WORKSPACE ?= 2048
 
 all: quilc
 
-quilc:
+deps:
+	sbcl --quit --eval "(ql:quickload ':quilc)"
+
+quilc: src/entry-point.lisp src/package.lisp src/printers.lisp src/server.lisp
 	buildapp --output quilc \
-		 --dynamic-space-size $(QVM_WORKSPACE) \
 		 --asdf-tree "~/quicklisp/dists/quicklisp/software/" \
 		 --asdf-tree "./../" \
 		 --load-system quilc \
@@ -14,7 +14,6 @@ quilc:
 
 quilc-unsafe:
 	buildapp --output quilc \
-		 --dynamic-space-size $(QVM_WORKSPACE) \
 		 --asdf-tree "~/quicklisp/dists/quicklisp/software/" \
 		 --asdf-tree "./../" \
 		 --load-system quilc \
