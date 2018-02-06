@@ -284,8 +284,7 @@
         (setf (quil::parsed-program-executable-code processed-program)
               (coerce
                (loop :for instr :across (quil::parsed-program-executable-code processed-program)
-                     :when (and (typep instr 'quil::pragma)
-                              (string= "CURRENT_REWIRING" (first (cl-quil::pragma-words instr))))
+                     :when (and (typep instr 'quil::pragma-current-rewiring))
                        :do (setf (gethash "final-rewiring" *statistics-dictionary*)
                                  (with-input-from-string (s (cl-quil::pragma-freeform-string instr)) (read s)))
                      :unless (typep instr 'quil::halt)
