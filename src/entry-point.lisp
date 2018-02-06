@@ -286,7 +286,7 @@
                (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                      :when (and (typep instr 'quil::pragma-current-rewiring))
                        :do (setf (gethash "final-rewiring" *statistics-dictionary*)
-                                 (with-input-from-string (s (cl-quil::pragma-freeform-string instr)) (read s)))
+                                 (quil::make-rewiring-from-string (cl-quil::pragma-freeform-string instr)))
                      :unless (typep instr 'quil::halt)
                        :collect instr)
                'vector)))
@@ -329,11 +329,13 @@
       
       (when (and *protoquil* *compute-matrix-reps*)
         (let ((processed-quil (quil::parsed-program-executable-code processed-program))
-              (initial-l2p (with-input-from-string (s (quil::pragma-freeform-string (aref (quil::parsed-program-executable-code processed-program) 0)))
-                             (read s)))
-              (final-l2p (with-input-from-string (s (quil::pragma-freeform-string (aref (quil::parsed-program-executable-code processed-program)
-                                                                                        (1- (length (quil::parsed-program-executable-code processed-program))))))
-                           (read s))))
+              (initial-l2p (quil::make-rewiring-from-string
+                            (quil::pragma-freeform-string
+                             (aref (quil::parsed-program-executable-code processed-program) 0))))
+              (final-l2p (quil::make-rewiring-from-string
+                          (quil::pragma-freeform-string
+                           (aref (quil::parsed-program-executable-code processed-program)
+                                 (1- (length (quil::parsed-program-executable-code processed-program))))))))
           (print-matrix-representations initial-l2p
                                         (coerce processed-quil 'list)
                                         final-l2p
