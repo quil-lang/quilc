@@ -4,32 +4,16 @@
 	    "version": "0.0",
 	    "timestamp": "20180104103600"
 	},
-	"logical-hardware": [
-	    [
-	        {
-                    "qubit-id": 0,
-                    "type": "Xhalves"
-                },
-	        {
-                    "qubit-id": 1
-                },
-	        {
-                    "qubit-id": 2
-                }
-	    ],
-	    [
-	        {
-	            "action-qubits": [0, 1],
-                    "type": "CZ"
-	        },
-	        {
-	            "action-qubits": [1, 2],
-                    "type": "ISWAP"
-	        },
-	        {
-	            "action-qubits": [2, 0],
-                    "type": "CPHASE"
-	        }
-            ]
+	"isa": [
+	    {
+	        "0": { "type": "Xhalves" },
+                "1": {},
+                "2": {}
+	    },
+	    {
+                "0-1": { "type": "CZ" },
+                "1-2": { "type": "ISWAP" },
+                "0-2": { "type": "CPHASE" }
+            }
 	]
 }

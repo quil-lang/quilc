@@ -133,6 +133,14 @@
 (defun show-version ()
   (format t "~A (cl-quil: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
 
+(defun maybe-expand-key (str)
+  "Utility function used as the :object-key-fn for yason:parse."
+  (let* ((*read-eval* nil)
+         (parsed-list (mapcar #'read-from-string (split-sequence:split-sequence #\- str))))
+    (if (every #'integerp parsed-list)
+        parsed-list
+        str)))
+
 
 
 
@@ -254,7 +262,7 @@
                ((probe-file isa)
                 (quil::qpu-hash-table-to-chip-specification
                  (with-open-file (s isa)
-                   (yason:parse s))))
+                   (yason:parse s :object-key-fn #'maybe-expand-key))))
                (t
                 (error "ISA descriptor does not name a known template or an extant file."))))
        (setf *verbose*

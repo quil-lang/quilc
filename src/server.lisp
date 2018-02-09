@@ -107,7 +107,7 @@
          (user-id (tbnl:header-in* ':X-USER-ID request))
          (data (hunchentoot:raw-post-data :request request
                                           :force-text t))
-         (json (yason:parse data)))
+         (json (yason:parse data :object-key-fn #'maybe-expand-key)))
     (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" api-key user-id)
     ;; we expect to get the guts of a Canopy POST:
     ;; { type: string,

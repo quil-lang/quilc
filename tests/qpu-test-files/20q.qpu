@@ -4,144 +4,53 @@
 	    "version": "0.0",
 	    "timestamp": "20171128151400"
 	},
-	"logical-hardware": [
-	    [
-	        {
-                    "qubit-id": 0
-                },
-	        {
-                    "qubit-id": 1
-                },
-	        {
-                    "qubit-id": 2
-                },
-	        {
-                    "qubit-id": 3,
-	            "dead": "true"
-	        },
-	        {
-                    "qubit-id": 4
-                },
-	        {
-                    "qubit-id": 5
-                },
-	        {
-                    "qubit-id": 6
-                },
-	        {
-                    "qubit-id": 7
-                },
-	        {
-                    "qubit-id": 8
-                },
-	        {
-                    "qubit-id": 9
-                },
-	        {
-                    "qubit-id": 10
-                },
-	        {
-                    "qubit-id": 11
-                },
-	        {
-                    "qubit-id": 12
-                },
-	        {
-                    "qubit-id": 13
-                },
-	        {
-                    "qubit-id": 14
-                },
-	        {
-                    "qubit-id": 15
-                },
-	        {
-                    "qubit-id": 16
-                },
-	        {
-                    "qubit-id": 17
-                },
-	        {
-                    "qubit-id": 18
-                },
-	        {
-                    "qubit-id": 19
-                }
-	    ],
-	    [
-	        {
-	            "action-qubits": [0, 5]
-	        },
-	        {
-	            "action-qubits": [0, 6]
-	        },
-	        {
-	            "action-qubits": [1, 6]
-	        },
-	        {
-	            "action-qubits": [1, 7]
-	        },
-	        {
-	            "action-qubits": [2, 7]
-	        },
-	        {
-	            "action-qubits": [2, 8]
-	        },
-	        {
-	            "action-qubits": [3, 8]
-	        },
-	        {
-	            "action-qubits": [3, 9]
-	        },
-	        {
-	            "action-qubits": [4, 9]
-	        },
-	        {
-	            "action-qubits": [5, 10]
-	        },
-	        {
-	            "action-qubits": [6, 11],
-	            "dead": "true"
-	        },
-	        {
-	            "action-qubits": [7, 12],
-	            "dead": "true"
-	        },
-	        {
-	            "action-qubits": [8, 13],
-	            "dead": "true"
-	        },
-	        {
-	            "action-qubits": [9, 14]
-	        },
-	        {
-	            "action-qubits": [10, 15],
-	            "dead": "true"
-	        },
-	        {
-	            "action-qubits": [10, 16]
-	        },
-	        {
-	            "action-qubits": [11, 16]
-	        },
-	        {
-	            "action-qubits": [11, 17]
-	        },
-	        {
-	            "action-qubits": [12, 17]
-	        },
-	        {
-	            "action-qubits": [12, 18]
-	        },
-	        {
-	            "action-qubits": [13, 18]
-	        },
-	        {
-	            "action-qubits": [13, 19]
-	        },
-	        {
-	            "action-qubits": [14, 19]
-	        }
-	    ]
+	"isa": [
+	    {
+                "0": {},
+                "1": {},
+                "2": {},
+                "3": { "dead": "true" },
+                "4": {},
+                "5": {},
+                "6": {},
+                "7": {},
+                "8": {},
+                "9": {},
+                "10": {},
+                "11": {},
+                "12": {},
+                "13": {},
+                "14": {},
+                "15": {},
+                "16": {},
+                "17": {},
+                "18": {},
+                "19": {}
+	    },
+	    {
+                "0-5": {},
+                "0-6": {},
+                "1-6": {},
+                "1-7": {},
+                "2-7": {},
+                "2-8": {},
+                "3-8": {},
+                "3-9": {},
+                "4-9": {},
+                "5-10": {},
+                "6-11": {},
+                "7-12": {},
+                "8-13": {},
+                "9-14": {},
+                "10-15": {},
+                "10-16": {},
+                "11-16": {},
+                "11-17": {},
+                "12-17": {},
+                "12-18": {},
+                "13-18": {},
+                "13-19": {},
+                "14-19": {}
+	    }
 	]
 }
