@@ -319,7 +319,8 @@
       (when (and *protoquil*
                  (or *compute-gate-depth*
                      *compute-gate-volume*
-                     *compute-runtime*))
+                     *compute-runtime*
+                     *compute-fidelity*))
         ;; calculate some statistics based on logical scheduling
         (let ((lschedule (make-instance 'quil::lscheduler-empty)))
           (loop :for instr :across (quil::parsed-program-executable-code processed-program)

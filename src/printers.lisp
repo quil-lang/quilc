@@ -81,7 +81,7 @@
 (defun print-program-fidelity (lschedule chip-specification)
   (let ((fidelity (quil::lscheduler-calculate-fidelity lschedule
                                                        chip-specification)))
-    (setf (gethash "program_fidelity" *statistics-dictionary*) duration)
+    (setf (gethash "program_fidelity" *statistics-dictionary*) fidelity)
     (format *human-readable-stream*
             "# Estimated compiled program fidelity: ~5d~%"
             fidelity)))
