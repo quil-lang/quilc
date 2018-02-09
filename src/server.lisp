@@ -121,7 +121,7 @@
                                       (gethash "quil-instructions" json)))
                (quil-program (quil::safely-parse-quil-string quil-instructions))
                (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
-                                    (gethash "isa" json)))
+                                    (gethash "target-device" json)))
                (*protoquil* t)
                (*statistics-dictionary* (process-program quil-program chip-specification)))
 
