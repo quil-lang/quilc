@@ -57,6 +57,7 @@
 (defparameter *program-name* "quilc")
 (defparameter *compute-gate-depth* nil)
 (defparameter *compute-runtime* nil)
+(defparameter *compute-fidelity* nil)
 (defparameter *compute-matrix-reps* nil)
 (defparameter *topological-swaps* nil)
 (defparameter *compute-gate-volume* nil)
@@ -79,6 +80,7 @@
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -p")
     (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -p")
+    (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -p")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
@@ -181,6 +183,7 @@
 (defun process-options (&key (compute-gate-depth nil)
                              (compute-gate-volume nil)
                              (compute-runtime nil)
+                             (compute-fidelity nil)
                              (compute-matrix-reps nil)
                              (show-topological-overhead nil)
                              (gate-blacklist nil)
@@ -208,6 +211,7 @@
   (setf *compute-gate-depth* compute-gate-depth)
   (setf *compute-gate-volume* compute-gate-volume)
   (setf *compute-runtime* compute-runtime)
+  (setf *compute-fidelity* compute-fidelity)
   (setf *compute-matrix-reps* compute-matrix-reps)
   (setf *without-pretty-printing* without-pretty-printing)
   (setf *gate-blacklist* 
@@ -333,7 +337,9 @@
           (when *compute-gate-volume*
             (print-gate-volume lschedule))
           (when *compute-runtime*
-            (print-program-runtime lschedule chip-specification))))
+            (print-program-runtime lschedule chip-specification))
+          (when *compute-fidelity*
+            (print-program-fidelity lschedule chip-specification))))
       
       (when (and *protoquil* *compute-matrix-reps*)
         (let ((processed-quil (quil::parsed-program-executable-code processed-program))

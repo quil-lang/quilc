@@ -78,6 +78,14 @@
             "# Compiled program duration: ~5d~%"
             duration)))
 
+(defun print-program-fidelity (lschedule chip-specification)
+  (let ((fidelity (quil::lscheduler-calculate-fidelity lschedule
+                                                       chip-specification)))
+    (setf (gethash "program_fidelity" *statistics-dictionary*) duration)
+    (format *human-readable-stream*
+            "# Estimated compiled program fidelity: ~5d~%"
+            fidelity)))
+
 (defun print-topological-swap-count (topological-swaps)
   (setf (gethash "topological_swaps" *statistics-dictionary*) topological-swaps)
   (format *human-readable-stream*
