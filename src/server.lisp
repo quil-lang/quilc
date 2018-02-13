@@ -107,6 +107,7 @@
          (user-id (tbnl:header-in* ':X-USER-ID request))
          (data (hunchentoot:raw-post-data :request request
                                           :force-text t))
+         (pure-json (yason:parse data))
          (json (yason:parse data :object-key-fn #'maybe-expand-key)))
     (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" api-key user-id)
     ;; we expect to get the guts of a Canopy POST:
@@ -141,6 +142,9 @@
           ;; store the statistics alongside the return data
           (setf (gethash "metadata" json)
                 *statistics-dictionary*)
+          ;; restore a version of the ISA without any funky deserialization
+          (setf (gethash "target-device" json)
+                (gethash "target-device" pure-json))
           ;; finally, return the string-ified JSON
           (with-output-to-string (s)
             (yason:encode json s))))))
