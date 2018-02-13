@@ -61,6 +61,7 @@
 (defparameter *compute-matrix-reps* nil)
 (defparameter *topological-swaps* nil)
 (defparameter *compute-gate-volume* nil)
+(defparameter *compute-2Q-gate-depth* nil)
 (defparameter *gate-whitelist* nil)
 (defparameter *gate-blacklist* nil)
 (defparameter *without-pretty-printing* nil)
@@ -81,6 +82,7 @@
     (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -p")
     (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity")
+    (("compute-2Q-gate-depth" #\2) :type boolean :optional t :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -p")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
@@ -185,6 +187,7 @@
                              (compute-runtime nil)
                              (compute-fidelity nil)
                              (compute-matrix-reps nil)
+                             (compute-2Q-gate-depth nil)
                              (show-topological-overhead nil)
                              (gate-blacklist nil)
                              (gate-whitelist nil)
@@ -213,6 +216,7 @@
   (setf *compute-runtime* compute-runtime)
   (setf *compute-fidelity* compute-fidelity)
   (setf *compute-matrix-reps* compute-matrix-reps)
+  (setf *compute-2Q-gate-depth* compute-2Q-gate-depth)
   (setf *without-pretty-printing* without-pretty-printing)
   (setf *gate-blacklist* 
         (when gate-blacklist
@@ -336,6 +340,14 @@
             (print-program-runtime lschedule chip-specification))
           (when *compute-fidelity*
             (print-program-fidelity lschedule chip-specification))))
+      
+      (when (and *protoquil* *compute-2Q-gate-depth*)
+        (let ((lschedule (make-instance 'quil::lscheduler-empty)))
+          (loop :for instr :across (quil::parsed-program-executable-code processed-program)
+                :when (and (typep instr 'quil::gate-application)
+                           (<= 2 (length (quil::application-arguments instr))))
+                  :do (quil::append-instruction-to-lschedule lschedule instr))
+          (print-2Q-gate-depth lschedule)))
       
       (when (and *protoquil* *compute-matrix-reps*)
         (let ((processed-quil (quil::parsed-program-executable-code processed-program))

@@ -67,6 +67,13 @@
             "# Compiled gate depth: ~d~%"
             depth)))
 
+(defun print-2Q-gate-depth (lschedule)
+  (let ((depth (quil::lscheduler-calculate-depth lschedule)))
+    (setf (gethash "multiqubit_gate_depth" *statistics-dictionary*) depth)
+    (format *human-readable-stream*
+            "# Compiled multiqubit gate depth: ~d~%"
+            depth)))
+
 (defun print-gate-volume (lschedule)
   (let ((volume (quil::lscheduler-calculate-volume lschedule)))
     (setf (gethash "gate_volume" *statistics-dictionary*) volume)
