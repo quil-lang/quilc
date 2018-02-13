@@ -7,6 +7,10 @@
 
 (in-package #:quilc)
 
+
+(declaim (special *without-pretty-printing*))
+
+
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p original-matrix)
   (let* ((initial-l2p (quil::trim-rewiring initial-l2p))
          (final-l2p (quil::trim-rewiring final-l2p))
@@ -92,13 +96,14 @@
           "# SWAPs incurred by topological considerations: ~d~%"
           topological-swaps))
 
-(defun print-program (initial-l2p processed-quil final-l2p &optional (stream *standard-output*))
-  (let ((*print-pretty* nil))
-    (format stream "PRAGMA EXPECTED_REWIRING \"~s\"~%" initial-l2p))
-  (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
-    (print-quil-list processed-quil stream))
-  (let ((*print-pretty* nil))
-    (format stream "PRAGMA CURRENT_REWIRING \"~s\"~%" final-l2p)))
+(defun print-program (processed-program &optional (stream *standard-output*))
+  (let ((program-as-string
+          (with-output-to-string (s)
+            (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
+              (quil::print-parsed-program processed-program s)))))
+    (setf (gethash "processed_program" *statistics-dictionary*)
+          program-as-string)
+    (write-string program-as-string stream)))
 
 (defun publish-json-statistics ()
   (yason:encode *statistics-dictionary* *json-stream*)

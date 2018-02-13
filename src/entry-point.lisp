@@ -305,12 +305,7 @@
       
       ;; now that we've compiled the program, we have various things to output
       ;; one thing we're always going to want to output is the program itself.
-      (let ((program-as-string
-              (with-output-to-string (s)
-                (quil::print-parsed-program processed-program s))))
-        (setf (gethash "processed_program" *statistics-dictionary*)
-              program-as-string)
-        (write-string program-as-string *quil-stream*))
+      (print-program processed-program *quil-stream*)
       
       
       (when *topological-swaps*
