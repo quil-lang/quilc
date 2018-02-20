@@ -8,7 +8,10 @@
 (in-package #:quilc)
 
 
-(declaim (special *without-pretty-printing*))
+(declaim (special *without-pretty-printing*
+                  *statistics-dictionary*
+                  *human-readable-stream*
+                  *json-stream*))
 
 
 (defun print-matrix-representations (initial-l2p processed-quil final-l2p original-matrix)

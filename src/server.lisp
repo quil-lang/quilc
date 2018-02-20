@@ -12,7 +12,8 @@
 (defparameter *time-limit* 60
   "Timeout in seconds.")
 
-(declaim (special *protoquil*))
+(declaim (special *protoquil*
+                  *statistics-dictionary*))
 
 
 (defmacro with-timeout (&body body)
