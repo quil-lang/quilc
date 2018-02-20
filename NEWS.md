@@ -1,5 +1,12 @@
 # `quilc` release notes
 
+## Version 0.8.0
+
+* added options to calculate fidelity and multiqubit gate depth
+* updated server-mode payloads to match Forest 1.3 spec
+* updated QPU parser to match new file format
+* added Makefile conveniences: source dependencies and `make deps`
+
 ## Version 0.7.1
 
 * improved protoquil support
