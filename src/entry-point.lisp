@@ -55,6 +55,7 @@
 
 
 (defparameter *program-name* "quilc")
+(defparameter *print-logical-schedule* nil)
 (defparameter *compute-gate-depth* nil)
 (defparameter *compute-runtime* nil)
 (defparameter *compute-fidelity* nil)
@@ -92,6 +93,7 @@
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     (("verbose") :type boolean :optional t :documentation "verbose compiler trace output")
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
+    (("print-logical-schedule" #\s) :type boolean :optional t :documentation "include logically parallelized schedule in JSON output; requires -p")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
     (("protoquil" #\p) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\? #\h) :optional t :documentation "print this help information and exit")
@@ -200,6 +202,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
                              (gate-blacklist nil)
                              (gate-whitelist nil)
                              (without-pretty-printing nil)
+                             (print-logical-schedule nil)
                              (verbose nil)
                              (json-serialize nil)
                              (isa nil)
@@ -227,6 +230,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
   (setf *compute-2Q-gate-depth* compute-2Q-gate-depth)
   (setf *compute-unused-qubits* compute-unused-qubits)
   (setf *without-pretty-printing* without-pretty-printing)
+  (setf *print-logical-schedule* print-logical-schedule)
   (setf *gate-blacklist* 
         (when gate-blacklist
           (split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
@@ -323,6 +327,18 @@ unmodified. Used as the :object-key-fn for yason:parse."
       
       (when *topological-swaps*
         (print-topological-swap-count topological-swaps))
+      
+      (when (and *protoquil*
+                 *print-logical-schedule*)
+        (let ((lschedule (make-instance 'quil::lscheduler-empty)))
+          ;; fill out the lschedule
+          (loop :for instr :across (quil::parsed-program-executable-code processed-program)
+                :unless (typep instr 'quil::pragma)
+                  :do (quil::append-instruction-to-lschedule lschedule
+                                                             instr))
+          ;; stuff it in the dictionary for later serialization
+          (setf (gethash "logical_schedule" *statistics-dictionary*)
+                lschedule)))
       
       (when (and *protoquil*
                  (or *compute-gate-depth*
