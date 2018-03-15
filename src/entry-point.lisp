@@ -137,13 +137,23 @@
 (defun show-version ()
   (format t "~A (cl-quil: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
 
+(define-condition qpu-file-parse-error (error)
+  ((string :initarg :string :reader qpu-file-parse-error-string))
+  (:documentation "Can be thrown when QPU deserialization fails.")
+  (:report (lambda (condition stream)
+             (format stream "QPU descriptor reader encountered badly formatted key ~s."
+                     (qpu-file-parse-error-string condition)))))
+
 (defun maybe-expand-key (str)
   "Utility function used as the :object-key-fn for yason:parse."
-  (let* ((*read-eval* nil)
-         (parsed-list (mapcar #'read-from-string (split-sequence:split-sequence #\- str))))
-    (if (every #'integerp parsed-list)
-        parsed-list
-        str)))
+  (handler-case
+      (let* ((*read-eval* nil)
+             (parsed-list (mapcar #'read-from-string (split-sequence:split-sequence #\- str))))
+        (if (every #'integerp parsed-list)
+            parsed-list
+            str))
+    (error ()
+      (error 'qpu-file-parse-error :string str))))
 
 
 
