@@ -84,6 +84,16 @@
             "# Compiled gate volume: ~d~%"
             volume)))
 
+(defun print-unused-qubits (lschedule chip-specification)
+  (let ((unused-qubits
+          (loop :for i :below (length (first (quil::chip-specification-objects chip-specification)))
+                :unless (member i (quil::lscheduler-quantum-resources lschedule))
+                  :collect i)))
+    (setf (gethash "unused_qubits" *statistics-dictionary*) unused-qubits)
+    (format *human-readable-stream*
+            "# Unused qubit list: ~{~a~^, ~}~%"
+            unused-qubits)))
+
 (defun print-program-runtime (lschedule chip-specification)
   (let ((duration (quil::lscheduler-calculate-duration lschedule
                                                        chip-specification)))

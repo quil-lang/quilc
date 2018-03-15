@@ -62,6 +62,7 @@
 (defparameter *topological-swaps* nil)
 (defparameter *compute-gate-volume* nil)
 (defparameter *compute-2Q-gate-depth* nil)
+(defparameter *compute-unused-qubits* nil)
 (defparameter *gate-whitelist* nil)
 (defparameter *gate-blacklist* nil)
 (defparameter *without-pretty-printing* nil)
@@ -79,11 +80,12 @@
 
 (defparameter *option-spec*
   '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -p")
-    (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume")
+    (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume; requires -p")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -p")
-    (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity")
-    (("compute-2Q-gate-depth" #\2) :type boolean :optional t :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists")
+    (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity; requires -p")
+    (("compute-2Q-gate-depth" #\2) :type boolean :optional t :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists, requires -p")
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -p")
+    (("compute-unused-qubits" #\u) :type boolean :optional t :documentation "prints unused qubits; requires -p")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
     (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
@@ -193,6 +195,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
                              (compute-fidelity nil)
                              (compute-matrix-reps nil)
                              (compute-2Q-gate-depth nil)
+                             (compute-unused-qubits nil)
                              (show-topological-overhead nil)
                              (gate-blacklist nil)
                              (gate-whitelist nil)
@@ -222,6 +225,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
   (setf *compute-fidelity* compute-fidelity)
   (setf *compute-matrix-reps* compute-matrix-reps)
   (setf *compute-2Q-gate-depth* compute-2Q-gate-depth)
+  (setf *compute-unused-qubits* compute-unused-qubits)
   (setf *without-pretty-printing* without-pretty-printing)
   (setf *gate-blacklist* 
         (when gate-blacklist
@@ -324,7 +328,8 @@ unmodified. Used as the :object-key-fn for yason:parse."
                  (or *compute-gate-depth*
                      *compute-gate-volume*
                      *compute-runtime*
-                     *compute-fidelity*))
+                     *compute-fidelity*
+                     *compute-unused-qubits*))
         ;; calculate some statistics based on logical scheduling
         (let ((lschedule (make-instance 'quil::lscheduler-empty)))
           (loop :for instr :across (quil::parsed-program-executable-code processed-program)
@@ -344,7 +349,9 @@ unmodified. Used as the :object-key-fn for yason:parse."
           (when *compute-runtime*
             (print-program-runtime lschedule chip-specification))
           (when *compute-fidelity*
-            (print-program-fidelity lschedule chip-specification))))
+            (print-program-fidelity lschedule chip-specification))
+          (when *compute-unused-qubits*
+            (print-unused-qubits lschedule chip-specification))))
       
       (when (and *protoquil* *compute-2Q-gate-depth*)
         (let ((lschedule (make-instance 'quil::lscheduler-empty)))
