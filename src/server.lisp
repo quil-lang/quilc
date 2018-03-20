@@ -59,7 +59,12 @@
 
 (defmethod tbnl:acceptor-status-message ((acceptor vhost) http-status-code &key error &allow-other-keys)
   (if (eql http-status-code tbnl:+http-internal-server-error+)
-      error
+      (with-output-to-string (s)
+        (yason:encode
+         (alexandria:plist-hash-table
+          (list "error_type" "quilc_error"
+                "status" error))
+         s))
       (call-next-method)))
 
 (defun create-prefix/method-dispatcher (prefix method handler)
