@@ -25,6 +25,7 @@
            (bt:with-timeout (*time-limit*)
              (,f))))))
 
+
 (defun session-info ()
   (if (or (not (boundp 'tbnl:*session*))
           (null tbnl:*session*))
@@ -86,7 +87,7 @@
 
 (defun start-server ()
   (format-server-log "Starting server: ~a : ~d.~%" *server-host* *server-port*)
-  
+
   (setq tbnl:*show-lisp-errors-p* t
         tbnl:*show-lisp-backtraces-p* t
         tbnl:*catch-errors-p* t)
@@ -98,7 +99,13 @@
                              :taskmaster (make-instance 'tbnl:one-thread-per-connection-taskmaster)))
   (when (null (dispatch-table *app*))
     (push
-     (create-prefix/method-dispatcher "/" ':POST #'handle-post-request)
+     (create-prefix/method-dispatcher "/" ':POST #'handle-compiler-post-request)
+     (dispatch-table *app*))
+    (push
+     (create-prefix/method-dispatcher "/rb" ':POST #'handle-rb-post-request)
+     (dispatch-table *app*))
+    (push
+     (create-prefix/method-dispatcher "/apply-clifford" ':POST #'handle-apply-clifford-post-request)
      (dispatch-table *app*)))
   (tbnl:start *app*)
   ;; let the hunchentoot thread take over
@@ -107,52 +114,103 @@
 (defun stop-server ()
   (tbnl:stop *app*))
 
-(defun handle-post-request (request)
-  (when (null tbnl:*session*)
-    (tbnl:start-session))
-  
-  (let* ((api-key (tbnl:header-in* ':X-API-KEY request))
-         (user-id (tbnl:header-in* ':X-USER-ID request))
-         (data (hunchentoot:raw-post-data :request request
-                                          :force-text t))
-         (pure-json (yason:parse data))
-         (json (yason:parse data :object-key-fn #'maybe-expand-key)))
-    (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" api-key user-id)
-    ;; we expect to get the guts of a Canopy POST:
-    ;; { type: string,
-    ;;   addresses: array,
-    ;;   trials: integer,
-    ;;   quil-instructions: string,
-    ;;   isa: string }
-    ;; we decode what we need, but we keep the object around to pass through.
-    (with-timeout
-        (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
-                                      (gethash "quil-instructions" json)))
-               (quil-program (quil::safely-parse-quil-string quil-instructions))
-               (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
-                                    (gethash "target-device" json)))
-               (*protoquil* t)
-               (*statistics-dictionary* (process-program quil-program chip-specification)))
+(defmacro handle-request (name (data pure-json json api-key user-id) &body body)
+  `(defun ,(intern (format nil "~:@(handle-~A-request~)" name)) (request)
+     (when (null tbnl:*session*)
+       (tbnl:start-session))
+     (let* ((,data (hunchentoot:raw-post-data :request request
+                                             :force-text t))
+            (,pure-json (yason:parse ,data))
+            (,json (yason:parse data :object-key-fn #'maybe-expand-key))
+            (,api-key (tbnl:header-in* ':X-API-KEY request))
+            (,user-id (tbnl:header-in* ':X-USER-ID request)))
+       (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" ,api-key
+                          ,user-id)
+       ;; we expect to get the guts of a Canopy POST: { type: string, addresses:
+       ;; array, trials: integer, quil-instructions: string, isa: string } we decode
+       ;; what we need, but we keep the object around to pass through.
+       (with-timeout ,@(cdr body)))))
 
-          ;; update the program with the compiled version
-          (setf (gethash "compiled-quil" json)
-                (gethash "processed_program" *statistics-dictionary*))
-          ;; remove the compiled program from the metadata
-          (remhash "processed_program" *statistics-dictionary*)
-          ;; if we're in protoquil mode, update the readout addresses
-          (when (and *protoquil*
-                     (string= "MULTISHOT_MEASURE" (gethash "type" json))
-                     (gethash "qubits" json))
-            (let ((l2p (gethash "final-rewiring" *statistics-dictionary*)))
-              (setf (gethash "qubits" json)
-                    (mapcar (lambda (index) (quil::apply-rewiring-l2p l2p index))
-                            (gethash "qubits" json)))))
-          ;; store the statistics alongside the return data
-          (setf (gethash "metadata" json)
-                *statistics-dictionary*)
-          ;; restore a version of the ISA without any funky deserialization
-          (setf (gethash "target-device" json)
-                (gethash "target-device" pure-json))
-          ;; finally, return the string-ified JSON
-          (with-output-to-string (s)
-            (yason:encode json s))))))
+(handle-request rb-post (data pure-json json api-key user-id)
+  "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON should be \"depth\", \"qubits\", and \"gateset\", all of which should map to INTEGERs."
+  (let* ((k (gethash "depth" json))
+         (n (gethash "qubits" json))
+         (gateset (gethash "gateset" json)))
+    (cond
+      ((> n 2) (error "Currently no more than two qubit randomized benchmarking is supported.")))
+    (let* ((cliffords (map 'list #'quil.clifford::clifford-from-quil gateset))
+	   (qubits-used (map 'list
+			     (alexandria:compose
+			     (lambda (l) (reduce #'union l)) #'cl-quil.clifford::extract-qubits-used #'cl-quil:parse-quil-string)
+			    gateset))
+	  (qubits (reduce #'union qubits-used))
+	  (embedded-cliffords (loop :for clifford :in cliffords
+				 :for i :from 0
+				 :collect
+				 (quil.clifford:embed clifford n
+						      (loop :for index :in (nth i qubits-used)
+							 :collect (position index qubits)))))
+	  (rb-sequence (loop :for decomposition :in (quil.clifford::rb-sequence k n embedded-cliffords) :collect decomposition))
+	  (gateset-label-sequence
+           (loop :for clifford-element :in rb-sequence
+	      :collect (loop :for generator :in clifford-element
+			  :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
+      (with-output-to-string (s) (yason:encode gateset-label-sequence s)))))
+
+(handle-request apply-clifford-post (data pure-json json api-key user-id)
+  "Handle a json post request for conjugating an element of the Pauli group by an element of the Clifford group. The Clifford element is specified as a quil program represented as a STRING and the element of the Pauli group is represented as a LIST whose first element is a LIST of qubit indices and the second element is a LIST of STRINGS, representing the Pauli operator acting on that index. e.g. ((1 2) (\"X\" \"Y\")) is the Pauli element IXY. JSON should be a HASHTABLE with keys \"pauli\" and \"clifford\", with values described above."
+  (let* ((indices-and-terms (gethash "pauli" json))
+         (clifford-program (gethash "clifford" json))
+         (pauli-indices (first indices-and-terms))
+         (pauli-terms (second indices-and-terms))
+         (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil-string clifford-program))) #'<))
+         (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
+	 (pauli (quil.clifford:pauli-from-string
+		 (with-output-to-string (s)
+		   (loop :for i :in qubits
+		      :do
+		      (cond ((member i pauli-indices)
+			     (format s (nth (position i pauli-indices) pauli-terms)))
+			    (T (format s "I")))))))
+         (clifford (cl-quil.clifford::embed (quil.clifford::clifford-from-quil clifford-program)
+                                            (length qubits)
+                                            (loop :for index :in clifford-indices :collect (position index qubits))))
+         (pauli-out (quil.clifford:apply-clifford clifford pauli)))
+    (with-output-to-string (s)
+      (yason:encode (list (quil.clifford::phase-factor pauli-out)
+                          (apply #'concatenate 'string
+                                 (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
+                                         (quil.clifford::base4-list pauli-out)))) s))))
+
+(handle-request compiler-post (data pure-json json api-key user-id)
+  "Handle a post request for compiling a quil circuit."
+  (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
+                                (gethash "quil-instructions" json)))
+         (quil-program (quil::safely-parse-quil-string quil-instructions))
+         (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
+                              (gethash "target-device" json)))
+         (*protoquil* t)
+         (*statistics-dictionary* (process-program quil-program chip-specification)))
+
+    ;; update the program with the compiled version
+    (setf (gethash "compiled-quil" json)
+          (gethash "processed_program" *statistics-dictionary*))
+    ;; remove the compiled program from the metadata
+    (remhash "processed_program" *statistics-dictionary*)
+    ;; if we're in protoquil mode, update the readout addresses
+    (when (and *protoquil*
+               (string= "MULTISHOT_MEASURE" (gethash "type" json))
+               (gethash "qubits" json))
+      (let ((l2p (gethash "final-rewiring" *statistics-dictionary*)))
+        (setf (gethash "qubits" json)
+              (mapcar (lambda (index) (quil::apply-rewiring-l2p l2p index))
+                      (gethash "qubits" json)))))
+    ;; store the statistics alongside the return data
+    (setf (gethash "metadata" json)
+          *statistics-dictionary*)
+    ;; restore a version of the ISA without any funky deserialization
+    (setf (gethash "target-device" json)
+          (gethash "target-device" pure-json))
+    ;; finally, return the string-ified JSON
+    (with-output-to-string (s)
+      (yason:encode json s))))
