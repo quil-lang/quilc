@@ -95,6 +95,7 @@
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
     (("print-logical-schedule" #\s) :type boolean :optional t :documentation "include logically parallelized schedule in JSON output; requires -p")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
+    (("enable-state-prep-reductions") :type boolean :optional t :documentation "assume that the program starts in the ground state")
     (("protoquil" #\p) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\? #\h) :optional t :documentation "print this help information and exit")
     (("server-mode" #\S) :type boolean :optional t :documentation "run as a server")
@@ -206,6 +207,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
                              (verbose nil)
                              (json-serialize nil)
                              (isa nil)
+                             (enable-state-prep-reductions nil)
                              (protoquil nil)
                              (version nil)
                              (server-mode nil)
@@ -239,6 +241,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
           (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
   (setf *topological-swaps* show-topological-overhead)
   (setf *protoquil* protoquil)
+  (setf quil::*enable-state-prep-compression* enable-state-prep-reductions)
   
   ;; at this point we know we're doing something. strap in LAPACK.
   (magicl:with-blapack
