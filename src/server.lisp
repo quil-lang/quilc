@@ -85,6 +85,8 @@
   (setq tbnl:*show-lisp-errors-p* t
         tbnl:*show-lisp-backtraces-p* t
         tbnl:*catch-errors-p* t)
+  (unless (zerop *time-limit*)
+    (setq tbnl:*default-connection-timeout* (/ *time-limit* 1000)))
   (setq *app* (make-instance 'vhost
                              :address *server-host*
                              :port *server-port*
