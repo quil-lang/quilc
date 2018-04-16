@@ -80,7 +80,8 @@
 (defparameter *statistics-dictionary* (make-hash-table :test #'equal))
 
 (defparameter *option-spec*
-  '((("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -p")
+  '((("prefer-gate-ladders") :type boolean :optional t :documentation "uses gate ladders rather than SWAPs to implement long-ranged gates")
+    (("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -p")
     (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume; requires -p")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -p")
     (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity; requires -p")
@@ -192,7 +193,8 @@ unmodified. Used as the :object-key-fn for yason:parse."
        :positional-arity 0
        :rest-arity nil))
 
-(defun process-options (&key (compute-gate-depth nil)
+(defun process-options (&key (prefer-gate-ladders nil)
+                             (compute-gate-depth nil)
                              (compute-gate-volume nil)
                              (compute-runtime nil)
                              (compute-fidelity nil)
@@ -224,6 +226,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
   (when (plusp time-limit)
     (setf *time-limit* (/ time-limit 1000.0d0)))
   
+  (setf quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
   (setf *compute-gate-depth* compute-gate-depth)
   (setf *compute-gate-volume* compute-gate-volume)
   (setf *compute-runtime* compute-runtime)
