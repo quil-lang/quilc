@@ -22,26 +22,22 @@
                            (1- (integer-length (magicl:matrix-rows original-matrix)))
                            (length initial-l2p)
                            (length final-l2p)))
-         (wire-out (apply #'quil::kq-gate-on-lines
-                          (quil::rewiring-to-permutation-matrix-p2l final-l2p)
-                          qubit-count
-                          (alexandria:iota (length final-l2p) :start (1- (length final-l2p)) :step -1)))
-         (wire-in (apply #'quil::kq-gate-on-lines
-                         (quil::rewiring-to-permutation-matrix-l2p initial-l2p)
-                         qubit-count
-                         (alexandria:iota (length initial-l2p) :start (1- (length initial-l2p)) :step -1)))
-         (stretched-raw-new-matrix (apply #'quil::kq-gate-on-lines
-                                          raw-new-matrix
-                                          qubit-count
-                                          (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
-                                                           :start (- (integer-length (magicl:matrix-rows raw-new-matrix)) 2)
-                                                           :step -1)))
-         (stretched-original-matrix (apply #'quil::kq-gate-on-lines
-                                           original-matrix
+         (wire-out (quil::kq-gate-on-lines (quil::rewiring-to-permutation-matrix-p2l final-l2p)
                                            qubit-count
-                                           (alexandria:iota (1- (integer-length (magicl:matrix-rows original-matrix)))
-                                                            :start (- (integer-length (magicl:matrix-rows original-matrix)) 2)
-                                                            :step -1)))
+                                           (alexandria:iota (length final-l2p) :start (1- (length final-l2p)) :step -1)))
+         (wire-in (quil::kq-gate-on-lines (quil::rewiring-to-permutation-matrix-l2p initial-l2p)
+                                          qubit-count
+                                          (alexandria:iota (length initial-l2p) :start (1- (length initial-l2p)) :step -1)))
+         (stretched-raw-new-matrix (quil::kq-gate-on-lines raw-new-matrix
+                                                           qubit-count
+                                                           (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
+                                                                            :start (- (integer-length (magicl:matrix-rows raw-new-matrix)) 2)
+                                                                            :step -1)))
+         (stretched-original-matrix (quil::kq-gate-on-lines original-matrix
+                                                            qubit-count
+                                                            (alexandria:iota (1- (integer-length (magicl:matrix-rows original-matrix)))
+                                                                             :start (- (integer-length (magicl:matrix-rows original-matrix)) 2)
+                                                                             :step -1)))
          (new-matrix
            (reduce #'magicl:multiply-complex-matrices
                    (list
