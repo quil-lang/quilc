@@ -11,8 +11,8 @@
                #:split-sequence
                #:command-line-arguments
                #:yason
-               (:version #:magicl "0.3.0")
-               (:version #:cl-quil "0.13.1")
+               (:version #:magicl "0.4.0")
+               (:version #:cl-quil "0.14.0")
                #:uiop
                #:hunchentoot
                )

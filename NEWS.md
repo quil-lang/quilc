@@ -1,5 +1,13 @@
 # `quilc` release notes
 
+## Version 0.9.0
+
+* reply with unused qubits
+* reply with raw logical schedule in the JSON output
+* change socket timeout to match process timeout, allowing longer server runtimes
+* emit JSONified error messages
+* various bugfixes
+
 ## Version 0.8.0
 
 * added options to calculate fidelity and multiqubit gate depth
