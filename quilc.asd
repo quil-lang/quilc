@@ -15,6 +15,7 @@
                (:version #:cl-quil "0.14.1")
                #:uiop
                #:hunchentoot
+               #:bordeaux-threads
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
@@ -22,6 +23,10 @@
                       (funcall compile)))
   :serial t
   :components ((:file "package")
+               #+sbcl
+               (:file "impl/sbcl")
+               #+clozure
+               (:file "impl/clozure")
                (:file "server")
                (:file "printers")
                (:file "entry-point")))

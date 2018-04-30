@@ -22,7 +22,7 @@
        (declare (dynamic-extent (function ,f)))
        (if (null *time-limit*)
            (,f)
-           (sb-ext:with-timeout *time-limit*
+           (bt:with-timeout (*time-limit*)
              (,f))))))
 
 (defun session-info ()

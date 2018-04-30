@@ -160,7 +160,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
 
 
 (defun entry-point (argv)
-  (sb-ext:disable-debugger)
+  (disable-debugger)
   
   ;; grab the CLI arguments
   (setf *program-name* (pop argv))
@@ -173,7 +173,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
        :name "quilc"
        :positional-arity 0
        :rest-arity nil)
-    (sb-sys:interactive-interrupt (c)
+    (interactive-interrupt (c)
       (declare (ignore c))
       (format *error-output* "~&! ! ! Caught keyboard interrupt. Exiting.~%")
       (uiop:quit 0))
