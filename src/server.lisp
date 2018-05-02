@@ -186,7 +186,7 @@
   "Handle a post request for compiling a quil circuit."
   (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
                                 (gethash "quil-instructions" json)))
-         (quil-program (quil::safely-parse-quil-string quil-instructions))
+         (quil-program (quil::parse-quil quil-instructions))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
                               (gethash "target-device" json)))
          (*protoquil* t)
