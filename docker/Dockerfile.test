@@ -1,7 +1,7 @@
 ###############################################################################
 # quilc-tests docker image (docker.lab.rigetti.com/qcs/quilc-tests)
 ###############################################################################
-FROM docker.lab.rigetti.com/qcs/lisp-base
+FROM rigetticomputing/lisp-base
 
 ###############################################################################
 # quilc / QVM-APP / wildfire dependencies setup
@@ -27,4 +27,4 @@ WORKDIR /src/quilc
 RUN sbcl --eval "(ql:quickload (list :quilc :quilc-tests))" --quit
 
 # executed on docker run
-ENTRYPOINT ["make", "test"]
+ENTRYPOINT ["make", "test", "test-ccl"]

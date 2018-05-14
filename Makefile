@@ -46,5 +46,12 @@ test:
 		 --eval "(ql:quickload :quilc-tests)" \
 		 --eval "(asdf:test-system :quilc)"
 
+test-ccl:
+	ccl -n --batch --load $(QUICKLISP_HOME)/setup.lisp \
+		--eval '(push (truename ".") asdf:*central-registry*)' \
+		--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)" \
+		--eval "(ql:quickload :quilc)" \
+		--eval '(quit)'
+
 clean:
 	rm -f quilc system-index.txt build-output.log

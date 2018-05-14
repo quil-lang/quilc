@@ -1,7 +1,7 @@
 ###############################################################################
 # quilc docker image (docker.lab.rigetti.com/qcs/quilc)
 ###############################################################################
-FROM docker.lab.rigetti.com/qcs/lisp-base
+FROM rigetticomputing/lisp-base
 
 ###############################################################################
 # quilc / QVM-APP / wildfire dependencies setup
