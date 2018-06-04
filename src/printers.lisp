@@ -20,14 +20,14 @@
          (raw-new-matrix (quil::make-matrix-from-quil processed-quil))
          (qubit-count (max (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
                            (1- (integer-length (magicl:matrix-rows original-matrix)))
-                           (length initial-l2p)
-                           (length final-l2p)))
+                           (quil::rewiring-length initial-l2p)
+                           (quil::rewiring-length final-l2p)))
          (wire-out (quil::kq-gate-on-lines (quil::rewiring-to-permutation-matrix-p2l final-l2p)
                                            qubit-count
-                                           (alexandria:iota (length final-l2p) :start (1- (length final-l2p)) :step -1)))
+                                           (alexandria:iota (quil::rewiring-length final-l2p) :start (1- (quil::rewiring-length final-l2p)) :step -1)))
          (wire-in (quil::kq-gate-on-lines (quil::rewiring-to-permutation-matrix-l2p initial-l2p)
                                           qubit-count
-                                          (alexandria:iota (length initial-l2p) :start (1- (length initial-l2p)) :step -1)))
+                                          (alexandria:iota (quil::rewiring-length initial-l2p) :start (1- (quil::rewiring-length initial-l2p)) :step -1)))
          (stretched-raw-new-matrix (quil::kq-gate-on-lines raw-new-matrix
                                                            qubit-count
                                                            (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
@@ -157,3 +157,7 @@
              (first (quil::lscheduler-children object))
              s))))
    stream))
+
+;; custom encoder for rewiring objects
+(defmethod yason:encode ((object quil::rewiring) &optional (stream *standard-output*))
+  (yason:encode (quil::rewiring-l2p object) stream))
