@@ -126,38 +126,6 @@
   *statistics-dictionary*)
 
 
-;; also, some custom yason encoders for lscheduler objects
-(defmethod yason:encode ((object quil::logical-scheduler)
-                         &optional (stream *standard-output*))
-  (yason:encode
-   (alexandria:plist-hash-table
-    (list "type" (etypecase object
-                   (quil::lscheduler-parallel "parallel")
-                   (quil::lscheduler-sequential "sequential")
-                   (quil::lscheduler-commuting-blocks "commuting_blocks"))
-          "children" (quil::lscheduler-children object)))
-   stream))
-
-(defmethod yason:encode ((object quil::lscheduler-empty)
-                         &optional (stream *standard-output*))
-  (yason:encode
-   (alexandria:plist-hash-table
-    (list "type" "empty"
-          "children" nil))
-   stream))
-
-(defmethod yason:encode ((object quil::lscheduler-atomic)
-                         &optional (stream *standard-output*))
-  (yason:encode
-   (alexandria:plist-hash-table
-    (list "type" "atomic"
-          "child"
-          (with-output-to-string (s)
-            (quil::print-instruction
-             (first (quil::lscheduler-children object))
-             s))))
-   stream))
-
 ;; custom encoder for rewiring objects
 (defmethod yason:encode ((object quil::rewiring) &optional (stream *standard-output*))
   (yason:encode (quil::rewiring-l2p object) stream))

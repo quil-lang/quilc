@@ -335,7 +335,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
       
       (when (and *protoquil*
                  *print-logical-schedule*)
-        (let ((lschedule (make-instance 'quil::lscheduler-empty)))
+        (let ((lschedule (quil::make-lscheduler)))
           ;; fill out the lschedule
           (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                 :unless (typep instr 'quil::pragma)
@@ -352,7 +352,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
                      *compute-fidelity*
                      *compute-unused-qubits*))
         ;; calculate some statistics based on logical scheduling
-        (let ((lschedule (make-instance 'quil::lscheduler-empty)))
+        (let ((lschedule (quil::make-lscheduler)))
           (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                 :when (and (typep instr 'quil::gate-application)
                            (not (member (quil::application-operator instr)
@@ -375,7 +375,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
             (print-unused-qubits lschedule chip-specification))))
       
       (when (and *protoquil* *compute-2Q-gate-depth*)
-        (let ((lschedule (make-instance 'quil::lscheduler-empty)))
+        (let ((lschedule (quil::make-lscheduler)))
           (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                 :when (and (typep instr 'quil::gate-application)
                            (<= 2 (length (quil::application-arguments instr))))
