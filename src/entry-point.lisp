@@ -142,18 +142,6 @@
 (defun show-version ()
   (format t "~A (cl-quil: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
 
-(defun maybe-expand-key (string)
-  "If STRING is of the form <digits>(-<digits>)*, return a list of
-integers parsed from the digits. Otherwise, return STRING
-unmodified. Used as the :object-key-fn for yason:parse."
-  (flet ((good-part-p (part)
-           (and (plusp (length part))
-                (every #'digit-char-p part))))
-    (loop :for part :in (split-sequence:split-sequence #\- string)
-          :if (not (good-part-p part))
-            :return string
-          :else
-            :collect (parse-integer part))))
 
 
 
@@ -286,9 +274,7 @@ unmodified. Used as the :object-key-fn for yason:parse."
                ((string= isa "16QMUX")
                 (quil::build-nQ-trivalent-chip 1 1 8 4))
                ((probe-file isa)
-                (quil::qpu-hash-table-to-chip-specification
-                 (with-open-file (s isa)
-                   (yason:parse s :object-key-fn #'maybe-expand-key))))
+                (quil::read-chip-spec-file isa))
                (t
                 (error "ISA descriptor does not name a known template or an extant file."))))
        (setf *verbose*
