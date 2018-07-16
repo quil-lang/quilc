@@ -134,26 +134,36 @@
   "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON should be \"depth\", \"qubits\", and \"gateset\", all of which should map to INTEGERs."
   (let* ((k (gethash "depth" json))
          (n (gethash "qubits" json))
-         (gateset (gethash "gateset" json)))
-    (cond
-      ((> n 2) (error "Currently no more than two qubit randomized benchmarking is supported.")))
+         (gateset (gethash "gateset" json))
+         (seed (gethash "seed" json)))
+    #-sbcl (when seed
+             (error "Unable to seed the random number generator."))
+    (when (and seed (not (typep seed 'unsigned-byte)))
+      (error "Seed must be a positive integer."))
+    (when (> n 2)
+      (error "Currently no more than two qubit randomized benchmarking is supported."))
     (let* ((cliffords (map 'list #'quil.clifford::clifford-from-quil gateset))
-	   (qubits-used (map 'list
-			     (alexandria:compose
-			     (lambda (l) (reduce #'union l)) #'cl-quil.clifford::extract-qubits-used #'cl-quil:parse-quil-string)
-			    gateset))
-	  (qubits (reduce #'union qubits-used))
-	  (embedded-cliffords (loop :for clifford :in cliffords
-				 :for i :from 0
-				 :collect
-				 (quil.clifford:embed clifford n
-						      (loop :for index :in (nth i qubits-used)
-							 :collect (position index qubits)))))
-	  (rb-sequence (loop :for decomposition :in (quil.clifford::rb-sequence k n embedded-cliffords) :collect decomposition))
-	  (gateset-label-sequence
-           (loop :for clifford-element :in rb-sequence
-	      :collect (loop :for generator :in clifford-element
-			  :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
+           (qubits-used (map 'list
+                             (alexandria:compose
+                              (lambda (l) (reduce #'union l))
+                              #'cl-quil.clifford::extract-qubits-used #'cl-quil:parse-quil-string)
+                             gateset))
+           (qubits (reduce #'union qubits-used))
+           (embedded-cliffords (loop :for clifford :in cliffords
+                                     :for i :from 0
+                                     :collect
+                                     (quil.clifford:embed clifford n
+                                                          (loop :for index :in (nth i qubits-used)
+                                                                :collect (position index qubits)))))
+           (rb-sequence
+             (let ((*random-state*
+                     #+sbcl (if seed (sb-ext:seed-random-state seed) *random-state*)
+                     #-sbcl *random-state*))
+               (quil.clifford::rb-sequence k n embedded-cliffords)))
+           (gateset-label-sequence
+             (loop :for clifford-element :in rb-sequence
+	                 :collect (loop :for generator :in clifford-element
+			                            :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
       (with-output-to-string (s) (yason:encode gateset-label-sequence s)))))
 
 (handle-request apply-clifford-post (data json api-key user-id)
