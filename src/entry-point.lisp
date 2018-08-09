@@ -122,8 +122,7 @@
         (declare #+sbcl (sb-ext:muffle-conditions style-warning))
       (handler-bind (#+sbcl (style-warning #'muffle-warning))
         (cffi:load-foreign-library 'magicl.foreign-libraries::libblas)
-        (cffi:load-foreign-library 'magicl.foreign-libraries::liblapack)
-        (cffi:load-foreign-library 'magicl.foreign-libraries::libexpokit))))
+        (cffi:load-foreign-library 'magicl.foreign-libraries::liblapack))))
 
 (defun print-matrix-with-comment-hashes (matrix &optional (stream *standard-output*))
   (format stream "~d"
