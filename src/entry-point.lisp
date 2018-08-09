@@ -284,7 +284,7 @@
 
 (defun run-CLI-mode ()
   (let* ((program-text (slurp-lines))
-         (program (quil::parse-quil program-text)))
+         (program (quil::parse-quil-string program-text)))
     (process-program program *isa-descriptor*)))
 
 (defun process-program (program chip-specification)
