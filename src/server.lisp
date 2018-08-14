@@ -131,7 +131,10 @@
        (with-timeout ,@(cdr body)))))
 
 (handle-request rb-post (data json api-key user-id)
-  "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON should be \"depth\", \"qubits\", and \"gateset\", all of which should map to INTEGERs."
+  "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON are:
+ * \"depth\": integer representing the desired circuit depth.
+ * \"qubits\": integer representing the number of qubits involved in the circuit.
+ * \"gateset\", list of strings, each representing a Clifford gate as a Quil program."
   (let* ((k (gethash "depth" json))
          (n (gethash "qubits" json))
          (gateset (gethash "gateset" json))
