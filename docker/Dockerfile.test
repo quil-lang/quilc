@@ -8,4 +8,5 @@ WORKDIR /src/quilc
 RUN sbcl --eval "(ql:quickload :quilc-tests)" --quit
 
 # executed on docker run
-ENTRYPOINT ["make", "test", "test-ccl"]
+# ENTRYPOINT ["make", "test", "test-ccl"]
+ENTRYPOINT ["make", "test"]
