@@ -1,0 +1,3 @@
+[submodule "bamboo"]
+	path = bamboo
+	url = ssh://git@bitbucket.lab.rigetti.com:7999/devops/bamboo.git
