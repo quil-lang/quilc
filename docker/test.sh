@@ -1,6 +1,6 @@
 #!/bin/bash
 set -ex
 ###############################################################################
-# Bamboo script for building the Docker image(s) in a docker Makefile
+# Script for running dockerized quilc tests
 ###############################################################################
-make -C ../docker
+docker run --rm --name quilc-tests quilc-tests
