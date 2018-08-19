@@ -1,31 +1,7 @@
 ###############################################################################
 # quilc docker image (docker.lab.rigetti.com/qcs/quilc)
 ###############################################################################
-FROM rigetticomputing/lisp-base
-
-###############################################################################
-# quilc / QVM-APP / wildfire dependencies setup
-###############################################################################
-
-# organize the source
-# NOTE: this only works if the current directory is the top-level directory of
-# quilc and the alexa, cl-quil, and magicl sources are in subdirectories inside quilc
-ADD . /src/quilc
-RUN cp -R /src/quilc/alexa /src/alexa
-RUN rm -rf /src/quilc/alexa
-RUN cp -R /src/quilc/cl-quil /src/cl-quil
-RUN rm -rf /src/quilc/cl-quil
-RUN cp -R /src/quilc/magicl /src/magicl
-RUN rm -rf /src/quilc/magicl
-
-###############################################################################
-# quilc setup
-###############################################################################
-
-# build quilc
-WORKDIR /src/quilc
-RUN sbcl --eval "(ql:quickload :quilc)" --quit
-RUN make quilc
+FROM quilc-base
 
 # executed on docker run
 ENTRYPOINT ["./quilc"]

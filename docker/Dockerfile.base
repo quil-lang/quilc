@@ -1,0 +1,25 @@
+###############################################################################
+# quilc-base Docker image
+###############################################################################
+FROM rigetticomputing/lisp-base
+
+###############################################################################
+# quilc dependencies setup
+###############################################################################
+
+# organize the source
+# NOTE: only works if alexa, and magicl, cl-ppcre, cl-quil, and quilc are in the same directory
+ADD alexa /src/alexa
+ADD magicl /src/magicl
+ADD cl-ppcre /src/cl-ppcre
+ADD cl-quil /src/cl-quil
+ADD quilc /src/quilc
+
+###############################################################################
+# quilc setup
+###############################################################################
+
+# build quilc
+WORKDIR /src/quilc
+RUN sbcl --eval "(ql:quickload :quilc)" --quit
+RUN make quilc
