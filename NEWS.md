@@ -1,5 +1,17 @@
 # `quilc` release notes
 
+## Version 0.12.0
+
+* TODO
+
+## Version 0.11.0
+
+* TODO
+
+## Version 0.10.0
+
+* TODO
+
 ## Version 0.9.0
 
 * reply with unused qubits
