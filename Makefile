@@ -6,6 +6,7 @@ QUICKLISP_HOME=$(HOME)/quicklisp
 QUICKLISP_SETUP=$(QUICKLISP_HOME)/setup.lisp
 QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
 	--eval '(push (truename ".") asdf:*central-registry*)' \
+	--eval '(push :hunchentoot-no-ssl *features*)' \
 	--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)"
 QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 
@@ -28,6 +29,7 @@ system-index.txt: $(QUICKLISP_SETUP)
 quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp src/server.lisp
 	buildapp --output quilc \
 		 --manifest-file system-index.txt \
+		 --eval '(push :hunchentoot-no-ssl *features*)' \
 		 --asdf-path . \
 		 --load-system quilc \
 		 --compress-core \
