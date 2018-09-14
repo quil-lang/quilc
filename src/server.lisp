@@ -85,6 +85,22 @@
         (dispatch-table vhost))
   (call-next-method))
 
+(defun request-handler (fn)
+  "Given a function FN that takes DATA, JSON, API-KEY, and USER-ID, produce a new function which takes a request and properly unpacks it, calling the function."
+  (lambda (request)
+    (when (null tbnl:*session*)
+      (tbnl:start-session))
+    (let* ((data (hunchentoot:raw-post-data :request request :force-text t))
+           (json (yason:parse data))
+           (api-key (tbnl:header-in* ':X-API-KEY request))
+           (user-id (tbnl:header-in* ':X-USER-ID request)))
+      (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" api-key
+                         user-id)
+      ;; we expect to get the guts of a Canopy POST: { type: string, addresses:
+      ;; array, trials: integer, quil-instructions: string, isa: string } we decode
+      ;; what we need, but we keep the object around to pass through.
+      (with-timeout (funcall fn data json api-key user-id)))))
+
 (defun start-server ()
   (format-server-log "Starting server: ~a : ~d.~%" *server-host* *server-port*)
 
@@ -99,13 +115,13 @@
                              :taskmaster (make-instance 'tbnl:one-thread-per-connection-taskmaster)))
   (when (null (dispatch-table *app*))
     (push
-     (create-prefix/method-dispatcher "/" ':POST #'handle-compiler-post-request)
+     (create-prefix/method-dispatcher "/" ':POST (request-handler 'compiler-post))
      (dispatch-table *app*))
     (push
-     (create-prefix/method-dispatcher "/rb" ':POST #'handle-rb-post-request)
+     (create-prefix/method-dispatcher "/rb" ':POST (request-handler 'rb-post))
      (dispatch-table *app*))
     (push
-     (create-prefix/method-dispatcher "/apply-clifford" ':POST #'handle-apply-clifford-post-request)
+     (create-prefix/method-dispatcher "/apply-clifford" ':POST (request-handler 'apply-clifford-post))
      (dispatch-table *app*)))
   (tbnl:start *app*)
   ;; let the hunchentoot thread take over
@@ -114,33 +130,19 @@
 (defun stop-server ()
   (tbnl:stop *app*))
 
-(defmacro handle-request (name (data json api-key user-id) &body body)
-  `(defun ,(intern (format nil "~:@(handle-~A-request~)" name)) (request)
-     (when (null tbnl:*session*)
-       (tbnl:start-session))
-     (let* ((,data (hunchentoot:raw-post-data :request request
-                                             :force-text t))
-            (,json (yason:parse ,data))
-            (,api-key (tbnl:header-in* ':X-API-KEY request))
-            (,user-id (tbnl:header-in* ':X-USER-ID request)))
-       (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" ,api-key
-                          ,user-id)
-       ;; we expect to get the guts of a Canopy POST: { type: string, addresses:
-       ;; array, trials: integer, quil-instructions: string, isa: string } we decode
-       ;; what we need, but we keep the object around to pass through.
-       (with-timeout ,@(cdr body)))))
-
-(handle-request rb-post (data json api-key user-id)
+(defun rb-post (data json api-key user-id)
   "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON are:
  * \"depth\": integer representing the desired circuit depth.
  * \"qubits\": integer representing the number of qubits involved in the circuit.
  * \"gateset\", list of strings, each representing a Clifford gate as a Quil program."
+  (declare (ignore data api-key user-id))
   (let* ((k (gethash "depth" json))
          (n (gethash "qubits" json))
          (gateset (gethash "gateset" json))
          (seed (gethash "seed" json)))
-    #-sbcl (when seed
-             (error "Unable to seed the random number generator."))
+    #-sbcl
+    (when seed
+      (error "Unable to seed the random number generator."))
     (when (and seed (not (typep seed 'unsigned-byte)))
       (error "Seed must be a positive integer."))
     (when (> n 2)
@@ -169,8 +171,9 @@
 			                            :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
       (with-output-to-string (s) (yason:encode gateset-label-sequence s)))))
 
-(handle-request apply-clifford-post (data json api-key user-id)
+(defun apply-clifford-post (data json api-key user-id)
   "Handle a json post request for conjugating an element of the Pauli group by an element of the Clifford group. The Clifford element is specified as a quil program represented as a STRING and the element of the Pauli group is represented as a LIST whose first element is a LIST of qubit indices and the second element is a LIST of STRINGS, representing the Pauli operator acting on that index. e.g. ((1 2) (\"X\" \"Y\")) is the Pauli element IXY. JSON should be a HASHTABLE with keys \"pauli\" and \"clifford\", with values described above."
+  (declare (ignore data api-key user-id))
   (let* ((indices-and-terms (gethash "pauli" json))
          (clifford-program (gethash "clifford" json))
          (pauli-indices (first indices-and-terms))
@@ -192,10 +195,12 @@
       (yason:encode (list (quil.clifford::phase-factor pauli-out)
                           (apply #'concatenate 'string
                                  (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
-                                         (quil.clifford::base4-list pauli-out)))) s))))
+                                         (quil.clifford::base4-list pauli-out))))
+                    s))))
 
-(handle-request compiler-post (data json api-key user-id)
+(defun compiler-post (data json api-key user-id)
   "Handle a post request for compiling a quil circuit."
+  (declare (ignore data api-key user-id))
   (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
                                 (gethash "quil-instructions" json)))
          (quil-program (quil::parse-quil quil-instructions))
