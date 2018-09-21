@@ -1,4 +1,6 @@
 RIGETTI_LISP_LIBRARY_HOME=../
+LISP_CACHE ?= $(HOME)/.cache/common-lisp
+
 
 SBCL_BIN=sbcl
 SBCL=$(SBCL_BIN) --noinform --no-userinit --no-sysinit --non-interactive
@@ -23,6 +25,7 @@ $(QUICKLISP_SETUP):
 
 system-index.txt: $(QUICKLISP_SETUP)
 	$(QUICKLISP)  \
+		$(FOREST_SDK_FEATURE) \
 		--eval '(ql:quickload "quilc")' \
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
 
@@ -34,6 +37,9 @@ quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp 
 		 --load-system quilc \
 		 --compress-core \
 		 --entry quilc::entry-point
+
+quilc-sdk: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
+quilc-sdk: clean clean-cache quilc
 
 quilc-unsafe: system-index.txt
 	buildapp --output quilc \
@@ -57,3 +63,7 @@ test-ccl:
 
 clean:
 	rm -f quilc system-index.txt build-output.log
+
+clean-cache:
+	@echo "Deleting $(LISP_CACHE)"
+	rm -rf "$(LISP_CACHE)"

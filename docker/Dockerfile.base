@@ -18,7 +18,9 @@ ADD quilc /src/quilc
 # quilc setup
 ###############################################################################
 
+ARG build_target
+
 # build quilc
 WORKDIR /src/quilc
 RUN sbcl --eval "(ql:quickload :quilc)" --quit
-RUN make quilc
+RUN make ${build_target}
