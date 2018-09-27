@@ -10,10 +10,72 @@ todo
 .SH OPTIONS
 .IP "-S, --server"
 (Server Mode) Run the compiler in Server Mode. This starts an HTTP server.
-.IP "-h, --help"
+.IP "-?, -h, --help"
 Show the help message.
 .IP "-v, --version"
 Show the version.
+.IP "--verbose"
+Print what the compiler is thinking. (Warning: It thinks a lot.)
+.IP "--isa <string>"
+Compile for the qubit architecture defined by <string>, which can be
+either 8Q, 20Q, 16QMUX, or a path to a QPU description file.
+.IP "-p, --protoquil"
+Prescribe that the input and output must be ProtoQuil, which is Quil
+that is comprised of gates and measurements, with no control flow.
+.IP "--port <port>"
+(Server Mode) Run quilc in server mode on port <port>.
+.IP "-d, --compute-gate-depth"
+Print a calculated gate depth for the provided circuit as an appended
+Quil comment. (Requires -p.)
+.IP "-2, --compute-2Q-gate-depth"
+Print a calculated multiqubit gate depth for the provided circuit as
+an appended Quil comment. (Requires -p. Ignores the blacklist and
+whitelist.)
+.IP "--compute-gate-volume"
+Print a calculated gate volume for the provided circuit as an appended
+Quil comment. (Requires -p.)
+.IP "-r, --compute-runtime"
+Print a calculated estimated runtime for the provided circuit as an
+appended Quil comment. (Requires -p.)
+.IP "-f, --compute-fidelity"
+Print a calculated estimated compiled circuit fidelity for the
+provided circuit as an appended Quil comment. (Requires -p.)
+.IP "-u, --compute-unused-qubits"
+Print a list of unused qubits as an appended Quil comment. (Requires
+-p.)
+.IP "-t, --show-topological-overhead"
+Print the number of SWAP gates incurred for topological reasons for
+the provided circuit as an appended Quil comment. (Requires -p.)
+.IP "--gate-blacklist <gate-list>"
+When calculating statistics, ignore the gates present in the
+comma-separated list of names of <gate-list>.
+.IP "--gate-whitelist <gate-list>"
+When calculating statistics, consider only the gates present in the
+comma-separated list of names of <gate-list>.
+.IP "--time-limit <limit-ms>"
+(Server Mode) Limit the amount of time for a single request to
+approximately <limit-ms> milliseconds. By default, this value is 0,
+which indicates an unlimited amount of time is allowed.
+.IP "--without-pretty-printing"
+Disable pretty printing of numerical quantities (e.g., multiples of
+pi) in compiled output.
+.IP "--prefer-gate-ladders"
+Use gate ladders, instead of the SWAP gate, to implement long-ranged
+gates, when possible.
+.IP "-j, --json-serialize"
+Serialize the output of compilation as a JSON object.
+.IP "-s, --print-logical-schedule"
+Include the logically parallelized schedule in JSON output. (Requires
+-p.)
+.IP "-m, --compute-matrix-reps"
+Print the matrix representation of a compiled ProtoQuil
+program. Additionally, verify that this matrix matches the matrix
+representation of the input program. (Requires -p. Note that this is a
+very expensive operation.)
+.IP "--enable-state-prep-reductions"
+Perform program optimizations by assuming that the quantum state
+starts in the zero state.
+
 .SH EXAMPLES
 quilc --isa "8Q" < file.quil
 .RS
