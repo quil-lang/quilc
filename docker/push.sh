@@ -10,7 +10,10 @@ then
     bamboo_DOCKER_IMAGE_TAG="latest"
 elif [ "$GIT_BRANCH_NAME" = "master" ]
 then
-    echo "Custom build on master, so using overridden bamboo tag"
+    STABLE="stable"
+    echo "Custom release build on master, so using overridden bamboo tag and updating stable"
+    docker tag quilc docker.lab.rigetti.com/qcs/quilc:$STABLE
+    docker push docker.lab.rigetti.com/qcs/quilc:$STABLE
 elif [ "$GIT_BRANCH_NAME" != "master" ] && [ -z "$bamboo_DOCKER_IMAGE_TAG" ]
 then
     echo "Standard build on a branch, so using the branch name as tag"
