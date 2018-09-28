@@ -92,17 +92,20 @@
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
     (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
+    #-forest-sdk
     (("verbose") :type boolean :optional t :documentation "verbose compiler trace output")
+    #-forest-sdk
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
+    #-forest-sdk
     (("print-logical-schedule" #\s) :type boolean :optional t :documentation "include logically parallelized schedule in JSON output; requires -p")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
     (("enable-state-prep-reductions") :type boolean :optional t :documentation "assume that the program starts in the ground state")
-    (("protoquil" #\p) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
-    (("help" #\? #\h) :optional t :documentation "print this help information and exit")
+    (("protoquil" #\P) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
+    (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
     (("server-mode" #\S) :type boolean :optional t :documentation "run as a server")
-    (("port") :type integer :optional t :documentation "port to run the server on")
+    (("port" #\p) :type integer :optional t :documentation "port to run the server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
-    (("version" #\v) :optional t :documentation "print version information")))
+    (("version" #\v) :type boolean :optional t :documentation "print version information")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))

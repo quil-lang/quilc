@@ -21,20 +21,18 @@ PyQuil.
 .SH OPTIONS
 .IP "-S, --server"
 (Server Mode) Run the compiler in Server Mode. This starts an HTTP server.
-.IP "-?, -h, --help"
+.IP "-p <port>, --port <port>"
+(Server Mode) Run quilc in server mode on port <port>.
+.IP "-h, --help"
 Show the help message.
 .IP "-v, --version"
 Show the version.
-.IP "--verbose"
-Print what the compiler is thinking. (Warning: It thinks a lot.)
 .IP "--isa <string>"
 Compile for the qubit architecture defined by <string>, which can be
 either 8Q, 20Q, 16QMUX, or a path to a QPU description file.
-.IP "-p, --protoquil"
+.IP "-P, --protoquil"
 Prescribe that the input and output must be ProtoQuil, which is Quil
 that is comprised of gates and measurements, with no control flow.
-.IP "--port <port>"
-(Server Mode) Run quilc in server mode on port <port>.
 .IP "-d, --compute-gate-depth"
 Print a calculated gate depth for the provided circuit as an appended
 Quil comment. (Requires -p.)
@@ -73,11 +71,6 @@ pi) in compiled output.
 .IP "--prefer-gate-ladders"
 Use gate ladders, instead of the SWAP gate, to implement long-ranged
 gates, when possible.
-.IP "-j, --json-serialize"
-Serialize the output of compilation as a JSON object.
-.IP "-s, --print-logical-schedule"
-Include the logically parallelized schedule in JSON output. (Requires
--p.)
 .IP "-m, --compute-matrix-reps"
 Print the matrix representation of a compiled ProtoQuil
 program. Additionally, verify that this matrix matches the matrix
