@@ -292,7 +292,8 @@
            (when (and *protoquil* *compute-matrix-reps*)
              (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code program) 'list) program)))
          (quil::*compiler-noise-stream* *verbose*)
-         (*statistics-dictionary* (make-hash-table :test 'equal)))
+         (*statistics-dictionary* (make-hash-table :test 'equal))
+         (*random-state* (make-random-state t)))
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
         (quil::compiler-hook program chip-specification :protoquil *protoquil*)
