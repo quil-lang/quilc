@@ -139,7 +139,7 @@
   (command-line-arguments:show-option-help *option-spec* :sort-names t))
 
 (defun show-version ()
-  (format t "~A (cl-quil: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
+  (format t "~A (library: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
 
 
 
