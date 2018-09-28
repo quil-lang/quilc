@@ -182,11 +182,10 @@
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
 	 (pauli (quil.clifford:pauli-from-string
 		 (with-output-to-string (s)
-		   (loop :for i :in qubits
-		      :do
-		      (cond ((member i pauli-indices)
-			     (format s (nth (position i pauli-indices) pauli-terms)))
-			    (T (format s "I")))))))
+                   (dolist (i qubits)
+                     (cond ((member i pauli-indices)
+                            (write-string (nth (position i pauli-indices) pauli-terms) s))
+                           (T (write-string "I" s)))))))
          (clifford (cl-quil.clifford::embed (quil.clifford::clifford-from-quil clifford-program)
                                             (length qubits)
                                             (loop :for index :in clifford-indices :collect (position index qubits))))
@@ -206,7 +205,6 @@
          (quil-program (quil::parse-quil quil-instructions))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
                               (gethash "target-device" json)))
-         (*protoquil* t)
          (*statistics-dictionary* (process-program quil-program chip-specification)))
 
     ;; update the program with the compiled version
