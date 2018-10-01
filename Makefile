@@ -35,6 +35,7 @@ quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp 
 		 --eval '(push :hunchentoot-no-ssl *features*)' \
 		 --asdf-path . \
 		 --load-system quilc \
+                 --eval '(quilc::setup-debugger)' \
 		 --compress-core \
 		 --entry quilc::entry-point
 

@@ -141,12 +141,22 @@
 (defun show-version ()
   (format t "~A (library: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
 
+(defun command-line-debugger (condition previous-hook)
+  (declare (ignore previous-hook))
+  (format *error-output* "~&Fatal ~A: ~%  ~A~%"
+          (type-of condition)
+          condition)
+  (force-output *error-output*)
+  (uiop:quit 1))
 
-
-
+(defun setup-debugger ()
+  #+forest-sdk
+  (setf *debugger-hook* 'command-line-debugger)
+  #-forest-sdk
+  (disable-debugger))
 
 (defun entry-point (argv)
-  (disable-debugger)
+  (setup-debugger)
   
   ;; grab the CLI arguments
   (setf *program-name* (pop argv))
