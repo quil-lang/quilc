@@ -63,8 +63,12 @@
       (with-output-to-string (s)
         (yason:encode
          (alexandria:plist-hash-table
-          (list "error_type" "quilc_error"
-                "status" error))
+          (list* "error_type" "quilc_error"
+                 #-forest-sdk
+                 (list
+                  "status" error)
+                 #+forest-sdk
+                 nil))
          s))
       (call-next-method)))
 
@@ -107,6 +111,15 @@
   (setq tbnl:*show-lisp-errors-p* t
         tbnl:*show-lisp-backtraces-p* t
         tbnl:*catch-errors-p* t)
+
+  #+forest-sdk
+  (setq tbnl:*log-lisp-backtraces-p* nil
+        tbnl:*log-lisp-errors-p* nil
+        tbnl:*show-lisp-errors-p* nil
+        tbnl:*show-lisp-backtraces-p* nil
+        tbnl:*catch-errors-p* t)
+  (tbnl:reset-session-secret)
+
   (unless (zerop *time-limit*)
     (setq tbnl:*default-connection-timeout* (/ *time-limit* 1000)))
   (setq *app* (make-instance 'vhost
