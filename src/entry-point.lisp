@@ -135,10 +135,24 @@
              (princ matrix s))
            (coerce #(#\Newline #\#) 'string))))
 
+(defvar *nick-banner* t)
+
 (defun show-banner ()
-  (format t "****************************************~%")
-  (format t "* Welcome to the Rigetti Quil Compiler *~%")
-  (format t "****************************************~%")
+  (cond
+    (*nick-banner*
+     (write-string "
++-----------------+
+|  W E L C O M E  |
+|   T O   T H E   |
+|  R I G E T T I  |
+|     Q U I L     |
+| C O M P I L E R |
++-----------------+
+"))
+    (t
+     (format t "****************************************~%")
+     (format t "* Welcome to the Rigetti Quil Compiler *~%")
+     (format t "****************************************~%")))
   (format t "Copyright (c) 2018 Rigetti Computing.~2%")
   #+forest-sdk
   (format t "This is a part of the Forest SDK. By using this program~%~
