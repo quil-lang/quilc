@@ -135,6 +135,17 @@
              (princ matrix s))
            (coerce #(#\Newline #\#) 'string))))
 
+(defun show-banner ()
+  (format t "****************************************~%")
+  (format t "* Welcome to the Rigetti Quil Compiler *~%")
+  (format t "****************************************~%")
+  (format t "Copyright (c) 2018 Rigetti Computing.~2%")
+  #+forest-sdk
+  (format t "This is a part of the Forest SDK. By using this program~%~
+             you agree to the End User License Agreement (EULA) supplied~%~
+             with this program. If you did not receive the EULA, please~%~
+             contact <support@rigetti.com>.~2%"))
+
 (defun show-help ()
   (format t "Usage:~%")
   (format t "  ~A [options]~%" *program-name*)
@@ -263,6 +274,7 @@
          (setf *server-port* port))
        
        ;; launch the polling loop
+       (show-banner)
        (start-server))
       
       ;; server mode not requested, so continue parsing arguments
