@@ -140,8 +140,7 @@
 (defun show-banner ()
   (cond
     (*nick-banner*
-     (write-string "
-+-----------------+
+     (write-string "+-----------------+
 |  W E L C O M E  |
 |   T O   T H E   |
 |  R I G E T T I  |
@@ -284,7 +283,6 @@
        
        ;; configure the server
        (when port
-         (format t "port triggered: ~a.~%" port)
          (setf *server-port* port))
        
        ;; launch the polling loop
