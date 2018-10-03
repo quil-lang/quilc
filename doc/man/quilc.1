@@ -1,4 +1,4 @@
-.TH QUILC 1 "24 September 2018" "0.13.0 (cl-quil: 0.19.0) [e9b41e3]" 
+.TH QUILC 1 "24 September 2018" "0.13.0 (cl-quil: 0.19.0) [e9b41e3]"
 .SH NAME
 quilc \- an optimizing, architecture-independent Quil compiler
 .SH SYNOPSIS
@@ -79,6 +79,82 @@ very expensive operation.)
 .IP "--enable-state-prep-reductions"
 Perform program optimizations by assuming that the quantum state
 starts in the zero state.
+.SH HTTP API
+In Server Mode, the QVM accepts a number of POST requests over HTTP to
+accomplish tasks. In this section, we describe each such request.
+
+(The authors are aware that the usage pattern described isn't making
+use of standard REST conventions.)
+
+The payload of the POST request is always a JSON object (i.e.,
+dictionary).
+
+Compile a program \- Endpoint: /
+.RS
+To compile a Quil program, supply a JSON object with the following
+keys:
+
+    - The value of "uncompiled-quil" or "quil-instructions" (in order
+      of precendence) should be a Quil program in a string.
+
+    - The value of "target-device" should be a device specification.
+
+Returned will be a JSON object with the following keys:
+
+    - The value of "compiled-quil" will be the compiled Quil program
+      as a string.
+
+    - The value of "metadata" will be a collection of statistics about
+      the program that was compiled.
+.RE
+
+Generate a randomized benchmarking sequence \- Endpoint: /rb
+.RS
+The compiler is able to generate uniformly random sequences of
+Clifford gates, along with their inversions, for use with randomized
+benchmarking. The request takes up to four keys:
+
+    - The value of "depth" is the length of the sequence to generate
+      (i.e., the circuit depth).
+
+    - The value of "qubits" is the number of qubits to generate a
+      sequence for. (Currently supported is 1 or 2.)
+
+    - The value of "gateset", which is a list of unitary Quil
+      instructions that represent the gate set which acts as a
+      (possibly overdetermined) collection of generators of the
+      Clifford group. The behavior of a non-generating set is
+      unspecified.
+
+    - Optionally, the value of "seed" which is a positive integer
+      acting as the random number generator seed.
+
+Returned will be a list of elements of the generating set representing
+the randomized benchmarking sequence.
+.RE
+
+Apply a Clifford element \- Endpoint: /apply-clifford
+.RS
+The compiler is able to efficiently conjugate an element of the Pauli
+group by an arbitrary element of the Clifford group. (Recall that
+Clifford group elements stabilize the Pauli group.) The request takes
+up to ??? keys:
+
+    - The value of "clifford" is a Quil program represented as a
+      string. (The consequences are undefined if the program does not
+      represent an element of the Clifford group.)
+
+    - The value of "pauli" is a list of two elements. Each element is
+      itself a list of equal size, where the first list is a list of
+      qubit indexes, and the second list is a list of Pauli strings
+      (i.e., "I", "X", "Y", and "Z"). For instance, [[1,2],["X","Z"]]
+      represents a Pauli operator with Z acting on qubit 1 and X
+      acting on qubit 2.
+
+Returned will be a list of two elements, the first being the the phase
+factor (i.e., 1, i, -1, -i) and the second being the resulting Pauli
+element.
+.RE
 
 .SH EXAMPLES
 quilc --isa "8Q" < file.quil

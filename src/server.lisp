@@ -167,8 +167,8 @@
                (quil.clifford::rb-sequence k n embedded-cliffords)))
            (gateset-label-sequence
              (loop :for clifford-element :in rb-sequence
-	                 :collect (loop :for generator :in clifford-element
-			                            :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
+                   :collect (loop :for generator :in clifford-element
+                                  :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
       (with-output-to-string (s) (yason:encode gateset-label-sequence s)))))
 
 (defun apply-clifford-post (data json api-key user-id)
