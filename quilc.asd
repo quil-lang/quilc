@@ -12,7 +12,7 @@
                #:command-line-arguments
                #:yason
                (:version #:magicl "0.5.0")
-               (:version #:cl-quil "0.21.0")
+               (:version #:cl-quil "0.21.1")
                #:uiop
                #:hunchentoot
                #:bordeaux-threads
