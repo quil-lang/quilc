@@ -135,6 +135,9 @@
      (dispatch-table *app*))
     (push
      (create-prefix/method-dispatcher "/apply-clifford" ':POST (request-handler 'apply-clifford-post))
+     (dispatch-table *app*))
+    (push
+     (create-prefix/method-dispatcher "/version" ':GET 'version-get)
      (dispatch-table *app*)))
   (tbnl:start *app*)
   ;; let the hunchentoot thread take over
@@ -142,6 +145,21 @@
 
 (defun stop-server ()
   (tbnl:stop *app*))
+
+(defun version-get (request)
+  (when (null tbnl:*session*)
+    (tbnl:start-session))
+  (let* ((api-key (tbnl:header-in* ':X-API-KEY request))
+         (user-id (tbnl:header-in* ':X-USER-ID request)))
+    (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%"
+                       api-key user-id)
+    (with-timeout
+        (with-output-to-string (s)
+          (yason:encode (alexandria:alist-hash-table
+                         `(("cl-quil" . ,+CL-QUIL-VERSION+)
+                           ("quilc"   . ,+QUILC-VERSION+)
+                           ("githash" . ,+GIT-HASH+)))
+                        s)))))
 
 (defun rb-post (data json api-key user-id)
   "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON are:
