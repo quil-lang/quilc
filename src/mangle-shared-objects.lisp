@@ -21,7 +21,7 @@
         (original-path (sb-alien::shared-object-pathname shared-object)))
     (let ((dylib (first (member (file-namestring original-path)
                                 dylibs-to-replace
-                                :test 'equalp))))
+                                :test 'string-equal))))
       (when dylib
         (let ((new-path
                (merge-pathnames dylib "/usr/local/lib/rigetti/")))
