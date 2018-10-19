@@ -105,7 +105,8 @@
     (("server-mode" #\S) :type boolean :optional t :documentation "run as a server")
     (("port" #\p) :type integer :optional t :documentation "port to run the server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
-    (("version" #\v) :type boolean :optional t :documentation "print version information")))
+    (("version" #\v) :type boolean :optional t :documentation "print version information")
+    (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
@@ -167,6 +168,19 @@
 
 (defun show-version ()
   (format t "~A (library: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
+
+(defun check-libraries ()
+  "Check that the foreign libraries are adequate. Exits with status
+  0 if so, 1 if not."
+  #+sbcl
+  (format t "SB-SYS:*SHARED-OBJECTS*:~%  ~S~%"
+          sb-sys:*shared-objects*)
+  (unless (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_"
+                                                               'magicl.foreign-libraries:liblapack)
+    (format t "Missing ZUNCSD~%")
+    (uiop:quit 1))
+  (format t "Library check passed~%")
+  (uiop:quit 0))
 
 (defun command-line-debugger (condition previous-hook)
   (declare (ignore previous-hook))
@@ -235,6 +249,7 @@
                              (enable-state-prep-reductions nil)
                              (protoquil nil)
                              (version nil)
+                             (check-libraries nil)
                              (server-mode nil)
                              (port *server-port*)
                              time-limit
@@ -245,7 +260,9 @@
   (when version
     (show-version)
     (uiop:quit 0))
-  
+  (when check-libraries
+    (check-libraries))
+
   (when (plusp time-limit)
     (setf *time-limit* (/ time-limit 1000.0d0)))
   
