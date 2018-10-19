@@ -35,11 +35,13 @@ quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp 
 		 --eval '(push :hunchentoot-no-ssl *features*)' \
 		 --asdf-path . \
 		 --load-system quilc \
+		 $(FOREST_SDK_LOAD) \
                  --eval '(quilc::setup-debugger)' \
 		 --compress-core \
 		 --entry quilc::entry-point
 
 quilc-sdk: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
+quilc-sdk: FOREST_SDK_LOAD=--load src/mangle-shared-objects.lisp
 quilc-sdk: clean clean-cache quilc
 
 quilc-unsafe: system-index.txt
