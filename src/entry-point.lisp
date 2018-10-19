@@ -173,13 +173,13 @@
   "Check that the foreign libraries are adequate. Exits with status
   0 if so, 1 if not."
   #+sbcl
-  (format t "SB-SYS:*SHARED-OBJECTS*:~%  ~S~%"
-          sb-sys:*shared-objects*)
+  (format t "Loaded libraries:~%~{  ~A~%~}~%"
+          (mapcar 'sb-alien::shared-object-pathname sb-sys:*shared-objects*))
   (unless (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_"
                                                                'magicl.foreign-libraries:liblapack)
-    (format t "Missing ZUNCSD~%")
+    (format t "The loaded version of LAPACK is missing necessary functionality.~%")
     (uiop:quit 1))
-  (format t "Library check passed~%")
+  (format t "Library check passed.~%")
   (uiop:quit 0))
 
 (defun command-line-debugger (condition previous-hook)
