@@ -81,13 +81,13 @@
 
 (defparameter *option-spec*
   '((("prefer-gate-ladders") :type boolean :optional t :documentation "uses gate ladders rather than SWAPs to implement long-ranged gates")
-    (("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -p")
-    (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume; requires -p")
-    (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -p")
-    (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity; requires -p")
-    (("compute-2Q-gate-depth" #\2) :type boolean :optional t :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists, requires -p")
-    (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -p")
-    (("compute-unused-qubits" #\u) :type boolean :optional t :documentation "prints unused qubits; requires -p")
+    (("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -P")
+    (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume; requires -P")
+    (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -P")
+    (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity; requires -P")
+    (("compute-2Q-gate-depth" #\2) :type boolean :optional t :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists, requires -P")
+    (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -P")
+    (("compute-unused-qubits" #\u) :type boolean :optional t :documentation "prints unused qubits; requires -P")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
     (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
     (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
@@ -97,12 +97,13 @@
     #-forest-sdk
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
     #-forest-sdk
-    (("print-logical-schedule" #\s) :type boolean :optional t :documentation "include logically parallelized schedule in JSON output; requires -p")
+    (("print-logical-schedule" #\s) :type boolean :optional t :documentation "include logically parallelized schedule in JSON output; requires -P")
     (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", or path to QPU description file")
     (("enable-state-prep-reductions") :type boolean :optional t :documentation "assume that the program starts in the ground state")
     (("protoquil" #\P) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
-    (("server-mode" #\S) :type boolean :optional t :documentation "run as a server")
+    (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server")
+    (("server-mode-rpc" #\R) :type boolean :optional t :documentation "run as an RPCQ server")
     (("port" #\p) :type integer :optional t :documentation "port to run the server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
     (("version" #\v) :type boolean :optional t :documentation "print version information")
@@ -142,7 +143,8 @@
 (defun show-banner ()
   (cond
     (*nick-banner*
-     (write-string "+-----------------+
+     (write-string "~
++-----------------+
 |  W E L C O M E  |
 |   T O   T H E   |
 |  R I G E T T I  |
@@ -151,10 +153,11 @@
 +-----------------+
 "))
     (t
-     (format t "****************************************~%")
-     (format t "* Welcome to the Rigetti Quil Compiler *~%")
-     (format t "****************************************~%")))
-  (format t "Copyright (c) 2018 Rigetti Computing.~2%")
+     (format t "~
+****************************************
+* Welcome to the Rigetti Quil Compiler *
+****************************************
+Copyright (c) 2018 Rigetti Computing.~2%")))
   #+forest-sdk
   (format t "This is a part of the Forest SDK. By using this program~%~
              you agree to the End User License Agreement (EULA) supplied~%~
@@ -256,8 +259,9 @@
                              (version nil)
                              (check-libraries nil)
                              (benchmark nil)
-                             (server-mode nil)
-                             (port *server-port*)
+                             (server-mode-http nil)
+                             (server-mode-rpc nil)
+                             (port nil)
                              time-limit
                              (help nil))
   (when help
@@ -299,12 +303,15 @@
     (reload-foreign-libraries)
     
     (cond
-      ;; server mode requested
-      (server-mode
+      ((and server-mode-http server-mode-rpc)
+       (format t "quilc can only run in either RPCQ or HTTP server mode. Select only one.")
+       (uiop:quit 0))
+      ;; web server mode requested
+      (server-mode-http
        ;; null out the streams
-       (setf *json-stream* (make-broadcast-stream))
-       (setf *human-readable-stream* (make-broadcast-stream))
-       (setf *quil-stream* (make-broadcast-stream))
+       (setf *json-stream* (make-broadcast-stream)
+             *human-readable-stream* (make-broadcast-stream)
+             *quil-stream* (make-broadcast-stream))
        
        ;; configure the server
        (when port
@@ -312,9 +319,25 @@
        
        ;; launch the polling loop
        (show-banner)
-       (start-server))
+       (start-web-server))
       
-      ;; server mode not requested, so continue parsing arguments
+      ;; RPCQ server mode requested
+      (server-mode-rpc
+       ;; null out the streams
+       (setf *json-stream* (make-broadcast-stream)
+             *human-readable-stream* (make-broadcast-stream)
+             *quil-stream* (make-broadcast-stream))
+       
+       ;; configure the server
+       (if port
+           (setf *server-port* port)
+           (setf *server-port* 5555))
+       
+       ;; launch the polling loop
+       (show-banner)
+       (start-rpc-server :port *server-port*))
+      
+      ;; server modes not requested, so continue parsing arguments
       (t
        (cond
          (json-serialize
@@ -361,7 +384,7 @@
         (quil::compiler-hook program chip-specification :protoquil *protoquil*)
       
       ;; if we're supposed to output protoQuil, we need to strip the final HALT
-      ;; instructios from the output
+      ;; instructions from the output
       (when *protoquil*
         (setf (quil::parsed-program-executable-code processed-program)
               (coerce

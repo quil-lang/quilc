@@ -15,8 +15,9 @@
                (:version #:cl-quil "1.0.3")
                #:cl-quil-benchmarking
                #:uiop
-               #:hunchentoot
-               #:bordeaux-threads
+               #:hunchentoot          ; deprecated
+               #:bordeaux-threads     ; deprecated
+               #:rpcq                 ; to replace HUNCHENTOOT and B-T
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
@@ -28,6 +29,7 @@
                (:file "impl/sbcl")
                #+clozure
                (:file "impl/clozure")
-               (:file "server")
+               (:file "web-server")
+               (:file "rpc-server")
                (:file "printers")
                (:file "entry-point")))

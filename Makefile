@@ -29,7 +29,7 @@ system-index.txt: $(QUICKLISP_SETUP)
 		--eval '(ql:quickload "quilc")' \
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
 
-quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp src/server.lisp
+quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp src/web-server.lisp src/rpc-server.lisp
 	buildapp --output quilc \
 		 --manifest-file system-index.txt \
 		 --eval '(push :hunchentoot-no-ssl *features*)' \

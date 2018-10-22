@@ -105,7 +105,7 @@
       ;; what we need, but we keep the object around to pass through.
       (with-timeout (funcall fn data json api-key user-id)))))
 
-(defun start-server ()
+(defun start-web-server ()
   (format-server-log "Starting server: ~a : ~d.~%" *server-host* *server-port*)
 
   (setq tbnl:*show-lisp-errors-p* t
@@ -143,7 +143,7 @@
   ;; let the hunchentoot thread take over
   (loop (sleep 1)))
 
-(defun stop-server ()
+(defun stop-web-server ()
   (tbnl:stop *app*))
 
 (defun version-get (request)
