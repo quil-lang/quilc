@@ -36,7 +36,8 @@ quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp 
 		 --asdf-path . \
 		 --load-system quilc \
 		 $(FOREST_SDK_LOAD) \
-                 --eval '(quilc::setup-debugger)' \
+		 --eval '(quilc::zap-info)' \
+		 --eval '(quilc::setup-debugger)' \
 		 --compress-core \
 		 --entry quilc::entry-point
 
