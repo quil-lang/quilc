@@ -13,6 +13,7 @@
                #:yason
                (:version #:magicl "0.6.0")
                (:version #:cl-quil "1.0.2")
+               #:cl-quil-benchmarking
                #:uiop
                #:hunchentoot
                #:bordeaux-threads

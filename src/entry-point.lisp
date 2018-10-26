@@ -106,7 +106,8 @@
     (("port" #\p) :type integer :optional t :documentation "port to run the server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
     (("version" #\v) :type boolean :optional t :documentation "print version information")
-    (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")))
+    (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")
+    (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
@@ -182,6 +183,10 @@
   (format t "Library check passed.~%")
   (uiop:quit 0))
 
+(defun benchmarks ()
+  (uiop:quit (if (cl-quil-benchmarking:run-benchmarks :verbose t)
+                 0 1)))
+
 (defun command-line-debugger (condition previous-hook)
   (declare (ignore previous-hook))
   (format *error-output* "~&Fatal ~A: ~%  ~A~%"
@@ -250,6 +255,7 @@
                              (protoquil nil)
                              (version nil)
                              (check-libraries nil)
+                             (benchmark nil)
                              (server-mode nil)
                              (port *server-port*)
                              time-limit
@@ -262,6 +268,8 @@
     (uiop:quit 0))
   (when check-libraries
     (check-libraries))
+  (when benchmark
+    (benchmarks))
 
   (when (plusp time-limit)
     (setf *time-limit* (/ time-limit 1000.0d0)))
