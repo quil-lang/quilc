@@ -43,7 +43,8 @@
   (let ((k (rpcq::|RandomizedBenchmarkingRequest-depth| request))
         (n (rpcq::|RandomizedBenchmarkingRequest-qubits| request))
         (gateset (rpcq::|RandomizedBenchmarkingRequest-gateset| request))
-        (seed (rpcq::|RandomizedBenchmarkingRequest-seed| request)))
+        (seed (rpcq::|RandomizedBenchmarkingRequest-seed| request))
+        (interleaver (rpcq::|RandomizedBenchmarkingRequest-interleaver| request)))
     #-sbcl
     (when seed
       (error "Unable to seed the random number generator."))
@@ -51,29 +52,39 @@
       (error "Seed must be a positive integer."))
     (when (> n 2)
       (error "Currently no more than two qubit randomized benchmarking is supported."))
-    (let* ((cliffords (map 'list #'quil.clifford::clifford-from-quil gateset))
-           (qubits-used (map 'list
-                             (alexandria:compose
-                              (lambda (l) (reduce #'union l))
-                              #'cl-quil.clifford::extract-qubits-used #'cl-quil:parse-quil-string)
-                             gateset))
-           (qubits (reduce #'union qubits-used))
+    (let* ((cliffords (mapcar #'quil.clifford::clifford-from-quil gateset))
+           (qubits-used (mapcar (alexandria:compose
+                                 (alexandria:curry #'reduce #'union)
+                                 #'cl-quil.clifford::extract-qubits-used
+                                 #'cl-quil:parse-quil-string)
+                                gateset))
+           (qubits-used-by-interleaver
+             (when interleaver
+               (reduce #'union
+                       (cl-quil.clifford::extract-qubits-used
+                        (cl-quil:parse-quil-string interleaver)))))
+           (qubits (union qubits-used-by-interleaver (reduce #'union qubits-used)))
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
                                      :collect
                                      (quil.clifford:embed clifford n
                                                           (loop :for index :in (nth i qubits-used)
                                                                 :collect (position index qubits)))))
+           (embedded-interleaver
+             (when interleaver
+               (quil.clifford:embed (quil.clifford::clifford-from-quil interleaver)
+                                    n
+                                    (loop :for index :in qubits-used-by-interleaver
+                                          :collect (position index qubits)))))
            (rb-sequence
              (let ((*random-state*
                      #+sbcl (if seed (sb-ext:seed-random-state seed) *random-state*)
                      #-sbcl *random-state*))
-               (quil.clifford::rb-sequence k n embedded-cliffords)))
+               (quil.clifford::rb-sequence k n embedded-cliffords embedded-interleaver)))
            (gateset-label-sequence
              (loop :for clifford-element :in rb-sequence
                    :collect (loop :for generator :in clifford-element
                                   :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
-      (format *debug-io* "~a, ~a~%" (type-of gateset-label-sequence) gateset-label-sequence)
       (make-instance 'rpcq::|RandomizedBenchmarkingResponse|
                      :|sequence| gateset-label-sequence))))
 
