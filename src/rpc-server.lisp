@@ -114,13 +114,13 @@
                                            (quil.clifford::base4-list pauli-out))))))
 
 (defun rewrite-arithmetic (request)
-  ""
+  "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
-  (let (program (rpcq::|RewriteArithmeticRequest-program| request))
+  (let ((program (rpcq::|RewriteArithmeticRequest-program| request)))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
       (make-instance 'rpcq::|RewriteArithmeticResponse|
-                     :|program| rewritten-program
+                     :|quil| rewritten-program
                      :|original_memory_descriptors| original-memory-descriptors
                      :|recalculation_table| recalculation-table))))
 
