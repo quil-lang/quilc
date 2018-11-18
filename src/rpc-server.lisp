@@ -113,6 +113,17 @@
                                    (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                            (quil.clifford::base4-list pauli-out))))))
 
+(defun rewrite-arithmetic (request)
+  ""
+  (check-type request rpcq::|RewriteArithmeticRequest|)
+  (let (program (rpcq::|RewriteArithmeticRequest-program| request))
+    (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
+        (cl-quil::rewrite-arithmetic program)
+      (make-instance 'rpcq::|RewriteArithmeticResponse|
+                     :|program| rewritten-program
+                     :|original_memory_descriptors| original-memory-descriptors
+                     :|recalculation_table| recalculation-table))))
+
 
 (defun start-rpc-server (&key (port 5555))
   (let ((dt (rpcq:make-dispatch-table)))
@@ -120,6 +131,7 @@
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
     (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
+    (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
                        :logging-stream *error-output*
