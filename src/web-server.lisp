@@ -137,6 +137,9 @@
      (create-prefix/method-dispatcher "/apply-clifford" ':POST (request-handler 'apply-clifford-post))
      (dispatch-table *app*))
     (push
+     (create-prefix/method-dispatcher "/rewrite-arithmetic" ':POST (request-handler 'rewrite-arithmetic-post))
+     (dispatch-table *app*))
+    (push
      (create-prefix/method-dispatcher "/version" ':GET 'version-get)
      (dispatch-table *app*)))
   (tbnl:start *app*)
@@ -160,6 +163,44 @@
                            ("quilc"   . ,+QUILC-VERSION+)
                            ("githash" . ,+GIT-HASH+)))
                         s)))))
+
+(defun rewrite-arithmetic-post (data json api-key user-id)
+  "Rewrites the request program without arithmetic in gate parameters.  Expects a JSON payload of the form
+
+{
+    \"program\": original program as a raw Quil string
+},
+
+and replies with the JSON
+
+{
+    \"quil\": the rewritten program, again as a Quil string,
+    \"original_memory_descriptors\": list of memory region descriptions as strings containing DECLARE directives,
+    \"recalculation_table\": dictionary with keys memory references and values text containing parameter expressions
+}."
+  (declare (ignore data api-key user-id))
+  (let ((program (quil::parse-quil (gethash "program" json))))
+    (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
+        (cl-quil::rewrite-arithmetic program)
+      (let (reformatted-omd
+            (reformatted-rt (make-hash-table)))
+        (setf reformatted-omd (mapcar (lambda (memory-defn)
+                                        (with-output-to-string (s)
+                                          (format s "DECLARE ~a ~a"
+                                                  (quil::memory-descriptor-name memory-defn)
+                                                  (quil::quil-type-string (quil::memory-descriptor-type memory-defn)))))
+                                      original-memory-descriptors))
+        (maphash (lambda (key val)
+                   (setf (gethash (quil::print-instruction key nil) reformatted-rt)
+                         (quil::print-instruction val nil)))
+                 recalculation-table)
+        (with-output-to-string (s)
+          (yason:encode
+           (alexandria:plist-hash-table (list "quil" (with-output-to-string (s)
+                                                       (quil::print-parsed-program rewritten-program s))
+                                              "original_memory_descriptors" reformatted-omd
+                                              "recalculation_table" reformatted-rt))
+           s))))))
 
 (defun rb-post (data json api-key user-id)
   "Handle a post request for generating a randomized benchmarking sequence. The keys of JSON are:
