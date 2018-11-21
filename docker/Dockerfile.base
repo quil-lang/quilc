@@ -3,6 +3,9 @@
 ###############################################################################
 FROM rigetticomputing/lisp-base
 
+# need zmq.h
+RUN apt-get install -y libzmq-dev
+
 ###############################################################################
 # quilc dependencies setup
 ###############################################################################
@@ -12,6 +15,7 @@ FROM rigetticomputing/lisp-base
 ADD alexa /src/alexa
 ADD magicl /src/magicl
 ADD cl-quil /src/cl-quil
+ADD rpcq /src/rpcq
 ADD quilc /src/quilc
 
 ###############################################################################
