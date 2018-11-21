@@ -113,6 +113,35 @@
                                    (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                            (quil.clifford::base4-list pauli-out))))))
 
+(defun rewrite-arithmetic (request)
+  "Rewrites the request program without arithmetic in gate parameters."
+  (check-type request rpcq::|RewriteArithmeticRequest|)
+  (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-program| request))))
+    (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
+        (cl-quil::rewrite-arithmetic program)
+      (let ((reformatted-rt (make-hash-table)))
+        (maphash (lambda (key val)
+                   (setf (gethash (make-instance 'rpcq::|ParameterAref|
+                                                 :|name| (quil::memory-ref-name key)
+                                                 :|index| (quil::memory-ref-position key))
+                                  reformatted-rt)
+                         (quil::print-instruction val nil)))
+                 recalculation-table)
+        (make-instance 'rpcq::|RewriteArithmeticResponse|
+                       :|quil|
+                       (with-output-to-string (s)
+                         (quil::print-parsed-program rewritten-program))
+                       :|original_memory_descriptors|
+                       (alexandria:alist-hash-table
+                        (mapcar (lambda (memory-defn)
+                                  (cons (quil::memory-descriptor-name memory-defn)
+                                        (make-instance 'rpcq::|ParameterSpec|
+                                                       :|type| (quil::quil-type-string (quil::memory-descriptor-type memory-defn))
+                                                       :|length| (quil::memory-descriptor-length memory-defn))))
+                                original-memory-descriptors))
+                       :|recalculation_table|
+                       reformatted-rt)))))
+
 
 (defun start-rpc-server (&key (port 5555))
   (let ((dt (rpcq:make-dispatch-table)))
@@ -120,6 +149,7 @@
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
     (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
+    (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
                        :logging-stream *error-output*
