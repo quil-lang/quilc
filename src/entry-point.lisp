@@ -108,6 +108,7 @@
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
     (("version" #\v) :type boolean :optional t :documentation "print version information")
     (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")
+    #-forest-sdk
     (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -258,6 +259,7 @@ Copyright (c) 2018 Rigetti Computing.~2%")))
                              (protoquil nil)
                              (version nil)
                              (check-libraries nil)
+                             #-forest-sdk
                              (benchmark nil)
                              (server-mode-http nil)
                              (server-mode-rpc nil)
@@ -272,6 +274,7 @@ Copyright (c) 2018 Rigetti Computing.~2%")))
     (uiop:quit 0))
   (when check-libraries
     (check-libraries))
+  #-forest-sdk
   (when benchmark
     (benchmarks))
 

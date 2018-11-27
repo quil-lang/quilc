@@ -3,13 +3,13 @@
 ;;;; This is loaded (as with CL:LOAD) before the final image is saved
 ;;;; by buildapp.
 ;;;;
-;;;; Rewrites shared library references to libblas.dylib and
-;;;; liblapack.dylib on Mac SDK targets to use the Rigetti package
-;;;; path /usr/local/lib/rigetti. This is so the exact
-;;;; Rigetti-provided versions of these libraries are found when the
-;;;; SDK binary starts up. If these were not rewritten, the SDK binary
-;;;; could try to load from non-existent Brew paths or inadequate
-;;;; Accelerate-related system paths.
+;;;; Rewrites shared library references to certain dylibs on Mac SDK
+;;;; targets to use the Rigetti package path
+;;;; /usr/local/lib/rigetti. This is so the exact Rigetti-provided
+;;;; versions of these libraries are found when the SDK binary starts
+;;;; up. If these were not rewritten, the SDK binary could try to load
+;;;; from non-existent Brew paths or inadequate Accelerate-related
+;;;; system paths.
 ;;;;
 ;;;; Has no effect on non-Mac targets.
 
@@ -17,7 +17,8 @@
 
 (dolist (shared-object sb-sys:*shared-objects*)
   (let ((dylibs-to-replace '("libblas.dylib"
-                             "liblapack.dylib"))
+                             "liblapack.dylib"
+                             "libzmq.dylib"))
         (original-path (sb-alien::shared-object-pathname shared-object)))
     (let ((dylib (first (member (file-namestring original-path)
                                 dylibs-to-replace
