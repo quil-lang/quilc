@@ -145,7 +145,7 @@
 (defun show-banner ()
   (cond
     (*nick-banner*
-     (write-string "~
+     (format t "~
 +-----------------+
 |  W E L C O M E  |
 |   T O   T H E   |
