@@ -103,6 +103,7 @@
     (("protoquil" #\P) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
     (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server")
+    #-forest-sdk
     (("server-mode-rpc" #\R) :type boolean :optional t :documentation "run as an RPCQ server")
     (("port" #\p) :type integer :optional t :documentation "port to run the server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
