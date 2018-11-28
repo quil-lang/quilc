@@ -106,7 +106,7 @@
       (with-timeout (funcall fn data json api-key user-id)))))
 
 (defun start-web-server ()
-  (format-server-log "Starting server: ~a : ~d.~%" *server-host* *server-port*)
+  (format-server-log "Starting server: ~a : ~d." *server-host* *server-port*)
 
   (setq tbnl:*show-lisp-errors-p* t
         tbnl:*show-lisp-backtraces-p* t
