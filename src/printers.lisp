@@ -81,10 +81,21 @@
             volume)))
 
 (defun print-unused-qubits (lschedule chip-specification)
-  (let ((unused-qubits
-          (loop :for i :below (length (first (quil::chip-specification-objects chip-specification)))
-                :unless (member i (quil::lscheduler-quantum-resources lschedule))
-                  :collect i)))
+  (let* ((lscheduler-resources
+           (let ((collect (quil::make-null-resource)))
+             (quil::lscheduler-walk-graph
+              lschedule
+              :bump-value (lambda (instr value)
+                            (setf collect
+                                  (quil::resource-union collect
+                                                        (quil::instruction-resources instr)))
+                            value))
+             collect))
+         (unused-qubits
+           (loop :for i :below (length (quil::vnth 0 (quil::chip-specification-objects chip-specification)))
+                 :unless (quil::resources-intersect-p (quil::make-qubit-resource i)
+                                                      lscheduler-resources)
+                   :collect i)))
     (setf (gethash "unused_qubits" *statistics-dictionary*) unused-qubits)
     (format *human-readable-stream*
             "# Unused qubit list: ~{~a~^, ~}~%"
