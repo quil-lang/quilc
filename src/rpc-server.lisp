@@ -5,6 +5,12 @@
 (in-package #:quilc)
 
 
+(defun extract-version ()
+  (alexandria:alist-hash-table
+   `(("cl-quil" . ,+CL-QUIL-VERSION+)
+     ("quilc"   . ,+QUILC-VERSION+)
+     ("githash" . ,+GIT-HASH+))))
+
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
 (defun quil-to-native-quil (request)
@@ -143,14 +149,17 @@
                        reformatted-rt)))))
 
 
-(defun start-rpc-server (&key (port 5555))
+(defun start-rpc-server (&key
+                           (port 5555)
+                           (logging-stream *error-output*))
   (let ((dt (rpcq:make-dispatch-table)))
     (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil)
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
     (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
+    (rpcq:dispatch-table-add-handler dt 'extract-version :name "version")
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
-                       :logging-stream *error-output*
+                       :logging-stream logging-stream
                        :timeout 60)))
