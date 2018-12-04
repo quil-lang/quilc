@@ -322,6 +322,13 @@
        
        ;; launch the polling loop
        (show-banner)
+       (format t "~%
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
+future, it will be removed.  You're advised to modify your client code to talk
+to the RPCQ version instead.
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~%~%")
        (start-web-server))
       
       ;; RPCQ server mode requested
