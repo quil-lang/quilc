@@ -17,5 +17,5 @@
   :components ((:file "package")
                (:file "suite")
                (:file "faithfulness-tests")
-               )
-  )
+               (:file "rpcq-tests")
+               ))
