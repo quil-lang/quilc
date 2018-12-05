@@ -156,7 +156,7 @@
     (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil)
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
-    (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford :name "apply-clifford")
+    (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
     (rpcq:dispatch-table-add-handler dt 'get-version-info)
     (rpcq:start-server :dispatch-table dt
