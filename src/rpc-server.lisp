@@ -122,7 +122,7 @@
 (defun rewrite-arithmetic (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
-  (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-program| request))))
+  (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-quil| request))))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
       (let ((reformatted-rt (make-hash-table)))
@@ -136,7 +136,7 @@
         (make-instance 'rpcq::|RewriteArithmeticResponse|
                        :|quil|
                        (with-output-to-string (s)
-                         (quil::print-parsed-program rewritten-program))
+                         (quil::print-parsed-program rewritten-program s))
                        :|original_memory_descriptors|
                        (alexandria:alist-hash-table
                         (mapcar (lambda (memory-defn)
@@ -156,7 +156,7 @@
     (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil)
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
-    (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
+    (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford :name "apply-clifford")
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
     (rpcq:dispatch-table-add-handler dt 'extract-version :name "version")
     (rpcq:start-server :dispatch-table dt
