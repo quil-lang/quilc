@@ -5,7 +5,7 @@
 (in-package #:quilc)
 
 
-(defun extract-version ()
+(defun get-version-info ()
   (alexandria:alist-hash-table
    `(("cl-quil" . ,+CL-QUIL-VERSION+)
      ("quilc"   . ,+QUILC-VERSION+)
@@ -158,7 +158,7 @@
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
     (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford :name "apply-clifford")
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
-    (rpcq:dispatch-table-add-handler dt 'extract-version :name "version")
+    (rpcq:dispatch-table-add-handler dt 'get-version-info)
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
                        :logging-stream logging-stream

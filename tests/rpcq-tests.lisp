@@ -10,7 +10,7 @@
     (sleep 1)
     (unwind-protect
          (rpcq:with-rpc-client (client "tcp://127.0.0.1:5555")
-           (let ((hash (rpcq:rpc-call client "version")))
+           (let ((hash (rpcq:rpc-call client "get-version-info")))
              (is (typep hash 'hash-table))))
       (bt:destroy-thread server-thread))))
 
