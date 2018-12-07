@@ -250,7 +250,7 @@ and replies with the JSON
  * \"qubits\": integer representing the number of qubits involved in the circuit.
  * \"gateset\", list of strings, each representing a Clifford gate as a Quil program."
   (declare (ignore data api-key user-id))
-  (check-payload-for-keys "depth" "qubits" "gateset")
+  (check-payload-for-keys json "depth" "qubits" "gateset")
   (let* ((k (gethash "depth" json))
          (n (gethash "qubits" json))
          (gateset (gethash "gateset" json))
