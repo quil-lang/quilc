@@ -57,20 +57,27 @@
    :error-template-directory nil
    :persistent-connections-p t))
 
+(defmethod tbnl:acceptor-status-message ((acceptor vhost) (http-return-code (eql #.tbnl:+http-not-found+)) &key &allow-other-keys)
+  (load-time-value
+   (with-output-to-string (s)
+     (yason:encode
+      (alexandria:plist-hash-table
+       (list "error_type" "quilc_error"
+             "status" "invalid endpoint"))
+      s))
+   t))
 
-(defmethod tbnl:acceptor-status-message ((acceptor vhost) http-status-code &key error &allow-other-keys)
-  (if (eql http-status-code tbnl:+http-internal-server-error+)
-      (with-output-to-string (s)
-        (yason:encode
-         (alexandria:plist-hash-table
-          (list* "error_type" "quilc_error"
-                 #-forest-sdk
-                 (list
-                  "status" error)
-                 #+forest-sdk
-                 nil))
-         s))
-      (call-next-method)))
+(defmethod tbnl:acceptor-status-message ((acceptor vhost) (http-status-code (eql #.tbnl:+http-internal-server-error+)) &key error &allow-other-keys)
+  (with-output-to-string (s)
+    (yason:encode
+     (alexandria:plist-hash-table
+      (list* "error_type" "quilc_error"
+             #-forest-sdk
+             (list
+              "status" error)
+             #+forest-sdk
+             nil))
+     s)))
 
 (defun create-prefix/method-dispatcher (prefix method handler)
   "Return a function such that given a request, return the handler function HANDLER only when the METHOD (e.g., :POST) matches, and when the request has a URI that is *prefixed* by the string PREFIX."
