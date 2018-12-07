@@ -105,21 +105,32 @@
         (dispatch-table vhost))
   (call-next-method))
 
-(defun request-handler (fn)
-  "Given a function FN that takes DATA, JSON, API-KEY, and USER-ID, produce a new function which takes a request and properly unpacks it, calling the function."
+(defun request-handler (fn &key allow-empty-payloads)
+  "Given a function FN that takes DATA, JSON, API-KEY, and USER-ID, produce a new function which takes a request and properly unpacks it, calling the function.
+
+If ALLOW-EMPTY-PAYLOADS is true, then an empty payload resolves to the same thing as the JSON object {}."
   (lambda (request)
     (when (null tbnl:*session*)
       (tbnl:start-session))
-    (let* ((data (hunchentoot:raw-post-data :request request :force-text t))
-           (json (yason:parse data))
-           (api-key (tbnl:header-in* ':X-API-KEY request))
-           (user-id (tbnl:header-in* ':X-USER-ID request)))
-      (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%" api-key
-                         user-id)
-      ;; we expect to get the guts of a Canopy POST: { type: string, addresses:
-      ;; array, trials: integer, quil-instructions: string, isa: string } we decode
-      ;; what we need, but we keep the object around to pass through.
-      (with-timeout (funcall fn data json api-key user-id)))))
+    (let ((data (hunchentoot:raw-post-data :request request :force-text t)))
+      ;; Some helpful checking.
+      (cond
+        ((and (null data) allow-empty-payloads) (setf data "{}"))
+        ((not (stringp data)) (error "Invalid payload in POST request. Was it empty?")))
+      ;; Proceed with parsing.
+      (let ((json (yason:parse data))
+            (api-key (tbnl:header-in* ':X-API-KEY request))
+            (user-id (tbnl:header-in* ':X-USER-ID request)))
+        (unless (hash-table-p json)
+          (error "The JSON payload parsed as something other than a ~
+                  JSON object. The payload was: ~S"
+                 data))
+        (format-server-log "Processing request from API-key/user-ID: ~s / ~s~%"
+                           api-key user-id)
+        ;; we expect to get the guts of a Canopy POST: { type: string, addresses:
+        ;; array, trials: integer, quil-instructions: string, isa: string } we decode
+        ;; what we need, but we keep the object around to pass through.
+        (with-timeout (funcall fn data json api-key user-id))))))
 
 (defun start-web-server ()
   (format-server-log "Starting server: ~a : ~d." *server-host* *server-port*)
@@ -180,7 +191,7 @@
   "Check that the parsed JSON payload PAYLOAD has all of the keys KEYS present."
   (check-type payload hash-table "Received a JSON payload that wasn't a JSON object.")
   (dolist (key keys)
-    (multiple-value-bind (value exists?) (gethash payload key)
+    (multiple-value-bind (value exists?) (gethash key payload)
       (declare (ignore value))
       (unless exists?
         (error "For this endpoint, expected JSON with the key ~S, ~
