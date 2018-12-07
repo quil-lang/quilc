@@ -76,7 +76,7 @@
   "Return a function such that given a request, return the handler function HANDLER only when the METHOD (e.g., :POST) matches, and when the request has a URI that is *prefixed* by the string PREFIX."
   (check-type prefix string)
   (check-type method symbol)
-  (check-type handler function)
+  (check-type handler (or symbol function))
   (lambda (request)
     (and (eq method (tbnl:request-method request))
          (let ((mismatch (mismatch (tbnl:script-name request) prefix
@@ -90,7 +90,7 @@
   "Return a function such that given a request, return the handler function HANDLER only when the METHOD (e.g., :POST) matches, and when the request has a URI that exactly matches the string EXACT-PREFIX."
   (check-type exact-prefix string)
   (check-type method symbol)
-  (check-type handler function)  
+  (check-type handler (or symbol function))
   (lambda (request)
     (and (eq method (tbnl:request-method request))
          (if (string= exact-prefix (tbnl:script-name request))
