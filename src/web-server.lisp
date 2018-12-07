@@ -73,13 +73,29 @@
       (call-next-method)))
 
 (defun create-prefix/method-dispatcher (prefix method handler)
+  "Return a function such that given a request, return the handler function HANDLER only when the METHOD (e.g., :POST) matches, and when the request has a URI that is *prefixed* by the string PREFIX."
+  (check-type prefix string)
+  (check-type method symbol)
+  (check-type handler function)
   (lambda (request)
     (and (eq method (tbnl:request-method request))
          (let ((mismatch (mismatch (tbnl:script-name request) prefix
                                    :test #'char=)))
-           (and (or (null mismatch)
-                    (>= mismatch (length prefix)))
-                handler)))))
+           (if (or (null mismatch)
+                   (>= mismatch (length prefix)))
+               handler
+               nil)))))
+
+(defun create-exact/method-dispatcher (exact-prefix method handler)
+  "Return a function such that given a request, return the handler function HANDLER only when the METHOD (e.g., :POST) matches, and when the request has a URI that exactly matches the string EXACT-PREFIX."
+  (check-type exact-prefix string)
+  (check-type method symbol)
+  (check-type handler function)  
+  (lambda (request)
+    (and (eq method (tbnl:request-method request))
+         (if (string= exact-prefix (tbnl:script-name request))
+             handler
+             nil))))
 
 (defmethod tbnl:acceptor-dispatch-request ((vhost vhost) request)
   (mapc (lambda (dispatcher)
@@ -127,21 +143,17 @@
                              :port *server-port*
                              :taskmaster (make-instance 'tbnl:one-thread-per-connection-taskmaster)))
   (when (null (dispatch-table *app*))
-    (push
-     (create-prefix/method-dispatcher "/" ':POST (request-handler 'compiler-post))
-     (dispatch-table *app*))
-    (push
-     (create-prefix/method-dispatcher "/rb" ':POST (request-handler 'rb-post))
-     (dispatch-table *app*))
-    (push
-     (create-prefix/method-dispatcher "/apply-clifford" ':POST (request-handler 'apply-clifford-post))
-     (dispatch-table *app*))
-    (push
-     (create-prefix/method-dispatcher "/rewrite-arithmetic" ':POST (request-handler 'rewrite-arithmetic-post))
-     (dispatch-table *app*))
-    (push
-     (create-prefix/method-dispatcher "/version" ':GET 'version-get)
-     (dispatch-table *app*)))
+    (flet ((handle (uri method function &key (requestify t))
+             (push
+              (create-exact/method-dispatcher uri method (if requestify
+                                                             (request-handler function)
+                                                             function))
+              (dispatch-table *app*))))
+      (handle "/"                   ':POST 'compiler-post)
+      (handle "/rb"                 ':POST 'rb-post)
+      (handle "/apply-clifford"     ':POST 'apply-clifford-post)
+      (handle "/rewrite-arithmetic" ':POST 'rewrite-arithmetic-post)
+      (handle "/version"            ':GET  'version-get :requestify nil)))
   (tbnl:start *app*)
   ;; let the hunchentoot thread take over
   (loop (sleep 1)))
@@ -164,6 +176,17 @@
                            ("githash" . ,+GIT-HASH+)))
                         s)))))
 
+(defun check-payload-for-keys (payload &rest keys)
+  "Check that the parsed JSON payload PAYLOAD has all of the keys KEYS present."
+  (check-type payload hash-table "Received a JSON payload that wasn't a JSON object.")
+  (dolist (key keys)
+    (multiple-value-bind (value exists?) (gethash payload key)
+      (declare (ignore value))
+      (unless exists?
+        (error "For this endpoint, expected JSON with the key ~S, ~
+                but it was nowhere to be found."
+               key)))))
+
 (defun rewrite-arithmetic-post (data json api-key user-id)
   "Rewrites the request program without arithmetic in gate parameters.  Expects a JSON payload of the form
 
@@ -179,6 +202,7 @@ and replies with the JSON
     \"recalculation_table\": dictionary with keys memory references and values text containing parameter expressions
 }."
   (declare (ignore data api-key user-id))
+  (check-payload-for-keys json "program")
   (let ((program (quil::parse-quil (gethash "program" json))))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
@@ -208,6 +232,7 @@ and replies with the JSON
  * \"qubits\": integer representing the number of qubits involved in the circuit.
  * \"gateset\", list of strings, each representing a Clifford gate as a Quil program."
   (declare (ignore data api-key user-id))
+  (check-payload-for-keys "depth" "qubits" "gateset")
   (let* ((k (gethash "depth" json))
          (n (gethash "qubits" json))
          (gateset (gethash "gateset" json))
@@ -285,7 +310,11 @@ and replies with the JSON
   "Handle a post request for compiling a quil circuit."
   (declare (ignore data api-key user-id))
   (let* ((quil-instructions (or (gethash "uncompiled-quil" json)
-                                (gethash "quil-instructions" json)))
+                                (gethash "quil-instructions" json)
+                                (error "compiler-post requires the JSON to ~
+                                        have \"uncompiled-quil\" or ~
+                                        \"quil-instructions\", but they ~
+                                        were nowhere to be found.")))
          (quil-program (quil::parse-quil quil-instructions))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
                               (gethash "target-device" json)))

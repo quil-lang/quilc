@@ -25,6 +25,7 @@
                       (funcall compile)))
   :serial t
   :components ((:file "package")
+               (:file "versions")
                #+sbcl
                (:file "impl/sbcl")
                #+clozure
