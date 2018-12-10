@@ -4,7 +4,10 @@
 FROM rigetticomputing/lisp-base
 
 # need zmq.h
-RUN apt-get install -y libzmq-dev
+
+RUN echo "deb https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/ ./" >> /etc/apt/sources.list
+RUN curl https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/Release.key | apt-key add -
+RUN apt-get install -y libzmq3-dev
 
 ###############################################################################
 # quilc dependencies setup
