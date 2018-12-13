@@ -11,6 +11,11 @@
      ("quilc"   . ,+QUILC-VERSION+)
      ("githash" . ,+GIT-HASH+))))
 
+(defun ensure-optional-real (x)
+  (if x
+      (coerce x 'double-float)
+      nil))
+
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
 (defun quil-to-native-quil (request)
@@ -28,8 +33,8 @@
                                   :|gate_depth| (gethash "gate_depth" dictionary)
                                   :|gate_volume| (gethash "gate_volume" dictionary)
                                   :|multiqubit_gate_depth| (gethash "multiqubit_gate_depth" dictionary)
-                                  :|program_duration| (gethash "program_duration" dictionary)
-                                  :|program_fidelity| (gethash "program_fidelity" dictionary)
+                                  :|program_duration| (ensure-optional-real (gethash "program_duration" dictionary))
+                                  :|program_fidelity| (ensure-optional-real (gethash "program_fidelity" dictionary))
                                   :|topological_swaps| (gethash "topological_swaps" dictionary))))
     (make-instance 'rpcq::|NativeQuilResponse|
                    :|quil| (gethash "processed_program" dictionary)
