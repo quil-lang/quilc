@@ -154,9 +154,11 @@
                        reformatted-rt)))))
 
 
+(declaim (special *program-name*))
 (defun start-rpc-server (&key
                            (port 5555)
-                           (logging-stream *error-output*))
+                           (logger (make-instance 'cl-syslog:rfc5424-logger
+                                                  :log-writer (cl-syslog:null-log-writer))))
   (let ((dt (rpcq:make-dispatch-table)))
     (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil)
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
@@ -166,5 +168,5 @@
     (rpcq:dispatch-table-add-handler dt 'get-version-info)
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
-                       :logging-stream logging-stream
+                       :logger logger
                        :timeout 60)))

@@ -15,9 +15,8 @@
       (bt:destroy-thread server-thread))))
 
 (deftest test-quil-roundtrip ()
-  (let* ((logging-stream *debug-io*)
-         (server-function (lambda ()
-                            (quilc::start-rpc-server :logging-stream logging-stream)))
+  (let* ((server-function (lambda ()
+                            (quilc::start-rpc-server)))
          (server-thread (bt:make-thread server-function)))
     (sleep 1)
     (unwind-protect
