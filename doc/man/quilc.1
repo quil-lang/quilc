@@ -73,10 +73,11 @@ pi) in compiled output.
 Use gate ladders, instead of the SWAP gate, to implement long-ranged
 gates, when possible.
 .IP "-m, --compute-matrix-reps"
-Print the matrix representation of a compiled ProtoQuil
-program. Additionally, verify that this matrix matches the matrix
-representation of the input program. (Requires -p. Note that this is a
-very expensive operation.)
+Print and verify the matrix representation of a compiled ProtoQuil
+program. Verification is done by checking that the matrix
+representation of the output program matches the matrix representation
+of the input program. (Requires -p. Note that this is a very expensive
+operation.)
 .IP "--enable-state-prep-reductions"
 Perform program optimizations by assuming that the quantum state
 starts in the zero state.
