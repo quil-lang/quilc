@@ -1,0 +1,4 @@
+# gates with complex params
+
+CPHASE(pi/2) 1 0
+CPHASE(cos(sin(2*pi/3))*cis(-1)*exp(i*pi)) 3 4

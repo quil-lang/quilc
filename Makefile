@@ -29,7 +29,8 @@ system-index.txt: $(QUICKLISP_SETUP)
 		--eval '(ql:quickload "quilc")' \
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
 
-quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp src/web-server.lisp src/rpc-server.lisp
+.PHONY: quilc
+quilc: system-index.txt
 	buildapp --output quilc \
 		 --manifest-file system-index.txt \
 		 --eval '(push :hunchentoot-no-ssl *features*)' \
@@ -63,6 +64,8 @@ quilc-unsafe: system-index.txt
 
 test:
 	$(QUICKLISP) \
+		 --eval "(ql:quickload :cl-quil-tests)" \
+		 --eval "(asdf:test-system :cl-quil)" \
 		 --eval "(ql:quickload :quilc-tests)" \
 		 --eval "(asdf:test-system :quilc)"
 
@@ -75,6 +78,7 @@ test-ccl:
 
 clean:
 	rm -f quilc system-index.txt build-output.log
+	rm -f coverage-report/*.html
 
 clean-cache:
 	@echo "Deleting $(LISP_CACHE)"

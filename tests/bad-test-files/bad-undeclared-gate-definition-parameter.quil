@@ -1,0 +1,5 @@
+# parameter in the body of the gate definition that wasn't declared
+
+DEFGATE FOO(%a):
+    1, %a
+    %a, %b

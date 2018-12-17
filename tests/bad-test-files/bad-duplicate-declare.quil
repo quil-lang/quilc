@@ -1,0 +1,6 @@
+# duplicate DECLARE
+
+DECLARE x BIT
+DECLARE x BIT
+
+NOT x

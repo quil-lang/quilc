@@ -1,0 +1,12 @@
+# valid PRAGMA lines
+
+PRAGMA x
+PRAGMA x y
+PRAGMA x y z
+
+PRAGMA x "something"
+PRAGMA x y "something"
+PRAGMA x y z "something"
+
+PRAGMA ___X_y_Z "s"
+

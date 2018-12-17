@@ -6,7 +6,7 @@
   :description "A CLI compiler for the Quantum Instruction Language (Quil)."
   :author "Eric Peterson <eric@rigetti.com>"
   :version (:read-file-form "VERSION.txt")
-  :pathname "src/"
+  :pathname "app/src/"
   :depends-on (#:cl-ppcre
                #:split-sequence
                #:command-line-arguments

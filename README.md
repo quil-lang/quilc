@@ -1,54 +1,89 @@
-# `quilc` README
+# QUILC
 
-[![Build Status](http://bamboo.lab.rigetti.com/plugins/servlet/wittified/build-status/QCS-QUILC)](http://bamboo.lab.rigetti.com/browse/QCS-QUILC)
+QUILC comprises two projects. The first, `cl-quil`, does the heavy
+lifting of parsing, compiling, and optimizing Quil code. The second,
+`quilc`, presents an external interface for using `cl-quil`, either
+using the binary `quilc` application directly, or alternatively by
+communicating with a server.
 
-## Specification
+## `CL-QUIL`
 
-`quilc` is a program that reads arbitrary[^qubit-restriction] ProtoQuil from standard in and writes Quil to standard out which can be directly instantiated on an 8Q chip arranged in a ring topology with the native gate set {±X/2, RZ, CZ}.[^future-plans]
+`CL-QUIL` is the library that implements lexing, parsing, and
+compiling of Quil code. The code can be found under `./src/`.
 
-[^qubit-restriction]: Currently, the input program is required to use only qubits 0-7.
+### Usage
 
-[^future-plans]: We will soon loosen this considerably. A user will be able to specify a chip design and ISA by passing a command-line parameter, and `quilc` will target this instead.
+Follow the instructions in `docs/lisp-setup.md` to satisfy the
+dependencies required to load the `CL-QUIL` library. Afterwhich, the
+library can be loaded 
 
-## Compilation
+``` shell
+$ sbcl
 
-After installing and compiling `CL-QUIL`, the `quilc` binary can be built by running
-
-```
-$ make quilc
-```
-
-from within the `CL-QUIL` root directory.  This deposits the binary into the root directory as well.
-
-## Invocation
-
-`quilc` takes no command-line arguments.  It reads ProtoQuil in from standard-in and writes ProtoQuil to standard-out. The program is preceded by a pragma of the form
-
-```
-PRAGMA EXPECTED_REWIRING "#(n0 n1 ... n7)"
-```
-
-which means that any state preparation intended for the logical `j`th qubit should instead be done on the `nj`th physical qubit. Similarly, the program is followed by a pragma of the form
-
-```
-PRAGMA CURRENT_REWIRING "#(m0 m1 ... m7)"
+* (ql:quickload :cl-quil)
+;;; <snip>compilation output</snip>
+(:CL-QUIL)
+* (cl-quil:parse-quil-string "H 0")
+#<CL-QUIL:PARSED-PROGRAM {100312C643}>
 ```
 
-which indicates that readout intended for the `j`th logical qubit should be measured from the `mj`th physical qubit.
+A few good entry points to exploring the library are:
 
-## An example Python hook
+* The functions `cl-quil::parse-quil` in
+   [`src/parser.lisp`](src/parser.lisp), and
+   `cl-quil:parse-quil-string` in
+   [`src/cl-quil.lisp`](src/cl-quil.lisp) and the various transforms
+   therein.
+* The function `cl-quil:compiler-hook` which constructs a control-flow
+  graph (CFG) and then performs various optimizations on the CFG.
 
-The following Python snippet indicates how to use the `quilc` compiler from within pyQuil.  The function `compile_program` takes a pyQuil `Program` object as its argument and returns the output of `quilc` on that object as another `Program` object.
+## Quil Compiler
 
-```
-from subprocess import Popen, PIPE, STDOUT
-from pyquil.quil import Program
+This directory contains the `quilc` application. `quilc` takes as
+input arbitrary Quil code, either provided directly to the binary or
+to the `quilc` server, and produces optimized Quil code. The compiled
+code is optimized for the configured instruction set architecture
+(ISA), targeting the native gates specified by the ISA.
 
-# old_program is a pyQuil program object.
-# This returns a new pyQuil program object
-def compile_program(old_program):
-    old_program_text = "{}".format(old_program)
-    p = Popen(['/path/to/cl-quil/quilc'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-    out_pipe = p.communicate(input=old_program_text)[0]
-    return Program(out_pipe.decode().encode('ascii').split('\n'))
-```
+### Building the Quil Compiler
+
+Prerequisites to building `quilc` are:
+0. Standard unix build tools
+1. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp
+   compiler
+2. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library
+   manager
+3. [buildapp](https://github.com/xach/buildapp): Builds executable
+   binaries from Common Lisp software
+4. [CL-QUIL](https://github.com/rigetti/cl-quil): The Common Lisp Quil
+   compiler
+
+Building the `quilc` binary is automated using the `Makefile`:
+
+    make quilc
+
+### Using the Quil Compiler
+
+The Quil Compiler provides two modes of interaction: (1) communicating
+directly with the `quilc` binary, providing your Quil code over
+`stdin`; or (2) communicating with the `quilc` server.
+
+#### quilc
+
+The `quilc` binary reads Quil code provided on `stdin`:
+
+    echo "H 0" | quilc
+    cat large_file.quil | quilc
+
+#### Server
+
+For various reasons (e.g. not having to repeatedly load the `quilc`
+binary into memory, communicating over a network) `quilc` provides a
+server interface:
+
+    quilc -S
+
+This provides high-level languages such as Python a way to communicate
+with the Quil compiler, thus enabling high-level abstractions and
+tools that are not directly available in Quil. The `pyquil` library
+provides such an interface to `quilc`.

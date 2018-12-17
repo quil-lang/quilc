@@ -1,0 +1,5 @@
+# Gates with simple params.
+
+CPHASE(1.0) 0 1
+CPHASE(1.0-2.0i) 1 0
+

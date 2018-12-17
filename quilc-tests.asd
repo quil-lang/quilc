@@ -12,7 +12,7 @@
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':quilc-tests
                                            '#:run-quilc-tests))
-  :pathname "tests/"
+  :pathname "app/tests/"
   :serial t
   :components ((:file "package")
                (:file "suite")

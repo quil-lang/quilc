@@ -1,10 +1,10 @@
 ;;;; tests/package.lisp
 ;;;;
-;;;; Author: Eric Peterson
+;;;; Author: Robert Smith
 
-(fiasco:define-test-package #:quilc-tests
-  (:use #:quilc)
-  
+(fiasco:define-test-package #:cl-quil-tests
+    (:use #:cl-quil #:cl-quil.clifford)
+
   ;; suite.lisp
   (:export
-   #:run-quilc-tests))
+   #:run-cl-quil-tests))

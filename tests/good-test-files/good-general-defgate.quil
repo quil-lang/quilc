@@ -1,0 +1,7 @@
+# fully general defgate
+
+DEFGATE GEN-GATE(%a,%b,%c,%d):
+    %a, %b
+    %c, %d
+
+GEN-GATE(0,1,2,3) 0

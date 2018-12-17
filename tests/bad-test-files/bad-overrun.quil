@@ -1,0 +1,5 @@
+# attempted overrun
+
+DECLARE x REAL[2]
+
+ADD x[1] x[2]

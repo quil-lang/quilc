@@ -1,0 +1,12 @@
+# classical instructions in defcircuit
+
+DECLARE ro BIT[2]
+
+DEFCIRCUIT TEST a b:
+    NOT a
+    AND a b
+    IOR a b
+    MOVE a b
+    EXCHANGE a b
+
+TEST ro[0] ro[1]
