@@ -305,7 +305,15 @@ to the RPCQ version instead.
        
        ;; launch the polling loop
        (show-banner)
-       (start-rpc-server :port *server-port*))
+       (let ((logger (make-instance 'cl-syslog:rfc5424-logger
+                                    :app-name *program-name*
+                                    :facility ':local0
+                                    :log-writer (cl-syslog:tee-to-stream
+                                                 (cl-syslog:syslog-log-writer "quilc" :local0)))))
+         (cl-syslog:rfc-log (logger :info "Launching quilc.")
+           (:msgid "LOG0001"))
+         (start-rpc-server :port *server-port*
+                           :logger logger)))
       
       ;; server modes not requested, so continue parsing arguments
       (t
