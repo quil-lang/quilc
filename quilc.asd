@@ -12,7 +12,7 @@
                #:command-line-arguments
                #:yason
                (:version #:magicl "0.6.1")
-               (:version #:cl-quil "1.1.2")
+               (:version #:cl-quil "1.2.0")
                #:cl-quil-benchmarking
                #:uiop
                #:hunchentoot          ; deprecated
