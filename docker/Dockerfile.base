@@ -1,28 +1,11 @@
 ###############################################################################
 # quilc-base Docker image
 ###############################################################################
-FROM rigetticomputing/lisp-base
-
-# need zmq.h
-
-RUN echo "deb https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/ ./" >> /etc/apt/sources.list
-RUN curl https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/Release.key | apt-key add -
-RUN apt-get install -y libzmq3-dev
-
-###############################################################################
-# quilc dependencies setup
-###############################################################################
+FROM rigetticomputing/lisp-base:qcs-1.2.0
 
 # organize the source
-# NOTE: only works if magicl, cl-quil, and quilc are in the same directory
-ADD magicl /src/magicl
 ADD cl-quil /src/cl-quil
-ADD rpcq /src/rpcq
 ADD quilc /src/quilc
-
-###############################################################################
-# quilc setup
-###############################################################################
 
 ARG build_target
 
