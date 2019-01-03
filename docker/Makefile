@@ -1,17 +1,24 @@
 # Makefile for Docker images
 
 BASE_TARGET=quilc
+DOCKER_TAG=quilc-base
 
 .PHONY: all
 all: quilc-base quilc-tests quilc
 
 .PHONY: quilc-base
 quilc-base: Dockerfile
-	docker build --build-arg build_target=$(BASE_TARGET) -t quilc-base -f Dockerfile.base ../../
+	docker build --build-arg build_target=$(BASE_TARGET) -t $(DOCKER_TAG) -f Dockerfile.base ../../
 
 .PHONY: quilc-sdk
 quilc-sdk: BASE_TARGET=quilc-sdk
+quilc-sdk: DOCKER_TAG=quilc-sdk
 quilc-sdk: quilc-base
+
+.PHONY: quilc-sdk-barebones
+quilc-sdk-barebones: BASE_TARGET=quilc-sdk-barebones
+quilc-sdk-barebones: DOCKER_TAG=quilc-sdk-barebones
+quilc-sdk-barebones: quilc-base
 
 .PHONY: quilc-tests
 quilc-tests: Dockerfile.test

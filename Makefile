@@ -41,9 +41,17 @@ quilc: system-index.txt src/entry-point.lisp src/package.lisp src/printers.lisp 
 		 --compress-core \
 		 --entry quilc::entry-point
 
-quilc-sdk: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
+quilc-sdk-base: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
+quilc-sdk-base: clean clean-cache quilc
+
+# By default, relocate shared libraries on SDK builds
 quilc-sdk: FOREST_SDK_LOAD=--load src/mangle-shared-objects.lisp
-quilc-sdk: clean clean-cache quilc
+quilc-sdk: quilc-sdk-base
+
+# Don't relocate shared libraries on barebones SDK builds
+quilc-sdk-barebones: quilc-sdk-base
+
+
 
 quilc-unsafe: system-index.txt
 	buildapp --output quilc \
