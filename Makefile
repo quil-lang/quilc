@@ -46,7 +46,7 @@ quilc-sdk-base: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
 quilc-sdk-base: clean clean-cache quilc
 
 # By default, relocate shared libraries on SDK builds
-quilc-sdk: FOREST_SDK_LOAD=--load src/mangle-shared-objects.lisp
+quilc-sdk: FOREST_SDK_LOAD=--load app/src/mangle-shared-objects.lisp
 quilc-sdk: quilc-sdk-base
 
 # Don't relocate shared libraries on barebones SDK builds
