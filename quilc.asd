@@ -17,6 +17,7 @@
                #:uiop
                #:hunchentoot          ; deprecated
                #:bordeaux-threads     ; deprecated
+               #:cl-syslog
                #:rpcq                 ; to replace HUNCHENTOOT and B-T
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
