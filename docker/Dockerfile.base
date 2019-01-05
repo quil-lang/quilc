@@ -4,7 +4,6 @@
 FROM rigetticomputing/lisp-base:qcs-1.2.0
 
 # organize the source
-ADD cl-quil /src/cl-quil
 ADD quilc /src/quilc
 
 ARG build_target
