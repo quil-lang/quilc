@@ -4,26 +4,9 @@
 
 (in-package #:cl-quil)
 
-(defmacro postpend (obj place)
-  `(if ,place
-       (push ,obj (cdr (last ,place)))
-       (setf ,place (list ,obj))))
-
-(defun make-adjustable-vector ()
-  (make-array 4 :element-type t
-                :initial-element nil
-                :adjustable t
-                :fill-pointer 0))
-
-(defun vnth (index vector)
-  "Like NTH, but for VECTORs."
-  (aref vector index))
-
-(defun (setf vnth) (val index vector)
-  (setf (aref vector index) val))
-
-
 ;;; some data structures that encode hardware structure
+;;;
+;;; Use MAKE-ADJUSTABLE-VECTOR and VNTH for these objects.
 
 (defstruct chip-specification
   "Houses information about hardware components on a QPU.
