@@ -103,7 +103,7 @@ to `git shortlog --summary --numbered`, _prior to 2019_ were:
 * **Aaron Vontell** (CFG optimizations, gate fusion)
 * **Anthony Polloreno** (Clifford groups, randomized benchmarking, SWAP quotient)
 * **Chris Osborn** (dead qubit detection)
-* **Joeseph Lin** (MAGICL, static arity and gate resolution analysis)
+* **Joseph Lin** (MAGICL, static arity and gate resolution analysis)
 
 ## Open Source
 
