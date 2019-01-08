@@ -398,8 +398,13 @@ NOTE: Assumes no nested COMMUTING_BLOCKS regions."
             (remove instr (gethash earlier-instr (lscheduler-later-instrs lschedule)))))
     ;; unlink later instructions from instr
     (dolist (later-instr (gethash instr (lscheduler-later-instrs lschedule)))
-      (setf (gethash later-instr (lscheduler-earlier-instrs lschedule))
-            (remove instr (gethash later-instr (lscheduler-earlier-instrs lschedule)))))
+      (let ((punctured-seq (remove instr (gethash later-instr
+                                                  (lscheduler-earlier-instrs lschedule)))))
+        (setf (gethash later-instr (lscheduler-earlier-instrs lschedule))
+              punctured-seq)
+        ;; prevent anyone from getting orphaned
+        (when (endp punctured-seq)
+          (push later-instr (lscheduler-first-instrs lschedule)))))
     ;; remove the old instruction from lschedule
     (remhash instr (lscheduler-later-instrs lschedule))
     (remhash instr (lscheduler-earlier-instrs lschedule))
