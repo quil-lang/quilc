@@ -12,7 +12,7 @@ RUN sbcl --noinform --non-interactive \
 # install test dependencies
 COPY Makefile /src/quilc/Makefile
 WORKDIR /src/quilc
-RUN make deps
+RUN make install-deps
 
 # install expokit (requirements: blas, gfortran, lapack)
 WORKDIR /src

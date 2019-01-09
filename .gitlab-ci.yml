@@ -5,7 +5,7 @@ test:
   image: rigetti/quicklisp
   script:
     - make dump-version-info
-    - make deps
+    - make install-deps
     # clone rpcq to work around QuickLisp
     - pushd /builds/rigetti && rm -rf rpcq && git clone https://github.com/rigetti/rpcq.git && popd
     - make test

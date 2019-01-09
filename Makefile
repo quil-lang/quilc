@@ -16,10 +16,10 @@ ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/
 all: quilc
 
 ###############################################################################
-# DEPS
+# DEPENDENCIES
 ###############################################################################
 
-deps:
+install-deps:
 ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
 	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
@@ -37,7 +37,8 @@ dump-version-info:
 		--eval '(format t "~A ~A" (lisp-implementation-type) (lisp-implementation-version))' \
 		--eval '(print (ql-dist:find-system "alexa"))' \
 		--eval '(print (ql-dist:find-system "magicl"))' \
-		--eval '(print (ql-dist:find-system "rpcq"))' --quit
+		--eval '(print (ql-dist:find-system "rpcq"))' \
+		--eval '(terpri)' --quit
 
 ###############################################################################
 # BUILD
