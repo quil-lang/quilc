@@ -2,7 +2,9 @@ test:
   tags:
     - docker
     - python:3.6
-  image: rigetti/quicklisp
+  image:
+    name: rigetti/quicklisp
+    entrypoint: ["bash"]
   script:
     - cd /builds/rigetti
     - git clone https://github.com/rigetti/rpcq.git
