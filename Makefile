@@ -1,7 +1,6 @@
-RIGETTI_LISP_LIBRARY_HOME=../
+COMMIT_HASH=$(shell git rev-parse --short HEAD)
 LISP_CACHE ?= $(HOME)/.cache/common-lisp
-
-
+RIGETTI_LISP_LIBRARY_HOME=../
 SBCL_BIN=sbcl
 SBCL=$(SBCL_BIN) --noinform --no-userinit --no-sysinit --non-interactive
 QUICKLISP_HOME=$(HOME)/quicklisp
@@ -11,10 +10,31 @@ QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
 	--eval '(push :hunchentoot-no-ssl *features*)' \
 	--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)"
 QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
-
-
+UNAME_S=$(shell uname -s)
+ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 
 all: quilc
+
+###############################################################################
+# DEPS
+###############################################################################
+
+deps:
+ifeq ($(UNAME_S),Linux)
+ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
+	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
+	curl $(ZMQ_REPO)/Release.key | apt-key add -
+	apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev
+else
+	echo "Centos-based platforms unsupported"
+endif
+else
+	echo "Non-Linux-based platforms unsupported"
+endif
+
+###############################################################################
+# BUILD
+###############################################################################
 
 $(QUICKLISP_SETUP):
 	mkdir -p $(QUICKLISP_HOME)
@@ -52,8 +72,6 @@ quilc-sdk: quilc-sdk-base
 # Don't relocate shared libraries on barebones SDK builds
 quilc-sdk-barebones: quilc-sdk-base
 
-
-
 quilc-unsafe: system-index.txt
 	buildapp --output quilc \
 		 --manifest-file system-index.txt \
@@ -75,6 +93,10 @@ test-ccl:
 		--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)" \
 		--eval "(ql:quickload :quilc)" \
 		--eval '(quit)'
+
+###############################################################################
+# CLEAN
+###############################################################################
 
 clean:
 	rm -f quilc system-index.txt build-output.log
