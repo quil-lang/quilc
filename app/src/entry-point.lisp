@@ -1,15 +1,9 @@
-;;;; pipe-compiler-entry-points.lisp
+;;;; entry-point.lisp
 ;;;;
-;;;; fast entry point for compilation methods
+;;;; Binary app interface entry point.
 ;;;;
 ;;;; Author: Eric Peterson
 ;;;;
-;;;; eventually, we will want this to look at argv for a filename from which it
-;;;; can parse a chip/ISA specification. for now, we're going to bake such a
-;;;; specification in.
-;;;; ===sample input===
-;;;; ANY CLASSICAL-FREE QUIL PROGRAM
-;;;; ^D
 
 (in-package #:quilc)
 
@@ -49,8 +43,8 @@
     (("compute-matrix-reps" #\m) :type boolean :optional t :documentation "prints matrix representations for comparison; requires -P")
     (("compute-unused-qubits" #\u) :type boolean :optional t :documentation "prints unused qubits; requires -P")
     (("show-topological-overhead" #\t) :type boolean :optional t :documentation "prints the number of SWAPs incurred for topological reasons")
-    (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these gates")
-    (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these gates")
+    (("gate-blacklist") :type string :optional t :documentation "when calculating statistics, ignore these (comma-separated) gates")
+    (("gate-whitelist") :type string :optional t :documentation "when calculating statistics, consider only these (comma-separated) gates")
     (("without-pretty-printing") :type boolean :optional t :documentation "turns off pretty-printing features")
     #-forest-sdk
     (("verbose") :type boolean :optional t :documentation "verbose compiler trace output")
