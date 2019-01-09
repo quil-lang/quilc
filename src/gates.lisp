@@ -549,10 +549,10 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
 ;;;; some leftover stuff from standard-gates.lisp and elsewhere
 
 (defun apply-gate (m instr &optional (environs nil))
+  "Constructs the matrix representation associated to an instruction list consisting of certain standard gates or gate definitions found in ENVIRONS. Suitable for testing the output of compilation routines."
   (check-type m magicl:matrix)
   (check-type instr application)
   (check-type environs (or null parsed-program))
-  "Constructs the matrix representation associated to an instruction list consisting of certain standard gates or gate definitions found in ENVIRONS. Suitable for testing the output of compilation routines."
   (alexandria:when-let ((defn (gate-matrix instr)))
     (let* ((mat-size (1- (integer-length (magicl:matrix-rows m))))
            (size (max mat-size
