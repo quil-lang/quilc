@@ -53,9 +53,7 @@
             "The lower bound must be below the upper bound: ~a </= ~a" lo hi)
     (dpb +full+
          (byte (- hi lo) lo)
-         +empty+))
-
-)                                       ; End MACROLET.
+         +empty+)))
 
 (defun bit-set-to-list (bits)
   "Return a list of integers corresponding to the bit set BITS."
