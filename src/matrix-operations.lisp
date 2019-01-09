@@ -78,7 +78,8 @@
 
 (defun matrix-rescale (mat1 mat2)
   "Given square matrices MAT1 and MAT2, returns a pair of matrices of
-equal dimensions, "
+equal dimensions, extending the smaller matrix by a tensor product
+with the identity matrix."
   (let ((size1 (1- (integer-length (magicl:matrix-rows mat1))))
         (size2 (1- (integer-length (magicl:matrix-rows mat2)))))
     (cond ((< size1 size2)
