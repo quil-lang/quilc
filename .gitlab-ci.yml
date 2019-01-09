@@ -7,5 +7,5 @@ test:
     - make dump-version-info
     - make deps
     # clone rpcq to work around QuickLisp
-    - pushd /builds/rigetti && git clone https://github.com/rigetti/rpcq.git && popd
+    - pushd /builds/rigetti && rm -rf rpcq && git clone https://github.com/rigetti/rpcq.git && popd
     - make test
