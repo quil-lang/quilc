@@ -49,7 +49,7 @@
            (salza2:compress-data octets 'salza2:gzip-compressor)))
     'done))
 
-(Defun distance-table (gt)
+(defun distance-table (gt)
   (let ((a (make-array 50 :initial-element 0))
         (n 0)
         (ct (hash-table-count (mapping gt))))
