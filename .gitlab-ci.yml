@@ -4,7 +4,6 @@ test:
     - python:3.6
   image:
     name: rigetti/quicklisp
-    entrypoint: ["/bin/bash", "-l", "-c"]
   script:
     - bash --version
     - cd /builds/rigetti
