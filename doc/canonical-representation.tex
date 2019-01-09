@@ -1,0 +1,42 @@
+% root: developer-guide.tex
+
+\section{Random Clifford sampling procedure}
+
+This section provides documentation for the routine found in \texttt{src/cliffords/swap-representation.lisp}. The n-qubit Clifford group grows rapidly with the number of qubits, in particular as $\prod^n_{i=1} 2(4^i - 1)4^i$. In addition, the Clifford group often comes about in quantum computation, in particular because it stabilizes the Pauli operators, and can thus be written as a basis map that that only has size polynomial in the number of qubits under investigation. In addition, schemes like randomized benchmarking leverage the fact that the Clifford group is a unitary 2-design to estimate the error on a gate.
+
+In routines like randomized benchmarking it is necessary to sample randomly from the Clifford group, and one could imagine a form of classical benchmarking where random clifford circuits are sampled, simulted, and compared with quantum hardware. From the Gottesman-Knill theorem, this simulation can be done efficiently.
+
+The naive approach to sampling from the Clifford group scales poorly - generating the entire group quickly becomes infeasible after two qubits. One way of attempting to improve this would be to still do a tree search over the group, but to implement a more intelligent pruning technique. Namely, if we can recognize that a collection of paths will lead to the same kind of sub-trees, we can ignore those paths, and cut down the search time.
+
+A natural way to attempt this is to consider Clifford elements to be equivalent up to SWAP operations. The SWAP group is an asymptotically large, easy to understand, and relatively uninteresting subgroup of the Clifford group. In particular, looking at $C_n/SWAP_n$ we see that the sizes grow more slowly, supressed by a factor of $n!$.
+
+In order to work with this subset of the Clifford group, one needs to generate a procedure for picking out a canonical representative for each coset of the SWAP group in the Clifford group efficiently. Such a procedure is given (currently without proof) below, and implemented in the code. A nice property of this particular routine is that it canonizes SWAP operations to the identity.
+
+\begin{algorithm}[H]
+\caption*{\textsc{\textbf{Canonical Representative}}}
+\hspace*{\algorithmicindent} \textbf{Input} $c\in C_n$, $c\equiv[X_1, Z_1, ..., X_n, Z_n]$\\
+\hspace*{\algorithmicindent} \textbf{Output} $\Pi(c)$, $\Pi\in SWAP_n$\\
+\begin{algorithmic}
+\State \textbf{initialize} $\Pi$ = Identity
+\For{$1 \leq i \leq n$}
+    \State \textbf{defun} MaxIndices(A, k, n) := \{$\ell\mid A_\ell$ = n and $\ell >k$\}
+    \State indices = MaxIndices(M($X_i$), i, max($M(X_i)$))
+    \For{$i \leq j \leq n$}
+        \State curr\_max = max(\{$M(X_j)_\ell\mid\ell\in$indices\})
+        \State indices = indices $\cap$ MaxIndices(M($X_j$), j, curr\_max)
+        \State curr\_max = max(\{$M(Z_j)_\ell\mid\ell\in$indices\})
+        \State indices = indices $\cap$ MaxIndices(M($Z_j$), j, curr\_max)
+    \EndFor
+    \State first = indices[0]
+    \State $\pi$ := SWAP(first, $\Pi^{-1}(0)$)
+    \State set $\Pi := \pi\circ\Pi$
+\EndFor
+\State  \textbf{return} $\Pi(c)$
+
+\end{algorithmic}
+\end{algorithm}
+
+
+The main idea behind this algorithm is that for each basis vector (sorted in a standard order) we can choose swaps such that the $i$\textsuperscript{th} image has a pauli term with the largest base four representation in the $i$\textsuperscript{th} position. This immediately satisfies the property that SWAPs are canonized to the identity, if the basis vectors were sorted as $X_1, Z_1, ..., X_n, Z_n$. The only remaining problem is that there are in general many tensor factors in the image that have the same highest base four representation. To break these ties unambiguously we must iterate through the remaining basis vectors, indexed by $j$, and look at their images. If we call the indices of the tied tensor factors in the image `indices` as above, then we can break ties in the $i$\textsuperscript{th} image by looking at the base four representation of all elements of `indices`, and only keeping the terms that are maximal for each $j$. This process will either terminate with one unique element, in which case we should swap that element to the $i$\textsuperscript{th} position, or it will terminate with many elements, from which we are free to pick one. If there is more than one element, they have the same base four representation in each image, are therefore indistinguishable by swapping, and we are free to pick any one in the $i$\textsuperscript{th} step.
+
+As a final remark, we give a rough estimate of the runtime of this algorithm. The number of basis vectors is linear in the number of qubits, $n$. For each (even) basis vector, we look at all following basis vectors, of which there are at most $n$. In addition, for each following basis vector, we must look at all tensor factors in its image, which is also $n$. Therefore the runtime of this algorithm is $\mathcal{O}(n^3)$.

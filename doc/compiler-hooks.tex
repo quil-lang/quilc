@@ -1,0 +1,138 @@
+% root: developer-guide.tex
+
+\section{Protocols and hooks for compilation subroutines}
+
+\subsection{Chip specifications}\label{ChipSpecifications}
+
+The family of datatypes described in `src/chip-specification.lisp` house CL-QUIL's internal description of a target QPU architecture, containing all the necessary information for a fully automatic compilation process.  The fundamental unit of information is the `HARDWARE-OBJECT`, which is an abstraction of any device component capable of executing a quantum instruction.  Its constituent components are:
+
+\begin{description}
+	\item[`ORDER`] The "dimensionality" of this hardware object, i.e., the dimension of the figure you would draw if you were to draw this as part of a picture of a QPU.  This is one less than the number of qubits that participate in the interaction.
+	\item[`CXNS`] The indices in a `CHIP-SPECIFICATION` object of the other `HARDWARE-OBJECT`s which share resources (e.g., qubits) with the current `HARDWARE-OBJECT`.  These are sorted into (unsorted) vectors of `HARDWARE-OBJECT`s of like order, and the `order`th vector is then stored in a parent vector at the `order`th position.
+	\item [`NATIVE-INSTRUCTIONS`] Houses a function that can be used as a generalized boolean to test whether a given `APPLICATION` is a native instruction for the physical hardware associated to this `HARDWARE-OBJECT`.  If the `APPLICATION` is not native, it returns `NIL`; if the `APPLICATION` is native, it returns the number of nanoseconds that this instruction takes to execute as a rational value.
+	\item[`COMPILATION-METHODS`] A vector of \textit{compilation methods} (see below), sorted in descending precedence order.  These should be individually designed and collectively sorted so that they make progress towards the `HARDWARE-OBJECT`'s native instruction set.
+	\item[`REWRITING-RULES`] A vector of \textit{rewriting rules} (see below), sorted in descending precedence order.  These should be individually designed and collectively sorted so that they make progress towards some canonical form.  The current convention in CL-QUIL is to sort "harder" gates earlier (e.g., `CZ`s before `RX`es before `RZ`s).
+	\item[`PERMUTATION-GATES`] A vector of `PERMUTATION-RECORD` objects, which encode (perhaps non-native) qubit permutations that a `HARDWARE-OBJECT` is capable of enacting (perhaps after further compilation).  These are used by the addresser to rearrange the assignment of logical qubits to physical qubits.
+	\item[`MISC-DATA`] A hash table populated with any other miscellaneous information pertaining to the `HARDWARE-OBJECT`.  (Typically houses fidelity information, as well as a modifiable table of gate times referenced by the function installed into `NATIVE-INSTRUCTIONS`.)
+\end{description}
+
+Typical instances of `HARDWARE-OBJECT`s can be constructed using `build-qubit`, `build-link`, and `install-link-onto-chip`.  Hardware objects can be installed with `adjoin-hardware-object` (useful for any order object, especially qubits) and `install-link-onto-chip` (useful when you already have qubits, and you want to link them together).  Examples of using these functions to build standard chip designs can be found at the bottom of `src/chip-specification.lisp`.
+
+These objects are then aggregated into a `CHIP-SPECIFICATION` object, which describes the totality of a quantum device and the interactions between its different `HARDWARE-OBJECT`s.  The constituent components of a `CHIP-SPECIFICATION` instance are:
+
+\begin{description}
+	\item[`OBJECTS`] Contains the `HARDWARE-OBJECT`s that make up this QPU.  These are sorted into vectors, one for each `ORDER`, and these vectors are themselves stored within a parent vector, where the $n$th element is the vector of `ORDER` $n$.  Position matters: `HARDWARE-OBJECT`s are often named "by reference" by using their position with the vector.
+	\item[`GENERIC-COMPILERS`] A vector of \textit{compilation methods} to apply to `APPLICATION`s which either do not lie on a `HARDWARE-OBJECT` or whose supporting `HARDWARE-OBJECT`'s compilation rules do not consume this `APPLICATION`.
+	\item[`GENERIC-REWRITING-RULES`] A vector of \textit{rewriting rules} to apply to collections of instructions which do not lie on a particular `HARDWARE-OBJECT`.
+	\item[`LOOKUP-CACHE`] This is used internally to accelerate `HARDWARE-OBJECT` lookup based on Quil instruction argument lists.
+\end{description}
+
+\begin{remark}
+Although the `CHIP-SPECIFICATION` data structure is set up to allow multiqubit interactions of arbitrary size, the CL-QUIL internals currently assume at various points that only hardware objects of rank at most $1$ (i.e., qubits and qubit--qubit links) are present.
+\end{remark}
+
+\begin{remark}
+The only valid `PERMUTATION-RECORD`s on a `HARDWARE-OBJECT` of rank 1 is the `SWAP` permutation.  Because of the aforementioned current assumption about the global dimension of `CHIP-SPECIFICATION` objects, CL-QUIL makes the assumptions both that this is the only permutation record present and that it is always present.
+\end{remark}
+
+
+\subsection{Compilation methods}\label{CompilationMethods}
+
+A \textit{compilation method} in CL-QUIL refers to a routine for converting an input instruction, perhaps with some restrictions, into a string of other instructions which are drawn from some specified set but which compose to give the same element of the projective unitary group (i.e., agree with the original instruction up to global phase).
+
+\begin{example}
+ZYZ-Euler decomposition qualifies as a compilation method: it converts an input instruction that operates on a single qubit into a sequence of the form
+\begin{verbatim}
+RZ(alpha) q
+RY(beta)  q
+RZ(gamma) q
+\end{verbatim}
+where the gates are drawn from the set $\{$`RZ(theta)`, `RY(theta)`$\}$.
+\end{example}
+
+A CL-QUIL implementation of a compilation method is embodied by a function with the following properties:
+
+\begin{itemize}
+	\item It takes one required input: a resolved `GATE-APPLICATION` object.
+	\item All other inputs are optional keyword arguments, used only to specialize the behavior of the method.
+	\item It concludes in one of the following three ways:
+	\begin{enumerate}
+		\item It returns a list of Quil instructions which encode the original instruction as an element of the projective unitary group (i.e., up to global phase).
+		\item It signals the condition `COMPILER-DOES-NOT-APPLY`, which means that the supplied instruction is outside the input domain of the method.  Typically, this means that control is forwarded to some alternative compilation method instead.
+		\item It signals a condition that subclasses `ERROR`, which means that the compilation routine expected to be able to handle this input but experienced some other (typically unrecoverable) error.
+	\end{enumerate}
+\end{itemize}
+
+The `src/compilers/` directory contains the implementations of compilation methods available in CL-QUIL.  By convention, each compilation method belongs to a distinct file.
+
+The compilation driver in CL-QUIL will not pick up on compilation methods unless they are pointed to by `CHIP-SPECIFICATION` objects.  See \Cref{ChipSpecifications} for more information.
+
+
+\subsubsection*{Translation templates}
+
+As an aside, the file `src/compilers/translators.lisp` contains a suite of compilation routines that translate specific gates (e.g., only gates of the form `RY(theta)`) into specific other gates (e.g., strings of the form `RX(pi/2)`, `RZ(theta)`, `RX(-pi/2)`).  As a rule of thumb, a compilation routine belongs in this file (1) if it involves no linear algebra and (2) if it operates on a specific input gate name rather than an undetermined family.
+
+
+
+\subsection{Rewriting rules}
+
+A \textit{rewriting rule} is a cousin of a compilation method that is used by CL-QUIL's peephole rewriter to shorten or canonicalize gate strings.  The raw data type is a struct with three fields:
+
+\begin{description}
+	\item[`READABLE-NAME`] A human-readable name for what this rule accomplishes. Used to aid debugging.
+	\item[`COUNT`] The number of instructions that this rewriting rule expects to act upon.
+	\item[`CONSUMER`] A function that takes as arguments a `COMPRESSOR-CONTEXT` and `COUNT`-many `GATE-APPLICATION` objects.  This function either returns a new list of `GATE-APPLICATION` objects on a successful rewrite application or throws a `COMPILER-DOES-NOT-APPLY` error on an unsuccessful application.
+\end{description}
+
+The helper macro `make-rewriting-rule` assists developers in writing their own rewriting rules, and it has the form:
+\begin{verbatim}
+(make-rewriting-rule READABLE-NAME
+    (CONTEXT
+     BIND-CLAUSE-1
+     ...
+     BIND-CLAUSE-COUNT)
+
+  BODY)
+\end{verbatim}
+The `READABLE-NAME` field gets loaded into the struct's `READABLE-NAME` slot; the `CONTEXT` field becomes the binding location of the active `COMPRESSOR-CONTEXT`; the `BIND-CLAUSE-n` fields are used to automatically match against input `GATE-APPLICATION`s (using `operator-match`); and, finally, `BODY` is responsible for either emitting the resulting instruction sequence or throwing its own `COMPILER-DOES-NOT-APPLY` error in the event of a further applicability condition not being met.
+
+\begin{example}
+The following simple rule eliminates a pair of successive identical `CZ`s:
+\begin{verbatim}
+(make-rewriting-rule "CZ CZ -> NOP"
+    (_                  ; this wildcard indicates this rule is context-free
+     (("CZ" () p q) x)  ; the first gate must be a CZ, and we call its qubits p and q
+     (("CZ" () r s) y)) ; ditto with the second gate, with qubits r and s
+
+  ;; if the sets {p, q} and {r, s} are equal...
+  (else-give-up-compilation
+      (subsetp (list p q) (list r s))
+    ;; ... then replace this with the empty list of instructions.
+    (list)))
+\end{verbatim}
+\end{example}
+
+\begin{example}
+The following rule additionally makes use of the `CONTEXT` field to perform a rewrite based on the current wavefunction state of the quantum device:
+\begin{verbatim}
+(make-rewriting-rule "Eigenvectors take no action"
+    (context    ; this houses the wf state
+     (_ instr)) ; this binds to any instruction
+
+  ;; extract the wf
+  (unpack-wf instr context (psi qubit-indices)
+    ;; apply the instruction to the wf
+    (let ((updated-wf (nondestructively-apply-instr-to-wf instr psi qubit-indices)))
+      ;; if the new wf is collinear with the old wf...
+      (else-give-up-compilation
+          (collinearp psi updated-wf)
+        ;; ... then replace this with the empty list of instructions.
+        (list)))))
+\end{verbatim}
+\end{example}
+
+Similarly to compilation methods, in order for rewriting rules to be found by the peephole rewriter, they must be loaded into the `REWRITING-RULES` slot of the relevant `HARDWARE-OBJECT` instances.  The default lists of rules loaded onto `HARDWARE-OBJECT`s manufactured using the helper constructors can be found in `src/compressor/rewriting-rules.lisp`.  These also serve as instructive examples of the use of `make-rewriting-rule`.
+
+\begin{remark}
+The canonical form convention in CL-QUIL is for rewriting rules to output larger gates earlier (e.g., `CZ` before `RZ`) and slower gates earlier (e.g., `RX` before `RZ`).
+\end{remark}
