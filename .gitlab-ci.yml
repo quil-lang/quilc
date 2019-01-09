@@ -4,8 +4,9 @@ test:
     - python:3.6
   image:
     name: rigetti/quicklisp
-    entrypoint: ["bash"]
+    entrypoint: bash
   script:
+    - bash --version
     - cd /builds/rigetti
     - git clone https://github.com/rigetti/rpcq.git
     - cd /builds/rigetti/quilc
