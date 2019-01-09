@@ -33,12 +33,11 @@ else
 endif
 
 dump-version-info:
-	sbcl --noinform --non-interactive --eval '(format t "~A ~A~%~S~%~S~%~S~%" \
-		(lisp-implementation-type) \
-		(lisp-implementation-version) \
-		(ql-dist:find-system "alexa") \
-		(ql-dist:find-system "magicl") \
-		(ql-dist:find-system "rpcq"))' --quit
+	sbcl --noinform --non-interactive \
+		--eval '(format t "~A ~A" (lisp-implementation-type) (lisp-implementation-version))' \
+		--eval '(print (ql-dist:find-system "alexa"))' \
+		--eval '(print (ql-dist:find-system "magicl"))' \
+		--eval '(print (ql-dist:find-system "rpcq"))' --quit
 
 ###############################################################################
 # BUILD
