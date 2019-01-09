@@ -80,6 +80,14 @@ quilc-unsafe: system-index.txt
 		 --compress-core \
 		 --entry quilc::%entry-point
 
+.PHONY: docker
+docker: Dockerfile
+	docker build -t rigetti/quilc:$(COMMIT_HASH) .
+
+###############################################################################
+# TEST
+###############################################################################
+
 test:
 	$(QUICKLISP) \
 		 --eval "(ql:quickload :cl-quil-tests)" \
