@@ -109,7 +109,7 @@ as needed so that they are the same size."
   ;; rewiring. this is somewhat complicated by the fact that rewirings
   ;; when we enter a block (EXPECTED_REWIRING) and when we exit a
   ;; block (CURRENT_REWIRING) may differ
-   (loop
+  (loop
     :with mat := (magicl:make-complex-matrix 1 1 '(1d0))
     :with rewiring := (make-rewiring 1)
     :for instr :across (parsed-program-executable-code pp)
@@ -207,9 +207,9 @@ as needed so that they are the same size."
 ;; also, some routines for manipulating *vectors*, here expressed as Lisp lists
 (defun dot-product (u v)
   (loop
-     :for i :in u
-     :for j :in v
-     :sum (* i (conjugate j))))
+    :for i :in u
+    :for j :in v
+    :sum (* i (conjugate j))))
 
 (defun vector-difference (u v)
   (loop :for i :in u :for j :in v
@@ -230,11 +230,11 @@ as needed so that they are the same size."
   "Performs Gram-Schmidt orthonormalization of the list of complex vectors stored in VECTORS."
   (let ((ret (list)))
     (loop :for v :in vectors :do
-       (progn
-         (loop :for u :in ret :do
-            (setf v (vector-difference v (vector-scale (dot-product v u) u))))
-         (when (not (double= 0 (norm v)))
-           (setf ret (cons (vector-scale (/ 1 (norm v)) v) ret)))))
+      (progn
+        (loop :for u :in ret :do
+          (setf v (vector-difference v (vector-scale (dot-product v u) u))))
+        (when (not (double= 0 (norm v)))
+          (setf ret (cons (vector-scale (/ 1 (norm v)) v) ret)))))
     ret))
 
 (defun collinearp (vect1 vect2)
