@@ -5,9 +5,14 @@ test:
   image:
     name: rigetti/quicklisp
   script:
+    # dump some version info
     - bash --version
+    - sbcl --version
+    # install dependencies
+    - make deps
+    # clone rpcq to work around QuickLisp
     - cd /builds/rigetti
     - git clone https://github.com/rigetti/rpcq.git
     - cd /builds/rigetti/quilc
-    - make deps
+    # run tests
     - make test
