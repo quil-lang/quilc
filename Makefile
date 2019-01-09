@@ -32,6 +32,14 @@ else
 	echo "Non-Linux-based platforms unsupported"
 endif
 
+dump-version-info:
+	sbcl --noinform --non-interactive --eval '(format t "~A ~A~%~S~%~S~%~S~%"
+		(lisp-implementation-type)
+		(lisp-implementation-version)
+		(ql-dist:find-system "alexa")
+		(ql-dist:find-system "magicl")
+		(ql-dist:find-system "rpcq"))' --quit
+
 ###############################################################################
 # BUILD
 ###############################################################################
