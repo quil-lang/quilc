@@ -48,6 +48,7 @@
   (when prefix
     (format s prefix))
   (dolist (instr instructions)
+    (write-string "    " s)
     (print-instruction instr s)
     (terpri s)))
 

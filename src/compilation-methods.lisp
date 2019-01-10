@@ -35,10 +35,12 @@
              (restart-case
                  (handler-case
                      (let ((result (funcall compilation-method instruction)))
-                       (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Applying compiler ~a to ~a.~%"
-                               compilation-method
-                               (print-instruction instruction nil))
+                       (let ((*print-pretty* nil))
+                         (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Applying compiler ~a to ~a.~%"
+                                 compilation-method
+                                 (print-instruction instruction nil)))
                        (dolist (instr result)
+                         (write-string "    " *compiler-noise-stream*)
                          (print-instruction instr *compiler-noise-stream*)
                          (terpri *compiler-noise-stream*))
                        (return-from apply-translation-compilers result))
@@ -138,7 +140,8 @@ Returns a value list: (processed-program, of type parsed-program
          (topological-swaps 0)
          (unpreserved-duration 0))
     
-    (format *compiler-noise-stream* "COMPILER-HOOK: initial rewiring ~a~%" initial-rewiring)
+    (let ((*print-pretty* nil))
+      (format *compiler-noise-stream* "COMPILER-HOOK: initial rewiring ~a~%" initial-rewiring))
 
     ;; if we are expecting to manipulate protoquil, we segment the program-final
     ;; sequence of MEASURE instructions out into a separate CFG block, so that
@@ -303,10 +306,11 @@ Returns a value list: (processed-program, of type parsed-program
            (when (gethash blk block-initial-l2p)
              (return-from process-block))
            
-           (format *compiler-noise-stream* "COMPILER-HOOK: Visiting ~a for the first time, coming from ~a (~a).~%"
-                   (basic-block-name blk)
-                   (when registrant (basic-block-name registrant))
-                   (gethash registrant block-final-l2p))
+           (let ((*print-pretty* nil))
+             (format *compiler-noise-stream* "COMPILER-HOOK: Visiting ~a for the first time, coming from ~a (~a).~%"
+                     (basic-block-name blk)
+                     (and registrant (basic-block-name registrant))
+                     (gethash registrant block-final-l2p)))
            ;; set the block-initial-l2p, forced by the previous block
            (when registrant
              (setf (gethash blk block-initial-l2p)
