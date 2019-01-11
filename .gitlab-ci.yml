@@ -1,4 +1,5 @@
 test:
+  stage: test
   tags:
     - docker
     - python:3.6
@@ -9,3 +10,43 @@ test:
     # clone rpcq to work around QuickLisp
     - pushd /builds/rigetti && rm -rf rpcq && git clone https://github.com/rigetti/rpcq.git && popd
     - make test
+
+docker-master:
+  stage: deploy
+  tags:
+    - dockerd
+    - github
+  only:
+    - master
+  image: docker:stable
+  script:
+    - docker build --tag rigetti/quilc:${CI_COMMIT_SHORT_SHA} --tag rigetti/quilc:latest .
+    - docker push rigetti/quilc && docker rmi -f rigetti/quilc
+
+docker-branches:
+  stage: deploy
+  tags:
+    - dockerd
+    - github
+  only:
+    - branches
+  except:
+    - master
+  image: docker:stable
+  script:
+    - docker build --tag rigetti/quilc:${CI_COMMIT_REF_SLUG} --tag rigetti/quilc:stable .
+    - docker push rigetti/quilc && docker rmi -f rigetti/quilc
+
+docker-version-tags:
+  stage: deploy
+  tags:
+    - dockerd
+    - github
+  only:
+    - /^v(\d+\.)?(\d+\.)?(\d+)$/
+  except:
+    - branches
+  image: docker:stable
+  script:
+    - docker build --tag rigetti/quilc:${CI_COMMIT_TAG} .
+    - docker push rigetti/quilc && docker rmi -f rigetti/quilc
