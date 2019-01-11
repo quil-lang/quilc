@@ -1,5 +1,4 @@
 test:
-  stage: test
   tags:
     - docker
     - python:3.6
@@ -12,7 +11,6 @@ test:
     - make test
 
 docker-master:
-  stage: deploy
   tags:
     - dockerd
     - github
@@ -23,8 +21,7 @@ docker-master:
     - docker build --tag rigetti/quilc:${CI_COMMIT_SHORT_SHA} --tag rigetti/quilc:latest .
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
 
-docker-branches:
-  stage: deploy
+docker-branch:
   tags:
     - dockerd
     - github
@@ -37,11 +34,11 @@ docker-branches:
     - docker build --tag rigetti/quilc:${CI_COMMIT_REF_SLUG} --tag rigetti/quilc:stable .
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
 
-docker-version-tags:
-  stage: deploy
+docker-vtag:
   tags:
     - dockerd
     - github
+  # matches only on tags of the form vX.Y.Z
   only:
     - /^v(\d+\.)?(\d+\.)?(\d+)$/
   except:
