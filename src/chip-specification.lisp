@@ -190,10 +190,11 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
           :do (setf lower-precedence (rest lower-precedence))
               ;; set up duration-alist
           :nconc (case current-type
-                   (:CZ     (list (cons `("CZ"     ( ) _ _) 150)))
+                   (:CZ     (list (cons `("CZ"     ()  _ _) 150)))
                    (:CPHASE (list (cons `("CPHASE" (_) _ _) 150)))
-                   (:ISWAP  (list (cons `("ISWAP"  ( ) _ _) 150)))
+                   (:ISWAP  (list (cons `("ISWAP"  ()  _ _) 150)))
                    (:PISWAP (list (cons `("PISWAP" (_) _ _) 150)))
+                   (:CNOT   (list (cons `("CNOT"   ()  _ _) 500)))
                    (otherwise (error "Unknown qubit type.")))
             :into duration-alist
           ;; set up single-type rewriting rules
@@ -245,11 +246,28 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
                    :do (vector-push-extend method
                                            (hardware-object-compilation-methods obj))))
     ;; set up the basic optimal 2Q compiler
-    (vector-push-extend (lambda (instr)
-                          (optimal-2q-compiler instr :target type))
-                        (hardware-object-compilation-methods obj))
+    (case (first type)
+      (:CNOT
+       (vector-push-extend #'2q-cnot-compiler
+                           (hardware-object-compilation-methods obj)))
+      (otherwise
+       (vector-push-extend (lambda (instr)
+                             (optimal-2q-compiler instr :target type))
+                           (hardware-object-compilation-methods obj))))
     ;; return the qubit
     obj))
+
+(defun 2q-cnot-compiler (instr)
+  "Compile any 2q gate INSTR into a list of CNOT and 1q gates."
+  (operator-match
+    (((("CNOT" () _ _) instr))
+     (list instr))
+    (_ (mapcan (lambda (instr)
+                 (handler-case (CZ-to-CNOT instr)
+                   (compiler-does-not-apply (c)
+                     (declare (ignore c))
+                     (list instr))))
+               (optimal-2q-compiler instr :target ':cz)))))
 
 
 (defun build-qubit (&optional (type (list ':RZ ':X/2)))
@@ -359,20 +377,28 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
       (vector-push-extend (lambda (instr)
                             (PISWAP-to-native-PISWAPs chip-spec instr))
                           ret))
+    (when (find ':cnot architecture)
+      (vector-push-extend (lambda (instr)
+                            (CNOT-to-native-CNOTs chip-spec instr))
+                          ret))
     (cond
+
       ((optimal-2q-target-meets-requirements architecture ':cz)
        (vector-push-extend #'ucr-compiler ret))
       ((optimal-2q-target-meets-requirements architecture ':iswap)
        (vector-push-extend (lambda (instr)
                              (ucr-compiler instr :target ':iswap))
                            ret))
+      ((find ':cnot architecture)
+       (warn "No UCR compiler for CNOT"))
       (t
        (error "Can't find a general UCR compiler for this target type.")))
     (vector-push-extend #'state-prep-compiler ret)
     (vector-push-extend #'recognize-ucr ret)
-    (vector-push-extend (lambda (instr)
-                          (optimal-2q-compiler instr :target architecture))
-                        ret)
+    (when (typep architecture 'optimal-2q-target)
+      (vector-push-extend (lambda (instr)
+                            (optimal-2q-compiler instr :target architecture))
+                          ret))
     (vector-push-extend #'qs-compiler ret)
     (setf (chip-specification-generic-compilers chip-spec) ret)))
 
