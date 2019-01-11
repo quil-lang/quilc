@@ -19,6 +19,7 @@ docker-master:
   image: docker:stable
   script:
     - docker build --tag rigetti/quilc:${CI_COMMIT_SHORT_SHA} --tag rigetti/quilc:latest .
+    - docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
 
 docker-branch:
@@ -32,6 +33,7 @@ docker-branch:
   image: docker:stable
   script:
     - docker build --tag rigetti/quilc:${CI_COMMIT_REF_SLUG} --tag rigetti/quilc:stable .
+    - docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
 
 docker-vtag:
@@ -46,4 +48,5 @@ docker-vtag:
   image: docker:stable
   script:
     - docker build --tag rigetti/quilc:${CI_COMMIT_TAG} .
+    - docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
