@@ -1,6 +1,9 @@
 test-cl-quil:
+  stage: test
   tags:
     - github
+  only:
+    - branches
   image: rigetti/quicklisp
   script:
     - make dump-version-info
@@ -8,8 +11,11 @@ test-cl-quil:
     - make test-cl-quil
 
 test-quilc:
+  stage: test
   tags:
     - github
+  only:
+    - branches
   image: rigetti/quicklisp
   script:
     - make dump-version-info
@@ -19,6 +25,7 @@ test-quilc:
     - make test-quilc
 
 docker-master:
+  stage: deploy
   tags:
     - dockerd
     - github
@@ -31,6 +38,7 @@ docker-master:
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
 
 docker-branch:
+  stage: deploy
   tags:
     - dockerd
     - github
@@ -45,6 +53,7 @@ docker-branch:
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc
 
 docker-vtag:
+  stage: deploy
   tags:
     - dockerd
     - github
