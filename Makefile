@@ -103,6 +103,16 @@ test:
 		 --eval "(ql:quickload :quilc-tests)" \
 		 --eval "(asdf:test-system :quilc)"
 
+test-cl-quil:
+	$(QUICKLISP) \
+		 --eval "(ql:quickload :cl-quil-tests)" \
+		 --eval "(asdf:test-system :cl-quil)"
+
+test-quilc:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :quilc-tests)" \
+		--eval "(asdf:test-system :quilc)"
+
 test-ccl:
 	ccl -n --batch --load $(QUICKLISP_HOME)/setup.lisp \
 		--eval '(push (truename ".") asdf:*central-registry*)' \

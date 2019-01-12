@@ -1,14 +1,22 @@
-test:
+test-cl-quil:
   tags:
-    - docker
-    - python:3.6
+    - github
+  image: rigetti/quicklisp
+  script:
+    - make dump-version-info
+    - make install-test-deps
+    - make test-cl-quil
+
+test-quilc:
+  tags:
+    - github
   image: rigetti/quicklisp
   script:
     - make dump-version-info
     - make install-test-deps
     # clone rpcq to work around QuickLisp
     - pushd /builds/rigetti && rm -rf rpcq && git clone https://github.com/rigetti/rpcq.git && popd
-    - make test
+    - make test-quilc
 
 docker-master:
   tags:
