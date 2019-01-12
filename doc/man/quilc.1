@@ -36,26 +36,26 @@ Prescribe that the input and output must be ProtoQuil, which is Quil
 that is comprised of gates and measurements, with no control flow.
 .IP "-d, --compute-gate-depth"
 Print a calculated gate depth for the provided circuit as an appended
-Quil comment. (Requires -p.)
+Quil comment. (Requires -P.)
 .IP "-2, --compute-2Q-gate-depth"
 Print a calculated multiqubit gate depth for the provided circuit as
-an appended Quil comment. (Requires -p. Ignores the blacklist and
+an appended Quil comment. (Requires -P. Ignores the blacklist and
 whitelist.)
 .IP "--compute-gate-volume"
 Print a calculated gate volume for the provided circuit as an appended
-Quil comment. (Requires -p.)
+Quil comment. (Requires -P.)
 .IP "-r, --compute-runtime"
 Print a calculated estimated runtime for the provided circuit as an
-appended Quil comment. (Requires -p.)
+appended Quil comment. (Requires -P.)
 .IP "-f, --compute-fidelity"
 Print a calculated estimated compiled circuit fidelity for the
-provided circuit as an appended Quil comment. (Requires -p.)
+provided circuit as an appended Quil comment. (Requires -P.)
 .IP "-u, --compute-unused-qubits"
 Print a list of unused qubits as an appended Quil comment. (Requires
--p.)
+-P.)
 .IP "-t, --show-topological-overhead"
 Print the number of SWAP gates incurred for topological reasons for
-the provided circuit as an appended Quil comment. (Requires -p.)
+the provided circuit as an appended Quil comment. (Requires -P.)
 .IP "--gate-blacklist <gate-list>"
 When calculating statistics, ignore the gates present in the
 comma-separated list of names of <gate-list>.
@@ -76,7 +76,7 @@ gates, when possible.
 Print and verify the matrix representation of a compiled ProtoQuil
 program. Verification is done by checking that the matrix
 representation of the output program matches the matrix representation
-of the input program. (Requires -p. Note that this is a very expensive
+of the input program. (Requires -P. Note that this is a very expensive
 operation.)
 .IP "--enable-state-prep-reductions"
 Perform program optimizations by assuming that the quantum state
