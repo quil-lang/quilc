@@ -1,3 +1,7 @@
+stages:
+  - test
+  - package
+
 test-cl-quil:
   stage: test
   tags:
@@ -25,7 +29,7 @@ test-quilc:
     - make test-quilc
 
 docker-master:
-  stage: deploy
+  stage: package
   tags:
     - dockerd
     - github
@@ -38,7 +42,7 @@ docker-master:
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc:latest
 
 docker-branch:
-  stage: deploy
+  stage: package
   tags:
     - dockerd
     - github
@@ -53,7 +57,7 @@ docker-branch:
     - docker push rigetti/quilc && docker rmi -f rigetti/quilc:${CI_COMMIT_REF_SLUG}
 
 docker-vtag:
-  stage: deploy
+  stage: package
   tags:
     - dockerd
     - github
