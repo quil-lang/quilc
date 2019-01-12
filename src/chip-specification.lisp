@@ -403,13 +403,17 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
     (setf (chip-specification-generic-compilers chip-spec) ret)))
 
 
-(defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz)))
-  "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link."
+(defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz))
+                                                             (directed nil))
+  "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link.
+
+If DIRECTED is T (default: NIL), only build a link from Q0 to Q1 (Q0 -> Q1)."
   (let ((link (build-link q0 q1 architecture))
         (link-index (chip-spec-n-links chip-specification)))
     (adjoin-hardware-object link chip-specification)
     (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q0))))
-    (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q1))))
+    (unless directed
+      (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q1)))))
     ;; Return the link.
     link))
 
