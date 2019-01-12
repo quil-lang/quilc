@@ -642,3 +642,28 @@ If DIRECTED is T (default: NIL), only build a link from Q0 to Q1 (Q0 -> Q1)."
 (defun build-bristlecone-chip ()
   "Create a full 72-qubit Bristlecone CHIP-SPECIFICATION."
   (build-bristlecone-chip-pattern 12 6))
+
+(defun build-ibm-qx5 ()
+  "Create a CHIP-SPECIFICATION matching IBM's qx5 chip."
+  ;; From "16-qubit IBM universal quantum computer can be fully entangled" by Wang, Li, Yin, & Zeng.
+  ;;
+  ;; https://www.nature.com/articles/s41534-018-0095-x
+  ;;
+  ;; Also known as IBM Q 16 Rüschlikon:
+  ;;
+  ;; https://www.research.ibm.com/ibm-q/technology/devices/
+  ;;
+  ;; accessed 11 Jan 2019.
+  (let ((chip-spec (make-chip-specification
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector)))
+        (nqubits 16)
+        (links '((1 2)  (2 3)   (3 4)   (5 4)   (6 5)   (6 7)   (8 7)
+                 (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
+                 (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
+    (install-generic-compilers chip-spec ':cnot)
+    (loop :repeat nqubits :do
+      (adjoin-hardware-object (build-qubit) chip-spec))
+    (loop :for (control target) :in links :do
+      (install-link-onto-chip chip-spec control target :architecture '(:CNOT)
+                                                       :directed t))
+    chip-spec))
