@@ -16,32 +16,7 @@ ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/
 all: quilc
 
 ###############################################################################
-# DEPENDENCIES
-###############################################################################
-
-install-test-deps:
-ifeq ($(UNAME_S),Linux)
-ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
-	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
-	curl $(ZMQ_REPO)/Release.key | apt-key add -
-	apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev
-else
-	echo "Centos-based platforms unsupported"
-endif
-else
-	echo "Non-Linux-based platforms unsupported"
-endif
-
-dump-version-info:
-	sbcl --noinform --non-interactive \
-		--eval '(format t "~A ~A" (lisp-implementation-type) (lisp-implementation-version))' \
-		--eval '(print (ql-dist:find-system "alexa"))' \
-		--eval '(print (ql-dist:find-system "magicl"))' \
-		--eval '(print (ql-dist:find-system "rpcq"))' \
-		--eval '(terpri)' --quit
-
-###############################################################################
-# BUILD
+# SETUP
 ###############################################################################
 
 $(QUICKLISP_SETUP):
@@ -57,18 +32,52 @@ system-index.txt: $(QUICKLISP_SETUP)
 		--eval '(ql:quickload "quilc")' \
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
 
+###############################################################################
+# DEPENDENCIES
+###############################################################################
+
+dump-version-info:
+	sbcl --noinform --non-interactive \
+		--eval '(format t "~A ~A" (lisp-implementation-type) (lisp-implementation-version))' \
+		--eval '(print (ql-dist:find-system "alexa"))' \
+		--eval '(print (ql-dist:find-system "magicl"))' \
+		--eval '(print (ql-dist:find-system "rpcq"))' \
+		--eval '(terpri)' --quit
+
+install-test-deps:
+ifeq ($(UNAME_S),Linux)
+ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
+	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
+	curl $(ZMQ_REPO)/Release.key | apt-key add -
+	apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev
+else
+	echo "Centos-based platforms unsupported"
+endif
+else
+	echo "Non-Linux-based platforms unsupported"
+endif
+
+install-build-deps: install-test-deps
+	sbcl --noinform --non-interactive \
+		--eval '(ql:quickload "buildapp")' \
+		--eval '(buildapp:build-buildapp "/usr/local/bin/buildapp")'
+
+###############################################################################
+# BUILD
+###############################################################################
+
 .PHONY: quilc
 quilc: system-index.txt
 	buildapp --output quilc \
-		 --manifest-file system-index.txt \
-		 --eval '(push :hunchentoot-no-ssl *features*)' \
-		 --asdf-path . \
-		 --load-system quilc \
-		 $(FOREST_SDK_LOAD) \
-		 --eval '(quilc::zap-info)' \
-		 --eval '(quilc::setup-debugger)' \
-		 --compress-core \
-		 --entry quilc::entry-point
+		--manifest-file system-index.txt \
+		--eval '(push :hunchentoot-no-ssl *features*)' \
+		--asdf-path . \
+		--load-system quilc \
+		$(FOREST_SDK_LOAD) \
+		--eval '(quilc::zap-info)' \
+		--eval '(quilc::setup-debugger)' \
+		--compress-core \
+		--entry quilc::entry-point
 
 quilc-sdk-base: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
 quilc-sdk-base: clean clean-cache quilc
@@ -82,11 +91,11 @@ quilc-sdk-barebones: quilc-sdk-base
 
 quilc-unsafe: system-index.txt
 	buildapp --output quilc \
-		 --manifest-file system-index.txt \
-		 --asdf-path . \
-		 --load-system quilc \
-		 --compress-core \
-		 --entry quilc::%entry-point
+		--manifest-file system-index.txt \
+		--asdf-path . \
+		--load-system quilc \
+		--compress-core \
+		--entry quilc::%entry-point
 
 .PHONY: docker
 docker: Dockerfile
@@ -98,15 +107,15 @@ docker: Dockerfile
 
 test:
 	$(QUICKLISP) \
-		 --eval "(ql:quickload :cl-quil-tests)" \
-		 --eval "(asdf:test-system :cl-quil)" \
-		 --eval "(ql:quickload :quilc-tests)" \
-		 --eval "(asdf:test-system :quilc)"
+		--eval "(ql:quickload :cl-quil-tests)" \
+		--eval "(asdf:test-system :cl-quil)" \
+		--eval "(ql:quickload :quilc-tests)" \
+		--eval "(asdf:test-system :quilc)"
 
 test-cl-quil:
 	$(QUICKLISP) \
-		 --eval "(ql:quickload :cl-quil-tests)" \
-		 --eval "(asdf:test-system :cl-quil)"
+		--eval "(ql:quickload :cl-quil-tests)" \
+		--eval "(asdf:test-system :cl-quil)"
 
 test-quilc:
 	$(QUICKLISP) \
