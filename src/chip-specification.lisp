@@ -161,7 +161,7 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
 ;;; constructors for hardware object building blocks
 
 (defun build-link (qubit0 qubit1 &optional (type (list ':CZ)))
-  "Constructs a template link. Legal types: (lists of) ':CZ, ':CPHASE, ':ISWAP, ':PISWAP."
+  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
   (setf type (alexandria:ensure-list type))
   (let* ((misc-data (make-hash-table :test #'equal))
          (obj (make-hardware-object
@@ -377,7 +377,7 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
       (vector-push-extend (lambda (instr)
                             (PISWAP-to-native-PISWAPs chip-spec instr))
                           ret))
-    (when (find ':cnot architecture)
+    (when (find ':cnot (alexandria:ensure-list architecture))
       (vector-push-extend (lambda (instr)
                             (CNOT-to-native-CNOTs chip-spec instr))
                           ret))
@@ -389,7 +389,7 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
        (vector-push-extend (lambda (instr)
                              (ucr-compiler instr :target ':iswap))
                            ret))
-      ((find ':cnot architecture)
+      ((find ':cnot (alexandria:ensure-list architecture))
        (warn "No UCR compiler for CNOT"))
       (t
        (error "Can't find a general UCR compiler for this target type.")))
