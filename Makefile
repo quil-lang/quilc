@@ -19,7 +19,7 @@ all: quilc
 # DEPENDENCIES
 ###############################################################################
 
-install-deps:
+install-test-deps:
 ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
 	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
