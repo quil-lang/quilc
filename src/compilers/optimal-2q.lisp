@@ -20,13 +20,15 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
   '(member :cz :iswap :piswap :cphase))
 
 (defun sequence-of-optimal-2q-target-atoms-p (seq)
-  (every (lambda (a) (typep a 'optimal-2q-target-atom))
-         seq))
+  (and (typep seq 'sequence)
+       (every (lambda (a) (typep a 'optimal-2q-target-atom))
+              seq)))
 
 (deftype optimal-2q-target ()
   "A valid TARGET value for OPTIMAL-2Q-COMPILE."
   '(or optimal-2q-target-atom
-       (satisfies sequence-of-optimal-2q-target-atoms-p)))
+       (and sequence
+            (satisfies sequence-of-optimal-2q-target-atoms-p))))
 
 (defun optimal-2q-target-meets-requirements (target requirements)
   (let ((targetl (if (typep target 'list) target (list target)))
