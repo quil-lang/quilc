@@ -390,7 +390,9 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
                              (ucr-compiler instr :target ':iswap))
                            ret))
       ((find ':cnot (alexandria:ensure-list architecture))
-       (warn "No UCR compiler for CNOT"))
+       (vector-push-extend (lambda (instr)
+                             (ucr-compiler instr :target ':cnot))
+                           ret))
       (t
        (error "Can't find a general UCR compiler for this target type.")))
     (vector-push-extend #'state-prep-compiler ret)
