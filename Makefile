@@ -27,7 +27,7 @@ $(QUICKLISP_SETUP):
 		--eval "(quicklisp-quickstart:install :path \"$(QUICKLISP_HOME)\")"
 
 system-index.txt: $(QUICKLISP_SETUP)
-	$(QUICKLISP)  \
+	$(QUICKLISP) \
 		$(FOREST_SDK_FEATURE) \
 		--eval '(ql:quickload "quilc")' \
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'

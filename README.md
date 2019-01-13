@@ -1,5 +1,7 @@
 # QUILC
 
+[![pipeline status](https://gitlab.com/rigetti/quilc/badges/master/pipeline.svg)](https://gitlab.com/rigetti/quilc/commits/master)
+
 QUILC comprises two projects. The first, `cl-quil`, does the heavy
 lifting of parsing, compiling, and optimizing Quil code. The second,
 `quilc`, presents an external interface for using `cl-quil`, either
@@ -15,7 +17,7 @@ compiling of Quil code. The code can be found under `./src/`.
 
 Follow the instructions in `docs/lisp-setup.md` to satisfy the
 dependencies required to load the `CL-QUIL` library. Afterwhich, the
-library can be loaded 
+library can be loaded
 
 ``` shell
 $ sbcl
