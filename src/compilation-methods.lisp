@@ -350,6 +350,13 @@ Returns a value list: (processed-program, of type parsed-program
       ;; one more pass of CFG collapse
       (simplify-cfg cfg)
       (let ((processed-program (reconstitute-program cfg)))
+        ;; Keep global PRAGMAS in the code, at the top of the file.
+        (setf (parsed-program-executable-code processed-program)
+              (concatenate
+               'vector
+               (remove-if-not #'global-pragma-instruction-p
+                              (parsed-program-executable-code parsed-program))
+               (parsed-program-executable-code processed-program)))
         ;; retain the old circuit and gate definitions
         (setf (parsed-program-gate-definitions processed-program)
               (parsed-program-gate-definitions parsed-program))

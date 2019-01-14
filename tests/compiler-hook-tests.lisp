@@ -424,3 +424,20 @@ MEASURE 1
     (signals simple-error (cl-quil::check-protoquil-program invalid-pp-1in2))
     (signals simple-error (cl-quil::check-protoquil-program invalid-pp-1in3))
     (signals simple-error (cl-quil::check-protoquil-program invalid-pp-2in3))))
+
+(deftest test-global-pragma-survives-compilation ()
+  "Test that a global pragma survives compilation."
+  (let* ((p (with-output-to-quil
+              "PRAGMA INITIAL_REWIRING \"GREEDY\""
+              "PRAGMA READOUT-POVM 3 \"(0.9 0.2 0.1 0.8)\""
+              "PRAGMA ADD-KRAUS X 2 \"(1.0 0.0 0.0 1.0)\""
+              "PRAGMA ADD-KRAUS X 2 \"(1.0 0.0 0.0 -i)\""
+              "X 0"
+              "X 1"
+              "X 2"
+              "X 3"))
+         (cp (quil:parsed-program-executable-code
+              (cl-quil::compiler-hook p (quil::build-8q-chip)))))
+    (is (= 1 (count-if (lambda (x) (typep x 'quil::pragma-initial-rewiring)) cp)))
+    (is (= 1 (count-if (lambda (x) (typep x 'quil::pragma-readout-povm)) cp)))
+    (is (= 2 (count-if (lambda (x) (typep x 'quil::pragma-add-kraus)) cp)))))

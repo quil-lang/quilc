@@ -35,6 +35,7 @@ Expected syntax: PRAGMA END_BLOCK"))
    "PRAGMA that introduces a Kraus noise channel on a fixed instruction.
 
 Expected syntax: PRAGMA ADD-KRAUS operator qubit-list \"(matrix entries)\"")
+  (:global t)
   (:slots operator-name qubit-arguments matrix-entries)
   (:words (operator string) &rest (args integer-list))
   (:freeform-string freeform-string)
@@ -53,6 +54,7 @@ Expected syntax: PRAGMA ADD-KRAUS operator qubit-list \"(matrix entries)\"")
   (:documentation "PRAGMA that introduces measurement noise on a particular qubit.
 
 Expected syntax: PRAGMA READOUT-POVM qubit \"(matrix entries)\"")
+  (:global t)
   (:slots qubit-index matrix-entries)
   (:words (index integer))
   (:freeform-string freeform-string)
@@ -96,6 +98,7 @@ Expected syntax: PRAGMA CURRENT_REWIRING \"#(qubit permutation vector)\"")
   should use. This can only appear at the start of a program.
 
 Expected syntax: PRAGMA INITIAL_REWIRING [NAIVE|PARTIAL|GREEDY|RANDOM]")
+  (:global t)
   (:slots (rewiring-type (member :naive :random :partial :greedy)))
   (:freeform-string rewiring-type-string)
   (:initialization
