@@ -19,6 +19,7 @@
 (defgeneric pdef-freeform-string-name (pdef))
 (defgeneric pdef-initialization-code (pdef))
 (defgeneric pdef-display-string-code (pdef))
+(defgeneric pdef-global-p (pdef))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Support ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -97,7 +98,8 @@ elements to ELT-TYPE.
     :words
     :freeform-string
     :initialization
-    :display-string))
+    :display-string
+    :global))
 
 (defun check-defpragma-options-list (options-list)
   "Check that a OPTIONS-LIST, of the form ((:option1 value1) (:option2
@@ -230,6 +232,17 @@ contains no duplicates."
        (:default-initargs
         :name ,name))))
 
+(defgeneric global-pragma-instruction-p (obj)
+  (:documentation "Is OBJ a PRAGMA instruction that affects the program globally?")
+  (:method ((obj t))
+    nil))
+
+(defun pdef-record-global-pragma-form (pdef)
+  ;; We generate a DEFMETHOD regardless so re-evaluation works.
+  `(defmethod global-pragma-instruction-p ((obj ,(pdef-class-name pdef)))
+     (declare (ignore obj))
+     ',(pdef-global-p pdef)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;; Class implementation ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -256,7 +269,9 @@ contains no duplicates."
    (initialization-code :initarg :initialization-code
                         :reader pdef-initialization-code)
    (display-string-code :initarg :display-string-code
-                        :reader pdef-display-string-code)))
+                        :reader pdef-display-string-code)
+   (global :initarg :global
+           :reader pdef-global-p)))
 
 (defmethod pdef-freeform-string-p (pdef)
   (not (null (pdef-freeform-string-name pdef))))
@@ -298,6 +313,10 @@ form (:keyword value). Accepted options are:
   should assign a value each slot variable. Multiple forms are
   allowed.
 
+  (:global <boolean>) -- Specifies whether the pragma affects the
+  entire program, and must be persisted through different
+  transformations. (Default: NIL)
+
   (:display <code>) -- When printing a specialized instruction, <code>
   should evaluate to a string that displays the data of the
   specialized pragma. Slot variables are in scope. Multiple forms are
@@ -316,6 +335,7 @@ form (:keyword value). Accepted options are:
     (check-defpragma-options-list pragma-options)
     (let* ((words (option-value :words))
            (slots (option-value :slots))
+           (global (first (option-value :global)))
            (freeform-string-name (first (option-value :freeform-string)))
            (raw-words (remove '&rest words))
            (word-lambda-list (mapcar #'thing-name words))
@@ -337,7 +357,8 @@ form (:keyword value). Accepted options are:
                            :initialization-code
                            (option-value :initialization)
                            :display-string-code
-                           (option-value :display-string))))
+                           (option-value :display-string)
+                           :global global)))
       (check-defpragma-lambda-list word-lambda-list)
       (check-defpragma-names-compatibility slot-names
                                            word-names
@@ -347,7 +368,8 @@ form (:keyword value). Accepted options are:
          ,(pdef-defclass-form pdef)
          ,(pdef-check-pragma-arguments-form pdef)
          ,(pdef-pragma-specalized-initargs-form pdef)
-         ,(pdef-pragma-display-string-form pdef)))))
+         ,(pdef-pragma-display-string-form pdef)
+         ,(pdef-record-global-pragma-form pdef)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Driver ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
