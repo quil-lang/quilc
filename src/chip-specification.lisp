@@ -44,6 +44,31 @@ DURATION is the time duration in nanoseconds of this gate application."
   (permutation (list 1 0))
   (duration 600))
 
+
+;;; The HARDWARE object structure stores a lot of information. It
+;;; serves many purposes, principally to solve some of the following
+;;; problems:
+;;;
+;;;     1. To address operations on qubits, qubit pairs, qubit
+;;;     triplets, etc. This requires determining a notion of
+;;;     _occupancy_ of resources.
+;;;
+;;;     2. To determine what options are available for compiling
+;;;     operations on that resource.
+;;;
+;;; The first point is particularly important. You should *not* use
+;;; CXNS to determine directed connectivity. (By "directed", we mean
+;;; anything to do with what operations are allowed.) CXNS just
+;;; encodes some physical relationships on physical hardware;
+;;; collections of resources on which a variety of operations can
+;;; possibly act.
+;;;
+;;; To determine available instructions, their validity, etc., the
+;;; information in NATIVE-INSTRUCTIONS and MISC-DATA (namely the
+;;; duration table) are helpful.
+;;;
+;;; Now for some miscellaneous comments about the design.
+
 ;;; some design decisions about CXNS:
 ;;; + easy to iterate over the objects in positions above ORDER and know when to terminate
 ;;; + easy to iterate over the objects in positions below ORDER and know when to terminate
@@ -79,15 +104,15 @@ REWRITING-RULES is a vector of REWRITING-RULE structures that the compressor loo
 
 CXNS is an array. In its nth position, there is a vector of the order n hardware objects on the chip that are connected to this one. Among other things, this is used to determine shared resource blocking.
 
-MISC-DATA is a hashtable of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
+MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
   (order 0 :type unsigned-byte :read-only t)
-  (native-instructions (constantly nil))
+  (native-instructions (constantly nil) :type function)
   (compilation-methods (make-adjustable-vector))
   (permutation-gates (make-adjustable-vector))
   (rewriting-rules (make-adjustable-vector))
   (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
                                               (make-adjustable-vector))))
-  (misc-data (make-hash-table :test #'equal)))
+  (misc-data (make-hash-table :test #'equal) :type hash-table))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
@@ -383,7 +408,6 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
                             (CNOT-to-native-CNOTs chip-spec instr))
                           ret))
     (cond
-
       ((optimal-2q-target-meets-requirements architecture ':cz)
        (vector-push-extend #'ucr-compiler ret))
       ((optimal-2q-target-meets-requirements architecture ':iswap)
