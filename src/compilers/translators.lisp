@@ -10,10 +10,10 @@
   "Defines a function whose single argument is passed to operator-bind, which wraps BODY. In the event of a match failure, GIVE-UP-COMPILATION is called."
   `(defun ,fn-name (,gate-var)
      (operator-match
-      (((,bind-expression ,gate-var))
-       ,@body)
-      (_
-       (give-up-compilation)))))
+       (((,bind-expression ,gate-var))
+        ,@body)
+       (_
+        (give-up-compilation)))))
 
 ;; standard 1Q gate translators
 ;;
@@ -155,62 +155,73 @@
         (build-gate "RY"    '(#.(/ pi 2)) q0)
         (build-gate "RZ"    '(#.pi)       q0)))
 
-;; there are other standard algorithms that do this with better run-times, but i
-;; don't know where to find (e.g.) a standard implementation of a priority queue
-;; in Lisp, and i'm not presently interested in writing one. so, you get a naive
-;; implementation of Dijkstra's.
 (defun find-shortest-path-on-chip-spec (chip-spec start-node target-node)
-  "Returns a sequence of link addresses that reach from START-NODE to TARGET-NODE on CHIP-SPEC."
-  (let* ((num-qubits (length (vnth 0 (chip-specification-objects chip-spec))))
-         (computed-paths (make-array num-qubits :initial-element -1))
-         (current-node start-node)
-         (unvisited-nodes (make-array num-qubits :initial-element t)))
-    ;; the trivial path reaches the start node.
-    (setf (aref computed-paths current-node) nil)
-    ;; loop until we reach the target node
-    (loop :until (= current-node target-node) :do
-      (progn
-        ;; set the current node as visited
-        (setf (aref unvisited-nodes current-node) nil)
-        ;; at the current node, look at all its neighbors
-        (loop :for cxn :across (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-spec current-node))) :do
-          (let ((other-qubit (let ((pair (chip-spec-qubits-on-link chip-spec cxn)))
-                               (if (= (vnth 0 pair) current-node) (vnth 1 pair) (vnth 0 pair)))))
-            (if (or
-                 ;; if we haven't visited the other qubit yet
-                 (typep (aref computed-paths other-qubit) 'integer)
-                 ;; or if our current path is shorter than the existing path
-                 (< (1+ (length (aref computed-paths current-node)))
-                    (length (aref computed-paths other-qubit))))
-                ;; then store this new shorter path
-                (setf (aref computed-paths other-qubit)
-                      (cons cxn (aref computed-paths current-node))))))
-        ;; now we're looking for a new current node.
-        ;; over all of the nodes...
-        (let ((shortest-distance most-positive-fixnum))
-          (dotimes (new-node num-qubits)
-            (when (and
-                   ;; if we haven't visited new-node yet
-                   (aref unvisited-nodes new-node)
-                   ;; and it's adjacent to a visited node
-                   (typep (aref computed-paths new-node) 'list)
-                   ;; and it's the shortest path we've seen yet
-                   (< (length (aref computed-paths new-node)) shortest-distance))
-              ;; then pick this as our new current node (so far)
-              (setf shortest-distance (1+ (length (aref computed-paths new-node))))
-              (setf current-node new-node))))))
-    ;; finally, reply with the computed shortest path.
-    (nreverse (aref computed-paths target-node))))
+  "Returns a sequence of qubit indices that reach from START-NODE to TARGET-NODE on CHIP-SPEC, or NIL if no path can be found.
+
+Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
+  (assert (<= 0 start-node (1- (chip-spec-n-qubits chip-spec))) ()
+          "Can't possibly find a path if START-NODE is not found within the CHIP-SPEC qubits.")
+  (assert (<= 0 target-node (1- (chip-spec-n-qubits chip-spec))) ()
+          "Can't possibly find a path if END-NODE is not found within the CHIP-SPEC qubits.")
+  (labels ((make-graph ()
+             "Builds a graph ((ni . (nj nk ...)) (...) ...) from CHIP-SPEC where ni are the nodes (qubits), and the (nj nk ...) are the nodes adjacent to ni."
+             (loop :for i :below (chip-spec-n-qubits chip-spec)
+                   :collect (cons i (chip-spec-adj-qubits chip-spec i))))
+           (neighbors (graph node seen)
+             "Find the neighbors of NODE in GRAPH that are not in SEEN."
+             (let* ((all-neighbors (cdr (find node graph :key #'car))))
+               (remove-if (lambda (neighbor) (find neighbor seen))
+                          all-neighbors)))
+           (mindistance (distances seen)
+             "Find the node with smallest distance in DISTANCES that is not in SEEN."
+             ;; dislike
+             (cdr (reduce (lambda (a b) (if (<= (car a) (car b)) a b))
+                          (loop :for i :below (length distances)
+                                :unless (find i seen)
+                                  :collect (cons (nth i distances) i)))))
+           (dijkstra (graph)
+             "Compute shortest distances to each node in GRAPH from START-NODE."
+             (let ((nodes (loop :for n :below (chip-spec-n-qubits chip-spec) :collect n))
+                   (seen nil)
+                   (distances (loop :for n :below (chip-spec-n-qubits chip-spec)
+                                    :collect (if (= n start-node) 0 most-positive-fixnum)))
+                   (prev-nodes '()))
+               (loop :until (every #'null nodes) :do
+                 (let ((next-node (mindistance distances seen)))
+                   (setf (nth next-node nodes) nil)
+                   (push next-node seen)
+                   (loop :for neighbor :in (neighbors graph next-node seen)
+                         :for next-node-dist := (nth next-node distances)
+                         :for neighbor-dist := (nth neighbor distances) :do
+                           (when (>= neighbor-dist (1+ next-node-dist))
+                             (setf (nth neighbor distances) (1+ next-node-dist))
+                             (push (cons neighbor next-node) prev-nodes)))))
+               (values distances prev-nodes)))
+           (path (prev)
+             "Compute the shortest path from START-NODE to TARGET-NODE given path information PREV."
+             (let ((path nil)
+                   (node target-node))
+               (when (or (find node prev :key #'car)
+                         (= node start-node))
+                 (loop :while node :do
+                   (progn (push node path)
+                          (setq node (cdr (find node prev :key #'car))))))
+               path)))
+    (multiple-value-bind (distances prev)
+        (dijkstra (make-graph))
+      (declare (ignore distances))
+      (path prev))))
 
 (defun SWAP-to-native-SWAPs (chip-spec swap-gate)
   (operator-match
     (((("SWAP" () q0 q1) swap-gate))
-     (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0))
-            (f-list (mapcar (lambda (link-cxn)
-                              (apply #'build-gate "SWAP" '()
-                                     (map 'list #'qubit (chip-spec-qubits-on-link chip-spec link-cxn))))
-                            computed-path)))
-       (append f-list (rest (reverse f-list)))))
+     (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
+       (unless computed-path
+         (give-up-compilation))
+       (let* ((f-list (mapcar (lambda (q1 q2) (build-gate "SWAP" '() q1 q2))
+                              computed-path
+                              (rest computed-path))))
+         (append f-list (rest (reverse f-list))))))
     (_
      (give-up-compilation))))
 
@@ -218,30 +229,26 @@
   (operator-match
     (((("CNOT" () q0 q1) cnot-gate))
      (labels
-         ((build-CNOT-string (index-list prev-qubit)
-            (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
-                                                     'list))
-                   (oriented-qubits (if (= prev-qubit (first unoriented-qubit-indices))
-                                        (mapcar #'qubit unoriented-qubit-indices)
-                                        (mapcar #'qubit (reverse unoriented-qubit-indices)))))
+         ((build-CNOT-string (index-list)
+            (let* ((oriented-qubits (mapcar #'qubit index-list))
+                   (q0 (first oriented-qubits))
+                   (q1 (second oriented-qubits)))
               (cond
                 ;; base case
-                ((= 1 (length index-list))
-                 (list (apply #'build-gate "CNOT" '() oriented-qubits)))
+                ((= 2 (length index-list))
+                 (list (build-gate "CNOT" '() q0 q1)))
                 ;; recursive case
                 (t
-                 (let ((temp-string (build-CNOT-string (rest index-list)
-                                                       (qubit-index (second oriented-qubits)))))
-                   (append
-                    (list
-                     (apply #'build-gate "CNOT" '() oriented-qubits))
-                    temp-string
-                    (list
-                     (apply #'build-gate "CNOT" '() oriented-qubits))
-                    temp-string)))))))
-       (build-CNOT-string (find-shortest-path-on-chip-spec chip-spec q0 q1) q0)))
+                 (let ((temp-string (build-CNOT-string (rest index-list)))
+                       (gate (list (build-gate "CNOT" '() q0 q1))))
+                   (append gate temp-string gate temp-string)))))))
+       (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
+         (unless computed-path
+           (give-up-compilation))
+         (build-CNOT-string computed-path))))
     (_
      (give-up-compilation))))
+
 
 (defun CZ-to-native-CZs (chip-spec cz-gate)
   (operator-match
@@ -281,26 +288,19 @@
     (((("PISWAP" (theta) q0 q1) piswap-gate))
      (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
        (labels
-           ((build-PISWAP-string (index-list prev-qubit)
-              (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
-                                                       'list))
-                     (oriented-qubits (if (= (first unoriented-qubit-indices) prev-qubit)
-                                          unoriented-qubit-indices
-                                          (reverse unoriented-qubit-indices))))
+           ((build-PISWAP-string (index-list)
+              (let* ((oriented-qubits (mapcar #'qubit index-list))
+                     (a (first oriented-qubits))
+                     (b (second oriented-qubits)))
                 (cond
                   ;; base case
-                  ((= 1 (length index-list))
-                   (list (build-gate "PISWAP" `(,theta) (first oriented-qubits) (second oriented-qubits))))
+                  ((= 2 (length index-list))
+                   (list (build-gate "PISWAP" `(,theta) a b)))
                   ;; recursive case
                   (t
-                   (let ((temp-string (build-PISWAP-string (rest index-list)
-                                                           (second oriented-qubits))))
-                     (append
-                      (list
-                       (build-gate "SWAP" () (first oriented-qubits) (second oriented-qubits)))
-                      temp-string
-                      (list
-                       (build-gate "SWAP" () (first oriented-qubits) (second oriented-qubits))))))))))
-         (build-PISWAP-string computed-path q0))))
+                   (let ((temp-string (build-PISWAP-string (rest index-list)))
+                         (gate (list (build-gate "SWAP" () a b))))
+                     (append gate temp-string gate)))))))
+         (build-PISWAP-string computed-path))))
     (_
      (give-up-compilation))))
