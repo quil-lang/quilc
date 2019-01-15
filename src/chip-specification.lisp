@@ -174,13 +174,15 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
 
 (defun lookup-hardware-address (chip-spec instr)
   "Finds a hardware object OBJ in CHIP-SPEC whose qubit resources match those used by INSTR. Returns the values object (ORDER ADDRESS OBJ), so that OBJ equals (vnth ADDRESS (vnth ORDER (chip-specification-objects CHIP-SPEC)))."
+  ;; Only APPLICATIONs and MEASUREs use qubits in contexts where you'd
+  ;; actually want to call this function.
+  ;;
+  ;; XXX: What about RESET q?
   (etypecase instr
     (application
      (lookup-hardware-address-by-qubits chip-spec (mapcar #'qubit-index (application-arguments instr))))
-    (measure
-     (lookup-hardware-address-by-qubits chip-spec (list (qubit-index (measurement-qubit instr)))))
-    (instruction
-     1/100)))
+    (measurement
+     (lookup-hardware-address-by-qubits chip-spec (list (qubit-index (measurement-qubit instr)))))))
 
 
 ;;; constructors for hardware object building blocks
