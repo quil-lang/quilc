@@ -51,8 +51,9 @@ PRAGMA CURRENT_REWIRING \"#(1 0)\"")))
 (deftest test-rewiring-modes ()
   "Iterates over the rewiring modes and tests that the addresser is well-behaved on each of them."
   ;; first, the straight-line rewiring methods
-  (dolist (quil::*initial-rewiring-default-type*
-           (list ':naive ':random ':partial ':greedy))
+  (dolist (quil::*initial-rewiring-default-type* '(:naive :random :partial :greedy))
+    (format t "    Testing rewiring type ~A~%" quil::*initial-rewiring-default-type*)
+    (finish-output)
     (let* ((pstring "
 CNOT 0 3
 CNOT 1 4")
@@ -64,8 +65,9 @@ CNOT 1 4")
                      (quil::gate-applications-to-logical-matrix cpp)))))
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
-  (dolist (quil::*addresser-move-to-rewiring-swap-search-type*
-           (list ':greedy-path ':greedy-qubit ':a*))
+  (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
+    (format t "    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
+    (finish-output)
     (let* ((pp (quil::parse-quil "
 LABEL @a
 CNOT 0 1
