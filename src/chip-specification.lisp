@@ -189,6 +189,9 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
 
 (defun build-link (qubit0 qubit1 &optional (type (list ':CZ)))
   "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
+  (check-type qubit0 unsigned-byte)
+  (check-type qubit1 unsigned-byte)
+  (assert (/= qubit0 qubit1))
   (setf type (alexandria:ensure-list type))
   (let* ((misc-data (make-hash-table :test #'equal))
          (obj (make-hardware-object
