@@ -217,11 +217,31 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
           :do (setf lower-precedence (rest lower-precedence))
               ;; set up duration-alist
           :nconc (case current-type
-                   (:CZ     (list (cons `("CZ"     ()  _ _) 150)))
-                   (:CPHASE (list (cons `("CPHASE" (_) _ _) 150)))
-                   (:ISWAP  (list (cons `("ISWAP"  ()  _ _) 150)))
-                   (:PISWAP (list (cons `("PISWAP" (_) _ _) 150)))
-                   (:CNOT   (list (cons `("CNOT"   ()  _ _) 500)))
+                   ;; In usual interactions, these are all capable of
+                   ;; acting bidirectionally.
+                   (:CZ     (list (cons `("CZ"     ()  ,qubit0 ,qubit1) 150)
+                                  (cons `("CZ"     ()  ,qubit1 ,qubit0) 150)))
+                   (:CPHASE (list (cons `("CPHASE" (_) ,qubit0 ,qubit1) 150)
+                                  (cons `("CPHASE" (_) ,qubit1 ,qubit0) 150)))
+                   (:ISWAP  (list (cons `("ISWAP"  ()  ,qubit0 ,qubit1) 150)
+                                  (cons `("ISWAP"  ()  ,qubit1 ,qubit0) 150)))
+                   (:PISWAP (list (cons `("PISWAP" (_) ,qubit0 ,qubit1) 150)
+                                  (cons `("PISWAP" (_) ,qubit1 ,qubit0) 150)))
+                   ;; CNOT typically only acts in one direction
+                   ;; natively. One can swap the direction of CNOT 0 1
+                   ;; by sandwiching it between Hadamard gates. (The
+                   ;; compiler will do this for you elsewhere.)
+                   ;;
+                   ;;     +----------+
+                   ;;     | H 0      |
+                   ;;     | H 1      |    +----------+
+                   ;;     | CNOT 0 1 | == | CNOT 1 0 |
+                   ;;     | H 1      |    +----------+
+                   ;;     | H 0      |
+                   ;;     +----------+
+                   ;;
+                   (:CNOT   (list (cons `("CNOT"   ()  ,qubit0 ,qubit1) 150)))
+                   ;; We need some qubit type to be specified...
                    (otherwise (error "Unknown qubit type.")))
             :into duration-alist
           ;; set up single-type rewriting rules
@@ -432,17 +452,13 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
     (setf (chip-specification-generic-compilers chip-spec) ret)))
 
 
-(defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz))
-                                                             (directed nil))
-  "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link.
-
-If DIRECTED is T (default: NIL), only build a link from Q0 to Q1 (Q0 -> Q1)."
+(defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz)))
+  "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link."
   (let ((link (build-link q0 q1 architecture))
         (link-index (chip-spec-n-links chip-specification)))
     (adjoin-hardware-object link chip-specification)
     (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q0))))
-    (unless directed
-      (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q1)))))
+    (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q1))))
     ;; Return the link.
     link))
 
@@ -695,6 +711,5 @@ If DIRECTED is T (default: NIL), only build a link from Q0 to Q1 (Q0 -> Q1)."
     (loop :repeat nqubits :do
       (adjoin-hardware-object (build-qubit) chip-spec))
     (loop :for (control target) :in links :do
-      (install-link-onto-chip chip-spec control target :architecture '(:CNOT)
-                                                       :directed t))
+      (install-link-onto-chip chip-spec control target :architecture '(:CNOT)))
     chip-spec))
