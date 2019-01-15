@@ -121,3 +121,30 @@
                (mat (cl-quil::make-matrix-from-quil (funcall expander chip-spec instr))))
           (is (cl-quil::matrix-equality ref-mat
                                         (cl-quil::scale-out-matrix-phases mat ref-mat))))))))
+
+(defun %build-disconnected-chip-spec ()
+  ;; chip spec with disconnected qubits 0 <-> 1 and 2 <-> 3
+  (let ((chip-spec (cl-quil::make-chip-specification
+                    :generic-rewriting-rules (coerce (cl-quil::global-rewriting-rules) 'vector))))
+    (cl-quil::install-generic-compilers chip-spec ':cz)
+    (loop :repeat 4 :do
+      (cl-quil::adjoin-hardware-object (cl-quil::build-qubit) chip-spec))
+    (cl-quil::install-link-onto-chip chip-spec 0 1)
+    (cl-quil::install-link-onto-chip chip-spec 2 3)
+    chip-spec))
+
+(deftest test-find-directed-shortest-path-on-chip-spec ()
+  (let (;; 1 <-> 2 <-> 3 <-> 4
+        (undirected-nq (cl-quil::build-nq-linear-chip 4))
+        ;; 1 <-> 2     3 <-> 4
+        (pathological (%build-disconnected-chip-spec))
+        (ring (cl-quil::build-8q-chip)))
+    ;; good paths
+    (is (equal (cl-quil::find-shortest-path-on-chip-spec undirected-nq 1 3) '(1 2 3)))
+    (is (equal (cl-quil::find-shortest-path-on-chip-spec undirected-nq 1 0) '(1 0)))
+    (is (equal (cl-quil::find-shortest-path-on-chip-spec undirected-nq 2 0) '(2 1 0)))
+    (is (equal (cl-quil::find-shortest-path-on-chip-spec ring 1 7) '(1 0 7)))
+    ;; bad paths
+    (is (null (cl-quil::find-shortest-path-on-chip-spec pathological 2 1)))))
+
+
