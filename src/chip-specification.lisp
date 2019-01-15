@@ -17,13 +17,13 @@ GENERIC-COMPILERS is a vector of functions used as fallback compilation methods,
 
 GENERIC-REWRITING-RULES is a similar vector of REWRITING-RULE structures that the compressor loop can use to generate shorter gate strings when rules specialized to local hardware objects have been exhausted.  Again, the array is sorted by descending preference.
 
-LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.  It gets auto-populated by WARM-CHIP-SPEC-LOOKUP-CACHE."
+LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.  It gets auto-populated by `WARM-CHIP-SPEC-LOOKUP-CACHE'. This should not be accessed directly; use `LOOKUP-HARDWARE-ADDRESS-BY-QUBITS'."
   (objects (make-array 2 :initial-contents (list (make-adjustable-vector)
                                                  (make-adjustable-vector)))
    :type vector)
   (generic-compilers (make-adjustable-vector) :type vector)
   (generic-rewriting-rules (make-adjustable-vector) :type vector)
-  (lookup-cache nil))
+  (lookup-cache nil :type (or null hash-table)))
 
 (defmethod print-object ((cs chip-specification) stream)
   (print-unreadable-object (cs stream :type t :identity nil)
@@ -421,6 +421,7 @@ If DIRECTED is T (default: NIL), only build a link from Q0 to Q1 (Q0 -> Q1)."
     link))
 
 (defun warm-chip-spec-lookup-cache (chip-spec)
+  "Warm the lookup cache of the CHIP-SPEC. This sets the table of the chip specification as a side effect. See the documentation of the `CHIP-SPECIFICATION' structure."
   (let ((hash (make-hash-table :test 'equalp)))
     (loop :for q :across (chip-spec-qubits chip-spec)
           :for index :from 0
@@ -432,7 +433,8 @@ If DIRECTED is T (default: NIL), only build a link from Q0 to Q1 (Q0 -> Q1)."
           :for other-pair := (reverse pair)
           :do (setf (gethash pair       hash) (list index l))
               (setf (gethash other-pair hash) (list index l)))
-    (setf (chip-specification-lookup-cache chip-spec) hash)))
+    (setf (chip-specification-lookup-cache chip-spec) hash)
+    nil))
 
 
 
