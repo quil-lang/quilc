@@ -239,8 +239,9 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
              (setf (gethash "duration-alist" misc-data)
                    (nconc duration-alist (gethash "duration-alist" misc-data)))
              (setf (hardware-object-rewriting-rules obj)
+
                    (make-array (length rewriting-rules)
-                               :fill-pointer t
+                               :adjustable t
                                :initial-contents rewriting-rules))
              (loop :for method :in compilation-methods
                    :do (vector-push-extend method
