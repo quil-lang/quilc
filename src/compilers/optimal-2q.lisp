@@ -241,6 +241,31 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
               (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
               (gate-matrix (lookup-standard-gate "ISWAP")))))))
 
+;; optimal-2Q-compile returns the smallest string of 2Q gates that it can, but
+;; what this means depends upon what gateset is available. the TARGET argument
+;; is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted) sequence of such atoms,
+;; indicating which 2Q gates are available for use.
+(deftype optimal-2q-target-atom ()
+  '(member :cz :iswap :piswap :cphase))
+
+(defun sequence-of-optimal-2q-target-atoms-p (seq)
+  (and (typep seq 'sequence)
+       (every (lambda (a) (typep a 'optimal-2q-target-atom))
+              seq)))
+
+(deftype optimal-2q-target ()
+  "A valid TARGET value for OPTIMAL-2Q-COMPILE."
+  '(or optimal-2q-target-atom
+       (and sequence
+            (satisfies sequence-of-optimal-2q-target-atoms-p))))
+
+(defun optimal-2q-target-meets-requirements (target requirements)
+  (let ((targetl       (alexandria:ensure-list target))
+        (requirementsl (alexandria:ensure-list requirements)))
+    (when (member ':cphase targetl) (push ':cz targetl))
+    (when (member ':piswap targetl) (push ':iswap targetl))
+    (subsetp requirementsl targetl)))
+
 (defun chi-from-evals (evals)
   "Computes the characteristic polynomial of a 4x4 matrix with all
 unit-norm eigenvalues from the length 4 list of their ANGLES.  Returns
@@ -298,6 +323,12 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
     (norm
      (vector-difference chi
                         (chi-from-evals circuit-evals)))))
+
+(defun optimal-2q-compiler-for (target)
+  "Return an optimal 2q compilation function for TARGET."
+  (check-type target optimal-2q-target)
+  (lambda (instr)
+    (optimal-2q-compiler instr :target target)))
 
 (defun optimal-2q-compiler (instr &key (target ':cz))
   "Computes a representation of a 2Q gate which is of optimal multiqubit gate depth. TARGET is of type OPTIMAL-2Q-TARGET."

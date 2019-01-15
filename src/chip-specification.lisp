@@ -289,7 +289,6 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
              (setf (gethash "duration-alist" misc-data)
                    (nconc duration-alist (gethash "duration-alist" misc-data)))
              (setf (hardware-object-rewriting-rules obj)
-
                    (make-array (length rewriting-rules)
                                :adjustable t
                                :initial-contents rewriting-rules))
@@ -302,8 +301,7 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
        (vector-push-extend #'2q-cnot-compiler
                            (hardware-object-compilation-methods obj)))
       (otherwise
-       (vector-push-extend (lambda (instr)
-                             (optimal-2q-compiler instr :target type))
+       (vector-push-extend (optimal-2q-compiler-for type)
                            (hardware-object-compilation-methods obj))))
     ;; return the qubit
     obj))
