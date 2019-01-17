@@ -94,7 +94,7 @@ DURATION is the time duration in nanoseconds of this gate application."
 
 ORDER is a non-negative integer that counts the number of qubit subsidiaries of this hardware object. Equals (1- (length (vnth 0 (hardware-object-cxns this)))). (If you drew a schematic of a chip, this is also the dimension of the graphical representation of the hardware object: 0 for qubits, 1 for links, ... .)
 
-NATIVE-INSTRUCTIONS is a function that takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate), and it emits NIL if this instruction does not admit direct translation to a physical pulse.
+NATIVE-INSTRUCTIONS is a function that takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse. A second value is returned, which is T if the instruction would be native were the qubits permuted in some fashion (\"gate native\").
 
 COMPILATION-METHODS is a vector of functions that this device can employ to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.
 
@@ -106,7 +106,10 @@ CXNS is an array. In its nth position, there is a vector of the order n hardware
 
 MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
   (order 0 :type unsigned-byte :read-only t)
-  (native-instructions (constantly nil) :type function)
+  (native-instructions (lambda (instr)
+                         (declare (ignore instr))
+                         (values nil nil))
+   :type (function (t) (values t t)))
   (compilation-methods (make-adjustable-vector))
   (permutation-gates (make-adjustable-vector))
   (rewriting-rules (make-adjustable-vector))
@@ -196,10 +199,23 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
   (let* ((misc-data (make-hash-table :test #'equal))
          (obj (make-hardware-object
                :order 1
-               :native-instructions (lambda (instr)
-                                      (cdr (assoc instr
-                                                  (gethash "duration-alist" misc-data)
-                                                  :test #'operator-match-p)))
+               :native-instructions
+               (lambda (instr)
+                 (if (not (typep instr 'application))
+                     (values nil nil)
+                     (let* ((duration-alist (gethash "duration-alist" misc-data))
+                            (duration (cdr (assoc instr duration-alist :test #'operator-match-p))))
+                       (values
+                        ;; Is the instruction precisely native? (both gate + qubit indexes)
+                        duration
+                        ;; Is the gate native? (just the gate)
+                        (and (or duration
+                                 (and (plain-operator-p (application-operator instr))
+                                      (assoc (application-operator-name instr)
+                                             duration-alist
+                                             :test (lambda (name pattern)
+                                                     (string= name (first pattern))))))
+                             t)))))
                :cxns (vector (vector qubit0 qubit1) #())
                :misc-data misc-data)))
     ;; set up the SWAP record
