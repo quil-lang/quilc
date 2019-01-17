@@ -5,7 +5,34 @@
 (in-package #:cl-quil)
 
 (defconstant +makhlin-distance-to-operator-distance-postfactor+ 4
-  "In the invocations of Nelder-Mead in the routine OPTIMAL-2Q-COMPILE below, GOODNESS is a measure of the L^2-distance between the vectors of Makhlin invariants of the input 2Q operator and the output of the Nelder-Mead finder for the circuit template.  This is a measure of distance between the two double-cosets, which is not an exact reflection of the L^2-distance between the two operators.  In fact, it's not possible to measure that distance until the rest of the routine has completed, which picks out a particular representative element of the coset carved out by the chosen template.  Nonetheless, we have to make a decision earlier as to whether a given template is appropriate.  I believe that since both objects (the double-coset space and the space of projective unitaries) are compact, it suffices to scale up the distance by a factor, though it's more work than it's worth to precisely determine it.  Bump this value up if the tests ever start failing.")
+  "In the invocations of Nelder-Mead in the routine OPTIMAL-2Q-COMPILE below, GOODNESS is a measure of the L^2-distance between the vectors of Makhlin invariants of the input 2Q operator and the output of the Nelder-Mead finder for the circuit template.  This is a measure of distance between the two double-cosets, which is not an exact reflection of the L^2-distance between the two operators.  In fact, it's not possible to measure that distance until the rest of the routine has completed, which picks out a particular representative element of the coset carved out by the chosen template.  Nonetheless, we have to make a decision earlier as to whether a given template is appropriate.
+
+NOTE: I believe that even though both objects (the double-coset space and the space of projective unitaries) are compact, it actually does not suffice to scale up the distance by a constant factor (for some small fraction of gates): the Makhlin map has a degenerate derivative at the edge of the figure, so that 1/det D goes to infinity.  Bump this value up if the tests ever start failing.  A more long-lasting solution might be to work with alcove coordinates instead of Makhlin coordinates, which do not suffer from this degeneracy.")
+
+
+;; optimal-2Q-compile returns the smallest string of 2Q gates that it can, but
+;; what this means depends upon what gateset is available. the TARGET argument
+;; is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted) sequence of such atoms,
+;; indicating which 2Q gates are available for use.
+(deftype optimal-2q-target-atom ()
+  '(member :cz :iswap :piswap :cphase))
+
+(defun sequence-of-optimal-2q-target-atoms-p (seq)
+  (every (lambda (a) (typep a 'optimal-2q-target-atom))
+         seq))
+
+(deftype optimal-2q-target ()
+  "A valid TARGET value for OPTIMAL-2Q-COMPILE."
+  '(or optimal-2q-target-atom
+       (satisfies sequence-of-optimal-2q-target-atoms-p)))
+
+(defun optimal-2q-target-meets-requirements (target requirements)
+  (let ((targetl (if (typep target 'list) target (list target)))
+        (requirementsl (if (typep requirements 'list) requirements (list requirements))))
+    (when (member ':cphase targetl) (push ':cz targetl))
+    (when (member ':piswap targetl) (push ':iswap targetl))
+    (subsetp requirementsl targetl)))
+
 
 (defun convert-su4-to-su2x2 (m)
   "Assuming m is in the subgroup SU(2) x SU(2) of SU(4), this computes the parent matrices."
@@ -89,13 +116,13 @@
 
 ;; REM: this is a utility routine that supports diagonalizer-in-e-basis.
 ;; it seems that when an eigenspace of a complex operator is one-dimensional and
-;; it admits a real generator, MAGICL will pick it automatically. (presumably
-;; this is because forcing any entry of the vector to be real forces the rest too.)
-;; if the eigenspace is pluridimensional, the guarantee goes out the window :(
-;; and so if we expect the matrix of eigenvectors to be special-orthogonal where
-;; possible, we have to correct this behavior manually.
+;; it admits a real generator, MAGICL will pick it automatically. (this is
+;; because forcing any nonzero entry of the vector to be real forces the rest to
+;; be too.) if the eigenspace is pluridimensional, the guarantee goes out the
+;; window :( because we expect/require the matrix of eigenvectors to be
+;; special-orthogonal, we have to correct this behavior manually.
 (defun find-real-spanning-set (vectors)
-  "When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as spanned by the list of complex vectors in VECTORS."
+  "VECTORS is a list of complex vectors in C^n.  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
   (check-type vectors list)
   (let* ((coeff-matrix (magicl:make-complex-matrix
                         (length (first vectors))
@@ -127,11 +154,9 @@
     (gram-schmidt backsolved-vectors)))
 
 ;; this is a support routine for optimal-2q-compile (which explains the funny
-;; prefactor multiplication it does). future programmers might be warned: it
-;; won't be easy to break this into "generic" linear algebra routines, essentially
-;; because the support routine find-real-spanning-pair is specific to dim 2 < C^4.
+;; prefactor multiplication it does).
 (defun diagonalizer-in-e-basis (m)
-  "For u in SU(4), compute an SO(4) column matrix of eigenvectors of e^* m e (e^* m e)^T."
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
   (check-type m magicl:matrix)
   (let* ((u (magicl:multiply-complex-matrices +edag-basis+ (magicl:multiply-complex-matrices m +e-basis+)))
          (gammag (magicl:multiply-complex-matrices u (magicl:transpose u))))
@@ -183,7 +208,7 @@
       a)))
 
 (defun twist-to-real (m)
-  "For a Magicl matrix M in SU(4), returns a values pair (SIGMA, M') such that M' = M * RZ(sigma) 1 * iSWAP and M' has real chi-gamma polynomial."
+  "For a matrix M in SU(4), returns a values pair (SIGMA, M') such that M' = M * RZ(sigma) 1 * iSWAP and M' has real chi-gamma polynomial."
   ;; this magical formula was furnished to us by asking Mathematica to compute
   ;; the trace of M' for a symbolic M and SIGMA, then solving
   ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)) ,
@@ -212,31 +237,6 @@
               (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
               (gate-matrix (lookup-standard-gate "ISWAP")))))))
 
-
-;; optimal-2Q-compile returns the smallest string of 2Q gates that it can, but
-;; what this means depends upon what gateset is available. the TARGET argument
-;; is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted) sequence of such atoms,
-;; indicating which 2Q gates are available for use.
-(deftype optimal-2q-target-atom ()
-  '(member :cz :iswap :piswap :cphase))
-
-(defun sequence-of-optimal-2q-target-atoms-p (seq)
-  (every (lambda (a) (typep a 'optimal-2q-target-atom))
-         seq))
-
-(deftype optimal-2q-target ()
-  "A valid TARGET value for OPTIMAL-2Q-COMPILE."
-  '(or optimal-2q-target-atom
-       (satisfies sequence-of-optimal-2q-target-atoms-p)))
-
-(defun optimal-2q-target-meets-requirements (target requirements)
-  (let ((targetl (if (typep target 'list) target (list target)))
-        (requirementsl (if (typep requirements 'list) requirements (list requirements))))
-    (when (member ':cphase targetl) (push ':cz targetl))
-    (when (member ':piswap targetl) (push ':iswap targetl))
-    (subsetp requirementsl targetl)))
-
-
 (defun chi-from-evals (evals)
   "Computes the characteristic polynomial of a 4x4 matrix with all
 unit-norm eigenvalues from the length 4 list of their ANGLES.  Returns
@@ -259,6 +259,7 @@ a triple (A B C) such that the characteristic polynomial is given by 1
             (realpart double-sum)))))
 
 (defun angles-from-su4 (m)
+  "For an matrix M in SU(4) with decomposition M = O_1 D O_2 into orthogonal matrices O_1, O_2 and a diagonal matrix D, turns the VALUES pair (ANGLES, EVALS), where ANGLES is sorted descending in (-pi, pi], EVALS_j = exp(i * ANGLES_j), and D is diagonal with EVALS as diagonal entries."
   (when (minusp (realpart (magicl:det m)))
     (setf m (magicl:scale (sqrt #C(0 1)) m)))
   (let* ((ggt (reduce 'magicl:multiply-complex-matrices
@@ -278,6 +279,9 @@ a triple (A B C) such that the characteristic polynomial is given by 1
           :finally (return (values angles evals)))))
 
 (defun compare-circuit-angles (circuit chi &optional instr)
+  "Computes a nonnegative cost function value between CHI, the result of CHI-FROM-EVALS, and the result of ANGLES-FROM-SU4 on the matrix form of CIRCUIT.  This cost function has a unique zero, corresponding to the case of equality.
+
+The optional argument INSTR is used to canonicalize the qubit indices of the instructions in CIRCUIT."
   (when instr
     (dolist (isn circuit)
       (setf (application-arguments isn)
