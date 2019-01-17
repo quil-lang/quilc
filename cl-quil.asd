@@ -79,12 +79,12 @@
                              (:file "rewrite-arithmetic")))
                (:file "cfg")
                (:file "compilation-methods")
-               (:file "initial-rewiring")
                (:file "chip-specification")
                (:file "chip-reader")
                (:module "addresser"
                 :serial t
                 :components ((:file "rewiring")
+                             (:file "initial-rewiring")
                              (:file "logical-schedule")
                              (:file "outgoing-schedule")
                              (:file "cost-function")
