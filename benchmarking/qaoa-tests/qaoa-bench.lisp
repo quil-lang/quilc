@@ -31,45 +31,52 @@
    "./benchmarking/qaoa-tests/generate-program.lisp"))
 (sb-ext:gc :full t) 
 
-(defun make-program (qubits valency)
-  (generate-random-qaoa-program (1+ qubits) :self-connectivity 0.5d0 :graph-valency valency))
 
-(defparameter *program* (make-program 127 3))
-
-(flet ((benchmark ()
-         (sb-ext:gc :full t)
-         (let ((repetitions 3))
-           (dolist (valency (list 3))
-             (let ((qubits 127))
-               (let ((pp (let ((*random-state* (make-random-state
-                                                cl-user::*this-random-state*)))
-                           (make-program qubits valency)))
-                     (chip (build-nQ-trivalent-chip -1 1 16 16))) ;; 32 qubit chip
-                 (sb-ext:gc :full t)
-                 (loop :for count :below repetitions
-                       :with runtime := nil
-                       :with gc-time := nil
-                       :with bytes := nil
-                       :do (flet ((process-timing-info (&key real-time-ms
-                                                             gc-run-time-ms
-                                                             bytes-consed
-                                                        &allow-other-keys)
-                                    (push real-time-ms runtime)
-                                    (push gc-run-time-ms gc-time)
-                                    (push bytes-consed bytes)
-                                    nil)
-                                  (thing-to-time ()
-                                    (let ((*random-state* (make-random-state
-                                                           cl-user::*this-random-state*)))
-                                      (compiler-hook pp chip))))
-                             (declare (dynamic-extent #'process-timing-info #'thing-to-time))
-                             ;;(sb-ext:gc :full t)
-                             (sb-ext:call-with-timing #'process-timing-info #'thing-to-time)
-                             (format t "~D " (1+ count)) (finish-output))
-                       :finally (progn
-                                  (print-stats "Time   " runtime)
-                                  (print-stats "GC     " gc-time)
-                                  (print-stats "Consing" bytes)))))))))
-  (benchmark))
+(labels
+    ((make-program (qubits valency)
+       (generate-random-qaoa-program (1+ qubits)
+                                     :self-connectivity 0.5d0
+                                     :graph-valency valency))
+     (benchmark (&key (repetitions 3)
+                      (valencies (list 3))
+                      (qubit-counts (list 127)))
+       (sb-ext:gc :full t)
+       (dolist (valency valencies)
+         (dolist (qubits qubit-counts)
+           (let ((pp (let ((*random-state* (make-random-state
+                                            cl-user::*this-random-state*)))
+                       (make-program qubits valency)))
+                 (chip (build-nQ-trivalent-chip -1 1 16 16))) ;; 128 qubit chip
+             (sb-ext:gc :full t)
+             (loop :for count :below repetitions
+                   :with runtime := nil
+                   :with gc-time := nil
+                   :with bytes := nil
+                   :do (flet ((process-timing-info (&key real-time-ms
+                                                         gc-run-time-ms
+                                                         bytes-consed
+                                                    &allow-other-keys)
+                                (push real-time-ms runtime)
+                                (push gc-run-time-ms gc-time)
+                                (push bytes-consed bytes)
+                                nil)
+                              (thing-to-time ()
+                                (let ((*random-state* (make-random-state
+                                                       cl-user::*this-random-state*)))
+                                  (compiler-hook pp chip))))
+                         (declare (dynamic-extent #'process-timing-info #'thing-to-time))
+                         ;;(sb-ext:gc :full t)
+                         (sb-ext:call-with-timing #'process-timing-info #'thing-to-time)
+                         (format t "~D " (1+ count)) (finish-output))
+                   :finally (progn
+                              (format t "Completed run on ~a qubits with valency ~a.~%" qubits valency)
+                              (print-stats "Time   " runtime)
+                              (print-stats "GC     " gc-time)
+                              (print-stats "Consing" bytes))))))))
+  (benchmark :repetitions 3
+             ;; note: you can make these into longer lists to get more
+             ;; benchmarks at once
+             :valencies (list 3)
+             :qubit-counts (list 127)))
 
 (sb-ext:exit)

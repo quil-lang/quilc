@@ -7,8 +7,10 @@
 (defmacro remfs (place &rest props)
   "Destructively remove the properties specified in PROPS from the plist stored at PLACE.
 
-PROPS must be fully specified at compile time."
+NOTE: PROPS must be fully specified at compile time.
+NOTE: This copies the list first, and so is safe to apply to &REST lists."
   `(progn
+     (setf ,place (copy-list ,place))
      ,@(loop :for prop :in props
              :collect `(remf ,place ,prop))))
 
@@ -131,7 +133,7 @@ NOTE: SELF-CONNECTIVITY must lie in the region [0, 1). For values very close to 
                            (member (list qubit1 qubit0) qubit-connections :test #'equalp))
                  (push (list qubit0 qubit1) qubit-connections)))))
           ((>= qubit-bound qubit-count)
-           (return))                    ; exit the DO
+           (return))                    ; exit the LOOP
           (t
            (push (list qubit-bound
                        (loop :for j := (random qubit-bound)
