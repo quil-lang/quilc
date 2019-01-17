@@ -54,10 +54,6 @@
   (:documentation "This condition can be signaled when the chip reader fails to find an ISA layer.")
   (:report "Invalid QPU description file: missing required ISA layer or sub-layer."))
 
-(defmacro dohash (((key val) hash) &body body)
-  `(maphash (lambda (,key ,val) ,@body)
-            ,hash))
-
 (defun integer-list-p (list)
   (every #'integerp list))
 
