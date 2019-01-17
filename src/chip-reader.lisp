@@ -1,38 +1,51 @@
 ;;;; chip-reader.lisp
 ;;;;
 ;;;; Author: Eric Peterson
-
-;;;; putative JSON file format for QPU specification:
-;;;; {
-;;;;     id: optional
-;;;;         {
-;;;;             name: optional string,
-;;;;             version: optional string,
-;;;;             ... any other identification info (e.g., a timestamp) ...
-;;;;         },
-;;;;     logical-hardware: required [list of length 2
-;;;;         0: required dictionary {
-;;;;             "qubitId":
-;;;;             {
-;;;;                 type: optional, one of two types:
-;;;;                                   a string from { "X/2", "RZ" } or
-;;;;                                   a list of such strings, sorted by precedence.
-;;;;                                 defaults to the list ["RZ", "X/2"].
-;;;;                 dead: optional boolean, defaults to false
-;;;;             }
-;;;;         },
-;;;;         1: required dictionary {
-;;;;             "qubit0-qubit1": <~~ this is currently required to satisfy qubit0 < qubit1
-;;;;             {
-;;;;                 type: optional, one of two types:
-;;;;                                   a string from {"ISWAP", "CZ", "CPHASE", "PISWAP"} or
-;;;;                                   a list of such strings, sorted by precedence.
-;;;;                                 defaults to "CZ".
-;;;;                 dead: optional boolean, defaults to false
-;;;;             }
-;;;;         }
-;;;;     ]
-;;;; }
+;;;;
+;;;; This file contains routines that read in "ISA" specifications, which are
+;;;; JSON dictionaries that specify QPU information.  The top level entries of
+;;;; the dictionary are "layers", which each contain some semantically cohesive
+;;;; information about the QPU.  The only irregular entry is keyed on "id",
+;;;; whose value is a dictionary of the following form:
+;;;;
+;;;; { name: optional string,
+;;;;   version: optional string,
+;;;;   ... any other identification info (e.g., a timestamp) }
+;;;;
+;;;; All other toplevel keys are dictionaries, structured the same way. The
+;;;; dictionary is keyed on strings of the form "nQ", n a positive integer, which
+;;;; holds the information related to n-qubit operations. Each value is again
+;;;; a dictionary, keyed on strings of the form "m1-...-mn", where each mj is a
+;;;; positive integer and mj < m(j+1) is sorted ascending.  The value for this
+;;;; object contains the information related to the specific n-qubit complex
+;;;; (m1, ..., mn).
+;;;;
+;;;; In the case of the layer "isa", this complex data is a dictionary which
+;;;; tracks information about legal operations on the QPU components:
+;;;; { type: optional string or optional list of strings, in the case of 1Q
+;;;;         drawn from the set { "RZ", "X/2" } and in the case of 2Q drawn from
+;;;;         the set { "CZ", "ISWAP", "CPHASE", "ISWAP" }. these indicate which
+;;;;         operations are legal on this component of the QPU. in the case of a
+;;;;         list, the operations are sorted into "preference order": the
+;;;;         compiler will make an effort to prefer instructions earlier in the
+;;;;         sequence to those later in the sequence. for 1Q the default is
+;;;;         [ "RZ", "X/2" ], and for 2Q the default is "CZ".
+;;;;   dead: optional boolean. when set to T, the compiler will treat all
+;;;;         instructions on this component as illegal. }
+;;;;
+;;;; In the case of the layer "specs", this complex data is again a dictionary,
+;;;; which tracks information about fidelity properties of operations. it is
+;;;; keyed on strings irregularly related to the names of the operations, as in:
+;;;; { "fCZ": optional float for CZ fidelity,
+;;;;   "fCZ_std_err": standard error in quoted fCZ measurement,
+;;;;   "fCPHASE": optional float for CPHASE fidelity,    ; NB: it is unspecified what angle value this pertains to.
+;;;;   "f1QRB": optional float for X/2 fidelity,
+;;;;   "fRO": optional float for readout fidelity,
+;;;;   "fActiveReset": optional float for active reset success probability,
+;;;;   "fBellState": optional float for Bell state preparation success,
+;;;;   "T1": optional float measuring the relaxation lifetime of a qubit,
+;;;;   "T2": optional float measuring the decoherence lifetime of a qubit,
+;;;;   ... }
 
 (in-package #:cl-quil)
 
@@ -40,6 +53,10 @@
   ()
   (:documentation "This condition can be signaled when the chip reader fails to find an ISA layer.")
   (:report "Invalid QPU description file: missing required ISA layer or sub-layer."))
+
+(defmacro dohash (((key val) hash) &body body)
+  `(maphash (lambda (,key ,val) ,@body)
+            ,hash))
 
 (defun integer-list-p (list)
   (every #'integerp list))
@@ -88,86 +105,80 @@
     (setf (vnth 0 (chip-specification-objects chip-spec))
           (make-array qubit-count :initial-element nil))
     ;; for each logical qubit descriptor...
-    (maphash (lambda (key qubit-hash)
-               (destructuring-bind (i) (expand-key-to-integer-list key)
-                 (assert (< i qubit-count)
-                         nil
-                         "ISA contains a 1Q descriptor of index ~a, but there are only ~a qubit(s) altogether."
-                         i
-                         (1- qubit-count))
-                 ;; form a qubit
-                 (let* ((qubit-type (gethash "type" qubit-hash))
-                        (qubit (cond
-                                 ((or (null qubit-type)
-                                      (string= "Xhalves" qubit-type))
-                                  (build-qubit))
-                                 (t
-                                  (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
-                                         i
-                                         qubit-type)))))
-                   ;; store the descriptor in the qubit hardware-object for later reference
-                   (setf (hardware-object-misc-data qubit) qubit-hash)
-                   ;; and store the hardware-object into the chip specification
-                   (setf (vnth i (vnth 0 (chip-specification-objects chip-spec)))
-                         qubit))))
-             (gethash "1Q" isa-hash))
+    (dohash ((key qubit-hash) (gethash "1Q" isa-hash))
+      (destructuring-bind (i) (expand-key-to-integer-list key)
+        (assert (< i qubit-count)
+                nil
+                "ISA contains a 1Q descriptor of index ~a, but there are only ~a qubit(s) altogether."
+                i (1- qubit-count))
+        ;; form a qubit
+        (let* ((qubit-type (gethash "type" qubit-hash))
+               (qubit (cond
+                        ((or (null qubit-type)
+                             (string= "Xhalves" qubit-type))
+                         (build-qubit))
+                        (t
+                         (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
+                                i qubit-type)))))
+          ;; store the descriptor in the qubit hardware-object for later reference
+          (setf (hardware-object-misc-data qubit) qubit-hash)
+          ;; and store the hardware-object into the chip specification
+          (setf (vnth i (vnth 0 (chip-specification-objects chip-spec)))
+                qubit))))
     ;; for each logical link descriptor...
     (when (gethash "2Q" isa-hash)
-      (maphash (lambda (key link-hash)
-                 (destructuring-bind (q0 q1) (expand-key-to-integer-list key)
-                   ;; check that the link is ordered
-                   (assert (< q0 q1)
-                           nil
-                           "Link descriptor found with edge label \"~{~a~^-~}\". Edge labels are required to be sorted ascending; use \"~{~a~^-~}\" instead."
-                           (list q0 q1)
-                           (list q1 q0))
-                   ;; check that the link lies on reasonable qubits
-                   (assert (< q0 q1 qubit-count)
-                           nil
-                           "ISA contains a 2Q hardware descriptor attached to qubits ~a, but there are only ~a qubit(s) altogether."
-                           (list q0 q1)
-                           qubit-count)
-                   ;; check that the link isn't dead
-                   ;; NOTE: By skipping the dead links, we're shifting the internal link
-                   ;;       indices from what a user (or debugger) might expect.  Beware!
-                   (when (and
-                          ;; the link itself is alive
-                          (null (gethash "dead" link-hash))
-                          ;; the link is not attached to dead qubits
-                          (null (gethash "dead" (hardware-object-misc-data
-                                                 (chip-spec-nth-qubit chip-spec
-                                                                      q0))))
-                          (null (gethash "dead" (hardware-object-misc-data
-                                                 (chip-spec-nth-qubit chip-spec
-                                                                      q1)))))
-                     ;; form a link attached to the two qubit indices
-                     (labels ((individual-target-parser (string)
-                                (cond
-                                  ((null string) nil)
-                                  ((string= "CZ" string) ':cz)
-                                  ((string= "ISWAP" string) ':iswap)
-                                  ((string= "CPHASE" string) ':cphase)
-                                  ((string= "PISWAP" string) ':piswap)
-                                  (t (error "Unknown link type in QPU descriptor on link ~a: ~a."
-                                            (list q0 q1) string))))
-                              (target-parser (hash-value)
-                                (mapcar #'individual-target-parser (alexandria:ensure-list hash-value))))
-                       (let ((link (build-link q0 q1
-                                               (if (gethash "type" link-hash)
-                                                   (target-parser (gethash "type" link-hash))
-                                                   (list ':CZ))))
-                             (link-index (length (vnth 1 (chip-specification-objects chip-spec)))))
-                         ;; notify the qubits that they're attached to this link
-                         (dolist (qubit-index (list q0 q1))
-                           (vector-push-extend link-index
-                                               (vnth 1 (hardware-object-cxns
-                                                        (vnth qubit-index
-                                                              (vnth 0 (chip-specification-objects chip-spec)))))))
-                         ;; store the descriptor in the link hardware-object for later reference
-                         (setf (hardware-object-misc-data link) link-hash)
-                         ;; and store the hardware-object into the chip specification
-                         (vector-push-extend link (vnth 1 (chip-specification-objects chip-spec))))))))
-               (gethash "2Q" isa-hash)))))
+      (dohash ((key link-hash) (gethash "2Q" isa-hash))
+        (destructuring-bind (q0 q1) (expand-key-to-integer-list key)
+          ;; check that the link is ordered
+          (assert (< q0 q1)
+                  nil
+                  "Link descriptor found with edge label \"~{~a~^-~}\". Edge labels are required to be sorted ascending; use \"~{~a~^-~}\" instead."
+                  (list q0 q1) (list q1 q0))
+          ;; check that the link lies on reasonable qubits
+          (assert (< q0 q1 qubit-count)
+                  nil
+                  "ISA contains a 2Q hardware descriptor attached to qubits ~a, but there are only ~a qubit(s) altogether."
+                  (list q0 q1 )qubit-count)
+          ;; check that the link isn't dead
+          ;; NOTE: By skipping the dead links, we're shifting the internal link
+          ;;       indices from what a user (or debugger) might expect.  Beware!
+          (when (and
+                 ;; the link itself is alive
+                 (null (gethash "dead" link-hash))
+                 ;; the link is not attached to dead qubits
+                 (null (gethash "dead" (hardware-object-misc-data
+                                        (chip-spec-nth-qubit chip-spec
+                                                             q0))))
+                 (null (gethash "dead" (hardware-object-misc-data
+                                        (chip-spec-nth-qubit chip-spec
+                                                             q1)))))
+            ;; form a link attached to the two qubit indices
+            (labels ((individual-target-parser (string)
+                       (cond
+                         ((null string) nil)
+                         ((string= "CZ" string) ':cz)
+                         ((string= "ISWAP" string) ':iswap)
+                         ((string= "CPHASE" string) ':cphase)
+                         ((string= "PISWAP" string) ':piswap)
+                         (t (error "Unknown link type in QPU descriptor on link ~a: ~a."
+                                   (list q0 q1) string))))
+                     (target-parser (hash-value)
+                       (mapcar #'individual-target-parser (alexandria:ensure-list hash-value))))
+              (let ((link (build-link q0 q1
+                                      (if (gethash "type" link-hash)
+                                          (target-parser (gethash "type" link-hash))
+                                          (list ':CZ))))
+                    (link-index (length (vnth 1 (chip-specification-objects chip-spec)))))
+                ;; notify the qubits that they're attached to this link
+                (dolist (qubit-index (list q0 q1))
+                  (vector-push-extend link-index
+                                      (vnth 1 (hardware-object-cxns
+                                               (vnth qubit-index
+                                                     (vnth 0 (chip-specification-objects chip-spec)))))))
+                ;; store the descriptor in the link hardware-object for later reference
+                (setf (hardware-object-misc-data link) link-hash)
+                ;; and store the hardware-object into the chip specification
+                (vector-push-extend link (vnth 1 (chip-specification-objects chip-spec)))))))))))
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
@@ -223,9 +234,5 @@ touch any qubits marked as dead in CHIP-SPECIFICATION."
                                                        dead-qubits)))
                   (assert (endp instr-dead-qubits)
                           nil
-                          "Program instruction '~A' attempts to use ~
-                          dead qubits: ~{~A~^, ~}. Dead qubits on ~
-                          this QPU: ~{~A~^, ~}."
-                          (print-instruction instr nil)
-                          instr-dead-qubits
-                          dead-qubits))))))
+                          "Program instruction '~A' attempts to use illegal qubits: ~{~A~^, ~}. Illegal qubits on this QPU: ~{~A~^, ~}."
+                          (print-instruction instr nil) instr-dead-qubits dead-qubits))))))
