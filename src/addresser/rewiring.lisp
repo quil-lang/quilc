@@ -171,7 +171,9 @@ N. When ASSERT-WIRED is T, ensures that the mapping exists."
   rewiring)
 
 (defun rewire-l2p-instruction (rewiring instr)
-  "Remaps the resources of INSTRuction in-place to their physical counterparts under REWIRING."
+  "Remaps the resources of INSTRuction in-place to their physical counterparts under REWIRING.
+
+Returns NIL. This mutates the instruction."
   (typecase instr
     (measurement
      (setf (measurement-qubit instr)
@@ -190,7 +192,9 @@ N. When ASSERT-WIRED is T, ensures that the mapping exists."
                                       :assert-wired t))))
     (otherwise
      (error "Requested to rewire ~a, but we don't know how to do this."
-            (print-instruction instr nil)))))
+            (print-instruction instr nil))))
+  ;; Return nil to emphasize side effect.
+  nil)
 
 (defun make-rewiring-from-l2p (l2p)
   "Safely extract a REWIRING from a logical-to-physical array."
