@@ -58,6 +58,7 @@
   (every #'integerp list))
 
 (defun expand-key-to-integer-list (key)
+  "Expands a string of the form \"n1-...-nm\" to the list of integers (list n1 ... nm)."
   (etypecase key
     (string
      (mapcar #'parse-integer (split-sequence:split-sequence #\- key)))
