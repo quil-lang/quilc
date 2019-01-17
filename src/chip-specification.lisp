@@ -201,7 +201,8 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                :order 1
                :native-instructions
                (lambda (instr)
-                 (if (not (typep instr 'application))
+                 (if (not (or (typep instr 'gate-application)
+                              (typep instr 'unresolved-application)))
                      (values nil nil)
                      (let* ((duration-alist (gethash "duration-alist" misc-data))
                             (duration (cdr (assoc instr duration-alist :test #'operator-match-p))))
