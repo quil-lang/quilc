@@ -846,18 +846,10 @@ Optional arguments:
                               (print-instruction instr nil)
                               (rewiring-l2p working-l2p)))
 
-                    ;; assign qubits to their wires
-                    (loop
-                      :for (logical physical) :in qubit-assignments
-                      :unless (apply-rewiring-l2p working-l2p logical)
-                        :do (format *compiler-noise-stream*
-                                    "GREEDY-TEMPORAL-ADDRESSING: assign logical qubit ~a to physical qubit ~a~%"
-                                    logical physical)
-                            (rewiring-assign working-l2p logical physical))
-
                     (destructuring-bind (left-line right-line)
                         (mapcar #'qubit-index (application-arguments instr))
-                      ;; dequeue the instruction (so that we can modify it)
+                      ;; dequeue the instruction so we can push the
+                      ;; modified instruction onto the schedule.
                       (lscheduler-dequeue-instruction lschedule instr)
                       ;; flush the 1Q gates down the line
                       (flush-1q-instructions-after-wiring left-line)
