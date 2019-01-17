@@ -129,15 +129,14 @@ as aliases that overflow their shared region."
 
     ;; We've recorded parent-children relationships, but we've never
     ;; actually checked that the parents exist. We do that here.
-    (maphash (lambda (parent-name childrens-names)
-               ;; Check that the parent exists.
-               (unless (gethash parent-name name->desc)
-                 (quil-memory-model-error
-                  "Each of the declared memories {~{~S~^, ~}} purportedly ~
+    (dohash ((parent-name childrens-names) name->children)
+      ;; Check that the parent exists.
+      (unless (gethash parent-name name->desc)
+        (quil-memory-model-error
+         "Each of the declared memories {~{~S~^, ~}} purportedly ~
                    share memory with ~S, but it was nowhere to be found."
-                  childrens-names
-                  parent-name)))
-             name->children)
+         childrens-names
+         parent-name)))
 
     ;; Package up everything we've learned into the memory model.
     (let ((roots (remove-if-not #'simple-memory-descriptor-p descrs)))

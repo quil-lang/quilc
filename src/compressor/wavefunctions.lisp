@@ -428,22 +428,20 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
         (format stream "(~D wfs on ~D qubits):"
                 (hash-table-count aqvm-hash)
                 (array-total-size (antisocial-qvm-wfs aqvm)))
-        (maphash
-         (lambda (wf qubit-list)
-           (format stream "~%Wavefunction on ~a:" (reverse qubit-list))
-           (cond
-             ((eql ':not-simulated wf)
-              (format stream "~%  NOT SIMULATED"))
-             (t
-              (loop :for j :from 0
-                    :for wf-entry :across wf
-                    :do (format stream "~%  |~v,'0B>: "
-                                (length qubit-list)
-                                j)
-                        (format stream "~6,3f ~:[+~;-~]~6,3fj"
-                                (realpart wf-entry)
-                                (minusp (imagpart wf-entry))
-                                (abs (imagpart wf-entry)))))))
-         aqvm-hash)))))
+        (dohash ((wf qubit-list) aqvm-hash)
+          (format stream "~%Wavefunction on ~a:" (reverse qubit-list))
+          (cond
+            ((eql ':not-simulated wf)
+             (format stream "~%  NOT SIMULATED"))
+            (t
+             (loop :for j :from 0
+                   :for wf-entry :across wf
+                   :do (format stream "~%  |~v,'0B>: "
+                               (length qubit-list)
+                               j)
+                       (format stream "~6,3f ~:[+~;-~]~6,3fj"
+                               (realpart wf-entry)
+                               (minusp (imagpart wf-entry))
+                               (abs (imagpart wf-entry)))))))))))
 
 (set-pprint-dispatch 'antisocial-qvm 'pprint-aqvm)

@@ -165,14 +165,12 @@
   (dolist (instr (lscheduler-last-instrs lschedule))
     (format stream "    ~a~%"
             (print-instruction instr nil)))
-  (maphash (lambda (key val)
-             (format stream "Instrs beneath ~a: ~{~a~^, ~}~%" (print-instruction key nil)
-                     (mapcar (lambda (i) (print-instruction i nil)) val)))
-           (lscheduler-later-instrs lschedule))
-  (maphash (lambda (key val)
-             (format stream "Instrs above ~a: ~{~a~^, ~}~%" (print-instruction key nil)
-                     (mapcar (lambda (i) (print-instruction i nil)) val)))
-           (lscheduler-earlier-instrs lschedule)))
+  (dohash ((key val) (lscheduler-later-instrs lschedule))
+    (format stream "Instrs beneath ~a: ~{~a~^, ~}~%" (print-instruction key nil)
+            (mapcar (lambda (i) (print-instruction i nil)) val)))
+  (dohash ((key val) (lscheduler-earlier-instrs lschedule))
+    (format stream "Instrs above ~a: ~{~a~^, ~}~%" (print-instruction key nil)
+            (mapcar (lambda (i) (print-instruction i nil)) val))))
 
 ;;;
 ;;; routines for incrementally forming a logical-scheduler object
@@ -372,12 +370,10 @@ NOTE: Assumes no nested COMMUTING_BLOCKS regions."
   (let ((new-lschedule (make-lscheduler)))
     (append-instructions-to-lschedule new-lschedule new-sequence)
     ;; sew together the new lschedule and the old one along instr
-    (maphash (lambda (key val)
-               (setf (gethash key (lscheduler-earlier-instrs lschedule)) val))
-             (lscheduler-earlier-instrs new-lschedule))
-    (maphash (lambda (key val)
-               (setf (gethash key (lscheduler-later-instrs lschedule)) val))
-             (lscheduler-later-instrs new-lschedule))
+    (dohash ((key val) (lscheduler-earlier-instrs new-lschedule))
+             (setf (gethash key (lscheduler-earlier-instrs lschedule)) val))
+    (dohash ((key val) (lscheduler-later-instrs new-lschedule))
+             (setf (gethash key (lscheduler-later-instrs lschedule)) val))
     (setf (lscheduler-first-instrs lschedule)
           (append (lscheduler-first-instrs new-lschedule)
                   (loop :for i :in (lscheduler-first-instrs lschedule)
@@ -519,10 +515,9 @@ mapping instructions to their tags. "
                                :test-values #'max)
       (when value-hash
         (let ((tier-array (make-array max-value :initial-element nil)))
-          (maphash (lambda (key val)
-                     (when (2q-application-p key)
-                       (push key (aref tier-array val))))
-                   value-hash)
+          (dohash ((key val) value-hash)
+            (when (2q-application-p key)
+              (push key (aref tier-array val))))
           (coerce tier-array 'list))))))
 
 ;; TODO: it might be nice to supply a max-depth optional argument. this will
@@ -537,9 +532,8 @@ mapping instructions to their tags. "
                              :test-values #'max)
     (when value-hash
       (let ((tier-array (make-array max-value :initial-element nil)))
-        (maphash (lambda (key val)
-                   (push key (aref tier-array val)))
-                 value-hash)
+        (dohash ((key val) value-hash)
+          (push key (aref tier-array val)))
         (coerce tier-array 'list)))))
 
 (defun lscheduler-calculate-duration (lschedule chip-spec)

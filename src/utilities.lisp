@@ -25,3 +25,7 @@
 
 (defun (setf vnth) (val index vector)
   (setf (aref vector index) val))
+
+(defmacro dohash (((key val) hash) &body body)
+  `(maphash (lambda (,key ,val) ,@body)
+            ,hash))
