@@ -19,6 +19,8 @@ RANDOM: Start with a random rewiring.
 NAIVE: Start with the identity rewiring. This will fail if any 2-qubit gates are
 impossible using that rewiring.")
 
+
+;;; a minimalist queue implementation ;;;
 (defun make-q (&rest items)
   (let ((dummy (list nil)))
     (list* (nconc items dummy) dummy)))
@@ -31,6 +33,7 @@ impossible using that rewiring.")
   q)
 (defun q-deq (q)
   (if (q-empty q) nil (pop (car q))))
+
 
 (defun chip-spec-live-qubit-bfs (chip-spec qubit-index &optional seen)
   "From a given initial qubit, find the distance to every other qubit in the connected component. SEEN is an array of T/NIL for each qubit, indicating whether that qubit has been visited yet."
@@ -92,7 +95,7 @@ impossible using that rewiring.")
           :and :collect idx)))
 
 (defun containing-indices (list-of-lists)
-  "Given a list of lists, return a table mapping elements to the index of their containing list"
+  "Given a list of lists, return a table mapping elements to the index of the last list in which they appear"
   (let ((tbl (make-hash-table)))
     (loop
       :for i :from 0
