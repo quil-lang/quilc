@@ -36,6 +36,7 @@
 ;; first we do base case work.
 ;; the most basic base case is the case of a 1-qubit operator.
 (defun state-prep-1Q-compiler (instr)
+  "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
   (unless (and (typep instr 'state-prep-application)
                (= 1 (length (application-arguments instr))))
     (give-up-compilation))
@@ -156,6 +157,7 @@
 ;; TODO: this should be made architecture-sensitive, with separate templates
 ;;       for ISWAP-based chips
 (defun state-prep-2Q-compiler (instr &optional (target ':cz)) 
+  "Compiler for STATE-PREP-APPLICATION instances that target a pair of qubits."
   (declare (ignore target))     ; for now, everything compiles to CNOT
   (unless (and (typep instr 'state-prep-application)
                (= 2 (length (application-arguments instr))))
@@ -240,6 +242,7 @@
                                      :arguments (list (first (application-arguments instr))))))))))
 
 (defun state-prep-trampolining-compiler (instr &key (target ':cz))
+  "Recursive compiler for STATE-PREP-APPLICATION instances. It's probably wise to use this only if the state preparation instruction targets at least two qubits."
   (declare (ignore target))
   (unless (typep instr 'state-prep-application)
     (give-up-compilation))
@@ -309,7 +312,7 @@
 
 ;; this decomposition algorithm is based off of Section 4 of /0406176, our old QSC favorite
 (defun state-prep-compiler (instr &key (target ':cz))
-  "Compiles a state preparation instruction into a pair of UCRs and a smaller state preparation instruction."
+  "Compiles a STATE-PREP-APPLICATION instance by intelligently selecting one of the special-case compilation routines above."
   (unless (typep instr 'state-prep-application)
     (give-up-compilation))
   
