@@ -12,12 +12,16 @@
   '(member :zxz :zyz :xyx :xzx :yzy :yxy))
 
 (defun euler-compiler (instr &key (target ':zyz))
-  "Compiles a 1-Q gate definition to a circuit definition by ZYZ Euler decomposition."
+  "Compiles a 1-Q gate definition to a circuit definition by Euler decomposition."
   (check-type target euler-target)
   (when (< 1 (length (application-arguments instr)))
     (give-up-compilation))
-  (let ((matrix (gate-matrix instr)))
-    (unless matrix
+  (let ((pi/2 (/ pi 2))
+        (-pi/2 (- (/ pi 2)))
+        (qubit (first (application-arguments instr)))
+        (normalized-instr (copy-instance instr)))
+    (setf (application-arguments normalized-instr) (list (qubit 0)))
+    (unless (gate-matrix normalized-instr)
       (give-up-compilation))
     (let* (;; read out what gates we're targetting
            (gate-types (ecase target
@@ -39,36 +43,31 @@
            ;; will get something that conjugates to the desired Euler decomposition
            ;; of the original gate.
            (m (ecase target
-                (:zyz matrix)
-                (:xyx (reduce #'magicl:multiply-complex-matrices
-                              (list
-                               (gate-matrix (lookup-standard-gate "RY") (/ pi 2))
-                               matrix
-                               (gate-matrix (lookup-standard-gate "RY") (/ pi -2)))))
-                (:xzx (reduce #'magicl:multiply-complex-matrices
-                              (list
-                               (gate-matrix (lookup-standard-gate "RY") (/ pi 2))
-                               (gate-matrix (lookup-standard-gate "RX") (/ pi 2))
-                               matrix
-                               (gate-matrix (lookup-standard-gate "RX") (/ pi -2))
-                               (gate-matrix (lookup-standard-gate "RY") (/ pi -2)))))
-                (:zxz (reduce #'magicl:multiply-complex-matrices
-                              (list
-                               (gate-matrix (lookup-standard-gate "RZ") (/ pi 2))
-                               matrix
-                               (gate-matrix (lookup-standard-gate "RZ") (/ pi -2)))))
-                (:yzy (reduce #'magicl:multiply-complex-matrices
-                              (list
-                               (gate-matrix (lookup-standard-gate "RX") (/ pi 2))
-                               matrix
-                               (gate-matrix (lookup-standard-gate "RX") (/ pi -2)))))
-                (:yxy (reduce #'magicl:multiply-complex-matrices
-                              (list
-                               (gate-matrix (lookup-standard-gate "RX") (/ pi 2))
-                               (gate-matrix (lookup-standard-gate "RY") (/ pi 2))
-                               matrix
-                               (gate-matrix (lookup-standard-gate "RY") (/ pi -2))
-                               (gate-matrix (lookup-standard-gate "RX") (/ pi -2))))))))
+                (:zyz (gate-matrix instr))
+                (:xyx (make-matrix-from-quil
+                       (list (build-gate "RY" `(,-pi/2) 0)
+                             normalized-instr
+                             (build-gate "RY" `(,pi/2) 0))))
+                (:xzx (make-matrix-from-quil
+                       (list (build-gate "RY" `(,-pi/2) 0)
+                             (build-gate "RX" `(,-pi/2) 0)
+                             normalized-instr
+                             (build-gate "RX" `(,pi/2) 0)
+                             (build-gate "RY" `(,pi/2) 0))))
+                (:zxz (make-matrix-from-quil
+                       (list (build-gate "RZ" `(,-pi/2) 0)
+                             normalized-instr
+                             (build-gate "RZ" `(,pi/2) 0))))
+                (:yzy (make-matrix-from-quil
+                       (list (build-gate "RX" `(,-pi/2) 0)
+                             normalized-instr
+                             (build-gate "RX" `(,pi/2) 0))))
+                (:yxy (make-matrix-from-quil
+                       (list (build-gate "RX" `(,-pi/2) 0)
+                             (build-gate "RY" `(,-pi/2) 0)
+                             normalized-instr
+                             (build-gate "RY" `(,pi/2) 0)
+                             (build-gate "RX" `(,pi/2) 0)))))))
       ;; perform CSD on m, which in this case writes m as a product u s v, where
       ;; s is an RY gate and u and v are, up to rescaling, RZ gates.
       ;;
@@ -89,13 +88,13 @@
          (build-gate (first gate-types)
                      (list (* (realpart (/ (log v1) #C(0 1/2)))
                               (first gate-scalars)))
-                     (first (application-arguments instr)))
+                     qubit)
          (build-gate (second gate-types)
                      (list (* 2
                               (nth 0 angles)
                               (second gate-scalars)))
-                     (first (application-arguments instr)))
+                     qubit)
          (build-gate (third gate-types)
                      (list (* (realpart (/ (log u1) #C(0 1/2)))
                               (third gate-scalars)))
-                     (first (application-arguments instr))))))))
+                     qubit))))))
