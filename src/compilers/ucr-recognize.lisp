@@ -15,87 +15,94 @@
   (let* ((matrix (gate-matrix instr))
          (dimension (magicl:matrix-rows matrix))
          (log-dimension (length (application-arguments instr)))
-         (diagonal-flag
-           (loop :for i :below (magicl:matrix-rows matrix)
-                 :always (double= 1d0 (abs (magicl:ref matrix i i))))))
+         angles)
     (cond
-      ;; in this case, we are definitely a diagonal matrix, which means we are
-      ;; potentially of the form UCRZ.  the extra check we need to do is to see
-      ;; if the matrix has the required extra symmetry: there has to be a fixed
-      ;; target bit about which the matrix has some symmetry:
-      ;;     j'  = j & !(2^d)
-      ;;     j'' = j | 2^d
-      ;;     m_j'j' = conj(m_j''j'').
-      ;; in this case, the angles are given by (phase ...).
-      (diagonal-flag
+      ;; are we a diagonal matrix?
+      ((loop :for i :below (magicl:matrix-rows matrix)
+             :always (double= 1d0 (abs (magicl:ref matrix i i))))
+       ;; if so, we are potentially of the form UCRZ.  the extra check
+       ;; we need to do is to see if the matrix has the required extra
+       ;; symmetry: there has to be a fixed target bit d about which
+       ;; the matrix satisfies
+       ;;
+       ;;     j'  = j & !(2^d),
+       ;;     j'' = j | 2^d,
+       ;;     m_j'j' = conj(m_j''j'').
+       ;;
+       ;; in this case, the angles are given by (phase ...).
        (loop :for d :below log-dimension
-             :do (let ((angles (make-list (/ dimension 2))))
-                   (when (loop :for j :below dimension
-                               :always (let* ((jp  (dpb 0 (byte 1 d) j))
-                                              (jpp (dpb 1 (byte 1 d) j))
-                                              (i (+ (mod jp (ash 1 d))
-                                                    (ash (- jp (mod jp (ash 1 d))) -1))))
-                                         (setf (nth i angles)
-                                               (constant (* -2 (phase (magicl:ref matrix jp jp)))))
-                                         (double= (magicl:ref matrix jp jp)
-                                                               (conjugate (magicl:ref matrix jpp jpp)))))
-                     (return-from recognize-ucr
-                       (list
-                        (make-instance 'ucr-application
-                                       :roll-type "RZ"
-                                       :parameters angles
-                                       :arguments (append
-                                                   (list (nth (- log-dimension d 1)
-                                                              (application-arguments instr)))
-                                                   (subseq (application-arguments instr)
-                                                           0
-                                                           (- log-dimension d 1))
-                                                   (subseq (application-arguments instr)
-                                                           (- log-dimension d))))))))))
-      ;; in the complementary case, we are looking for a UCRY matrix.
-      ;; these have three salient properties:
+             :do (setf angles (make-list (/ dimension 2)))
+                 (when (loop :for j :below dimension
+                             :always (let* ((jp  (dpb 0 (byte 1 d) j))
+                                            (jpp (dpb 1 (byte 1 d) j))
+                                            (i (+ (mod jp (ash 1 d))
+                                                  (ash (- jp (mod jp (ash 1 d))) -1))))
+                                       (setf (nth i angles)
+                                             (constant (* -2 (phase (magicl:ref matrix jp jp)))))
+                                       (double= (magicl:ref matrix jp jp)
+                                                (conjugate (magicl:ref matrix jpp jpp)))))
+                   (return-from recognize-ucr
+                     (list
+                      (make-instance 'ucr-application
+                                     :roll-type "RZ"
+                                     :parameters angles
+                                     :arguments (append
+                                                 (list (nth (- log-dimension d 1)
+                                                            (application-arguments instr)))
+                                                 (subseq (application-arguments instr)
+                                                         0
+                                                         (- log-dimension d 1))
+                                                 (subseq (application-arguments instr)
+                                                         (- log-dimension d))))))))
+       (give-up-compilation))
+      ;; are we a UCRY matrix? these have three salient properties:
+      ;;
       ;;  (1) they are completely real
       ;;  (2) each column and row has only two nonzero entries
       ;;  (3) these nonzero entries arrange into squares of width 2^d for some d:
       ;;      setting j' and j'' as before, the nonzero entries have the form
       ;;          m_j'j' = m_j''j'' and m_j'j'' = -m_j''j' .
+      ;;
       ;; in this case, the angles are given by (atan ...).
       (t
        (loop :for d :below log-dimension
-             :do (let ((angles (make-list (/ dimension 2))))
-                   (when (loop :for j :below dimension
-                               :always (let* ((jp  (dpb 0 (byte 1 d) j))
-                                              (jpp (dpb 1 (byte 1 d) j))
-                                              (m-jp-jp (magicl:ref matrix jp jp))
-                                              (m-jpp-jp (magicl:ref matrix jpp jp))
-                                              (m-jp-jpp (magicl:ref matrix jp jpp))
-                                              (m-jpp-jpp (magicl:ref matrix jpp jpp))
-                                              (i (+ (mod jp (ash 1 d))
-                                                    (ash (- jp (mod jp (ash 1 d))) -1))))
-                                         (setf (nth i angles)
-                                               (constant (* 2 (atan (realpart m-jpp-jp)
-                                                                    (realpart m-jp-jp)))))
-                                         (and (double= 1d0 (+ (* m-jp-jp m-jp-jp)
-                                                                           (* m-jp-jpp m-jp-jpp)))
-                                              (double= 1d0 (+ (* m-jpp-jp m-jpp-jp)
-                                                                           (* m-jpp-jpp m-jpp-jpp)))
-                                              (double= m-jp-jp (realpart m-jp-jp))
-                                              (double= m-jp-jpp (realpart m-jp-jpp))
-                                              (double= m-jpp-jp (realpart m-jpp-jp))
-                                              (double= m-jpp-jpp (realpart m-jpp-jpp))
-                                              (double= m-jp-jp m-jpp-jpp)
-                                              (double= m-jp-jpp (- m-jpp-jp)))))
-                     (return-from recognize-ucr
-                       (list
-                        (make-instance 'ucr-application
-                                       :roll-type "RY"
-                                       :parameters angles
-                                       :arguments (append
-                                                   (list (nth (- log-dimension d 1)
-                                                              (application-arguments instr)))
-                                                   (subseq (application-arguments instr)
-                                                           0
-                                                           (- log-dimension d 1))
-                                                   (subseq (application-arguments instr)
-                                                           (- log-dimension d)))))))))))
-    (give-up-compilation)))
+             :do (setf angles (make-list (/ dimension 2)))
+                 (when (loop :for j :below dimension
+                             :always (let* ((jp  (dpb 0 (byte 1 d) j))
+                                            (jpp (dpb 1 (byte 1 d) j))
+                                            (m-jp-jp (magicl:ref matrix jp jp))
+                                            (m-jpp-jp (magicl:ref matrix jpp jp))
+                                            (m-jp-jpp (magicl:ref matrix jp jpp))
+                                            (m-jpp-jpp (magicl:ref matrix jpp jpp))
+                                            (i (+ (mod jp (ash 1 d))
+                                                  (ash (- jp (mod jp (ash 1 d))) -1))))
+                                       (setf (nth i angles)
+                                             (constant (* 2 (atan (realpart m-jpp-jp)
+                                                                  (realpart m-jp-jp)))))
+                                       (and (double= 1d0 (+ (* m-jp-jp m-jp-jp)
+                                                            (* m-jp-jpp m-jp-jpp)))
+                                            (double= 1d0 (+ (* m-jpp-jp m-jpp-jp)
+                                                            (* m-jpp-jpp m-jpp-jpp)))
+                                            (double= m-jp-jp (realpart m-jp-jp))
+                                            (double= m-jp-jpp (realpart m-jp-jpp))
+                                            (double= m-jpp-jp (realpart m-jpp-jp))
+                                            (double= m-jpp-jpp (realpart m-jpp-jpp))
+                                            (double= m-jp-jp m-jpp-jpp)
+                                            (double= m-jp-jpp (- m-jpp-jp)))))
+                   (return-from recognize-ucr
+                     (list
+                      (make-instance 'ucr-application
+                                     :roll-type "RY"
+                                     :parameters angles
+                                     :arguments (append
+                                                 (list (nth (- log-dimension d 1)
+                                                            (application-arguments instr)))
+                                                 (subseq (application-arguments instr)
+                                                         0
+                                                         (- log-dimension d 1))
+                                                 (subseq (application-arguments instr)
+                                                         (- log-dimension d))))))))
+       (give-up-compilation))
+      ;; just in case we extend / restructure the above cond into something that
+      ;; doesn't end in a T branch:
+      (give-up-compilation))))
