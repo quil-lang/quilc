@@ -11,6 +11,7 @@
 
 ;; NOTE: these break some MAGICL abstractions and really belongs in that package
 (defun nondestructively-apply-matrix-to-vector (matrix vector)
+  "Takes a column VECTOR, specified as an array of complex doubles, and applies a MAGICL MATRIX to it on the left, producing a new column vector, also specified as a fresh array of complex doubles.  The original VECTOR is not modified."
   (let* ((vector-as-matrix (magicl:make-matrix :rows (array-total-size vector)
                                                :cols 1
                                                :data (copy-seq vector)))
@@ -43,8 +44,6 @@
 
 
 ;;; the antisocial qvm data type
-;;;
-;;; XXX: go through and make sure the WF arrays have element type '(complex double-float)
 
 (defparameter *aqvm-correlation-threshold*
   *global-queue-tolerance-threshold*
@@ -57,7 +56,7 @@ WFS is a vector. The jth entry points to the wavefunction component in which the
 
 INTERNAL-INDICES is a vector. The jth entry points to the index of the wavefunction component corresponding to the jth external qubit.
 
-Both arrays may be populated instead by the keyword :NOT-SIMULATED, which indicates that the AQVM has discarded all information about this qubit (and this qubit is not correlated with any wavefunction component that the AQVM is still tracking)."
+Both arrays may be populated instead by the keyword :NOT-SIMULATED, which indicates that the AQVM has discarded all information about this qubit (and this qubit is not correlated with any wavefunction component that the AQVM is still tracking). (Unfortunately, this prevents us from making easy and strong type-safety guarantees.)"
   (wfs #())
   (internal-indices #()))
 
@@ -166,8 +165,8 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
                      (setf (aref (antisocial-qvm-internal-indices aqvm) p) internal-index))))))
     (list wf updated-qc)))
 
-(defun nondestructively-apply-instr-to-wf (instr wf qc &optional environs)
-  (declare (ignore environs))
+(defun nondestructively-apply-instr-to-wf (instr wf qc)
+  "Given a wavefunction WF, represented as an array of complex doubles, together with a list QC of qubit indices describing what the components of the wavefunction represent, applies the instruction INSTR and returns the resulting wavefunction (with the same qubit ordering).  Does not modify any of its inputs."
   (unless (eq wf ':not-simulated)
     (handler-case 
         (let* ((qubit-indices (mapcar #'qubit-index (application-arguments instr)))
@@ -179,19 +178,20 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
            wf))
       (unknown-gate-parameter () ':not-simulated))))
 
-(defun nondestructively-apply-instrs-to-wf (instrs wf qc &optional environs)
+(defun nondestructively-apply-instrs-to-wf (instrs wf qc)
+  "Given a wavefunction WF, represented as an array of complex doubles, together with a list QC of qubit indices describing what the components of the wavefunction represent, applies the sequence of instructions INSTRS and returns the resulting wavefunction (with the same qubit ordering).  Does not modify any of its inputs."
   (alexandria:when-let ((wf (copy-seq wf)))
     (assert (= (length wf) (expt 2 (length qc))))
     (dolist (instr instrs wf)
-      (let ((new-wf (nondestructively-apply-instr-to-wf instr wf qc environs)))
+      (let ((new-wf (nondestructively-apply-instr-to-wf instr wf qc)))
         (when (eq new-wf ':not-simulated)
           (return ':not-simulated))
         (dotimes (j (array-total-size wf))
           (setf (aref wf j)
                 (aref new-wf j)))))))
 
-(defun aqvm-apply-instruction (aqvm instr &optional environs)
-  "Applies INSTR to the wavefunction housed in AQVM, correlating components as needed."
+(defun aqvm-apply-instruction (aqvm instr)
+  "Applies INSTR to the wavefunction housed in AQVM, correlating components as needed.  Destructively modifies AQVM."
   (check-type instr gate-application)
   ;; get the state out of AQVM in a way that it's ready to receive an update
   (let ((qubit-indices (mapcar #'qubit-index (application-arguments instr))))
@@ -200,7 +200,7 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
       ;; if we're in a dead zone, we can just quit early
       (unless (eql wf ':not-simulated)
         ;; get the associated matrix (& information for how to use it)
-        (let* ((updated-wf (nondestructively-apply-instr-to-wf instr wf updated-qc environs)))
+        (let* ((updated-wf (nondestructively-apply-instr-to-wf instr wf updated-qc)))
           ;; destructively store the result back into wf
           (cond ((eq updated-wf ':not-simulated)
                  (dolist (q updated-qc)
@@ -212,6 +212,7 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
 
 ;; NOTE: there are a lot of degrees of thoroughness that you could write into
 ;; this function. here are three strategies, from simple to difficult:
+;;
 ;;  (0) do nothing.
 ;;  (1) if a wf component has grown too large, just call aqvm-stop-simulating on
 ;;      it no matter what.
@@ -223,8 +224,10 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
 ;;      of any Segre embedding by doing a bunch of determinant calculations.
 ;;      if any of these return true, then calculate the Segre components and
 ;;      use them to dissect the wf into smaller components.
+;;
+;; at present, we pursue a strategy between (1) and (3).
 (defun aqvm-unlink (aqvm)
-  "Attempts to write the correlated components of ANTISOCIAL-QVM into smaller components, else discards them."
+  "Attempts to write the correlated components of ANTISOCIAL-QVM into smaller components, else discards them if they've grown too large."
   ;; buckets is a list of lists, indexed descending by the size of the string we're going to attempt to unlink
   ;; each bucket component is a list of pairs: (list wf qubit-indices)
   (let ((buckets (list nil)))
@@ -374,6 +377,7 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
         (setf (aref (antisocial-qvm-internal-indices aqvm) j) ':not-simulated)))))
 
 (defun aqvm-copy (aqvm)
+  "Makes a deep copy of AQVM."
   (let ((new-aqvm (make-antisocial-qvm)))
     (setf (antisocial-qvm-internal-indices new-aqvm)
           (make-array (length (antisocial-qvm-internal-indices aqvm))
