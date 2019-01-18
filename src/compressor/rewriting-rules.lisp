@@ -5,7 +5,7 @@
 (in-package #:cl-quil)
 
 
-;; functions for dealing with mixed constant vs delayed-expression types
+;;; functions for dealing with mixed constant vs delayed-expression types
 
 (defun param-binary-op (op arg1 arg2)
   "Binary operator that safely applies to possibly mixed arguments of NUMBER / DELAYED-EXPRESSION objects."
@@ -50,6 +50,7 @@
 ;;; dumb little macros for cond guards that we were repeating a million times
 
 (defmacro else-give-up-compilation (test &body body)
+  "If TEST passes, proceed to execute BODY (and return the value of the final expression). If TEST fails, call GIVE-UP-COMPILATION."
   `(cond
      (,test
       ,@body)
@@ -57,6 +58,7 @@
       (give-up-compilation))))
 
 (defmacro unpack-wf (instr context (psi qubits) &body body)
+  "Extracts from CONTEXT the wavefunction component related to the instruction INSTR.  Upon success, bind PSI to the wavefunction contents, bind QUBITS to the qubit ordering convention of PSI, execute BODY, and return the result of the final expression.  Upon failure, call GIVE-UP-COMPILATION."
   `(destructuring-bind (,psi ,qubits)
        (aqvm-extract-state (compressor-context-aqvm ,context)
                            (mapcar #'qubit-index (application-arguments ,instr)))
@@ -68,6 +70,7 @@
 ;;; rewriting rules in general
 
 (defun global-rewriting-rules ()
+  "Rewriting rules that may be useful in manipulating instruction sequences that do not have an underlying notion of 'native hardware'.  In particular, this includes canonicalizing the ordering of commuting instructions."
   (list
    (make-rewriting-rule "CZs commute"
        (_
@@ -102,6 +105,7 @@
 
 ;; rewriting rules specialized to qubit types
 (defmacro rewriting-rules-for-roll-template (roll-type)
+  "The rewriting rules for a roll do not depend on the particular roll type and are instead valid for any single-parameter exponentiated family (which, incidentally, are all automatically 2pi-periodic). To cut down on repeated code, we provide this macro that slots the roll type in to the standard set of rules."
   `(list
     (make-rewriting-rule ,(format nil "~a(a) ~:*~a(b) -> ~:*~a(a + b)" roll-type)
         (_
@@ -139,12 +143,15 @@
       (list (build-gate ,roll-type (list pi) q)))))
 
 (defun rewriting-rules-for-roll-RX ()
+  "Generates a list of rewriting rules for simplifying expressions involving RX."
   (rewriting-rules-for-roll-template "RX"))
 
 (defun rewriting-rules-for-roll-RZ ()
+  "Generates a list of rewriting rules for simplifying expressions involving RZ."
   (rewriting-rules-for-roll-template "RZ"))
 
 (defmacro rewriting-rules-preferring-rollA-to-rollB-template (rollA rollB)
+  "The rewriting rules for a pair of distinct rolls do not depend on the particular roll types and are instead valid for any single-parameter exponentiated families for rolls about orthogonal axes. To cut down on repeated code, we provide this macro that slots the roll types in to the standard set of rules. Here we require a notion of \"preference\" of ROLLA over ROLLB: some of the rules trade rolls of one type for rolls of another, and so we prefer to rewrite the \"less natural\" ROLLB into the \"more natural\" ROLLA."
   `(list
     ;; rollB(X) rollA(pi) --> rollA(pi) rollB(-x)
     (make-rewriting-rule ,(format nil "~a(x) ~a(pi) -> ~:*~a(pi) ~:*~:*~a(-x)" rollB rollA)
@@ -183,15 +190,18 @@
               (build-gate ,rollA (list theta1) q))))))
 
 (defun rewriting-rules-preferring-RX-to-RZ ()
+  "Generates a list of rewriting rules for simplifying expressions involving RX and RZ, with RX preferred."
   (rewriting-rules-preferring-rollA-to-rollB-template "RX" "RZ"))
 
 (defun rewriting-rules-preferring-RZ-to-RX ()
+  "Generates a list of rewriting rules for simplifying expressions involving RZ and RX, with RZ preferred."
   (rewriting-rules-preferring-rollA-to-rollB-template "RZ" "RX"))
 
 
 ;; rewriting rules specialized to link type
 
 (defun rewriting-rules-for-link-of-ISWAP-type ()
+  "Generates a list of rewriting rules for simplifying expressions involving ISWAP and standard single-qubit operations."
   (list
    (make-rewriting-rule "ISWAP ISWAP -> Z (x) Z"
        (_
@@ -215,6 +225,7 @@
 
 
 (defun rewriting-rules-for-link-of-PISWAP-type ()
+  "Generates a list of rewriting rules for simplifying expressions involving PISWAP and standard single-qubit operations."
   (list
    (make-rewriting-rule "PISWAP(phi) PISWAP(theta) -> PISWAP(phi + theta)"
        (_
@@ -263,6 +274,7 @@
 
 
 (defun rewriting-rules-preferring-ISWAP-to-PISWAP ()
+  "Generates a list of rewriting rules that simplify expressions involving ISWAP and PISWAP, with a preference for rewriting into ISWAP over PISWAP."
   (list
    (make-rewriting-rule "PISWAP(odd * pi) -> ISWAP PISWAP(even * pi)"
        (_
@@ -292,7 +304,9 @@
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ theta pi)) p q))))))
 
+
 (defun rewriting-rules-preferring-PISWAP-to-ISWAP ()
+  "Generates a list of rewriting rules that simplify expressions involving ISWAP and PISWAP, with a preference for rewriting into PISWAP over ISWAP."
   (list
    (make-rewriting-rule "ISWAP -> PISWAP"
        (_
@@ -302,6 +316,7 @@
 
 
 (defun rewriting-rules-for-link-of-CZ-type ()
+  "Generates a list of rewriting rules for simplifying expressions involving CZ and standard single-qubit operations."
   (list
    (make-rewriting-rule "CZ CZ -> NOP"
        (_
@@ -413,6 +428,7 @@
                   (give-up-compilation)))))))))))
 
 (defun rewriting-rules-for-link-of-CPHASE-type ()
+  "Generates a list of rewriting rules for simplifying expressions involving CPHASE and standard single-qubit operations."
   (list*
    (make-rewriting-rule "CPHASE(theta) CPHASE(phi) -> CPHASE(theta + phi)"
        (_
@@ -481,6 +497,7 @@
    (rewriting-rules-for-link-of-CZ-type)))
 
 (defun rewriting-rules-preferring-CPHASE-to-CZ ()
+  "Generates a list of rewriting rules that simplify expressions involving CZ and CPHASE, with a preference for rewriting into CPHASE over CZ."
   (list
    (make-rewriting-rule "CZ -> CPHASE"
        (_
@@ -489,6 +506,7 @@
      (list (build-gate "CPHASE" (list pi) p q)))))
 
 (defun rewriting-rules-preferring-CZ-to-CPHASE ()
+  "Generates a list of rewriting rules that simplify expressions involving CZ and CPHASE, with a preference for rewriting into CZ over CPHASE."
   (list
    (make-rewriting-rule "CPHASE CZ -> CPHASE"
        (_
