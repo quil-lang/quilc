@@ -7,16 +7,7 @@
 
 (in-package #:cl-quil)
 
-(declaim (type fixnum **qsc-counter**))
-(global-vars:define-global-var **qsc-counter** 0)
-(defun generate-qsc-tag ()
-  "Returns a unique number for each run of QSC, so that anonymous gates can be (partially) tracked."
-  #+sbcl
-  (sb-ext:atomic-incf **qsc-counter**)
-  #+lispworks
-  (system:atomic-incf **qsc-counter**)
-  #-(or sbcl lispworks)
-  (incf **qsc-counter**))
+(define-global-counter **qsc-counter** generate-qsc-tag)
 
 (defun qs-compiler (instr)
   "Performs Quantum Shannon Compilation, emitting a list of anonymous gates and UCR instructions that describe an equivalent circuit."

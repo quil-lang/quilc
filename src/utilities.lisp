@@ -29,3 +29,15 @@
 (defmacro dohash (((key val) hash) &body body)
   `(maphash (lambda (,key ,val) ,@body)
             ,hash))
+
+(defmacro define-global-counter (counter-name incf-name)
+  `(progn
+     (declaim (type fixnum ,counter-name))
+     (global-vars:define-global-var ,counter-name 0)
+     (defun ,incf-name ()
+       #+sbcl
+       (sb-ext:atomic-incf ,counter-name)
+       #+lispworks
+       (system:atomic-incf ,counter-name)
+       #-(or sbcl lispworks)
+       (incf ,counter-name))))

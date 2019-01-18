@@ -5,17 +5,7 @@
 
 (in-package #:cl-quil)
 
-
-(declaim (type fixnum **csc-counter**))
-(global-vars:define-global-var **csc-counter** 0)
-(defun generate-csc-tag ()
-  "Returns a unique number for each step of CSC, so that anonymous gates can be (partially) tracked."
-  #+sbcl
-  (sb-ext:atomic-incf **csc-counter**)
-  #+lispworks
-  (system:atomic-incf **csc-counter**)
-  #-(or sbcl lispworks)
-  (incf **csc-counter**))
+(define-global-counter **csc-counter** generate-csc-tag)
 
 ;; zips up a compatible pair of lists of UCRs into a single such list by
 ;; letting each list act on a block factor
