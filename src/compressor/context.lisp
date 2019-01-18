@@ -14,9 +14,11 @@
 
 
 (defun set-up-compressor-context (&key (qubit-count 0) (simulate nil))
+  "A helper function for instantiating a new COMPRESSOR-CONTEXT."
   (make-compressor-context :aqvm (build-aqvm qubit-count :simulate simulate)))
 
 (defun update-compressor-context (context instr &key (destructive? nil))
+  "This is called when the compressor walks over an instruction in its inner loops, which may in turn modify the active context."
   (let ((n-qubits (length (antisocial-qvm-wfs (compressor-context-aqvm context))))
         (context
           (if destructive?
@@ -49,6 +51,7 @@
     context))
 
 (defun clean-up-compressor-context (context &key (destructive? nil))
+  "This is called when the compressor finishes processing an instruction in the outer loop, which is an opportunity to do computation-intensive cleaning of the context."
   (let ((context
           (if destructive?
               context
