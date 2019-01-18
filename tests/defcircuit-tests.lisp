@@ -39,6 +39,7 @@
              "DEFCIRCUIT BELL p q:"
              "    H p"
              "    CNOT p q"
+             "    RESET p"
              "BELL 0 1"
              )))
     (verify-h-cnot-code (quil:parsed-program-executable-code p))))
@@ -74,7 +75,7 @@
     (verify-rx-code (quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-argument-passing ()
-  "Test that arguments get passed from ouyter DEFCIRCUITs to inner ones."
+  "Test that arguments get passed from outer DEFCIRCUITs to inner ones."
   (let ((p (with-output-to-quil
              "DEFCIRCUIT BELL p q:"
              "    H p"
