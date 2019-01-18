@@ -42,9 +42,11 @@
 ;;; generic helper functions
 
 (defun application-qubit-indices (appl)
+  "Abbreviation: extracts the QUBIT-INDEX values of an application APPL."
   (mapcar #'qubit-index (application-arguments appl)))
 
 (defun format-quil-sequence (s instructions &optional prefix)
+  "Nicely prints a sequence of INSTRUCTIONS to a stream S. If PREFIX is present, prepend it to the overall output."
   (when prefix
     (format s prefix))
   (dolist (instr instructions)
@@ -53,17 +55,15 @@
     (terpri s)))
 
 (defun qubits-in-instr-list (instructions)
-  (remove-duplicates
-   (mapcan (lambda (instr)
-             (mapcar #'qubit-index (application-arguments instr)))
-           instructions)))
+  "Produces a list of all of the (unboxed) qubit indices appearing in INSTRUCTIONS, a list of applications."
+  (remove-duplicates (mapcan #'application-qubit-indices instructions)))
 
 
 ;;; helper functions for algebraically-reduce-instructions, including the doubly-linked
 ;;; list structure peephole-rewriter-node which is used for rewinding the peephole rewriter
 
 (defun calculate-instructions-duration (instructions chip-specification)
-  "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION."
+  "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
   (let ((lschedule (make-lscheduler)))
     ; load up the logical schedule
     (append-instructions-to-lschedule lschedule instructions)
@@ -120,7 +120,7 @@ other's."
         (incf pos)))))
 
 (defstruct peephole-rewriter-node
-  "A node housing an instruction and attendant metadata used during peephole rewriting."
+  "A node housing an instruction and attendant metadata used during peephole rewriting.  Essentially a doubly-linked list."
   (instr nil :type application)
   (prev nil :type (or null peephole-rewriter-node))
   (next nil :type (or null peephole-rewriter-node))
@@ -142,11 +142,13 @@ other's."
     (values first this)))
 
 (defun peephole-rewriter-nodes->instrs (node)
+  "Linearizes the peephole rewriter nodes at-and-below NODE into a list of instructions."
   (loop :for n := node :then (peephole-rewriter-node-next n)
         :while n
           :collect (peephole-rewriter-node-instr n)))
 
 (defun rewind-node (node n)
+  "Makes N calls to PEEPHOLE-REWRITER-NODE-PREV starting on NODE."
   (cond
     ((zerop n) node)
     ((peephole-rewriter-node-prev node)
@@ -154,6 +156,7 @@ other's."
     (t node)))
 
 (defun find-safe-insertion-node (relevant-nodes-for-inspection)
+  "Given a list RELEVANT-NODES-FOR-INSPECTION of peephole rewriter nodes, calculates the last such node that accesses new qubits not accessed by previous instructions in the list."
   (loop
     :for n :in (rest relevant-nodes-for-inspection)
     :for i := (peephole-rewriter-node-instr n)
@@ -168,6 +171,7 @@ other's."
     :finally (return target)))
 
 (defun splice-instrs-in-at-node (instrs node)
+  "Given a list of instructions INSTRS, replaces a peephole rewriter NODE (which possibly belongs to a larger family of nodes) with a family of peephole rewriter nodes equivalent to INSTRS."
   (cond
     ((null instrs)
      t)
@@ -182,6 +186,7 @@ other's."
        t))))
 
 (defun delete-node (node)
+  "Removes a peephole rewriter node NODE from a larger network of peephole rewriter nodes, patching over any links that touched this node."
   (let ((prev (peephole-rewriter-node-prev node))
         (next (peephole-rewriter-node-next node)))
     (when prev
@@ -191,6 +196,7 @@ other's."
     t))
 
 (defun print-node-list (node)
+  "Pretty-prints a list of peephole rewriter nodes, beginning with NODE, together with the structure as a doubly-linked list."
   (unless node
     (return-from print-node-list nil))
   (format t "~30a <-- ~30a --> ~30a~%"
@@ -204,17 +210,22 @@ other's."
 (defun algebraically-reduce-instructions (instructions
                                           chip-specification
                                           context)
-  "Applies algebraic reduction rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS.  The optional keyword argument WF describes the state of the quantum system at the start of the INSTRUCTIONS sequence, and will be used to perform state-based reductions.  If WF is provided, WF-INDICES is also required: it is a list of qubits that the index positions in WF correspond to.
-
-START-INDEX is used internally to skip over instructions at the start of INSTRUCTIONS.  WF-TABLE is used internally as scratch storage for the intermediate states of WF as execution steps through INSTRUCTIONS."
+  "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      ((update-context (node)
+      (;; let the context know that we've passed inspection of NODE, so that the
+       ;; effect of that instruction is visible during inspection of the next node
+       (update-context (node)
          (setf (peephole-rewriter-node-context node)
                (update-compressor-context (peephole-rewriter-node-context
                                            (peephole-rewriter-node-prev node))
                                           (peephole-rewriter-node-instr node)
                                           :destructive? nil)))
        
+       ;; having selected an appropriate sequence of instructions, actually
+       ;; apply the available rewriting rules. if we find one that applies,
+       ;; splices the results in to replace the nodes and return the location
+       ;; of the new node (so that the outer loop can rewind). if none applies,
+       ;; announce failure (so that the outer loop can step ahead by one).
        (apply-rules (rewrite-rules nodes-for-inspection)
          (loop :for rule :across rewrite-rules :do
            ;; make sure we have enough terms, then apply the rule's consumer
@@ -248,6 +259,11 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
                        (return-from apply-rules new-node))))
                (compiler-does-not-apply () nil)))))
        
+       ;; main loop for the peephole rewriter. for any particular node, it
+       ;; assembles a list of instructions which might be subject to rewriting
+       ;; rules, then passes those to APPLY-RULES. if APPLY-RULES returns
+       ;; successfully, we rewind by the peephole window and try again. if it
+       ;; fails, we fall through, step through to the next node, and try again.
        (outer-instruction-loop (node)
          ;; for each instruction...
          (setf node (peephole-rewriter-node-next node))
@@ -311,7 +327,7 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
 (defun expand-to-native-instructions (instrs chip-specification &optional environs output-string)
-  "Expands a list of addressed instructions into a list of addressed, native instructions."
+  "Repeatedly applies nativization routines to expand a list of addressed instructions into a list of addressed, native instructions. Makes no attempt to perform any kind of rewiring or any kind of simplification."
   ;; dispatch on the top instruction type
   (cond
     ;; if we've exhausted the input, then return
@@ -372,9 +388,12 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
 
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
+  "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
   (let ((qubits-on-obj (qubits-in-instr-list instructions)))
     (labels
-        ((decompile-instructions-into-state-prep (start-wf final-wf)
+        (;; produce a sequence of native instructions that have the effect of
+         ;; carrying START-WF to FINAL-WF (= INSTRUCTIONS |START-WF>)
+         (decompile-instructions-into-state-prep (start-wf final-wf)
            (expand-to-native-instructions
             (list (make-instance 'state-prep-application
                                  :source-wf (copy-seq start-wf)
@@ -382,6 +401,8 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
                                  :arguments (nreverse (mapcar #'qubit qubits-on-obj))))
             chip-specification))
          
+         ;; produce a sequence of native instructions that have the same effect
+         ;; as the matrix representation of INSTRUCTIONS
          (decompile-instructions-into-full-unitary ()
            (alexandria:when-let ((matrix (make-gate-matrix-from-gate-string (mapcar #'qubit qubits-on-obj)
                                                                             instructions)))
@@ -421,6 +442,7 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
                                                       reduced-instructions
                                                       reduced-decompiled-instructions
                                                       context)
+  "Checks that INSTRUCTIONS, DECOMPILED-INSTRUCTIONS, REDUCED-INSTRUCTIONS, and REDUCED-DECOMPILED-INSTRUCTIONS are sufficiently faithful models of one another (whose precise meaning depends upon CONTEXT)."
   (unless *compress-carefully*
     (return-from check-contextual-compression-was-well-behaved t))
   
@@ -489,6 +511,7 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
 
 
 (defun compress-instructions-in-context (instructions chip-specification context)
+  "Dispatch routine for doing rewriting, algebraic and linear-algebraic, on a sequence of INSTRUCTIONS."
   ;; start by making a decision about how we're going to do linear algebraic compression
   (let ((decompiled-instructions (decompile-instructions-in-context instructions
                                                                     chip-specification
@@ -531,8 +554,8 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
       result-instructions)))
 
 
-(defun actually-compress-instructions (instructions chip-specification context &optional processed-instructions)
-  "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION and the current quantum state in AQVM."
+(defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
+  "Dispatch routine for compressing a sequence of INSTRUCTIONS, perhaps with unknown parameter values sprinkled through, based on the routines specified by a CHIP-SPECIFICATION and the current CONTEXT."
   (format-quil-sequence *compiler-noise-stream*
                         instructions
                         "COMPRESS-INSTRUCTIONS: Selected the following sequence for compression:~%")
@@ -543,9 +566,8 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
   ;; so that we can interleave linear algebraic rewriting where appropriate and
   ;; also use peephole writing all around.
   ;;
-  ;; extract the top two blocks of instructions.
   (unless instructions
-    (return-from actually-compress-instructions processed-instructions))
+    (return-from compress-instructions-with-possibly-unknown-params processed-instructions))
   (labels ((instruction-type (instr)
              (if (every (lambda (p) (typep p 'constant)) (application-parameters instr))
                  ':known-parameters
@@ -585,6 +607,7 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
              (compress-instructions-in-context instructions chip-specification context))
            (process-block (instructions)
              (compress-instructions-in-context instructions chip-specification context)))
+    ;; extract the top two blocks of instructions.
     (multiple-value-bind (first-block second-block instr-rest)
         (grab-first-two-blocks instructions)
       ;; if the first block consists of known parameters, run compression on it alone, and substitute in the results.
@@ -606,11 +629,12 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
           (setf new-context
                 (update-compressor-context new-context instr
                                            :destructive? nil)))
-        (return-from actually-compress-instructions
-          (actually-compress-instructions (nconc second-block instr-rest)
-                                          chip-specification
-                                          new-context
-                                          (nconc processed-instructions first-block)))))))
+        (return-from compress-instructions-with-possibly-unknown-params
+          (compress-instructions-with-possibly-unknown-params
+           (nconc second-block instr-rest)
+           chip-specification
+           new-context
+           (nconc processed-instructions first-block)))))))
 
 (deftype governor-state ()
   "Encodes the state of a governed queue."
@@ -632,17 +656,15 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
   (setf (governed-queue-contents queue) contents)
   (setf (governed-queue-resources queue) resources))
 
-;; this just contains the logic for slicing out sequences of instructions that
-;; could be passed to the compression routines. the actual compression of such
-;; strings is handled by ACTUALLY-COMPRESS-INSTRUCTIONS above.
-;;
 ;; the broad strokes of this routine is that there is instructions are loaded
 ;; into a queueing system based on what chip resources they use, and these queues
 ;; are coalesced based on the noncommutativity of instructions.  when any queue
 ;; uses "too many" resources, its content is selected for compression and the
-;; results are piped out.  there are several delicate caveats to this
+;; results are piped out.
 (defun compress-instructions (instructions chip-specification &key (protoquil nil))
-  "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION."
+  "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION.
+
+This specific routine is the start of a giant dispatch mechanism. Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
   (format *compiler-noise-stream* "COMPRESS-INSTRUCTIONS: entrance.~%")
   ;; set up the places where our state will live
   (let* ((output nil)
@@ -676,8 +698,9 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
              ;;
              ;; MAXIMS FOR THESE TRANSITION RULES:
              ;; (1) state transition comes FIRST, re/introduction of instructions comes SECOND
-             ;; (2) the queue structure should be made sane before and after any recursive call with setfs
-             ;;     (a) this might mean making a before/after comparison of queueing system state
+             ;; (2) the queue structure should be made sane before and after any recursive call with SETFs.
+             ;;     this might mean making a before/after comparison of queueing system state.
+             ;; If you don't obey these, you're very likely to introduce subtle bugs.
              (transition-governor-state (order address new-state &optional arg)
                (when (and (typep order 'number) (> order 1))
                  (format *error-output* "WARNING: No support for higher order hardware objects. Compressor queue may behave badly...~%"))
@@ -882,9 +905,10 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
                    ;;
                    ('(:queueing :flushing)
                      (let ((compressed-instructions
-                             (actually-compress-instructions (governed-queue-contents governed-queue)
-                                                             chip-specification
-                                                             context)))
+                             (compress-instructions-with-possibly-unknown-params
+                              (governed-queue-contents governed-queue)
+                              chip-specification
+                              context)))
                        ;; set all of the hardware devices that we subsume to empty
                        (cond
                          ;; if we are the global pseudodevice...
@@ -1024,10 +1048,6 @@ START-INDEX is used internally to skip over instructions at the start of INSTRUC
 
 
 
-
-
-
-;;
 ;; this is a debug routine used to see the current state of the
 ;; queueing system.
 (defun print-queue-state (governors global-governor)
