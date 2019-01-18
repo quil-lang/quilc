@@ -25,6 +25,7 @@ DEFGATE I:
   (let ((p1 (with-output-to-quil
               (write-line "H 0")
               (write-line "RX(1.0) 1")
+              (write-line "MEASURE 1")
               (write-line "RESET 1")
               (write-line "CNOT 6 0")))
         (p2 (with-output-to-quil
