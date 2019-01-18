@@ -13,11 +13,9 @@
 ;; this encodes a pseudo-instruction that performs different amounts of roll
 ;; depending on the (fine-resolution) state of a sequence of control qubits.
 ;;
-;; TODO: for other uniformly controlled operations, it might be useful to
-;; track both the "roll type" and the negation type. for someone looking
-;; into this, it's probably helpful to think about what the many-qubit
-;; analogues of UCRs look like, if there is such a thing. (if there isn't,
-;; there aren't enough single-qubit gates to warrant a generalization...)
+;; just like we currently support CONTROLLED gates, it might be useful someday
+;; to provide support for general "multiplexed" gates, of which CONTROLLED gates
+;; and UCRs are both special instances.
 (defclass UCR-application (gate-application)
   ((roll-type :initarg :roll-type
               :accessor UCR-application-roll-type
@@ -42,7 +40,6 @@
                   (rest (application-arguments thing)))
           (print-instruction (first (application-arguments thing)) nil)))
 
-;;; XXX FIXME
 (defmethod gate-matrix ((gate ucr-application) &rest parameters)
   (unless (endp parameters)
     (warn "unexpected parameters given to GATE-MATRIX for UCR-APPLICATION"))
@@ -56,11 +53,13 @@
      (append
       (when (eql ':up (ucr-application-chirality temp-gate))
         (list
-         (build-gate "CNOT" () (second (application-arguments temp-gate)) (first (application-arguments temp-gate)))))
+         (build-gate "CNOT" () (second (application-arguments temp-gate))
+                               (first (application-arguments temp-gate)))))
       (ucr-explode-instr temp-gate)
       (when (eql ':down (ucr-application-chirality temp-gate))
         (list
-         (build-gate "CNOT" () (second (application-arguments temp-gate)) (first (application-arguments temp-gate)))))))))
+         (build-gate "CNOT" () (second (application-arguments temp-gate))
+                               (first (application-arguments temp-gate)))))))))
 
 
 ;;; now some local utility functions
@@ -90,18 +89,15 @@
                (list n)
                recurse)))))
 
-;; this is used to compute the angle delta values that, given different sign
+;; this is used to compute the angle deltas that, given different sign
 ;; assignments encoded by gray-code-toggles, reassemble to a given sequence of
 ;; angle values.
 ;;
-;; REM: this is 1/2^n * the transpose of mathematica's, because this one is
-;; precomputing the inverse rather than the effect of the literal CNOT sequence
-;;
-;; TODO: the :append in the main loop is probably a source of serious
-;; inefficiency. a better version of this function would use arrays everywhere:
-;; an array can house the matrix data, an array can house the column data, the
-;; column can get scanned + updated + copied into the appropriate location in
-;; the output matrix all at once, without any reallocation happening.
+;; TODO: the :append in the main loop is probably a source of inefficiency. a
+;; better version of this function would use arrays everywhere: an array can
+;; house the matrix data, an array can house the column data, the column can get
+;; scanned + updated + copied into the appropriate location in the output matrix
+;; all at once, without any reallocation happening.
 (defun gray-code-difference-matrix (n)
   "This generates the matrix used by the angle difference backsolver."
   (check-type n integer)
@@ -159,16 +155,16 @@
 ;; differing hardware object native gate sets. (NOTE: it's unclear how these
 ;; complexities interact with the higher CNOT complexity imposed by chip topology.)
 ;;
-;; this is also the place where UCR-to-iSWAP compilation gets done. the two main
-;; recipes are
+;; this is also the place where UCR-to-iSWAP compilation gets done, according to
 ;;
 ;;     Z c, Z t, RZ(pi/2) t, ISWAP c t, RY(r) c, ISWAP c t, RZ(-pi/2) t
 ;;          == UCRY(r,-r) (c) t
 ;;
 ;;     X t, Z c, RY(pi/2) t, ISWAP c t, RY(r) c, ISWAP c t, RY(-pi/2) t
 ;;          == UCRZ(r,-r) (c) t 
+;;
 (defun ucr-compiler (instr &key (target ':cz))
-  "Compiles a UCR into UCRs of one smaller order."
+  "Compiles a UCR into UCRs of one smaller order (or, in the base case, into plain rolls)."
   ;; if this isn't a UCR, skip it.
   (unless (typep instr 'ucr-application)
     (give-up-compilation))
