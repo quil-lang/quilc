@@ -256,34 +256,6 @@
                            (build-gate "CNOT" () q1 q0))
      (list (build-gate "RY" '(#.(/ pi -2)) q0)))))
 
-;; TODO: there is almost certainly a better way to do this decomposition, but i
-;; can't figure out what it is. a foothold is that
-;;     ISWAP 0 2
-;;     ISWAP 1 2
-;;     ISWAP 0 1
-;;     ISWAP 1 2
-;;     RZ(-pi/2) 0
-;;     RZ(pi/2) 2
-;; emits a diagonal matrix of 1s and -1s, and so should be modelable by a sequence
-;; of UCRs---but this seems to give a circularly dependent decomposition. hm.
-;; another place you might be able to pick this up is using the following
-;; encoding of CNOT 1 0 to demonstrate generation of the Clifford group, followed
-;; by God Tables:
-;;     P q0
-;;     P q0
-;;     P q1
-;;     P q1
-;;     ISWAP q0 q1
-;;     H q0
-;;     P q0
-;;     P q0
-;;     ISWAP q0 q1
-;;     P q1
-;;     H q1
-;;     P q1
-;;     P q0
-;;     P q0
-;;     P q0
 (defun ISWAP-to-native-ISWAPs (chip-spec iswap-gate)
   (let* ((cnot-equivalent (iSWAP-to-CNOT iswap-gate))
          (cnots-on-chip (loop :for instr :in cnot-equivalent
