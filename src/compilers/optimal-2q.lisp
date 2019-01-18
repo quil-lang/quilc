@@ -4,6 +4,8 @@
 
 (in-package #:cl-quil)
 
+(define-global-counter **optimal-2q-twist-counter** generate-optimal-2q-twist-tag)
+
 (defconstant +makhlin-distance-to-operator-distance-postfactor+ 4
   "In the invocations of Nelder-Mead in the routine OPTIMAL-2Q-COMPILE below, GOODNESS is a measure of the L^2-distance between the vectors of Makhlin invariants of the input 2Q operator and the output of the Nelder-Mead finder for the circuit template.  This is a measure of distance between the two double-cosets, which is not an exact reflection of the L^2-distance between the two operators.  In fact, it's not possible to measure that distance until the rest of the routine has completed, which picks out a particular representative element of the coset carved out by the chosen template.  Nonetheless, we have to make a decision earlier as to whether a given template is appropriate.
 
@@ -294,19 +296,6 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
     (norm
      (vector-difference chi
                         (chi-from-evals circuit-evals)))))
-
-
-(declaim (type fixnum **optimal-2q-twist-counter**))
-(global-vars:define-global-var **optimal-2q-twist-counter** 0)
-(defun generate-optimal-2q-twist-tag ()
-  "Returns a unique number for each run of QSC, so that anonymous gates can be (partially) tracked."
-  #+sbcl
-  (sb-ext:atomic-incf **optimal-2q-twist-counter**)
-  #+lispworks
-  (system:atomic-incf **optimal-2q-twist-counter**)
-  #-(or sbcl lispworks)
-  (incf **optimal-2q-twist-counter**))
-
 
 (defun optimal-2q-compiler (instr &key (target ':cz))
   "Computes a representation of a 2Q gate which is of optimal multiqubit gate depth. TARGET is of type OPTIMAL-2Q-TARGET."
