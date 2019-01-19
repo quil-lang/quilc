@@ -203,58 +203,57 @@
     (nreverse (aref computed-paths target-node))))
 
 (defun SWAP-to-native-SWAPs (chip-spec swap-gate)
-  (unless (operator-match-p swap-gate '("SWAP" () _ _))
-    (give-up-compilation))
-  (let* ((q0 (qubit-index (first (application-arguments swap-gate))))
-         (q1 (qubit-index (second (application-arguments swap-gate))))
-         (computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0))
-         (f-list (mapcar (lambda (link-cxn)
-                           (apply #'build-gate "SWAP" '() 
-                                  (map 'list #'qubit (chip-spec-qubits-on-link chip-spec link-cxn))))
-                         computed-path)))
-    (append f-list (rest (reverse f-list)))))
+  (operator-match
+    ;; TODO Syntactically, could operator-match be better? Feels verbose.
+    (((("SWAP" () q0 q1) swap-gate))
+     (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0))
+            (f-list (mapcar (lambda (link-cxn)
+                              (apply #'build-gate "SWAP" '()
+                                     (map 'list #'qubit (chip-spec-qubits-on-link chip-spec link-cxn))))
+                            computed-path)))
+       (append f-list (rest (reverse f-list)))))
+    (_
+     (give-up-compilation))))
 
 (defun CNOT-to-native-CNOTs (chip-spec cnot-gate)
-  (unless (operator-match-p cnot-gate '("CNOT" () _ _))
-    (give-up-compilation))
-  (let* ((q1 (qubit-index (first (application-arguments cnot-gate))))
-         (q0 (qubit-index (second (application-arguments cnot-gate))))
-         ;; find a shortest path between the two qubits in the swap gate
-         (computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
-    (labels
-        ((build-CNOT-string (index-list prev-qubit)
-           (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
-                                                    'list))
-                  (oriented-qubits (if (= prev-qubit (first unoriented-qubit-indices))
-                                       (mapcar #'qubit unoriented-qubit-indices)
-                                       (mapcar #'qubit (reverse unoriented-qubit-indices)))))
-             (cond
-               ;; base case
-               ((= 1 (length index-list))
-                (list (apply #'build-gate "CNOT" '() oriented-qubits)))
-               ;; recursive case
-               (t
-                (let ((temp-string (build-CNOT-string (rest index-list)
-                                                      (qubit-index (second oriented-qubits)))))
-                  (append
-                   (list
-                    (apply #'build-gate "CNOT" '() oriented-qubits))
-                   temp-string
-                   (list
-                    (apply #'build-gate "CNOT" '() oriented-qubits))
-                   temp-string)))))))
-      (build-CNOT-string computed-path q1))))
+  (operator-match
+    (((("CNOT" () q0 q1) cnot-gate))
+     (labels
+         ((build-CNOT-string (index-list prev-qubit)
+            (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
+                                                     'list))
+                   (oriented-qubits (if (= prev-qubit (first unoriented-qubit-indices))
+                                        (mapcar #'qubit unoriented-qubit-indices)
+                                        (mapcar #'qubit (reverse unoriented-qubit-indices)))))
+              (cond
+                ;; base case
+                ((= 1 (length index-list))
+                 (list (apply #'build-gate "CNOT" '() oriented-qubits)))
+                ;; recursive case
+                (t
+                 (let ((temp-string (build-CNOT-string (rest index-list)
+                                                       (qubit-index (second oriented-qubits)))))
+                   (append
+                    (list
+                     (apply #'build-gate "CNOT" '() oriented-qubits))
+                    temp-string
+                    (list
+                     (apply #'build-gate "CNOT" '() oriented-qubits))
+                    temp-string)))))))
+       (build-CNOT-string (find-shortest-path-on-chip-spec chip-spec q0 q1) q0)))
+    (_
+     (give-up-compilation))))
 
 (defun CZ-to-native-CZs (chip-spec cz-gate)
-  (unless (operator-match-p cz-gate '("CZ" () _ _))
-    (give-up-compilation))
-  (let ((q1 (qubit-index (first (application-arguments cz-gate))))
-        (q0 (qubit-index (second (application-arguments cz-gate)))))
-    (nconc
-     (list (build-gate "RY" '(#.(/ pi 2)) q0))
-     (CNOT-to-native-CNOTs chip-spec
-                           (build-gate "CNOT" () q1 q0))
-     (list (build-gate "RY" '(#.(/ pi -2)) q0)))))
+  (operator-match
+    (((("CZ" () q0 q1) cz-gate))
+     (nconc
+      (list (build-gate "RY" '(#.(/ pi 2)) q1))
+      (CNOT-to-native-CNOTs chip-spec
+                            (build-gate "CNOT" () q0 q1))
+      (list (build-gate "RY" '(#.(/ pi -2)) q1))))
+    (_
+     (give-up-compilation))))
 
 (defun ISWAP-to-native-ISWAPs (chip-spec iswap-gate)
   (let* ((cnot-equivalent (iSWAP-to-CNOT iswap-gate))
@@ -279,32 +278,30 @@
             cnot-equivalent)))
 
 (defun PISWAP-to-native-PISWAPs (chip-spec piswap-gate)
-  (unless (operator-match-p piswap-gate '("PISWAP" (_) _ _))
-    (give-up-compilation))
-  (let ((theta (first (application-parameters piswap-gate)))
-        (p (qubit-index (first (application-arguments piswap-gate))))
-        (q (qubit-index (second (application-arguments piswap-gate)))))
-    ;; find a shortest path between the two qubits in the swap gate
-    (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec p q)))
-      (labels
-          ((build-PISWAP-string (index-list prev-qubit)
-             (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
-                                                      'list))
-                    (oriented-qubits (if (= (first unoriented-qubit-indices) prev-qubit)
-                                         unoriented-qubit-indices
-                                         (reverse unoriented-qubit-indices))))
-               (cond
-                 ;; base case
-                 ((= 1 (length index-list))
-                  (list (build-gate "PISWAP" `(,theta) (first oriented-qubits) (second oriented-qubits))))
-                 ;; recursive case
-                 (t
-                  (let ((temp-string (build-PISWAP-string (rest index-list)
-                                                          (second oriented-qubits))))
-                    (append
-                     (list
-                      (build-gate "SWAP" () (first oriented-qubits) (second oriented-qubits)))
-                     temp-string
-                     (list
-                      (build-gate "SWAP" () (first oriented-qubits) (second oriented-qubits))))))))))
-        (build-PISWAP-string computed-path p)))))
+  (operator-match
+    (((("PISWAP" (theta) q0 q1) piswap-gate))
+     (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
+       (labels
+           ((build-PISWAP-string (index-list prev-qubit)
+              (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
+                                                       'list))
+                     (oriented-qubits (if (= (first unoriented-qubit-indices) prev-qubit)
+                                          unoriented-qubit-indices
+                                          (reverse unoriented-qubit-indices))))
+                (cond
+                  ;; base case
+                  ((= 1 (length index-list))
+                   (list (build-gate "PISWAP" `(,theta) (first oriented-qubits) (second oriented-qubits))))
+                  ;; recursive case
+                  (t
+                   (let ((temp-string (build-PISWAP-string (rest index-list)
+                                                           (second oriented-qubits))))
+                     (append
+                      (list
+                       (build-gate "SWAP" () (first oriented-qubits) (second oriented-qubits)))
+                      temp-string
+                      (list
+                       (build-gate "SWAP" () (first oriented-qubits) (second oriented-qubits))))))))))
+         (build-PISWAP-string computed-path q0))))
+    (_
+     (give-up-compilation))))
