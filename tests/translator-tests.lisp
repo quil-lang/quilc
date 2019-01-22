@@ -105,6 +105,7 @@
        recognized-matrix))))
 
 (deftest test-global-instruction-expansion ()
+  "Tests the expansion of gate applications on non-adjacent qubits by comparing the matrix of the gate before and afte expansion."
   (finish-output *debug-io*)
   (let ((chip-spec (cl-quil::build-8Q-chip)))
     (dolist (instr-type (list (list "CNOT"   nil #'cl-quil::CNOT-to-native-CNOTs)

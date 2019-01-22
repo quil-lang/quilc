@@ -209,12 +209,19 @@
   "For a sequence of OPERATOR objects, performs a match and destructuring bind over the lexical environment of BODY.
 
 Example usage:
-(let ((g (build-gate \"CZ\" () 0 1)))
-  (operator-bind   ((\"CZ\" _  _ q) g)
-    ;; ... forms that use Q, which has been bound to 1 ...
-    ))
+(let ((g (build-gate \"CZ\" () 0 1))
+      (h (build-gate \"CNOT\" () 2 3)))
+  (operator-bind (((\"CZ\" _ _ p) g)
+                  ((\"CNOT\" _ _ q) h))
+    (list p q))) ;; => (1 3)
 
-NOTE: Returns NIL without executing BODY if match fails."
+(let ((g (build-gate \"CZ\" () 0 1))
+      (h (build-gate \"CNOT\" () 2 3)))
+  (operator-bind (((\"CZ\" _ _ p) g)
+                  ((\"CZ\" _ _ q) h))
+    (list p q))) ;; => NIL
+
+NOTE: Returns NIL without executing BODY if any one of BINDINGS does not match."
   (operator-bind-form bindings body))
 
 (defmacro lambda-on-operators (binding-list &body body)
