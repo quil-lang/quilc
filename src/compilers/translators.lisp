@@ -204,7 +204,6 @@
 
 (defun SWAP-to-native-SWAPs (chip-spec swap-gate)
   (operator-match
-    ;; TODO Syntactically, could operator-match be better? Feels verbose.
     (((("SWAP" () q0 q1) swap-gate))
      (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0))
             (f-list (mapcar (lambda (link-cxn)
@@ -280,7 +279,7 @@
 (defun PISWAP-to-native-PISWAPs (chip-spec piswap-gate)
   (operator-match
     (((("PISWAP" (theta) q0 q1) piswap-gate))
-     (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
+     (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
        (labels
            ((build-PISWAP-string (index-list prev-qubit)
               (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
