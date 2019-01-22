@@ -172,3 +172,19 @@ R 0")))
                       (quil::parse-quil-string before)
                       s))))
         (quil::parse-quil-string after)))))
+
+(deftest test-circuit-and-declare-printing ()
+  (let* ((before "DECLARE theta REAL[16]
+DECLARE theta-bits BIT[100] SHARING theta OFFSET 1 REAL
+
+DEFCIRCUIT TEST(%a) b c:
+    RZ(%a) b
+    RZ(%a) c
+
+
+TEST(0.5) 0 1
+")
+         (after (with-output-to-string (s)
+                  (cl-quil::print-parsed-program
+                   (cl-quil::parse-quil before) s))))
+    (is (string= before after))))
