@@ -5,14 +5,16 @@
 (in-package #:cl-quil-tests)
 
 (defun verify-h-cnot-code (code)
-  (is (= 2 (length code)))
-  (destructuring-bind (h cnot) (coerce code 'list)
+  (is (= 3 (length code)))
+  (destructuring-bind (h cnot reset) (coerce code 'list)
     (is (string= "H" (quil::application-operator-name h)))
     (is (= 0 (quil:qubit-index (elt (quil:application-arguments h) 0))))
 
     (is (string= "CNOT" (quil::application-operator-name cnot)))
     (is (= 0 (quil:qubit-index (elt (quil:application-arguments cnot) 0))))
-    (is (= 1 (quil:qubit-index (elt (quil:application-arguments cnot) 1))))))
+    (is (= 1 (quil:qubit-index (elt (quil:application-arguments cnot) 1))))
+    
+    (is (= 0 (quil::qubit-index (quil::reset-qubit-target reset))))))
 
 (defun verify-rx-code (code)
   (is (= 1 (length code)))
@@ -29,6 +31,7 @@
              "DEFCIRCUIT BELL:"
              "    H 0"
              "    CNOT 0 1"
+             "    RESET 0"
              "BELL"
              )))
     (verify-h-cnot-code (quil:parsed-program-executable-code p))))
@@ -39,6 +42,7 @@
              "DEFCIRCUIT BELL p q:"
              "    H p"
              "    CNOT p q"
+             "    RESET p"
              "BELL 0 1"
              )))
     (verify-h-cnot-code (quil:parsed-program-executable-code p))))
@@ -58,6 +62,7 @@
              "DEFCIRCUIT BELL p q:"
              "    H p"
              "    CNOT p q"
+             "    RESET p"
              "DEFCIRCUIT INDIRECTION:"
              "    BELL 0 1"
              "INDIRECTION")))
@@ -74,11 +79,12 @@
     (verify-rx-code (quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-argument-passing ()
-  "Test that arguments get passed from ouyter DEFCIRCUITs to inner ones."
+  "Test that arguments get passed from outer DEFCIRCUITs to inner ones."
   (let ((p (with-output-to-quil
              "DEFCIRCUIT BELL p q:"
              "    H p"
              "    CNOT p q"
+             "    RESET p"
              "DEFCIRCUIT INDIRECTION r s:"
              "    BELL s r"
              "INDIRECTION 1 0")))
