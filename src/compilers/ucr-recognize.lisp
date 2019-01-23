@@ -102,7 +102,4 @@
                                                          (- log-dimension d 1))
                                                  (subseq (application-arguments instr)
                                                          (- log-dimension d))))))))
-       (give-up-compilation))
-      ;; just in case we extend / restructure the above cond into something that
-      ;; doesn't end in a T branch:
-      (give-up-compilation))))
+       (give-up-compilation)))))
