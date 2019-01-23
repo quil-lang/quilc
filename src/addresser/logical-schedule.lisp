@@ -232,8 +232,7 @@
          (let ((bottom-resources (instruction-resources bottom-instr)))
            (when (resources-intersect-p resources bottom-resources)
              (push bottom-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
-             (push instr (gethash bottom-instr (lscheduler-later-instrs lschedule)))
-             (setf resources (resource-difference resources bottom-resources))))))))
+             (push instr (gethash bottom-instr (lscheduler-later-instrs lschedule)))))))))
   ;; are we a topmost instr?
   (unless (gethash instr (lscheduler-earlier-instrs lschedule))
     (push instr (lscheduler-first-instrs lschedule)))
