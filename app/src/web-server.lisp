@@ -71,12 +71,8 @@
   (with-output-to-string (s)
     (yason:encode
      (alexandria:plist-hash-table
-      (list* "error_type" "quilc_error"
-             #-forest-sdk
-             (list
-              "status" error)
-             #+forest-sdk
-             nil))
+      (list "error_type" "quilc_error"
+            "status" error))
      s)))
 
 (defun create-prefix/method-dispatcher (prefix method handler)
