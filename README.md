@@ -8,6 +8,13 @@ lifting of parsing, compiling, and optimizing Quil code. The second,
 using the binary `quilc` application directly, or alternatively by
 communicating with a server.
 
+Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at [Rigetti
+Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
+native gates and instructions. One can also use Quil's `DEFGATE` to
+define new non-native gates, and `DEFCIRCUIT` to build a named circuit
+that can be referenced elsewhere in Quil code (analogous to a function
+in most other programming languages).
+
 ## `CL-QUIL`
 
 `CL-QUIL` is the library that implements lexing, parsing, and
