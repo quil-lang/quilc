@@ -1,5 +1,7 @@
 FROM rigetti/quicklisp
 
+ARG build_target
+
 # install build dependencies
 COPY Makefile /src/quilc/Makefile
 WORKDIR /src/quilc
@@ -12,6 +14,6 @@ RUN git clone https://github.com/rigetti/rpcq.git
 # build the quilc app
 ADD . /src/quilc
 WORKDIR /src/quilc
-RUN git clean -fdx && make
+RUN git clean -fdx && make ${build_target}
 
 ENTRYPOINT ["./quilc"]

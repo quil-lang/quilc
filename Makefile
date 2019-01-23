@@ -97,9 +97,21 @@ quilc-unsafe: system-index.txt
 		--compress-core \
 		--entry quilc::%entry-point
 
+DOCKER_BUILD_TARGET=all
+DOCKER_TAG=rigetti/quilc:$(COMMIT_HASH)
 .PHONY: docker
 docker: Dockerfile
-	docker build -t rigetti/quilc:$(COMMIT_HASH) .
+	docker build --build-arg build_target=$(DOCKER_BUILD_TARGET) \
+		-t $(DOCKER_TAG) .
+
+docker-sdk: DOCKER_BUILD_TARGET=quilc-sdk
+docker-sdk: DOCKER_TAG=quilc-sdk
+docker-sdk: docker
+
+docker-sdk-barebones: DOCKER_BUILD_TARGET=quilc-sdk-barebones
+docker-sdk-barebones: DOCKER_TAG=quilc-sdk-barebones
+docker-sdk-barebones: docker
+
 
 ###############################################################################
 # TEST
