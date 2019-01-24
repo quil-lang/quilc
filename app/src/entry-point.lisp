@@ -301,8 +301,10 @@ to the RPCQ version instead.
        (let ((logger (make-instance 'cl-syslog:rfc5424-logger
                                     :app-name *program-name*
                                     :facility ':local0
-                                    :log-writer (cl-syslog:tee-to-stream
-                                                 (cl-syslog:syslog-log-writer "quilc" :local0)))))
+                                    :log-writer
+                                    #+windows (cl-syslog:stream-log-writer)
+                                    #-windows (cl-syslog:tee-to-stream
+                                               (cl-syslog:syslog-log-writer "quilc" :local0)))))
          (cl-syslog:rfc-log (logger :info "Launching quilc.")
            (:msgid "LOG0001"))
          (start-rpc-server :port *server-port*
