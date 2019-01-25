@@ -23,3 +23,9 @@ contributors:
      making changes where suggested and pushing them to the PR branch.
   5. If all goes well, your code will be merged and you will be
      attributed in the ACKNOWLEDGEMENTS file.
+* Style. In general, follow the [Google Common-Lisp style guide](https://google.github.io/styleguide/lispguide.xml). If
+  there is an inconsistency between the style guide and neighboring
+  code, follow the style of the neighboring code. Use code formatting
+  (indentation) that is equivalent to that of GNU Emacs'
+  `common-lisp-mode`.
+* Be polite.
