@@ -104,3 +104,10 @@ This provides high-level languages such as Python a way to communicate
 with the Quil compiler, thus enabling high-level abstractions and
 tools that are not directly available in Quil. The `pyquil` library
 provides such an interface to `quilc`.
+
+# Get involved!
+
+We welcome and encourage community contributions! Peruse our
+[guidelines for contributing](CONTRIBUTING.md) to get you up to speed on
+expectations. Once that's clear, a good place to start is the [good
+first issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) section. We look forward to working together!
