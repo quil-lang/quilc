@@ -10,6 +10,13 @@ contributors:
   the project root. Code coverage statistics can be compiled by
   running `sbcl --load coverage-report.lisp` in the `coverage-report`
   directory.
+* Documentation. Provide concise but clear documentation for your
+  changes. In general, all public functions (those exported in
+  `package.lisp`) *must* have docstrings. Internal functions should
+  usually be documented though it is less important. Documentation
+  should also be provided as comments to your code. In particular,
+  non-obvious code should be accompanied by detailed explanation of
+  its working.
 * Pull Request. The typical workflow for contributing to an
   open-source project is
   1. Create a fork of the project.
