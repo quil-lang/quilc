@@ -75,6 +75,18 @@ Building the `quilc` binary is automated using the `Makefile`:
 make quilc
 ```
 
+This will create a binary `quilc` in the current directory
+
+``` shell
+./quilc --version
+```
+
+To install system-wide issue the command
+
+``` shell
+make install
+```
+
 ### Using the Quil Compiler
 
 The Quil Compiler provides two modes of interaction: (1) communicating
