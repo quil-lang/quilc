@@ -29,13 +29,17 @@ Follow the instructions in QVM's [docs/lisp-setup.md](https://github.com/rigetti
 dependencies required to load the `CL-QUIL` library. Afterwhich, the
 library can be loaded
 
+
 ``` shell
 $ sbcl
 
-* (ql:quickload :cl-quil)
+```
+
+``` common-lisp
+(ql:quickload :cl-quil)
 ;;; <snip>compilation output</snip>
 (:CL-QUIL)
-* (cl-quil:parse-quil-string "H 0")
+(cl-quil:parse-quil-string "H 0")
 #<CL-QUIL:PARSED-PROGRAM {100312C643}>
 ```
 
@@ -66,7 +70,9 @@ Prerequisites to building `quilc` are:
 
 Building the `quilc` binary is automated using the `Makefile`:
 
-    make quilc
+``` shell
+make quilc
+```
 
 ### Using the Quil Compiler
 
@@ -78,8 +84,10 @@ or (2) communicating with the `quilc` server.
 
 The `quilc` binary reads Quil code provided on `stdin`:
 
-    echo "H 0" | quilc
-    cat large_file.quil | quilc
+``` shell
+echo "H 0" | quilc
+cat large_file.quil | quilc
+```
 
 #### Server
 
@@ -87,7 +95,9 @@ For various reasons (e.g. not having to repeatedly load the `quilc`
 binary into memory, communicating over a network) `quilc` provides a
 server interface:
 
-    quilc -S
+``` shell
+quilc -S
+```
 
 This provides high-level languages such as Python a way to communicate
 with the Quil compiler, thus enabling high-level abstractions and
