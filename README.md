@@ -62,11 +62,12 @@ targeting the native gates specified by the ISA.
 ### Building the Quil Compiler
 
 Prerequisites to building `quilc` are:
-0. Standard unix build tools
-1. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
-2. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
-3. [buildapp](https://github.com/xach/buildapp): Builds executable binaries from Common Lisp software
-4. [CL-QUIL](https://github.com/rigetti/cl-quil): The Common Lisp Quil compiler
+
+1. Standard unix build tools
+2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
+3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
+4. [buildapp](https://github.com/xach/buildapp): Builds executable binaries from Common Lisp software
+5. [CL-QUIL](https://github.com/rigetti/cl-quil): The Common Lisp Quil compiler
 
 Building the `quilc` binary is automated using the `Makefile`:
 
