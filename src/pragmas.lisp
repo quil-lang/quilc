@@ -115,4 +115,4 @@ Expected syntax: PRAGMA INITIAL_REWIRING [NAIVE|PARTIAL|GREEDY|RANDOM]")
            (t
             (error "Invalid PRAGMA INITIAL_REWIRING: ~a" rewiring-type-string)))))
   (:display-string
-   (symbol-name rewiring-type)))
+   (prin1-to-string (symbol-name rewiring-type))))
