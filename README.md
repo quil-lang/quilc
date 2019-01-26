@@ -36,10 +36,10 @@ $ sbcl
 ```
 
 ``` common-lisp
-(ql:quickload :cl-quil)
+* (ql:quickload :cl-quil)
 ;;; <snip>compilation output</snip>
 (:CL-QUIL)
-(cl-quil:parse-quil-string "H 0")
+* (cl-quil:parse-quil-string "H 0")
 #<CL-QUIL:PARSED-PROGRAM {100312C643}>
 ```
 
