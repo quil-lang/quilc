@@ -5,6 +5,7 @@
 (asdf:defsystem #:quilc-tests
   :description "Regression tests for quilc."
   :author "Eric Peterson <eric@rigetti.com>"
+  :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:quilc
                #:fiasco
                #:uiop

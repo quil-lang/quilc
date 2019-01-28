@@ -3,8 +3,9 @@
 ;;;; Author: Robert Smith
 
 (asdf:defsystem #:cl-quil
-  :description "A parser for the Quantum Instruction Language (Quil)."
-  :author "Robert Smith <robert@rigetti.com>"
+  :description "A parser and optimizing compiler for the Quantum Instruction Language (Quil)."
+  :author "Robert Smith <robert@rigetti.com>, Eric Peterson <eric@rigetti.com>, Rigetti Computing"
+  :license "Apache License 2.0 (See LICENSE.txt)"
   :version (:read-file-form "VERSION.txt")
   :pathname "src/"
   :depends-on ((:version #:alexa "2.1.1")

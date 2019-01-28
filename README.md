@@ -2,7 +2,10 @@
 
 [![pipeline status](https://gitlab.com/rigetti/quilc/badges/master/pipeline.svg)](https://gitlab.com/rigetti/quilc/commits/master)
 
-QUILC comprises two projects. The first, `cl-quil`, does the heavy
+Quilc is an advanced optimizing compiler for the quantum instruction
+language Quil, licensed under the [Apache 2.0 license](LICENSE.txt).
+
+Quilc comprises two projects. The first, `cl-quil`, does the heavy
 lifting of parsing, compiling, and optimizing Quil code. The second,
 `quilc`, presents an external interface for using `cl-quil`, either
 using the binary `quilc` application directly, or alternatively by
