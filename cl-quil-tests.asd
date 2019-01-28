@@ -5,6 +5,7 @@
 (asdf:defsystem #:cl-quil-tests
   :description "Regression tests for CL-QUIL."
   :author "Robert Smith <robert@rigetti.com>"
+  :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
                #:magicl
                #:alexandria

@@ -3,9 +3,10 @@
 ;;;; Author: Eric Peterson
 
 (asdf:defsystem #:quilc
-  :description "A CLI compiler for the Quantum Instruction Language (Quil)."
+  :description "A CLI front-end for the Quil compiler"
   :author "Eric Peterson <eric@rigetti.com>"
   :version (:read-file-form "VERSION.txt")
+  :license "Apache License 2.0 (See LICENSE.txt)"
   :pathname "app/src/"
   :depends-on (#:cl-ppcre
                #:split-sequence
