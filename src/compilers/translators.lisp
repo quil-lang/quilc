@@ -70,6 +70,20 @@
         (build-gate "RY" '(#.(/ pi -2)) q0)
         (build-gate "Z"  ()             q1)))
 
+(defun build-CZ-to-CNOT-translator (control target)
+  (lambda (instr)
+    (operator-match
+      (((("CZ" () q1 q0) instr))
+       (cond
+         ((subsetp (list q1 q0) (list control target))
+          (list (build-gate "H"    () target)
+                (build-gate "CNOT" () control target)
+                (build-gate "H"    () target)))
+         (t
+          (give-up-compilation))))
+      (_
+       (give-up-compilation)))))
+
 (define-translator iSWAP-to-CNOT (("ISWAP" () q1 q0) iswap-gate)
   (list (build-gate "RY"   '(#.(/ pi 2))   q1)
         (build-gate "RZ"   '(#.(/ pi -2))  q1)

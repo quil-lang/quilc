@@ -246,7 +246,7 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
 ;; is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted) sequence of such atoms,
 ;; indicating which 2Q gates are available for use.
 (deftype optimal-2q-target-atom ()
-  '(member :cz :iswap :piswap :cphase))
+  '(member :cz :iswap :piswap :cphase :cnot))
 
 (defun sequence-of-optimal-2q-target-atoms-p (seq)
   (and (typep seq 'sequence)
@@ -264,6 +264,7 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
         (requirementsl (alexandria:ensure-list requirements)))
     (when (member ':cphase targetl) (push ':cz targetl))
     (when (member ':piswap targetl) (push ':iswap targetl))
+    (when (member ':cnot targetl) (push ':cz targetl))
     (subsetp requirementsl targetl)))
 
 (defun gate-application-trivially-satisfies-2q-target-requirements (instr requirements)

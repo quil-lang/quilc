@@ -267,6 +267,7 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
           ;; set up single-type rewriting rules
           :nconc (case current-type
                    (:CZ     (rewriting-rules-for-link-of-CZ-type))
+                   (:CNOT   (rewriting-rules-for-link-of-CNOT-type))
                    (:CPHASE (rewriting-rules-for-link-of-CPHASE-type))
                    (:ISWAP  (rewriting-rules-for-link-of-ISWAP-type))
                    (:PISWAP (rewriting-rules-for-link-of-PISWAP-type)))
@@ -288,6 +289,10 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
             :into rewriting-rules
           ;; set up compilation methods
           :nconc (cond
+                   ((and (eql ':CNOT current-type)
+                         (not (find ':CPHASE higher-precedence))
+                         (not (find ':CZ higher-precedence)))
+                    (list (build-CZ-to-CNOT-translator qubit0 qubit1)))
                    ((and (eql ':CZ current-type)
                          (not (find ':CPHASE higher-precedence))
                          (not (find ':CZ     higher-precedence)))
@@ -313,27 +318,10 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                    :do (vector-push-extend method
                                            (hardware-object-compilation-methods obj))))
     ;; set up the basic optimal 2Q compiler
-    (case (first type)
-      (:CNOT
-       (vector-push-extend #'2q-cnot-compiler
-                           (hardware-object-compilation-methods obj)))
-      (otherwise
-       (vector-push-extend (optimal-2q-compiler-for type)
-                           (hardware-object-compilation-methods obj))))
+    (vector-push-extend (optimal-2q-compiler-for type)
+                        (hardware-object-compilation-methods obj))
     ;; return the qubit
     obj))
-
-(defun 2q-cnot-compiler (instr)
-  "Compile any 2q gate INSTR into a list of CNOT and 1q gates."
-  (operator-match
-    (((("CNOT" () _ _) instr))
-     (list instr))
-    (_ (mapcan (lambda (instr)
-                 (handler-case (CZ-to-CNOT instr)
-                   (compiler-does-not-apply (c)
-                     (declare (ignore c))
-                     (list instr))))
-               (optimal-2q-compiler instr :target ':cz)))))
 
 
 (defun build-qubit (&optional (type (list ':RZ ':X/2)))
