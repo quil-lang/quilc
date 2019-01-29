@@ -72,19 +72,19 @@ Prerequisites to building `quilc` are:
 Building the `quilc` binary is automated using the `Makefile`:
 
 ``` shell
-make quilc
+$ make quilc
 ```
 
 This will create a binary `quilc` in the current directory
 
 ``` shell
-./quilc --version
+$ ./quilc --version
 ```
 
 To install system-wide issue the command
 
 ``` shell
-make install
+$ make install
 ```
 
 ### Using the Quil Compiler
@@ -98,24 +98,65 @@ or (2) communicating with the `quilc` server.
 The `quilc` binary reads Quil code provided on `stdin`:
 
 ``` shell
-echo "H 0" | quilc
-cat large_file.quil | quilc
+$ echo "H 0" | quilc
+$ cat large_file.quil | quilc
 ```
 
 #### Server
 
 For various reasons (e.g. not having to repeatedly load the `quilc`
 binary into memory, communicating over a network) `quilc` provides a
-server interface:
+server interface. `quilc` currently supports two server modes:
 
+* HTTP
+
+The HTTP server was the original implementation of the server mode. It is now deprecated in favour of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
 ``` shell
-quilc -S
+$ quilc -S
++-----------------+
+|  W E L C O M E  |
+|   T O   T H E   |
+|  R I G E T T I  |
+|     Q U I L     |
+| C O M P I L E R |
++-----------------+
+Copyright (c) 2016-2019 Rigetti Computing.
+
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
+future, it will be removed.  You're advised to modify your client code to talk
+to the RPCQ version instead.
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+[2019-01-29 13:59:18] Starting server: 0.0.0.0 : 6000.
 ```
 
-This provides high-level languages such as Python a way to communicate
-with the Quil compiler, thus enabling high-level abstractions and
-tools that are not directly available in Quil. The `pyquil` library
-provides such an interface to `quilc`.
+* RPCQ
+
+[RPCQ](https://github.com/rigetti/rpcq/) is an open-source RPC framework developed at Rigetti for efficient network communication through the QCS stack. The server is started in RPCQ-mode using the `-R` flag
+
+``` shell
+$ quilc -R
++-----------------+
+|  W E L C O M E  |
+|   T O   T H E   |
+|  R I G E T T I  |
+|     Q U I L     |
+| C O M P I L E R |
++-----------------+
+Copyright (c) 2016-2019 Rigetti Computing.
+
+<134>1 2019-01-29T22:03:08Z workstation.local ./quilc 4077 LOG0001 - Launching quilc.
+<134>1 2019-01-29T22:03:08Z workstation.local ./quilc 4077 - - Spawning server at (tcp://*:5555) .
+```
+
+The server-mode provides to high-level languages such as Python a way
+to communicate with the Quil compiler, thus enabling high-level
+abstractions and tools that are not directly available in Quil. The
+`pyquil` library provides such an interface to `quilc`.
 
 # Get involved!
 
