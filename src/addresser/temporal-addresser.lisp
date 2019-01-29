@@ -866,8 +866,7 @@ Optional arguments:
                     (let ((*print-pretty* nil))
                       (format *compiler-noise-stream*
                               "GREEDY-TEMPORAL-ADDRESSING: ~a is native if we do proper rewiring assignment, flushing 1Q lines and dequeueing.~%"
-                              (print-instruction instr nil)
-                              (rewiring-l2p working-l2p)))
+                              (print-instruction instr nil)))
 
                     ;; assign qubits to their wires
                     (loop
