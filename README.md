@@ -108,7 +108,7 @@ For various reasons (e.g. not having to repeatedly load the `quilc`
 binary into memory, communicating over a network) `quilc` provides a
 server interface. `quilc` currently supports two server modes:
 
-* HTTP
+##### HTTP
 
 The HTTP server was the original implementation of the server mode. It is now deprecated in favour of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
 ``` shell
@@ -134,7 +134,7 @@ to the RPCQ version instead.
 [2019-01-29 13:59:18] Starting server: 0.0.0.0 : 6000.
 ```
 
-* RPCQ
+##### RPCQ
 
 [RPCQ](https://github.com/rigetti/rpcq/) is an open-source RPC framework developed at Rigetti for efficient network communication through the QCS stack. The server is started in RPCQ-mode using the `-R` flag
 
