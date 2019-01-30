@@ -186,3 +186,20 @@
          (format t " ~X~X" i j) (finish-output)
          (test-rewiring-in-cnot-for "CZ" i j)))))
   (format t "]"))
+
+(deftest test-absolute-unit-cnot-compilation ()
+  (let* ((chip (quil::build-ibm-qx5))
+         (pp (parse-quil-string "
+# in awe of the size of this lad
+CCNOT 8 9 2
+CNOT 15 4
+CZ 5 7
+CPHASE(pi/8) 1 3
+ISWAP 5 2"))
+         (cp (let ((quil::*compress-carefully* nil))
+               (compiler-hook pp chip)))
+         (2q-code (remove-if-not (lambda (isn)
+                                   (and (typep isn 'application)
+                                        (= 2 (length (application-arguments isn)))))
+                                 (parsed-program-executable-code cp))))
+    (is (every (link-nativep chip) 2q-code))))
