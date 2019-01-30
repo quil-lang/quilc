@@ -178,7 +178,7 @@
                        (format nil "CNOT ~D ~D" i j)))))
     (format t "[Test output:")
     (finish-output)
-    (loop :repeat 5 s:do      
+    (loop :repeat 5 :do
       (let* ((2q-code (remove-if-not
                        (lambda (isn) (and (typep isn 'application)
                                      (= 2 (length (application-arguments isn)))))
