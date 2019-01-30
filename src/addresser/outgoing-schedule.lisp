@@ -37,11 +37,15 @@ permutation record duration."
       (return-from instruction-duration
         (permutation-record-duration (vnth 0 (hardware-object-permutation-gates
                                               (chip-spec-nth-link chip-spec link-index)))))))
-  (or
-   (alexandria:when-let
-       ((obj (nth-value 2 (lookup-hardware-address chip-spec inst))))
-     (funcall (hardware-object-native-instructions obj) inst))
-   default))
+  (flet ((get-it (chip-spec isn)
+           (alexandria:if-let ((obj (nth-value 2 (lookup-hardware-address chip-spec isn))))
+             (funcall (hardware-object-native-instructions obj) isn)
+             nil)))
+    (declare (inline get-it))
+    (etypecase inst
+      (application (or (get-it chip-spec inst) default))
+      (measurement (or (get-it chip-spec inst) default))
+      (instruction default))))
 
 (defun chip-schedule-start-time (schedule inst)
   "Return the time when the instruction INST begins executing in SCHEDULE."

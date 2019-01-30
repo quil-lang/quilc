@@ -73,6 +73,25 @@
         (build-gate "RY" '(#.(/ pi -2)) q0)
         (build-gate "Z"  ()             q1)))
 
+(defun build-CZ-to-CNOT-translator (control target)
+  (lambda (instr)
+    (operator-match
+      (((("CZ" () q1 q0) instr))
+       (cond
+         ;; Prefer the ordering of the CONTROL and TARGET, if that's
+         ;; what we got...
+         ((subsetp (list q1 q0) (list control target))
+          (list (build-gate "H"    () target)
+                (build-gate "CNOT" () control target)
+                (build-gate "H"    () target)))
+         ;; Otherwise just use the specified ordering.
+         (t
+          (list (build-gate "H"    () q0)
+                (build-gate "CNOT" () q1 q0)
+                (build-gate "H"    () q0)))))
+      (_
+       (give-up-compilation)))))
+
 (define-translator iSWAP-to-CNOT (("ISWAP" () q1 q0) iswap-gate)
   (list (build-gate "RY"   '(#.(/ pi 2))   q1)
         (build-gate "RZ"   '(#.(/ pi -2))  q1)
@@ -229,29 +248,32 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
      (give-up-compilation))))
 
 (defun CNOT-to-native-CNOTs (chip-spec cnot-gate)
-  (operator-match
-    (((("CNOT" () q0 q1) cnot-gate))
-     (labels
-         ((build-CNOT-string (index-list)
-            (let* ((oriented-qubits (mapcar #'qubit index-list))
-                   (q0 (first oriented-qubits))
-                   (q1 (second oriented-qubits)))
-              (cond
-                ;; base case
-                ((= 2 (length index-list))
-                 (list (build-gate "CNOT" '() q0 q1)))
-                ;; recursive case
-                (t
-                 (let ((temp-string (build-CNOT-string (rest index-list)))
-                       (gate (list (build-gate "CNOT" '() q0 q1))))
-                   (append gate temp-string gate temp-string)))))))
-       (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
-         (unless computed-path
-           (give-up-compilation))
-         (build-CNOT-string computed-path))))
-    (_
-     (give-up-compilation))))
-
+  (unless (operator-match-p cnot-gate '("CNOT" () _ _))
+    (give-up-compilation))
+  (let* ((q1 (qubit-index (first (application-arguments cnot-gate))))
+         (q0 (qubit-index (second (application-arguments cnot-gate))))
+         ;; find a shortest path between the two qubits in the swap gate
+         (computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
+    (labels
+        ((build-CNOT-string (qubit-string)
+           (cond
+             ;; base case
+             ((= 2 (length qubit-string))
+              (list (apply #'build-gate "CNOT" '() qubit-string)))
+             ;; recursive case
+             (t
+              (let ((inner-string (build-CNOT-string (rest qubit-string)))
+                    ;; one could also make a deep copy instead of running build-CNOT-string again
+                    (inner-string-copy (build-CNOT-string (rest qubit-string)))
+                    (first-two-qubits (list (first qubit-string) (second qubit-string))))
+                (append
+                 (list
+                  (apply #'build-gate "CNOT" '() first-two-qubits))
+                 inner-string
+                 (list
+                  (apply #'build-gate "CNOT" '() first-two-qubits))
+                 inner-string-copy))))))
+      (build-CNOT-string computed-path))))
 
 (defun CZ-to-native-CZs (chip-spec cz-gate)
   (operator-match

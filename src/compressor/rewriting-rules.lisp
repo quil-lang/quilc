@@ -315,6 +315,34 @@
      (list (build-gate "PISWAP" (list pi) p q)))))
 
 
+(defun rewriting-rules-for-link-of-CNOT-type ()
+  (list
+   (make-rewriting-rule "CNOT CNOT -> NOP"
+       (_
+        (("CNOT" () p q) x)
+        (("CNOT" () r s) y))
+     
+     (else-give-up-compilation
+         (subsetp (list p q) (list r s))
+       (list)))
+   
+   (make-rewriting-rule "(RZ (x) I) CNOT -> CNOT (RZ (x) I)"
+       (_
+        (("RZ"   (theta) p)   x)
+        (("CNOT" ()      p q) y))
+     
+     (list (build-gate "CNOT" ()        p q)
+           (build-gate "RZ"   `(,theta) p)))
+   
+   (make-rewriting-rule "(I (x) RX) CNOT -> CNOT (I (x) RX)"
+       (_
+        (("RX"   (theta) q)   x)
+        (("CNOT" ()      p q) y))
+     
+     (list (build-gate "CNOT" ()        p q)
+           (build-gate "RX"   `(,theta) q)))))
+
+
 (defun rewriting-rules-for-link-of-CZ-type ()
   "Generates a list of rewriting rules for simplifying expressions involving CZ and standard single-qubit operations."
   (list

@@ -52,7 +52,7 @@
     (("json-serialize" #\j) :type boolean :optional t :documentation "serialize output as a JSON object")
     #-forest-sdk
     (("print-logical-schedule" #\s) :type boolean :optional t :documentation "include logically parallelized schedule in JSON output; requires -P")
-    (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", \"bristlecone\", or path to QPU description file")
+    (("isa") :type string :optional t :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", \"bristlecone\", \"ibmqx5\", or path to QPU description file")
     (("enable-state-prep-reductions") :type boolean :optional t :documentation "assume that the program starts in the ground state")
     (("protoquil" #\P) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
