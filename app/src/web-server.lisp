@@ -1,8 +1,6 @@
 ;;;; server.lisp
 ;;;;
 ;;;; Author: Eric Peterson
-;;;;
-;;;; all the hunchentoot junk goes in here.
 
 (in-package #:quilc)
 
