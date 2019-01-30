@@ -354,10 +354,15 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
 
-  ;; Does it actually need compilation?
+  ;; Does it actually need compilation? If compilation won't get us
+  ;; any further, we might as well just give up.
+  ;;
+  ;; NOTE: We used to just return (LIST INSTR) here, but Eric says
+  ;; that compilers should in general get us closer to our target, and
+  ;; identity is *not* getting us closer.
   (when (gate-application-trivially-satisfies-2q-target-requirements
          instr (alexandria:ensure-list target))
-    (return-from optimal-2q-compiler (list instr)))
+    (give-up-compilation))
 
   ;; first, some utility definitions for 2Q templates that require numerical solvers
   (let ((m (gate-matrix instr)))
