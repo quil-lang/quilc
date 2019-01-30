@@ -9,7 +9,7 @@ Quilc comprises two projects. The first, `cl-quil`, does the heavy
 lifting of parsing, compiling, and optimizing Quil code. The second,
 `quilc`, presents an external interface for using `cl-quil`, either using
 the binary `quilc` application directly, or alternatively by
-communicating with an server (HTTP or [RPCQ](https://github.com/rigetti/rpcq/)).
+communicating with a server (HTTP or [RPCQ](https://github.com/rigetti/rpcq/)).
 
 Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at [Rigetti
 Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
