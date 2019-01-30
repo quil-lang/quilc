@@ -17,24 +17,26 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
 ;; is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted) sequence of such atoms,
 ;; indicating which 2Q gates are available for use.
 (deftype optimal-2q-target-atom ()
-  '(member :cz :iswap :piswap :cphase))
+  '(member :cz :iswap :piswap :cphase :cnot))
 
 (defun sequence-of-optimal-2q-target-atoms-p (seq)
-  (every (lambda (a) (typep a 'optimal-2q-target-atom))
-         seq))
+  (and (typep seq 'sequence)
+       (every (lambda (a) (typep a 'optimal-2q-target-atom))
+              seq)))
 
 (deftype optimal-2q-target ()
   "A valid TARGET value for OPTIMAL-2Q-COMPILE."
   '(or optimal-2q-target-atom
-       (satisfies sequence-of-optimal-2q-target-atoms-p)))
+    (and sequence
+     (satisfies sequence-of-optimal-2q-target-atoms-p))))
 
 (defun optimal-2q-target-meets-requirements (target requirements)
-  (let ((targetl (if (typep target 'list) target (list target)))
-        (requirementsl (if (typep requirements 'list) requirements (list requirements))))
+  (let ((targetl       (alexandria:ensure-list target))
+        (requirementsl (alexandria:ensure-list requirements)))
     (when (member ':cphase targetl) (push ':cz targetl))
     (when (member ':piswap targetl) (push ':iswap targetl))
+    (when (member ':cnot targetl) (push ':cz targetl))
     (subsetp requirementsl targetl)))
-
 
 (defun convert-su4-to-su2x2 (m)
   "Assuming m is in the subgroup SU(2) x SU(2) of SU(4), this computes the parent matrices."
@@ -174,10 +176,10 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
       ;; first, we address the sort issue. the columns of a match the order of
       ;; the the values in angles, so we sort the two lists in parallel.\
       (let* ((angles (map 'list (lambda (x) (let ((ret (imagpart (log x))))
-                                              (if (double= ret (- pi)) pi ret)))
+                                         (if (double= ret (- pi)) pi ret)))
                           evals))
              (augmented-list
-               (sort 
+               (sort
                 (loop :for i :below 4
                       :collect (let ((col (loop :for j :below 4
                                                 :collect (magicl:ref a j i))))
@@ -239,6 +241,20 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
               (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
               (gate-matrix (lookup-standard-gate "ISWAP")))))))
 
+(defun gate-application-trivially-satisfies-2q-target-requirements (instr requirements)
+  "Does the gate application INSTR trivially satisfy the requirements imposed by REQUIREMENTS? (In other words, do we actually need to do decomposition?)"
+  (check-type instr gate-application)
+  (and (plain-operator-p (application-operator instr))
+       (let ((name (application-operator-name instr)))
+         (flet ((good (req)
+                  (case req
+                    (:cz       (string= name "CZ"))
+                    (:iswap    (string= name "ISWAP"))
+                    (:piswap   (string= name "PISWAP"))
+                    (:cphase   (string= name "CPHASE"))
+                    (otherwise nil))))
+           (some #'good requirements)))))
+
 (defun chi-from-evals (evals)
   "Computes the characteristic polynomial of a 4x4 matrix with all
 unit-norm eigenvalues from the length 4 list of their ANGLES.  Returns
@@ -297,11 +313,31 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
      (vector-difference chi
                         (chi-from-evals circuit-evals)))))
 
+(defun optimal-2q-compiler-for (target)
+  "Return an optimal 2q compilation function for TARGET."
+  (check-type target optimal-2q-target)
+  (lambda (instr)
+    (optimal-2q-compiler instr :target target)))
+
 (defun optimal-2q-compiler (instr &key (target ':cz))
   "Computes a representation of a 2Q gate which is of optimal multiqubit gate depth. TARGET is of type OPTIMAL-2Q-TARGET."
+  (check-type instr gate-application)
+  (check-type target optimal-2q-target)
+
+  ;; Do we have a 2q gate?
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
-  (check-type target optimal-2q-target)
+
+  ;; Does it actually need compilation? If compilation won't get us
+  ;; any further, we might as well just give up.
+  ;;
+  ;; NOTE: We used to just return (LIST INSTR) here, but Eric says
+  ;; that compilers should in general get us closer to our target, and
+  ;; identity is *not* getting us closer.
+  (when (gate-application-trivially-satisfies-2q-target-requirements
+         instr (alexandria:ensure-list target))
+    (give-up-compilation :because ':acts-trivially))
+
   ;; first, some utility definitions for 2Q templates that require numerical solvers
   (let ((m (gate-matrix instr)))
     (unless m
@@ -439,11 +475,11 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
                                 (build-gate "RY"    (list alpha)   q0)
                                 (build-gate "RY"    (list beta)    q1)
                                 (build-gate "ISWAP" '()            q0 q1)))))))
-                 
+
                  ;; at this point, we don't know how to test for the remaining
                  ;; depth 2 templates. we apply the relevant numerical solver, see
                  ;; if it comes up with an answer, and use it if we can.
-                 
+
                  ;; PiSWAP-PiSWAP case
                  (when (and (optimal-2q-target-meets-requirements target ':piswap))
                    (flet ((circuit-template (array)
@@ -457,7 +493,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
                            (cl-grnm:nm-optimize (lambda (in) (compare-circuit-angles (circuit-template in) x-list instr))
                                                 (make-array 3 :initial-contents '(1d0 1d0 1d0)))
                          (when (double= 0d0 (* goodness +makhlin-distance-to-operator-distance-postfactor+))
-                           (return-from bare-circuit-defn (circuit-template template-values)))))))                 
+                           (return-from bare-circuit-defn (circuit-template template-values)))))))
                  ;; PiSWAP-CNOT case
                  (when (optimal-2q-target-meets-requirements target (list ':cz ':piswap))
                    (flet ((circuit-template (array)
@@ -506,9 +542,9 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
                          (when (double= 0d0 (* goodness +makhlin-distance-to-operator-distance-postfactor+))
                            (return-from bare-circuit-defn
                              (circuit-template template-values)))))))
-                 
+
                  ;; ===== NON-CASES: CPHASE-CPHASE =====
-                 
+
                  ;; ===== depth 3 cases =====
                  ;; if we've made it down to the depth 3 case, then we can
                  ;; always succeed in making a circuit, and what's left is to

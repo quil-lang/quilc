@@ -17,13 +17,13 @@ GENERIC-COMPILERS is a vector of functions used as fallback compilation methods,
 
 GENERIC-REWRITING-RULES is a similar vector of REWRITING-RULE structures that the compressor loop can use to generate shorter gate strings when rules specialized to local hardware objects have been exhausted.  Again, the array is sorted by descending preference.
 
-LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.  It gets auto-populated by WARM-CHIP-SPEC-LOOKUP-CACHE."
+LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.  It gets auto-populated by `WARM-CHIP-SPEC-LOOKUP-CACHE'. This should not be accessed directly; use `LOOKUP-HARDWARE-ADDRESS-BY-QUBITS'."
   (objects (make-array 2 :initial-contents (list (make-adjustable-vector)
                                                  (make-adjustable-vector)))
    :type vector)
   (generic-compilers (make-adjustable-vector) :type vector)
   (generic-rewriting-rules (make-adjustable-vector) :type vector)
-  (lookup-cache nil))
+  (lookup-cache nil :type (or null hash-table)))
 
 (defmethod print-object ((cs chip-specification) stream)
   (print-unreadable-object (cs stream :type t :identity nil)
@@ -43,6 +43,31 @@ DURATION is the time duration in nanoseconds of this gate application."
   (arguments (list 0 1))
   (permutation (list 1 0))
   (duration 600))
+
+
+;;; The HARDWARE object structure stores a lot of information. It
+;;; serves many purposes, principally to solve some of the following
+;;; problems:
+;;;
+;;;     1. To address operations on qubits, qubit pairs, qubit
+;;;     triplets, etc. This requires determining a notion of
+;;;     _occupancy_ of resources.
+;;;
+;;;     2. To determine what options are available for compiling
+;;;     operations on that resource.
+;;;
+;;; The first point is particularly important. You should *not* use
+;;; CXNS to determine directed connectivity. (By "directed", we mean
+;;; anything to do with what operations are allowed.) CXNS just
+;;; encodes some physical relationships on physical hardware;
+;;; collections of resources on which a variety of operations can
+;;; possibly act.
+;;;
+;;; To determine available instructions, their validity, etc., the
+;;; information in NATIVE-INSTRUCTIONS and MISC-DATA (namely the
+;;; duration table) are helpful.
+;;;
+;;; Now for some miscellaneous comments about the design.
 
 ;;; some design decisions about CXNS:
 ;;; + easy to iterate over the objects in positions above ORDER and know when to terminate
@@ -69,7 +94,7 @@ DURATION is the time duration in nanoseconds of this gate application."
 
 ORDER is a non-negative integer that counts the number of qubit subsidiaries of this hardware object. Equals (1- (length (vnth 0 (hardware-object-cxns this)))). (If you drew a schematic of a chip, this is also the dimension of the graphical representation of the hardware object: 0 for qubits, 1 for links, ... .)
 
-NATIVE-INSTRUCTIONS is a function that takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate), and it emits NIL if this instruction does not admit direct translation to a physical pulse.
+NATIVE-INSTRUCTIONS is a function that takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse. A second value is returned, which is T if the instruction would be native were the qubits permuted in some fashion (\"gate native\").
 
 COMPILATION-METHODS is a vector of functions that this device can employ to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.
 
@@ -79,15 +104,18 @@ REWRITING-RULES is a vector of REWRITING-RULE structures that the compressor loo
 
 CXNS is an array. In its nth position, there is a vector of the order n hardware objects on the chip that are connected to this one. Among other things, this is used to determine shared resource blocking.
 
-MISC-DATA is a hashtable of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
+MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
   (order 0 :type unsigned-byte :read-only t)
-  (native-instructions (constantly nil))
+  (native-instructions (lambda (instr)
+                         (declare (ignore instr))
+                         (values nil nil))
+   :type (function (t) (values t t)))
   (compilation-methods (make-adjustable-vector))
   (permutation-gates (make-adjustable-vector))
   (rewriting-rules (make-adjustable-vector))
   (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
                                               (make-adjustable-vector))))
-  (misc-data (make-hash-table :test #'equal)))
+  (misc-data (make-hash-table :test #'equal) :type hash-table))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
@@ -149,27 +177,46 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
 
 (defun lookup-hardware-address (chip-spec instr)
   "Finds a hardware object OBJ in CHIP-SPEC whose qubit resources match those used by INSTR. Returns the values object (ORDER ADDRESS OBJ), so that OBJ equals (vnth ADDRESS (vnth ORDER (chip-specification-objects CHIP-SPEC)))."
+  ;; Only APPLICATIONs and MEASUREs use qubits in contexts where you'd
+  ;; actually want to call this function.
+  ;;
+  ;; XXX: What about RESET q?
   (etypecase instr
     (application
      (lookup-hardware-address-by-qubits chip-spec (mapcar #'qubit-index (application-arguments instr))))
-    (measure
-     (lookup-hardware-address-by-qubits chip-spec (list (qubit-index (measurement-qubit instr)))))
-    (instruction
-     1/100)))
+    (measurement
+     (lookup-hardware-address-by-qubits chip-spec (list (qubit-index (measurement-qubit instr)))))))
 
 
 ;;; constructors for hardware object building blocks
 
 (defun build-link (qubit0 qubit1 &optional (type (list ':CZ)))
-  "Constructs a template link. Legal types: (lists of) ':CZ, ':CPHASE, ':ISWAP, ':PISWAP."
+  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
+  (check-type qubit0 unsigned-byte)
+  (check-type qubit1 unsigned-byte)
+  (assert (/= qubit0 qubit1))
   (setf type (alexandria:ensure-list type))
   (let* ((misc-data (make-hash-table :test #'equal))
          (obj (make-hardware-object
                :order 1
-               :native-instructions (lambda (instr)
-                                      (cdr (assoc instr
-                                                  (gethash "duration-alist" misc-data)
-                                                  :test #'operator-match-p)))
+               :native-instructions
+               (lambda (instr)
+                 (if (not (or (typep instr 'gate-application)
+                              (typep instr 'unresolved-application)))
+                     (values nil nil)
+                     (let* ((duration-alist (gethash "duration-alist" misc-data))
+                            (duration (cdr (assoc instr duration-alist :test #'operator-match-p))))
+                       (values
+                        ;; Is the instruction precisely native? (both gate + qubit indexes)
+                        duration
+                        ;; Is the gate native? (just the gate)
+                        (and (or duration
+                                 (and (plain-operator-p (application-operator instr))
+                                      (assoc (application-operator-name instr)
+                                             duration-alist
+                                             :test (lambda (name pattern)
+                                                     (string= name (first pattern))))))
+                             t)))))
                :cxns (vector (vector qubit0 qubit1) #())
                :misc-data misc-data)))
     ;; set up the SWAP record
@@ -190,15 +237,37 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
           :do (setf lower-precedence (rest lower-precedence))
               ;; set up duration-alist
           :nconc (case current-type
-                   (:CZ     (list (cons `("CZ"     ( ) _ _) 150)))
-                   (:CPHASE (list (cons `("CPHASE" (_) _ _) 150)))
-                   (:ISWAP  (list (cons `("ISWAP"  ( ) _ _) 150)))
-                   (:PISWAP (list (cons `("PISWAP" (_) _ _) 150)))
+                   ;; In usual interactions, these are all capable of
+                   ;; acting bidirectionally.
+                   (:CZ     (list (cons `("CZ"     ()  ,qubit0 ,qubit1) 150)
+                                  (cons `("CZ"     ()  ,qubit1 ,qubit0) 150)))
+                   (:CPHASE (list (cons `("CPHASE" (_) ,qubit0 ,qubit1) 150)
+                                  (cons `("CPHASE" (_) ,qubit1 ,qubit0) 150)))
+                   (:ISWAP  (list (cons `("ISWAP"  ()  ,qubit0 ,qubit1) 150)
+                                  (cons `("ISWAP"  ()  ,qubit1 ,qubit0) 150)))
+                   (:PISWAP (list (cons `("PISWAP" (_) ,qubit0 ,qubit1) 150)
+                                  (cons `("PISWAP" (_) ,qubit1 ,qubit0) 150)))
+                   ;; CNOT typically only acts in one direction
+                   ;; natively. One can swap the direction of CNOT 0 1
+                   ;; by sandwiching it between Hadamard gates. (The
+                   ;; compiler will do this for you elsewhere.)
+                   ;;
+                   ;;     +----------+
+                   ;;     | H 0      |
+                   ;;     | H 1      |    +----------+
+                   ;;     | CNOT 0 1 | == | CNOT 1 0 |
+                   ;;     | H 1      |    +----------+
+                   ;;     | H 0      |
+                   ;;     +----------+
+                   ;;
+                   (:CNOT   (list (cons `("CNOT"   ()  ,qubit0 ,qubit1) 150)))
+                   ;; We need some qubit type to be specified...
                    (otherwise (error "Unknown qubit type.")))
             :into duration-alist
           ;; set up single-type rewriting rules
           :nconc (case current-type
                    (:CZ     (rewriting-rules-for-link-of-CZ-type))
+                   (:CNOT   (rewriting-rules-for-link-of-CNOT-type))
                    (:CPHASE (rewriting-rules-for-link-of-CPHASE-type))
                    (:ISWAP  (rewriting-rules-for-link-of-ISWAP-type))
                    (:PISWAP (rewriting-rules-for-link-of-PISWAP-type)))
@@ -220,6 +289,10 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
             :into rewriting-rules
           ;; set up compilation methods
           :nconc (cond
+                   ((and (eql ':CNOT current-type)
+                         (not (find ':CPHASE higher-precedence))
+                         (not (find ':CZ higher-precedence)))
+                    (list (build-CZ-to-CNOT-translator qubit0 qubit1)))
                    ((and (eql ':CZ current-type)
                          (not (find ':CPHASE higher-precedence))
                          (not (find ':CZ     higher-precedence)))
@@ -239,14 +312,13 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
                    (nconc duration-alist (gethash "duration-alist" misc-data)))
              (setf (hardware-object-rewriting-rules obj)
                    (make-array (length rewriting-rules)
-                               :fill-pointer t
+                               :adjustable t
                                :initial-contents rewriting-rules))
              (loop :for method :in compilation-methods
                    :do (vector-push-extend method
                                            (hardware-object-compilation-methods obj))))
     ;; set up the basic optimal 2Q compiler
-    (vector-push-extend (lambda (instr)
-                          (optimal-2q-compiler instr :target type))
+    (vector-push-extend (optimal-2q-compiler-for type)
                         (hardware-object-compilation-methods obj))
     ;; return the qubit
     obj))
@@ -359,6 +431,10 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
       (vector-push-extend (lambda (instr)
                             (PISWAP-to-native-PISWAPs chip-spec instr))
                           ret))
+    (when (find ':cnot (alexandria:ensure-list architecture))
+      (vector-push-extend (lambda (instr)
+                            (CNOT-to-native-CNOTs chip-spec instr))
+                          ret))
     (cond
       ((optimal-2q-target-meets-requirements architecture ':cz)
        (vector-push-extend #'ucr-compiler ret))
@@ -366,13 +442,18 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
        (vector-push-extend (lambda (instr)
                              (ucr-compiler instr :target ':iswap))
                            ret))
+      ((find ':cnot (alexandria:ensure-list architecture))
+       (vector-push-extend (lambda (instr)
+                             (ucr-compiler instr :target ':cnot))
+                           ret))
       (t
        (error "Can't find a general UCR compiler for this target type.")))
     (vector-push-extend #'state-prep-compiler ret)
     (vector-push-extend #'recognize-ucr ret)
-    (vector-push-extend (lambda (instr)
-                          (optimal-2q-compiler instr :target architecture))
-                        ret)
+    (when (typep architecture 'optimal-2q-target)
+      (vector-push-extend (lambda (instr)
+                            (optimal-2q-compiler instr :target architecture))
+                          ret))
     (vector-push-extend #'qs-compiler ret)
     (setf (chip-specification-generic-compilers chip-spec) ret)))
 
@@ -388,6 +469,7 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
     link))
 
 (defun warm-chip-spec-lookup-cache (chip-spec)
+  "Warm the lookup cache of the CHIP-SPEC. This sets the table of the chip specification as a side effect. See the documentation of the `CHIP-SPECIFICATION' structure."
   (let ((hash (make-hash-table :test 'equalp)))
     (loop :for q :across (chip-spec-qubits chip-spec)
           :for index :from 0
@@ -399,7 +481,8 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
           :for other-pair := (reverse pair)
           :do (setf (gethash pair       hash) (list index l))
               (setf (gethash other-pair hash) (list index l)))
-    (setf (chip-specification-lookup-cache chip-spec) hash)))
+    (setf (chip-specification-lookup-cache chip-spec) hash)
+    nil))
 
 
 
@@ -612,3 +695,27 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
 (defun build-bristlecone-chip ()
   "Create a full 72-qubit Bristlecone CHIP-SPECIFICATION."
   (build-bristlecone-chip-pattern 12 6))
+
+(defun build-ibm-qx5 ()
+  "Create a CHIP-SPECIFICATION matching IBM's qx5 chip."
+  ;; From "16-qubit IBM universal quantum computer can be fully entangled" by Wang, Li, Yin, & Zeng.
+  ;;
+  ;; https://www.nature.com/articles/s41534-018-0095-x
+  ;;
+  ;; Also known as IBM Q 16 Rüschlikon:
+  ;;
+  ;; https://www.research.ibm.com/ibm-q/technology/devices/
+  ;;
+  ;; accessed 11 Jan 2019.
+  (let ((chip-spec (make-chip-specification
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector)))
+        (nqubits 16)
+        (links '((1 2)  (2 3)   (3 4)   (5 4)   (6 5)   (6 7)   (8 7)
+                 (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
+                 (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
+    (install-generic-compilers chip-spec ':cnot)
+    (loop :repeat nqubits :do
+      (adjoin-hardware-object (build-qubit) chip-spec))
+    (loop :for (control target) :in links :do
+      (install-link-onto-chip chip-spec control target :architecture '(:CNOT)))
+    chip-spec))

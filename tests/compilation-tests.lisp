@@ -111,3 +111,95 @@
       (check-type u magicl:matrix)
       (quil::scale-out-matrix-phases u m)
       (fiasco-assert-matrices-are-equal m u))))
+
+(deftest test-cnot->cnot ()
+  (let ((progm (parse-quil-string "CNOT 1 0"))
+        (chip (quil::build-ibm-qx5)))
+    (let* ((comp (compiler-hook progm chip))
+           (code (remove-if-not (lambda (isn) (typep isn 'application))
+                                (parsed-program-executable-code comp))))
+      (is (= 1 (length code)))
+      (is (string= "CNOT 1 0" (print-instruction (aref code 0) nil))))))
+
+(deftest test-cnot-flipped-edge ()
+  (let ((progm (parse-quil-string "CNOT 0 1"))
+        (chip (quil::build-ibm-qx5)))
+    (let* ((comp (compiler-hook progm chip))
+           (code (remove-if-not (lambda (isn) (typep isn 'application))
+                                (parsed-program-executable-code comp)))
+           (2q-code (remove-if-not (lambda (isn) (= 2 (length (application-arguments isn))))
+                                   code)))
+      (is (plusp (length code)))
+      (is (= 1 (length 2q-code)))
+      (is (string= "CNOT 1 0" (print-instruction (aref 2q-code 0) nil))))))
+
+(defun application-argument-indicies (app)
+  (mapcar #'qubit-index (application-arguments app)))
+
+(deftest test-cnot-to-native-cnots ()
+  (let* ((cnot-gate (quil::build-gate "CNOT" () 1 15))
+         (chip (quil::build-ibm-qx5))
+         (possible-paths '(((1 2) (2 15) (1 2) (2 15))
+                           ((1 0) (0 15) (1 0) (0 15))))
+         (path (quil::cnot-to-native-cnots chip cnot-gate)))
+    (is (find (mapcar #'application-argument-indicies path) possible-paths
+              :test #'equalp))))
+
+(defun link-nativep (chip-spec)
+  (reduce #'alexandria:disjoin
+          (quil::chip-spec-links chip-spec)
+          :initial-value (constantly t)
+          :key #'quil::hardware-object-native-instructions))
+
+(defun test-rewiring-in-cnot-for (gate-name i j)
+  (let* ((chip (quil::build-ibm-qx5))
+         (sssppp (quil::parse-quil-string (format nil "~A ~D ~D" gate-name i j)))
+         (code (remove-if-not (lambda (isn)
+                                (and (typep isn 'application)
+                                     (= 2 (length (application-arguments isn)))))
+                              (parsed-program-executable-code
+                               (quil::compiler-hook sssppp chip)))))
+    (is (= 1 (length code)))
+    (is (funcall (link-nativep chip) (aref code 0)))))
+
+(deftest test-cnot-rewiring-in-cnot-architecture ()
+  "Test that all CNOTs on each pair of qubits compile into a single CNOT rewired appropriately."
+  (format t "[Test output:")
+  (finish-output)
+  ;; don't let nobody bully you into allocating (2^16)^2 elements
+  (let ((quil::*compress-carefully* nil))
+    (dotimes (i 16)
+      (dotimes (j 16)
+        (unless (= i j)
+          (format t " ~X~X" i j) (finish-output)
+          (test-rewiring-in-cnot-for "CNOT" i j)))))
+  (format t "]"))
+
+(deftest test-cz-compilation-and-rewiring-in-cnot-architecture ()
+  "Test that all CZs on all qubit combinations compile to a single CNOT that's native."
+  (format t "[Test output:")
+  (finish-output)
+  (let ((quil::*compress-carefully* nil))
+   (dotimes (i 16)
+     (dotimes (j 16)
+       (unless (= i j)
+         (format t " ~X~X" i j) (finish-output)
+         (test-rewiring-in-cnot-for "CZ" i j)))))
+  (format t "]"))
+
+(deftest test-absolute-unit-cnot-compilation ()
+  (let* ((chip (quil::build-ibm-qx5))
+         (pp (parse-quil-string "
+# in awe at the size of this lad
+CCNOT 8 9 2
+CNOT 15 4
+CZ 5 7
+CPHASE(pi/8) 1 3
+ISWAP 5 2"))
+         (cp (let ((quil::*compress-carefully* nil))
+               (compiler-hook pp chip)))
+         (2q-code (remove-if-not (lambda (isn)
+                                   (and (typep isn 'application)
+                                        (= 2 (length (application-arguments isn)))))
+                                 (parsed-program-executable-code cp))))
+    (is (every (link-nativep chip) 2q-code))))

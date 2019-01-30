@@ -240,7 +240,7 @@
         ;; we're ready to output the list of compiled instructions. we do case
         ;; analysis to decide whether we need to emit smaller UCRs or just rolls.
         (cond
-          ((and (eql target ':cz)
+          ((and (member target '(:cnot :cz))
                 (= 1 (length averages)))
            (ecase chirality
              (:down
@@ -253,7 +253,7 @@
               ;; in this case, we just emit rolls, encoded with CNOTs
               (list avgroll (cnot) diffroll (cnot)))))
           ;; otherwise, we need to emit shorter UCRs encoded with CNOTs
-          ((eql target ':cz)
+          ((member target '(:cnot :cz))
            (ecase chirality
              (:down
               (list (chiroll ':down averages) (cnot) (chiroll ':up differences)))

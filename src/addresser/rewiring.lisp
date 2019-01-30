@@ -101,21 +101,35 @@ INVERSE."
           (aref (rewiring-l2p rewiring) logical) nil)
     rewiring))
 
+(define-condition missing-rewiring-assignment (error)
+  ((rewiring :initarg :rewiring
+             :reader missing-rewiring-assignment-rewiring
+             :documentation "The rewiring responsible for the error.")
+   (wire :initarg :wire
+         :reader missing-rewiring-assignment-wire
+         :documentation "The wire whose assignment doesn't exist."))
+  (:report (lambda (condition stream)
+             (let ((*print-pretty* nil))
+               (format stream "Rewiring missing assignment for qubit ~A in rewiring ~A"
+                       (missing-rewiring-assignment-wire condition)
+                       (missing-rewiring-assignment-rewiring condition)))))
+  (:documentation "An error signaled if a rewiring is being applied but an assignment is missing."))
+
 (defun apply-rewiring-l2p (rewiring n &key assert-wired)
   "Uses REWIRING to get a physical qubit address from the logical qubit address
 N. When ASSERT-WIRED is T, ensures that the mapping exists."
-  (when assert-wired
-    (assert (aref (rewiring-l2p rewiring) n) (n)
-            "Rewiring missing assignment for qubit: ~a ~a" n rewiring))
-  (aref (rewiring-l2p rewiring) n))
+  (let ((image (aref (rewiring-l2p rewiring) n)))
+    (when (and assert-wired (null image))
+      (error 'missing-rewiring-assignment :wire n :rewiring rewiring))
+    image))
 
 (defun apply-rewiring-p2l (rewiring n &key assert-wired)
   "Uses REWIRING to get a logical qubit address from the physical qubit address
 N. When ASSERT-WIRED is T, ensures that the mapping exists."
-  (when assert-wired
-    (assert (aref (rewiring-p2l rewiring) n) (n)
-            "Rewiring missing assignment for qubit: ~a ~a" n rewiring))
-  (aref (rewiring-p2l rewiring) n))
+  (let ((image (aref (rewiring-p2l rewiring) n)))
+    (when (and assert-wired (null image))
+      (error 'missing-rewiring-assignment :wire n :rewiring rewiring))
+    image))
 
 (defun rewiring-to-permutation-matrix-l2p (rewiring)
   (check-type rewiring full-rewiring)
@@ -171,7 +185,9 @@ N. When ASSERT-WIRED is T, ensures that the mapping exists."
   rewiring)
 
 (defun rewire-l2p-instruction (rewiring instr)
-  "Remaps the resources of INSTRuction in-place to their physical counterparts under REWIRING."
+  "Remaps the resources of INSTRuction in-place to their physical counterparts under REWIRING.
+
+Returns NIL. This mutates the instruction."
   (typecase instr
     (measurement
      (setf (measurement-qubit instr)
@@ -190,7 +206,9 @@ N. When ASSERT-WIRED is T, ensures that the mapping exists."
                                       :assert-wired t))))
     (otherwise
      (error "Requested to rewire ~a, but we don't know how to do this."
-            (print-instruction instr nil)))))
+            (print-instruction instr nil))))
+  ;; Return nil to emphasize side effect.
+  nil)
 
 (defun make-rewiring-from-l2p (l2p)
   "Safely extract a REWIRING from a logical-to-physical array."
