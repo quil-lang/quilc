@@ -190,7 +190,7 @@
 (deftest test-absolute-unit-cnot-compilation ()
   (let* ((chip (quil::build-ibm-qx5))
          (pp (parse-quil-string "
-# in awe of the size of this lad
+# in awe at the size of this lad
 CCNOT 8 9 2
 CNOT 15 4
 CZ 5 7
