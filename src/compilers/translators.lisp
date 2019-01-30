@@ -75,12 +75,17 @@
     (operator-match
       (((("CZ" () q1 q0) instr))
        (cond
+         ;; Prefer the ordering of the CONTROL and TARGET, if that's
+         ;; what we got...
          ((subsetp (list q1 q0) (list control target))
           (list (build-gate "H"    () target)
                 (build-gate "CNOT" () control target)
                 (build-gate "H"    () target)))
+         ;; Otherwise just use the specified ordering.
          (t
-          (give-up-compilation))))
+          (list (build-gate "H"    () q0)
+                (build-gate "CNOT" () q1 q0)
+                (build-gate "H"    () q0)))))
       (_
        (give-up-compilation)))))
 
