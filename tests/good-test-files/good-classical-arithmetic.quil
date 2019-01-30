@@ -1,0 +1,15 @@
+# make sure arithmetic in classical instructions is fine
+#
+# From issue QVM-47
+DECLARE b BIT
+DECLARE theta REAL
+
+MOVE theta -3.14
+MOVE theta -pi
+MOVE theta -pi/2
+MOVE theta ((2*pi)+1)/0.5
+
+LT b theta -3.14
+LT b theta -pi
+LT b theta -pi/2
+LT b theta ((2*pi)+1)/0.5

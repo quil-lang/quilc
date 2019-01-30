@@ -1,0 +1,6 @@
+# measurements
+
+DECLARE ro BIT
+
+MEASURE 0
+MEASURE 1 ro[0]

@@ -1,0 +1,9 @@
+# DEFGATES w/params.
+
+DEFGATE CPHASE(%theta):
+    1, 0, 0, 0
+    0, 1, 0, 0
+    0, 0, 1, 0
+    0, 0, 0, cis(pi+%theta)
+
+CPHASE(1.0) 0 1

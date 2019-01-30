@@ -1,0 +1,3 @@
+# pragma with freeform string but no ident
+
+PRAGMA "x"

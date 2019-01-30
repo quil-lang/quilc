@@ -1,0 +1,4 @@
+# unused parameter in gate definition
+DEFGATE FOO(%a):
+    1.0, 0.0
+    0.0, 1.0

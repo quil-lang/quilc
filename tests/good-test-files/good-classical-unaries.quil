@@ -1,0 +1,7 @@
+# test parsing all classical unaries
+
+DECLARE ro BIT[4]
+DECLARE angle REAL
+
+NOT ro[3]
+NEG angle[0]

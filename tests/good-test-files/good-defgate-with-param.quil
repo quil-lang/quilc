@@ -1,0 +1,7 @@
+# defgate with param
+
+DEFGATE BASIC(%alpha):
+    1, 0
+    0, %alpha
+
+BASIC(1.0) 1

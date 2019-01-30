@@ -1,0 +1,8 @@
+# Fully general parametric gate with arg.
+
+DEFCIRCUIT EULER(%alpha, %beta, %gamma) q:
+    RX(%alpha) q
+    RY(%beta)  q
+    RZ(%gamma) q
+
+EULER(pi, 2*pi, 3*pi/2) 0

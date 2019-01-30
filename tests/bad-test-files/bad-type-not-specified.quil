@@ -1,0 +1,3 @@
+# offset type not specified
+DECLARE a OCTET
+DECLARE b BIT SHARING a OFFSET 1

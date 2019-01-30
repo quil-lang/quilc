@@ -1,0 +1,24 @@
+DECLARE ro BIT[2]
+
+DEFCIRCUIT TELEPORT A q B:
+    # Bell pair
+    H        A
+    CNOT     A B
+    
+    # Teleport
+    CNOT     q A
+    H        q
+    MEASURE  q ro[0]
+    MEASURE  A ro[1]
+    
+    # Classically communicate measurements
+    JUMP-UNLESS @SKIP ro[1]
+    X B
+    LABEL @SKIP
+    JUMP-UNLESS @END ro[0]
+    Z B
+    LABEL @END
+
+# If Alice's qubits are 0 and 1
+# and Bob's is 5
+TELEPORT 0 1 5

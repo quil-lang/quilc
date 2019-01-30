@@ -1,0 +1,34 @@
+% root: developer-guide.tex
+
+\usepackage{shortvrb}
+\usepackage{amsthm}
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\newtheorem*{example}{Example}
+
+\setcounter{tocdepth}{1}
+
+% stuff relevant to canonical_representation.tex
+
+\usepackage{algorithm}
+\usepackage{algpseudocode, caption}
+\usepackage{tabularx}
+\usepackage{amsmath}%
+\usepackage[margin=1in]{geometry}
+\renewcommand{\texttt}[1]{%
+  \begingroup
+  \ttfamily
+  \begingroup\lccode`~=`/\lowercase{\endgroup\def~}{/\discretionary{}{}{}}%
+  \begingroup\lccode`~=`[\lowercase{\endgroup\def~}{[\discretionary{}{}{}}%
+  \begingroup\lccode`~=`.\lowercase{\endgroup\def~}{.\discretionary{}{}{}}%
+  \catcode`/=\active\catcode`[=\active\catcode`.=\active
+  \scantokens{#1\noexpand}%
+  \endgroup
+}
+
+\usepackage{cleveref}
+
+\MakeShortVerb{\`}
+
+\newcommand{\todo}[1]{\textbf{TODO:} #1}

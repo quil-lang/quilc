@@ -1,0 +1,4 @@
+# parent of a declare is itself
+
+DECLARE x BIT SHARING x
+NOT x

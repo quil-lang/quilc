@@ -1,0 +1,4 @@
+CNOT 2 3
+CNOT 3 1
+CNOT 2 4
+CNOT 4 1

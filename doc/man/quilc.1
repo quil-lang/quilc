@@ -1,0 +1,172 @@
+.TH QUILC 1 "24 September 2018" "0.13.0 (cl-quil: 0.19.0) [e9b41e3]"
+.SH NAME
+quilc \- an optimizing, architecture-independent Quil compiler
+.SH SYNOPSIS
+
+quilc <options>
+
+.SH DESCRIPTION
+The Rigetti Quil compiler, quilc, is an optimizing compiler for
+Quil. It takes a general Quil program along with a qubit architecture,
+called an ISA, and produces another Quil program that is executable on
+that architecture. The compiler will also attempt to optimize the
+program by producing fewer gates and shorter gate depths. The compiler
+may either be run as a server which takes requests (as is used with
+PyQuil), or it may be run as a batch program reading from standard
+input.
+
+Server Mode runs the compiler as an HTTP server, taking simple POST
+requests with JSON payloads which are known to the companion library
+PyQuil.
+.SH OPTIONS
+.IP "-S, --server"
+(Server Mode) Run the compiler in Server Mode. Start an HTTP server and
+process HTTP API calls. To stop the server, use Ctrl-C.
+.IP "-p <port>, --port <port>"
+(Server Mode) Run quilc in server mode on port <port>.
+.IP "-h, --help"
+Show the help message.
+.IP "-v, --version"
+Show the version.
+.IP "--isa <string>"
+Compile for the qubit architecture defined by <string>, which can be
+either 8Q, 20Q, 16QMUX, bristlecone, or a path to a QPU description file.
+.IP "-P, --protoquil"
+Prescribe that the input and output must be ProtoQuil, which is Quil
+that is comprised of gates and measurements, with no control flow.
+.IP "-d, --compute-gate-depth"
+Print a calculated gate depth for the provided circuit as an appended
+Quil comment. (Requires -P.)
+.IP "-2, --compute-2Q-gate-depth"
+Print a calculated multiqubit gate depth for the provided circuit as
+an appended Quil comment. (Requires -P. Ignores the blacklist and
+whitelist.)
+.IP "--compute-gate-volume"
+Print a calculated gate volume for the provided circuit as an appended
+Quil comment. (Requires -P.)
+.IP "-r, --compute-runtime"
+Print a calculated estimated runtime for the provided circuit as an
+appended Quil comment. (Requires -P.)
+.IP "-f, --compute-fidelity"
+Print a calculated estimated compiled circuit fidelity for the
+provided circuit as an appended Quil comment. (Requires -P.)
+.IP "-u, --compute-unused-qubits"
+Print a list of unused qubits as an appended Quil comment. (Requires
+-P.)
+.IP "-t, --show-topological-overhead"
+Print the number of SWAP gates incurred for topological reasons for
+the provided circuit as an appended Quil comment. (Requires -P.)
+.IP "--gate-blacklist <gate-list>"
+When calculating statistics, ignore the gates present in the
+comma-separated list of names of <gate-list>.
+.IP "--gate-whitelist <gate-list>"
+When calculating statistics, consider only the gates present in the
+comma-separated list of names of <gate-list>.
+.IP "--time-limit <limit-ms>"
+(Server Mode) Limit the amount of time for a single request to
+approximately <limit-ms> milliseconds. By default, this value is 0,
+which indicates an unlimited amount of time is allowed.
+.IP "--without-pretty-printing"
+Disable pretty printing of numerical quantities (e.g., multiples of
+pi) in compiled output.
+.IP "--prefer-gate-ladders"
+Use gate ladders, instead of the SWAP gate, to implement long-ranged
+gates, when possible.
+.IP "-m, --compute-matrix-reps"
+Print and verify the matrix representation of a compiled ProtoQuil
+program. Verification is done by checking that the matrix
+representation of the output program matches the matrix representation
+of the input program. (Requires -P. Note that this is a very expensive
+operation.)
+.IP "--enable-state-prep-reductions"
+Perform program optimizations by assuming that the quantum state
+starts in the zero state.
+.SH HTTP API
+In Server Mode, the QVM accepts a number of POST requests over HTTP to
+accomplish tasks. In this section, we describe each such request.
+
+(The authors are aware that the usage pattern described isn't making
+use of standard REST conventions.)
+
+The payload of the POST request is always a JSON object (i.e.,
+dictionary).
+
+Compile a program \- Endpoint: /
+.RS
+To compile a Quil program, supply a JSON object with the following
+keys:
+
+    - The value of "uncompiled-quil" or "quil-instructions" (in order
+      of precendence) should be a Quil program in a string.
+
+    - The value of "target-device" should be a device specification.
+
+Returned will be a JSON object with the following keys:
+
+    - The value of "compiled-quil" will be the compiled Quil program
+      as a string.
+
+    - The value of "metadata" will be a collection of statistics about
+      the program that was compiled.
+.RE
+
+Generate a randomized benchmarking sequence \- Endpoint: /rb
+.RS
+The compiler is able to generate uniformly random sequences of
+Clifford gates, along with their inversions, for use with randomized
+benchmarking. The request takes up to four keys:
+
+    - The value of "depth" is the length of the sequence to generate
+      (i.e., the circuit depth).
+
+    - The value of "qubits" is the number of qubits to generate a
+      sequence for. (Currently supported is 1 or 2.)
+
+    - The value of "gateset", which is a list of unitary Quil
+      instructions that represent the gate set which acts as a
+      (possibly over-determined) collection of generators of the
+      Clifford group. The behavior of a non-generating set is
+      unspecified.
+
+    - Optionally, the value of "seed" which is a positive integer
+      acting as the random number generator seed.
+
+Returned will be a list of elements of the generating set representing
+the randomized benchmarking sequence.
+.RE
+
+Apply a Clifford element \- Endpoint: /apply-clifford
+.RS
+The compiler is able to efficiently conjugate an element of the Pauli
+group by an arbitrary element of the Clifford group. (Recall that
+Clifford group elements stabilize the Pauli group.) The request takes
+up to ??? keys:
+
+    - The value of "clifford" is a Quil program represented as a
+      string. (The consequences are undefined if the program does not
+      represent an element of the Clifford group.)
+
+    - The value of "pauli" is a list of two elements. Each element is
+      itself a list of equal size, where the first list is a list of
+      qubit indexes, and the second list is a list of Pauli strings
+      (i.e., "I", "X", "Y", and "Z"). For instance, [[1,2],["X","Z"]]
+      represents a Pauli operator with Z acting on qubit 1 and X
+      acting on qubit 2.
+
+Returned will be a list of two elements, the first being the the phase
+factor (i.e., 1, i, -1, -i) and the second being the resulting Pauli
+element.
+.RE
+
+.SH EXAMPLES
+quilc --isa "8Q" < file.quil
+.RS
+Compile a Quil file (printing the result to stdout) for an eight qubit ring.
+.RE
+
+.SH SUPPORT
+Contact <support@rigetti.com> or Robert Smith <robert@rigetti.com>.
+.SH COPYRIGHT
+Copyright (c) 2016-2019 Rigetti Computing
+.SH SEE ALSO
+qvm(1)
