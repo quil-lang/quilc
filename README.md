@@ -156,7 +156,7 @@ Copyright (c) 2016-2019 Rigetti Computing.
 The server-mode provides to high-level languages such as Python a way
 to communicate with the Quil compiler, thus enabling high-level
 abstractions and tools that are not directly available in Quil. The
-`pyquil` library provides such an interface to `quilc`.
+[`pyquil`](https://github.com/rigetti/pyquil) library provides such an interface to `quilc`.
 
 # Get involved!
 
