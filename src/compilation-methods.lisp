@@ -7,21 +7,44 @@
 
 ;;; A compilation method is a function with inputs
 ;;;   * a resolved gate-application object
-;;;   * keyword arguments that further specialize the behavior of the method
-;;; and outputs
-;;;   a list of Quil instructions which encode the matrix up to global phase
-;;;   OR the signal COMPILER-DOES-NOT-APPLY, which means that the supplied
-;;;      instruction is outside the input domain of the method.  The preferred
-;;;      method for this is calling GIVE-UP-COMPILATION, so that other quilc
-;;;      authors have the opportunity to install more complicated error handling.
-;;;   OR an error, which means that the compilation routine experienced an error.
+;;;
+;;;   * keyword arguments that further specialize the behavior of the
+;;;     method and outputs a list of Quil instructions which encode
+;;;     the matrix up to global phase
+;;;
+;;;   OR the signal of (a subcondition of) COMPILER-DOES-NOT-APPLY,
+;;;      which means that the supplied instruction is cannot or
+;;;      "should" not be compiled with this method. The preferred
+;;;      method for signalling a condition is calling
+;;;      GIVE-UP-COMPILATION, so that other quilc authors have the
+;;;      opportunity to install more complicated error handling.
+;;;
+;;;   OR an error, which means that the compilation routine
+;;;      experienced an error.
+;;;
+;;; Compilation methods should bring you *closer* to some desired
+;;; output. If it doesn't, or if it can't, one of these conditions
+;;; should be signalled.
 
 (define-condition compiler-does-not-apply (serious-condition)
   ()
-  (:documentation "This condition is signaled by a compilation method when the input matrix is outside the input domain of the method."))
+  (:documentation "A condition that is signalled anytime a compiler doesn't apply. In general, a sub-condition should be preferred over signalling this one."))
 
-(defun give-up-compilation ()
-  (error 'compiler-does-not-apply))
+(define-condition compiler-invalid-domain (compiler-does-not-apply)
+  ()
+  (:documentation "This is signaled by a compilation method when the input matrix is outside the input domain of the method."))
+
+(define-condition compiler-acts-trivially (compiler-does-not-apply)
+  ()
+  (:documentation "This is signaled when a compiler is technically applicable, but would act as an identity."))
+
+
+
+(defun give-up-compilation (&key (because ':invalid-compiler))
+  (ecase because
+    (:invalid-domain (error 'compiler-invalid-domain))
+    (:acts-trivially (error 'compiler-acts-trivially))
+    (:unknown        (error 'compiler-does-not-apply))))
 
 
 ;;; Core routines governing how a chip-specification's compiler list is walked
