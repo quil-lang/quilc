@@ -278,7 +278,6 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
                     (:iswap    (string= name "ISWAP"))
                     (:piswap   (string= name "PISWAP"))
                     (:cphase   (string= name "CPHASE"))
-                    (:cnot     (string= name "CNOT"))
                     (otherwise nil))))
            (some #'good requirements)))))
 
