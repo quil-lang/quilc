@@ -111,3 +111,80 @@
       (check-type u magicl:matrix)
       (quil::scale-out-matrix-phases u m)
       (fiasco-assert-matrices-are-equal m u))))
+
+(deftest test-cnot->cnot ()
+  (let ((progm (parse-quil-string "CNOT 1 0"))
+        (chip (quil::build-ibm-qx5)))
+    (let* ((comp (compiler-hook progm chip))
+           (code (remove-if-not (lambda (isn) (typep isn 'application))
+                                (parsed-program-executable-code comp))))
+      (is (= 1 (length code)))
+      (is (string= "CNOT 1 0" (print-instruction (aref code 0) nil))))))
+
+(deftest test-cnot-flipped-edge ()
+  (let ((progm (parse-quil-string "CNOT 0 1"))
+        (chip (quil::build-ibm-qx5)))
+    (let* ((comp (compiler-hook progm chip))
+           (code (remove-if-not (lambda (isn) (typep isn 'application))
+                                (parsed-program-executable-code comp)))
+           (2q-code (remove-if-not (lambda (isn) (= 2 (length (application-arguments isn))))
+                                   code)))
+      (is (plusp (length code)))
+      (is (= 1 (length 2q-code)))
+      (is (string= "CNOT 1 0" (print-instruction (aref 2q-code 0) nil))))))
+
+(defun application-argument-indicies (app)
+  (mapcar #'qubit-index (application-arguments app)))
+
+(deftest test-cnot-to-native-cnots ()
+  (let* ((cnot-gate (quil::build-gate "CNOT" () 1 15))
+         (chip (quil::build-ibm-qx5))
+         (possible-paths '(((1 2) (2 15) (1 2) (2 15))
+                           ((1 0) (0 15) (1 0) (0 15))))
+         (path (quil::cnot-to-native-cnots chip cnot-gate)))
+    (is (find (mapcar #'application-argument-indicies path) possible-paths
+              :test #'equalp))))
+
+(defun link-nativep (chip-spec)
+  (reduce #'alexandria:disjoin
+          (quil::chip-spec-links chip-spec)
+          :initial-value (constantly t)
+          :key #'quil::hardware-object-native-instructions))
+
+(defun test-cnot-rewiring-for (i j)
+  (let* ((chip (quil::build-ibm-qx5))
+         (sssppp (quil::parse-quil-string (format nil "CNOT ~D ~D" i j)))
+         (code (remove-if-not (lambda (isn) (typep isn 'application))
+                              (parsed-program-executable-code
+                               (quil::compiler-hook sssppp chip)))))
+    (is (= 1 (length code)))
+    (is (funcall (link-nativep chip) (aref code 0)))))
+
+(deftest test-cnot-1-9-rewiring ()
+  (test-cnot-rewiring-for 1 9))
+
+(deftest test-cnot-9-3-rewiring ()
+  (test-cnot-rewiring-for 9 3))
+
+(deftest test-cnot-rewiring-randomly ()
+  (let* ((chip (quil::build-ibm-qx5))
+         (nativep (link-nativep chip))
+         (make-prog (lambda (i j)                      
+                      (when (= i j)
+                        (setf i (mod (1+ i) 16)))
+                      (format t "    Testing CNOT ~D ~D~%" i j)
+                      (finish-output)
+                      (quil::parse-quil-string
+                       (format nil "CNOT ~D ~D" i j)))))
+    (format t "[Test output:")
+    (finish-output)
+    (loop :repeat 5 s:do      
+      (let* ((2q-code (remove-if-not
+                       (lambda (isn) (and (typep isn 'application)
+                                     (= 2 (length (application-arguments isn)))))
+                       (quil::parsed-program-executable-code
+                        (quil::compiler-hook
+                         (funcall make-prog (random 16) (random 16))
+                         chip)))))
+        (is (every nativep 2q-code))))
+    (format t "]")))

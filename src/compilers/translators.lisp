@@ -240,29 +240,37 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
      (give-up-compilation))))
 
 (defun CNOT-to-native-CNOTs (chip-spec cnot-gate)
-  (operator-match
-    (((("CNOT" () q0 q1) cnot-gate))
-     (labels
-         ((build-CNOT-string (index-list)
-            (let* ((oriented-qubits (mapcar #'qubit index-list))
-                   (q0 (first oriented-qubits))
-                   (q1 (second oriented-qubits)))
-              (cond
-                ;; base case
-                ((= 2 (length index-list))
-                 (list (build-gate "CNOT" '() q0 q1)))
-                ;; recursive case
-                (t
-                 (let ((temp-string (build-CNOT-string (rest index-list)))
-                       (gate (list (build-gate "CNOT" '() q0 q1))))
-                   (append gate temp-string gate temp-string)))))))
-       (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
-         (unless computed-path
-           (give-up-compilation))
-         (build-CNOT-string computed-path))))
-    (_
-     (give-up-compilation))))
-
+  ;; XXX This does not account for directedness of
+  ;; instructions. Should we fix this in *this* function or elsewhere.
+  (unless (operator-match-p cnot-gate '("CNOT" () _ _))
+    (give-up-compilation))
+  (let* ((q1 (qubit-index (first (application-arguments cnot-gate))))
+         (q0 (qubit-index (second (application-arguments cnot-gate))))
+         ;; find a shortest path between the two qubits in the swap gate
+         (computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
+    (labels
+        ((build-CNOT-string (index-list prev-qubit)
+           (let* ((unoriented-qubit-indices (coerce (chip-spec-qubits-on-link chip-spec (first index-list))
+                                                    'list))
+                  (oriented-qubits (if (= prev-qubit (first unoriented-qubit-indices))
+                                       (mapcar #'qubit unoriented-qubit-indices)
+                                       (mapcar #'qubit (reverse unoriented-qubit-indices)))))
+             (cond
+               ;; base case
+               ((= 1 (length index-list))
+                (list (apply #'build-gate "CNOT" '() oriented-qubits)))
+               ;; recursive case
+               (t
+                (let ((temp-string (build-CNOT-string (rest index-list)
+                                                      (qubit-index (second oriented-qubits)))))
+                  (append
+                   (list
+                    (apply #'build-gate "CNOT" '() oriented-qubits))
+                   temp-string
+                   (list
+                    (apply #'build-gate "CNOT" '() oriented-qubits))
+                   temp-string)))))))
+      (build-CNOT-string computed-path q1))))
 
 (defun CZ-to-native-CZs (chip-spec cz-gate)
   (operator-match

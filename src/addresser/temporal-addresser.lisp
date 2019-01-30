@@ -827,7 +827,7 @@ Optional arguments:
                             (print-instruction instr nil)))
                    (t
                     (format *compiler-noise-stream*
-                            "GREEDY-TEMPORAL-ADDRESSING: Rewired ~A ==> ~A"
+                            "GREEDY-TEMPORAL-ADDRESSING: Rewired ~A ==> ~A~%"
                             (print-instruction instr nil)
                             (print-instruction rewired-instr nil))))
 
