@@ -20,12 +20,12 @@ in most other programming languages).
 
 ## `CL-QUIL`
 
-`CL-QUIL` is the library that implements lexing, parsing, and compiling
+`CL-QUIL` is the library that implements parsing and compiling
 of Quil code. The code can be found under `./src/`.
 
 ### Usage
 
-Follow the instructions in QVM's [docs/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
+Follow the instructions in QVM's [docs/lisp-setup.md](doc/lisp-setup.md) to satisfy the
 dependencies required to load the `CL-QUIL` library. Afterwhich, the
 library can be loaded
 
@@ -63,7 +63,7 @@ targeting the native gates specified by the ISA.
 
 Prerequisites to building `quilc` are:
 
-1. Standard unix build tools
+1. Standard UNIX build tools
 2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
 4. [buildapp](https://github.com/xach/buildapp): Builds executable binaries from Common Lisp software
