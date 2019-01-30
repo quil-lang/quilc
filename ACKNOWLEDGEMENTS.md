@@ -82,24 +82,24 @@ porting & packaging `quilc` for Windows. Lauren Capelluto contributed
 the implementation of arithmetic rewriting.
 
 CL-QUIL and quilc benefited extensively from internal testers at
-Rigetti, as well as the thousands of users of Forest and Quantum Cloud
-Services.
+Rigetti, as well as the thousands of users of Quantum Cloud Services.
 
 ## Credits Roll
 
 For security and privacy, the git history has been removed. The
-contributors of the project, in order of their commit count according
-to `git shortlog --summary --numbered`, _prior to 2019_ were:
+contributors of the project, in approximately the order of their
+commit count according to `git shortlog --summary --numbered`, prior
+to open-sourcing were:
 
 * **Eric Peterson** (decomposition and optimization framework, too many contributions to count)
 * **Robert Smith** (parser, CFG generation, symplectic representations)
+* **Mark Skilbeck** (`DAGGER` expansion, benchmarking, Windows port, Google & IBM architecture ports)
 * **Peter Karalekas** (release management, automated testing, versioning, and deployment)
 * **Nikolas Tezak** (Pauli and Clifford group algebra, gate resolution, `PRAGMA` formalization)
 * **Zach Beane** (porting to CCL & LispWorks, release management, Quicklisp & `buildapp`)
 * **Corwin de Boor** (resource tracking, implementation and comparative study of rewiring schemes)
 * **Lauren Capelluto** (arithmetic rewriting)
 * **Erik Davis** (optimization of resource tracking)
-* **Mark Skilbeck** (`DAGGER` expansion, benchmarking, Windows port)
 * **Aaron Vontell** (CFG optimizations, gate fusion)
 * **Anthony Polloreno** (Clifford groups, randomized benchmarking, SWAP quotient)
 * **Chris Osborn** (dead qubit detection)
