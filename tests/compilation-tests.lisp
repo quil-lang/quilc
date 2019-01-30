@@ -151,40 +151,35 @@
           :initial-value (constantly t)
           :key #'quil::hardware-object-native-instructions))
 
-(defun test-cnot-rewiring-for (i j)
+(defun test-rewiring-in-cnot-for (gate-name i j)
   (let* ((chip (quil::build-ibm-qx5))
-         (sssppp (quil::parse-quil-string (format nil "CNOT ~D ~D" i j)))
-         (code (remove-if-not (lambda (isn) (typep isn 'application))
+         (sssppp (quil::parse-quil-string (format nil "~A ~D ~D" gate-name i j)))
+         (code (remove-if-not (lambda (isn)
+                                (and (typep isn 'application)
+                                     (= 2 (length (application-arguments isn)))))
                               (parsed-program-executable-code
                                (quil::compiler-hook sssppp chip)))))
     (is (= 1 (length code)))
     (is (funcall (link-nativep chip) (aref code 0)))))
 
-(deftest test-cnot-1-9-rewiring ()
-  (test-cnot-rewiring-for 1 9))
+(deftest test-cnot-rewiring-in-cnot-architecture ()
+  "Test that all CNOTs on each pair of qubits compile into a single CNOT rewired appropriately."
+  (format t "[Test output:")
+  (finish-output)
+  (dotimes (i 16)
+    (dotimes (j 16)
+      (unless (= i j)
+        (format t " ~X~X" i j)
+        (test-rewiring-in-cnot-for "CNOT" i j))))
+  (format t "]"))
 
-(deftest test-cnot-9-3-rewiring ()
-  (test-cnot-rewiring-for 9 3))
-
-(deftest test-cnot-rewiring-randomly ()
-  (let* ((chip (quil::build-ibm-qx5))
-         (nativep (link-nativep chip))
-         (make-prog (lambda (i j)                      
-                      (when (= i j)
-                        (setf i (mod (1+ i) 16)))
-                      (format t "    Testing CNOT ~D ~D~%" i j)
-                      (finish-output)
-                      (quil::parse-quil-string
-                       (format nil "CNOT ~D ~D" i j)))))
-    (format t "[Test output:")
-    (finish-output)
-    (loop :repeat 5 :do
-      (let* ((2q-code (remove-if-not
-                       (lambda (isn) (and (typep isn 'application)
-                                     (= 2 (length (application-arguments isn)))))
-                       (quil::parsed-program-executable-code
-                        (quil::compiler-hook
-                         (funcall make-prog (random 16) (random 16))
-                         chip)))))
-        (is (every nativep 2q-code))))
-    (format t "]")))
+(deftest test-cz-compilation-and-rewiring-in-cnot-architecture ()
+  "Test that all CZs on all qubit combinations compile to a single CNOT that's native."
+  (format t "[Test output:")
+  (finish-output)
+  (dotimes (i 16)
+    (dotimes (j 16)
+      (unless (= i j)
+        (format t " ~X~X" i j)
+        (test-rewiring-in-cnot-for "CZ" i j))))
+  (format t "]"))
