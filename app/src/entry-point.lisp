@@ -56,9 +56,9 @@
     (("enable-state-prep-reductions") :type boolean :optional t :documentation "assume that the program starts in the ground state")
     (("protoquil" #\P) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
-    (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server")
+    (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server *and* an RPCQ server. ignores --port and uses 6000 and 5555 respectively.")
     (("server-mode-rpc" #\R) :type boolean :optional t :documentation "run as an RPCQ server")
-    (("port" #\p) :type integer :optional t :documentation "port to run the server on")
+    (("port" #\p) :type integer :optional t :documentation "port to run the RPCQ server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
     (("version" #\v) :type boolean :optional t :documentation "print version information")
     (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")
@@ -256,91 +256,103 @@
   
   ;; at this point we know we're doing something. strap in LAPACK.
   (magicl:with-blapack
-    (reload-foreign-libraries)
+   (reload-foreign-libraries)
     
-    (cond
-      ((and server-mode-http server-mode-rpc)
-       (format t "quilc can only run in either RPCQ or HTTP server mode. Select only one.")
-       (uiop:quit 0))
-      ;; web server mode requested
-      (server-mode-http
-       ;; null out the streams
-       (setf *json-stream* (make-broadcast-stream)
-             *human-readable-stream* (make-broadcast-stream)
-             *quil-stream* (make-broadcast-stream))
-       
-       ;; configure the server
-       (when port
-         (setf *server-port* port))
-       
-       ;; launch the polling loop
-       (show-banner)
-       (format t "~%
+   (cond
+    ;; web server mode requested.
+    ;; currently provides both web and RPCQ server as a transition.
+    (server-mode-http
+     ;; null out the streams
+     (setf *json-stream* (make-broadcast-stream)
+           *human-readable-stream* (make-broadcast-stream)
+           *quil-stream* (make-broadcast-stream))
+     
+     ;; launch the polling loop
+     (show-banner)
+     (format t "~%
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
-future, it will be removed.  You're advised to modify your client code to talk
-to the RPCQ version instead.
+future, it will be removed.  In the meanwhile, we are launching *both* an HTTP
+server and an RPCQ server.  You're advised to modify your client code to talk
+to the RPCQ version instead, so that it continues to operate when we disable the
+HTTP server for good.
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ~%~%")
-       (start-web-server))
+     
+     (when port
+       (format t "WARNING: -p and -S are incompatible. Dropping -p.~%~%"))
+     
+     ;; start the RPCQ server in parallel
+     (let ((logger (make-instance 'cl-syslog:rfc5424-logger
+                                  :app-name *program-name*
+                                  :facility ':local0
+                                  :log-writer
+                                  #+windows (cl-syslog:stream-log-writer)
+                                  #-windows (cl-syslog:tee-to-stream
+                                             (cl-syslog:syslog-log-writer "quilc" :local0)))))
+       (cl-syslog:rfc-log (logger :info "Launching quilc.")
+                          (:msgid "LOG0001"))
+       (bt:make-thread (lambda () (start-rpc-server :port 5555
+                                                    :logger logger))))
+       
+     (start-web-server))
       
-      ;; RPCQ server mode requested
-      (server-mode-rpc
-       ;; null out the streams
-       (setf *json-stream* (make-broadcast-stream)
-             *human-readable-stream* (make-broadcast-stream)
-             *quil-stream* (make-broadcast-stream))
+    ;; RPCQ server mode requested
+    (server-mode-rpc
+     ;; null out the streams
+     (setf *json-stream* (make-broadcast-stream)
+           *human-readable-stream* (make-broadcast-stream)
+           *quil-stream* (make-broadcast-stream))
        
-       ;; configure the server
-       (if port
-           (setf *server-port* port)
-           (setf *server-port* 5555))
-       
+     ;; configure the server
+     (unless port
+       (setf port 5555)
+         
        ;; launch the polling loop
-       (show-banner)
-       (let ((logger (make-instance 'cl-syslog:rfc5424-logger
-                                    :app-name *program-name*
-                                    :facility ':local0
-                                    :log-writer
-                                    #+windows (cl-syslog:stream-log-writer)
-                                    #-windows (cl-syslog:tee-to-stream
-                                               (cl-syslog:syslog-log-writer "quilc" :local0)))))
-         (cl-syslog:rfc-log (logger :info "Launching quilc.")
-           (:msgid "LOG0001"))
-         (start-rpc-server :port *server-port*
-                           :logger logger)))
+       (show-banner))
+     (let ((logger (make-instance 'cl-syslog:rfc5424-logger
+                                  :app-name *program-name*
+                                  :facility ':local0
+                                  :log-writer
+                                  #+windows (cl-syslog:stream-log-writer)
+                                  #-windows (cl-syslog:tee-to-stream
+                                             (cl-syslog:syslog-log-writer "quilc" :local0)))))
+       (cl-syslog:rfc-log (logger :info "Launching quilc.")
+                          (:msgid "LOG0001"))
+       (start-rpc-server :port port
+                         :logger logger)))
       
-      ;; server modes not requested, so continue parsing arguments
+    ;; server modes not requested, so continue parsing arguments
+    (t
+     (cond
+      (json-serialize
+       (setf *json-stream* *standard-output*)
+       (setf *human-readable-stream* (make-broadcast-stream))
+       (setf *quil-stream* (make-broadcast-stream)))
       (t
-       (cond
-         (json-serialize
-          (setf *json-stream* *standard-output*)
-          (setf *human-readable-stream* (make-broadcast-stream))
-          (setf *quil-stream* (make-broadcast-stream)))
-         (t
-          (setf *json-stream* (make-broadcast-stream))
-          (setf *human-readable-stream* *error-output*)
-          (setf *quil-stream* *standard-output*)))
-       (setf *isa-descriptor*
-             (cond
-               ((or (null isa)
-                    (string= isa "8Q"))
-                (quil::build-8Q-chip))
-               ((string= isa "20Q")
-                (quil::build-skew-rectangular-chip 0 4 5))
-               ((string= isa "16QMUX")
-                (quil::build-nQ-trivalent-chip 1 1 8 4))
-               ((string= isa "bristlecone")
-                (quil::build-bristlecone-chip))
-               ((probe-file isa)
-                (quil::read-chip-spec-file isa))
-               (t
-                (error "ISA descriptor does not name a known template or an extant file."))))
-       (setf *verbose*
-             (cond
-               (verbose *human-readable-stream*)
-               (t (make-broadcast-stream))))
-       (run-CLI-mode)))))
+       (setf *json-stream* (make-broadcast-stream))
+       (setf *human-readable-stream* *error-output*)
+       (setf *quil-stream* *standard-output*)))
+     (setf *isa-descriptor*
+           (cond
+            ((or (null isa)
+                 (string= isa "8Q"))
+             (quil::build-8Q-chip))
+            ((string= isa "20Q")
+             (quil::build-skew-rectangular-chip 0 4 5))
+            ((string= isa "16QMUX")
+             (quil::build-nQ-trivalent-chip 1 1 8 4))
+            ((string= isa "bristlecone")
+             (quil::build-bristlecone-chip))
+            ((probe-file isa)
+             (quil::read-chip-spec-file isa))
+            (t
+             (error "ISA descriptor does not name a known template or an extant file."))))
+     (setf *verbose*
+           (cond
+            (verbose *human-readable-stream*)
+            (t (make-broadcast-stream))))
+     (run-CLI-mode)))))
 
 (defun run-CLI-mode ()
   (let* ((program-text (slurp-lines))
