@@ -33,3 +33,22 @@
                  :operator (cl-quil::named-operator "TEST")
                  :arguments (mapcar #'cl-quil::qubit qubit-indices)
                  :gate matrix))
+
+(defun first-column-operator= (mat1 mat2)
+  (multiple-value-bind (mat1 mat2) (quil::matrix-rescale mat1 mat2)
+    (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
+    (quil::matrix-first-column-equality mat1 mat2)))
+
+(defun operator= (mat1 mat2)
+  (multiple-value-bind (mat1 mat2) (quil::matrix-rescale mat1 mat2)
+    (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
+    (quil::matrix-equality mat1 mat2)))
+
+(defun matrix-equals-dwim (mat1 mat2)
+  "Returns true if mat1 is equal to mat2, with the specific notion of equality
+depending on whether *ENABLE-STATE-PREP-COMPRESSION* is enabled."
+  (funcall (if quil::*enable-state-prep-compression*
+               #'first-column-operator=
+               #'operator=)
+           mat1
+           mat2))
