@@ -308,6 +308,7 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                          (not (find ':ISWAP  higher-precedence)))
                     (list #'ISWAP-to-PISWAP)))
             :into compilation-methods
+          :do (push current-type higher-precedence)
           :finally
              (setf (gethash "duration-alist" misc-data)
                    (nconc duration-alist (gethash "duration-alist" misc-data)))
@@ -391,6 +392,7 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                           #'RX-to-ZXZXZ
                           #'euler-compiler)))
             :into compilation-methods
+          :do (push current-type higher-precedence)
           :finally
              (setf (gethash "duration-alist" misc-data)
                    (nconc duration-alist (gethash "duration-alist" misc-data)))
