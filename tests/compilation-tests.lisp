@@ -121,20 +121,26 @@
       (is (= 1 (length code)))
       (is (string= "CNOT 1 0" (print-instruction (aref code 0) nil))))))
 
+(defun application-argument-indicies (app)
+  (mapcar #'qubit-index (application-arguments app)))
+
+(defun program-applications (parsed-prog)
+  (remove-if-not (lambda (isn) (typep isn 'application))
+                 (parsed-program-executable-code parsed-prog)))
+
+(defun program-2q (parsed-prog)
+  (remove-if-not (lambda (isn) (= 2 (length (application-arguments isn))))
+                 (program-applications parsed-prog)))
+
 (deftest test-cnot-flipped-edge ()
   (let ((progm (parse-quil-string "CNOT 0 1"))
         (chip (quil::build-ibm-qx5)))
     (let* ((comp (compiler-hook progm chip))
-           (code (remove-if-not (lambda (isn) (typep isn 'application))
-                                (parsed-program-executable-code comp)))
-           (2q-code (remove-if-not (lambda (isn) (= 2 (length (application-arguments isn))))
-                                   code)))
+           (code (program-applications comp))
+           (2q-code (program-2q-instructions comp)))
       (is (plusp (length code)))
       (is (= 1 (length 2q-code)))
       (is (string= "CNOT 1 0" (print-instruction (aref 2q-code 0) nil))))))
-
-(defun application-argument-indicies (app)
-  (mapcar #'qubit-index (application-arguments app)))
 
 (deftest test-cnot-to-native-cnots ()
   (let* ((cnot-gate (quil::build-gate "CNOT" () 1 15))
@@ -154,11 +160,7 @@
 (defun test-rewiring-in-cnot-for (gate-name i j)
   (let* ((chip (quil::build-ibm-qx5))
          (sssppp (quil::parse-quil-string (format nil "~A ~D ~D" gate-name i j)))
-         (code (remove-if-not (lambda (isn)
-                                (and (typep isn 'application)
-                                     (= 2 (length (application-arguments isn)))))
-                              (parsed-program-executable-code
-                               (quil::compiler-hook sssppp chip)))))
+         (code (program-2q-instructions (quil::compiler-hook sssppp chip))))
     (is (= 1 (length code)))
     (is (funcall (link-nativep chip) (aref code 0)))))
 
@@ -198,8 +200,7 @@ CPHASE(pi/8) 1 3
 ISWAP 5 2"))
          (cp (let ((quil::*compress-carefully* nil))
                (compiler-hook pp chip)))
-         (2q-code (remove-if-not (lambda (isn)
-                                   (and (typep isn 'application)
-                                        (= 2 (length (application-arguments isn)))))
-                                 (parsed-program-executable-code cp))))
+         (2q-code (program-2q-instructions cp)))
+    (is (every (link-nativep chip) 2q-code))))
+
     (is (every (link-nativep chip) 2q-code))))
