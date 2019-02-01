@@ -292,7 +292,8 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                    ((and (eql ':CNOT current-type)
                          (not (find ':CPHASE higher-precedence))
                          (not (find ':CZ higher-precedence)))
-                    (list (build-CZ-to-CNOT-translator qubit0 qubit1)))
+                    (list #'CZ-to-CNOT
+                          #'CNOT-to-flipped-CNOT))
                    ((and (eql ':CZ current-type)
                          (not (find ':CPHASE higher-precedence))
                          (not (find ':CZ     higher-precedence)))
