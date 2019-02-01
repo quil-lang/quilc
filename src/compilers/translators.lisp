@@ -70,24 +70,12 @@
         (build-gate "RY" '(#.(/ pi -2)) q0)
         (build-gate "Z"  ()             q1)))
 
-(defun build-CZ-to-CNOT-translator (control target)
-  (lambda (instr)
-    (operator-match
-      (((("CZ" () q1 q0) instr))
-       (cond
-         ;; Prefer the ordering of the CONTROL and TARGET, if that's
-         ;; what we got...
-         ((subsetp (list q1 q0) (list control target))
-          (list (build-gate "H"    () target)
-                (build-gate "CNOT" () control target)
-                (build-gate "H"    () target)))
-         ;; Otherwise just use the specified ordering.
-         (t
-          (list (build-gate "H"    () q0)
-                (build-gate "CNOT" () q1 q0)
-                (build-gate "H"    () q0)))))
-      (_
-       (give-up-compilation)))))
+(define-translator CNOT-to-flipped-CNOT (("CNOT" () control target) cnot-gate)
+  (list (build-gate "H"    () control)
+        (build-gate "H"    () target)
+        (build-gate "CNOT" () target control) ; !!
+        (build-gate "H"    () control)
+        (build-gate "H"    () target)))
 
 (define-translator iSWAP-to-CNOT (("ISWAP" () q1 q0) iswap-gate)
   (list (build-gate "RY"   '(#.(/ pi 2))   q1)
