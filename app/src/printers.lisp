@@ -13,52 +13,6 @@
                   *human-readable-stream*
                   *json-stream*))
 
-
-(defun print-matrix-representations (initial-l2p processed-quil final-l2p original-matrix)
-  (let* ((initial-l2p (quil::trim-rewiring initial-l2p))
-         (final-l2p (quil::trim-rewiring final-l2p))
-         (raw-new-matrix (quil::make-matrix-from-quil processed-quil))
-         (qubit-count (max (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
-                           (1- (integer-length (magicl:matrix-rows original-matrix)))
-                           (quil::rewiring-length initial-l2p)
-                           (quil::rewiring-length final-l2p)))
-         (wire-out (quil::kq-gate-on-lines (quil::rewiring-to-permutation-matrix-p2l final-l2p)
-                                           qubit-count
-                                           (alexandria:iota (quil::rewiring-length final-l2p) :start (1- (quil::rewiring-length final-l2p)) :step -1)))
-         (wire-in (quil::kq-gate-on-lines (quil::rewiring-to-permutation-matrix-l2p initial-l2p)
-                                          qubit-count
-                                          (alexandria:iota (quil::rewiring-length initial-l2p) :start (1- (quil::rewiring-length initial-l2p)) :step -1)))
-         (stretched-raw-new-matrix (quil::kq-gate-on-lines raw-new-matrix
-                                                           qubit-count
-                                                           (alexandria:iota (1- (integer-length (magicl:matrix-rows raw-new-matrix)))
-                                                                            :start (- (integer-length (magicl:matrix-rows raw-new-matrix)) 2)
-                                                                            :step -1)))
-         (stretched-original-matrix (quil::kq-gate-on-lines original-matrix
-                                                            qubit-count
-                                                            (alexandria:iota (1- (integer-length (magicl:matrix-rows original-matrix)))
-                                                                             :start (- (integer-length (magicl:matrix-rows original-matrix)) 2)
-                                                                             :step -1)))
-         (new-matrix
-           (reduce #'magicl:multiply-complex-matrices
-                   (list
-                    wire-out
-                    stretched-raw-new-matrix
-                    wire-in))))
-    (setf new-matrix (quil::scale-out-matrix-phases new-matrix stretched-original-matrix))
-    (format *human-readable-stream* "~%#Matrix read off from input code~%")
-    (print-matrix-with-comment-hashes stretched-original-matrix *human-readable-stream*)
-    (setf (gethash "original_matrix" *statistics-dictionary*)
-          (with-output-to-string (s)
-            (print-matrix-with-comment-hashes stretched-original-matrix s)))
-    (format *human-readable-stream* "~%#Matrix read off from compiled code~%")
-    (print-matrix-with-comment-hashes new-matrix *human-readable-stream*)
-    (setf (gethash "compiled_matrix" *statistics-dictionary*)
-          (with-output-to-string (s)
-            (print-matrix-with-comment-hashes new-matrix s)))
-    (format *human-readable-stream* "~%")
-    (finish-output *standard-output*)
-    (finish-output *human-readable-stream*)))
-
 (defun print-gate-depth (lschedule)
   (let ((depth (quil::lscheduler-calculate-depth lschedule)))
     (setf (gethash "gate_depth" *statistics-dictionary*) depth)
