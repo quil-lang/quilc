@@ -41,3 +41,21 @@
        (system:atomic-incf ,counter-name)
        #-(or sbcl lispworks)
        (incf ,counter-name))))
+
+(defun first-column-operator= (mat1 mat2)
+  (multiple-value-bind (mat1 mat2) (matrix-rescale mat1 mat2)
+    (setf mat1 (scale-out-matrix-phases mat1 mat2))
+    (matrix-first-column-equality mat1 mat2)))
+
+(defun operator= (mat1 mat2)
+  (multiple-value-bind (mat1 mat2) (matrix-rescale mat1 mat2)
+    (setf mat1 (scale-out-matrix-phases mat1 mat2))
+    (matrix-equality mat1 mat2)))
+
+(defun matrix-equals-dwim (mat1 mat2)
+  "Returns true if mat1 is equal to mat2. DWIM (Do What I Mean) means take into
+account whether *ENABLE-STATE-PREP-COMPRESSION* is enabled, and use the
+appropriate method of comparison."
+  (if *enable-state-prep-compression*
+      (first-column-operator= mat1 mat2)
+      (operator= mat1 mat2)))

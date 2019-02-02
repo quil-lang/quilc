@@ -21,8 +21,8 @@ CNOT 0 1
 CNOT 0 2
 PRAGMA CURRENT_REWIRING \"#(2 0 1)\"
 ")))
-    (is (operator= (quil::gate-applications-to-logical-matrix pp)
-                   (quil::gate-applications-to-logical-matrix pp-rewired)))))
+    (is (quil::operator= (quil::gate-applications-to-logical-matrix pp)
+                         (quil::gate-applications-to-logical-matrix pp-rewired)))))
 
 (deftest test-gate-applications-to-logical-matrix-swap-rewiring ()
   "Test whether quil::gate-applications-to-logical-matrix converts equivalent
@@ -34,8 +34,8 @@ SWAP 0 1"))
 PRAGMA EXPECTED_REWIRING \"#(0 1)\"
 CNOT 0 1
 PRAGMA CURRENT_REWIRING \"#(1 0)\"")))
-    (is (operator= (quil::gate-applications-to-logical-matrix pp)
-                   (quil::gate-applications-to-logical-matrix pp-rewired)))))
+    (is (quil::operator= (quil::gate-applications-to-logical-matrix pp)
+                         (quil::gate-applications-to-logical-matrix pp-rewired)))))
 
 
 (deftest test-rewiring-modes ()
@@ -51,8 +51,8 @@ CNOT 1 4")
            (cpp (quil::compiler-hook (quil::parse-quil-string pstring)
                                      (quil::build-8Q-chip)
                                      :protoquil t)))
-      (is (operator= (quil::gate-applications-to-logical-matrix pp)
-                     (quil::gate-applications-to-logical-matrix cpp)))))
+      (is (quil::operator= (quil::gate-applications-to-logical-matrix pp)
+                           (quil::gate-applications-to-logical-matrix cpp)))))
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
@@ -66,7 +66,6 @@ CNOT 0 2
 JUMP @a")))
       (quil::compiler-hook pp (quil::build-8Q-chip))
       (is t))))
-
 
 (deftest test-compiler-hook ()
   "Test whether the compiler hook preserves semantic equivalence for
@@ -83,8 +82,8 @@ some test programs."
                       (quil::compiler-hook (quil::transform 'quil::compress-qubits
                                                             (cl-quil::read-quil-file file))
                                            (quil::build-nQ-linear-chip 5 :architecture architecture))))
-               (is (matrix-equals-dwim (quil::gate-applications-to-logical-matrix orig-prog)
-                                       (quil::gate-applications-to-logical-matrix proc-prog :compress-qubits t))))))
+               (is (quil::matrix-equals-dwim (quil::gate-applications-to-logical-matrix orig-prog)
+                                             (quil::gate-applications-to-logical-matrix proc-prog :compress-qubits t))))))
     (finish-output *debug-io*)
     (dolist (state-prep '(nil t))
       (let ((quil::*enable-state-prep-compression* state-prep))
@@ -156,8 +155,8 @@ RX(pi) 2
                (processed-program
                  (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
                                                                               :architecture architecture))))
-          (is (matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
-                                  (quil::gate-applications-to-logical-matrix processed-program))))))))
+          (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
+                                        (quil::gate-applications-to-logical-matrix processed-program))))))))
 
 
 
@@ -227,12 +226,12 @@ CZ 2 7
            (quil::transform 'quil::resolve-applications
                             (quil::parse-quil program-string))))
     (let* ((chip (quil::build-8Q-chip :architecture ':cz))
-             (processed-pp (compiler-hook (make-pp) chip))
-             (orig-pp (make-pp)))
-        (substitute-params orig-pp segment-table)
-        (substitute-params processed-pp segment-table)
-        (is (matrix-equals-dwim (quil::gate-applications-to-logical-matrix orig-pp :compress-qubits t)
-                                (quil::gate-applications-to-logical-matrix processed-pp :compress-qubits t))))))
+           (processed-pp (compiler-hook (make-pp) chip))
+           (orig-pp (make-pp)))
+      (substitute-params orig-pp segment-table)
+      (substitute-params processed-pp segment-table)
+      (is (quil::matrix-equals-dwim (quil::gate-applications-to-logical-matrix orig-pp :compress-qubits t)
+                                    (quil::gate-applications-to-logical-matrix processed-pp :compress-qubits t))))))
 
 (deftest test-parametric-compiler-cphase ()
   (dolist (quil::*enable-state-prep-compression* '(nil t))
@@ -274,7 +273,7 @@ CNOT 1 2"))
              (old-matrix (quil::gate-applications-to-logical-matrix pp))
              (cpp (quil::compiler-hook pp chip-spec :protoquil t))
              (new-matrix (quil::gate-applications-to-logical-matrix cpp)))
-        (is (matrix-equals-dwim old-matrix new-matrix))))))
+        (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
   (let ((pp (quil::parse-quil "
