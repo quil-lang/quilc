@@ -25,7 +25,7 @@ of Quil code. The code can be found under `./src/`.
 
 ### Usage
 
-Follow the instructions in QVM's [docs/lisp-setup.md](http://github.com/rigetti/qvm/doc/lisp-setup.md) to satisfy the
+Follow the instructions in QVM's [doc/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
 dependencies required to load the `CL-QUIL` library. Afterwhich, the
 library can be loaded
 
