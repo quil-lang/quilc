@@ -29,14 +29,15 @@
                     (setf (sb-kernel:%simple-fun-info fun)
                           (cdr (sb-kernel:%simple-fun-info fun)))))))
        ((= tag sb-vm:instance-widetag)
-        (cond ((typep obj 'method-combination)
-               (setf (slot-value obj 'sb-pcl::%documentation) nil))
-              ((typep obj 'standard-method)
-               (setf (slot-value obj 'sb-pcl::%documentation) nil))
-              ((typep obj 'class)
-               (setf (slot-value obj 'sb-pcl::%documentation) nil))
-              ((typep obj 'sb-mop:standard-slot-definition)
-               (setf (slot-value obj 'sb-pcl::%documentation) nil))))
+	(typecase obj
+	  (method-combination
+	   (setf (slot-value obj 'sb-pcl::%documentation) nil))
+          (standard-method
+           (setf (slot-value obj 'sb-pcl::%documentation) nil))
+          (class
+           (setf (slot-value obj 'sb-pcl::%documentation) nil))
+          (sb-mop:standard-slot-definition
+           (setf (slot-value obj 'sb-pcl::%documentation) nil))))
        ((and (= tag sb-vm:funcallable-instance-widetag)
              (typep obj 'generic-function))
         (setf (slot-value obj 'sb-pcl::%documentation) nil))))
