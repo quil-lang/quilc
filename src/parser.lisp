@@ -1510,10 +1510,10 @@
         (memory-defs nil)
         (exec-code nil))
     (flet ((bin (x)
-             (cond
-               ((typep x 'gate-definition) (push x gate-defs))
-               ((typep x 'circuit-definition) (push x circ-defs))
-               ((typep x 'memory-descriptor) (push x memory-defs))
+             (typecase x
+               (gate-definition (push x gate-defs))
+               (circuit-definition (push x circ-defs))
+               (memory-descriptor (push x memory-defs))
                (t (push x exec-code)))))
       (mapc #'bin code)
       (values (nreverse gate-defs)
