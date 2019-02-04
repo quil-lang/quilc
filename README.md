@@ -67,7 +67,6 @@ Prerequisites to building `quilc` are:
 2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
 4. [buildapp](https://github.com/xach/buildapp): Builds executable binaries from Common Lisp software
-5. [CL-QUIL](https://github.com/rigetti/cl-quil): The Common Lisp Quil compiler
 
 Building the `quilc` binary is automated using the `Makefile`:
 
