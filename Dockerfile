@@ -1,15 +1,11 @@
-FROM rigetti/quicklisp
+FROM rigetti/rpcq
 
 ARG build_target
 
 # install build dependencies
 COPY Makefile /src/quilc/Makefile
 WORKDIR /src/quilc
-RUN make install-build-deps
-
-# clone rpcq to get version > v2.0.0 (which is available in QL)
-WORKDIR /src
-RUN git clone https://github.com/rigetti/rpcq.git
+RUN make dump-version-info install-build-deps
 
 # build the quilc app
 ADD . /src/quilc
