@@ -195,6 +195,15 @@ you would like to change the port of the server to PORT, you can alter the comma
 
 `docker run --rm -it -p PORT:PORT rigetti/quilc -R -p PORT`
 
+# Release Process
+
+1. Update `VERSION.txt` and dependency versions (if applicable) and push the commit to `master`.
+2. Push a git tag `vX.Y.Z` that contains the same version number as in `VERSION.txt`.
+3. Verify that the resulting build (triggered by pushing the tag) completes successfully.
+4. Publish a [release](https://github.com/rigetti/quilc/releases) using the tag as the name.
+5. Close the [milestone](https://github.com/rigetti/quilc/milestones) associated with this release,
+   and migrate incomplete issues to the next one.
+
 # Get involved!
 
 We welcome and encourage community contributions! Peruse our
