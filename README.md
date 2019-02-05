@@ -171,6 +171,30 @@ The CI pipeline for `quilc` produces a Docker image, available at
 [`rigetti/quilc`](https://hub.docker.com/r/rigetti/quilc). To get the latest stable
 version of `quilc`, run `docker pull rigetti/quilc`.
 
+# Running the Quil Compiler with Docker
+
+As outlined above, the Quil Compiler supports two modes of operation: stdin and server.
+
+To run `quilc` in stdin mode, do one either of the following:
+
+1) `docker run --rm -it rigetti/quilc`
+
+The containerized compiler will then read whatever newline-separated Quil instructions you
+enter, waiting for an EOF signal (C+d) to compile it.
+
+2) `echo "H 0" | docker run --rm -i rigetti/quilc`
+
+You can pipe Quil instructions into the `quilc` container if you drop the `-t`.
+
+To run `quilc` in server mode, do the following:
+
+`docker run --rm -it -p 5555:5555 rigetti/quilc -R`
+
+This will spawn an RPCQ-mode `quilc` server, that you can communicate with over TCP. If
+you would like to change the port of the server to PORT, you can alter the command as follows:
+
+`docker run --rm -it -p PORT:PORT rigetti/quilc -R -p PORT`
+
 # Get involved!
 
 We welcome and encourage community contributions! Peruse our
