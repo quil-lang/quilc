@@ -11,8 +11,8 @@ lifting of parsing, compiling, and optimizing Quil code. The second,
 the binary `quilc` application directly, or alternatively by
 communicating with a server (HTTP or [RPCQ](https://github.com/rigetti/rpcq/)).
 
-Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at [Rigetti
-Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
+Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at
+[Rigetti Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
 native gates and instructions. One can also use Quil's `DEFGATE` to
 define new non-native gates, and `DEFCIRCUIT` to build a named circuit
 that can be referenced elsewhere in Quil code (analogous to a function
@@ -25,7 +25,12 @@ of Quil code. The code can be found under `./src/`.
 
 ### Usage
 
-Follow the instructions in QVM's [doc/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
+To get up and running quickly using the `quilc` Docker image, head directly to the
+section "Running the Quil Compiler with Docker" below. Otherwise, the following steps
+will walk you through how to build the compiler from source.
+
+Follow the instructions in QVM's
+[doc/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
 dependencies required to load the `CL-QUIL` library. Afterwhich, the
 library can be loaded
 
@@ -109,7 +114,8 @@ server interface. `quilc` currently supports two server modes:
 
 ##### HTTP
 
-The HTTP server was the original implementation of the server mode. It is now deprecated in favour of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
+The HTTP server was the original implementation of the server mode. It is now deprecated in favour
+of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
 ``` shell
 $ quilc -S
 +-----------------+
@@ -135,7 +141,9 @@ to the RPCQ version instead.
 
 ##### RPCQ
 
-[RPCQ](https://github.com/rigetti/rpcq/) is an open-source RPC framework developed at Rigetti for efficient network communication through the QCS stack. The server is started in RPCQ-mode using the `-R` flag
+[RPCQ](https://github.com/rigetti/rpcq/) is an open-source RPC framework developed at Rigetti for
+efficient network communication through the QCS stack. The server is started in RPCQ-mode using
+the `-R` flag
 
 ``` shell
 $ quilc -R
@@ -157,13 +165,21 @@ to communicate with the Quil compiler, thus enabling high-level
 abstractions and tools that are not directly available in Quil. The
 [`pyquil`](https://github.com/rigetti/pyquil) library provides such an interface to `quilc`.
 
+# Automated Packaging with Docker
+
+The CI pipeline for `quilc` produces a Docker image, available at
+[`rigetti/quilc`](https://hub.docker.com/r/rigetti/quilc). To get the latest stable
+version of `quilc`, run `docker pull rigetti/quilc`.
+
 # Get involved!
 
 We welcome and encourage community contributions! Peruse our
 [guidelines for contributing](CONTRIBUTING.md) to get you up to speed on
-expectations. Once that's clear, a good place to start is the [good
-first issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) section. If you have any find bugs, please create an
-[issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). If you need help with some code or want to discuss some
-technical issues, you can find us in the `#dev` channel on [slack](https://slack.rigetti.com/).
+expectations. Once that's clear, a good place to start is the
+[good first issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+section. If you have any find bugs, please create an
+[issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+If you need help with some code or want to discuss some technical issues, you can find us in the
+`#dev` channel on [slack](https://slack.rigetti.com/).
 
 We look forward to meeting and working with you!
