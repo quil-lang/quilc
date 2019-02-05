@@ -155,7 +155,7 @@ expressions, as elements of a single new memory descriptor.
             old-memory-descriptors
             recalculation-table)))
 
-(define-transform rewrite-arithmetic (rewrite-arthimetic)
+(define-transform rewrite-arithmetic (rewrite-arithmetic)
   "This transformation allows for arbitrary arithmetic in Quil gate
 parameters to be compiled out and later patched in as with binary
 patching. Take, for instance:
