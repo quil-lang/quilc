@@ -28,7 +28,7 @@ test-quilc:
     - pushd /builds/rigetti && rm -rf rpcq && git clone https://github.com/rigetti/rpcq.git && popd
     - make test-quilc
 
-docker-master:
+docker-edge:
   stage: package
   tags:
     - dockerd
@@ -37,9 +37,10 @@ docker-master:
     - master
   image: docker:stable
   script:
-    - docker build --tag rigetti/quilc:${CI_COMMIT_SHORT_SHA} --tag rigetti/quilc:latest .
+    - docker build --tag rigetti/quilc:${CI_COMMIT_SHORT_SHA} --tag rigetti/quilc:edge .
     - echo ${DOCKERHUB_PASSWORD} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
-    - docker push rigetti/quilc && docker rmi -f rigetti/quilc:latest
+    - docker push rigetti/quilc:${CI_COMMIT_SHORT_SHA} && docker push rigetti/quilc:edge
+    - docker rmi rigetti/quilc:${CI_COMMIT_SHORT_SHA} rigetti/quilc:edge
 
 docker-branch:
   stage: package
@@ -54,7 +55,8 @@ docker-branch:
   script:
     - docker build --tag rigetti/quilc:${CI_COMMIT_REF_SLUG} .
     - echo ${DOCKERHUB_PASSWORD} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
-    - docker push rigetti/quilc && docker rmi -f rigetti/quilc:${CI_COMMIT_REF_SLUG}
+    - docker push rigetti/quilc:${CI_COMMIT_REF_SLUG}
+    - docker rmi rigetti/quilc:${CI_COMMIT_REF_SLUG}
 
 docker-vtag:
   stage: package
@@ -68,6 +70,10 @@ docker-vtag:
     - branches
   image: docker:stable
   script:
-    - docker build --tag rigetti/quilc:${CI_COMMIT_TAG} --tag rigetti/quilc:stable .
+    - export VERSION=`cat VERSION.txt`
+    # make sure tag matches VERSION.txt
+    - if [ "${CI_COMMIT_TAG}" = "v${VERSION}" ]; then return 0; else return 1; fi
+    - docker build --tag rigetti/quilc:$VERSION --tag rigetti/quilc:stable --tag rigetti/quilc:latest .
     - echo ${DOCKERHUB_PASSWORD} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
-    - docker push rigetti/quilc && docker rmi -f rigetti/quilc:stable
+    - docker push rigetti rigetti/quilc:$VERSION && docker push rigetti/quilc:stable && docker push rigetti/quilc:latest
+    - docker rmi rigetti/quilc:$VERSION rigetti/quilc:stable rigetti/quilc:latest
