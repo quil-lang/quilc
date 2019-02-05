@@ -11,7 +11,7 @@ test-cl-quil:
     - github
   only:
     - branches
-  image: rigetti/quicklisp
+  image: rigetti/rpcq
   script:
     - make dump-version-info
     - make install-test-deps
@@ -23,10 +23,8 @@ test-quilc:
     - github
   only:
     - branches
-  image: rigetti/quicklisp
+  image: rigetti/rpcq
   script:
     - make dump-version-info
     - make install-test-deps
-    # clone rpcq to work around QuickLisp
-    - pushd /builds/rigetti && rm -rf rpcq && git clone https://github.com/rigetti/rpcq.git && popd
     - make test-quilc
