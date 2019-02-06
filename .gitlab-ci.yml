@@ -15,7 +15,7 @@ test-cl-quil:
   script:
     - make dump-version-info
     - make install-test-deps
-    - make test-cl-quil
+    - make test-cl-quil RIGETTI_LISP_LIBRARY_HOME=/src
 
 test-quilc:
   stage: test
@@ -27,4 +27,4 @@ test-quilc:
   script:
     - make dump-version-info
     - make install-test-deps
-    - make test-quilc
+    - make test-quilc RIGETTI_LISP_LIBRARY_HOME=/src
