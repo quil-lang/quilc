@@ -13,48 +13,10 @@ communicating with a server (HTTP or [RPCQ](https://github.com/rigetti/rpcq/)).
 
 Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at
 [Rigetti Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
-native gates and instructions. One can also use Quil's `DEFGATE` to
-define new non-native gates, and `DEFCIRCUIT` to build a named circuit
+standard gates and instructions. One can also use Quil's `DEFGATE` to
+define new non-standard gates, and `DEFCIRCUIT` to build a named circuit
 that can be referenced elsewhere in Quil code (analogous to a function
 in most other programming languages).
-
-## `CL-QUIL`
-
-`CL-QUIL` is the library that implements parsing and compiling
-of Quil code. The code can be found under `./src/`.
-
-### Usage
-
-To get up and running quickly using the `quilc` Docker image, head directly to the
-section "Running the Quil Compiler with Docker" below. Otherwise, the following steps
-will walk you through how to build the compiler from source.
-
-Follow the instructions in QVM's
-[doc/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
-dependencies required to load the `CL-QUIL` library. Afterwhich, the
-library can be loaded
-
-
-``` shell
-$ sbcl
-
-```
-
-``` common-lisp
-* (ql:quickload :cl-quil)
-;;; <snip>compilation output</snip>
-(:CL-QUIL)
-* (cl-quil:parse-quil-string "H 0")
-#<CL-QUIL:PARSED-PROGRAM {100312C643}>
-```
-
-A few good entry points to exploring the library are:
-
-* The functions `cl-quil::parse-quil` in [`src/parser.lisp`](src/parser.lisp), and
-  `cl-quil:parse-quil-string` in [`src/cl-quil.lisp`](src/cl-quil.lisp) and the various
-  transforms therein.
-* The function `cl-quil:compiler-hook` which constructs a control-flow
-  graph (CFG) and then performs various optimizations on the CFG.
 
 ## Quil Compiler
 
@@ -73,7 +35,15 @@ Prerequisites to building `quilc` are:
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
 4. [buildapp](https://github.com/xach/buildapp): Builds executable binaries from Common Lisp software
 
-Building the `quilc` binary is automated using the `Makefile`:
+Follow [these instructions](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md)
+to get started from scratch.
+
+One notorious dependency is [MAGICL](https://github.com/rigetti/magicl). It is available on Quicklisp,
+but requires you to install some system libraries such as BLAS, LAPACK, and libffi. Follow MAGICL's
+instructions carefully before proceeding with loading CL-QUIL or `make`ing quilc.
+
+Once these dependencies are installed, building should be easy. Building the `quilc`
+binary is automated using the `Makefile`:
 
 ``` shell
 $ make quilc
@@ -164,6 +134,45 @@ The server-mode provides to high-level languages such as Python a way
 to communicate with the Quil compiler, thus enabling high-level
 abstractions and tools that are not directly available in Quil. The
 [`pyquil`](https://github.com/rigetti/pyquil) library provides such an interface to `quilc`.
+
+## CL-QUIL
+
+`CL-QUIL` is the Lisp library that implements parsing and compiling
+of Quil code. The code can be found under `./src/`. Other lisp libraries, including
+`quilc`, can depend on it.
+
+### Usage
+
+To get up and running quickly using the `quilc` Docker image, head directly to the
+section "Running the Quil Compiler with Docker" below. Otherwise, the following steps
+will walk you through how to build the compiler from source.
+
+Follow the instructions in QVM's
+[doc/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
+dependencies required to load the `CL-QUIL` library. Afterwhich, the
+library can be loaded
+
+
+``` shell
+$ sbcl
+
+```
+
+``` common-lisp
+* (ql:quickload :cl-quil)
+;;; <snip>compilation output</snip>
+(:CL-QUIL)
+* (cl-quil:parse-quil-string "H 0")
+#<CL-QUIL:PARSED-PROGRAM {100312C643}>
+```
+
+A few good entry points to exploring the library are:
+
+* The functions `cl-quil::parse-quil` in [`src/parser.lisp`](src/parser.lisp), and
+  `cl-quil:parse-quil-string` in [`src/cl-quil.lisp`](src/cl-quil.lisp) and the various
+  transforms therein.
+* The function `cl-quil:compiler-hook` which constructs a control-flow
+  graph (CFG) and then performs various optimizations on the CFG.
 
 ## Automated Packaging with Docker
 
