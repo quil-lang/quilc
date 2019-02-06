@@ -128,7 +128,7 @@
   (remove-if-not (lambda (isn) (typep isn 'application))
                  (parsed-program-executable-code parsed-prog)))
 
-(defun program-2q (parsed-prog)
+(defun program-2q-instructions (parsed-prog)
   (remove-if-not (lambda (isn) (= 2 (length (application-arguments isn))))
                  (program-applications parsed-prog)))
 
