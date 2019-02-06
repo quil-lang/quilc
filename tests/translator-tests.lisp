@@ -147,4 +147,21 @@
     ;; bad paths
     (is (null (cl-quil::find-shortest-path-on-chip-spec pathological 2 1)))))
 
+(deftest test-phase-compiles-to-rz ()
+  "A PHASE gate should trivially compile to a RZ gate, preserving parameters."
+  (let* ((cphase (quil::parse-quil-string "PHASE(0) 0"))
+         (cphase-compiled (quil::compiler-hook cphase (quil::build-8q-chip)))
+         (cphase-parametric (quil::parse-quil-string "DECLARE gamma REAL[1]
+PHASE(2*gamma[0]) 0"))
+         (cphase-parametric-compiled (quil::compiler-hook cphase-parametric (build-8q-chip)))
+         (rz (quil::compiler-hook (quil::parse-quil-string "RZ(0) 0") (build-8q-chip)))
+         (rz-parametric (quil::compiler-hook (quil::parse-quil-string "DECLARE gamma REAL[1]
+RZ(2*gamma[0]) 0") (quil::build-8q-chip))))
+    (fiasco-assert-matrices-are-equal
+     (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code cphase-compiled) 'list))
+     (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code rz) 'list)))
+    ;; one phase should compile to one rz
+    (is (= (length (quil::parsed-program-executable-code cphase-parametric-compiled))
+           (length (quil::parsed-program-executable-code rz-parametric))))))
+
 
