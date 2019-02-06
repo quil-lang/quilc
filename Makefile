@@ -37,7 +37,7 @@ system-index.txt: $(QUICKLISP_SETUP)
 ###############################################################################
 
 dump-version-info:
-	sbcl --noinform --non-interactive \
+	$(QUICKLISP) \
 		--eval '(format t "~A ~A" (lisp-implementation-type) (lisp-implementation-version))' \
 		--eval '(print (ql-dist:find-system "alexa"))' \
 		--eval '(print (ql-dist:find-system "magicl"))' \
@@ -58,7 +58,7 @@ else
 endif
 
 install-build-deps: install-test-deps
-	sbcl --noinform --non-interactive \
+	$(QUICKLISP) \
 		--eval '(ql:quickload "buildapp")' \
 		--eval '(buildapp:build-buildapp "/usr/local/bin/buildapp")'
 
