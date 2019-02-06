@@ -51,6 +51,9 @@
         (build-gate "RX" '(#.(/ pi -2)) q)
         (build-gate "RZ" '(#.(/ pi -2)) q)))
 
+(define-translator PHASE-to-RZ (("PHASE" (alpha) q) phase-gate)
+  (list (build-gate "RZ" `(,alpha) q)))
+
 ;; standard 2Q gate translators
 
 (define-translator CZ-to-CPHASE (("CZ" () q1 q0) CZ-gate)

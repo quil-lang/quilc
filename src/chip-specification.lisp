@@ -313,7 +313,8 @@ MISC-DATA is a hashtable of miscellaneous data associated to this hardware objec
                              (find  ':X/2 lower-precedence))
                          (not (find ':RZ  higher-precedence))
                          (not (find ':Z/2 higher-precedence)))
-                    (list #'RY-to-XZX
+                    (list #'PHASE-to-RZ
+                          #'RY-to-XZX
                           #'RX-to-ZXZXZ
                           #'euler-compiler)))
             :into compilation-methods
