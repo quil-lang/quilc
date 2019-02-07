@@ -463,11 +463,10 @@ use RESOURCE."
   "Walks the edges in the DAG underlying LSCHEDULE according to a topological
 ordering.
 
-Each instruction begins as being tagged with BASE-VALUE. When we visit an
-instruction INST, we find its bumped value INST-BUMP by calling (BUMP-VALUE INST
-INST-TAG). We visit INST only after all of its incoming edges have been
-propagated. To propagate an edge (SOURCE TARGET) after SOURCE has been visited,
-the TARGET has its tag updated to (TEST-VALUES TARGET-TAG SOURCE-BUMP).
+All instructions begin with a tag of BASE-VALUE. When we visit an instruction
+INSTR, we first compute SOURCE-BUMP, which is a obtained by reducing tags of
+all sources of INSTR's in-edges using TEST-VALUES. Finally, INSTR's tag
+is overwritten by (BUMP-VALUE INSTR SOURCE-BUMP).
 
 Return the reduction of all bumped values by TEST-VALUES, and a hash table
 mapping instructions to their tags. "

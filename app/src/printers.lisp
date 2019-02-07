@@ -102,12 +102,17 @@
             unused-qubits)))
 
 (defun print-program-runtime (lschedule chip-specification)
-  (let ((duration (quil::lscheduler-calculate-duration lschedule
-                                                       chip-specification)))
+  (let* ((duration (quil::lscheduler-calculate-duration lschedule
+                                                       chip-specification))
+         (seconds  (floor duration 1000000000))
+         (millis   (floor duration 1000000))
+         (micros   (floor duration 1000))
+         (nanos    (floor duration 1))
+         (picos    (mod (* duration 1000) 1000)))
     (setf (gethash "program_duration" *statistics-dictionary*) duration)
     (format *human-readable-stream*
-            "# Compiled program duration: ~5d~%"
-            duration)))
+            "# Compiled program duration: ~4ds ~4dms ~4dus ~4dns ~4dps~%"
+            seconds millis micros nanos picos)))
 
 (defun print-program-fidelity (lschedule chip-specification)
   (let ((fidelity (quil::lscheduler-calculate-fidelity lschedule
