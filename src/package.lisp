@@ -346,7 +346,7 @@
    )
 
   (:export
-   #:rewrite-arithmetic                 ; FUNCTION/TRANSFORMATION
+   #:resolve-gate-parameter-arithmetic  ; FUNCTION/TRANSFORMATION
    )
 
   ;; cl-quil.lisp

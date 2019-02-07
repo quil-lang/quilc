@@ -124,7 +124,7 @@
                                    (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                            (quil.clifford::base4-list pauli-out))))))
 
-(defun rewrite-arithmetic (request)
+(defun rresolve-gate-parameter-arithmetic (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
   (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-quil| request))))
@@ -164,7 +164,7 @@
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
     (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
-    (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
+    (rpcq:dispatch-table-add-handler dt 'resolve-gate-parameter-arithmetic)
     (rpcq:dispatch-table-add-handler dt 'get-version-info)
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
