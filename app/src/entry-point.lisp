@@ -65,6 +65,14 @@
     #-forest-sdk
     (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")))
 
+(defparameter *isa-descriptors*
+  (alexandria::alist-hash-table
+   '(("8Q" . (quil::build-8Q-chip))
+     ("20Q" . (quil::build-skew-rectangular-chip 0 4 5))
+     ("16QMUX" . (quil::build-nQ-trivalent-chip 1 1 8 4))
+     ("bristlecone" . (quil::build-bristlecone-chip)))
+   :test 'equal))
+
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
     (with-output-to-string (s)
@@ -92,6 +100,18 @@
            (with-output-to-string (s)
              (princ matrix s))
            (coerce #(#\Newline #\#) 'string))))
+
+(defun lookup-isa-descriptor-for-name (isa)
+  (if (null isa)
+      (gethash "8Q" *isa-descriptors*)
+      (let ((isa-hash-value (gethash isa *isa-descriptors*)))
+        (cond
+          ((not (null isa-hash-value))
+           isa-hash-value)
+          ((probe-file isa)
+           (quil::read-chip-spec-file isa))
+          (t
+           (error "ISA descriptor does not name a known template or an extant file."))))))
 
 (defvar *nick-banner* t)
 
@@ -160,10 +180,10 @@
 
 (defun entry-point (argv)
   (setup-debugger)
-  
+
   ;; grab the CLI arguments
   (setf *program-name* (pop argv))
-  
+
   (handler-case
       (command-line-arguments:handle-command-line
        *option-spec*
@@ -183,7 +203,7 @@
 (defun %entry-point (argv)
   ;; grab the CLI arguments
   (setf *program-name* (pop argv))
-  
+
   (command-line-arguments:handle-command-line
        *option-spec*
        'process-options
@@ -233,7 +253,7 @@
 
   (when (plusp time-limit)
     (setf *time-limit* (/ time-limit 1000.0d0)))
-  
+
   (setf quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
   (setf *compute-gate-depth* compute-gate-depth)
   (setf *compute-gate-volume* compute-gate-volume)
@@ -244,20 +264,20 @@
   (setf *compute-unused-qubits* compute-unused-qubits)
   (setf *without-pretty-printing* without-pretty-printing)
   (setf *print-logical-schedule* print-logical-schedule)
-  (setf *gate-blacklist* 
+  (setf *gate-blacklist*
         (when gate-blacklist
           (split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
-  (setf *gate-whitelist* 
+  (setf *gate-whitelist*
         (when gate-whitelist
           (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
   (setf *topological-swaps* show-topological-overhead)
   (setf *protoquil* protoquil)
   (setf quil::*enable-state-prep-compression* enable-state-prep-reductions)
-  
+
   ;; at this point we know we're doing something. strap in LAPACK.
   (magicl:with-blapack
    (reload-foreign-libraries)
-    
+
    (cond
     ;; web server mode requested.
     ;; currently provides both web and RPCQ server as a transition.
@@ -266,7 +286,7 @@
      (setf *json-stream* (make-broadcast-stream)
            *human-readable-stream* (make-broadcast-stream)
            *quil-stream* (make-broadcast-stream))
-     
+
      ;; launch the polling loop
      (show-banner)
      (format t "~%
@@ -278,10 +298,10 @@ to the RPCQ version instead, so that it continues to operate when we disable the
 HTTP server for good.
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ~%~%")
-     
+
      (when port
        (format t "WARNING: -p and -S are incompatible. Dropping -p.~%~%"))
-     
+
      ;; start the RPCQ server in parallel
      (let ((logger (make-instance 'cl-syslog:rfc5424-logger
                                   :app-name *program-name*
@@ -294,20 +314,20 @@ HTTP server for good.
                           (:msgid "LOG0001"))
        (bt:make-thread (lambda () (start-rpc-server :port 5555
                                                     :logger logger))))
-       
+
      (start-web-server))
-      
+
     ;; RPCQ server mode requested
     (server-mode-rpc
      ;; null out the streams
      (setf *json-stream* (make-broadcast-stream)
            *human-readable-stream* (make-broadcast-stream)
            *quil-stream* (make-broadcast-stream))
-       
+
      ;; configure the server
      (unless port
        (setf port 5555)
-         
+
        ;; launch the polling loop
        (show-banner))
      (let ((logger (make-instance 'cl-syslog:rfc5424-logger
@@ -321,7 +341,7 @@ HTTP server for good.
                           (:msgid "LOG0001"))
        (start-rpc-server :port port
                          :logger logger)))
-      
+
     ;; server modes not requested, so continue parsing arguments
     (t
      (cond
@@ -333,21 +353,7 @@ HTTP server for good.
        (setf *json-stream* (make-broadcast-stream))
        (setf *human-readable-stream* *error-output*)
        (setf *quil-stream* *standard-output*)))
-     (setf *isa-descriptor*
-           (cond
-            ((or (null isa)
-                 (string= isa "8Q"))
-             (quil::build-8Q-chip))
-            ((string= isa "20Q")
-             (quil::build-skew-rectangular-chip 0 4 5))
-            ((string= isa "16QMUX")
-             (quil::build-nQ-trivalent-chip 1 1 8 4))
-            ((string= isa "bristlecone")
-             (quil::build-bristlecone-chip))
-            ((probe-file isa)
-             (quil::read-chip-spec-file isa))
-            (t
-             (error "ISA descriptor does not name a known template or an extant file."))))
+     (setf *isa-descriptor* (lookup-isa-descriptor-for-name isa))
      (setf *verbose*
            (cond
             (verbose *human-readable-stream*)
@@ -369,7 +375,7 @@ HTTP server for good.
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
         (quil::compiler-hook program chip-specification :protoquil *protoquil*)
-      
+
       ;; if we're supposed to output protoQuil, we need to strip the final HALT
       ;; instructions from the output
       (when *protoquil*
@@ -382,15 +388,15 @@ HTTP server for good.
                      :unless (typep instr 'quil::halt)
                        :collect instr)
                'vector)))
-      
+
       ;; now that we've compiled the program, we have various things to output
       ;; one thing we're always going to want to output is the program itself.
       (print-program processed-program *quil-stream*)
-      
-      
+
+
       (when *topological-swaps*
         (print-topological-swap-count topological-swaps))
-      
+
       (when (and *protoquil*
                  *print-logical-schedule*)
         (let ((lschedule (quil::make-lscheduler)))
@@ -402,7 +408,7 @@ HTTP server for good.
           ;; stuff it in the dictionary for later serialization
           (setf (gethash "logical_schedule" *statistics-dictionary*)
                 lschedule)))
-      
+
       (when (and *protoquil*
                  (or *compute-gate-depth*
                      *compute-gate-volume*
@@ -431,7 +437,7 @@ HTTP server for good.
             (print-program-fidelity lschedule chip-specification))
           (when *compute-unused-qubits*
             (print-unused-qubits lschedule chip-specification))))
-      
+
       (when (and *protoquil* *compute-2Q-gate-depth*)
         (let ((lschedule (quil::make-lscheduler)))
           (loop :for instr :across (quil::parsed-program-executable-code processed-program)
@@ -439,7 +445,7 @@ HTTP server for good.
                            (<= 2 (length (quil::application-arguments instr))))
                   :do (quil::append-instruction-to-lschedule lschedule instr))
           (print-2Q-gate-depth lschedule)))
-      
+
       (when (and *protoquil* *compute-matrix-reps*)
         (let ((processed-quil (quil::parsed-program-executable-code processed-program))
               (initial-l2p (quil::pragma-rewiring
@@ -451,5 +457,5 @@ HTTP server for good.
                                         (coerce processed-quil 'list)
                                         final-l2p
                                         original-matrix)))
-      
+
       (publish-json-statistics))))
