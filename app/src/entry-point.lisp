@@ -67,10 +67,10 @@
 
 (defparameter *isa-descriptors*
   (alexandria::alist-hash-table
-   '(("8Q" . (quil::build-8Q-chip))
-     ("20Q" . (quil::build-skew-rectangular-chip 0 4 5))
-     ("16QMUX" . (quil::build-nQ-trivalent-chip 1 1 8 4))
-     ("bristlecone" . (quil::build-bristlecone-chip)))
+   `(("8Q" . ,(quil::build-8Q-chip))
+     ("20Q" . ,(quil::build-skew-rectangular-chip 0 4 5))
+     ("16QMUX" . ,(quil::build-nQ-trivalent-chip 1 1 8 4))
+     ("bristlecone" . ,(quil::build-bristlecone-chip)))
    :test 'equal))
 
 (defun slurp-lines (&optional (stream *standard-input*))
