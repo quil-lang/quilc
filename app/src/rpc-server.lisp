@@ -124,7 +124,7 @@
                                    (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                            (quil.clifford::base4-list pauli-out))))))
 
-(defun rresolve-gate-parameter-arithmetic (request)
+(defun resolve-gate-parameter-arithmetic (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
   (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-quil| request))))
