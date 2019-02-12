@@ -375,7 +375,7 @@
 
   ;; matrix-operations.lisp
   (:export
-   #:gate-applications-to-logical-matrix ; FUNCTION
+   #:parsed-program-to-logical-matrix ; FUNCTION
    )
   
   ;; type-safety.lisp

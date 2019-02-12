@@ -367,7 +367,7 @@ HTTP server for good.
 (defun process-program (program chip-specification)
   (let* ((original-matrix
            (when (and *protoquil* *compute-matrix-reps*)
-             (quil::gate-applications-to-logical-matrix program)))
+             (quil::parsed-program-to-logical-matrix program)))
          (quil::*compiler-noise-stream* *verbose*)
          (*statistics-dictionary* (make-hash-table :test 'equal))
          (*random-state* (make-random-state t)))
@@ -446,7 +446,7 @@ HTTP server for good.
           (print-2Q-gate-depth lschedule)))
 
       (when (and *protoquil* *compute-matrix-reps*)
-        (let* ((processed-program-matrix (quil::gate-applications-to-logical-matrix processed-program :compress-qubits t))
+        (let* ((processed-program-matrix (quil::parsed-program-to-logical-matrix processed-program :compress-qubits t))
                (same-same-but-different (quil::scale-out-matrix-phases processed-program-matrix
                                                                        original-matrix)))
           (format *human-readable-stream* "~%#Matrix read off from input code~%")

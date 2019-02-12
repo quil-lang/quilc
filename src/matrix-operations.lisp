@@ -94,7 +94,7 @@ as needed so that they are the same size."
   (multiple-value-bind (mat1 mat2) (matrix-rescale mat1 mat2)
     (magicl:multiply-complex-matrices mat1 mat2)))
 
-(defun gate-applications-to-logical-matrix (pp &key compress-qubits)
+(defun parsed-program-to-logical-matrix (pp &key compress-qubits)
   "Convert a parsed program PP, consisting of only i) gate
  applications ii) trivial control operations (HALT and NOP), and iii)
  pragmas, to an equivalent matrix. If present, rewiring pragmas will
