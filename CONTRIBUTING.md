@@ -9,7 +9,9 @@ contributors:
   have run the test suite. You can run tests by invoking `make test` in
   the project root. Code coverage statistics can be compiled by
   running `sbcl --load coverage-report.lisp` in the `coverage-report`
-  directory.
+  directory. **Note** You should also test [QVM](https://github.com/rigetti/qvm) 
+  since it depends on `cl-quil`, and changes to the public interface of `cl-quil`
+  may affect QVM.
 * Documentation. Provide concise but clear documentation for your
   changes. In general, all public functions (those exported in
   `package.lisp`) *must* have docstrings. Internal functions should
