@@ -52,6 +52,7 @@
     (setf mat1 (scale-out-matrix-phases mat1 mat2))
     (matrix-equality mat1 mat2)))
 
+(declaim (special *enable-state-prep-compression*)) ; forward declare
 (defun matrix-equals-dwim (mat1 mat2)
   "Returns true if mat1 is equal to mat2. DWIM (Do What I Mean) means take into
 account whether *ENABLE-STATE-PREP-COMPRESSION* is enabled, and use the
