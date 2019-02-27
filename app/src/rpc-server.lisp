@@ -169,4 +169,4 @@
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "tcp://*:~a" port))
                        :logger logger
-                       :timeout 60)))
+                       :timeout *time-limit*)))
