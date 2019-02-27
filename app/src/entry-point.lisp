@@ -251,9 +251,7 @@
     (benchmarks))
 
   (when (minusp time-limit)
-    (format t "WARNING: a negative value (~D) was provided for the server time-limit; using default value (~D) instead."
-            time-limit *time-limit*)
-    (setf time-limit 60))
+    (error "A negative value (~D) was provided for the server time-limit." time-limit))
   (setf *time-limit* time-limit)
 
   (setf quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
