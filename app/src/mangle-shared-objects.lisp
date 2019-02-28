@@ -1,7 +1,6 @@
 ;;;; mangle-shared-objects.lisp
 ;;;;
-;;;; This is loaded (as with CL:LOAD) before the final image is saved
-;;;; by buildapp.
+;;;; This is loaded (as with CL:LOAD) before the final image is saved.
 ;;;;
 ;;;; Rewrites shared library references on SDK targets to use the
 ;;;; Rigetti package path /usr/local/lib/rigetti. This is so the exact

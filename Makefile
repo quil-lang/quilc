@@ -58,45 +58,32 @@ else
 	echo "Non-Linux-based platforms unsupported"
 endif
 
-install-build-deps: install-test-deps
-	$(QUICKLISP) \
-		--eval '(ql:quickload "buildapp")' \
-		--eval '(buildapp:build-buildapp "/usr/local/bin/buildapp")'
-
 ###############################################################################
 # BUILD
 ###############################################################################
 
 .PHONY: quilc
 quilc: system-index.txt
-	buildapp --output quilc \
-		--manifest-file system-index.txt \
+	$(SBCL) $(FOREST_SDK_FEATURE) \
+	        --eval "(setf sb-ext:\*on-package-variance\* '(:warn (:swank :swank-backend :swank-repl) :error t))" \
 		--eval '(push :hunchentoot-no-ssl *features*)' \
-		--asdf-path . \
-		--load-system quilc \
-		$(FOREST_SDK_LOAD) \
-		--eval '(quilc::zap-info)' \
-		--eval '(quilc::setup-debugger)' \
-		--compress-core \
-		--entry quilc::entry-point
+		--load "build-app.lisp" \
+		$(FOREST_SDK_OPTION) \
+		$(QUILC_UNSAFE_OPTION)
+
 
 quilc-sdk-base: FOREST_SDK_FEATURE=--eval '(pushnew :forest-sdk *features*)'
 quilc-sdk-base: clean clean-cache quilc
 
 # By default, relocate shared libraries on SDK builds
-quilc-sdk: FOREST_SDK_LOAD=--load app/src/mangle-shared-objects.lisp
+quilc-sdk: FOREST_SDK_OPTION=--quilc-sdk
 quilc-sdk: quilc-sdk-base
 
 # Don't relocate shared libraries on barebones SDK builds
 quilc-sdk-barebones: quilc-sdk-base
 
-quilc-unsafe: system-index.txt
-	buildapp --output quilc \
-		--manifest-file system-index.txt \
-		--asdf-path . \
-		--load-system quilc \
-		--compress-core \
-		--entry quilc::%entry-point
+quilc-unsafe: QUILC_UNSAFE_OPTION=--unsafe
+quilc-unsafe: quilc
 
 DOCKER_BUILD_TARGET=all
 DOCKER_TAG=rigetti/quilc:$(COMMIT_HASH)
