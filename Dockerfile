@@ -5,7 +5,7 @@ ARG build_target
 # install build dependencies
 COPY Makefile /src/quilc/Makefile
 WORKDIR /src/quilc
-RUN make dump-version-info install-build-deps
+RUN make dump-version-info install-test-deps
 
 # build the quilc app
 ADD . /src/quilc
