@@ -33,7 +33,6 @@ Prerequisites to building `quilc` are:
 1. Standard UNIX build tools
 2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
-4. [buildapp](https://github.com/xach/buildapp): Builds executable binaries from Common Lisp software
 
 Follow [these instructions](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md)
 to get started from scratch.
