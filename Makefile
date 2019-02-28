@@ -12,6 +12,7 @@ QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
 QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 UNAME_S=$(shell uname -s)
 ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
+PREFIX ?= /usr/local
 
 all: quilc
 
@@ -112,6 +113,17 @@ docker-sdk-barebones: DOCKER_BUILD_TARGET=quilc-sdk-barebones
 docker-sdk-barebones: DOCKER_TAG=quilc-sdk-barebones
 docker-sdk-barebones: docker
 
+###############################################################################
+# INSTALL/UNINSTALL
+###############################################################################
+
+.PHONY: install
+install: quilc
+	install quilc $(DESTDIR)$(PREFIX)/bin
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/quilc
 
 ###############################################################################
 # TEST
