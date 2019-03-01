@@ -161,7 +161,6 @@ following swaps. Perform translations under ENVIRONS."
 ;; this function searched for a SWAP that lowers a user-defined
 ;; objective function.  it guarantees that if such a SWAP exists,
 ;; it returns it, and it errors if it cannot find one.
-;;
 (defun select-cost-lowering-swap (chip-spec chip-sched use-free-swaps cost-function rewirings-tried working-l2p
                                   &optional
                                     (depth *addresser-swap-lookahead-depth*))
@@ -209,9 +208,15 @@ following swaps. Perform translations under ENVIRONS."
           (let* ((swap-duration (permutation-record-duration
                                  (vnth 0 (hardware-object-permutation-gates
                                           (chip-spec-nth-link chip-spec index)))))
-                 (old-horizon (chip-schedule-resource-end-time
-                               chip-sched
-                               (make-qubit-resource q0 q1)))
+                 (old-horizon (alexandria:if-let ((time-bound (gethash "time-bound"
+                                                                       (hardware-object-misc-data
+                                                                        (chip-spec-nth-link chip-spec index)))))
+                                (chip-schedule-resource-carving-point
+                                 chip-sched
+                                 (make-qubit-resource q0 q1))
+                                (chip-schedule-resource-end-time
+                                 chip-sched
+                                 (make-qubit-resource q0 q1))))
                  (new-horizon (cond
                                 ((not (zerop old-horizon))
                                  (+ old-horizon swap-duration))
@@ -280,7 +285,7 @@ Optional arguments:
  + INITIAL-REWIRING launches with the addresser with a nontrivial qubit
    permutation.
  + USE-FREE-SWAPS treats the initial rewiring as virtual (able to be changed).
-   If INITIAL-REWIRING is not provided this option has not effect
+   If INITIAL-REWIRING is not provided this option has no effect.
 "
   (format *compiler-noise-stream*
           "GREEDY-TEMPORAL-ADDRESSING: entrance.~%")

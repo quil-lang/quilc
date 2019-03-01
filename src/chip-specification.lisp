@@ -322,6 +322,14 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
     ;; set up the basic optimal 2Q compiler
     (vector-push-extend (optimal-2q-compiler-for type)
                         (hardware-object-compilation-methods obj))
+    ;; based on the optimal 2Q compiler, tag this hardware object with the
+    ;; longest duration any compiled sequence of instructions could possibly
+    ;; take to run on it.
+    (when (or (member ':cz type)
+              (member ':iswap type))
+      ;; TODO: compute this based on duration data
+      (setf (gethash "time-bound" misc-data)
+            504))                       ; (+ (* 3 150) (* 6 9))
     ;; return the qubit
     obj))
 

@@ -97,6 +97,16 @@ BEFORE-INST to make use of RESOURCE."
     (chip-schedule-end-time schedule inst)
     0))
 
+(defun chip-schedule-resource-carving-point (schedule resource)
+  (let ((max-start-time 0))
+    (dohash ((instr instr-start-time) (chip-schedule-times schedule))
+      (when (and (resources-intersect-p (instruction-resources instr) resource)
+                 (not (resource-subsetp (instruction-resources instr) resource)))
+        (setf max-start-time
+              (max max-start-time
+                   instr-start-time))))
+    max-start-time))
+
 (defun chip-schedule-qubit-times (schedule)
   "Find the first time a qubit is available, for each qubit in the schedule."
   (map 'vector
