@@ -56,10 +56,10 @@
     (("enable-state-prep-reductions") :type boolean :optional t :documentation "assume that the program starts in the ground state")
     (("protoquil" #\P) :type boolean :optional t :documentation "restrict input/output to ProtoQuil")
     (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
-    (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server *and* an RPCQ server. ignores --port and uses 6000 and 5555 respectively.")
+    (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server *and* an RPCQ server. ignores --port and uses 6000 and 5555 respectively")
     (("server-mode-rpc" #\R) :type boolean :optional t :documentation "run as an RPCQ server")
     (("port" #\p) :type integer :optional t :documentation "port to run the RPCQ server on")
-    (("time-limit") :type integer :initial-value 0 :documentation "time limit for server requests (0 => unlimited, ms)")
+    (("time-limit") :type integer :initial-value 0 :documentation "time limit (in seconds) for server requests (0 => unlimited)")
     (("version" #\v) :type boolean :optional t :documentation "print version information")
     (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")
     #-forest-sdk
@@ -250,8 +250,9 @@
   (when benchmark
     (benchmarks))
 
-  (when (plusp time-limit)
-    (setf *time-limit* (/ time-limit 1000.0d0)))
+  (when (minusp time-limit)
+    (error "A negative value (~D) was provided for the server time-limit." time-limit))
+  (setf *time-limit* time-limit)
 
   (setf quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
   (setf *compute-gate-depth* compute-gate-depth)

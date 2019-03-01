@@ -148,8 +148,8 @@ If ALLOW-EMPTY-PAYLOADS is true, then an empty payload resolves to the same thin
         tbnl:*catch-errors-p* t)
   (tbnl:reset-session-secret)
 
-  (unless (zerop *time-limit*)
-    (setq tbnl:*default-connection-timeout* (/ *time-limit* 1000)))
+  (setq tbnl:*default-connection-timeout* *time-limit*)
+
   (setq *app* (make-instance 'vhost
                              :address *server-host*
                              :port *server-port*
