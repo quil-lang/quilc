@@ -439,6 +439,9 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
       (vector-push-extend (lambda (instr)
                             (CNOT-to-native-CNOTs chip-spec instr))
                           ret))
+    (when (or (find ':cnot (alexandria:ensure-list architecture))
+              (find ':cz (alexandria:ensure-list architecture)))
+      (vector-push-extend #'CCNOT-to-CNOT ret))
     (cond
       ((optimal-2q-target-meets-requirements architecture ':cz)
        (vector-push-extend #'ucr-compiler ret))
