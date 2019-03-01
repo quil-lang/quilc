@@ -225,3 +225,17 @@ CNOT 0 2"))
          (2q-code (program-2q-instructions proc-prog)))
     (is (matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))))
+
+(deftest test-ccnot-compilation-on-cphase-iswap ()
+  "Test that CCNOT compiles nicely on a line having the (:CPHASE ISWAP) architecture."
+  (let* ((chip (quil::build-nq-linear-chip 3 :architecture '(:cphase :iswap)))
+         (orig-prog (quil::parse-quil-string "CCNOT 0 1 2"))
+         (orig-matrix (quil::parsed-program-to-logical-matrix orig-prog))
+         (proc-prog (quil::compiler-hook orig-prog chip))
+         (proc-matrix (quil::parsed-program-to-logical-matrix proc-prog))
+         (2q-code (program-2q-instructions proc-prog)))
+    (is (matrix-equals-dwim orig-matrix proc-matrix))
+    (is (every (link-nativep chip) 2q-code))
+    ;; NOTE: Decomposing into five 2q gates is more of a regression
+    ;; test on quality of compilation, and not on correctness.
+    (is (= 5 (length 2q-code)))))
