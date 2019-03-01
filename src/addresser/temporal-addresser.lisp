@@ -161,7 +161,6 @@ following swaps. Perform translations under ENVIRONS."
 ;; this function searched for a SWAP that lowers a user-defined
 ;; objective function.  it guarantees that if such a SWAP exists,
 ;; it returns it, and it errors if it cannot find one.
-;;
 (defun select-cost-lowering-swap (chip-spec chip-sched use-free-swaps cost-function rewirings-tried working-l2p
                                   &optional
                                     (depth *addresser-swap-lookahead-depth*))
@@ -206,19 +205,45 @@ following swaps. Perform translations under ENVIRONS."
       (dolist (index potential-first-links)
         ;; TODO: this assumes only SWAPs exist in the permutation list
         (destructuring-bind (q0 q1) (coerce (chip-spec-qubits-on-link chip-spec index) 'list)
-          (let* ((swap-duration (permutation-record-duration
-                                 (vnth 0 (hardware-object-permutation-gates
-                                          (chip-spec-nth-link chip-spec index)))))
-                 (old-horizon (chip-schedule-resource-end-time
-                               chip-sched
-                               (make-qubit-resource q0 q1)))
-                 (new-horizon (cond
-                                ((not (zerop old-horizon))
-                                 (+ old-horizon swap-duration))
-                                (use-free-swaps
-                                 0)
-                                (t
-                                 swap-duration))))
+          (let ((swap-duration (permutation-record-duration
+                                (vnth 0 (hardware-object-permutation-gates
+                                         (chip-spec-nth-link chip-spec index)))))
+                old-horizon new-horizon)
+            ;; populate old-horizon and new-horizon based on a bunch of goofy case work
+            (cond
+              ;; if we know that 2Q programs have a bounded length...
+              ((gethash "time-bound"
+                        (hardware-object-misc-data
+                         (chip-spec-nth-link chip-spec index)))
+               (let ((time-bound (gethash "time-bound"
+                                          (hardware-object-misc-data
+                                           (chip-spec-nth-link chip-spec index)))))
+                 ;; calculate the "start" of the active 2Q program
+                 (setf old-horizon (chip-schedule-resource-carving-point
+                                    chip-sched
+                                    (make-qubit-resource q0 q1)))
+                 (setf new-horizon
+                       (cond
+                         ((not (zerop old-horizon))
+                          (+ old-horizon time-bound))
+                         (use-free-swaps
+                          0)
+                         (t
+                          time-bound)))))
+              ;; otherwise, we don't have a guarantee on the length of a 2Q program
+              (t
+               ;; find the current time that the 2Q resource becomes free
+               (setf old-horizon (chip-schedule-resource-end-time
+                                  chip-sched
+                                  (make-qubit-resource q0 q1)))
+               (setf new-horizon
+                     (cond
+                       ((not (zerop old-horizon))
+                        (+ old-horizon swap-duration))
+                       (use-free-swaps
+                        0)
+                       (t
+                        swap-duration)))))
             (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Considering ~d: this ~,3f vs best ~,3f.~%"
                     (chip-spec-qubits-on-link chip-spec index)
                     new-horizon
@@ -280,7 +305,7 @@ Optional arguments:
  + INITIAL-REWIRING launches with the addresser with a nontrivial qubit
    permutation.
  + USE-FREE-SWAPS treats the initial rewiring as virtual (able to be changed).
-   If INITIAL-REWIRING is not provided this option has not effect
+   If INITIAL-REWIRING is not provided this option has no effect.
 "
   (format *compiler-noise-stream*
           "GREEDY-TEMPORAL-ADDRESSING: entrance.~%")
