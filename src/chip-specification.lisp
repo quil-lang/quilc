@@ -439,6 +439,10 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
       (vector-push-extend (lambda (instr)
                             (CNOT-to-native-CNOTs chip-spec instr))
                           ret))
+    ;; We make this unconditional. We could later conditionalize it if
+    ;; we happen to have better CCNOT translations for specific target
+    ;; gate sets.
+    (vector-push-extend #'CCNOT-to-CNOT ret)
     (cond
       ((optimal-2q-target-meets-requirements architecture ':cz)
        (vector-push-extend #'ucr-compiler ret))
