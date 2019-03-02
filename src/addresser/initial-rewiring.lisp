@@ -176,6 +176,17 @@ is found, then it will return *INITIAL-REWIRING-DEFAULT-TYPE*."
 ;;; In the future, we should definitely try to parallelize across the connected
 ;;; components.
 
+(defun rewire-dead-qubits-on-chip-spec (rewiring chip-spec)
+  ""
+  (declare (type rewiring rewiring))
+  (declare (type chip-specification chip-spec))
+  (loop :for qi :below (chip-spec-n-qubits chip-spec)
+        :when (chip-spec-qubit-dead? chip-spec qi) :do
+    (progn
+      (setf (aref (rewiring-l2p rewiring) qi) qi
+            (aref (rewiring-p2l rewiring) qi) qi)))
+  rewiring)
+
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
   "Find an initial rewiring for a program that ensures that all used qubits
 appear in the same connected component of the qpu"
@@ -208,7 +219,8 @@ appear in the same connected component of the qpu"
             (length needed) (length cc))
 
     (when (eql type :partial)
-      (return-from prog-initial-rewiring (make-partial-rewiring n-qubits)))
+      (return-from prog-initial-rewiring
+        (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec)))
 
     (when (eql type :random)
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
@@ -226,7 +238,7 @@ appear in the same connected component of the qpu"
 
            ;; physical qubit -> logical qubit -> distance
            (p2l-distances (make-array n-qubits :initial-element nil))
-           (rewiring (make-partial-rewiring n-qubits)))
+           (rewiring (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec)))
 
       (labels
           ((qubit-best-location (qubit)
