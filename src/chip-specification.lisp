@@ -329,7 +329,7 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
               (member ':iswap type))
       ;; TODO: compute this based on duration data
       (setf (gethash "time-bound" misc-data)
-            504))                       ; (+ (* 3 150) (* 6 9))
+            #.(+ (* 3 150) (* 6 9)))) ; this is the maximum amt of time that a 2Q program might take
     ;; return the qubit
     obj))
 
