@@ -423,3 +423,42 @@ MEASURE 1
     (is (= 1 (count-if (lambda (x) (typep x 'quil::pragma-initial-rewiring)) cp)))
     (is (= 1 (count-if (lambda (x) (typep x 'quil::pragma-readout-povm)) cp)))
     (is (= 2 (count-if (lambda (x) (typep x 'quil::pragma-add-kraus)) cp)))))
+
+(deftest test-clever-CCNOT-depth-reduction ()
+  "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
+  (let ((p (quil::compiler-hook (quil::parse-quil "
+PRAGMA INITIAL_REWIRING \"GREEDY\"
+CCNOT 0 1 2")
+                                (quil::build-8Q-chip)))
+        (ls (quil::make-lscheduler)))
+    (quil::append-instructions-to-lschedule ls (coerce (quil::parsed-program-executable-code p)
+                                                       'list))
+    (flet
+        ((value-bumper (instr value)
+           (cond
+             ((not (typep instr 'gate-application))
+              value)
+             (t
+              (quil::operator-match
+                (((("CZ" () _ _) instr))
+                 (1+ value))
+                (_
+                 value))))))
+      (let ((CZ-depth (quil::lscheduler-walk-graph ls :bump-value #'value-bumper)))
+        (is (= 7 CZ-depth))))))
+
+(deftest test-resource-carving-basic ()
+  (let* ((chip (build-8Q-chip))
+         (sched (quil::make-chip-schedule chip)))
+    (map nil (lambda (instr) (quil::chip-schedule-append sched instr))
+         (list (quil::build-gate "CZ" () 0 1)
+               (quil::build-gate "CZ" () 2 3)
+               (quil::build-gate "CZ" () 1 2)
+               (quil::build-gate "CZ" () 0 3)
+               (quil::build-gate "RX" '(#.(/ pi 2)) 1)))
+    (multiple-value-bind (order index obj)
+        (quil::lookup-hardware-address-by-qubits chip (list 1 2))
+      (declare (ignore order index))
+      (is (= (funcall (quil::hardware-object-native-instructions obj)
+                      (quil::build-gate "CZ" () 1 2))
+             (quil::chip-schedule-resource-carving-point sched (quil::make-qubit-resource 1 2)))))))
