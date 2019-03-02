@@ -100,10 +100,9 @@ BEFORE-INST to make use of RESOURCE."
 (defun chip-schedule-resource-carving-point (schedule resource)
   "Returns the latest time in SCHEDULE after which RESOURCE does not communicate with any other resources (i.e., RESOURCE is only touched by instructions whose resource utilization is a subset of RESOURCE)."
   (loop :for instr :being :the :hash-keys :of (chip-schedule-times schedule)
-        :using (hash-value instr-start-time)
       :when (and (resources-intersect-p (instruction-resources instr) resource)
                  (not (resource-subsetp (instruction-resources instr) resource)))
-        :maximize instr-start-time))
+        :maximize (chip-schedule-end-time schedule instr)))
 
 (defun chip-schedule-qubit-times (schedule)
   "Find the first time a qubit is available, for each qubit in the schedule."
