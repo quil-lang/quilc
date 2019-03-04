@@ -168,6 +168,19 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
 (defun chip-spec-qubit-dead? (chip-spec qubit-index)
   (gethash "dead" (hardware-object-misc-data (chip-spec-nth-qubit chip-spec qubit-index))))
 
+(defun chip-spec-dead-qubits (chip-spec)
+  (declare (type chip-specification chip-spec))
+  (loop :for qi :below (chip-spec-n-qubits chip-spec)
+        :when (chip-spec-qubit-dead? chip-spec qi)
+          :collect qi))
+
+(defun chip-spec-live-qubits (chip-spec)
+  (declare (type chip-specification chip-spec))
+  (loop :with dead-qubits := (chip-spec-dead-qubits chip-spec)
+        :for qi :below (chip-spec-n-qubits chip-spec)
+        :unless (find qi dead-qubits)
+          :collect qi))
+
 (defun lookup-hardware-address-by-qubits (chip-spec args)
   (unless (chip-specification-lookup-cache chip-spec)
     (warm-chip-spec-lookup-cache chip-spec))

@@ -176,15 +176,15 @@ is found, then it will return *INITIAL-REWIRING-DEFAULT-TYPE*."
 ;;; In the future, we should definitely try to parallelize across the connected
 ;;; components.
 
-(defun rewire-dead-qubits-on-chip-spec (rewiring chip-spec)
+(defun rewire-dead-qubits-on-chip-spec (rewiring chip-spec needed)
   ""
   (declare (type rewiring rewiring))
   (declare (type chip-specification chip-spec))
-  (loop :for qi :below (chip-spec-n-qubits chip-spec)
-        :when (chip-spec-qubit-dead? chip-spec qi) :do
-    (progn
-      (setf (aref (rewiring-l2p rewiring) qi) qi
-            (aref (rewiring-p2l rewiring) qi) qi)))
+  (declare (type list needed))
+  (loop :for qid :in (chip-spec-dead-qubits chip-spec)
+        :for qil :in (set-difference (chip-spec-live-qubits chip-spec) needed) :do
+          (setf (aref (rewiring-p2l rewiring) qid) qil
+                (aref (rewiring-l2p rewiring) qil) qid))
   rewiring)
 
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
@@ -220,7 +220,7 @@ appear in the same connected component of the qpu"
 
     (when (eql type :partial)
       (return-from prog-initial-rewiring
-        (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec)))
+        (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed)))
 
     (when (eql type :random)
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
@@ -238,7 +238,7 @@ appear in the same connected component of the qpu"
 
            ;; physical qubit -> logical qubit -> distance
            (p2l-distances (make-array n-qubits :initial-element nil))
-           (rewiring (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec)))
+           (rewiring (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed)))
 
       (labels
           ((qubit-best-location (qubit)
