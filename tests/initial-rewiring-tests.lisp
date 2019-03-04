@@ -31,3 +31,17 @@
     (is (= 4 (quil::q-deq q)))
     (is (= 5 (quil::q-deq q)))
     (is (quil::q-empty q))))
+
+(deftest test-partial-rewiring-on-dead-qubits ()
+  ;; See https://github.com/rigetti/quilc/issues/128
+  (let ((progm (quil::parse-quil-string "PRAGMA INITIAL_REWIRING \"PARTIAL\"
+PRAGMA EXPECTED_REWIRING \"#(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)\"
+RX(pi) 1
+PRAGMA CURRENT_REWIRING \"#(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)\"
+HALT"))
+        (chip (quil::qpu-hash-table-to-chip-specification
+               (yason:parse
+                "{\"isa\":
+        {\"1Q\": {\"1\": {}, \"2\": {}, \"3\": {}},
+         \"2Q\": {\"1-2\": {}, \"2-3\": {}}}}"))))
+    (is (compiler-hook progm chip))))
