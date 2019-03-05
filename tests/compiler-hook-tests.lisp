@@ -426,11 +426,13 @@ MEASURE 1
 
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
-  (let ((p (quil::compiler-hook (quil::parse-quil "
+  (let* ((quil::*compiler-noise-stream* *debug-io*)
+         (p (quil::compiler-hook (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
                                 (quil::build-8Q-chip)))
         (ls (quil::make-lscheduler)))
+    (quil::print-parsed-program p *debug-io*)
     (quil::append-instructions-to-lschedule ls (coerce (quil::parsed-program-executable-code p)
                                                        'list))
     (flet
