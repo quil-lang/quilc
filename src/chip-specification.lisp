@@ -542,6 +542,51 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
       (install-link-onto-chip chip-spec i (1+ i) :architecture architecture))
     chip-spec))
 
+(defun build-16QMUX-chip ()
+  (qpu-hash-table-to-chip-specification
+   (alexandria:plist-hash-table
+    (list "isa" (alexandria:plist-hash-table
+                 (list "1Q" (alexandria:plist-hash-table
+                             (list "0" (make-hash-table)
+                                   "1" (make-hash-table)
+                                   "2" (make-hash-table)
+                                   "3" (make-hash-table)
+                                   "4" (make-hash-table)
+                                   "5" (make-hash-table)
+                                   "6" (make-hash-table)
+                                   "7" (make-hash-table)
+                                   "10" (make-hash-table)
+                                   "11" (make-hash-table)
+                                   "12" (make-hash-table)
+                                   "13" (make-hash-table)
+                                   "14" (make-hash-table)
+                                   "15" (make-hash-table)
+                                   "16" (make-hash-table)
+                                   "17" (make-hash-table))
+                             :test #'equal)
+                       "2Q" (alexandria:plist-hash-table
+                             (list "0-1" (make-hash-table)
+                                   "1-2" (make-hash-table)
+                                   "2-3" (make-hash-table)
+                                   "3-4" (make-hash-table)
+                                   "4-5" (make-hash-table)
+                                   "5-6" (make-hash-table)
+                                   "6-7" (make-hash-table)
+                                   "0-7" (make-hash-table)
+                                   "10-11" (make-hash-table)
+                                   "11-12" (make-hash-table)
+                                   "12-13" (make-hash-table)
+                                   "13-14" (make-hash-table)
+                                   "14-15" (make-hash-table)
+                                   "15-16" (make-hash-table)
+                                   "16-17" (make-hash-table)
+                                   "10-17" (make-hash-table)
+                                   "1-16" (make-hash-table)
+                                   "2-15" (make-hash-table))
+                             :test #'equal))
+                 :test #'equal))
+    :test #'equal)))
+
 ;; here's the scalable lattice that Rigetti is currently considering for use as
 ;; an n-Q chip template (2017-10-16):
 ;;

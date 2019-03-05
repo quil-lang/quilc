@@ -69,7 +69,7 @@
   (alexandria::alist-hash-table
    `(("8Q" . ,(quil::build-8Q-chip))
      ("20Q" . ,(quil::build-skew-rectangular-chip 0 4 5))
-     ("16QMUX" . ,(quil::build-nQ-trivalent-chip 1 1 8 4))
+     ("16QMUX" . ,(quil::build-16QMUX-chip))
      ("bristlecone" . ,(quil::build-bristlecone-chip))
      ("ibmqx5" . ,(quil::build-ibm-qx5)))
    :test 'equal))
