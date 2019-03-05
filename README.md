@@ -187,7 +187,7 @@ As outlined above, the Quil Compiler supports two modes of operation: stdin and 
 To run `quilc` in stdin mode, do one either of the following:
 
 1. The containerized compiler will then read whatever newline-separated Quil instructions you
-enter, waiting for an EOF signal (C+d) to compile it.
+enter, waiting for an EOF signal (Control+d) to compile it.
 
 ```shell
 docker run --rm -it rigetti/quilc
