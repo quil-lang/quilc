@@ -85,7 +85,7 @@ server interface. `quilc` currently supports two server modes:
 
 The HTTP server was the original implementation of the server mode. It is now deprecated in favour
 of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
-``` shell
+```
 $ quilc -S
 +-----------------+
 |  W E L C O M E  |
@@ -114,7 +114,7 @@ to the RPCQ version instead.
 efficient network communication through the QCS stack. The server is started in RPCQ-mode using
 the `-R` flag
 
-``` shell
+```
 $ quilc -R
 +-----------------+
 |  W E L C O M E  |
