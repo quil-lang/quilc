@@ -428,7 +428,7 @@ MEASURE 1
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
   (let* ((quil::*compiler-noise-stream* *debug-io*)
          (p (quil::compiler-hook (quil::parse-quil "
-PRAGMA INITIAL_REWIRING \"GREEDY\"
+PRAGMA INITIAL_REWIRING \"PARTIAL\"
 CCNOT 0 1 2")
                                 (quil::build-8Q-chip)))
         (ls (quil::make-lscheduler)))
