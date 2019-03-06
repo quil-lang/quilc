@@ -23,3 +23,6 @@
 
 (defvar *enable-state-prep-compression* nil
   "When NIL, compression using state preparation methods is disabled.")
+
+(defvar *enable-approximate-compilation* nil
+  "When NIL, compression by replacing instructions sequences with approximate sequences is disabled.")

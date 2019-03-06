@@ -495,7 +495,31 @@ other's."
                      ()
                      "During careful checking of instruction compression, the produced ~
                    wavefunction by state prep reduction was detected to not be ~
-                   collinear with the target wavefunction."))))
+                   collinear with the target wavefunction.")))
+         
+         (check-quil-is-near-as-matrices ()
+           (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
+             (let* ((decompiled-matrix (make-matrix-from-quil decompiled-instructions))
+                    (reduced-matrix (kron-matrix-up (make-matrix-from-quil reduced-instructions)
+                                                    (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                    (reduced-decompiled-matrix (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
+                                                               (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+               (assert (matrix-equality stretched-matrix
+                                        (scale-out-matrix-phases reduced-matrix stretched-matrix)))
+               (when decompiled-instructions
+                 (let* ((prod (magicl:multiply-complex-matrices
+                               reduced-matrix (magicl:dagger reduced-decompiled-matrix)))
+                        (tr (loop :for i :below (magicl:matrix-rows prod)
+                                  :sum (magicl:ref prod i i)))
+                        (trace-fidelity (/ (+ 4 (abs (* tr tr))) 20))
+                        (ls-reduced (make-lscheduler))
+                        (ls-reduced-decompiled (make-lscheduler))
+                        (chip-spec (compressor-context-chip-specification context)))
+                   (append-instructions-to-lschedule ls-reduced reduced-instructions)
+                   (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
+                   (assert (>= (* trace-fidelity
+                                  (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
+                               (lscheduler-calculate-fidelity ls-reduced chip-spec)))))))))
       
       (destructuring-bind (start-wf wf-qc)
           (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
@@ -506,8 +530,13 @@ other's."
                                                                wf-qc)))
             (return-from check-contextual-compression-was-well-behaved
               (check-quil-agrees-as-states start-wf final-wf wf-qc))))
-        ;; otherwise, we're obligated to do full unitary compilation.
-        (check-quil-agrees-as-matrices)))))
+        ;; otherwise, we're obligated to check the full unitary.
+        ;; we need only make a decision about whether we're allowing approximate methods.
+        (cond
+          (*enable-approximate-compilation*
+           (check-quil-is-near-as-matrices))
+          (t
+           (check-quil-agrees-as-matrices)))))))
 
 
 (defun compress-instructions-in-context (instructions chip-specification context)
@@ -672,7 +701,8 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
          (governors (make-list (length (chip-specification-objects chip-specification))))
          (global-governor (make-instance 'governed-queue))
          (context (set-up-compressor-context :qubit-count n-qubits
-                                             :simulate (and *enable-state-prep-compression* protoquil))))
+                                             :simulate (and *enable-state-prep-compression* protoquil)
+                                             :chip-specification chip-specification)))
     (labels (;; these are some routines that govern the behavior of the massive FSM
              ;; we're constructing.
              ;;
