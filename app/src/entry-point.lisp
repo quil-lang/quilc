@@ -309,7 +309,8 @@ HTTP server for good.
                                   :log-writer
                                   #+windows (cl-syslog:stream-log-writer)
                                   #-windows (cl-syslog:tee-to-stream
-                                             (cl-syslog:syslog-log-writer "quilc" :local0)))))
+                                             (cl-syslog:syslog-log-writer "quilc" :local0)
+                                             *error-output*))))
        (cl-syslog:rfc-log (logger :info "Launching quilc.")
                           (:msgid "LOG0001"))
        (bt:make-thread (lambda () (start-rpc-server :port 5555
@@ -336,7 +337,8 @@ HTTP server for good.
                                   :log-writer
                                   #+windows (cl-syslog:stream-log-writer)
                                   #-windows (cl-syslog:tee-to-stream
-                                             (cl-syslog:syslog-log-writer "quilc" :local0)))))
+                                             (cl-syslog:syslog-log-writer "quilc" :local0)
+                                             *error-output*))))
        (cl-syslog:rfc-log (logger :info "Launching quilc.")
                           (:msgid "LOG0001"))
        (start-rpc-server :port port
