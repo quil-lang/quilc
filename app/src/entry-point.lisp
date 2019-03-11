@@ -25,7 +25,6 @@
 (defparameter *verbose* (make-broadcast-stream))
 (defparameter *protoquil* nil)
 (defparameter *log-level* ':info)
-(defparameter *quiet* nil)
 
 
 ;; NOTE: these can't have default values b/c they don't survive serialization
@@ -276,8 +275,6 @@
     (benchmarks))
   (when log-level
     (setf *log-level* (log-level-string-to-symbol log-level)))
-  (when quiet
-    (setf *quiet* quiet))
   (setf *logger*
         (make-instance 'cl-syslog:rfc5424-logger
                        :app-name *program-name*
@@ -342,14 +339,14 @@ HTTP server for good.
 ~%~%"))
 
       (when port
-        (cl-syslog:rfc-log (*logger* :debug "WARNING: -p and -S are incompatible. Dropping -p.~%~%")
+        (cl-syslog:rfc-log (*logger* :debug "WARNING: -p and -S are incompatible. Dropping -p.")
           (:msgid "LOG0001")))
 
       ;; start the RPCQ server in parallel
       (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
         (:msgid "LOG0001"))
-      (bt:make-thread (lambda () (start-rpc-server :port 5555
-                                              :logger *logger*)))
+      (bt:make-thread (lambda ()
+                        (start-rpc-server :port 5555 :logger *logger*)))
 
      (start-web-server))
 
