@@ -123,17 +123,16 @@
        (error "ISA descriptor does not name a known template or an extant file.")))))
 
 (defun log-level-string-to-symbol (log-level)
-  (let* ((priorities '(("debug" . :debug)
-                       ("info" . :info)
-                       ("notice" . :notice)
-                       ("warning" . :warning)
-                       ("err" . :err)
-                       ("crit" . :crit)
-                       ("alert" . :alert)
-                       ("emerg" . :emerg)))
-         (kw (assoc log-level priorities :test #'string=)))
-    (assert kw () "Unexpected log level: ~a" log-level)
-    (cdr kw)))
+  ;; TODO Should we customize this error?
+  (alexandria:eswitch (log-level :test #'string=)
+    ("debug" :debug)
+    ("info" :info)
+    ("notice" :notice)
+    ("warning" :warning)
+    ("err" :err)
+    ("crit" :crit)
+    ("alert" :alert)
+    ("emerg" :emerg)))
 
 (defvar *nick-banner* t)
 
