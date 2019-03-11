@@ -25,6 +25,7 @@
 (defparameter *verbose* (make-broadcast-stream))
 (defparameter *protoquil* nil)
 (defparameter *log-level* ':info)
+(defparameter *quiet* nil)
 
 
 ;; NOTE: these can't have default values b/c they don't survive serialization
@@ -285,6 +286,8 @@
                          #+windows (cl-syslog:stream-log-writer)
                          #-windows (cl-syslog:tee-to-stream
                                     (cl-syslog:syslog-log-writer "quilc" :local0)))))
+  (when quiet
+    (setf *quiet* quiet))
 
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
