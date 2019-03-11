@@ -276,18 +276,19 @@
   (when benchmark
     (benchmarks))
   (when log-level
-    (setf *log-level* (log-level-string-to-symbol log-level))
-    (setf *logger*
-          (make-instance 'cl-syslog:rfc5424-logger
-                         :app-name *program-name*
-                         :facility ':local0
-                         :maximum-priority *log-level*
-                         :log-writer
-                         #+windows (cl-syslog:stream-log-writer)
-                         #-windows (cl-syslog:tee-to-stream
-                                    (cl-syslog:syslog-log-writer "quilc" :local0)))))
+    (setf *log-level* (log-level-string-to-symbol log-level)))
   (when quiet
     (setf *quiet* quiet))
+  (setf *logger*
+        (make-instance 'cl-syslog:rfc5424-logger
+                       :app-name *program-name*
+                       :facility ':local0
+                       :maximum-priority *log-level*
+                       :log-writer
+                       #+windows (cl-syslog:stream-log-writer)
+                       #-windows (cl-syslog:tee-to-stream
+                                  (cl-syslog:syslog-log-writer "quilc" :local0)
+                                  *error-output*)))
 
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
