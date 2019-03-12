@@ -46,6 +46,7 @@
 
 (defun make-grid-node (tag &rest qubits)
   (let ((n (length qubits)))
+    (assert (plusp n))
     (make-instance 'grid-node :tag tag
                               :qubits (sort (copy-list qubits) #'<)
                               :back (make-array n :initial-element nil)
@@ -72,6 +73,20 @@ This function is non-destructive."
               (setf (aref (grid-node-back    merged-node) wire) incoming
                     (aref (grid-node-forward merged-node) wire) outgoing)
           :finally (return merged-node))))
+
+(defun subsumed-ahead-p (node)
+  "Do all of NODE's outgoing wires lead into the same node?"
+  (let ((forward (grid-node-forward node)))
+    (loop :with x := (aref forward 0)
+          :for i :from 1 :below (length forward)
+          :always (eq x (aref forward i)))))
+
+(defun subsumed-behind-p (node)
+  "Do all of NODE's incoming wires lead into the same node?"
+  (let ((back (grid-node-back node)))
+    (loop :with x := (aref back 0)
+          :for i :from 1 :below (length back)
+          :always (eq x (aref back i)))))
 
 (defclass program-grid ()
   ((leaders :initarg :leaders
