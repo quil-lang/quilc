@@ -76,17 +76,22 @@ This function is non-destructive."
 
 (defun subsumed-ahead-p (node)
   "Do all of NODE's outgoing wires lead into the same node?"
-  (let ((forward (grid-node-forward node)))
-    (loop :with x := (aref forward 0)
-          :for i :from 1 :below (length forward)
-          :always (eq x (aref forward i)))))
+  (let* ((forward (grid-node-forward node))
+         (x (aref forward 0)))
+    (if (null x)
+        nil
+        (loop :for i :from 1 :below (length forward)
+              :always (eq x (aref forward i))))))
 
 (defun subsumed-behind-p (node)
   "Do all of NODE's incoming wires lead into the same node?"
-  (let ((back (grid-node-back node)))
-    (loop :with x := (aref back 0)
-          :for i :from 1 :below (length back)
-          :always (eq x (aref back i)))))
+  (let* ((back (grid-node-back node))
+         (x (aref back 0)))
+    (if (null x)
+        nil
+        (loop :with x := (aref back 0)
+              :for i :from 1 :below (length back)
+              :always (eq x (aref back i))))))
 
 (defclass program-grid ()
   ((leaders :initarg :leaders
