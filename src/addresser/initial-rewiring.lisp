@@ -176,15 +176,17 @@ is found, then it will return *INITIAL-REWIRING-DEFAULT-TYPE*."
 ;;; In the future, we should definitely try to parallelize across the connected
 ;;; components.
 
-(defun rewire-dead-qubits-on-chip-spec (rewiring chip-spec needed)
-  ""
-  (declare (type rewiring rewiring))
-  (declare (type chip-specification chip-spec))
-  (declare (type list needed))
-  (loop :for qid :in (chip-spec-dead-qubits chip-spec)
-        :for qil :in (set-difference (chip-spec-live-qubits chip-spec) needed) :do
-          (setf (aref (rewiring-p2l rewiring) qid) qil
-                (aref (rewiring-l2p rewiring) qil) qid))
+(defun rewire-non-cc-qubits-on-chip-spec (rewiring chip-spec needed cc)
+  "Rewires physical qubits not in CC to logical qubits that are not in
+NEEDED."
+  (loop :for qi-non-cc
+          :in (set-difference (alexandria:iota (chip-spec-n-qubits chip-spec))
+                              cc)
+        :for qi-non-needed
+          :in (set-difference (alexandria:iota (chip-spec-n-qubits chip-spec))
+                              needed) :do
+          (setf (aref (rewiring-p2l rewiring) qi-non-cc) qi-non-needed
+                (aref (rewiring-l2p rewiring) qi-non-needed) qi-non-cc))
   rewiring)
 
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
@@ -219,7 +221,7 @@ appear in the same connected component of the qpu"
 
     (when (eql type ':partial)
       (return-from prog-initial-rewiring
-        (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed)))
+        (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
 
     (when (eql type ':random)
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
@@ -237,7 +239,7 @@ appear in the same connected component of the qpu"
 
            ;; physical qubit -> logical qubit -> distance
            (p2l-distances (make-array n-qubits :initial-element nil))
-           (rewiring (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed)))
+           (rewiring (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
 
       (labels
           ((qubit-best-location (qubit)
