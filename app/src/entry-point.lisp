@@ -72,7 +72,7 @@
     #-forest-sdk
     (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")
     (("log-level") :type string :optional t :initial-value "info" :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
-    (("quiet" #\q) :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")))
+    (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")))
 
 (defparameter *isa-descriptors*
   (alexandria::alist-hash-table
@@ -122,7 +122,6 @@
        (error "ISA descriptor does not name a known template or an extant file.")))))
 
 (defun log-level-string-to-symbol (log-level)
-  ;; TODO Should we customize this error?
   (alexandria:eswitch (log-level :test #'string=)
     ("debug" :debug)
     ("info" :info)
