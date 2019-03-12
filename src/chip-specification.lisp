@@ -137,44 +137,58 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
 ;;; These are tailored for devices with order 0 and 1 objects.
 
 (defun chip-spec-qubits (chip-spec)
+  "Get the qubits (as hardware-objects) for CHIP-SPEC."
   (vnth 0 (chip-specification-objects chip-spec)))
 (defun chip-spec-links (chip-spec)
+  "Get the links (as hardware-objects) for CHIP-SPEC."
   (vnth 1 (chip-specification-objects chip-spec)))
 
 (defun chip-spec-n-qubits (chip-spec)
+  "Get the number of qubits on CHIP-SPEC. Equivalent to the largest qubit index
+used to specify CHIP-SPEC."
   (length (chip-spec-qubits chip-spec)))
 (defun chip-spec-n-links (chip-spec)
+  "Get the number of links on CHIP-SPEC."
   (length (chip-spec-links chip-spec)))
 
 (defun chip-spec-nth-qubit (chip-spec n)
+  "Get the Nth qubit on chip-spec (as a hardware-object)."
   (vnth n (chip-spec-qubits chip-spec)))
 (defun chip-spec-nth-link (chip-spec n)
+  "Get the Nth link on chip-spec (as a hardware-object)."
   (vnth n (chip-spec-links chip-spec)))
 
 (defun chip-spec-links-on-qubit (chip-spec qubit-index)
+  "Get the links associated with QUBIT-INDEX in CHIP-SPEC."
   (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-spec qubit-index))))
 (defun chip-spec-qubits-on-link (chip-spec link-index)
+  "Get the qubits associated with LINK-INDEX in CHIP-SPEC."
   (vnth 0 (hardware-object-cxns (chip-spec-nth-link chip-spec link-index))))
 (defun chip-spec-hw-object (chip-spec order address)
+  "Get the hardware-object with matching ORDER and ADDRESS."
   (vnth address (vnth order (chip-specification-objects chip-spec))))
 (defun chip-spec-adj-qubits (chip-spec qubit-index)
+  "Get the qubits adjacent (connected by a link) to QUBIT-INDEX in CHIP-SPEC."
   (loop
     :for link-index :across (chip-spec-links-on-qubit chip-spec qubit-index)
     :append (remove qubit-index (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list))))
 (defun chip-spec-adj-links (chip-spec link-index)
+  "Get the links adjacent (connected by a qubit) to LINK-INDEX in CHIP-SPEC."
   (loop
     :for qubit-index :across (chip-spec-qubits-on-link chip-spec link-index)
     :append (remove link-index (coerce (chip-spec-links-on-qubit chip-spec qubit-index) 'list))))
-(defun chip-spec-qubit-dead? (chip-spec qubit-index)
-  (gethash "dead" (hardware-object-misc-data (chip-spec-nth-qubit chip-spec qubit-index))))
 
+(defun chip-spec-qubit-dead? (chip-spec qubit-index)
+  "Is QUBIT-INDEX a dead qubit in CHIP-SPEC."
+  (gethash "dead" (hardware-object-misc-data (chip-spec-nth-qubit chip-spec qubit-index))))
 (defun chip-spec-dead-qubits (chip-spec)
+  "Get all dead qubit indices in CHIP-SPEC."
   (declare (type chip-specification chip-spec))
   (loop :for qi :below (chip-spec-n-qubits chip-spec)
         :when (chip-spec-qubit-dead? chip-spec qi)
           :collect qi))
-
 (defun chip-spec-live-qubits (chip-spec)
+  "Get all live qubit indices in CHIP-SPEC."
   (declare (type chip-specification chip-spec))
   (loop :with dead-qubits := (chip-spec-dead-qubits chip-spec)
         :for qi :below (chip-spec-n-qubits chip-spec)
