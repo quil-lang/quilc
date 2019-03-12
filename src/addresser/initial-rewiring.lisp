@@ -195,14 +195,13 @@ appear in the same connected component of the qpu"
          (indices (containing-indices connected-components))
          (cc (alexandria:extremum connected-components #'> :key #'length))
          (needed (prog-used-qubits parsed-prog)))
-
     (assert (or (endp needed)
                 (<= (apply #'max needed) n-qubits))
             ()
             "User program incompatible with chip: qubit index ~a used and ~a available"
             (apply #'max needed) n-qubits)
 
-    (when (eql type :naive)
+    (when (eql type ':naive)
       (unless (loop
                 :with component
                 :for qubit :in needed
@@ -218,14 +217,14 @@ appear in the same connected component of the qpu"
             "User program used too many qubits: ~a used and ~a available in the largest connected component"
             (length needed) (length cc))
 
-    (when (eql type :partial)
+    (when (eql type ':partial)
       (return-from prog-initial-rewiring
         (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed)))
 
-    (when (eql type :random)
+    (when (eql type ':random)
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
 
-    (assert (eql type :greedy) (type)
+    (assert (eql type ':greedy) (type)
             "Unexpected rewiring type: ~a" type)
 
     ;; TODO: this assumes that the program is sequential
