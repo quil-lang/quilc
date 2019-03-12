@@ -554,6 +554,18 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
       (install-link-onto-chip chip-spec i (1+ i) :architecture architecture))
     chip-spec))
 
+(defun build-nQ-fully-connected-chip (n &key (architecture ':cz))
+  (let ((chip-spec (make-chip-specification
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
+    (install-generic-compilers chip-spec architecture)
+    ;; prep the qubits
+    (loop :repeat n :do
+      (adjoin-hardware-object (build-qubit) chip-spec))
+    ;; prep the links
+    (dotimes (i n chip-spec)
+      (dotimes (j i)
+        (install-link-onto-chip chip-spec j i :architecture architecture)))))
+
 (defun build-16QMUX-chip ()
   (qpu-hash-table-to-chip-specification
    (alexandria:plist-hash-table
