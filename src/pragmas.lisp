@@ -105,13 +105,13 @@ Expected syntax: PRAGMA INITIAL_REWIRING [NAIVE|PARTIAL|GREEDY|RANDOM]")
    (setf rewiring-type
          (cond
            ((string= rewiring-type-string "NAIVE")
-            :naive)
+            ':naive)
            ((string= rewiring-type-string "RANDOM")
-            :random)
+            ':random)
            ((string= rewiring-type-string "PARTIAL")
-            :partial)
+            ':partial)
            ((string= rewiring-type-string "GREEDY")
-            :greedy)
+            ':greedy)
            (t
             (error "Invalid PRAGMA INITIAL_REWIRING: ~a" rewiring-type-string)))))
   (:display-string

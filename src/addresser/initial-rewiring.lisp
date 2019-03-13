@@ -10,7 +10,7 @@
 
 (in-package #:cl-quil)
 
-(defparameter *initial-rewiring-default-type* :naive
+(defparameter *initial-rewiring-default-type* ':naive
   "Determines the default initial rewiring type when not provided and no PRAGMA present.
 
 PARTIAL: Start with a completely empty rewiring.
