@@ -221,7 +221,7 @@ appear in the same connected component of the qpu"
 
     (when (eql type ':partial)
       (return-from prog-initial-rewiring
-        (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
+        (rewire-non-cc-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
 
     (when (eql type ':random)
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
@@ -239,7 +239,7 @@ appear in the same connected component of the qpu"
 
            ;; physical qubit -> logical qubit -> distance
            (p2l-distances (make-array n-qubits :initial-element nil))
-           (rewiring (rewire-dead-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
+           (rewiring (rewire-non-cc-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
 
       (labels
           ((qubit-best-location (qubit)
