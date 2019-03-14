@@ -183,13 +183,13 @@ used to specify CHIP-SPEC."
   (gethash "dead" (hardware-object-misc-data (chip-spec-nth-qubit chip-spec qubit-index))))
 (defun chip-spec-dead-qubits (chip-spec)
   "Get all dead qubit indices in CHIP-SPEC."
-  (declare (type chip-specification chip-spec))
+  (check-type chip-spec chip-specification)
   (loop :for qi :below (chip-spec-n-qubits chip-spec)
         :when (chip-spec-qubit-dead? chip-spec qi)
           :collect qi))
 (defun chip-spec-live-qubits (chip-spec)
   "Get all live qubit indices in CHIP-SPEC."
-  (declare (type chip-specification chip-spec))
+  (check-type chip-spec chip-specification)
   (loop :with dead-qubits := (chip-spec-dead-qubits chip-spec)
         :for qi :below (chip-spec-n-qubits chip-spec)
         :unless (find qi dead-qubits)
