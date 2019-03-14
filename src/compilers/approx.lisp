@@ -13,15 +13,10 @@
          (diag (loop :for j :below 4
                      :collect (let ((mag 0d0)
                                     phase)
-                                ;; TODO: this looks seriously wrong on startup with CPHASE(0.8)
                                 (dotimes (i 4)
-                                  (format t "phase: ~a, mag: ~a~%"
-                                          (phase (magicl:ref db j i))
-                                          (abs (magicl:ref db j i)))
                                   (when (>= (abs (magicl:ref db j i)) mag)
                                     (setf mag (abs (magicl:ref db j i)))
-                                    (setf phase (phase (magicl:ref db j i)))))
-                                (format t "~%")
+                                    (setf phase (mod (phase (magicl:ref db j i)) pi))))
                                 (exp (* #C(0 1) phase)))))
          (d (magicl:diag 4 4 diag))
          (b (magicl:multiply-complex-matrices
@@ -43,6 +38,10 @@
                                 (magicl:multiply-complex-matrices a (magicl:transpose a))))
     (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
                                 (magicl:multiply-complex-matrices b (magicl:transpose b))))
+    (assert (matrix-equals-dwim (reduce #'magicl:multiply-complex-matrices
+                                        (list +edag-basis+ m +e-basis+))
+                                (reduce #'magicl:multiply-complex-matrices
+                                        (list a d b))))
     (values a d b)))
 
 (defun trace-distance (m1 m2)
@@ -56,29 +55,33 @@
     (append-instructions-to-lschedule ls instrs)
     (lscheduler-calculate-fidelity ls chip-spec)))
 
-(defun get-canonical-coords-from-angles (angles)
-  (assert (= 4 (length angles)))
-  (let ((first  (mod (/ (- (fourth angles) (first angles))  2) pi))
-        (second (mod (/ (- (fourth angles) (second angles)) 2) pi))
-        (third  (mod (/ (- (fourth angles) (third angles))  2) pi)))
-    (let ((option-1 (sort (list first second third) #'>))
-          (option-2 (sort (list (- pi first) (- pi second) third) #'>))
-          (option-3 (sort (list first (- pi second) (- pi third)) #'>))
-          (option-4 (sort (list (- pi first) second (- pi third)) #'>)))
-      (flet ((test (seq)
-               ;; TODO: is this a utils kind of thing?
-               (and (>= (+ (/ pi 2) +double-comparison-threshold-strict+)
-                        (- (first seq) +double-comparison-threshold-strict+))
-                    (>= (+ (first seq) +double-comparison-threshold-strict+)
-                        (- (second seq) +double-comparison-threshold-strict+))
-                    (>= (+ (second seq) +double-comparison-threshold-strict+)
-                        (- (abs (third seq)) +double-comparison-threshold-strict+)))))
-        (cond
-          ((test option-1) option-1)
-          ((test option-2) option-2)
-          ((test option-3) option-3)
-          ((test option-4) option-4)
-          (t (error "uh-oh (cf. ~a)" option-1)))))))
+(defun get-canonical-coords-from-diagonal (d)
+  (assert (= 4 (magicl:matrix-rows d) (magicl:matrix-cols d)))
+  (let* ((angles (mapcar #'phase (loop :for i :below 4 :collect (magicl:ref d i i))))
+         (first  (mod (+ (third angles) (fourth angles)) pi))
+         (second (mod (- (+ (third angles) (first angles)))  pi))
+         (third  (mod (+ (third angles) (second angles)) pi))
+         (first  (if (double= pi first)  0d0 first))
+         (second (if (double= pi second) 0d0 second))
+         (third  (if (double= pi third)  0d0 third))
+         (option-1 (sort (list first second third) #'>))
+         (option-2 (sort (list (- pi first) (- pi second) third) #'>))
+         (option-3 (sort (list first (- pi second) (- pi third)) #'>))
+         (option-4 (sort (list (- pi first) second (- pi third)) #'>)))
+    (flet ((test (seq)
+             ;; TODO: is this a utils kind of thing?
+             (and (>= (+ (/ pi 2) +double-comparison-threshold-strict+)
+                      (- (first seq) +double-comparison-threshold-strict+))
+                  (>= (+ (first seq) +double-comparison-threshold-strict+)
+                      (- (second seq) +double-comparison-threshold-strict+))
+                  (>= (+ (second seq) +double-comparison-threshold-strict+)
+                      (- (abs (third seq)) +double-comparison-threshold-strict+)))))
+      (cond
+        ((test option-1) option-1)
+        ((test option-2) option-2)
+        ((test option-3) option-3)
+        ((test option-4) option-4)
+        (t (error "uh-oh (cf. ~a)" (list first second third)))))))
 
 (defun get-fidelity-distance-from-canonical-coords (coords1 coords2)
   (let* ((deltas  (mapcar #'- coords1 coords2))
@@ -119,21 +122,23 @@
           (when (= -1 (cl-permutation:perm-sign sigma))
             (setf (first signs) (* -1 (first signs))))
           (let* ((new-trace
-                  (loop :for x :in (cl-permutation:permute sigma d-as-list)
-                        :for y :in dprime-as-list
-                        :for sign :in signs
-                        :sum (* x sign (conjugate y))))
+                   (loop :for x :in (cl-permutation:permute sigma d-as-list)
+                         :for y :in dprime-as-list
+                         :for sign :in signs
+                         :sum (* x sign (conjugate y))))
                  (new-fidelity (/ (+ 4 (abs (* new-trace new-trace))) 20)))
             (when (>= new-fidelity max-fidelity)
               (setf max-fidelity new-fidelity)
               (setf o (make-signed-permutation-matrix sigma signs))))))
-      (print a) (terpri) (print d) (terpri) (print b) (terpri)
-      (print (reduce #'magicl:multiply-complex-matrices
-                     (list +e-basis+ a d b +edag-basis+))) (terpri)
-      (print aprime) (terpri) (print dprime) (terpri) (print bprime) (terpri)
-      (print (reduce #'magicl:multiply-complex-matrices
-                     (list +e-basis+ aprime dprime bprime +edag-basis+))) (terpri)
-      (print o) (terpri)
+      #+ignore
+      (progn
+        (print a) (terpri) (print d) (terpri) (print b) (terpri)
+        (print (reduce #'magicl:multiply-complex-matrices
+                       (list +e-basis+ a d b +edag-basis+))) (terpri)
+        (print aprime) (terpri) (print dprime) (terpri) (print bprime) (terpri)
+        (print (reduce #'magicl:multiply-complex-matrices
+                       (list +e-basis+ aprime dprime bprime +edag-basis+))) (terpri)
+        (print o) (terpri))
       (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
                                   (magicl:multiply-complex-matrices a (magicl:transpose a))))
       (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
@@ -182,10 +187,7 @@
     (multiple-value-bind (a d b) (orthogonal-decomposition m)
       ;; now we manufacture a bunch of candidate circuits
       (let* ((candidate-pairs nil)
-             (angles (loop :for j :below 4
-                           :collect (phase (magicl:ref d j j))))
-             (coord (get-canonical-coords-from-angles angles)))
-        (format t "Angles: ~a~%Coord: ~a~%" angles coord)
+             (coord (get-canonical-coords-from-diagonal d)))
         (flet
             ((build-depth-0-circuit (coord q1 q0)
                (declare (ignore coord))
@@ -206,7 +208,7 @@
                      (build-gate "CZ" '()                   q0 q1)
                      (build-gate "RY" '(#.(/ pi -2))        q0)
                      (build-gate "RY" (list (second coord)) q1)
-                     (build-gate "RZ" (list (third coord) ) q0)
+                     (build-gate "RZ" (list (third coord))  q0)
                      (build-gate "RY" '(#.(/ pi 2))         q1)
                      (build-gate "CZ" '()                   q0 q1)
                      (build-gate "RY" '(#.(/ pi -2))        q1)
@@ -218,25 +220,26 @@
                                          #'build-depth-1-circuit
                                          #'build-depth-2-circuit
                                          #'build-depth-3-circuit))
-            (format t "Trying ~a,~%" circuit-crafter)
+            
             (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
-                                                                        (application-arguments instr)))))
-              (format t "which gave:~%")
-              (dolist (instr center-circuit)
-                (print-instruction instr) (terpri))
+                                                                        (application-arguments instr))))
+                   (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
+                   (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
               (multiple-value-bind (ua ub fidelity)
                   (match-matrix-to-an-e-basis-diagonalization
                    (make-matrix-from-quil center-circuit)
                    a d b)
-                (dolist (instr center-circuit)
-                  (print-instruction instr) (terpri))
-                (format t "... with fidelity ~a.~%" fidelity)
-                (format t "... and with outer matrices~%")
-                (print ua) (terpri)
-                (print ub) (terpri)
+                (format t "APPROXIMATE-2Q-COMPILER: ~a resulted in
+    ... lone fidelity ~a
+    ... and cost ~a,
+    ... hence adjusted fidelity ~a.~%"
+                        circuit-crafter
+                        fidelity
+                        circuit-cost
+                        (* circuit-cost fidelity))
                 (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
                   (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
-                    (push (cons fidelity 
+                    (push (cons (* circuit-cost fidelity) 
                                 (append (list (anon-gate "B0" b0 q0)
                                               (anon-gate "B1" b1 q1))
                                         center-circuit
@@ -244,7 +247,7 @@
                                               (anon-gate "A1" a1 q1))))
                           candidate-pairs)))))))
         ;; now vomit the results
-        (cdr (alexandria:extremum candidate-pairs #'< :key #'car))))))
+        (cdr (alexandria:extremum candidate-pairs #'> :key #'car))))))
 
 (defun approximate-2Q-compiler-for (target chip-spec)
   (lambda (instr)

@@ -67,7 +67,8 @@
                              (:file "optimal-2q")
                              (:file "ucr-recognize")
                              (:file "state-prep")
-                             (:file "translators")))
+                             (:file "translators")
+                             (:file "approx")))
                (:module "analysis"
                 :serial t
                 :components ((:file "process-includes")
