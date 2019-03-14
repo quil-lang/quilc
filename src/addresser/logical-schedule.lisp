@@ -571,8 +571,9 @@ mapping instructions to their tags. "
              (* val1 val2))
            (fidelity-bumper (instr value)
              (flet ((warn-and-skip (instr)
-                      (warn "Fidelity not known for the following gate: ~s. Assuming ideal."
-                            (print-instruction instr nil))
+                      (format *compiler-noise-stream*
+                              "Fidelity not known for the following gate: ~s. Assuming ideal."
+                              (print-instruction instr nil))
                       (return-from fidelity-bumper value)))
                (let (fidelity)
                  (typecase instr
@@ -623,7 +624,9 @@ mapping instructions to their tags. "
       (declare (ignore max-value))
       (loop :with fidelity := 1d0
             :for instr :in (lscheduler-last-instrs lschedule)
-            :do (setf fidelity (* fidelity (gethash instr value-hash)))
+            :do (setf fidelity
+                      (fidelity-combinator (fidelity-bumper instr 1d0)
+                                           (* fidelity (gethash instr value-hash)))) 
             :finally (return (exp (- (sqrt (- (log fidelity))))))))))
 
 (defun lscheduler-all-instructions (lschedule)
