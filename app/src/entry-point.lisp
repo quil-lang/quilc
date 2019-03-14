@@ -24,12 +24,19 @@
 (defparameter *ISA-descriptor* nil)
 (defparameter *verbose* (make-broadcast-stream))
 (defparameter *protoquil* nil)
+(defparameter *log-level* ':info)
 
 
 ;; NOTE: these can't have default values b/c they don't survive serialization
 (defparameter *json-stream* (make-broadcast-stream))
 (defparameter *human-readable-stream* (make-broadcast-stream))
 (defparameter *quil-stream* (make-broadcast-stream))
+
+(defparameter *logger* (make-instance 'cl-syslog:rfc5424-logger
+                                      :app-name "quilc"
+                                      :facility ':local0
+                                      :maximum-priority ':info
+                                      :log-writer (cl-syslog:null-log-writer)))
 
 (defparameter *statistics-dictionary* (make-hash-table :test #'equal))
 
@@ -63,7 +70,9 @@
     (("version" #\v) :type boolean :optional t :documentation "print version information")
     (("check-libraries") :type boolean :optional t :documentation "check that foreign libraries are adequate")
     #-forest-sdk
-    (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")))
+    (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")
+    (("log-level") :type string :optional t :initial-value "info" :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
+    (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")))
 
 (defparameter *isa-descriptors*
   (alexandria::alist-hash-table
@@ -111,6 +120,17 @@
        (quil::read-chip-spec-file isa))
       (t
        (error "ISA descriptor does not name a known template or an extant file.")))))
+
+(defun log-level-string-to-symbol (log-level)
+  (alexandria:eswitch (log-level :test #'string=)
+    ("debug" :debug)
+    ("info" :info)
+    ("notice" :notice)
+    ("warning" :warning)
+    ("err" :err)
+    ("crit" :crit)
+    ("alert" :alert)
+    ("emerg" :emerg)))
 
 (defvar *nick-banner* t)
 
@@ -211,33 +231,36 @@
        :positional-arity 0
        :rest-arity nil))
 
-(defun process-options (&key (prefer-gate-ladders nil)
-                             (compute-gate-depth nil)
-                             (compute-gate-volume nil)
-                             (compute-runtime nil)
-                             (compute-fidelity nil)
-                             (compute-matrix-reps nil)
-                             (compute-2Q-gate-depth nil)
-                             (compute-unused-qubits nil)
-                             (show-topological-overhead nil)
-                             (gate-blacklist nil)
-                             (gate-whitelist nil)
-                             (without-pretty-printing nil)
-                             (print-logical-schedule nil)
-                             (verbose nil)
-                             (json-serialize nil)
-                             (isa nil)
-                             (enable-state-prep-reductions nil)
-                             (protoquil nil)
-                             (version nil)
-                             (check-libraries nil)
-                             #-forest-sdk
-                             (benchmark nil)
-                             (server-mode-http nil)
-                             (server-mode-rpc nil)
-                             (port nil)
-                             time-limit
-                             (help nil))
+(defun process-options (&key
+                          (prefer-gate-ladders nil)
+                          (compute-gate-depth nil)
+                          (compute-gate-volume nil)
+                          (compute-runtime nil)
+                          (compute-fidelity nil)
+                          (compute-matrix-reps nil)
+                          (compute-2Q-gate-depth nil)
+                          (compute-unused-qubits nil)
+                          (show-topological-overhead nil)
+                          (gate-blacklist nil)
+                          (gate-whitelist nil)
+                          (without-pretty-printing nil)
+                          (print-logical-schedule nil)
+                          (verbose nil)
+                          (json-serialize nil)
+                          (isa nil)
+                          (enable-state-prep-reductions nil)
+                          (protoquil nil)
+                          (version nil)
+                          (check-libraries nil)
+                          #-forest-sdk
+                          (benchmark nil)
+                          (server-mode-http nil)
+                          (server-mode-rpc nil)
+                          (port nil)
+                          time-limit
+                          (help nil)
+                          (log-level nil)
+                          (quiet nil))
   (when help
     (show-help)
     (uiop:quit 0))
@@ -249,6 +272,18 @@
   #-forest-sdk
   (when benchmark
     (benchmarks))
+  (when log-level
+    (setf *log-level* (log-level-string-to-symbol log-level)))
+  (setf *logger*
+        (make-instance 'cl-syslog:rfc5424-logger
+                       :app-name *program-name*
+                       :facility ':local0
+                       :maximum-priority *log-level*
+                       :log-writer
+                       #+windows (cl-syslog:stream-log-writer)
+                       #-windows (cl-syslog:tee-to-stream
+                                  (cl-syslog:syslog-log-writer "quilc" :local0)
+                                  *error-output*)))
 
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
@@ -281,15 +316,18 @@
    (cond
     ;; web server mode requested.
     ;; currently provides both web and RPCQ server as a transition.
-    (server-mode-http
-     ;; null out the streams
-     (setf *json-stream* (make-broadcast-stream)
-           *human-readable-stream* (make-broadcast-stream)
-           *quil-stream* (make-broadcast-stream))
+     (server-mode-http
+      ;; null out the streams
+      (setf *json-stream* (make-broadcast-stream)
+            *human-readable-stream* (make-broadcast-stream)
+            *quil-stream* (make-broadcast-stream))
 
-     ;; launch the polling loop
-     (show-banner)
-     (format t "~%
+      ;; launch the polling loop
+      (unless quiet
+        (show-banner))
+
+      (unless quiet
+        (format t "~%
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
 future, it will be removed.  In the meanwhile, we are launching *both* an HTTP
@@ -297,24 +335,17 @@ server and an RPCQ server.  You're advised to modify your client code to talk
 to the RPCQ version instead, so that it continues to operate when we disable the
 HTTP server for good.
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-~%~%")
+~%~%"))
 
-     (when port
-       (format t "WARNING: -p and -S are incompatible. Dropping -p.~%~%"))
+      (when port
+        (cl-syslog:rfc-log (*logger* :debug "WARNING: -p and -S are incompatible. Dropping -p.")
+          (:msgid "LOG0001")))
 
-     ;; start the RPCQ server in parallel
-     (let ((logger (make-instance 'cl-syslog:rfc5424-logger
-                                  :app-name *program-name*
-                                  :facility ':local0
-                                  :log-writer
-                                  #+windows (cl-syslog:stream-log-writer)
-                                  #-windows (cl-syslog:tee-to-stream
-                                             (cl-syslog:syslog-log-writer "quilc" :local0)
-                                             *error-output*))))
-       (cl-syslog:rfc-log (logger :info "Launching quilc.")
-                          (:msgid "LOG0001"))
-       (bt:make-thread (lambda () (start-rpc-server :port 5555
-                                                    :logger logger))))
+      ;; start the RPCQ server in parallel
+      (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
+        (:msgid "LOG0001"))
+      (bt:make-thread (lambda ()
+                        (start-rpc-server :port 5555 :logger *logger*)))
 
      (start-web-server))
 
@@ -330,19 +361,12 @@ HTTP server for good.
        (setf port 5555)
 
        ;; launch the polling loop
-       (show-banner))
-     (let ((logger (make-instance 'cl-syslog:rfc5424-logger
-                                  :app-name *program-name*
-                                  :facility ':local0
-                                  :log-writer
-                                  #+windows (cl-syslog:stream-log-writer)
-                                  #-windows (cl-syslog:tee-to-stream
-                                             (cl-syslog:syslog-log-writer "quilc" :local0)
-                                             *error-output*))))
-       (cl-syslog:rfc-log (logger :info "Launching quilc.")
-                          (:msgid "LOG0001"))
-       (start-rpc-server :port port
-                         :logger logger)))
+       (unless quiet
+         (show-banner)))
+     (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
+       (:msgid "LOG0001"))
+     (start-rpc-server :port port
+                       :logger *logger*))
 
     ;; server modes not requested, so continue parsing arguments
     (t
