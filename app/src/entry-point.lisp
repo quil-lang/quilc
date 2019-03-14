@@ -72,7 +72,9 @@
     #-forest-sdk
     (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")
     (("log-level") :type string :optional t :initial-value "info" :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
-    (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")))
+    (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")
+    #+forest-sdk
+    (("check-version") :type boolean :optional t :initial-value nil :documentation "Check for a new SDK version")))
 
 (defparameter *isa-descriptors*
   (alexandria::alist-hash-table
