@@ -40,3 +40,20 @@
     (git-hash '#:quilc)
   :test #'string=
   :documentation "The git hash of the quilc repo.")
+
+(defun latest-sdk-version ()
+  "Get the latest SDK version as tagged on Github"
+  (let* ((s (drakma:http-request "https://api.github.com/repos/rigetti/quilc/releases/latest"
+                                 :want-stream t))
+         (p (yason:parse s)))
+    (multiple-value-bind (version success)
+        (gethash "name" p)
+      ;; versions tagged on github are prefixed with "v"
+      (when success
+        (subseq version 1)))))
+
+(defun sdk-update-available-p ()
+  "Test whether the current SDK version is the latest SDK
+version. Second value returned indicates the latest version."
+  (let ((latest (latest-sdk-version)))
+    (values (not (string= latest +QUILC-VERSION+)) latest)))

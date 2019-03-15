@@ -20,6 +20,7 @@
                #:bordeaux-threads     ; deprecated
                #:cl-syslog
                #:rpcq                 ; to replace HUNCHENTOOT and B-T
+               #:drakma
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
