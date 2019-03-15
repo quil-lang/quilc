@@ -1,6 +1,40 @@
 ;;;; fusion.lisp
+;;;;
+;;;; Author: Robert Smith
+;;;;
+;;;; (Many ideas inspired by Aaron Vontell, who write the first but
+;;;; altogether different implementation of gate fusion.)
 
 (in-package #:cl-quil)
+
+;;; This file has data structures and algorithms for performing "gate
+;;; fusion", a program transformation to reduce the number of gates by
+;;; multiplying them together. The main purpose of this transformation
+;;; is faster simulation.
+;;;
+;;; The main object is a GRID-NODE. This is a doubly-linked-list-like
+;;; node that has multiple incoming and outgoing pointers. It is
+;;; modeled after a gate happening on qubits, though it doesn't
+;;; contain any actual information about the linear algebra of the
+;;; gate. (That information will most likely be found in its TAG
+;;; slot.) Instead, GRID-NODEs just contain the information necessary
+;;; to determine both if and how it can get fused with other, usually
+;;; neighboring nodes.
+;;;
+;;; The other object of interest is the PROGRAM-GRID. This is nothing
+;;; more than a record of which nodes are "roots" (i.e., the start of
+;;; a program), and which nodes are "trailers" (i.e., the last nodes
+;;; to exist on a qubit).
+;;;
+;;; The main way to extend the fusion routines is to teach it *when*
+;;; and *how* to fuse.
+;;;
+;;;     WHEN: [unimplemented]
+;;;
+;;;     HOW: Add a method to the FUSE-OBJECTS generic function.
+;;;
+;;; By default, fusion just builds lists out of the tags of the
+;;; GRID-NODE objects.
 
 (defclass grid-node ()
   ((tag :initarg :tag
@@ -23,6 +57,7 @@
       (format stream "~S" (grid-node-qubits o)))))
 
 (defun root-node-p (gn)
+  "Is the GRID-NODE GN a \"root node\", i.e., does it have no predecessors? "
   (every #'null (grid-node-back gn)))
 
 (defun preceding-node-on-qubit (gn qubit)
@@ -101,7 +136,7 @@ This function is non-destructive."
              :documentation "A vector of trailing nodes to the grid, where the index into the vector is the qubit/wire number."))
   (:default-initargs :roots nil
                      :trailers (make-array 0 :adjustable t :initial-element nil))
-  (:documentation "A representation of a program arranged as a collection of nodes on horizontal wires."))
+  (:documentation "A representation of a program arranged as a collection of nodes on horizontal qubit wires."))
 
 (defun program-grid-num-qubits (pg)
   "How many qubits does PG hold?"
@@ -338,6 +373,10 @@ forcing \"Y\" to be the middle link."
 (defun sort-program-grid (pg)
   "Produce a list of nodes of the PROGRAM-GRID PG a topologically sorted order, according to a temporal-<= relation."
   (let* ((sorted        nil)            ; Final sorted list.
+         ;; XXX: Note: We could merge NEEDS-SORTING with SORTED-SET if
+         ;; NEEDS-SORTING itself was a hash table, which
+         ;; PROGRAM-GRID-NODES could naturally return. This would be
+         ;; both time and memory efficient.
          (needs-sorting (program-grid-nodes pg))
          (sorted-set    (make-hash-table :test 'eq :size (length needs-sorting)))
          (sinks         (remove-if-not #'root-node-p needs-sorting)))
@@ -375,7 +414,7 @@ forcing \"Y\" to be the middle link."
 ;;;
 ;;;     <proto node> ::= ( <tag> <qubit>+ )
 ;;;
-;;;     <tag> ::= any symbol
+;;;     <tag> ::= any object
 ;;;
 ;;;     <qubit> ::= non-negative integer
 ;;;
@@ -399,7 +438,6 @@ Example:
 (defun proto-program (pg)
   "Reconstitute a proto-program from a PROGRAM-GRID.
 
-Note: This is not guaranteed to be a perfect inverse to BUILD-GRID, but it is guaranteed to be equivalent up-to qubit subsystem commutativity.
-"
+Note: This is not guaranteed to be a perfect inverse to BUILD-GRID, but it is guaranteed to be equivalent up-to qubit subsystem commutativity."
   (loop :for node :in (sort-program-grid pg)
         :collect (list* (grid-node-tag node) (grid-node-qubits node))))
