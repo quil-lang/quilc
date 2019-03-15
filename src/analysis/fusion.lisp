@@ -65,6 +65,11 @@
                               :back (make-array n :initial-element nil)
                               :forward (make-array n :initial-element nil))))
 
+(defgeneric fuse-objects (a b)
+  (:documentation "Compute the fusion (in the \"gate fusion\" sense) of objects A and B.")
+  (:method (a b)
+    (append (alexandria:ensure-list a) (alexandria:ensure-list b))))
+
 (defun merge-grid-nodes (a b)
   "Merge two grid nodes A and B to produce a new node. All incoming wires to A and outgoing wires to B will be the wires of the merged node.
 
@@ -73,8 +78,7 @@ This function is non-destructive."
                                              (grid-node-qubits b)))
                            #'<))
          (merged-node (apply #'make-grid-node
-                             (append (alexandria:ensure-list (grid-node-tag a))
-                                     (alexandria:ensure-list (grid-node-tag b)))
+                             (fuse-objects (grid-node-tag a) (grid-node-tag b))
                              all-qubits)))
     (loop :for qubit :in all-qubits
           ;; ATTENTION! The order of these OR-clauses matters!
@@ -124,7 +128,10 @@ This function is non-destructive."
                ;; Make sure we aren't updating something that isn't
                ;; actually a trailer. This would be a bug somewhere
                ;; else!
-               (assert (trailer-node-on-qubit-p trailer qubit))
+               (assert (trailer-node-on-qubit-p trailer qubit)
+                       ()
+                       "Inconsistency in program grid. Found a non-trailer ~
+                        node in the trailer vector.")
                ;; Update the GRID-NODE.
                (setf (preceding-node-on-qubit gn qubit) trailer)
                (setf (succeeding-node-on-qubit trailer qubit) gn)
@@ -279,7 +286,11 @@ forcing \"Y\" to be the middle link."
                (push node roots))
              (dolist (qubit (grid-node-qubits node))
                (when (trailer-node-on-qubit-p node qubit)
-                 (assert (null (aref trailers qubit)))
+                 (assert (null (aref trailers qubit))
+                         ()
+                         "Inconsistency in program grid. Found a duplicate ~
+                          trailer node on qubit ~D"
+                         qubit)
                  (setf (aref trailers qubit) node)))
           :finally (return (make-instance 'program-grid :roots roots
                                                         :trailers trailers)))))
@@ -312,4 +323,3 @@ Example:
         :for gn := (apply #'make-grid-node (first pn) (rest pn))
         :do (append-node pg gn)
         :finally (return pg)))
-
