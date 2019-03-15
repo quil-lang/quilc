@@ -269,3 +269,45 @@ B(b) 0 1
                  (subsetp mem-descriptors old-defs)))
         ;; Are there no new memory descriptors (no __P)?
         (is (= (length old-defs) (length mem-descriptors)))))))
+
+;;; Fusion tests
+
+(deftest test-grid-node ()
+  "Tests on the grid node data structure and associated functions."
+  (let ((q0 (quil::make-grid-node 'q0 0))
+        (q1 (quil::make-grid-node 'q1 1))
+        (q2 (quil::make-grid-node 'q2 2))
+        (q01 (quil::make-grid-node 'q01 0 1))
+        (q12 (quil::make-grid-node 'q12 1 2))
+        (q02 (quil::make-grid-node 'q02 0 2)))
+    ;; All notes start as root nodes.
+    (is (every #'quil::root-node-p (list q0 q1 q2 q01 q12 q02)))
+    ;; Set succeeding, check preceding.
+    (setf (quil::succeeding-node-on-qubit q0 0) q01)
+    (is (eq q01 (quil::succeeding-node-on-qubit q0 0)))
+    ;; Set preceding, check succeeding
+    (setf (quil::preceding-node-on-qubit q12 2) q2)
+    (is (eq q2 (quil::preceding-node-on-qubit q12 2)))
+    ;; Check that we can't set a preceding or succeeding node on
+    ;; invalid qubits.
+    (signals error (setf (quil::succeeding-node-on-qubit q2 0) q02))
+    (signals error (setf (quil::preceding-node-on-qubit q02 1) q1))
+    ;; Check trailer dealios.
+    (is (quil::trailer-node-on-qubit-p q01 0))
+    (is (not (quil::trailer-node-on-qubit-p q0 0)))))
+
+(defclass dummy-node ()
+  ((value :initarg :value
+          :accessor dummy-node-value)))
+
+(defmethod quil::fuse-objects ((a dummy-node) (b dummy-node))
+  (make-instance 'dummy-node :value (+ (dummy-node-value a)
+                                       (dummy-node-value b))))
+
+(deftest test-fuse-dummy-objects ()
+  "Test that FUSE-OBJECTS behaves properly in MERGE-GRID-NODES."
+  (is (= 3 (dummy-node-value
+            (quil::grid-node-tag
+             (quil::merge-grid-nodes
+              (quil::make-grid-node (make-instance 'dummy-node :value 1) 1)
+              (quil::make-grid-node (make-instance 'dummy-node :value 2) 1)))))))

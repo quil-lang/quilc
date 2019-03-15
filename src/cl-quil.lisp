@@ -11,6 +11,8 @@
     (setf pp (transform 'resolve-applications pp))
     (setf pp (transform 'expand-circuits pp))
     (setf pp (transform 'type-check pp))
+    ;; XXX: FIXME, the QVM should probably do this on its own
+    ;; accord. Figure it out! Don't merge until this is fixed.
     (setf pp (transform 'patch-labels pp))
     pp))
 
