@@ -6,7 +6,6 @@
 
 
 (defun orthogonal-decomposition (m)
-  (declare (optimize (debug 3) (speed 0) (safety 3)))
   (let* ((a (diagonalizer-in-e-basis m))
          (db (reduce #'magicl:multiply-complex-matrices
                      (list (magicl:transpose a) +edag-basis+ m +e-basis+)))
@@ -30,25 +29,30 @@
       (setf b (magicl:multiply-complex-matrices
                (magicl:diag 4 4 (list -1 1 1 1))
                b)))
-    (assert (double~ 1d0 (magicl:det m)))
-    (assert (double~ 1d0 (magicl:det a)))
-    (assert (double~ 1d0 (magicl:det b)))
-    (assert (double~ 1d0 (magicl:det d)))
-    (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                (magicl:multiply-complex-matrices a (magicl:transpose a))))
-    (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                (magicl:multiply-complex-matrices b (magicl:transpose b))))
-    (assert (matrix-equals-dwim (reduce #'magicl:multiply-complex-matrices
-                                        (list +edag-basis+ m +e-basis+))
-                                (reduce #'magicl:multiply-complex-matrices
-                                        (list a d b))))
+    (when *compress-carefully*
+      (assert (double~ 1d0 (magicl:det m)))
+      (assert (double~ 1d0 (magicl:det a)))
+      (assert (double~ 1d0 (magicl:det b)))
+      (assert (double~ 1d0 (magicl:det d)))
+      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                  (magicl:multiply-complex-matrices a (magicl:transpose a))))
+      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                  (magicl:multiply-complex-matrices b (magicl:transpose b))))
+      (assert (matrix-equals-dwim (reduce #'magicl:multiply-complex-matrices
+                                          (list +edag-basis+ m +e-basis+))
+                                  (reduce #'magicl:multiply-complex-matrices
+                                          (list a d b)))))
     (values a d b)))
 
 (defun trace-distance (m1 m2)
-  (assert (= 4 (magicl:matrix-rows m1) (magicl:matrix-rows m2)))
-  (let* ((prod (magicl:multiply-complex-matrices m1 (magicl:conjugate-transpose m2)))
-         (tr (loop :for j :below 4 :sum (magicl:ref prod j j))))
-    (/ (+ 4 (abs (* tr tr))) 20)))
+  "Calculates the average fidelity distance between two unitary operators M1 and M2."
+  (assert (= (magicl:matrix-rows m1) (magicl:matrix-cols m1)
+             (magicl:matrix-rows m2) (magicl:matrix-cols m2)))
+  (let* ((n (magicl:matrix-rows m1))
+         (prod (magicl:multiply-complex-matrices m1 (magicl:conjugate-transpose m2)))
+         (tr (loop :for j :below n :sum (magicl:ref prod j j))))
+    (/ (+ n (abs (* tr tr)))
+       (+ n (* n n)))))
 
 (defun fidelity-of-straight-quil (instrs chip-spec)
   (let ((ls (make-lscheduler)))
@@ -82,12 +86,6 @@
         ((test option-3) option-3)
         ((test option-4) option-4)
         (t (error "uh-oh (cf. ~a)" (list first second third)))))))
-
-(defun get-fidelity-distance-from-canonical-coords (coords1 coords2)
-  (let* ((deltas  (mapcar #'- coords1 coords2))
-         (cosines (mapcar #'cos deltas))
-         (sines   (mapcar #'sin deltas)))
-    (/ (+ 4 (abs (+ (reduce #'* cosines) (* #C(0 1) (reduce #'* sines))))) 20)))
 
 (defun make-signed-permutation-matrix (sigma signs)
   (let ((o (magicl:make-zero-matrix 4 4)))
@@ -139,26 +137,36 @@
         (print (reduce #'magicl:multiply-complex-matrices
                        (list +e-basis+ aprime dprime bprime +edag-basis+))) (terpri)
         (print o) (terpri))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices a (magicl:transpose a))))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices b (magicl:transpose b))))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices aprime (magicl:transpose aprime))))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices bprime (magicl:transpose bprime))))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices o (magicl:transpose o))))
-      (assert (double~ 1d0 (magicl:det a)))
-      (assert (double~ 1d0 (magicl:det aprime)))
-      (assert (double~ 1d0 (magicl:det b)))
-      (assert (double~ 1d0 (magicl:det bprime)))
-      (assert (double~ 1d0 (magicl:det o)))
+      (when *compress-carefully*
+        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                    (magicl:multiply-complex-matrices a (magicl:transpose a))))
+        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                    (magicl:multiply-complex-matrices b (magicl:transpose b))))
+        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                    (magicl:multiply-complex-matrices aprime (magicl:transpose aprime))))
+        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                    (magicl:multiply-complex-matrices bprime (magicl:transpose bprime))))
+        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                    (magicl:multiply-complex-matrices o (magicl:transpose o))))
+        (assert (double~ 1d0 (magicl:det a)))
+        (assert (double~ 1d0 (magicl:det aprime)))
+        (assert (double~ 1d0 (magicl:det b)))
+        (assert (double~ 1d0 (magicl:det bprime)))
+        (assert (double~ 1d0 (magicl:det o))))
       (values (reduce #'magicl:multiply-complex-matrices
                       (list +e-basis+ a o (magicl:transpose aprime) +edag-basis+))
               (reduce #'magicl:multiply-complex-matrices
                       (list +e-basis+ (magicl:transpose bprime) (magicl:transpose o) b +edag-basis+))
               max-fidelity))))
+
+(defun build-canonical-gate (coord)
+  (destructuring-bind (c1 c2 c3) coord
+    (magicl:diag 4 4
+                 (mapcar (lambda (z) (exp (* #C(0 1) z)))
+                         (list (+ c1 (- c2) c3)
+                               (+ c1 c2 (- c3))
+                               (- (+ c1 c2 c3))
+                               (+ (- c1) c2 c3))))))
 
 ;; IMPORTANT TODO: spend time refactoring this so that it blends seemlessly with optimal 2q.
 ;; it should be possible to have 'circuit templates' that have a membership test, a projector
@@ -166,17 +174,164 @@
 ;; membership test.  a chip can provide which templates it cares about, and we can additionally
 ;; thread logic to do/don't bother with projection based on the approximation flag.
 
-(defun approximate-2Q-compiler (instr &key (target ':cz) (chip-spec nil))
+(defvar **approximate-template-records** nil
+  "Houses a list of available approximate templates.")
+
+(setf **approximate-template-records** nil)
+
+(defstruct approximate-template-record
+  function
+  predicate
+  requirements)
+
+(defmacro define-approximate-template (name (&rest args) requirements pred &body body)
+  `(progn
+     (defun ,name (,@args)
+       (unless (or *enable-approximate-compilation*
+                   ,pred)
+         (give-up-compilation))
+       ,@body)
+     (push (make-approximate-template-record
+            :function #',name
+            :predicate (lambda (,@args)
+                         (declare (ignorable ,@args))
+                         ,pred)
+            :requirements ,requirements)
+           **approximate-template-records**)))
+
+
+(define-approximate-template nearest-circuit-of-depth-0 (coord q1 q0)
+    '(:cz)
+    (every #'double= coord (list 0d0 0d0 0d0))
+  (list (build-gate "I" () q0)
+        (build-gate "I" () q1)))
+
+(define-approximate-template nearest-CZ-circuit-of-depth-1 (coord q1 q0)
+    '(:cz)
+    (every #'double= coord (list (/ pi 2) 0d0 0d0))
+  (list (build-gate "CZ" () q1 q0)))
+
+(define-approximate-template nearest-ISWAP-circuit-of-depth-1 (coord q1 q0)
+    '(:iswap)
+    (every #'double= coord (list (/ pi 2) (/ pi 2) 0))
+  (list (build-gate "ISWAP" '() q1 q0)))
+
+(define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
+    '(:cphase)
+    (every #'double= (rest coord) (list 0d0 0d0))
+  (list (build-gate "CPHASE" (list (first coord)) q1 q0)))
+
+(define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
+    '(:cphase)
+    (and (double= (first coord) (second coord))
+         (double= (third coord) 0d0))
+  (list (build-gate "PISWAP" (list (first coord)) q1 q0)))
+
+(define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
+    '(:cz)
+    (double= 0d0 (third coord))
+  (list (build-gate "CZ" () q1 q0)
+        (build-gate "RY" (list (/ (+ (first coord) (second coord)) 2)) q1)
+        (build-gate "RY" (list (/ (- (first coord) (second coord)) 2)) q0)
+        (build-gate "CZ" () q1 q0)))
+
+(define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
+    '(:iswap)
+    (double= 0d0 (third coord))
+  (list (build-gate "ISWAP" '()          q1 q0)
+        (build-gate "RY"    (list (/ (+ (first coord) (second coord)) 2)) q1)
+        (build-gate "RY"    (list (/ (- (first coord) (second coord)) 2)) q0)
+        (build-gate "ISWAP" '()          q1 q0)))
+
+(define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
+    '(:cz :iswap)
+    (double= (/ pi 2) (first coord))
+  (list (build-gate "ISWAP" () q1 q0)
+        (build-gate "RY" (list (- (/ pi 2) (second coords))) q0)
+        (build-gate "RY" (list (- (/ pi 2) (third coords))) q1)
+        (build-gate "CZ" () q1 q0)))
+
+(define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
+    '(:cz)
+    t
+  (list (build-gate "RY" '(#.(/ pi 2))         q0)
+        (build-gate "CZ" '()                   q0 q1)
+        (build-gate "RY" '(#.(/ pi -2))        q0)
+        (build-gate "RY" (list (second coord)) q1)
+        (build-gate "RZ" (list (third coord))  q0)
+        (build-gate "RY" '(#.(/ pi 2))         q1)
+        (build-gate "CZ" '()                   q0 q1)
+        (build-gate "RY" '(#.(/ pi -2))        q1)
+        (build-gate "RY" (list (first coord))  q1)
+        (build-gate "RY" '(#.(/ pi 2))         q0)
+        (build-gate "CZ" '()                   q0 q1)
+        (build-gate "RY" '(#.(/ pi -2))        q0)))
+
+(define-approximate-template nearest-ISWAP-circuit-of-depth-3 (coord q1 q0)
+    '(:iswap)
+    t
+  (flet ((twist-to-real (m)
+           ;; this magical formula was furnished to us by asking Mathematica to compute
+           ;; the trace of M' for a symbolic M and SIGMA, then solving
+           ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)) ,
+           ;; where a and b work out to be these disgusting sums below.
+           (let* ((sigma (atan (imagpart (+ (*  1d0 (magicl:ref m 1 3) (magicl:ref m 2 0))
+                                            (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 1))
+                                            (*  1d0 (magicl:ref m 1 1) (magicl:ref m 2 2))
+                                            (*  1d0 (magicl:ref m 1 0) (magicl:ref m 2 3))
+                                            (* -1d0 (magicl:ref m 0 3) (magicl:ref m 3 0))
+                                            (* -1d0 (magicl:ref m 0 2) (magicl:ref m 3 1))
+                                            (* -1d0 (magicl:ref m 0 1) (magicl:ref m 3 2))
+                                            (* -1d0 (magicl:ref m 0 0) (magicl:ref m 3 3))))
+                               (imagpart (+ (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 0))
+                                            (* -1d0 (magicl:ref m 1 3) (magicl:ref m 2 1))
+                                            (*  1d0 (magicl:ref m 1 0) (magicl:ref m 2 2))
+                                            (* -1d0 (magicl:ref m 1 1) (magicl:ref m 2 3))
+                                            (* -1d0 (magicl:ref m 0 2) (magicl:ref m 3 0))
+                                            (*  1d0 (magicl:ref m 0 3) (magicl:ref m 3 1))
+                                            (* -1d0 (magicl:ref m 0 0) (magicl:ref m 3 2))
+                                            (*  1d0 (magicl:ref m 0 1) (magicl:ref m 3 3)))))))
+             (values
+              sigma
+              (reduce #'magicl:multiply-complex-matrices
+                      (list
+                       m
+                       (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
+                       (gate-matrix (lookup-standard-gate "ISWAP"))))))))
+    ;; TODO: is TWIST-TO-REAL easier to compute when coupled to BUILD-CANONICAL-GATE?
+    (multiple-value-bind (sigma mprime) (twist-to-real (build-canonical-gate coord))
+      (multiple-value-bind (a d b) (orthogonal-decomposition mprime)
+        (let ((coordprime (get-canonical-coords-from-diagonal d)))
+          (list* (build-gate "RY"    (list (- sigma)) q0)
+                 (build-gate "ISWAP" '()              q1 q0)
+                 (build-gate "Z"     '()              q0)
+                 (build-gate "Z"     '()              q1)
+                 (sandwich-with-local-gates
+                  (nearest-ISWAP-circuit-of-depth-2 coordprime q1 q0)
+                  a d b q1 q0)))))))
+
+(defun sandwich-with-local-gates (center-circuit a d b q1 q0)
+  (multiple-value-bind (ua ub fidelity)
+      (match-matrix-to-an-e-basis-diagonalization
+       (make-matrix-from-quil center-circuit)
+       a d b)
+    
+    (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
+      (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
+        (values
+         (append (list (anon-gate "B0" b0 q0)
+                       (anon-gate "B1" b1 q1))
+                 center-circuit
+                 (list (anon-gate "A0" a0 q0)
+                       (anon-gate "A1" a1 q1)))
+         fidelity)))))
+
+(defun approximate-2Q-compiler (instr &key (target ':cz) (chip-spec nil) (crafters nil))
   (check-type instr gate-application)
   (check-type target optimal-2q-target)
   (check-type chip-spec chip-specification)
   
-  ;; TODO: remove this first restriction
-  (unless (optimal-2q-target-meets-requirements target ':cz)
-    (give-up-compilation))
   (unless (= 2 (length (application-arguments instr)))
-    (give-up-compilation))
-  (unless *enable-approximate-compilation*
     (give-up-compilation))
   
   ;; extract matrix, canonical decomposition
@@ -188,69 +343,37 @@
       ;; now we manufacture a bunch of candidate circuits
       (let* ((candidate-pairs nil)
              (coord (get-canonical-coords-from-diagonal d)))
-        (flet
-            ((build-depth-0-circuit (coord q1 q0)
-               (declare (ignore coord))
-               (list (build-gate "I" () q0)
-                     (build-gate "I" () q1)))
-             (build-depth-1-circuit (coord q1 q0)
-               (declare (ignore coord))
-               (list (build-gate "CZ" () q1 q0)))
-             ;; TODO: fix this circuit, which is wrong.
-             (build-depth-2-circuit (coord q1 q0)
-               (list (build-gate "CZ" () q1 q0)
-                     (build-gate "RY" (list (/ (+ (first coord) (second coord)) 2)) q1)
-                     (build-gate "RY" (list (/ (- (first coord) (second coord)) 2)) q1)
-                     (build-gate "CZ" () q1 q0)))
-             ;; TODO: fix this circuit, which is wrong.
-             (build-depth-3-circuit (coord q1 q0)
-               (list (build-gate "RY" '(#.(/ pi 2))         q0)
-                     (build-gate "CZ" '()                   q0 q1)
-                     (build-gate "RY" '(#.(/ pi -2))        q0)
-                     (build-gate "RY" (list (second coord)) q1)
-                     (build-gate "RZ" (list (third coord))  q0)
-                     (build-gate "RY" '(#.(/ pi 2))         q1)
-                     (build-gate "CZ" '()                   q0 q1)
-                     (build-gate "RY" '(#.(/ pi -2))        q1)
-                     (build-gate "RY" (list (first coord))  q1)
-                     (build-gate "RY" '(#.(/ pi 2))         q0)
-                     (build-gate "CZ" '()                   q0 q1)
-                     (build-gate "RY" '(#.(/ pi -2))        q0))))
-          (dolist (circuit-crafter (list #'build-depth-0-circuit
-                                         #'build-depth-1-circuit
-                                         #'build-depth-2-circuit
-                                         #'build-depth-3-circuit))
-            
-            (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
-                                                                        (application-arguments instr))))
-                   (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
-                   (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
-              (multiple-value-bind (ua ub fidelity)
-                  (match-matrix-to-an-e-basis-diagonalization
-                   (make-matrix-from-quil center-circuit)
-                   a d b)
-                (format t "APPROXIMATE-2Q-COMPILER: ~a resulted in
-    ... lone fidelity ~a
-    ... and cost ~a,
-    ... hence adjusted fidelity ~a.~%"
-                        circuit-crafter
-                        fidelity
-                        circuit-cost
-                        (* circuit-cost fidelity))
-                (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
-                  (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
-                    (push (cons (* circuit-cost fidelity) 
-                                (append (list (anon-gate "B0" b0 q0)
-                                              (anon-gate "B1" b1 q1))
-                                        center-circuit
-                                        (list (anon-gate "A0" a0 q0)
-                                              (anon-gate "A1" a1 q1))))
-                          candidate-pairs)))))))
+        (dolist (circuit-crafter crafters)
+          (handler-case
+              (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
+                                                                          (application-arguments instr))))
+                     (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
+                     (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
+                (multiple-value-bind (sandwiched-circuit fidelity)
+                    (sandwich-with-local-gates center-circuit a d b q1 q0)
+                  (format *compiler-noise-stream*
+                          "APPROXIMATE-2Q-COMPILER: ~a resulted in~%    ... lone fidelity ~a~%    ... and cost ~a,~%    ... hence adjusted fidelity ~a.~%"
+                          circuit-crafter fidelity circuit-cost (* circuit-cost fidelity))
+                  (push (cons (* circuit-cost fidelity) sandwiched-circuit)
+                        candidate-pairs)))
+            (compiler-does-not-apply () nil)))
         ;; now vomit the results
-        (cdr (alexandria:extremum candidate-pairs #'> :key #'car))))))
+        (cond
+          ((endp candidate-pairs)
+           (give-up-compilation))
+          (t
+           (cdr (alexandria:extremum candidate-pairs #'> :key #'car))))))))
 
 (defun approximate-2Q-compiler-for (target chip-spec)
-  (lambda (instr)
-    (approximate-2Q-compiler instr
-                             :target target
-                             :chip-spec chip-spec)))
+  (let ((crafters
+         (mapcar #'approximate-template-record-function
+                 (remove-if-not (lambda (record)
+                                  (optimal-2q-target-meets-requirements
+                                   target
+                                   (approximate-template-record-requirements record)))
+                                **approximate-template-records**))))
+    (lambda (instr)
+      (approximate-2Q-compiler instr
+                               :target target
+                               :chip-spec chip-spec
+                               :crafters crafters))))
