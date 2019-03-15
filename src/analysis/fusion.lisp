@@ -371,7 +371,9 @@ forcing \"Y\" to be the middle link."
 ;;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (defun sort-program-grid (pg)
-  "Produce a list of nodes of the PROGRAM-GRID PG a topologically sorted order, according to a temporal-<= relation."
+  "Produce a list of nodes of the PROGRAM-GRID PG a topologically sorted order, according to a temporal-<= relation.
+
+The list will actually be a list of lists, where each sublist commutes and can be freely ordered. (Note that even up to permutation of the elements of the sublists, the answer is still not unique.)"
   (let* ((sorted        nil)            ; Final sorted list.
          ;; XXX: Note: We could merge NEEDS-SORTING with SORTED-SET if
          ;; NEEDS-SORTING itself was a hash table, which
@@ -389,15 +391,14 @@ forcing \"Y\" to be the middle link."
             :do (progn
                   ;; Remove the sinks.
                   (setf needs-sorting (delete-if #'dependencies-sorted-p needs-sorting))
-                  ;; Get the next sink.
-                  (let ((sink (pop sinks)))
-                    ;; Add it to the sorted list.
-                    (push sink sorted)
+                  ;; Record the sinks, which commute which one
+                  ;; another.
+                  (push sinks sorted)
+                  (dolist (sink sinks)
                     (setf (gethash sink sorted-set) t))
+
                   ;; Find the new sinks.
-                  (dolist (node needs-sorting)
-                    (when (dependencies-sorted-p node)
-                      (push node sinks))))
+                  (setf sinks (remove-if-not #'dependencies-sorted-p needs-sorting)))
             :finally (return (if (null needs-sorting)
                                  ;; Our DAG is empty. We're good!
                                  (nreverse sorted)
@@ -439,5 +440,6 @@ Example:
   "Reconstitute a proto-program from a PROGRAM-GRID.
 
 Note: This is not guaranteed to be a perfect inverse to BUILD-GRID, but it is guaranteed to be equivalent up-to qubit subsystem commutativity."
-  (loop :for node :in (sort-program-grid pg)
-        :collect (list* (grid-node-tag node) (grid-node-qubits node))))
+  (loop :for commuting-nodes :in (sort-program-grid pg)
+        :nconc (loop :for node :in commuting-nodes
+                     :collect (list* (grid-node-tag node) (grid-node-qubits node)))))
