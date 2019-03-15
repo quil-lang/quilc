@@ -262,7 +262,9 @@
                           time-limit
                           (help nil)
                           (log-level nil)
-                          (quiet nil))
+                          (quiet nil)
+                          #+forest-sdk
+                          (check-version nil))
   (when help
     (show-help)
     (uiop:quit 0))
@@ -271,6 +273,17 @@
     (uiop:quit 0))
   (when check-libraries
     (check-libraries))
+  #+forest-sdk
+  (when check-version
+    (multiple-value-bind (available-p version)
+        (sdk-update-available-p)
+      (if available-p
+          (format t "An update is available to the SDK. You have version ~A. ~
+Version ~A is available from downloads.rigetti.com/qcs-sdk/forest-sdk.dmg~%"
+                  +QUILC-VERSION+ version)
+          (format t "You have the latest SDK version: ~A.~%"
+                  +QUILC-VERSION+)))
+    (uiop:quit 0))
   #-forest-sdk
   (when benchmark
     (benchmarks))
