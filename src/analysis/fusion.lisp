@@ -101,9 +101,7 @@
                               :forward (make-array n :initial-element nil))))
 
 (defgeneric fuse-objects (a b)
-  (:documentation "Compute the fusion (in the \"gate fusion\" sense) of objects A and B.")
-  (:method (a b)
-    (append (alexandria:ensure-list a) (alexandria:ensure-list b))))
+  (:documentation "Compute the fusion (in the \"gate fusion\" sense) of objects A and B."))
 
 (defun merge-grid-nodes (a b)
   "Merge two grid nodes A and B to produce a new node. All incoming wires to A and outgoing wires to B will be the wires of the merged node.

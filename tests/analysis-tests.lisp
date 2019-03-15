@@ -300,14 +300,61 @@ B(b) 0 1
   ((value :initarg :value
           :accessor dummy-node-value)))
 
+(defun dummy-node (x)
+  (make-instance 'dummy-node :value (alexandria:ensure-list x)))
+
 (defmethod quil::fuse-objects ((a dummy-node) (b dummy-node))
-  (make-instance 'dummy-node :value (+ (dummy-node-value a)
-                                       (dummy-node-value b))))
+  (make-instance 'dummy-node
+                 :value (append
+                         (alexandria:ensure-list (dummy-node-value a))
+                         (alexandria:ensure-list (dummy-node-value b)))))
 
 (deftest test-fuse-dummy-objects ()
   "Test that FUSE-OBJECTS behaves properly in MERGE-GRID-NODES."
-  (is (= 3 (dummy-node-value
-            (quil::grid-node-tag
-             (quil::merge-grid-nodes
-              (quil::make-grid-node (make-instance 'dummy-node :value 1) 1)
-              (quil::make-grid-node (make-instance 'dummy-node :value 2) 1)))))))
+  (is (equal '(a b)
+             (dummy-node-value
+              (quil::grid-node-tag
+               (quil::merge-grid-nodes
+                (quil::make-grid-node (dummy-node 'a) 1)
+                (quil::make-grid-node (dummy-node 'b) 1)))))))
+
+(defun build-grid (&rest proto-nodes)
+  (loop :with pg := (make-instance 'quil::program-grid)
+        :for (x . qs) :in proto-nodes
+        :for gn := (apply #'quil::make-grid-node
+                          (dummy-node x)
+                          qs)
+        :do (quil::append-node pg gn)
+        :finally (return pg)))
+
+(deftest test-trivial-fusion ()
+  "Test that a bunch of 1q gates can be fused."
+  (flet ((test-it (&rest proto-nodes)
+           (let ((output-pg (quil::fuse-trivially (apply #'build-grid proto-nodes))))
+             (is (= 1 (length (quil::roots output-pg))))
+             (let ((root (first (quil::roots output-pg))))
+               (is (quil::root-node-p root))
+               (is (every (alexandria:curry #'eq root) (quil::trailers output-pg)))
+               (is (every #'null (quil::grid-node-back root)))
+               (is (every #'null (quil::grid-node-forward root)))
+               (is (equalp (mapcar #'first proto-nodes)
+                           (dummy-node-value (quil::grid-node-tag root))))))))
+    (test-it '(a 0)
+             '(b 0 1)
+             '(c 0 1 2)
+             '(d 0 1 2 3))
+    (test-it '(a 0 1 2 3)
+             '(b 0 1 2)
+             '(c 0 1)
+             '(d 0))
+    (test-it '(a 0 1 2 3)
+             '(b 0 1 2 3)
+             '(c 0 1 2 3)
+             '(d 0 1 2 3))
+    (test-it '(a 0)
+             '(b 0 1)
+             '(c 0 1 2)
+             '(d 0 1 2 3)
+             '(e 0 1 2)
+             '(f 0 1)
+             '(g 0))))
