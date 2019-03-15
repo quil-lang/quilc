@@ -4,6 +4,23 @@
 
 (in-package #:cl-quil-tests)
 
+(deftest test-partition-sequence-into-segments ()
+  (flet ((test-it (expected-first expected-segments input-sequence)
+           (multiple-value-bind (segments first?)
+               (cl-quil::partition-sequence-into-segments #'evenp input-sequence)
+             (is (eq first? expected-first))
+             (is (equalp segments expected-segments)))))
+    (test-it nil nil nil)
+    (test-it nil nil #())
+    (test-it nil nil "")
+    (test-it nil '((1)) '(1))
+    (test-it nil '((1) (2)) '(1 2))
+    (test-it nil '((1 1)) '(1 1))
+    (test-it t '((2)) '(2))
+    (test-it t '((2) (1)) '(2 1))
+    (test-it t '((2 2)) '(2 2))
+    (test-it t '((2) (1 1) (2 2 2) (1 1 1 1)) '(2 1 1 2 2 2 1 1 1 1))))
+
 (deftest test-code-splicing ()
   (is (equalp (cl-quil::splice-code-at #(1 x 2 3) 1 #(a b c))
               #(1 A B C 2 3)))
