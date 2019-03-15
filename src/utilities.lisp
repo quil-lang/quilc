@@ -26,9 +26,10 @@
 (defun (setf vnth) (val index vector)
   (setf (aref vector index) val))
 
-(defmacro dohash (((key val) hash) &body body)
-  `(maphash (lambda (,key ,val) ,@body)
-            ,hash))
+(defmacro dohash (((key val) hash &optional ret) &body body)
+  `(progn (maphash (lambda (,key ,val) ,@body)
+                   ,hash)
+          ,ret))
 
 (defmacro define-global-counter (counter-name incf-name)
   `(progn
