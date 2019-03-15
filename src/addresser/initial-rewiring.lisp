@@ -10,7 +10,7 @@
 
 (in-package #:cl-quil)
 
-(defparameter *initial-rewiring-default-type* :naive
+(defparameter *initial-rewiring-default-type* ':naive
   "Determines the default initial rewiring type when not provided and no PRAGMA present.
 
 PARTIAL: Start with a completely empty rewiring.
@@ -176,6 +176,19 @@ is found, then it will return *INITIAL-REWIRING-DEFAULT-TYPE*."
 ;;; In the future, we should definitely try to parallelize across the connected
 ;;; components.
 
+(defun rewire-non-cc-qubits-on-chip-spec (rewiring chip-spec needed cc)
+  "Rewires physical qubits not in CC to logical qubits that are not in
+NEEDED."
+  (loop :for qi-non-cc
+          :in (set-difference (alexandria:iota (chip-spec-n-qubits chip-spec))
+                              cc)
+        :for qi-non-needed
+          :in (set-difference (alexandria:iota (chip-spec-n-qubits chip-spec))
+                              needed) :do
+          (setf (aref (rewiring-p2l rewiring) qi-non-cc) qi-non-needed
+                (aref (rewiring-l2p rewiring) qi-non-needed) qi-non-cc))
+  rewiring)
+
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
   "Find an initial rewiring for a program that ensures that all used qubits
 appear in the same connected component of the qpu"
@@ -184,14 +197,13 @@ appear in the same connected component of the qpu"
          (indices (containing-indices connected-components))
          (cc (alexandria:extremum connected-components #'> :key #'length))
          (needed (prog-used-qubits parsed-prog)))
-
     (assert (or (endp needed)
                 (<= (apply #'max needed) n-qubits))
             ()
             "User program incompatible with chip: qubit index ~a used and ~a available"
             (apply #'max needed) n-qubits)
 
-    (when (eql type :naive)
+    (when (eql type ':naive)
       (unless (loop
                 :with component
                 :for qubit :in needed
@@ -207,13 +219,14 @@ appear in the same connected component of the qpu"
             "User program used too many qubits: ~a used and ~a available in the largest connected component"
             (length needed) (length cc))
 
-    (when (eql type :partial)
-      (return-from prog-initial-rewiring (make-partial-rewiring n-qubits)))
+    (when (eql type ':partial)
+      (return-from prog-initial-rewiring
+        (rewire-non-cc-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
 
-    (when (eql type :random)
+    (when (eql type ':random)
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
 
-    (assert (eql type :greedy) (type)
+    (assert (eql type ':greedy) (type)
             "Unexpected rewiring type: ~a" type)
 
     ;; TODO: this assumes that the program is sequential
@@ -226,7 +239,7 @@ appear in the same connected component of the qpu"
 
            ;; physical qubit -> logical qubit -> distance
            (p2l-distances (make-array n-qubits :initial-element nil))
-           (rewiring (make-partial-rewiring n-qubits)))
+           (rewiring (rewire-non-cc-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
 
       (labels
           ((qubit-best-location (qubit)
