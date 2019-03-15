@@ -295,6 +295,78 @@ forcing \"Y\" to be the middle link."
           :finally (return (make-instance 'program-grid :roots roots
                                                         :trailers trailers)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;; Sorting a Program ;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; The topological sort procedure in this section below is adapted
+;;; from
+;;;
+;;;     https://github.com/stylewarning/lisp-random/blob/master/tsort.lisp
+;;;
+;;; which is licensed under the BSD 3-clause
+;;; (https://github.com/stylewarning/lisp-random/blob/master/LICENSE).
+
+;;; Copyright (c) 2010-2015, Robert Smith
+;;; All rights reserved.
+;;;
+;;; Redistribution and use in source and binary forms, with or without
+;;; modification, are permitted provided that the following conditions are
+;;; met:
+;;;
+;;; 1. Redistributions of source code must retain the above copyright
+;;; notice, this list of conditions and the following disclaimer.
+;;;
+;;; 2. Redistributions in binary form must reproduce the above copyright
+;;; notice, this list of conditions and the following disclaimer in the
+;;; documentation and/or other materials provided with the distribution.
+;;;
+;;; 3. Neither the name of the copyright holder nor the names of its
+;;; contributors may be used to endorse or promote products derived from
+;;; this software without specific prior written permission.
+;;;
+;;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+;;; "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+;;; LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+;;; A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+;;; HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+;;; SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+;;; LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+;;; DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+;;; THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+;;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+;;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+(defun sort-program-grid (pg)
+  "Produce a list of nodes of the PROGRAM-GRID PG a topologically sorted order, according to a temporal-<= relation."
+  (let* ((sorted        nil)            ; Final sorted list.
+         (needs-sorting (program-grid-nodes pg))
+         (sorted-set    (make-hash-table :test 'eq :size (length needs-sorting)))
+         (sinks         (remove-if-not #'root-node-p needs-sorting)))
+    (flet ((dependencies-sorted-p (node)
+             (every (lambda (pred)
+                      (or (null pred)
+                          (gethash pred sorted-set)))
+                    (grid-node-back node))))
+      (loop :until (null sinks)
+            :do (progn
+                  ;; Remove the sinks.
+                  (setf needs-sorting (delete-if #'dependencies-sorted-p needs-sorting))
+                  ;; Get the next sink.
+                  (let ((sink (pop sinks)))
+                    ;; Add it to the sorted list.
+                    (push sink sorted)
+                    (setf (gethash sink sorted-set) t))
+                  ;; Find the new sinks.
+                  (dolist (node needs-sorting)
+                    (when (dependencies-sorted-p node)
+                      (push node sinks))))
+            :finally (return (if (null needs-sorting)
+                                 ;; Our DAG is empty. We're good!
+                                 (nreverse sorted)
+                                 ;; Our DAG isn't empty but has no
+                                 ;; sinks. It must be cyclic!
+                                 (error "Cannot sort a cyclic graph. ~
+                                         The cycles are ~S." needs-sorting)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Test Harness ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Input data structure is as follows:
@@ -323,3 +395,11 @@ Example:
         :for gn := (apply #'make-grid-node (first pn) (rest pn))
         :do (append-node pg gn)
         :finally (return pg)))
+
+(defun proto-program (pg)
+  "Reconstitute a proto-program from a PROGRAM-GRID.
+
+Note: This is not guaranteed to be a perfect inverse to BUILD-GRID, but it is guaranteed to be equivalent up-to qubit subsystem commutativity.
+"
+  (loop :for node :in (sort-program-grid pg)
+        :collect (list* (grid-node-tag node) (grid-node-qubits node))))
