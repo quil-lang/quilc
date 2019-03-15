@@ -74,7 +74,7 @@
     (("log-level") :type string :optional t :initial-value "info" :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
     (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")
     #+forest-sdk
-    (("check-version") :type boolean :optional t :initial-value nil :documentation "Check for a new SDK version")))
+    (("skip-version-check") :type boolean :optional t :initial-value nil :documentation "Do not check for a new SDK version at launch.")))
 
 (defparameter *isa-descriptors*
   (alexandria::alist-hash-table
@@ -264,7 +264,7 @@
                           (log-level nil)
                           (quiet nil)
                           #+forest-sdk
-                          (check-version nil))
+                          (skip-version-check nil))
   (when help
     (show-help)
     (uiop:quit 0))
@@ -274,16 +274,13 @@
   (when check-libraries
     (check-libraries))
   #+forest-sdk
-  (when check-version
+  (unless skip-version-check
     (multiple-value-bind (available-p version)
         (sdk-update-available-p)
-      (if available-p
+      (when available-p
           (format t "An update is available to the SDK. You have version ~A. ~
 Version ~A is available from downloads.rigetti.com/qcs-sdk/forest-sdk.dmg~%"
-                  +QUILC-VERSION+ version)
-          (format t "You have the latest SDK version: ~A.~%"
-                  +QUILC-VERSION+)))
-    (uiop:quit 0))
+                  +QUILC-VERSION+ version))))
   #-forest-sdk
   (when benchmark
     (benchmarks))
