@@ -53,12 +53,13 @@
 
 
 (defun trailer-node-on-qubit-p (gn qubit)
+  "Does GN look like a trailer node on qubit QUBIT?"
   (null (succeeding-node-on-qubit gn qubit)))
 
-
 (defun make-grid-node (tag &rest qubits)
+  "Make a GRID-NODE with the tag TAG and qubits QUBITS. There should be at least one qubit."
+  (assert (not (null qubits)))
   (let ((n (length qubits)))
-    (assert (plusp n))
     (make-instance 'grid-node :tag tag
                               :qubits (sort (copy-list qubits) #'<)
                               :back (make-array n :initial-element nil)
@@ -137,7 +138,7 @@ This function is non-destructive."
   (let ((nodes (make-hash-table :test 'eq)))
     (labels ((chase-node (n)
                (when (and (not (null n))
-                         (null (gethash n nodes)))
+                          (null (gethash n nodes)))
                  (setf (gethash n nodes) t)
                  (map nil #'chase-node (grid-node-forward n))
                  ;; We go backward too just in case there are some
@@ -219,6 +220,21 @@ forcing \"Y\" to be the middle link."
         (jam-node-in new-node)
         (values new-node node-behind node)))))
 
+(defun attempt-trivial-fusion (fuse-function node seen-table final-table)
+  ;; Helper function to FUSE-TRIVIALLY.
+  (multiple-value-bind (new-node old1 old2)
+      (funcall fuse-function node)
+    (when new-node
+      ;; Back out our added node.
+      (remhash node final-table)
+      ;; We don't want to see these nodes and they won't be a
+      ;; part of the final program, since they're now fused.
+      (setf (gethash old1 seen-table) t
+            (gethash old2 seen-table) t)
+      (remhash old1 final-table)
+      (remhash old2 final-table)
+      new-node)))
+
 (defun fuse-trivially (pg)
   "Perform only trivial fusions (i.e., fuse nodes that are trivially subsumed in some direction) on the program grod PG."
   (let* ((nodes (program-grid-nodes pg))
@@ -236,32 +252,15 @@ forcing \"Y\" to be the middle link."
            ;;Mark that we've seen it and don't want to see it again.
            (setf (gethash node seen) t)
            ;; Fuse forward.
-           (multiple-value-bind (new-node old1 old2)
-               (fuse-node-forward node)
-             (when new-node
-               ;; Back out our added node.
-               (remhash node final)
-               (setf node new-node)
-               ;; We don't want to see these nodes and they won't be a
-               ;; part of the final program, since they're now fused.
-               (setf (gethash old1 seen) t
-                     (gethash old2 seen) t)
-               (remhash old1 final)
-               (remhash old2 final)))
+           (alexandria:when-let
+               ((new-node (attempt-trivial-fusion #'fuse-node-forward node seen final )))
+             (setf node new-node))
+
            ;; Fuse backward.
-           (multiple-value-bind (new-node old1 old2)
-               (fuse-node-backward node)
-             (when new-node
-               ;; Back out our added node.
-               (remhash node final)
-               (setf node new-node)
-               ;; Again. We don't want to see these nodes and they
-               ;; won't be a part of the final program, since they're
-               ;; now fused.
-               (setf (gethash old1 seen) t
-                     (gethash old2 seen) t)
-               (remhash old1 final)
-               (remhash old2 final)))
+           (alexandria:when-let
+               ((new-node (attempt-trivial-fusion #'fuse-node-backward node seen final )))
+             (setf node new-node))
+
            ;; Check if this node is the same as the original. If it
            ;; is, fusion is done. If it's not, we need to go back and
            ;; re-process it. (In *that* process, the node will be
