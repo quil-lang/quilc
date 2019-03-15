@@ -634,3 +634,29 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
 (defun su2-on-line (line m)
   "Treats m in SU(2) as either m (x) Id or Id (x) m."
   (kq-gate-on-lines m 2 (list line)))
+
+(defun premultiply-gates (instructions)
+  "Given a list of (gate) applications INSTRUCTIONS, construct a new gate application which is their product."
+  (let ((u (magicl:diag 1 1 '(1d0)))
+        (qubits (list)))
+    (dolist (instr instructions)
+      (let ((new-qubits (set-difference (mapcar #'qubit-index (application-arguments instr))
+                                        qubits)))
+        (unless (endp new-qubits)
+          (setf u (kq-gate-on-lines u
+                                    (+ (length qubits) (length new-qubits))
+                                    (alexandria:iota (length qubits)
+                                                     :start (1- (length qubits))
+                                                     :step -1)))
+          (setf qubits (append new-qubits qubits)))
+        (setf u (magicl:multiply-complex-matrices
+                 (kq-gate-on-lines (gate-matrix instr)
+                                   (length qubits)
+                                   (mapcar (lambda (q)
+                                             (- (length qubits) 1 (position (qubit-index q) qubits)))
+                                           (application-arguments instr)))
+                 u))))
+    (make-instance 'gate-application
+                   :gate u
+                   :operator (named-operator "PREMULTIPLED-GATE")
+                   :arguments (mapcar #'qubit qubits))))
