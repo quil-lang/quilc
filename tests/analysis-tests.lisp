@@ -328,7 +328,7 @@ B(b) 0 1
         :finally (return pg)))
 
 (deftest test-trivial-fusion ()
-  "Test that a bunch of 1q gates can be fused."
+  "Test that a bunch of trivially fuseable gates can be fused."
   (flet ((test-it (&rest proto-nodes)
            (let ((output-pg (quil::fuse-trivially (apply #'build-grid proto-nodes))))
              (is (= 1 (length (quil::roots output-pg))))
