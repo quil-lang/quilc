@@ -841,6 +841,7 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
    (parameters :initarg :parameters
                :accessor application-parameters)
    (arguments :initarg :arguments
+              :reader arguments
               :accessor application-arguments))
   (:default-initargs
    :parameters nil
@@ -862,6 +863,11 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
     * Application is an invalid application.
 
 Determining this requires the context of the surrounding program."))
+
+(declaim (inline gate-application-p))
+(defun gate-application-p (x)
+  "Is X a gate application?"
+  (typep x 'gate-application))
 
 (defclass gate-application (application)
   ((name-resolution :initarg :name-resolution
