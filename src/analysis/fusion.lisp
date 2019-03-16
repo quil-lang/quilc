@@ -328,6 +328,7 @@ forcing \"Y\" to be the middle link."
           :finally (return (make-instance 'program-grid :roots roots
                                                         :trailers trailers)))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;; Sorting a Program ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; The topological sort procedure in this section below is adapted
@@ -404,6 +405,59 @@ The list will actually be a list of lists, where each sublist commutes and can b
                                  ;; sinks. It must be cyclic!
                                  (error "Cannot sort a cyclic graph. ~
                                          The cycles are ~S." needs-sorting)))))))
+
+
+;;;;;;;;;;;;;;;;;;;; Fusion on Real Programs (TM) ;;;;;;;;;;;;;;;;;;;;
+
+(defmethod fuse-objects ((a gate-application) (b gate-application))
+  ;; A and B are temporally ordered.
+  (premultiply-gates (list a b)))
+
+(defun static-gate-application-p (x)
+  (and (gate-application-p x)
+       (every #'is-constant (application-parameters x))))
+
+(defun gate-sequence-to-program-grid (gate-sequence)
+  (loop :with pg := (make-instance 'program-grid)
+        :for gate-app :in gate-sequence
+        :for gn := (apply #'make-grid-node gate-app (mapcar #'qubit-index (arguments gate-app)))
+        :do (append-node pg gn)
+        :finally (return pg)))
+
+(defun program-grid-to-gate-sequence (pg)
+  (mapcan (alexandria:curry #'mapcar #'grid-node-tag) (sort-program-grid pg)))
+
+(defun fuse-gate-sequence (gate-sequence)
+  (assert (every #'static-gate-application-p gate-sequence))
+  (program-grid-to-gate-sequence
+   (fuse-trivially
+    (gate-sequence-to-program-grid gate-sequence))))
+
+(defun fuse-gates-in-executable-code (code)
+  (multiple-value-bind (gate-segments first?)
+      (partition-sequence-into-segments #'static-gate-application-p code)
+    (coerce
+     (loop :for segment :in gate-segments
+           :for gate-seq-p := first? :then (not gate-seq-p)
+           :if gate-seq-p
+             :append (fuse-gate-sequence segment)
+           :else                         ; Do nothing!
+             :append segment)
+     'vector)))
+
+(defun fuse-gates-in-program (parsed-program)
+  (when (transformedp parsed-program 'patch-labels)
+    ;; We can't fuse gates when labels have been patched, because
+    ;; absolute addresses will change in the process.
+    (error "Can't fuse gates when program has had labels patched."))
+  (setf (parsed-program-executable-code parsed-program)
+        (fuse-gates-in-executable-code
+         (parsed-program-executable-code parsed-program)))
+  parsed-program)
+
+(define-transform gate-fusion (fuse-gates-in-program)
+  "Fuse gates together producing a new program that we stipulate will be more efficient to simulate."
+  process-includes)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Test Harness ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
