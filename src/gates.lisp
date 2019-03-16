@@ -570,7 +570,19 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
       (magicl:multiply-complex-matrices mat m))))
 
 (defun make-matrix-from-quil (instruction-list &key relabeling)
-  "If possible, create a matrix out of the instructions INSTRUCTION-LIST. If one can't be created, then return NIL."
+  "If possible, create a matrix out of the instructions INSTRUCTION-LIST, within the context of the environment ENVIRONS. If one can't be created, then return NIL.
+
+Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
+
+    A
+    B
+    C
+
+or equivalently as
+
+    C * B * A
+
+as matrices."
   (let ((u (magicl:diag 1 1 '(1d0))))
     (dolist (instr instruction-list u)
       (assert (not (null u)))
@@ -636,7 +648,19 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
   (kq-gate-on-lines m 2 (list line)))
 
 (defun premultiply-gates (instructions)
-  "Given a list of (gate) applications INSTRUCTIONS, construct a new gate application which is their product."
+  "Given a list of (gate) applications INSTRUCTIONS, construct a new gate application which is their product.
+
+Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
+
+    A
+    B
+    C
+
+or equivalently as
+
+    C * B * A
+
+as matrices."
   (let ((u (magicl:diag 1 1 '(1d0)))
         (qubits (list)))
     (dolist (instr instructions)
@@ -657,6 +681,8 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
                                            (application-arguments instr)))
                  u))))
     (make-instance 'gate-application
-                   :gate u
+                   :gate (make-instance 'simple-gate
+                                        :dimension (expt 2 (length qubits))
+                                        :matrix u)
                    :operator (named-operator "PREMULTIPLED-GATE")
                    :arguments (mapcar #'qubit qubits))))
