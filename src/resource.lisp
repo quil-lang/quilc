@@ -22,39 +22,55 @@
 (defconstant +full+ -1
   "The full bit set. This is all 1's in two's complement.")
 
-(macrolet ((define-inlineable (name args &body body)
-             `(progn
-                (declaim (inline ,name))
-                (defun ,name ,args ,@body)
-                (declaim (notinline ,name)))))
+(macrolet ((define-inlineable (name args types &body body)
+             (assert (= (+ 2 (length args)) (length types)))
+             (let ((arg-types (subseq types 0 (length args)))
+                   (ret-type  (subseq types (1+ (length args)))))
+               `(progn
+                  (declaim (inline ,name))
+                  (declaim (ftype (function ,arg-types ,ret-type) ,name))
+                  (defun ,name ,args ,@body)
+                  (declaim (notinline ,name))))))
 
   (define-inlineable integer-bits-equal (bits1 bits2)
+      (bit-set bit-set -> boolean)
     (= bits1 bits2))
   (define-inlineable infinite-integer-set-p (bits)
+      (bit-set -> boolean)
     (minusp bits))
   (define-inlineable integer-bits-complement (bits)
+      (bit-set -> bit-set)
     (lognot bits))
   (define-inlineable integer-bits-adjoin (i bits)
+      (bit-set-element bit-set -> bit-set)
     (dpb 1 (byte 1 i) bits))
   (define-inlineable integer-bits-remove (i bits)
+      (bit-set-element bit-set -> bit-set)
     (dpb 0 (byte 1 i) bits))
   (define-inlineable integer-bits-member (i bits)
+      (bit-set-element bit-set -> boolean)
     (logbitp i bits))
   (define-inlineable integer-bits-union (bits1 bits2)
+      (bit-set bit-set -> bit-set)
     (logior bits1 bits2))
   (define-inlineable integer-bits-intersection (bits1 bits2)
+      (bit-set bit-set -> bit-set)
     (logand bits1 bits2))
   (define-inlineable integer-bits-empty-p (bits)
+      (bit-set -> boolean)
     (integer-bits-equal bits +empty+))
   (define-inlineable integer-bits-difference (bits1 bits2)
+      (bit-set bit-set -> bit-set)
     (logandc2 bits1 bits2))
   (define-inlineable integer-bits-subsetp (bits1 bits2)
+      (bit-set bit-set -> boolean)
     "Is the bit set BITS1 is a subset of the bit set BITS2?"
     (integer-bits-empty-p (integer-bits-difference bits1 bits2)))
 
   (define-inlineable integer-bits-range (lo hi)
+      (bit-set-element bit-set-element -> bit-set)
     "Returns a bit set representing the range [LO,HI)."
-    (assert (<= lo hi) (lo hi)
+    (assert (<= lo hi) ()
             "The lower bound must be below the upper bound: ~a </= ~a" lo hi)
     (dpb +full+
          (byte (- hi lo) lo)
@@ -147,7 +163,9 @@ NAME with an inclusive lower bound LO and exclusive upper bound HI."
     (let ((qs (resource-collection-qubits r)))
       (format stream ":QUBITS {~{~D~^, ~}}~:[~;*~]~% :MEMORY-REGIONS ~w"
               (bit-set-to-list
-               (if (infinite-integer-set-p qs) (complement qs) qs))
+               (if (infinite-integer-set-p qs)
+                   (integer-bits-complement qs)
+                   qs))
               (infinite-integer-set-p qs)
               (resource-collection-memory-regions r)))))
 
