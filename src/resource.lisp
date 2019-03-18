@@ -12,6 +12,11 @@
   "Representation of a set of non-negative integers as bits. "
   'integer)
 
+(deftype bit-set-index ()
+  "An index into a bit set."
+  '(and fixnum unsigned-byte))
+
+(declaim (type bit-set +empty+ +full+))
 (defconstant +empty+ 0
   "The null bit set. This is all 0's in two's complement.")
 (defconstant +full+ -1
@@ -79,11 +84,11 @@
 ;;; region slot.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  
+
   (defstruct resource-collection
     "A collection of resources, representing some set of qubits and
 classical memory regions. "
-    (qubits +empty+ :read-only t)       ; A bit set
+    (qubits +empty+ :type bit-set :read-only t)
     (memory-regions nil :read-only t))  ; Either an alist mapping region names to bit sets, or the sentinel value T
 
   (defun resource= (rc1 rc2)
@@ -107,8 +112,12 @@ classical memory regions. "
 
 
 (defun make-qubit-resource (&rest indices)
+  (declare (dynamic-extent indices)
+           (inline integer-bits-adjoin))
   (let ((qubits +empty+))
+    (declare (type bit-set qubits))
     (dolist (i indices)
+      (declare (type bit-set-index i))
       (setf qubits (integer-bits-adjoin i qubits)))    
     (make-resource-collection :qubits qubits)))
 
