@@ -20,6 +20,18 @@
   (let ((diff (abs (- x y))))
     (< diff +double-comparison-threshold-strict+)))
 
+(defun double>= (&rest args)
+  (cond
+    ((endp args)
+     t)
+    ((endp (cdr args))
+     t)
+    ((>= (+ (first args) +double-comparison-threshold-strict+)
+         (- (second args) +double-comparison-threshold-strict+))
+     (double>= (rest args)))
+    (t
+     nil)))
+
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
   (check-type y magicl:matrix)
