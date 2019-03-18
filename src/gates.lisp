@@ -647,6 +647,8 @@ as matrices."
   "Treats m in SU(2) as either m (x) Id or Id (x) m."
   (kq-gate-on-lines m 2 (list line)))
 
+(define-global-counter **premultiplied-gate-count** incf-premultiplied-gate-count)
+
 (defun premultiply-gates (instructions)
   "Given a list of (gate) applications INSTRUCTIONS, construct a new gate application which is their product.
 
@@ -684,5 +686,6 @@ as matrices."
                    :gate (make-instance 'simple-gate
                                         :dimension (expt 2 (length qubits))
                                         :matrix u)
-                   :operator (named-operator "PREMULTIPLED-GATE")
+                   :operator (named-operator (format nil "FUSED-GATE-~D"
+                                                     (incf-premultiplied-gate-count)))
                    :arguments (mapcar #'qubit qubits))))
