@@ -161,12 +161,15 @@
 
 (defun build-canonical-gate (coord)
   (destructuring-bind (c1 c2 c3) coord
-    (magicl:diag 4 4
-                 (mapcar (lambda (z) (exp (* #C(0 1) z)))
-                         (list (+ c1 (- c2) c3)
-                               (+ c1 c2 (- c3))
-                               (- (+ c1 c2 c3))
-                               (+ (- c1) c2 c3))))))
+    (reduce #'magicl:multiply-complex-matrices
+            (list +e-basis+
+                  (magicl:diag 4 4
+                               (mapcar (lambda (z) (exp (* #C(0 0.5d0) z)))
+                                       (list (+ c1 (- c2) c3)
+                                             (+ c1 c2 (- c3))
+                                             (- (+ c1 c2 c3))
+                                             (+ (- c1) c2 c3))))
+                  +edag-basis+))))
 
 ;; IMPORTANT TODO: spend time refactoring this so that it blends seemlessly with optimal 2q.
 ;; it should be possible to have 'circuit templates' that have a membership test, a projector
@@ -231,41 +234,40 @@
     '(:cz)
     (double= 0d0 (third coord))
   (list (build-gate "CZ" () q1 q0)
-        (build-gate "RY" (list (/ (+ (first coord) (second coord)) 2)) q1)
-        (build-gate "RY" (list (/ (- (first coord) (second coord)) 2)) q0)
+        (build-gate "RY" (list (first coord)) q1)
+        (build-gate "RY" (list (second coord)) q0)
         (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
     '(:iswap)
     (double= 0d0 (third coord))
   (list (build-gate "ISWAP" '()          q1 q0)
-        (build-gate "RY"    (list (/ (+ (first coord) (second coord)) 2)) q1)
-        (build-gate "RY"    (list (/ (- (first coord) (second coord)) 2)) q0)
+        (build-gate "RY"    (list (first coord)) q1)
+        (build-gate "RY"    (list (second coord)) q0)
         (build-gate "ISWAP" '()          q1 q0)))
 
 (define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
     '(:cz :iswap)
     (double= (/ pi 2) (first coord))
   (list (build-gate "ISWAP" () q1 q0)
-        (build-gate "RY" (list (- (/ pi 2) (second coords))) q0)
-        (build-gate "RY" (list (- (/ pi 2) (third coords))) q1)
+        (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
+        (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
         (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
     '(:cz)
     t
-  (list (build-gate "RY" '(#.(/ pi 2))         q0)
-        (build-gate "CZ" '()                   q0 q1)
-        (build-gate "RY" '(#.(/ pi -2))        q0)
-        (build-gate "RY" (list (second coord)) q1)
-        (build-gate "RZ" (list (third coord))  q0)
-        (build-gate "RY" '(#.(/ pi 2))         q1)
-        (build-gate "CZ" '()                   q0 q1)
-        (build-gate "RY" '(#.(/ pi -2))        q1)
-        (build-gate "RY" (list (first coord))  q1)
-        (build-gate "RY" '(#.(/ pi 2))         q0)
-        (build-gate "CZ" '()                   q0 q1)
-        (build-gate "RY" '(#.(/ pi -2))        q0)))
+  (let ((alpha (- (first coord) pi))
+        (beta  (- pi            (second coord)))
+        (gamma (- (/ pi 2)      (third coord))))
+    (list (build-gate "CZ" '()            q0 q1)
+          (build-gate "RY" '(#.(/ pi -2)) q0)
+          (build-gate "RY" (list alpha)   q1)
+          (build-gate "RZ" (list gamma)   q0)
+          (build-gate "CZ" '()            q0 q1)
+          (build-gate "RY" (list alpha)   q1)
+          (build-gate "RY" '(#.(/ pi 2))  q0)
+          (build-gate "CZ" '()            q0 q1))))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-3 (coord q1 q0)
     '(:iswap)
@@ -326,9 +328,8 @@
                        (anon-gate "A1" a1 q1)))
          fidelity)))))
 
-(defun approximate-2Q-compiler (instr &key (target ':cz) (chip-spec nil) (crafters nil))
+(defun approximate-2Q-compiler (instr &key (chip-spec nil) (crafters nil))
   (check-type instr gate-application)
-  (check-type target optimal-2q-target)
   (check-type chip-spec chip-specification)
   
   (unless (= 2 (length (application-arguments instr)))
