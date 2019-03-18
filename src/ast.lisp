@@ -931,23 +931,24 @@ N.B., The fractions of pi will be printed up to a certain precision!")
        (when (double~ z (- pi))
          (return-from format-complex (format stream "-pi")))
        (dolist (denom '(2 3 4 6 8 16))
-         (dotimes (numer denom)
-           (when (double~ z (/ (* pi numer) denom))
-             (return-from format-complex
-               (cond
-                 ((= numer 1)
-                  (format stream "pi/~d" denom))
-                 ((zerop numer)
-                  (format stream "~F" z))
-                 (t (format stream "~d*pi/~d" numer denom)))))
-           (when (double~ z (/ (* -1 pi numer) denom))
-             (return-from format-complex
-               (cond
-                 ((= numer 1)
-                  (format stream "-pi/~d" denom))
-                 ((zerop numer)
-                  (format stream "~F" z))
-                 (t (format stream "-~d*pi/~d" numer denom))))))))
+         (dotimes (numer (* 2 denom))
+           (when (/= numer denom)
+             (when (double~ z (/ (* pi numer) denom))
+               (return-from format-complex
+                 (cond
+                   ((= numer 1)
+                    (format stream "pi/~d" denom))
+                   ((zerop numer)
+                    (format stream "~F" z))
+                   (t (format stream "~d*pi/~d" numer denom)))))
+             (when (double~ z (/ (* -1 pi numer) denom))
+               (return-from format-complex
+                 (cond
+                   ((= numer 1)
+                    (format stream "-pi/~d" denom))
+                   ((zerop numer)
+                    (format stream "~F" z))
+                   (t (format stream "-~d*pi/~d" numer denom)))))))))
      (format stream "~F" z))
     ((complexp z)
      (cond
