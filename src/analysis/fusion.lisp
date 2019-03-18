@@ -235,14 +235,13 @@ and
     A <--> Y <--> B,
 
 forcing \"Y\" to be the middle link."
-  (loop :for qubit :in (grid-node-qubits node)
-        :for ahead := (succeeding-node-on-qubit node qubit)
-        :for behind := (preceding-node-on-qubit node qubit)
-        :unless (null ahead)
-          :do (setf (preceding-node-on-qubit ahead qubit) node)
-        :unless (null behind)
-          :do (setf (succeeding-node-on-qubit behind qubit) node))
-  nil)
+  (dolist (qubit (grid-node-qubits node))
+    (let ((ahead  (succeeding-node-on-qubit node qubit))
+          (behind (preceding-node-on-qubit node qubit)))
+      (unless (null ahead)
+        (setf (preceding-node-on-qubit ahead qubit) node))
+      (unless (null behind)
+        (setf (succeeding-node-on-qubit behind qubit) node)))))
 
 (defun fuse-node-forward (node)
   (multiple-value-bind (subsumed? node-ahead)
@@ -417,6 +416,9 @@ The list will actually be a list of lists, where each sublist commutes and can b
   (and (gate-application-p x)
        (every #'is-constant (application-parameters x))))
 
+(defun fuseable-gate-p (x)
+  (static-gate-application-p x))
+
 (defun gate-sequence-to-program-grid (gate-sequence)
   (loop :with pg := (make-instance 'program-grid)
         :for gate-app :in gate-sequence
@@ -428,19 +430,34 @@ The list will actually be a list of lists, where each sublist commutes and can b
   (mapcan (alexandria:curry #'mapcar #'grid-node-tag) (sort-program-grid pg)))
 
 (defun fuse-gate-sequence (gate-sequence)
-  (assert (every #'static-gate-application-p gate-sequence))
+  (assert (every #'fuseable-gate-p gate-sequence))
   (program-grid-to-gate-sequence
    (fuse-trivially
     (gate-sequence-to-program-grid gate-sequence))))
 
 (defun fuse-gates-in-executable-code (code)
   (multiple-value-bind (gate-segments first?)
-      (partition-sequence-into-segments #'static-gate-application-p code)
+      ;; XXX: Note that with this approach to identifying fuseable
+      ;; gates, certain gate sequences will *NOT* be fused. For
+      ;; instance, consider the following program:
+      ;;
+      ;;     X 0
+      ;;     RZ(theta) 1
+      ;;     X 0
+      ;;
+      ;; The RZ will stop the sequence of X gates from getting fused.
+      (partition-sequence-into-segments #'fuseable-gate-p code)
     (coerce
      (loop :for segment :in gate-segments
            :for gate-seq-p := first? :then (not gate-seq-p)
            :if gate-seq-p
-             :append (fuse-gate-sequence segment)
+             :append (let ((fused-sequence (fuse-gate-sequence segment)))
+                       (append fused-sequence
+                               ;; Pad with NOPs so we are OK after a
+                               ;; PATCH-LABELS transform.
+                               (make-list (- (length segment)
+                                             (length fused-sequence))
+                                          :initial-element (make-instance 'no-operation))))
            :else                         ; Do nothing!
              :append segment)
      'vector)))
