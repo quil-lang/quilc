@@ -204,6 +204,10 @@ as needed so that they are the same size."
                           n
                           (alexandria:iota m :start (1- m) :step -1)))))
 
+(defun matrix-trace (m)
+  (assert (= (magicl:matrix-rows m) (magicl:matrix-cols m)))
+  (loop :for j :below (magicl:matrix-rows m) :sum (magicl:ref m j j)))
+
 ;; also, some routines for manipulating *vectors*, here expressed as Lisp lists
 (defun dot-product (u v)
   (loop

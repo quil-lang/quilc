@@ -50,7 +50,7 @@
              (magicl:matrix-rows m2) (magicl:matrix-cols m2)))
   (let* ((n (magicl:matrix-rows m1))
          (prod (magicl:multiply-complex-matrices m1 (magicl:conjugate-transpose m2)))
-         (tr (loop :for j :below n :sum (magicl:ref prod j j))))
+         (tr (matrix-trace prod)))
     (/ (+ n (abs (* tr tr)))
        (+ n (* n n)))))
 
