@@ -19,6 +19,9 @@
 (defun read-quil-file (filespec)
   "Read the Quil file designated by FILESPEC, and parse it as if by PARSE-QUIL-STRING."
   (check-type filespec (or string pathname))
-  (assert (uiop:file-pathname-p filespec) (filespec) "FILESPEC must be a path to a file name")
+  (assert (and (uiop:file-pathname-p filespec)
+               (uiop:file-exists-p filespec))
+          (filespec)
+          "FILESPEC must be a path to a file that exists")
   (parse-quil-string (alexandria:read-file-into-string filespec)
                      (first (directory filespec))))
