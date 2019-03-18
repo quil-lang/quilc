@@ -9,10 +9,10 @@
 ;;; Bit Sets
 
 (deftype bit-set ()
-  "Representation of a set of non-negative integers as bits. "
+  "Representation of a set of non-negative integers (specifically BIT-SET-ELEMENT) as bits. "
   'integer)
 
-(deftype bit-set-index ()
+(deftype bit-set-element ()
   "An index into a bit set."
   '(and fixnum unsigned-byte))
 
@@ -117,7 +117,7 @@ classical memory regions. "
   (let ((qubits +empty+))
     (declare (type bit-set qubits))
     (dolist (i indices)
-      (declare (type bit-set-index i))
+      (declare (type bit-set-element i))
       (setf qubits (integer-bits-adjoin i qubits)))    
     (make-resource-collection :qubits qubits)))
 
