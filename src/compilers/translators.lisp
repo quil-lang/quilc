@@ -140,9 +140,7 @@
         (build-gate "CNOT" () q0 q1)))
 
 (define-translator SWAP-to-CZ (("SWAP" () _ _) swap-gate)
-  (reduce #'append
-          (mapcar #'CNOT-to-CZ
-                  (SWAP-to-CNOT swap-gate))))
+  (mapcan #'CNOT-to-CZ (SWAP-to-CNOT swap-gate)))
 
 (define-translator SWAP-to-PSWAP (("SWAP" () q0 q1) swap-gate)
   (list (build-gate "PSWAP" '(0d0) q0 q1)))
