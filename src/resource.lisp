@@ -3,53 +3,74 @@
 ;;;; Authors: Corwin de Boor
 ;;;;          Erik Davis
 
-(in-package :cl-quil.resource)
+(in-package #:cl-quil.resource)
 
 
 ;;; Bit Sets
 
 (deftype bit-set ()
-  "Representation of a set of non-negative integers as bits. "
+  "Representation of a set of non-negative integers (specifically BIT-SET-ELEMENT) as bits. "
   'integer)
 
+(deftype bit-set-element ()
+  "An index into a bit set."
+  '(and fixnum unsigned-byte))
+
+(declaim (type bit-set +empty+ +full+))
 (defconstant +empty+ 0
   "The null bit set. This is all 0's in two's complement.")
 (defconstant +full+ -1
   "The full bit set. This is all 1's in two's complement.")
 
-(macrolet ((define-inlineable (name args &body body)
-             `(progn
-                (declaim (inline ,name))
-                (defun ,name ,args ,@body)
-                (declaim (notinline ,name)))))
+(macrolet ((define-inlineable (name args types &body body)
+             (assert (= (+ 2 (length args)) (length types)))
+             (let ((arg-types (subseq types 0 (length args)))
+                   (ret-type  (subseq types (1+ (length args)))))
+               `(progn
+                  (declaim (inline ,name))
+                  (declaim (ftype (function ,arg-types ,ret-type) ,name))
+                  (defun ,name ,args ,@body)
+                  (declaim (notinline ,name))))))
 
   (define-inlineable integer-bits-equal (bits1 bits2)
+      (bit-set bit-set -> boolean)
     (= bits1 bits2))
   (define-inlineable infinite-integer-set-p (bits)
+      (bit-set -> boolean)
     (minusp bits))
   (define-inlineable integer-bits-complement (bits)
+      (bit-set -> bit-set)
     (lognot bits))
   (define-inlineable integer-bits-adjoin (i bits)
+      (bit-set-element bit-set -> bit-set)
     (dpb 1 (byte 1 i) bits))
   (define-inlineable integer-bits-remove (i bits)
+      (bit-set-element bit-set -> bit-set)
     (dpb 0 (byte 1 i) bits))
   (define-inlineable integer-bits-member (i bits)
+      (bit-set-element bit-set -> boolean)
     (logbitp i bits))
   (define-inlineable integer-bits-union (bits1 bits2)
+      (bit-set bit-set -> bit-set)
     (logior bits1 bits2))
   (define-inlineable integer-bits-intersection (bits1 bits2)
+      (bit-set bit-set -> bit-set)
     (logand bits1 bits2))
   (define-inlineable integer-bits-empty-p (bits)
+      (bit-set -> boolean)
     (integer-bits-equal bits +empty+))
   (define-inlineable integer-bits-difference (bits1 bits2)
+      (bit-set bit-set -> bit-set)
     (logandc2 bits1 bits2))
   (define-inlineable integer-bits-subsetp (bits1 bits2)
+      (bit-set bit-set -> boolean)
     "Is the bit set BITS1 is a subset of the bit set BITS2?"
     (integer-bits-empty-p (integer-bits-difference bits1 bits2)))
 
   (define-inlineable integer-bits-range (lo hi)
+      (bit-set-element bit-set-element -> bit-set)
     "Returns a bit set representing the range [LO,HI)."
-    (assert (<= lo hi) (lo hi)
+    (assert (<= lo hi) ()
             "The lower bound must be below the upper bound: ~a </= ~a" lo hi)
     (dpb +full+
          (byte (- hi lo) lo)
@@ -79,11 +100,11 @@
 ;;; region slot.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  
+
   (defstruct resource-collection
     "A collection of resources, representing some set of qubits and
 classical memory regions. "
-    (qubits +empty+ :read-only t)       ; A bit set
+    (qubits +empty+ :type bit-set :read-only t)
     (memory-regions nil :read-only t))  ; Either an alist mapping region names to bit sets, or the sentinel value T
 
   (defun resource= (rc1 rc2)
@@ -107,13 +128,17 @@ classical memory regions. "
 
 
 (defun make-qubit-resource (&rest indices)
+  (declare (dynamic-extent indices)
+           (inline integer-bits-adjoin))
   (let ((qubits +empty+))
+    (declare (type bit-set qubits))
     (dolist (i indices)
+      (declare (type bit-set-element i))
       (setf qubits (integer-bits-adjoin i qubits)))    
     (make-resource-collection :qubits qubits)))
 
 (defun make-null-resource ()
-  (make-resource-collection))
+  (load-time-value (make-resource-collection) t))
 
 (defun make-all-resource ()
   +impossibly-full-resource+)
@@ -138,7 +163,9 @@ NAME with an inclusive lower bound LO and exclusive upper bound HI."
     (let ((qs (resource-collection-qubits r)))
       (format stream ":QUBITS {~{~D~^, ~}}~:[~;*~]~% :MEMORY-REGIONS ~w"
               (bit-set-to-list
-               (if (infinite-integer-set-p qs) (complement qs) qs))
+               (if (infinite-integer-set-p qs)
+                   (integer-bits-complement qs)
+                   qs))
               (infinite-integer-set-p qs)
               (resource-collection-memory-regions r)))))
 
@@ -173,6 +200,21 @@ NAME with an inclusive lower bound LO and exclusive upper bound HI."
   (resource= rc +impossibly-full-resource+))
 
 
+;;; There is some overhead in MAP-MEMORY-REGIONS. By isolating the qubit
+;;; combination from the region combination, we can short-circuit in
+;;; the later RESOURCE-UNION, RESOURCE-INTERSECTION, RESOURCE-SUBSET
+;;; functions.
+(declaim (inline combine-collections-default-regions))
+(defun combine-collections-default-regions (qubit-combiner memory-regions rc1 rc2)
+  "Combine resource collections RC1 and RC2 by applying QUBIT-COMBINER
+  to their qubit bit sets. Instead of combining their regions, the
+  default value of MEMORY-REGIONS is used for the result."
+  (make-resource-collection
+   :qubits (funcall qubit-combiner
+                    (resource-collection-qubits rc1)
+                    (resource-collection-qubits rc2))
+   :memory-regions memory-regions))
+
 (defun combine-collections (qubit-combiner region-combiner rc1 rc2)
   "Combine resource collections RC1 and RC2 by applying the function
 QUBIT-COMBINER to their qubit bit sets, and the function
@@ -189,63 +231,46 @@ REGION-COMBINER to their commonly-named regions."
                                         rc1
                                         rc2)))
 
-
-;;; There is some overhead in MAP-MEMORY-REGIONS. By isolating the qubit
-;;; combination from the region combination, we can short-circuit in
-;;; the later RESOURCE-UNION, RESOURCE-INTERSECTION, RESOURCE-SUBSET
-;;; functions.
-(defun combine-collections-default-regions (qubit-combiner memory-regions rc1 rc2)
-  "Combine resource collections RC1 and RC2 by applying QUBIT-COMBINER
-  to their qubit bit sets. Instead of combining their regions, the
-  default value of MEMORY-REGIONS is used for the result."
-  (make-resource-collection
-   :qubits (funcall qubit-combiner
-                    (resource-collection-qubits rc1)
-                    (resource-collection-qubits rc2))
-   :memory-regions memory-regions))
-
 (defun resource-union (rc1 rc2)
   "Returns a resource collection representing the union of RC1 and RC2."
-  (let ((combiner #'integer-bits-union))
-    (cond ((or (resource-all-p rc1)
-               (resource-all-p rc2))
-           +impossibly-full-resource+)
-          ;; Short circuit memory region combination, if possible
-          ((null (resource-collection-memory-regions rc1))
-           (combine-collections-default-regions combiner
-                                               (resource-collection-memory-regions rc2)
-                                               rc1
-                                               rc2))
-          ((null (resource-collection-memory-regions rc2))
-           (combine-collections-default-regions combiner
-                                               (resource-collection-memory-regions rc1)
-                                               rc1
-                                               rc2))
-          (t
-           (combine-collections combiner
-                                #'range-union
-                                rc1
-                                rc2)))))
+  (cond ((or (resource-all-p rc1)
+             (resource-all-p rc2))
+         +impossibly-full-resource+)
+        ;; Short circuit memory region combination, if possible
+        ((null (resource-collection-memory-regions rc1))
+         (combine-collections-default-regions #'integer-bits-union
+                                              (resource-collection-memory-regions rc2)
+                                              rc1
+                                              rc2))
+        ((null (resource-collection-memory-regions rc2))
+         (combine-collections-default-regions #'integer-bits-union
+                                              (resource-collection-memory-regions rc1)
+                                              rc1
+                                              rc2))
+        (t
+         (combine-collections #'integer-bits-union
+                              #'range-union
+                              rc1
+                              rc2))))
 
 (defun resource-intersection (rc1 rc2)
   "Returns a resource collection representing the intersection of RC1 and RC2."
-  (let ((combiner #'integer-bits-intersection))
-    (cond ((resource-all-p rc1)
-           rc2)
-          ((resource-all-p rc2)
-           rc1)
-          ;; Short circuit memory region combination, if possible
-          ((or (null (resource-collection-memory-regions rc1))
-               (null (resource-collection-memory-regions rc2)))
-           (combine-collections-default-regions combiner
-                                               nil
-                                               rc1
-                                               rc2))
-          (t
-           (combine-collections combiner
-                                #'range-intersection
-                                rc1
-                                rc2)))))
+  (cond ((resource-all-p rc1)
+         rc2)
+        ((resource-all-p rc2)
+         rc1)
+        ;; Short circuit memory region combination, if possible
+        ((or (null (resource-collection-memory-regions rc1))
+             (null (resource-collection-memory-regions rc2)))
+         (combine-collections-default-regions #'integer-bits-intersection
+                                              nil
+                                              rc1
+                                              rc2))
+        (t
+         (combine-collections #'integer-bits-intersection
+                              #'range-intersection
+                              rc1
+                              rc2))))
 
 (define-condition resource-collection-unbounded-names (error)
   ()
@@ -253,27 +278,26 @@ REGION-COMBINER to their commonly-named regions."
 
 (defun resource-difference (rc1 rc2)
   "Returns a resource collection representing those resources in RC1 and not in RC2."
-  (let ((combiner #'integer-bits-difference))
-    (cond ((resource-all-p rc1)
-           (error 'resource-collection-unbounded-names))
-          ((resource-all-p rc2)
-           (make-null-resource))
-          ;; Short circuit memory region combination, if possible
-          ((null (resource-collection-memory-regions rc1))
-           (combine-collections-default-regions combiner
-                                            nil
-                                            rc1
-                                            rc2))
-          ((null (resource-collection-memory-regions rc2))
-           (combine-collections-default-regions combiner
-                                            (resource-collection-memory-regions rc1)
-                                            rc1
-                                            rc2))
-          (t
-           (combine-collections combiner
-                                #'range-difference
-                                rc1
-                                rc2)))))
+  (cond ((resource-all-p rc1)
+         (error 'resource-collection-unbounded-names))
+        ((resource-all-p rc2)
+         (make-null-resource))
+        ;; Short circuit memory region combination, if possible
+        ((null (resource-collection-memory-regions rc1))
+         (combine-collections-default-regions #'integer-bits-difference
+                                              nil
+                                              rc1
+                                              rc2))
+        ((null (resource-collection-memory-regions rc2))
+         (combine-collections-default-regions #'integer-bits-difference
+                                              (resource-collection-memory-regions rc1)
+                                              rc1
+                                              rc2))
+        (t
+         (combine-collections #'integer-bits-difference
+                              #'range-difference
+                              rc1
+                              rc2))))
 
 
 (defun resources-intersect-p (rc1 rc2)

@@ -60,3 +60,17 @@ appropriate method of comparison."
   (if *enable-state-prep-compression*
       (first-column-operator= mat1 mat2)
       (operator= mat1 mat2)))
+
+(defun reduce-append (lists)
+  "Append all of the lists of LISTS together. Called 'concat' in some other languages. Equivalent to (REDUCE #'APPEND LISTS)."
+  ;; We could LOAD-TIME-VALUE this CONS but then the function wouldn't
+  ;; be re-entrant.
+  (let* ((leash (cons nil nil))
+         (last-cons leash))
+    (declare (type cons leash last-cons))
+    (loop :for list :of-type list :in lists
+          :do (loop :for x :in list
+                    :for new-cons :of-type cons := (cons x nil)
+                    :do (rplacd last-cons new-cons)
+                        (setf last-cons new-cons)))
+    (cdr leash)))
