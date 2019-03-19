@@ -12,6 +12,19 @@
   (is (equalp (cl-quil::splice-code-at #(0 1 2 x) 3 #(a b c))
               #(0 1 2 A B C))))
 
+(deftest test-append-reduce ()
+  (is (equal nil (quil::reduce-append nil)))
+  (is (equal nil (quil::reduce-append '(nil))))
+  (is (equal nil (quil::reduce-append '(nil nil))))
+  (is (equal '(a) (quil::reduce-append '(nil (a)))))
+  (is (equal '(a) (quil::reduce-append '((a) nil))))
+  (is (equal '(a) (quil::reduce-append '((a) nil nil))))
+  (is (equal '(a) (quil::reduce-append '(nil (a) nil))))
+  (is (equal '(a) (quil::reduce-append '(nil nil (a)))))
+  (is (equal '(a b c) (quil::reduce-append '((a) nil (b) nil (c)))))
+  (is (equal '(a b c d) (quil::reduce-append '((a) (b c) nil (d)))))
+  (is (equal '(a b c d e f) (quil::reduce-append '((a) (b c) nil (d) (e f))))))
+
 (deftest test-print-instruction ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\""
                (with-output-to-string (s)
