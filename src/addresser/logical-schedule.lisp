@@ -572,7 +572,7 @@ mapping instructions to their tags. "
            (fidelity-bumper (instr value)
              (flet ((warn-and-skip (instr)
                       (format *compiler-noise-stream*
-                              "Fidelity not known for the following gate: ~s. Assuming ideal."
+                              "Fidelity not known for the following gate: ~a. Assuming ideal.~%"
                               (print-instruction instr nil))
                       (return-from fidelity-bumper value)))
                (let (fidelity)

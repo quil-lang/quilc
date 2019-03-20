@@ -64,7 +64,6 @@
                              (:file "cs-compile")
                              (:file "euler-compile")
                              (:file "qs-compile")
-                             (:file "optimal-2q")
                              (:file "ucr-recognize")
                              (:file "state-prep")
                              (:file "translators")
