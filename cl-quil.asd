@@ -108,3 +108,57 @@
                              (:file "wavefunctions")
                              (:file "rewriting-rules")))
                (:file "cl-quil")))
+
+;;; Contribs
+
+;; Adapted from magicl's magicl-transcendental adapted from commonqt's
+;; qt.asd.
+(defclass c->so (asdf:source-file)
+ ())
+
+(defmethod output-files ((operation compile-op) (component c->so))
+  (values (list (make-pathname :name "libtweedledum"
+                               :type #-darwin "so" #+darwin "dylib"
+                               :defaults (component-pathname component)))
+          t))
+
+(defmethod perform ((operation load-op) (component c->so))
+  t)
+
+(defmethod perform ((operation compile-op) (component c->so))
+  (flet ((nn (x) (uiop:native-namestring x)))
+    (let* ((c-file (component-pathname component))
+           (shared-object (make-pathname :type #+darwin "dylib" #-darwin "so"
+                                         :name "libtweedledum"
+                                         :defaults c-file))
+           (dir (namestring (make-pathname :directory (pathname-directory c-file)))))
+      (uiop:run-program
+       ;; TODO This needs to be platform agnostic. The difficulty is
+       ;; in picking up a c++17 compiler automatically.
+       (list "/usr/local/opt/llvm/bin/clang++"
+             "-L/usr/local/opt/llvm/lib"
+             "-shared"
+             "-fPIC"
+             "-std=c++17"
+             "-Wl,-rpath,/usr/local/opt/llvm/lib"
+             "-DFMT_HEADER_ONLY"
+             (format nil "-I~a/tweedledum/libs/fmt" dir)
+             (format nil "-I~a/tweedledum/libs/easy" dir)
+             (format nil "-I~a/tweedledum/libs/glucose" dir)
+             (format nil "-I~a/tweedledum/libs/kitty" dir)
+             (format nil "-I~a/tweedledum/include" dir)
+             "-o" (nn shared-object)
+             (nn c-file))))))
+
+(asdf:defsystem #:cl-quil/tweedledum
+  :license "Apache License 2.0 (See LICENSE.txt)" 
+  :maintainer "Rigetti Computing"
+  :author "Rigetti Computing"
+  :description "C++17 Library for writing, manipulating, and optimizing quantum circuits"
+  :depends-on (#:cffi)
+  :pathname "src/contrib/tweedledum/"
+  :serial t
+  :components
+  ((c->so "tweedledum.c")
+   (:file "tweedledum")))
+
