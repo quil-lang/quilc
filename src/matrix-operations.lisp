@@ -28,7 +28,7 @@
      t)
     ((>= (+ (first args) +double-comparison-threshold-strict+)
          (- (second args) +double-comparison-threshold-strict+))
-     (double>= (rest args)))
+     (apply #'double>= (rest args)))
     (t
      nil)))
 

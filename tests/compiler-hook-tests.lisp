@@ -45,11 +45,11 @@ PRAGMA CURRENT_REWIRING \"#(1 0)\"")))
     (format t "    Testing rewiring type ~A~%" quil::*initial-rewiring-default-type*)
     (finish-output)
     (let* ((pstring "
-CNOT 0 3
-CNOT 1 4")
+CNOT 0 2
+CNOT 1 3")
            (pp (quil::parse-quil-string pstring))
            (cpp (quil::compiler-hook (quil::parse-quil-string pstring)
-                                     (quil::build-8Q-chip)
+                                     (quil::build-nQ-linear-chip 4)
                                      :protoquil t)))
       (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
                            (quil::parsed-program-to-logical-matrix cpp)))))

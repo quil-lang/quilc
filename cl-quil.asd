@@ -65,9 +65,9 @@
                              (:file "euler-compile")
                              (:file "qs-compile")
                              (:file "ucr-recognize")
+                             (:file "approx")
                              (:file "state-prep")
-                             (:file "translators")
-                             (:file "approx")))
+                             (:file "translators")))
                (:module "analysis"
                 :serial t
                 :components ((:file "process-includes")

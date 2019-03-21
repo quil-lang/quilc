@@ -221,7 +221,8 @@
       a)))
 
 (defun orthogonal-decomposition (m)
-  (let* ((a (diagonalizer-in-e-basis m))
+  (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
+         (a (diagonalizer-in-e-basis m))
          (db (reduce #'magicl:multiply-complex-matrices
                      (list (magicl:transpose a) +edag-basis+ m +e-basis+)))
          (diag (loop :for j :below 4
@@ -284,44 +285,60 @@
   (multiple-value-bind (aprime dprime bprime)
       (orthogonal-decomposition (magicl:scale (expt (magicl:det mprime) -1/4) mprime))
     (let (o oT
-          (d-as-list      (loop :for j :below 4 :collect (magicl:ref d j j)))
-          (dprime-as-list (loop :for j :below 4 :collect (magicl:ref dprime j j)))
-          (max-fidelity 0d0))
+            (d-as-list      (loop :for j :below 4 :collect (magicl:ref d j j)))
+            (dprime-as-list (loop :for j :below 4 :collect (magicl:ref dprime j j)))
+            (max-fidelity 0d0))
       ;; maximize the trace over signed permutations
       (cl-permutation:doperms (sigma 4)
         (dolist (signs (list (list  1  1  1  1)
                              (list -1 -1  1  1)
                              (list -1  1 -1  1)
                              (list -1  1  1 -1)))
-          (when (= -1 (cl-permutation:perm-sign sigma))
-            (setf (first signs) (* -1 (first signs))))
           (let* ((new-trace
-                  (loop :for x :in (cl-permutation:permute sigma d-as-list)
+                  (loop
+                     :for x :in (cl-permutation:permute sigma d-as-list)
                      :for y :in dprime-as-list
                      :for sign :in signs
                      :sum (* x sign (conjugate y))))
                  (new-fidelity (/ (+ 4 (abs (* new-trace new-trace))) 20)))
+            #+ignore
+            (format t "Old ~a vs new ~a.~%" max-fidelity new-fidelity)
             (when (> new-fidelity max-fidelity)
+              #+ignore
+              (format t "Movin on up:~%~a~%~a~%~a.~%" (cl-permutation:permute sigma d-as-list) dprime-as-list signs)
               (setf max-fidelity new-fidelity)
-              (setf o (make-signed-permutation-matrix sigma))
+              (when (= -1 (cl-permutation:perm-sign sigma))
+                (setf (first signs) (* -1 (first signs))))
+              (setf o (make-signed-permutation-matrix sigma (if (= -1 (cl-permutation:perm-sign sigma))
+                                                                (list -1 1 1 1)
+                                                                (list 1 1 1 1))))
               (setf oT (magicl:transpose (make-signed-permutation-matrix sigma signs)))))))
       (when *compress-carefully*
+        #+ignore
         (progn
           (format t "///////////~%~%")
+          #+ignore
           (format t "A: ~a~%" a)
           (format t "D: ~a~%" d)
+          #+ignore
           (format t "B: ~a~%" b)
+          #+ignore
           (format t "EADBE^*: ~a~%" (reduce
                                      #'magicl:multiply-complex-matrices
                                      (list +e-basis+ a d b +edag-basis+)))
+          #+ignore
           (format t "M': ~a~%" mprime)
+          #+ignore
           (format t "A': ~a~%" aprime)
           (format t "D': ~a~%" dprime)
+          #+ignore
           (format t "B': ~a~%" bprime)
+          #+ignore
           (format t "EA'D'B'E^*: ~a~%" (reduce #'magicl:multiply-complex-matrices
                                                (list +e-basis+ aprime dprime bprime +edag-basis+)))
           (format t "O: ~a~%" o)
           (format t "OT: ~a~%" oT)
+          #+ignore
           (format t "UA M' UB: ~a~%"
                   (reduce #'magicl:multiply-complex-matrices
                           (list +e-basis+ a o (magicl:transpose aprime) +edag-basis+
@@ -384,32 +401,27 @@
 
 (defun get-canonical-coords-from-diagonal (d)
   (assert (= 4 (magicl:matrix-rows d) (magicl:matrix-cols d)))
-  (let* ((angles (mapcar #'phase (loop :for i :below 4 :collect (magicl:ref d i i))))
-         (first  (mod    (+ (third angles) (fourth angles)) pi))
-         (second (mod (- (+ (third angles) (first angles))) pi))
-         (third  (mod    (+ (third angles) (second angles)) pi))
-         (first  (if (double= pi first)  0d0 first))
-         (second (if (double= pi second) 0d0 second))
-         (third  (if (double= pi third)  0d0 third))
-         (option-1 (sort (list first second third) #'>)))
-    (destructuring-bind (first second third) option-1
-      (let ((option-2 (sort (list (- pi first)       (- pi second) third)        #'>))
-            (option-3 (sort (list first              (- pi second) (- pi third)) #'>))
-            (option-4 (sort (list (- pi first)       second        (- pi third)) #'>))
-            (option-5 (sort (list (- first pi)       second        third)        #'>))
-            (option-6 (sort (list (- first pi)       (- pi second) (- pi third)) #'>))
-            (option-7 (sort (list (- (* 2 pi) first) (- pi second) third)        #'>))
-            (option-8 (sort (list (- (* 2 pi) first) second        (- pi third)) #'>)))
-        (flet ((test (seq) (double>= (/ pi 2) (first seq) (second seq) (abs (third seq)))))
+  (flet ((test (seq) (double>= (/ pi 2) (first seq) (second seq) (abs (third seq))))
+         (wrap-value (z)
+           (let* ((pi/2 (/ pi 2))
+                  (z (- (mod (+ z pi/2) pi) pi/2)))
+             (if (double= (/ pi -2) z)
+                 (- z)
+                 z))))
+    (let* ((angles (mapcar #'phase (loop :for i :below 4 :collect (magicl:ref d i i))))
+           (first  (mod    (+ (third angles) (fourth angles)) pi))
+           (second (mod (- (+ (third angles) (first angles))) pi))
+           (third  (mod    (+ (third angles) (second angles)) pi))
+           (option-1 (sort (mapcar #'wrap-value (list first second third)) #'>)))
+      (destructuring-bind (first second third) option-1
+        (let ((option-2 (sort (mapcar #'wrap-value (list (- first) (- second) third))     #'>))
+              (option-3 (sort (mapcar #'wrap-value (list (- first) second     (- third))) #'>))
+              (option-4 (sort (mapcar #'wrap-value (list first     (- second) (- third))) #'>)))
           (cond
             ((test option-1) option-1)
             ((test option-2) option-2)
             ((test option-3) option-3)
             ((test option-4) option-4)
-            ((test option-5) option-5)
-            ((test option-6) option-6)
-            ((test option-7) option-7)
-            ((test option-8) option-8)
             (t (error "uh-oh (cf. ~a)" (list first second third)))))))))
 
 (defun build-canonical-gate (coord)
@@ -432,7 +444,7 @@
 ;;; otherwise, this list of records will retain both the record pointing to the
 ;;; new definition as well as the previously existing record pointing to the old.
 ;;;
-;;; important note: these are listed in *ascending* preference order.
+;;; important note: these are listed in *descending* preference order.
 
 (defvar **approximate-template-records** nil
   "Houses a list of available approximate templates.")
@@ -480,28 +492,83 @@
          (values (circuit-template template-values ,(second args) ,(third args)) goodness)))))
 
 
-(define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
-    '(:cz)
-    t
-  (let ((alpha (- (first coord) pi))
-        (beta  (- pi            (second coord)))
-        (gamma (- (/ pi 2)      (third coord))))
-    (list (build-gate "CZ" '()            q0 q1)
-          (build-gate "RY" '(#.(/ pi -2)) q0)
-          (build-gate "RY" (list alpha)   q1)
-          (build-gate "RZ" (list gamma)   q0)
-          (build-gate "CZ" '()            q0 q1)
-          (build-gate "RY" (list alpha)   q1)
-          (build-gate "RY" '(#.(/ pi 2))  q0)
-          (build-gate "CZ" '()            q0 q1))))
 
-(define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
+(define-approximate-template nearest-circuit-of-depth-0 (coord q1 q0)
+    '()
+    (every #'double= coord (list 0d0 0d0 0d0))
+  (list (build-gate "I" () q0)
+        (build-gate "I" () q1)))
+
+(define-approximate-template nearest-ISWAP-circuit-of-depth-1 (coord q1 q0)
+    '(:iswap)
+    (every #'double= coord (list (/ pi 2) (/ pi 2) 0))
+  (list (build-gate "ISWAP" '() q1 q0)))
+
+(define-approximate-template nearest-XY-circuit-of-depth-1 (coord q1 q0)
+    '(:piswap)
+    (and (double= (first coord) (second coord))
+         (double= (third coord) 0d0))
+  (list (build-gate "PISWAP" (list (* 2 (first coord))) q1 q0)))
+
+(define-approximate-template nearest-CZ-circuit-of-depth-1 (coord q1 q0)
     '(:cz)
+    (every #'double= coord (list (/ pi 2) 0d0 0d0))
+  (list (build-gate "CZ" () q1 q0)))
+
+(define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
+    '(:cphase)
+    (every #'double= (rest coord) (list 0d0 0d0))
+  (list (build-gate "CPHASE" (list (* 2 (first coord))) q1 q0)))
+
+(define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
+    '(:iswap)
     (double= 0d0 (third coord))
-  (list (build-gate "CZ" () q1 q0)
-        (build-gate "RY" (list (first coord)) q1)
-        (build-gate "RY" (list (second coord)) q0)
+  (list (build-gate "ISWAP" '()          q1 q0)
+        (build-gate "RY"    (list (first coord)) q1)
+        (build-gate "RY"    (list (second coord)) q0)
+        (build-gate "ISWAP" '()          q1 q0)))
+
+(define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
+    '(:cz :iswap)
+    (double= (/ pi 2) (first coord))
+  (list (build-gate "ISWAP" () q1 q0)
+        (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
+        (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
         (build-gate "CZ" () q1 q0)))
+
+(define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
+    '(:cphase :iswap)
+    t                       ; TODO: replace this with a convexity test
+    3
+  (list
+   (build-gate "ISWAP"  ()                    q0 q1)
+   (build-gate "RY"     (list (aref array 0)) q0)
+   (build-gate "RY"     (list (aref array 1)) q1)
+   (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
+
+(define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
+  '(:cz :piswap)
+  t                         ; TODO: replace this with a convexity test
+  4
+  (list
+   (build-gate "CZ"     ()                     q1 q0)
+   (build-gate "RY"     (list (aref array 0))     q0)
+   (build-gate "RY"     (list (aref array 1))     q1)
+   (build-gate "RZ"     (list (aref array 2))     q0)
+   (build-gate "RZ"     (list (- (aref array 2))) q1)
+   (build-gate "PISWAP" (list (aref array 3)) q1 q0)))
+
+(define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
+  '(:cphase :piswap)
+  t                         ; TODO: replace this with a convexity test
+  5
+  (list
+   (build-gate "CPHASE" (list (aref array 4)) q1 q0)
+   (build-gate "RY" (list (aref array 0)) q0)
+   (build-gate "RY" (list (aref array 1)) q1)
+   (build-gate "RZ" (list (aref array 2)) q0)
+   (build-gate "RZ" (list (- (aref array 2))) q1)
+   (build-gate "PISWAP" (list (aref array 3)) q1 q0)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-3 (coord q1 q0)
     '(:iswap)
@@ -546,113 +613,51 @@
                   (nearest-ISWAP-circuit-of-depth-2 coordprime q1 q0)
                   a d b q1 q0)))))))
 
-(define-searching-approximate-template nearest-XY-XY-template-of-depth-2 (coord q1 q0 array)
-    '(:cphase :iswap)
-    t                       ; TODO: replace this with a convexity test
-    6
-  (let ((first  (aref array 0))
-        (second (aref array 1))
-        (third  (aref array 2))
-        (fourth (aref array 3))
-        (fifth  (aref array 4))
-        (sixth  (aref array 5)))
-    (list
-     (build-gate "PISWAP" (list third)     q0 q1)
-     (build-gate "RZ"     (list fifth)     q0)
-     (build-gate "RZ"     (list (- fifth)) q1)
-     (build-gate "RY"     (list first)     q0)
-     (build-gate "RY"     (list second)    q1)
-     (build-gate "RZ"     (list sixth)     q0)
-     (build-gate "RZ"     (list (- sixth)) q1)
-     (build-gate "PISWAP" (list fourth)    q0 q1))))
-
-(define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
-  '(:cphase :piswap)
-  t                         ; TODO: replace this with a convexity test
-  5
-  (list
-   (build-gate "CPHASE" (list (aref array 4)) q1 q0)
-   (build-gate "RY" (list (aref array 0)) q0)
-   (build-gate "RY" (list (aref array 1)) q1)
-   (build-gate "RZ" (list (aref array 2)) q0)
-   (build-gate "RZ" (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3)) q1 q0)))
-
-(define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
-  '(:cz :piswap)
-  t                         ; TODO: replace this with a convexity test
-  4
-  (list
-   (build-gate "CZ"     ()                     q1 q0)
-   (build-gate "RY"     (list (aref array 0))     q0)
-   (build-gate "RY"     (list (aref array 1))     q1)
-   (build-gate "RZ"     (list (aref array 2))     q0)
-   (build-gate "RZ"     (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3)) q1 q0)))
-
-(define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
-    '(:cphase :iswap)
-    t                       ; TODO: replace this with a convexity test
-    3
-  (list
-   (build-gate "ISWAP"  ()                    q0 q1)
-   (build-gate "RY"     (list (aref array 0)) q0)
-   (build-gate "RY"     (list (aref array 1)) q1)
-   (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
-
-(define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    '(:cz :iswap)
-    (double= (/ pi 2) (first coord))
-  (list (build-gate "ISWAP" () q1 q0)
-        (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
-        (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
+(define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
+    '(:cz)
+    (double= 0d0 (third coord))
+  (list (build-gate "CZ" () q1 q0)
+        (build-gate "RY" (list (first coord)) q1)
+        (build-gate "RY" (list (second coord)) q0)
         (build-gate "CZ" () q1 q0)))
 
-(define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    '(:iswap)
-    (double= 0d0 (third coord))
-  (list (build-gate "ISWAP" '()          q1 q0)
-        (build-gate "RY"    (list (first coord)) q1)
-        (build-gate "RY"    (list (second coord)) q0)
-        (build-gate "ISWAP" '()          q1 q0)))
-
-(define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
-    '(:cphase)
-    (every #'double= (rest coord) (list 0d0 0d0))
-  (list (build-gate "CPHASE" (list (first coord)) q1 q0)))
-
-(define-approximate-template nearest-CZ-circuit-of-depth-1 (coord q1 q0)
+(define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
     '(:cz)
-    (every #'double= coord (list (/ pi 2) 0d0 0d0))
-  (list (build-gate "CZ" () q1 q0)))
-
-(define-approximate-template nearest-XY-circuit-of-depth-1 (coord q1 q0)
-    '(:piswap)
-    (and (double= (first coord) (second coord))
-         (double= (third coord) 0d0))
-  (list (build-gate "PISWAP" (list (first coord)) q1 q0)))
-
-(define-approximate-template nearest-ISWAP-circuit-of-depth-1 (coord q1 q0)
-    '(:iswap)
-    (every #'double= coord (list (/ pi 2) (/ pi 2) 0))
-  (list (build-gate "ISWAP" '() q1 q0)))
-
-(define-approximate-template nearest-circuit-of-depth-0 (coord q1 q0)
-    '()
-    (every #'double= coord (list 0d0 0d0 0d0))
-  (list (build-gate "I" () q0)
-        (build-gate "I" () q1)))
+    t
+  (let ((alpha (- (first coord) pi))
+        (beta  (- pi            (second coord)))
+        (gamma (- (/ pi 2)      (third coord))))
+    (list (build-gate "CZ" '()            q0 q1)
+          (build-gate "RY" '(#.(/ pi -2)) q0)
+          (build-gate "RY" (list beta)   q1)
+          (build-gate "RZ" (list gamma)   q0)
+          (build-gate "CZ" '()            q0 q1)
+          (build-gate "RY" (list alpha)   q1)
+          (build-gate "RY" '(#.(/ pi 2))  q0)
+          (build-gate "CZ" '()            q0 q1))))
 
 
 ;;; here lies the logic underlying the approximate compilation routine.
 
 (defun sandwich-with-local-gates (center-circuit a d b q1 q0)
   "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS)."
+  #+ignore
   (format t "SANDWICH-... called with circuit ~a~%~%" center-circuit)
+  (dolist (instr center-circuit)
+    (map-into (application-arguments instr)
+              (lambda (q) (qubit (if (= q1 (qubit-index q))
+                                     1 0)))
+              (application-arguments instr)))
   (multiple-value-bind (ua ub fidelity)
       (match-matrix-to-an-e-basis-diagonalization
        (make-matrix-from-quil center-circuit)
        a d b)
+    
+    (dolist (instr center-circuit)
+    (map-into (application-arguments instr)
+              (lambda (q) (qubit (if (= 1 (qubit-index q))
+                                     q1 q0)))
+              (application-arguments instr)))
     
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
       (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
@@ -675,26 +680,36 @@
   ;; extract matrix, canonical decomposition
   (let* ((q1 (qubit-index (first (application-arguments instr))))
          (q0 (qubit-index (second (application-arguments instr))))
-         (m (gate-matrix instr))
+         (m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
          (m (magicl:scale (expt (magicl:det m) -1/4) m)))
     (multiple-value-bind (a d b) (orthogonal-decomposition m)
       ;; now we manufacture a bunch of candidate circuits
       (let* ((candidate-pairs nil)
              (coord (get-canonical-coords-from-diagonal d)))
         (dolist (circuit-crafter crafters)
-          (handler-case
-              (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
-                                                                          (application-arguments instr))))
-                     (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
-                     (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
-                (multiple-value-bind (sandwiched-circuit fidelity)
-                    (sandwich-with-local-gates center-circuit a d b q1 q0)
-                  (format *compiler-noise-stream*
-                          "APPROXIMATE-2Q-COMPILER: ~a resulted in~%    ... lone fidelity ~a~%    ... and cost ~a,~%    ... hence adjusted fidelity ~a.~%"
-                          circuit-crafter fidelity circuit-cost (* circuit-cost fidelity))
-                  (push (cons (* circuit-cost fidelity) sandwiched-circuit)
-                        candidate-pairs)))
-            (compiler-does-not-apply () nil)))
+          (unless (and (first candidate-pairs)
+                       (double= 1d0 (car (first candidate-pairs))))
+            (handler-case
+                (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
+                                                                            (application-arguments instr))))
+                       (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
+                       (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
+                  (multiple-value-bind (sandwiched-circuit fidelity)
+                      (sandwich-with-local-gates center-circuit a d b q1 q0)
+                    #+ignore
+                    (let ((local-coord
+                           (get-canonical-coords-from-diagonal
+                            (nth-value 1 (orthogonal-decomposition (make-matrix-from-quil sandwiched-circuit))))))
+                      (format *compiler-noise-stream*
+                              "APPROXIMATE-2Q-COMPILER: ~a~%    ... tried to match ~a~%    ... and got ~a~%    ... with diffs ~a~%    ... with lone fidelity ~a~%    ... and cost ~a,~%    ... hence adjusted fidelity ~a.~%"
+                              circuit-crafter
+                              coord
+                              local-coord
+                              (mapcar #'- coord local-coord)
+                              fidelity circuit-cost (* circuit-cost fidelity)))
+                    (push (cons (* circuit-cost fidelity) sandwiched-circuit)
+                          candidate-pairs)))
+              (compiler-does-not-apply () nil))))
         ;; now vomit the results
         (cond
           ((endp candidate-pairs)
@@ -706,11 +721,12 @@
   "Constructs an approximate 2Q compiler suitable for a TARGET architecture and a CHIP-SPEC with fidelity data.  Returns a function to be installed into the compilers present on CHIP-SPEC."
   (let ((crafters
          (mapcar #'approximate-template-record-function
-                 (remove-if-not (lambda (record)
-                                  (optimal-2q-target-meets-requirements
-                                   target
-                                   (approximate-template-record-requirements record)))
-                                **approximate-template-records**))))
+                 (reverse
+                  (remove-if-not (lambda (record)
+                                   (optimal-2q-target-meets-requirements
+                                    target
+                                    (approximate-template-record-requirements record)))
+                                 **approximate-template-records**)))))
     (lambda (instr)
       (approximate-2Q-compiler instr
                                :chip-spec chip-spec
