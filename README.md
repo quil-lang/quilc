@@ -230,6 +230,6 @@ expectations. Once that's clear, a good place to start is the
 section. If you have any find bugs, please create an
 [issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 If you need help with some code or want to discuss some technical issues, you can find us in the
-`#dev` channel on [slack](https://slack.rigetti.com/).
+`#dev` channel on [Slack](https://slack.rigetti.com/).
 
 We look forward to meeting and working with you!
