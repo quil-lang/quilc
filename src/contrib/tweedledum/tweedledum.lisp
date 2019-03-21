@@ -40,25 +40,37 @@
             (setf (cffi:mem-aref perm :uint32 i) p_i))
     (%synthesis-dbs perm (length permutation))))
 
+(defun compile-perm-gate-with-tweedledum (instr)
+  (let ((perm-gate (quil::gate-application-gate instr)))
+    (cond
+      ((typep perm-gate 'quil::permutation-gate)
+       (let* ((perm (coerce (quil::permutation-gate-permutation perm-gate) 'list))
+              (synth (synthesis-dbs perm))
+              (code (quil::parsed-program-executable-code
+                     (quil::parse-quil-string synth))))
+         (coerce code 'list)))
+      (t
+       (quil::give-up-compilation)))))
+
 #+#:testcode
 (progn
-  (setf *perm* '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 15 14))
-  (quil::record-standard-gate "PERMGATE" (apply #'quil::make-permutation-gate "PERM0231" "" *perm*))
   (let ((lschedule (quil::make-lscheduler)))
     (loop :for instr
             :across (quil::parsed-program-executable-code
-                     (compiler-hook (parse-quil-string "PERMGATE 3 2 1 0")
-                                    (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
+                     (quil::compiler-hook (quil::parse-quil-string "CCNOT 3 2 1")
+                                          (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
           :when (and (typep instr 'quil::gate-application)
                      (<= 2 (length (quil::application-arguments instr))))
             :do (quil::append-instruction-to-lschedule lschedule instr))
     (quil::lscheduler-calculate-depth lschedule))
   (let ((lschedule (quil::make-lscheduler)))
+    (push (constantly #'cl-quil.tweedledum::compile-perm-gate-with-tweedledum) quil::*global-compilers*)
     (loop :for instr
             :across (quil::parsed-program-executable-code
-                     (compiler-hook (parse-quil-string (cl-tweedledum:synthesis-dbs *perm*))
-                                    (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
+                     (quil::compiler-hook (quil::parse-quil-string "CCNOT 3 2 1")
+                                          (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
           :when (and (typep instr 'quil::gate-application)
                      (<= 2 (length (quil::application-arguments instr))))
             :do (quil::append-instruction-to-lschedule lschedule instr))
+    (pop quil::*global-compilers*)
     (quil::lscheduler-calculate-depth lschedule)))
