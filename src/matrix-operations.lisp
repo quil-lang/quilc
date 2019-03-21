@@ -21,16 +21,10 @@
     (< diff +double-comparison-threshold-strict+)))
 
 (defun double>= (&rest args)
-  (cond
-    ((endp args)
-     t)
-    ((endp (cdr args))
-     t)
-    ((>= (+ (first args) +double-comparison-threshold-strict+)
-         (- (second args) +double-comparison-threshold-strict+))
-     (apply #'double>= (rest args)))
-    (t
-     nil)))
+  (loop :for (x y) :on args
+        :while y
+        :always (>= (+ x quil::+double-comparison-threshold-strict+)
+                    (- y quil::+double-comparison-threshold-strict+))))
 
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
