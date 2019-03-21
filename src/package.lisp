@@ -96,6 +96,9 @@
    #:constant                           ; STRUCTURE
    #:constant-value                     ; READER
 
+   #:label                              ; STRUCTURE
+   #:label-name                         ; ACCESSOR
+
    #:param                              ; STRUCTURE
    #:param-name                         ; READER
    #:is-param                           ; FUNCTION (PREDICATE)
@@ -107,6 +110,13 @@
    #:is-mref                            ; FUNCTION (PREDICATE)
    #:memory-name                        ; TYPE (STRUCTURE)
    #:memory-name-region-name            ; READER
+
+   #:jump-target                        ; CLASS
+   #:jump-target-p                      ; FUNCTION
+   #:jump-target-label                  ; READER
+
+   #:include                            ; CLASS
+   #:include-pathname                   ; READER
 
    #:instruction                        ; ABSTRACT CLASS
 
