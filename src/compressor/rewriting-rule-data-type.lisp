@@ -106,7 +106,7 @@ BODY is a list of forms that, by the end, should construct a list of instruction
 
 ;;; dumb little macros for cond guards that we were repeating a million times
 
-(defmacro else-give-up-compilation (test &body body)
+(defmacro give-up-compilation-unless (test &body body)
   "If TEST passes, proceed to execute BODY (and return the value of the final expression). If TEST fails, call GIVE-UP-COMPILATION."
   `(cond
      (,test
@@ -119,6 +119,6 @@ BODY is a list of forms that, by the end, should construct a list of instruction
   `(destructuring-bind (,psi ,qubits)
        (aqvm-extract-state (compressor-context-aqvm ,context)
                            (mapcar #'qubit-index (application-arguments ,instr)))
-     (else-give-up-compilation
+     (give-up-compilation-unless
          (not (eql ':not-simulated ,psi))
        ,@body)))
