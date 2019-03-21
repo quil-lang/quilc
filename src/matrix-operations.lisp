@@ -23,8 +23,8 @@
 (defun double>= (&rest args)
   (loop :for (x y) :on args
         :while y
-        :always (>= (+ x quil::+double-comparison-threshold-strict+)
-                    (- y quil::+double-comparison-threshold-strict+))))
+        :always (>= (+ x +double-comparison-threshold-strict+)
+                    (- y +double-comparison-threshold-strict+))))
 
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
