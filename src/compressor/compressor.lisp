@@ -505,7 +505,8 @@ other's."
          
          (check-quil-is-near-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
-             (let* ((reduced-matrix
+             (let* ((n (1- (integer-length (magicl:matrix-rows stretched-matrix))))
+                    (reduced-matrix
                      (kron-matrix-up (make-matrix-from-quil reduced-instructions)
                                      (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
                     (reduced-decompiled-matrix
@@ -516,9 +517,9 @@ other's."
                (when decompiled-instructions
                  (let* ((prod (magicl:multiply-complex-matrices
                                reduced-matrix (magicl:dagger reduced-decompiled-matrix)))
-                        (tr (loop :for i :below (magicl:matrix-rows prod)
-                               :sum (magicl:ref prod i i)))
-                        (trace-fidelity (/ (+ 4 (abs (* tr tr))) 20))
+                        (tr (matrix-trace prod))
+                        (trace-fidelity (/ (+ n (abs (* tr tr)))
+                                           (+ n (* n n))))
                         (ls-reduced (make-lscheduler))
                         (ls-reduced-decompiled (make-lscheduler))
                         (chip-spec (compressor-context-chip-specification context)))
@@ -526,7 +527,12 @@ other's."
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert (>= (* trace-fidelity
                                   (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
-                               (lscheduler-calculate-fidelity ls-reduced chip-spec)))))))))
+                               (lscheduler-calculate-fidelity ls-reduced chip-spec))
+                           ()
+                           "During careful checking of instruction compression, ~
+                            the recomputed instruction sequence has an ~
+                            unreasonably large a fidelity drop from the original ~
+                            sequence.")))))))
       
       (destructuring-bind (start-wf wf-qc)
           (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)

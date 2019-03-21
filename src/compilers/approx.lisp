@@ -301,11 +301,7 @@
                      :for sign :in signs
                      :sum (* x sign (conjugate y))))
                  (new-fidelity (/ (+ 4 (abs (* new-trace new-trace))) 20)))
-            #+ignore
-            (format t "Old ~a vs new ~a.~%" max-fidelity new-fidelity)
             (when (> new-fidelity max-fidelity)
-              #+ignore
-              (format t "Movin on up:~%~a~%~a~%~a.~%" (cl-permutation:permute sigma d-as-list) dprime-as-list signs)
               (setf max-fidelity new-fidelity)
               (when (= -1 (cl-permutation:perm-sign sigma))
                 (setf (first signs) (* -1 (first signs))))
@@ -314,30 +310,6 @@
                                                                 (list 1 1 1 1))))
               (setf oT (magicl:transpose (make-signed-permutation-matrix sigma signs)))))))
       (when *compress-carefully*
-        #+ignore
-        (progn
-          (format t "///////////~%~%")
-          (format t "A: ~a~%" a)
-          (format t "D: ~a~%" d)
-          (format t "B: ~a~%" b)
-          (format t "EADBE^*: ~a~%" (reduce
-                                     #'magicl:multiply-complex-matrices
-                                     (list +e-basis+ a d b +edag-basis+)))
-          (format t "M': ~a~%" mprime)
-          (format t "A': ~a~%" aprime)
-          (format t "D': ~a~%" dprime)
-          (format t "B': ~a~%" bprime)
-          (format t "EA'D'B'E^*: ~a~%" (reduce #'magicl:multiply-complex-matrices
-                                               (list +e-basis+ aprime dprime bprime +edag-basis+)))
-          (format t "O: ~a~%" o)
-          (format t "OT: ~a~%" oT)
-          (format t "O D OT: ~a~%" (reduce #'magicl:multiply-complex-matrices
-                                           (list o d oT)))
-          (format t "UA M' UB: ~a~%"
-                  (reduce #'magicl:multiply-complex-matrices
-                          (list +e-basis+ a oT (magicl:transpose aprime) +edag-basis+
-                                mprime
-                                +e-basis+ (magicl:transpose bprime) o b +edag-basis+))))
         (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
                                     (magicl:multiply-complex-matrices a (magicl:transpose a))))
         (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
@@ -635,8 +607,6 @@
 
 (defun sandwich-with-local-gates (center-circuit a d b q1 q0)
   "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS)."
-  #+ignore
-  (format t "SANDWICH-... called with circuit ~a~%~%" center-circuit)
   (dolist (instr center-circuit)
     (map-into (application-arguments instr)
               (lambda (q) (qubit (if (= q1 (qubit-index q))
@@ -691,17 +661,6 @@
                        (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
                   (multiple-value-bind (sandwiched-circuit fidelity)
                       (sandwich-with-local-gates center-circuit a d b q1 q0)
-                    #+ignore
-                    (let ((local-coord
-                           (get-canonical-coords-from-diagonal
-                            (nth-value 1 (orthogonal-decomposition (make-matrix-from-quil sandwiched-circuit))))))
-                      (format *compiler-noise-stream*
-                              "APPROXIMATE-2Q-COMPILER: ~a~%    ... tried to match ~a~%    ... and got ~a~%    ... with diffs ~a~%    ... with lone fidelity ~a~%    ... and cost ~a,~%    ... hence adjusted fidelity ~a.~%"
-                              circuit-crafter
-                              coord
-                              local-coord
-                              (mapcar #'- coord local-coord)
-                              fidelity circuit-cost (* circuit-cost fidelity)))
                     (push (cons (* circuit-cost fidelity) sandwiched-circuit)
                           candidate-pairs)))
               (compiler-does-not-apply () nil))))
@@ -710,7 +669,11 @@
           ((endp candidate-pairs)
            (give-up-compilation))
           (t
-           (cdr (alexandria:extremum candidate-pairs #'> :key #'car))))))))
+           (destructuring-bind (fidelity . circuit) (alexandria:extremum candidate-pairs #'> :key #'car)
+             (unless (or *enable-approximate-compilation*
+                         (double= 1d0 fidelity))
+               (give-up-compilation))
+             (values circuit fidelity))))))))
 
 (defun approximate-2Q-compiler-for (target chip-spec)
   "Constructs an approximate 2Q compiler suitable for a TARGET architecture and a CHIP-SPEC with fidelity data.  Returns a function to be installed into the compilers present on CHIP-SPEC."
