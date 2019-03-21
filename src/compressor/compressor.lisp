@@ -368,6 +368,7 @@ other's."
          (cond
            (translation-results
             (when (and *compress-carefully*
+                       (not *enable-approximate-compilation*)
                        (notany (lambda (instr) (typep instr 'state-prep-application))
                                instrs))
               (let ((ref-mat (make-matrix-from-quil (list (first instrs)) environs))
