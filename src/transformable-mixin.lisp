@@ -88,24 +88,51 @@ If any of XFORM or its predecessors have not been performed, return NIL and the 
   ;; Check all of its predecessors.
   (validate-instance-for-transform-predecessors xform instance))
 
+(define-condition unsatisfied-transform-dependency (error)
+  ((attempted-transform :reader unsatisfied-transform-dependency-attempted-transform
+                        :initarg :attempted-transform)
+   (needed-transform :reader unsatisfied-transform-dependency-needed-transform
+                     :initarg :needed-transform)
+   (object :reader unsatisfied-transform-dependency-object
+           :initarg object))
+  (:documentation "An error that is signalled when a prerequisite transform has not been done.")
+  (:report (lambda (condition stream)
+             (format stream "Cannot transform ~A by ~A because ~A ~
+                             is a prerequisite transform."
+                     (unsatisfied-transform-dependency-object condition)
+                     (unsatisfied-transform-dependency-attempted-transform condition)
+                     (unsatisfied-transform-dependency-needed-transform condition)))))
+
+(defvar *max-transform-attempts* 5
+  "The number of times to retry transforming when a dependency isn't satisfied.")
+
 (defgeneric transform (xform instance &rest args)
-  (:documentation "Perform and record the transform XFORM on the instance INSTANCE. Pass INSTANCE and ARGS to the respective function representing this transform."))
+  (:documentation "Perform and record the transform XFORM on the instance INSTANCE. Pass INSTANCE and ARGS to the respective function representing this transform.
+
+Signals UNSATISFIED-TRANSFORM-DEPENDENCY if the transform cannot be applied because a transform is needed."))
 
 (defmethod transform :before ((xform symbol) instance &rest args)
   (declare (ignore args))
   (assert (find-transform xform) (xform)
           "The transform ~S is unknown to me." xform)
-  (tagbody
+  (prog ((attempts-left *max-transform-attempts*))
    :CHECK-AGAIN
      (multiple-value-bind (validated? xform-to-do)
          (validate-instance-for-transform-predecessors xform instance)
        (unless validated?
-         (cerror (format nil "Perform requisite transform ~S." xform-to-do)
-                 "Can't do ~S because ~S hasn't been performed."
-                 xform
-                 xform-to-do)
-         (transform xform-to-do instance)
-         (go :CHECK-AGAIN)))))
+         (cond
+           ((zerop attempts-left)
+            (error "Exceeded the number of attempts to transform ~
+                    an object with missing transform dependencies."))
+           (t
+            (cerror "Perform requisite transform."
+                    'unsatisfied-transform-dependency
+                    :attempted-transform xform
+                    :needed-transform xform-to-do
+                    :object instance)
+            (transform xform-to-do instance)
+            (decf attempts-left)
+            (go :CHECK-AGAIN)))))))
 
 (defmethod transform :around ((xform symbol) (instance transformable) &rest args)
   (declare (ignore args))

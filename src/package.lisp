@@ -37,6 +37,21 @@
    #:*resolve-include-pathname*         ; VARIABLE
    )
 
+  ;; transformable-mixin.lisp
+  (:export
+   #:unsatisfied-transform-dependency   ; CONDITION
+   #:unsatisfied-transform-dependency-object
+                                        ; READER
+   #:unsatisfied-transform-dependency-needed-transform
+                                        ; READER
+   #:unsatisfied-transform-dependency-attempted-transform
+                                        ; READER
+   #:transformable                      ; CLASS
+   #:transformedp                       ; GENERIC, METHOD
+   #:transform                          ; GENERIC, METHOD
+   #:define-transform                   ; MACRO
+   )
+
   ;; classical-memory.lisp
   (:export
    #:quil-memory-model-error            ; CONDITION
