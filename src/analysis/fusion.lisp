@@ -29,7 +29,8 @@
 ;;; The main way to extend the fusion routines is to teach it *when*
 ;;; and *how* to fuse.
 ;;;
-;;;     WHEN: [unimplemented]
+;;;     WHEN: Not currently extensible, but controlled by
+;;;           FUSEABLE-GATE-P.
 ;;;
 ;;;     HOW: Add a method to the FUSE-OBJECTS generic function.
 ;;;
@@ -278,7 +279,7 @@ forcing \"Y\" to be the middle link."
       new-node)))
 
 (defun fuse-trivially (pg)
-  "Perform only trivial fusions (i.e., fuse nodes that are trivially subsumed in some direction) on the program grod PG."
+  "Perform only trivial fusions (i.e., fuse nodes that are trivially subsumed in some direction) on the PROGRAM-GRID PG."
   (let* ((nodes (program-grid-nodes pg))
          (seen (make-hash-table :test 'eq
                                 :size (length nodes)))
@@ -376,7 +377,7 @@ forcing \"Y\" to be the middle link."
 
 The list will actually be a list of lists, where each sublist commutes and can be freely ordered. (Note that even up to permutation of the elements of the sublists, the answer is still not unique.)"
   (let* ((sorted        nil)            ; Final sorted list.
-         ;; XXX: Note: We could merge NEEDS-SORTING with SORTED-SET if
+         ;; Note! We could merge NEEDS-SORTING with SORTED-SET if
          ;; NEEDS-SORTING itself was a hash table, which
          ;; PROGRAM-GRID-NODES could naturally return. This would be
          ;; both time and memory efficient.
