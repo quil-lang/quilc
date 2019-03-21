@@ -11,6 +11,8 @@
   (:documentation "Helper function to determine the qubits used by an instruction.")
   (:method ((isn instruction))
     nil)
+  (:method ((pseudo-isn jump-target))
+    nil)
   (:method ((isn measurement))
     (list (qubit-index (measurement-qubit isn))))
   (:method ((isn application))
@@ -86,6 +88,10 @@ relabeled according to which free assignments remain."
 
 (defgeneric %relabel-qubits (isn relabeler)
   (:documentation "Relabel the qubits in the instruction ISN according to the relabeling function RELABELER. RELABELER should be a function that destructively modifies qubits.")
+
+  (:method ((isn jump-target) relabeler)
+    (declare (ignore relabeler))
+    nil)
 
   (:method ((isn instruction) relabeler)
     (declare (ignore relabeler))
