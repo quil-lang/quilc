@@ -285,7 +285,9 @@ Syntax:
    (binding-clause-2-2)
    ...)
   body-2)
- ...)"
+ ...)
+
+See also the documentation for MAKE-REWRITING-RULE."
   (let ((match-tag (gensym "OPERATOR-MATCH-TAG-")))
     `(block ,match-tag
        ,@(loop :for (match-clauses . code) :in binding-clauses

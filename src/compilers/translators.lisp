@@ -35,7 +35,7 @@
         (build-gate "Y"  ()             q)
         (build-gate "RX" '(#.(/ pi 2))  q)))
 
-(define-translator Yhalf-to-HX (("RY" (#. (/ pi 2)) q) yhalf-gate)
+(define-translator Yhalf-to-HX (("RY" (#.(/ pi 2)) q) yhalf-gate)
   (list (build-gate "H" () q)
         (build-gate "X" () q)))
 
