@@ -158,8 +158,12 @@
              "    INNER(%p) qubit addr"
              "OUTER(0.0) 0 ro[0]")))
     (let ((code (quil:parsed-program-executable-code p)))
-      (is (= 8 (length code)))
-      (destructuring-bind (meas-dis1 meas1 jw1 ju1 meas-dis2 meas2 jw2 ju2) (coerce code 'list)
+      (is (= 10 (length code)))
+      (destructuring-bind (lbl1 meas-dis1 meas1 jw1 ju1 lbl2 meas-dis2 meas2 jw2 ju2)
+          (coerce code 'list)
+        (is (jump-target-p lbl1))
+        (is (jump-target-p lbl2))
+
         (is (= 0 (qubit-index (measurement-qubit meas-dis1))))
         (is (= 0 (qubit-index (measurement-qubit meas1))))
         (is (= 0 (memory-ref-position (measure-address meas1))))
@@ -209,15 +213,17 @@
 (deftest test-defcircuit-unique-labels ()
   "Test that DEFCIRCUIT gets unique labels."
   (let* ((p (not-signals simple-error
-              (with-output-to-quil
-                "DECLARE ro BIT"
-                "DEFCIRCUIT FOO:"
-                "    LABEL @INNER"
-                "    JUMP @INNER"
-                "    JUMP-WHEN @INNER ro[0]"
-                "    JUMP-UNLESS @INNER ro[0]"
-                "FOO"
-                "FOO")))
+              (quil::transform
+               'quil::patch-labels
+               (with-output-to-quil
+                 "DECLARE ro BIT"
+                 "DEFCIRCUIT FOO:"
+                 "    LABEL @INNER"
+                 "    JUMP @INNER"
+                 "    JUMP-WHEN @INNER ro[0]"
+                 "    JUMP-UNLESS @INNER ro[0]"
+                 "FOO"
+                 "FOO"))))
          (code (quil:parsed-program-executable-code p)))
     (is (= 6 (length code)))
     (destructuring-bind (j1 jw1 ju1 j2 jw2 ju2) (coerce code 'list)

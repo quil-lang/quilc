@@ -52,10 +52,11 @@ DEFGATE I:
 
 (deftest test-repeat-labels ()
   "Test that repeat labels are detected."
-  (signals simple-error
-    (with-output-to-quil
-      "LABEL @a"
-      "LABEL @a")))
+  (let ((pp (with-output-to-quil
+              "LABEL @a"
+              "LABEL @a")))
+    (signals simple-error
+      (quil::transform 'quil::patch-labels pp))))
 
 (defun identity-test-program (quil-instr)
   (with-output-to-string (s)
