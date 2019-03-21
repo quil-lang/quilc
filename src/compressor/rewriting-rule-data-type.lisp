@@ -36,7 +36,8 @@ CONTEXT-VAR should be a symbol that will be bound to a context, or the symbol _ 
 BINDING-CLAUSES is a list of bindings, as if by OPERATOR-MATCH. Specifically, it has the following grammar:
 
     <BINDING-CLAUSES> ::= (<MATCH-CLAUSE> <VARIABLE>)
-    <MATCH-CLAUSE>    ::= (<GATE-NAME> (<PARAM>*) <QUBIT> <QUBIT>*)
+    <MATCH-CLAUSE>    ::= (<GATE-NAME> <PARAM-LIST> <QUBIT> <QUBIT>*)
+    <PARAM-LIST>      ::= (<PARAM>*) | _
     <GATE-NAME>       ::= <STRING>
     <PARAM>           ::= <VARIABLE> | <FLOAT>
     <QUBIT>           ::= <VARIABLE> | <INTEGER>
