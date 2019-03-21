@@ -103,7 +103,7 @@
   (let ((transform (quil::find-transform 'double-data)))
     (is (not (null transform)))
     (is (member 'identity (quil::transform-description-predecessors transform))))
-  (signals simple-error
+  (signals unsatisfied-transform-dependency
     (let ((thing (make-instance 'transformable-thing)))
       ;; IDENTITY is a prerequisite transform but not
       ;; performed.
