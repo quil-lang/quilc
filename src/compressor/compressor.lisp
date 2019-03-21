@@ -455,18 +455,24 @@ other's."
     (labels
         ((check-quil-agrees-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
-             (let* ((decompiled-matrix (make-matrix-from-quil decompiled-instructions))
-                    (reduced-matrix (kron-matrix-up (make-matrix-from-quil reduced-instructions)
-                                                    (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
-                    (reduced-decompiled-matrix (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
-                                                               (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+             (let* ((decompiled-matrix
+                     (make-matrix-from-quil decompiled-instructions))
+                    (reduced-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                    (reduced-decompiled-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
                (assert (matrix-equality stretched-matrix
-                                        (scale-out-matrix-phases reduced-matrix stretched-matrix)))
+                                        (scale-out-matrix-phases reduced-matrix
+                                                                 stretched-matrix)))
                (when decompiled-instructions
                  (assert (matrix-equality stretched-matrix
-                                          (scale-out-matrix-phases decompiled-matrix stretched-matrix)))
+                                          (scale-out-matrix-phases decompiled-matrix
+                                                                   stretched-matrix)))
                  (assert (matrix-equality stretched-matrix
-                                          (scale-out-matrix-phases reduced-decompiled-matrix stretched-matrix)))))))
+                                          (scale-out-matrix-phases reduced-decompiled-matrix
+                                                                   stretched-matrix)))))))
          
          (check-quil-agrees-as-states (start-wf final-wf wf-qc)
            (let* ((final-wf-reduced-instrs (nondestructively-apply-instrs-to-wf
@@ -474,18 +480,18 @@ other's."
                                             start-wf
                                             wf-qc))
                   (final-wf-reduced-instrs-collinearp
-                    (or (and (eql final-wf ':not-simulated)
-                             (eql final-wf-reduced-instrs ':not-simulated))
-                        (collinearp final-wf final-wf-reduced-instrs)))
+                   (or (and (eql final-wf ':not-simulated)
+                            (eql final-wf-reduced-instrs ':not-simulated))
+                       (collinearp final-wf final-wf-reduced-instrs)))
                   (final-wf-reduced-prep (nondestructively-apply-instrs-to-wf
                                           reduced-decompiled-instructions
                                           start-wf
                                           wf-qc))
                   (final-wf-reduced-prep-collinearp
-                    (or (null decompiled-instructions)
-                        (and (eql final-wf ':not-simulated)
-                             (eql final-wf-reduced-prep ':not-simulated))
-                        (collinearp final-wf final-wf-reduced-prep))))
+                   (or (null decompiled-instructions)
+                       (and (eql final-wf ':not-simulated)
+                            (eql final-wf-reduced-prep ':not-simulated))
+                       (collinearp final-wf final-wf-reduced-prep))))
              (assert final-wf-reduced-instrs-collinearp
                      ()
                      "During careful checking of instruction compression, the produced ~
@@ -499,18 +505,19 @@ other's."
          
          (check-quil-is-near-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
-             (let* ((decompiled-matrix (make-matrix-from-quil decompiled-instructions))
-                    (reduced-matrix (kron-matrix-up (make-matrix-from-quil reduced-instructions)
-                                                    (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
-                    (reduced-decompiled-matrix (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
-                                                               (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+             (let* ((reduced-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                    (reduced-decompiled-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
                (assert (matrix-equality stretched-matrix
                                         (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions
                  (let* ((prod (magicl:multiply-complex-matrices
                                reduced-matrix (magicl:dagger reduced-decompiled-matrix)))
                         (tr (loop :for i :below (magicl:matrix-rows prod)
-                                  :sum (magicl:ref prod i i)))
+                               :sum (magicl:ref prod i i)))
                         (trace-fidelity (/ (+ 4 (abs (* tr tr))) 20))
                         (ls-reduced (make-lscheduler))
                         (ls-reduced-decompiled (make-lscheduler))

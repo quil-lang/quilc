@@ -271,14 +271,14 @@
 (defun match-matrix-to-an-e-basis-diagonalization (mprime a d b)
   ;; start by decomposing e^* m' e = a' d' b'.
   ;; we then maximize over signed permutation matrices o so that
-  ;;     d' ~~ o^T d o
+  ;;     d' ~~ o d o^T
   ;; is as good an approximation as possible.
   ;; then, naming m = e (a d b) e^*, it follows that
   ;;     m  = e (a d b) e^*
-  ;;       ~~ e a o d' o^T b e^*
-  ;;        = e a o a'^T a' d' b' b'^T o^T b e^*
-  ;;        = (e a o a'^T e^*) (e a' d' b' e^*) (e b'^T o^T b e^*)
-  ;;        = (e a o a'^T e^*) m (e b'^T o^T b e^*)
+  ;;       ~~ e a o^T d' o b e^*
+  ;;        = e a o^T a'^T a' d' b' b'^T o b e^*
+  ;;        = (e a o^T a'^T e^*) (e a' d' b' e^*) (e b'^T o b e^*)
+  ;;        = (e a o^T a'^T e^*) m (e b'^T o b e^*)
   ;; is as good an approximation as possible.
   ;; we return the SU(2) (x) SU(2) versions of the triple products, as on the
   ;; last line, as well as the fidelity as a values triple.
@@ -317,33 +317,27 @@
         #+ignore
         (progn
           (format t "///////////~%~%")
-          #+ignore
           (format t "A: ~a~%" a)
           (format t "D: ~a~%" d)
-          #+ignore
           (format t "B: ~a~%" b)
-          #+ignore
           (format t "EADBE^*: ~a~%" (reduce
                                      #'magicl:multiply-complex-matrices
                                      (list +e-basis+ a d b +edag-basis+)))
-          #+ignore
           (format t "M': ~a~%" mprime)
-          #+ignore
           (format t "A': ~a~%" aprime)
           (format t "D': ~a~%" dprime)
-          #+ignore
           (format t "B': ~a~%" bprime)
-          #+ignore
           (format t "EA'D'B'E^*: ~a~%" (reduce #'magicl:multiply-complex-matrices
                                                (list +e-basis+ aprime dprime bprime +edag-basis+)))
           (format t "O: ~a~%" o)
           (format t "OT: ~a~%" oT)
-          #+ignore
+          (format t "O D OT: ~a~%" (reduce #'magicl:multiply-complex-matrices
+                                           (list o d oT)))
           (format t "UA M' UB: ~a~%"
                   (reduce #'magicl:multiply-complex-matrices
-                          (list +e-basis+ a o (magicl:transpose aprime) +edag-basis+
+                          (list +e-basis+ a oT (magicl:transpose aprime) +edag-basis+
                                 mprime
-                                +e-basis+ (magicl:transpose bprime) oT b +edag-basis+))))
+                                +e-basis+ (magicl:transpose bprime) o b +edag-basis+))))
         (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
                                     (magicl:multiply-complex-matrices a (magicl:transpose a))))
         (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
@@ -360,9 +354,9 @@
         (assert (double~ 1d0 (magicl:det bprime)))
         (assert (double~ 1d0 (magicl:det o))))
       (values (reduce #'magicl:multiply-complex-matrices
-                      (list +e-basis+ a o (magicl:transpose aprime) +edag-basis+))
+                      (list +e-basis+ a oT (magicl:transpose aprime) +edag-basis+))
               (reduce #'magicl:multiply-complex-matrices
-                      (list +e-basis+ (magicl:transpose bprime) oT b +edag-basis+))
+                      (list +e-basis+ (magicl:transpose bprime) o b +edag-basis+))
               max-fidelity))))
 
 
@@ -648,6 +642,7 @@
               (lambda (q) (qubit (if (= q1 (qubit-index q))
                                      1 0)))
               (application-arguments instr)))
+  
   (multiple-value-bind (ua ub fidelity)
       (match-matrix-to-an-e-basis-diagonalization
        (make-matrix-from-quil center-circuit)
