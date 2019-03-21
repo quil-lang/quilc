@@ -244,6 +244,7 @@ forcing \"Y\" to be the middle link."
         (setf (succeeding-node-on-qubit behind qubit) node)))))
 
 (defun fuse-node-forward (node)
+  "Given a node, and provided it's subsumed, fuse it with the node ahead of it. NODE will remain unchanged, but the nodes it is connected to will change."
   (multiple-value-bind (subsumed? node-ahead)
       (subsumed-ahead-p node)
     (when subsumed?
@@ -252,6 +253,7 @@ forcing \"Y\" to be the middle link."
         (values new-node node node-ahead)))))
 
 (defun fuse-node-backward (node)
+  "Given a node, and provided it's subsumed, fuse it with the node behind it. NODE will remain unchanged, but the nodes it is connected to will change."
   (multiple-value-bind (subsumed? node-behind)
       (subsumed-behind-p node)
     (when subsumed?
@@ -260,7 +262,8 @@ forcing \"Y\" to be the middle link."
         (values new-node node-behind node)))))
 
 (defun attempt-trivial-fusion (fuse-function node seen-table final-table)
-  ;; Helper function to FUSE-TRIVIALLY.
+  ;; Helper function to FUSE-TRIVIALLY that does the bookkeeping of
+  ;; added and removed nodes during a fusion.
   (multiple-value-bind (new-node old1 old2)
       (funcall fuse-function node)
     (when new-node
@@ -412,14 +415,14 @@ The list will actually be a list of lists, where each sublist commutes and can b
   ;; A and B are temporally ordered.
   (premultiply-gates (list a b)))
 
-(defun static-gate-application-p (x)
-  (and (gate-application-p x)
-       (every #'is-constant (application-parameters x))))
-
 (defun fuseable-gate-p (x)
+  "Is X a gate that's a candidate for fusion?"
+  ;; Currently we can only fuse gates that don't have anything
+  ;; undetermined about them.
   (static-gate-application-p x))
 
 (defun gate-sequence-to-program-grid (gate-sequence)
+  "Convert a list of gates GATE-SEQUENCE into a PROGRAM-GRID object."
   (loop :with pg := (make-instance 'program-grid)
         :for gate-app :in gate-sequence
         :for gn := (apply #'make-grid-node gate-app (mapcar #'qubit-index (arguments gate-app)))
@@ -427,15 +430,22 @@ The list will actually be a list of lists, where each sublist commutes and can b
         :finally (return pg)))
 
 (defun program-grid-to-gate-sequence (pg)
+  "Convert a PROGRAM-GRID PG back into a list of gates."
   (mapcan (alexandria:curry #'mapcar #'grid-node-tag) (sort-program-grid pg)))
 
 (defun fuse-gate-sequence (gate-sequence)
+  "Given a list of gates GATE-SEQUENCE containing *only* fuseable gates, perform gate fusion, returning a new list of gates that is purportedly mathematically equivalent."
   (assert (every #'fuseable-gate-p gate-sequence))
   (program-grid-to-gate-sequence
    (fuse-trivially
     (gate-sequence-to-program-grid gate-sequence))))
 
+(defun nop-sequence (n)
+  "Make a list of NOP's of length N."
+  (make-list n :initial-element (make-instance 'no-operation)))
+
 (defun fuse-gates-in-executable-code (code)
+  "Given a code vector (i.e., that of PARSED-PROGRAM-EXECUTABLE-CODE), produce a new code vector with gates fused."
   (multiple-value-bind (gate-segments first?)
       ;; XXX: Note that with this approach to identifying fuseable
       ;; gates, certain gate sequences will *NOT* be fused. For
@@ -455,10 +465,9 @@ The list will actually be a list of lists, where each sublist commutes and can b
                        (append fused-sequence
                                ;; Pad with NOPs so we are OK after a
                                ;; PATCH-LABELS transform.
-                               (make-list (- (length segment)
-                                             (length fused-sequence))
-                                          :initial-element (make-instance 'no-operation))))
-           :else                         ; Do nothing!
+                               (nop-sequence (- (length segment)
+                                                (length fused-sequence)))))
+           :else
              :append segment)
      'vector)))
 
@@ -474,7 +483,10 @@ The list will actually be a list of lists, where each sublist commutes and can b
 
 (define-transform gate-fusion (fuse-gates-in-program)
   "Fuse gates together producing a new program that we stipulate will be more efficient to simulate."
-  process-includes)
+  process-includes
+  ;; We need to resolve applications to the gate applications know
+  ;; their definitions for fusion.
+  resolve-applications)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Test Harness ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

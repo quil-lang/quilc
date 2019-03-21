@@ -872,6 +872,12 @@ Determining this requires the context of the surrounding program."))
   "Is X a gate application?"
   (typep x 'gate-application))
 
+(declaim (inline static-gate-application-p))
+(defun static-gate-application-p (x)
+  "Is X a gate application with constant parameters?"
+  (and (gate-application-p x)
+       (every #'is-constant (application-parameters x))))
+
 (defclass gate-application (application)
   ((name-resolution :initarg :name-resolution
                     :reader gate-application-resolution
