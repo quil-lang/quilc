@@ -9,7 +9,7 @@
 (in-package #:cl-quil)
 
 
-(defconstant +double-comparison-threshold-loose+ 1d-5)
+(defconstant +double-comparison-threshold-loose+  1d-5)
 (defconstant +double-comparison-threshold-strict+ 5d-11)
 (defun double~ (x y)
   "Loose equality of complex double floats, using the absolute threshold stored in +DOUBLE-COMPARISON-THRESHOLD-LOOSE+.  Use this comparison operator when testing for output correctness."
