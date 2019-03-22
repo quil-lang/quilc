@@ -241,22 +241,3 @@ CNOT 0 2"))
     ;; NOTE: Decomposing into five 2q gates is more of a regression
     ;; test on quality of compilation, and not on correctness.
     (is (= 5 (length 2q-code)))))
-
-(deftest test-approximate-compilation ()
-  (let* ((chip (quil::build-nq-linear-chip 3 :architecture ':cz))
-         (fidelity-hash (alexandria:plist-hash-table (list "fCZ"   0.50d0
-                                                           "f1QRB" 0.99d0)
-                                                     :test #'equalp))
-         (pp (quil::parse-quil-string "CPHASE(pi/4) 0 1"))
-         (m-in (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code pp) 'list)))
-         cpp m-out)
-    (loop
-       :for obj :across (quil::vnth 1 (quil::chip-specification-objects chip))
-       :do (setf (gethash "specs" (quil::hardware-object-misc-data obj)) fidelity-hash))
-    (let ((quil::*enable-approximate-compilation* t))
-      (setf cpp (quil::compiler-hook pp chip)))
-    ;; check: results are approximately correct
-    (setf m-out (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code cpp) 'list)))
-    (is (< 0.95d0 (quil::trace-distance m-in m-out)))
-    ;; check: reduction actually happened
-    (is (> 13 (length (quil::parsed-program-executable-code cpp))))))

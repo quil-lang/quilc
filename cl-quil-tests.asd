@@ -37,4 +37,5 @@
                (:file "state-prep-tests")
                (:file "compiler-hook-tests")
                (:file "benchmarking-procedures-tests")
-               (:file "typed-memory-tests")))
+               (:file "typed-memory-tests")
+               (:file "approximation-tests")))
