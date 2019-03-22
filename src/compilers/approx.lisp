@@ -464,6 +464,9 @@ One can show that this is equal to the trace calculation that's actually used in
   predicate
   requirements)
 
+(defparameter *approximate-template-search-limit* 5000
+  "Tolerance level for how many guesses an inexact template solver is allowed to make when it is unsure that an exact solution exists.")
+
 (defmacro define-approximate-template (name (coord q1 q0) (&rest requirements) pred &body body)
   "This defines an two-qubit circuit template for use by the approximation algorithm. The template is stored both as a raw function under the name NAME as well as in a list of available templates, guarded by the value REQUIREMENTS of type OPTIMAL-2Q-TARGET.  BODY is a routine that returns a list of GATE-APPLICATION objects and is allowed to reference three arguments: the desired canonical coordinate COORD, the first desired qubit Q1, and the zeroth desired qubit Q0.
 
@@ -503,28 +506,42 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-APPROXIMATE-TEMPLATE, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
   (multiple-value-bind (body-prog decls docstring)
       (alexandria:parse-body parametric-circuit :documentation t)
-    `(define-approximate-template ,name (,coord ,q1 ,q0)
-         ,reqs
-         ,pred
-       ,@(when docstring (list docstring))
-       ,@decls
-       (flet ((circuit-template (,parameter-array ,q1 ,q0)
-                ,@body-prog))
-         (multiple-value-bind (template-values goodness)
-             ;; TODO: if PRED evaluated to T, we should randomize the initial
-             ;;       guess and restart to try again. could also tighten the
-             ;;       number of iterations allowed before giving up.
-             (cl-grnm:nm-optimize
-              (lambda (in)
-                (multiple-value-bind (a d b)
-                    (orthogonal-decomposition (make-matrix-from-quil (circuit-template in 1 0)))
-                  (declare (ignore a b))
-                  (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal d))))
-              (make-array ,parameter-count :initial-element 1d0))
-           (unless (or *enable-approximate-compilation*
-                       (double= 0d0 goodness))
-             (give-up-compilation))
-           (values (circuit-template template-values q1 q0) (- 1 goodness)))))))
+    (alexandria:with-gensyms (a d b in goodness template-values)
+      `(define-approximate-template ,name (,coord ,q1 ,q0)
+           ,reqs
+           ,pred
+         ,@(when docstring (list docstring))
+         ,@decls
+         (labels
+             ((circuit-template (,parameter-array ,q1 ,q0)
+                ,@body-prog)
+              (run-optimizer ()
+                (multiple-value-bind (,template-values ,goodness)
+                    (cl-grnm:nm-optimize
+                     (lambda (,in)
+                       (multiple-value-bind (,a ,d ,b)
+                           (orthogonal-decomposition (make-matrix-from-quil (circuit-template ,in 1 0)))
+                         (declare (ignore ,a ,b))
+                         (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal ,d))))
+                     (make-array ,parameter-count
+                                 :initial-contents (mapcar #'random
+                                                           (make-list ,parameter-count
+                                                                      :initial-element (* 2 pi))))
+                     :max-function-calls *approximate-template-search-limit*)
+                  (cond
+                    ;; if we promised an exact solution but haven't found it yet,
+                    ;; try again.
+                    ((and ,pred (not (double= 0d0 ,goodness)))
+                     (run-optimizer))
+                    ;; if we are unsure about the existence of an exact solution, we
+                    ;; haven't found one yet, but the user is demanding one, give up.
+                    ((and (not *enable-approximate-compilation*)
+                          (not (double= 0d0 ,goodness)))
+                     (give-up-compilation))
+                    ;; otherwise, this solution will do.
+                    (t
+                     (values (circuit-template ,template-values ,q1 ,q0) (- 1 ,goodness)))))))
+           (run-optimizer))))))
 
 
 
@@ -565,7 +582,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
 
 (define-searching-approximate-template nearest-XY-XY-template-of-depth-2 (coord q1 q0 array)
     (:piswap)
-    t                       ; TODO: replace this with a convexity test
+    nil                     ; TODO: replace this with a convexity test
     6
   (list
    (build-gate "PISWAP" (list (aref array 4))     q1 q0)
@@ -631,7 +648,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
 ;;       it appears not to.
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
     (:cphase :iswap)
-    t                       ; TODO: replace this with a convexity test
+    nil                     ; TODO: replace this with a convexity test
     3
   (list
    (build-gate "ISWAP"  ()                    q0 q1)
@@ -641,7 +658,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
 
 (define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
     (:cz :piswap)
-    t                       ; TODO: replace this with a convexity test
+    nil                     ; TODO: replace this with a convexity test
     4
   (list
    (build-gate "CZ"     ()                        q1 q0)
@@ -653,7 +670,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
 
 (define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
     (:cphase :piswap)
-    t                       ; TODO: replace this with a convexity test
+    nil                     ; TODO: replace this with a convexity test
     5
   (list
    (build-gate "CPHASE" (list (aref array 4))     q1 q0)
