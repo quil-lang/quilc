@@ -529,86 +529,42 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
 
 
 (define-approximate-template nearest-circuit-of-depth-0 (coord q1 q0)
-    '()
+    ()
     (every #'double= coord (list 0d0 0d0 0d0))
   (list (build-gate "I" () q0)
         (build-gate "I" () q1)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-1 (coord q1 q0)
-    '(:iswap)
+    (:iswap)
     (every #'double= coord (list (/ pi 2) (/ pi 2) 0))
   (list (build-gate "ISWAP" '() q1 q0)))
 
 (define-approximate-template nearest-XY-circuit-of-depth-1 (coord q1 q0)
-    '(:piswap)
+    (:piswap)
     (and (double= (first coord) (second coord))
          (double= (third coord) 0d0))
   (list (build-gate "PISWAP" (list (* 2 (first coord))) q1 q0)))
 
 (define-approximate-template nearest-CZ-circuit-of-depth-1 (coord q1 q0)
-    '(:cz)
+    (:cz)
     (every #'double= coord (list (/ pi 2) 0d0 0d0))
   (list (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
-    '(:cphase)
+    (:cphase)
     (every #'double= (rest coord) (list 0d0 0d0))
   (list (build-gate "CPHASE" (list (* 2 (first coord))) q1 q0)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    '(:iswap)
+    (:iswap)
     (double= 0d0 (third coord))
   (list (build-gate "ISWAP" '()          q1 q0)
         (build-gate "RY"    (list (first coord)) q1)
         (build-gate "RY"    (list (second coord)) q0)
         (build-gate "ISWAP" '()          q1 q0)))
 
-(define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    '(:cz :iswap)
-    (double= (/ pi 2) (first coord))
-  (list (build-gate "ISWAP" () q1 q0)
-        (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
-        (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
-        (build-gate "CZ" () q1 q0)))
-
-;; TODO: when fed a SWAP, I would expect this to give an exact solution.
-;;       it appears not to.
-(define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
-    '(:cphase :iswap)
-    t                       ; TODO: replace this with a convexity test
-    3
-  (list
-   (build-gate "ISWAP"  ()                    q0 q1)
-   (build-gate "RY"     (list (aref array 0)) q0)
-   (build-gate "RY"     (list (aref array 1)) q1)
-   (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
-
-(define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
-  '(:cz :piswap)
-  t                         ; TODO: replace this with a convexity test
-  4
-  (list
-   (build-gate "CZ"     ()                        q1 q0)
-   (build-gate "RY"     (list (aref array 0))     q0)
-   (build-gate "RY"     (list (aref array 1))     q1)
-   (build-gate "RZ"     (list (aref array 2))     q0)
-   (build-gate "RZ"     (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
-
-(define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
-  '(:cphase :piswap)
-  t                         ; TODO: replace this with a convexity test
-  5
-  (list
-   (build-gate "CPHASE" (list (aref array 4))     q1 q0)
-   (build-gate "RY"     (list (aref array 0))     q0)
-   (build-gate "RY"     (list (aref array 1))     q1)
-   (build-gate "RZ"     (list (aref array 2))     q0)
-   (build-gate "RZ"     (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
-
 (define-searching-approximate-template nearest-XY-XY-template-of-depth-2 (coord q1 q0 array)
-    '(:piswap)
+    (:piswap)
     t                       ; TODO: replace this with a convexity test
     6
   (list
@@ -621,8 +577,16 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
    (build-gate "RZ"     (list (- (aref array 2))) q1)
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
+(define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
+    (:cz :iswap)
+    (double= (/ pi 2) (first coord))
+  (list (build-gate "ISWAP" () q1 q0)
+        (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
+        (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
+        (build-gate "CZ" () q1 q0)))
+
 (define-approximate-template nearest-ISWAP-circuit-of-depth-3 (coord q1 q0)
-    '(:iswap)
+    (:iswap)
     t
   (flet ((twist-to-real (m)
            ;; this magical formula was furnished to us by asking a CAS to compute
@@ -663,8 +627,44 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
                   (nearest-ISWAP-circuit-of-depth-2 coordprime q1 q0)
                   a d b q1 q0)))))))
 
+;; TODO: when fed a SWAP, I would expect this to give an exact solution.
+;;       it appears not to.
+(define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
+    (:cphase :iswap)
+    t                       ; TODO: replace this with a convexity test
+    3
+  (list
+   (build-gate "ISWAP"  ()                    q0 q1)
+   (build-gate "RY"     (list (aref array 0)) q0)
+   (build-gate "RY"     (list (aref array 1)) q1)
+   (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
+
+(define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
+    (:cz :piswap)
+    t                       ; TODO: replace this with a convexity test
+    4
+  (list
+   (build-gate "CZ"     ()                        q1 q0)
+   (build-gate "RY"     (list (aref array 0))     q0)
+   (build-gate "RY"     (list (aref array 1))     q1)
+   (build-gate "RZ"     (list (aref array 2))     q0)
+   (build-gate "RZ"     (list (- (aref array 2))) q1)
+   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
+
+(define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
+    (:cphase :piswap)
+    t                       ; TODO: replace this with a convexity test
+    5
+  (list
+   (build-gate "CPHASE" (list (aref array 4))     q1 q0)
+   (build-gate "RY"     (list (aref array 0))     q0)
+   (build-gate "RY"     (list (aref array 1))     q1)
+   (build-gate "RZ"     (list (aref array 2))     q0)
+   (build-gate "RZ"     (list (- (aref array 2))) q1)
+   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
+
 (define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
-    '(:cz)
+    (:cz)
     (double= 0d0 (third coord))
   (list (build-gate "CZ" () q1 q0)
         (build-gate "RY" (list (first coord)) q1)
@@ -672,7 +672,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
         (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
-    '(:cz)
+    (:cz)
     t
   (let ((alpha (- (first coord) pi))
         (beta  (- pi            (second coord)))
