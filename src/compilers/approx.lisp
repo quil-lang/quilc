@@ -298,10 +298,9 @@
     (values a d b)))
 
 (defun make-signed-permutation-matrix (sigma &optional (signs (list 1 1 1 1)))
-  "Constructs a 4x4 signed permutation matrix from a CL-PERMUTATION permutation of size 4 and a list of SIGNS of length 4."
   (let ((o (magicl:make-zero-matrix 4 4)))
     (loop :for i :below 4
-          :for j := (cl-permutation:perm-eval sigma i)
+          :for j := (1- (cl-permutation:perm-eval sigma (1+ i)))
           :for sign :in signs
           :do (setf (magicl:ref o i j) sign))
     o))
