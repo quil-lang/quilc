@@ -474,47 +474,58 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
   (check-type q1 symbol)
   (check-type q0 symbol)
   
-  `(progn
-     (defun ,name (,coord ,q1 ,q0)
-       (unless (or *enable-approximate-compilation*
-                   ,pred)
-         (give-up-compilation))
-       ,@body)
-     (let ((old-record (find ',name **approximate-template-records**
-                             :key #'approximate-template-record-name))
-           (new-record (make-approximate-template-record
-                        :name ',name
-                        :predicate (lambda (,coord ,q1 ,q0)
-                                     (declare (ignorable ,coord ,q1 ,q0))
-                                     ,pred)
-                        :requirements ',requirements)))
-       (cond
-         (old-record
-          (setf **approximate-template-records**
-                (substitute new-record old-record **approximate-template-records**)))
-         (t
-          (push new-record **approximate-template-records**)))
-       ',name)))
+  (multiple-value-bind (body-prog decls docstring)
+      (alexandria:parse-body body :documentation t)
+    `(progn
+       (defun ,name (,coord ,q1 ,q0)
+         ,@(when docstring (list docstring))
+         ,@decls
+         (unless (or *enable-approximate-compilation*
+                     ,pred)
+           (give-up-compilation))
+         ,@body-prog)
+       (let ((old-record (find ',name **approximate-template-records**
+                               :key #'approximate-template-record-name))
+             (new-record (make-approximate-template-record
+                          :name ',name
+                          :predicate (lambda (,coord ,q1 ,q0)
+                                       (declare (ignorable ,coord ,q1 ,q0))
+                                       ,pred)
+                          :requirements ',requirements)))
+         (cond
+           (old-record
+            (setf **approximate-template-records**
+                  (substitute new-record old-record **approximate-template-records**)))
+           (t
+            (push new-record **approximate-template-records**)))
+         ',name))))
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) reqs pred parameter-count &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-APPROXIMATE-TEMPLATE, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
-  `(define-approximate-template ,name (,coord ,q1 ,q0)
-       ,reqs
-       ,pred
-     (flet ((circuit-template (,parameter-array q1 q0)
-              ,@parametric-circuit))
-       (multiple-value-bind (template-values goodness)
-           (cl-grnm:nm-optimize
-            (lambda (in)
-              (multiple-value-bind (a d b)
-                  (orthogonal-decomposition (make-matrix-from-quil (circuit-template in 1 0)))
-                (declare (ignore a b))
-                (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal d))))
-            (make-array ,parameter-count :initial-element 1d0))
-         (unless (or *enable-approximate-compilation*
-                     (double= 0d0 goodness))
-           (give-up-compilation))
-         (values (circuit-template template-values q1 q0) goodness)))))
+  (multiple-value-bind (body-prog decls docstring)
+      (alexandria:parse-body parametric-circuit :documentation t)
+    `(define-approximate-template ,name (,coord ,q1 ,q0)
+         ,reqs
+         ,pred
+       ,@(when docstring (list docstring))
+       ,@decls
+       (flet ((circuit-template (,parameter-array ,q1 ,q0)
+                ,@body-prog))
+         (multiple-value-bind (template-values goodness)
+             ;; TODO: if PRED evaluated to T, we should randomize the initial
+             ;;       guess and restart to try again. could also tighten the
+             ;;       number of iterations allowed before giving up.
+             (cl-grnm:nm-optimize
+              (lambda (in)
+                (multiple-value-bind (a d b)
+                    (orthogonal-decomposition (make-matrix-from-quil (circuit-template in 1 0)))
+                  (declare (ignore a b))
+                  (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal d))))
+              (make-array ,parameter-count :initial-element 1d0))
+           (unless (or *enable-approximate-compilation*
+                       (double= 0d0 goodness))
+             (give-up-compilation))
+           (values (circuit-template template-values q1 q0) (- 1 goodness)))))))
 
 
 
