@@ -1,6 +1,34 @@
 ;;;; approx.lisp
 ;;;;
 ;;;; Author: Eric Peterson
+;;;;
+;;;; This file contains routines that use a family of circuit templates to emit
+;;;; from among them a "best approximation" to a two-qubit program.  This sort of
+;;;; protocol was previously discussed by arXiv:1811.12926 Appendix B, which is a
+;;;; good reference for the overall ideas here. This implementation comes with a
+;;;; number of features and caveats:
+;;;;
+;;;; * The definition of "best approximation" is that the average fidelity of a
+;;;;   state passed through the original program vs the emitted circuit is
+;;;;   maximized from among the various template options.
+;;;;
+;;;; * The global variable *ENABLE-APPROXIMATE-COMPILATION* controls whether the
+;;;;   routine will tolerate imperfect maximal fidelities.  This can be used to
+;;;;   two effects: given a limited set of templates, the routine will emit the
+;;;;   best option without complaint; or, given fidelity information about the
+;;;;   native operations on the chip, the routine will take this into account
+;;;;   and emit the template that has the highest fidelity **after incorporating
+;;;;   the fidelity loss due to the operations themselves**.
+;;;;
+;;;; * The model which blends of the fidelity loss of the operations with the
+;;;;   fidelity loss of selecting an imperfect template is their product.  This
+;;;;   is an imperfect approximation for any number of reasons, including
+;;;;   potential deconstructive interference of unitary error, potentially
+;;;;   resulting in a lower overall fidelity loss than expected.  (This is less
+;;;;   likely with nonunitary error, though I have not worked this out precisely.)
+;;;;
+;;;; * The templates defined here are user-extensible and are drawn from several
+;;;;   places, including arXiv:0308033 and our forthcoming compilation paper.
 
 (in-package #:cl-quil)
 
@@ -9,7 +37,10 @@
 ;;; the TARGET argument is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted)
 ;;; sequence of such atoms, indicating which 2Q gates are available for use.
 
+;; NOTE: editors of the following list should probably also investigate the
+;;       routines immediately following this definition.
 (deftype optimal-2q-target-atom ()
+  "An enumerative type describing the two-qubit operators required by a particular two-qubit decomposition template."
   '(member :cz :iswap :piswap :cphase :cnot))
 
 (defun sequence-of-optimal-2q-target-atoms-p (seq)
@@ -24,6 +55,7 @@
      (satisfies sequence-of-optimal-2q-target-atoms-p))))
 
 (defun optimal-2q-target-meets-requirements (target requirements)
+  "Tests whether REQUIREMENTS of type OPTIMAL-2Q-TARGET, thought of as the two-qubit instructions necessary to instantiate a two-qubit decomposition template, is covered by TARGET of type OPTIMAL-2Q-TARGET, thought of as the available two-qubit instructions on the device."
   (let ((targetl       (alexandria:ensure-list target))
         (requirementsl (alexandria:ensure-list requirements)))
     (when (member ':cphase targetl) (push ':cz targetl))
@@ -97,7 +129,7 @@
 
 ;; these are special matrices that conjugate SU(2) x SU(2) onto SO(4).
 ;;
-;; REM: according to /0308033, their only special property is:
+;; REM: according to arXiv:0308033, their only special property is:
 ;;     e e^T = -(sigma_y (x) sigma_y) .
 ;; there are several such matrices; this one is just easy to write down.
 (alexandria:define-constant
@@ -113,6 +145,7 @@
                                    sqrt2 -isqrt2  0       0)))
   :test #'matrix-equality
   :documentation "This is an element of SU(4) that has two properties: (1) e-basis e-basis^T = - sigma_y^((x) 2) and (2) e-basis^dag SU(2)^((x) 2) e-basis = SO(4).")
+
 (alexandria:define-constant
     +edag-basis+
     (let* ((sqrt2 (/ (sqrt 2) 2))
@@ -635,9 +668,9 @@
          fidelity)))))
 
 (defun approximate-2Q-compiler (instr &key (chip-spec nil) (crafters nil))
-  "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an object CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through."
+  "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through."
   (check-type instr gate-application)
-  (check-type chip-spec chip-specification)
+  (check-type chip-spec (or null chip-specification))
   
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
@@ -658,7 +691,8 @@
                 (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
                                                                             (application-arguments instr))))
                        (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
-                       (circuit-cost (lscheduler-calculate-fidelity ls chip-spec)))
+                       (circuit-cost (or (and chip-spec (lscheduler-calculate-fidelity ls chip-spec))
+                                         1d0)))
                   (multiple-value-bind (sandwiched-circuit fidelity)
                       (sandwich-with-local-gates center-circuit a d b q1 q0)
                     (push (cons (* circuit-cost fidelity) sandwiched-circuit)

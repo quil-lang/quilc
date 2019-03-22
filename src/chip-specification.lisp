@@ -218,7 +218,7 @@ used to specify CHIP-SPEC."
 ;;; constructors for hardware object building blocks
 
 (defun build-link (qubit0 qubit1 &optional (type (list ':CZ)) chip-spec)
-  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
+  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT. The optional argument CHIP-SPEC is used by compilers to make decisions based on characteristics of the chip and its other hardware components."
   (check-type qubit0 unsigned-byte)
   (check-type qubit1 unsigned-byte)
   (assert (/= qubit0 qubit1))
