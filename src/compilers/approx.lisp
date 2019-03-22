@@ -257,6 +257,7 @@
 
 
 (defun orthogonal-decomposition (m)
+  "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
   (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
          (a (diagonalizer-in-e-basis m))
          (db (reduce #'magicl:multiply-complex-matrices
@@ -268,7 +269,7 @@
                                   (when (>= (abs (magicl:ref db j i)) mag)
                                     (setf mag (abs (magicl:ref db j i)))
                                     (setf phase (mod (phase (magicl:ref db j i)) pi))))
-                                (exp (* #C(0 1) phase)))))
+                                (cis phase))))
          (d (magicl:diag 4 4 diag))
          (b (magicl:multiply-complex-matrices
              (magicl:conjugate-transpose d) db)))
@@ -297,14 +298,16 @@
     (values a d b)))
 
 (defun make-signed-permutation-matrix (sigma &optional (signs (list 1 1 1 1)))
+  "Constructs a 4x4 signed permutation matrix from a CL-PERMUTATION permutation of size 4 and a list of SIGNS of length 4."
   (let ((o (magicl:make-zero-matrix 4 4)))
     (loop :for i :below 4
-          :for j :in (cl-permutation:permute sigma (alexandria:iota 4))
+          :for j := (cl-permutation:perm-eval sigma i)
           :for sign :in signs
           :do (setf (magicl:ref o i j) sign))
     o))
 
 (defun match-matrix-to-an-e-basis-diagonalization (mprime a d b)
+  "Given a matrix MPRIME and a decomposed matrix E^* M E = A D B, this computes matrices UA and UB so that UA MPRIME UB gives the best approximation to M = E A D B E^*.  Returns UA and UB as the values pair (VALUES UA UB)."
   ;; start by decomposing e^* m' e = a' d' b'.
   ;; we then maximize over signed permutation matrices o so that
   ;;     d' ~~ o d o^T
@@ -340,7 +343,7 @@
             (when (> new-fidelity max-fidelity)
               (setf max-fidelity new-fidelity)
               (when (= -1 (cl-permutation:perm-sign sigma))
-                (setf (first signs) (* -1 (first signs))))
+                (setf (first signs) (- (first signs))))
               (setf o (make-signed-permutation-matrix sigma (if (= -1 (cl-permutation:perm-sign sigma))
                                                                 (list -1 1 1 1)
                                                                 (list 1 1 1 1))))
@@ -372,7 +375,11 @@
 ;;; to trace distance.
 
 (defun trace-distance (m1 m2)
-  "Calculates the average fidelity distance between two unitary operators M1 and M2."
+  "Calculates the average fidelity distance between two unitary operators M1 and M2.  A by-the-book definition of this function is that for operators M1 and M2 acting on a vector space V, we want to calculate
+
+     (trace-distance m1 m2) = \\int_{psi in P(V)} <psi| M1^* M2 |psi>.
+
+One can show that this is equal to the trace calculation that's actually used in this implementation."
   (assert (= (magicl:matrix-rows m1) (magicl:matrix-cols m1)
              (magicl:matrix-rows m2) (magicl:matrix-cols m2)))
   (let* ((n (magicl:matrix-rows m1))
@@ -382,60 +389,62 @@
        (+ n (* n n)))))
 
 (defun fidelity-coord-distance (coord1 coord2)
+  "Calculates the average fidelity distance between the canonical gates associated to the canonical coordinates COORD1 and COORD2."
   (let* ((n 4)
-         (delta-a (/ (- (first coord1) (first coord2)) 2))
+         (delta-a (/ (- (first coord1)  (first coord2))  2))
          (delta-b (/ (- (second coord1) (second coord2)) 2))
-         (delta-c (/ (- (third coord1) (third coord2)) 2))
-         (tr (+ (* (cos delta-a)
-                   (cos delta-b)
-                   (cos delta-c))
-                (* #C(0 1)
-                   (sin delta-a)
-                   (sin delta-b)
-                   (sin delta-c)))))
+         (delta-c (/ (- (third coord1)  (third coord2))  2))
+         (tr (complex (* (cos delta-a) (cos delta-b) (cos delta-c))
+                      (* (sin delta-a) (sin delta-b) (sin delta-c)))))
     (- 1 (/ (+ n (abs (* 16 tr tr)))
             (+ n (* n n))))))
 
 (defun fidelity-of-straight-quil (instrs chip-spec)
+  "Helper routine for calculating the fidelity of a straight line of Quil instructions against the fidelity information associated to CHIP-SPEC."
   (let ((ls (make-lscheduler)))
     (append-instructions-to-lschedule ls instrs)
     (lscheduler-calculate-fidelity ls chip-spec)))
 
 (defun get-canonical-coords-from-diagonal (d)
+  "Extracts \"canonical coordinates\" (c1, c2, c3) from a diagonal matrix D which belong to the Weyl chamber satisfying
+
+    pi/2 >= c1 >= c2 >= |c3|."
   (assert (= 4 (magicl:matrix-rows d) (magicl:matrix-cols d)))
-  (flet ((test (seq) (double>= (/ pi 2) (first seq) (second seq) (abs (third seq))))
-         (wrap-value (z)
-           (let* ((pi/2 (/ pi 2))
-                  (z (- (mod (+ z pi/2) pi) pi/2)))
-             (if (double= (/ pi -2) z)
-                 (- z)
-                 z))))
+  (labels ((test (seq) (double>= (/ pi 2) (first seq) (second seq) (abs (third seq))))
+           (wrap-value (z)
+             (let* ((pi/2 (/ pi 2))
+                    (z (- (mod (+ z pi/2) pi) pi/2)))
+               (if (double= (/ pi -2) z)
+                   (- z)
+                   z)))
+           (try-to-canonicalize (a b c) (sort (mapcar #'wrap-value (list a b c)) #'>)))
     (let* ((angles (mapcar #'phase (loop :for i :below 4 :collect (magicl:ref d i i))))
            (first  (mod    (+ (third angles) (fourth angles)) pi))
            (second (mod (- (+ (third angles) (first angles))) pi))
            (third  (mod    (+ (third angles) (second angles)) pi))
-           (option-1 (sort (mapcar #'wrap-value (list first second third)) #'>)))
+           (option-1 (try-to-canonicalize first second third)))
       (destructuring-bind (first second third) option-1
-        (let ((option-2 (sort (mapcar #'wrap-value (list (- first) (- second) third))     #'>))
-              (option-3 (sort (mapcar #'wrap-value (list (- first) second     (- third))) #'>))
-              (option-4 (sort (mapcar #'wrap-value (list first     (- second) (- third))) #'>)))
+        (let ((option-2 (try-to-canonicalize (- first) (- second) third))
+              (option-3 (try-to-canonicalize (- first) second     (- third)))
+              (option-4 (try-to-canonicalize first     (- second) (- third))))
           (cond
             ((test option-1) option-1)
             ((test option-2) option-2)
             ((test option-3) option-3)
             ((test option-4) option-4)
-            (t (error "uh-oh (cf. ~a)" (list first second third)))))))))
+            (t (error "Failed to put the canonical coordinates ~a into the preferred Weyl chamber." (list first second third)))))))))
 
 (defun build-canonical-gate (coord)
+  "Given a canonical coordinate, construct the associated canonical gate at that coordinate."
   (destructuring-bind (c1 c2 c3) coord
     (reduce #'magicl:multiply-complex-matrices
             (list +e-basis+
                   (magicl:diag 4 4
-                               (mapcar (lambda (z) (exp (* #C(0 0.5d0) z)))
-                                       (list (+ c1 (- c2) c3)
-                                             (+ c1 c2 (- c3))
-                                             (- (+ c1 c2 c3))
-                                             (+ (- c1) c2 c3))))
+                               (mapcar (lambda (z) (cis (* 0.5d0 z)))
+                                       (list    (+    c1 (- c2)   c3)
+                                                (+    c1    c2 (- c3))
+                                             (- (+    c1    c2    c3))
+                                                (+ (- c1)   c2    c3))))
                   +edag-basis+))))
 
 
@@ -446,39 +455,53 @@
 ;;; otherwise, this list of records will retain both the record pointing to the
 ;;; new definition as well as the previously existing record pointing to the old.
 ;;;
-;;; important note: these are listed in *descending* preference order.
+;;; IMPORTANT NOTE: these are listed in *descending* preference order.
 
 (defvar **approximate-template-records** nil
-  "Houses a list of available approximate templates.")
-
-(setf **approximate-template-records** nil)
+  "Houses a list of available approximate templates, sorted in *descending* preference order.")
 
 (defstruct approximate-template-record
-  function
+  (name nil :type symbol :read-only t)
   predicate
   requirements)
 
-(defmacro define-approximate-template (name (&rest args) requirements pred &body body)
+(defmacro define-approximate-template (name (coord q1 q0) (&rest requirements) pred &body body)
+  "This defines an two-qubit circuit template for use by the approximation algorithm. The template is stored both as a raw function under the name NAME as well as in a list of available templates, guarded by the value REQUIREMENTS of type OPTIMAL-2Q-TARGET.  BODY is a routine that returns a list of GATE-APPLICATION objects and is allowed to reference three arguments: the desired canonical coordinate COORD, the first desired qubit Q1, and the zeroth desired qubit Q0.
+
+Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is NIL, the template errors with GIVE-UP-COMPILATION and does not evaluate BODY; this mechanism is used to avoid the emission of approximate templates when they aren't wanted.  If a template author cannot provide a meaningful predicate, they must manually install a guard against such unwanted emissions."
+  (check-type name symbol)
+  (check-type coord symbol)
+  (check-type q1 symbol)
+  (check-type q0 symbol)
+  
   `(progn
-     (defun ,name (,@args)
+     (defun ,name (,coord ,q1 ,q0)
        (unless (or *enable-approximate-compilation*
                    ,pred)
          (give-up-compilation))
        ,@body)
-     (push (make-approximate-template-record
-            :function #',name
-            :predicate (lambda (,@args)
-                         (declare (ignorable ,@args))
-                         ,pred)
-            :requirements ,requirements)
-           **approximate-template-records**)))
+     (let ((old-record (find ',name **approximate-template-records**
+                             :key #'approximate-template-record-name))
+           (new-record (make-approximate-template-record
+                        :name ',name
+                        :predicate (lambda (,coord ,q1 ,q0)
+                                     (declare (ignorable ,coord ,q1 ,q0))
+                                     ,pred)
+                        :requirements ',requirements)))
+       (cond
+         (old-record
+          (setf **approximate-template-records**
+                (substitute new-record old-record **approximate-template-records**)))
+         (t
+          (push new-record **approximate-template-records**)))
+       ',name)))
 
-(defmacro define-searching-approximate-template (name (&rest args) reqs pred parameter-count &body parametric-circuit)
-  "Defines an approximate template that uses a Nelder-Mead solver."
-  `(define-approximate-template ,name (,(first args) ,(second args) ,(third args))
+(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) reqs pred parameter-count &body parametric-circuit)
+  "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-APPROXIMATE-TEMPLATE, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
+  `(define-approximate-template ,name (,coord ,q1 ,q0)
        ,reqs
        ,pred
-     (flet ((circuit-template (,(fourth args) q1 q0)
+     (flet ((circuit-template (,parameter-array q1 q0)
               ,@parametric-circuit))
        (multiple-value-bind (template-values goodness)
            (cl-grnm:nm-optimize
@@ -486,12 +509,12 @@
               (multiple-value-bind (a d b)
                   (orthogonal-decomposition (make-matrix-from-quil (circuit-template in 1 0)))
                 (declare (ignore a b))
-                (fidelity-coord-distance ,(first args) (get-canonical-coords-from-diagonal d))))
+                (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal d))))
             (make-array ,parameter-count :initial-element 1d0))
          (unless (or *enable-approximate-compilation*
                      (double= 0d0 goodness))
            (give-up-compilation))
-         (values (circuit-template template-values ,(second args) ,(third args)) goodness)))))
+         (values (circuit-template template-values q1 q0) goodness)))))
 
 
 
@@ -576,7 +599,7 @@
     '(:iswap)
     t
   (flet ((twist-to-real (m)
-           ;; this magical formula was furnished to us by asking Mathematica to compute
+           ;; this magical formula was furnished to us by asking a CAS to compute
            ;; the trace of M' for a symbolic M and SIGMA, then solving
            ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)) ,
            ;; where a and b work out to be these disgusting sums below.
@@ -603,7 +626,6 @@
                        m
                        (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
                        (gate-matrix (lookup-standard-gate "ISWAP"))))))))
-    ;; TODO: is TWIST-TO-REAL easier to compute when coupled to BUILD-CANONICAL-GATE?
     (multiple-value-bind (sigma mprime) (twist-to-real (build-canonical-gate coord))
       (multiple-value-bind (a d b) (orthogonal-decomposition mprime)
         (let ((coordprime (get-canonical-coords-from-diagonal d)))
@@ -642,12 +664,14 @@
 ;;; here lies the logic underlying the approximate compilation routine.
 
 (defun sandwich-with-local-gates (center-circuit a d b q1 q0)
-  "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS)."
+  "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
+
+Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, and B are matrices; and Q1, Q0 are qubit indices."
   (dolist (instr center-circuit)
-    (map-into (application-arguments instr)
-              (lambda (q) (qubit (if (= q1 (qubit-index q))
-                                     1 0)))
-              (application-arguments instr)))
+    (setf (application-arguments instr)
+          (mapcar (lambda (q) (qubit (if (= q1 (qubit-index q))
+                                         1 0)))
+                  (application-arguments instr))))
   
   (multiple-value-bind (ua ub fidelity)
       (match-matrix-to-an-e-basis-diagonalization
@@ -655,10 +679,10 @@
        a d b)
     
     (dolist (instr center-circuit)
-    (map-into (application-arguments instr)
-              (lambda (q) (qubit (if (= 1 (qubit-index q))
-                                     q1 q0)))
-              (application-arguments instr)))
+      (setf (application-arguments instr)
+            (mapcar     (lambda (q) (qubit (if (= 1 (qubit-index q))
+                                               q1 q0)))
+                        (application-arguments instr))))
     
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
       (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
@@ -671,7 +695,9 @@
          fidelity)))))
 
 (defun approximate-2Q-compiler (instr &key (chip-spec nil) (crafters nil))
-  "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through."
+  "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through.
+
+NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMATE-COMPILER* is NIL."
   (check-type instr gate-application)
   (check-type chip-spec (or null chip-specification))
   
@@ -690,6 +716,10 @@
         (dolist (circuit-crafter crafters)
           (unless (and (first candidate-pairs)
                        (double= 1d0 (car (first candidate-pairs))))
+            (format *compiler-noise-stream*
+                    "APPROXIMATE-2Q-COMPILER: Trying ~a on ~a.~%"
+                    circuit-crafter
+                    (with-output-to-string (s) (print-instruction instr s)))
             (handler-case
                 (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
                                                                             (application-arguments instr))))
@@ -715,7 +745,7 @@
 (defun approximate-2Q-compiler-for (target chip-spec)
   "Constructs an approximate 2Q compiler suitable for a TARGET architecture and a CHIP-SPEC with fidelity data.  Returns a function to be installed into the compilers present on CHIP-SPEC."
   (let ((crafters
-         (mapcar #'approximate-template-record-function
+         (mapcar #'approximate-template-record-name
                  (reverse
                   (remove-if-not (lambda (record)
                                    (optimal-2q-target-meets-requirements
