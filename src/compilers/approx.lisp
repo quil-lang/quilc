@@ -168,31 +168,32 @@
 ;; window :( because we expect/require the matrix of eigenvectors to be
 ;; special-orthogonal, we have to correct this behavior manually.
 (defun find-real-spanning-set (vectors)
-  "VECTORS is a list of complex vectors in C^n.  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
-  (check-type vectors list)
+  "VECTORS is a list of complex vectors in C^n (which, here, are of type LIST).  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
+  (assert (alexandria:proper-list-p vectors))
   (let* ((coeff-matrix (magicl:make-complex-matrix
                         (length (first vectors))
                         (* 2 (length vectors))
-                        (concatenate 'list
-                                     (loop :for v :in vectors :nconc (map 'list #'imagpart v))
-                                     (loop :for v :in vectors :nconc (map 'list #'realpart v)))))
+                        (nconc
+                         (loop :for v :in vectors :nconc (mapcar #'imagpart v))
+                         (loop :for v :in vectors :nconc (mapcar #'realpart v)))))
          (reassemble-matrix (magicl:make-complex-matrix
                              (length vectors)
                              (* 2 (length vectors))
-                             (concatenate 'list
-                                          (loop :for i :from 1 :to (length vectors)
-                                                :nconc (loop :for j :from 1 :to (length vectors)
-                                                             :collect (if (= i j) 1d0 0d0)))
-                                          (loop :for i :from 1 :to (length vectors)
-                                                :nconc (loop :for j :from 1 :to (length vectors)
-                                                             :collect (if (= i j) #C(0d0 1d0) 0d0))))))
-         (backsolved-matrix (reduce #'magicl:multiply-complex-matrices
-                                    (list (magicl:make-complex-matrix
-                                           (length (first vectors))
-                                           (length vectors)
-                                           (reduce #'append vectors))
-                                          reassemble-matrix
-                                          (kernel coeff-matrix))))
+                             (nconc
+                              (loop :for i :from 1 :to (length vectors)
+                                    :nconc (loop :for j :from 1 :to (length vectors)
+                                                 :collect (if (= i j) 1d0 0d0)))
+                              (loop :for i :from 1 :to (length vectors)
+                                    :nconc (loop :for j :from 1 :to (length vectors)
+                                                 :collect (if (= i j) #C(0d0 1d0) 0d0))))))
+         (backsolved-matrix (magicl:multiply-complex-matrices
+                             (magicl:multiply-complex-matrices
+                              (magicl:make-complex-matrix
+                               (length (first vectors))
+                               (length vectors)
+                               (reduce-append vectors))
+                              reassemble-matrix)
+                             (kernel coeff-matrix)))
          (backsolved-vectors
            (loop :for i :below (magicl:matrix-cols backsolved-matrix)
                  :collect (loop :for j :below (magicl:matrix-rows backsolved-matrix)
@@ -217,9 +218,9 @@
       ;;
       ;; first, we address the sort issue. the columns of a match the order of
       ;; the the values in angles, so we sort the two lists in parallel.\
-      (let* ((angles (map 'list (lambda (x) (let ((ret (imagpart (log x))))
-                                         (if (double= ret (- pi)) pi ret)))
-                          evals))
+      (let* ((angles (mapcar (lambda (x) (let ((ret (imagpart (log x))))
+                                           (if (double= ret (- pi)) pi ret)))
+                             evals))
              (augmented-list
                (sort
                 (loop :for i :below 4
@@ -228,30 +229,32 @@
                                  (list (nth i angles) col)))
                 (lambda (x y) (< (first x) (first y)))))
              ;; if vectors lie in the same eigenspace, make them real and orthonormal
-             (current-eval (first (first augmented-list)))
-             (current-evects (list (second (first augmented-list))))
              (real-data
-               (reduce #'append
-                       (loop
-                         :for pair :in (append (rest augmented-list)
-                                               (list (list most-positive-fixnum nil))) ;; this dummy tail item forces a flush
-                         :nconc (if (double= current-eval (first pair))
-                                    ;; we're still forming the current eigenspace...
-                                    (prog1
-                                        nil
-                                      (setf current-evects (append (list (second pair))
-                                                                   current-evects)))
-                                    ;; we're ready for a flush and a new eigenspace.
-                                    (prog1
-                                        (find-real-spanning-set current-evects)
-                                      (setf current-eval (first pair))
-                                      (setf current-evects (list (second pair)))))))))
+               (let ((current-eval (first (first augmented-list)))
+                     (current-evects (list (second (first augmented-list)))))
+                 (reduce-append
+                  (loop
+                    :for pair :in (append (rest augmented-list)
+                                          (list (list most-positive-fixnum nil))) ;; this dummy tail item forces a flush
+                    :nconc
+                    (cond
+                      ;; we're still forming the current eigenspace...
+                      ((double= current-eval (first pair))
+                       (setf current-evects (append (list (second pair))
+                                                    current-evects))
+                       nil)
+                      (t
+                       ;; we're ready for a flush and a new eigenspace.
+                       (prog1 (find-real-spanning-set current-evects)
+                         (setf current-eval (first pair))
+                         (setf current-evects (list (second pair)))))))))))
         ;; form a matrix out of the results so far.
         (setf a (magicl:make-complex-matrix 4 4 real-data)))
       ;; lastly, fix the determinant (if there's anything left to fix)
-      (when (< (realpart (magicl:det a)) 0)
+      (when (minusp (realpart (magicl:det a)))
         (setf a (magicl:multiply-complex-matrices a (magicl:diag 4 4 '(-1d0 1d0 1d0 1d0)))))
       a)))
+
 
 (defun orthogonal-decomposition (m)
   (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
