@@ -94,7 +94,7 @@ If any of XFORM or its predecessors have not been performed, return NIL and the 
    (needed-transform :reader unsatisfied-transform-dependency-needed-transform
                      :initarg :needed-transform)
    (object :reader unsatisfied-transform-dependency-object
-           :initarg object))
+           :initarg :object))
   (:documentation "An error that is signalled when a prerequisite transform has not been done.")
   (:report (lambda (condition stream)
              (format stream "Cannot transform ~A by ~A because ~A ~
