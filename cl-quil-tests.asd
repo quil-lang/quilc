@@ -10,6 +10,7 @@
                (:version #:qvm "1.9.0")
                #:magicl
                #:alexandria
+               #:lparallel
                #:fiasco
                #:uiop
                #:yacc                     ; for the conditions

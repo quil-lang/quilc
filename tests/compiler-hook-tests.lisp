@@ -4,11 +4,6 @@
 
 (in-package #:cl-quil-tests)
 
-(defparameter *compiler-hook-test-file-directory*
-  (asdf:system-relative-pathname
-   ':cl-quil-tests
-   "tests/compiler-hook-test-files/"))
-
 (defun attach-rewirings-to-program (pp in-rewiring-vector out-rewiring-vector)
   (check-type in-rewiring-vector (or null quil::integer-vector))
   (check-type out-rewiring-vector (or null quil::integer-vector))
@@ -114,21 +109,28 @@ JUMP @a")))
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
 
-(deftest test-compiler-hook (&key print-stats)
-  "Test whether the compiler hook preserves semantic equivalence for
-some test programs."
-  (finish-output *debug-io*)
-  (dolist (state-prep '(nil t))
-    (let ((quil::*enable-state-prep-compression* state-prep))
-      (format *debug-io* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
-      (dolist (file (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))
-        (format *debug-io* "      Testing file ~a:" (pathname-name file))
-        (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
-          (format *debug-io* " ~a" architecture)
-          (let ((stats (compare-compiled file architecture)))
-            (when print-stats
-              (format *debug-io* "~a" stats))))
-        (terpri *debug-io*)))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  
+  (defmacro define-compiler-hook-tests ()
+    `(progn
+       ,@(loop :for test-file :in (uiop:directory-files (asdf:system-relative-pathname
+                                                         ':cl-quil-tests
+                                                         "tests/compiler-hook-test-files/") #P "*.quil")
+               :append (loop :for test-name :in (list
+                                                 (concatenate 'string "TEST-COMPILER-HOOK-"
+                                                              (string-upcase (pathname-name test-file)))
+                                                 (concatenate 'string "TEST-COMPILER-HOOK-"
+                                                              (string-upcase (pathname-name test-file))
+                                                              "-WITH-STATE-PREP-COMPRESSION"))
+                             :append
+                             (loop :for arch :in (list ':cz ':iswap ':cphase ':piswap ':cnot)
+                                   :for name := (concatenate 'string test-name "-" (string arch))
+                                   :collect
+                                   `(deftest ,(intern name) (&key print-stats)
+                                      (finish-output *debug-io*)
+                                      (compare-compiled ,test-file ,arch)))))))
+
+  (define-compiler-hook-tests))
 
 (deftest test-compression-bug-QUILC-152 ()
   "QUILC-152: A bug in state compression caused a failed assertion."
