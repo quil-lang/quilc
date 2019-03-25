@@ -25,4 +25,6 @@
   "When NIL, compression using state preparation methods is disabled.")
 
 (defvar *enable-approximate-compilation* nil
-  "When NIL, compression by replacing instructions sequences with approximate sequences is disabled.")
+  "When NIL, compression by replacing instructions sequences with approximate sequences is disabled.
+
+NOTE: When T, this permits the approximate compilation templates to emit inexact results, but does not actually enable any alternative code paths.  When NIL, these results are still generated, but they are discarded.")
