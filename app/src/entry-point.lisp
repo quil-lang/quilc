@@ -42,7 +42,7 @@
 
 (defparameter *option-spec*
   '((("prefer-gate-ladders") :type boolean :optional t :documentation "uses gate ladders rather than SWAPs to implement long-ranged gates")
-    (("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth; requires -P")
+    (("compute-gate-depth" #\d) :type boolean :optional t :documentation "prints compiled circuit gate depth (longest subsequece of data-sharing compiled instructions); requires -P")
     (("compute-gate-volume") :type boolean :optional t :documentation "prints compiled circuit gate volume (number of gates); requires -P")
     (("compute-runtime" #\r) :type boolean :optional t :documentation "prints compiled circuit expected runtime; requires -P")
     (("compute-fidelity" #\f) :type boolean :optional t :documentation "prints approximate compiled circuit fidelity; requires -P")
