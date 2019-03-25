@@ -326,7 +326,7 @@ other's."
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
-(defun expand-to-native-instructions (instrs chip-specification &optional environs output-string)
+(defun expand-to-native-instructions (instrs chip-specification &optional output-string)
   "Repeatedly applies nativization routines to expand a list of addressed instructions into a list of addressed, native instructions. Makes no attempt to perform any kind of rewiring or any kind of simplification."
   ;; dispatch on the top instruction type
   (cond
@@ -337,13 +337,11 @@ other's."
     ((typep (first instrs) 'no-operation)
      (expand-to-native-instructions (rest instrs)
                                     chip-specification
-                                    environs
                                     output-string))
     ;; pass any classical instructions through
     ((not (typep (first instrs) 'application))
      (expand-to-native-instructions (rest instrs)
                                     chip-specification
-                                    environs
                                     (cons (first instrs) output-string)))
     ;; otherwise, we have a quantum instruction
     (t
@@ -357,7 +355,6 @@ other's."
          (return-from expand-to-native-instructions
            (expand-to-native-instructions (rest instrs)
                                           chip-specification
-                                          environs
                                           (cons (first instrs) output-string))))
        ;; otherwise, we are nonnative. translate us.
        (let ((translation-results (apply-translation-compilers (first instrs)
@@ -371,8 +368,8 @@ other's."
                        (not *enable-approximate-compilation*)
                        (notany (lambda (instr) (typep instr 'state-prep-application))
                                instrs))
-              (let ((ref-mat (make-matrix-from-quil (list (first instrs)) environs))
-                    (mat (make-matrix-from-quil translation-results environs)))
+              (let ((ref-mat (make-matrix-from-quil (list (first instrs))))
+                    (mat (make-matrix-from-quil translation-results)))
                 (setf mat (kron-matrix-up mat (1- (integer-length (magicl:matrix-rows ref-mat)))))
                 (assert
                  (matrix-equality
@@ -381,7 +378,6 @@ other's."
             (expand-to-native-instructions (append translation-results
                                                    (rest instrs))
                                            chip-specification
-                                           environs
                                            output-string))
            (t
             (error "Failed to expand ~a into native instructions."

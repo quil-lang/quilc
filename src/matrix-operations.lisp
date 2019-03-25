@@ -121,7 +121,7 @@ as needed so that they are the same size."
     :for instr :across (parsed-program-executable-code pp)
     :do (typecase instr
           (gate-application
-           (setf mat (apply-gate mat instr pp)))
+           (setf mat (apply-gate mat instr)))
           (pragma-expected-rewiring
            (let ((trimmed (trim-rewiring
                            (pragma-rewiring instr))))

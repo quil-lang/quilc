@@ -717,22 +717,10 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
   "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
 
 Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, and B are matrices; and Q1, Q0 are qubit indices."
-  (dolist (instr center-circuit)
-    (setf (application-arguments instr)
-          (mapcar (lambda (q) (qubit (if (= q1 (qubit-index q))
-                                         1 0)))
-                  (application-arguments instr))))
-  
   (multiple-value-bind (ua ub fidelity)
       (match-matrix-to-an-e-basis-diagonalization
-       (make-matrix-from-quil center-circuit)
+       (make-matrix-from-quil center-circuit :relabeling `((,q1 . 1) (,q0 . 0)))
        a d b)
-    
-    (dolist (instr center-circuit)
-      (setf (application-arguments instr)
-            (mapcar     (lambda (q) (qubit (if (= 1 (qubit-index q))
-                                               q1 q0)))
-                        (application-arguments instr))))
     
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
       (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)

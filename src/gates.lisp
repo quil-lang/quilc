@@ -548,11 +548,10 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
 
 ;;;; some leftover stuff from standard-gates.lisp and elsewhere
 
-(defun apply-gate (m instr &optional (environs nil))
-  "Constructs the matrix representation associated to an instruction list consisting of certain standard gates or gate definitions found in ENVIRONS. Suitable for testing the output of compilation routines."
+(defun apply-gate (m instr)
+  "Constructs the matrix representation associated to an instruction list consisting of gates. Suitable for testing the output of compilation routines."
   (check-type m magicl:matrix)
   (check-type instr application)
-  (check-type environs (or null parsed-program))
   (alexandria:when-let ((defn (gate-matrix instr)))
     (let* ((mat-size (1- (integer-length (magicl:matrix-rows m))))
            (size (max mat-size
@@ -570,8 +569,8 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
                   m)))
       (magicl:multiply-complex-matrices mat m))))
 
-(defun make-matrix-from-quil (instruction-list &optional (environs nil))
-  "If possible, create a matrix out of the instructions INSTRUCTION-LIST, within the context of the environment ENVIRONS. If one can't be created, then return NIL."
+(defun make-matrix-from-quil (instruction-list &key relabeling)
+  "If possible, create a matrix out of the instructions INSTRUCTION-LIST. If one can't be created, then return NIL."
   (let ((u (magicl:diag 1 1 '(1d0))))
     (dolist (instr instruction-list u)
       (assert (not (null u)))
@@ -584,11 +583,17 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
           (return-from make-matrix-from-quil nil))
         (let ((new-instr (copy-instance instr)))
           (setf (application-arguments new-instr)
-                (mapcar (lambda (a) (if (typep a 'formal)
-                                        (qubit (parse-integer (formal-name a) :start 1))
-                                        a))
+                (mapcar (lambda (a)
+                          (cond
+                            ((typep a 'formal)
+                             (qubit (parse-integer (formal-name a) :start 1)))
+                            ((and (typep a 'qubit)
+                                  (assoc (qubit-index a) relabeling))
+                             (qubit (cdr (assoc (qubit-index a) relabeling))))
+                            (t
+                             a)))
                         (application-arguments new-instr)))
-          (setf u (apply-gate u new-instr environs)))))))
+          (setf u (apply-gate u new-instr)))))))
 
 (defun kq-gate-on-lines (gate-mat n lines)
   "Writes the gate GATE-MAT as an N-qubit gate by applying it to the qubit lines in LINES."
