@@ -186,12 +186,14 @@
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
   (loop :for gate-application :across (quil::parsed-program-executable-code parsed-quil)
-        :collect (matrix-to-clifford (quil:gate-matrix gate-application))))
+        :when (typep gate-application 'quil::application)
+          :collect (matrix-to-clifford (quil:gate-matrix gate-application))))
 
 (defun extract-qubits-used (parsed-quil)
   "Given PARSED-QUIL return the indices of the qubits used. The result is given as a list of the qubits used per instruction in the PARSED-QUIL."
   (loop :for parsed-clifford :across (quil::parsed-program-executable-code parsed-quil)
-        :collect (mapcar #'quil::qubit-index (quil::application-arguments parsed-clifford))))
+        :when (typep parsed-clifford 'quil::application)
+          :collect (mapcar #'quil::qubit-index (quil::application-arguments parsed-clifford))))
 
 (defun clifford-circuit-p (parsed-quil)
   "If the parsed circuit PARSED-QUIL a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
