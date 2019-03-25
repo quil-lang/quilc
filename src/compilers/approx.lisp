@@ -378,7 +378,7 @@
 
      (trace-distance m1 m2) = \\int_{psi in P(V)} <psi| M1^* M2 |psi>.
 
-One can show that this is equal to the trace calculation that's actually used in this implementation."
+One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V rho V^*) that this is equal to the trace calculation that's actually used in this implementation."
   (assert (= (magicl:matrix-rows m1) (magicl:matrix-cols m1)
              (magicl:matrix-rows m2) (magicl:matrix-cols m2)))
   (let* ((n (magicl:matrix-rows m1))
