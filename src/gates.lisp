@@ -287,6 +287,21 @@
                    :dimension dim
                    :matrix (make-row-major-matrix dim dim entries))))
 
+(defun permutation-from-gate-entries (entries)
+  (loop :with size := (isqrt (length entries))
+        :for i :below size
+        :collect (position 1 (loop :for j :below size :collect (nth (+ i (* j size)) entries))
+                           :test #'=)))
+
+(defmethod gate-definition-to-gate ((gate-def permutation-gate-definition))
+  (let* ((name (gate-definition-name gate-def))
+         (entries (gate-definition-entries gate-def))
+         (dim (isqrt (length entries))))
+    (make-instance 'permutation-gate
+                   :name name
+                   :dimension dim
+                   :permutation (permutation-from-gate-entries entries))))
+
 (defmethod gate-definition-to-gate ((gate-def parameterized-gate-definition))
   (flet ((lambda-form (params dimension entries)
            `(lambda ,params
