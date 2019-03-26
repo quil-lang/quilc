@@ -39,14 +39,17 @@ Prescribe that the input and output must be ProtoQuil, which is Quil
 that is comprised of gates and measurements, with no control flow.
 .IP "-d, --compute-gate-depth"
 Print a calculated gate depth for the provided circuit as an appended
-Quil comment. (Requires -P.)
+Quil comment. Gate depth is defined as the longest subsequence of
+compiled instructions where adjacent instructions share data.
+(Requires -P.)
 .IP "-2, --compute-2Q-gate-depth"
 Print a calculated multiqubit gate depth for the provided circuit as
 an appended Quil comment. (Requires -P. Ignores the blacklist and
 whitelist.)
 .IP "--compute-gate-volume"
 Print a calculated gate volume for the provided circuit as an appended
-Quil comment. (Requires -P.)
+Quil comment. Gate volume is defined as the total number of gates in
+the compiled program. (Requires -P.)
 .IP "-r, --compute-runtime"
 Print a calculated estimated runtime for the provided circuit as an
 appended Quil comment. (Requires -P.)
