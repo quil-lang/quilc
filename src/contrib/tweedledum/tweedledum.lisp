@@ -40,6 +40,8 @@
             (setf (cffi:mem-aref perm :uint32 i) p_i))
     (%synthesis-dbs perm (length permutation))))
 
+;; TODO There is code smell here, and some changes will probably need to be made
+;; to quilc proper.
 (defun compile-perm-gate-with-tweedledum (instr)
   (unless (slot-boundp instr 'quil::name-resolution)
     (quil::give-up-compilation))
