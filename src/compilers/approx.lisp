@@ -99,7 +99,7 @@
          ;; rescaling, by assigning the first nonzero value in the first column
          ;; as belonging to a
          (b
-           (magicl:scale (/ 1 (magicl:ref m 0 state))
+           (magicl:scale (/ (magicl:ref m 0 state))
                          (cond
                            ((or (= state 0) (= state 1))
                             (magicl:make-complex-matrix 2 2
@@ -227,7 +227,8 @@
                       :collect (let ((col (loop :for j :below 4
                                                 :collect (magicl:ref a j i))))
                                  (list (nth i angles) col)))
-                (lambda (x y) (< (first x) (first y)))))
+                #'<
+                :key #'first))
              ;; if vectors lie in the same eigenspace, make them real and orthonormal
              (real-data
                (let ((current-eval (first (first augmented-list)))
@@ -463,7 +464,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 ;;;
 ;;; IMPORTANT NOTE: these are listed in *descending* preference order.
 
-(defvar **approximate-template-records** nil
+(global-vars:define-global-var **approximate-template-records** nil
   "Houses a list of available approximate templates, sorted in *descending* preference order.")
 
 (defstruct approximate-template-record
@@ -471,7 +472,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
   predicate
   requirements)
 
-(defparameter *approximate-template-search-limit* 5000
+(defvar *approximate-template-search-limit* 5000
   "Tolerance level for how many guesses an inexact template solver is allowed to make when it is unsure that an exact solution exists.")
 
 (defmacro define-approximate-template (name (coord q1 q0) (&rest requirements) pred &body body)
@@ -651,8 +652,6 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
                   (nearest-ISWAP-circuit-of-depth-2 coordprime q1 q0)
                   a d b q1 q0)))))))
 
-;; TODO: when fed a SWAP, I would expect this to give an exact solution.
-;;       it appears not to.
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
     (:cphase :iswap)
     nil                     ; TODO: replace this with a convexity test

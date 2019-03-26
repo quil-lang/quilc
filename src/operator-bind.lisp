@@ -40,8 +40,7 @@
   "Variant of BUILD-GATE for constructing anonymous gate applications."
   (check-type operator string)
   (check-type matrix magicl:matrix)
-  (check-type qubits list)
-  (assert (not (null qubits)))
+  (assert (not (endp qubits)))
   (flet ((capture-arg (arg)
            (typecase arg
              (integer
