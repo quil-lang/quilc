@@ -147,14 +147,13 @@
              (nn c-file))))))
 
 (asdf:defsystem #:cl-quil/tweedledum
-  :license "Apache License 2.0 (See LICENSE.txt)" 
+  :license "Apache License 2.0 (See LICENSE.txt)"
   :maintainer "Rigetti Computing"
   :author "Rigetti Computing"
   :description "C++17 Library for writing, manipulating, and optimizing quantum circuits"
-  :depends-on (#:cffi)
+  :depends-on (#:cffi #:cl-quil)
   :pathname "src/contrib/tweedledum/"
   :serial t
   :components
   ((c->so "tweedledum.c")
    (:file "tweedledum")))
-
