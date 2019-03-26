@@ -71,7 +71,8 @@
                                 :gate (funcall
                                        (operator-description-gate-lifter
                                         (application-operator app))
-                                       in-default-gateset))
+                                       in-default-gateset)
+                                :name-resolution in-default-gateset)
              (let ((args (application-arguments app))
                    (params (application-parameters app)))
                ;; Check that all arguments are qubits

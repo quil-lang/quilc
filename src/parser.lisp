@@ -910,7 +910,6 @@ INPUT-STRING that triggered the condition."
                           :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
                         :else
                           :collect (second found-p))))
-
             ;; Return the gate definition.
             (values (make-gate-definition name param-symbols parsed-entries)
                     rest-lines)))))))

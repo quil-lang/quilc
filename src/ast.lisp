@@ -198,18 +198,32 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ()
   (:documentation "A gate definition that has no parameters."))
 
+(defclass permutation-gate-definition (gate-definition)
+  ()
+  (:documentation "A gate definition whose entries can be represented by a permutation matrix."))
+
 (defclass parameterized-gate-definition (gate-definition)
   ((parameters :initarg :parameters
                :reader gate-definition-parameters
                :documentation "A list of symbol parameter names."))
   (:documentation "A gate definition that has named parameters."))
 
+(defun permutation-entries-p (entries)
+  (loop :with size := (isqrt (length entries))
+        :for row-start :below (length entries) :by size
+        :for row-end := (+ size row-start)
+        :always (and (= 1
+                        (count 1 entries :start row-start :end row-end :test #'=)
+                        (reduce #'+ entries :start row-start :end row-end)))))
+
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (assert (every #'symbolp parameters))
   (if (null parameters)
-      (make-instance 'static-gate-definition
+      (make-instance (if (permutation-entries-p entries)
+                         'permutation-gate-definition
+                         'static-gate-definition)
                      :name name
                      :entries entries)
       (make-instance 'parameterized-gate-definition
