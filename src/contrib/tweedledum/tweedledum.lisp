@@ -62,7 +62,6 @@
                             (setf (quil::qubit-index q)
                                   (quil::qubit-index (nth (quil::qubit-index q) qubits))))))
            (map nil (alexandria:rcurry #'quil::%relabel-qubits relabler) code)
-           (format t "~&tweed: ~D~%" (length code))
            (coerce code 'list)))
         (t
          (quil::give-up-compilation))))))
