@@ -141,8 +141,8 @@ Returns a value list: (processed-program, of type parsed-program
   
   ;; we disallow compilation of programs that use memory aliasing
   (loop :for mdesc :in (parsed-program-memory-definitions parsed-program)
-        :when (memory-descriptor-sharing-parent mdesc)
-          :do (error "Programs with aliased memory are currently unsupported."))
+     :when (memory-descriptor-sharing-parent mdesc)
+     :do (error "Programs with aliased memory are currently unsupported."))
   
   ;; check that the program obeys the dead qubit rule
   (when (eql ':naive rewiring-type)
@@ -180,10 +180,10 @@ Returns a value list: (processed-program, of type parsed-program
             (setf final-blk blk)))
         ;; segments its instructions into the MEASURES and the non-MEASURES
         (loop :for instr :across (basic-block-code final-blk)
-              :if (typep instr 'measure)
-                :do (push instr instrs-measures)
-              :else
-                :do (push instr instrs-rest))
+           :if (typep instr 'measure)
+           :do (push instr instrs-measures)
+           :else
+           :do (push instr instrs-rest))
         ;; store its non-MEASURE instructions back into the block
         (setf (basic-block-code final-blk) (coerce (nreverse instrs-rest) 'vector))
         ;; store its MEASURE instructions into the cordoned-off block
@@ -222,13 +222,6 @@ Returns a value list: (processed-program, of type parsed-program
            ;; if so, then we don't have any business compiling it. treat
            ;; it as marked, with the identity rewiring on both ends,
            ;; and proceed 
-           (setf (basic-block-code blk)
-                 (concatenate 'vector
-                              (list (make-instance 'pragma-expected-rewiring
-                                                   :rewiring (make-rewiring (chip-spec-n-qubits chip-specification))))
-                              (basic-block-code blk)
-                              (list (make-instance 'pragma-current-rewiring
-                                                   :rewiring (make-rewiring (chip-spec-n-qubits chip-specification))))))
            (setf (gethash blk block-initial-l2p) (make-rewiring (chip-spec-n-qubits chip-specification)))
            (setf (gethash blk block-final-l2p) (make-rewiring (chip-spec-n-qubits chip-specification)))
            (change-class blk 'basic-block))
@@ -255,13 +248,7 @@ Returns a value list: (processed-program, of type parsed-program
                        (compress-instructions processed-quil chip-specification
                                               :protoquil (null registrant))))
                ;; we're done processing. store the results back into the CFG block.
-               (setf (basic-block-code blk)
-                     (concatenate 'vector
-                                  (list (make-instance 'pragma-expected-rewiring
-                                                       :rewiring initial-l2p))
-                                  processed-quil
-                                  (list (make-instance 'pragma-current-rewiring
-                                                       :rewiring final-l2p))))
+               (setf (basic-block-code blk) processed-quil)
                (setf (gethash blk block-initial-l2p) initial-l2p)
                (setf (gethash blk block-final-l2p) final-l2p)
                (incf topological-swaps local-topological-swaps)
@@ -288,14 +275,7 @@ Returns a value list: (processed-program, of type parsed-program
                        (compress-instructions processed-quil chip-specification
                                               :protoquil t)))
                ;; we're done processing. store the results back into the CFG block.
-               (setf (basic-block-code blk)
-                     (concatenate 'vector
-                                  (list (make-instance 'reset)
-                                        (make-instance 'pragma-expected-rewiring
-                                                       :rewiring initial-l2p))
-                                  processed-quil
-                                  (list (make-instance 'pragma-current-rewiring
-                                                       :rewiring final-l2p))))
+               (setf (basic-block-code blk) processed-quil)
                (setf (gethash blk block-initial-l2p) initial-l2p)
                (setf (gethash blk block-final-l2p) final-l2p)
                (incf topological-swaps local-topological-swaps)
@@ -372,7 +352,18 @@ Returns a value list: (processed-program, of type parsed-program
           (change-class blk 'basic-block)))
       ;; one more pass of CFG collapse
       (simplify-cfg cfg)
-      (let ((processed-program (reconstitute-program cfg)))
+      (let* ((in-comments (make-hash-table))
+             (out-comments (make-hash-table))
+             processed-program)
+        (dohash ((key val) block-initial-l2p)
+          (setf (gethash key in-comments)
+                (format nil "Entering rewiring: ~a" (rewiring-l2p val))))
+        (dohash ((key val) block-final-l2p)
+          (setf (gethash key out-comments)
+                (format nil "Exiting rewiring: ~a" (rewiring-l2p val))))
+        (setf processed-program (reconstitute-program cfg
+                                                      :in-comments in-comments
+                                                      :out-comments out-comments))
         ;; Keep global PRAGMAS in the code, at the top of the file.
         (setf (parsed-program-executable-code processed-program)
               (concatenate
