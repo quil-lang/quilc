@@ -482,14 +482,15 @@
 
 
    ;; swap-representation.lisp
-   #:canonical-swap-representative           ; FUNCTION
+   #:canonical-swap-representative      ; FUNCTION
 
    ;; benchmarking-procedures.lisp
    #:apply-clifford-string              ; FUNCTION
    #:rb-sequence                        ; FUNCTION
    #:serialize-clifford                 ; FUNCTION
    #:serialize-clifford-sequence        ; FUNCTION
-   #:clifford-element-string            ; FUNCTION   #:apply-clifford-string              ; FUNCTION
+   #:clifford-element-string            ; FUNCTION
+   #:apply-clifford-string              ; FUNCTION
    #:pauli-matrix-p                     ; FUNCTION
    #:n-qubit-pauli-basis-matrices       ; FUNCTION
    #:clifford-from-quil                 ; FUNCTION
