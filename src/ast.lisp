@@ -199,19 +199,35 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (:metaclass abstract-class)
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 
-(defclass static-gate-definition (gate-definition)
+(defgeneric gate-definition-qubits-needed (gate)
+  (:documentation "The number of qubits needed by GATE."))
+
+(defclass matrix-gate-definition (gate-definition)
+  ((entries :initarg :entries
+            :reader gate-definition-entries))
+  (:metaclass abstract-class)
+  (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
+
+(defmethod gate-definition-qubits-needed ((gate matrix-gate-definition))
+  (1- (integer-length (isqrt (length (gate-definition-entries gate))))))
+
+(defclass static-gate-definition (matrix-gate-definition)
   ()
   (:documentation "A gate definition that has no parameters."))
 
-(defclass permutation-gate-definition (gate-definition)
-  ()
-  (:documentation "A gate definition whose entries can be represented by a permutation matrix."))
-
-(defclass parameterized-gate-definition (gate-definition)
+(defclass parameterized-gate-definition (matrix-gate-definition)
   ((parameters :initarg :parameters
                :reader gate-definition-parameters
                :documentation "A list of symbol parameter names."))
   (:documentation "A gate definition that has named parameters."))
+
+(defclass permutation-gate-definition (gate-definition)
+  ((permutation :initarg :permutation
+                :reader permutation-gate-definition-permutation))
+  (:documentation "A gate definition whose entries can be represented by a permutation matrix."))
+
+(defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
+  (1- (integer-length (length (permutation-gate-definition-permutation gate)))))
 
 (defun permutation-entries-p (entries)
   (loop :with size := (isqrt (length entries))
@@ -225,16 +241,20 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (assert (every #'symbolp parameters))
-  (if (null parameters)
-      (make-instance (if (permutation-entries-p entries)
-                         'permutation-gate-definition
-                         'static-gate-definition)
-                     :name name
-                     :entries entries)
-      (make-instance 'parameterized-gate-definition
-                     :name name
-                     :parameters parameters
-                     :entries entries)))
+  (cond
+    (parameters
+     (make-instance 'parameterized-gate-definition
+                    :name name
+                    :parameters parameters
+                    :entries entries))
+    ((permutation-entries-p entries)
+     (make-instance 'permutation-gate-definition
+                    :name name
+                    :permutation (permutation-from-gate-entries entries)))
+    (t
+     (make-instance 'static-gate-definition
+                    :name name
+                    :entries entries))))
 
 (defclass circuit-definition ()
   ((name :initarg :name
@@ -1215,7 +1235,34 @@ For example,
             (mapcar (lambda (thing) (print-instruction thing nil))
                     (application-parameters instr))
             (mapcar (lambda (thing) (print-instruction thing nil))
-                    (application-arguments instr)))))
+                    (application-arguments instr))))
+
+  ;; The following are not actually instructions, but who cares.
+  (:method ((gate matrix-gate-definition) (stream stream))
+    (let ((gate-size (isqrt (length (gate-definition-entries gate)))))
+      (format stream "DEFGATE ~a~@[(~{%~a~^, ~})~]:~%"
+              (gate-definition-name gate)
+              (if (typep gate 'static-gate-definition)
+                  nil
+                  (gate-definition-parameters gate)))
+      (dotimes (i gate-size)
+        (format stream "    ~{~a~^, ~}~%"
+                (mapcar (lambda (z)
+                          (with-output-to-string (s)
+                            (etypecase z
+                              (number
+                               (format-complex z s))
+                              (list
+                               (print-instruction (make-delayed-expression nil nil z) s)))))
+                        (subseq (gate-definition-entries gate)
+                                (* i gate-size)
+                                (* (1+ i) gate-size)))))
+      (format stream "~%")))
+  (:method ((gate permutation-gate-definition) (stream stream))
+    (format stream "DEFGATE ~a AS PERMUTATION:~%"
+            (gate-definition-name gate))
+    (format stream "    ~{~a~^, ~}~%"
+            (permutation-gate-definition-permutation gate))))
 
 (defmethod print-object ((object instruction) stream)
   (print-unreadable-object (object stream :type nil :identity nil)
@@ -1272,25 +1319,8 @@ For example,
 
   ;; write out gates
   (dolist (gate-defn (parsed-program-gate-definitions parsed-program))
-    (let ((gate-size (isqrt (length (gate-definition-entries gate-defn)))))
-      (format s "DEFGATE ~a~@[(~{%~a~^, ~})~]:~%"
-              (gate-definition-name gate-defn)
-              (if (typep gate-defn 'static-gate-definition)
-                  nil
-                  (gate-definition-parameters gate-defn)))
-      (dotimes (i gate-size)
-        (format s "    ~{~a~^, ~}~%"
-                (mapcar (lambda (z)
-                          (with-output-to-string (s)
-                            (etypecase z
-                              (number
-                               (format-complex z s))
-                              (list
-                               (print-instruction (make-delayed-expression nil nil z) s)))))
-                        (subseq (gate-definition-entries gate-defn)
-                                (* i gate-size)
-                                (* (1+ i) gate-size)))))
-      (format s "~%")))
+    (print-instruction gate-defn s))
+
   (unless (endp (parsed-program-gate-definitions parsed-program))
     (format s "~%"))
   ;; write out circuits

@@ -47,9 +47,7 @@
                     (distinct-args (remove-duplicates args :test 'equalp))
                     (expected-qubits
                       (+ addl-qubits
-                         (ilog2
-                          (isqrt
-                           (length (gate-definition-entries found-gate-defn)))))))
+                         (gate-definition-qubits-needed found-gate-defn))))
                ;; Check that all arguments are distinct
                (assert-and-print-instruction (= (length args) (length distinct-args))
                                              ()

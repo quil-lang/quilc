@@ -99,13 +99,11 @@
   (and (complex= top-right 0)
        (complex= top-right bottom-left)))
 
-(defun power-of-two-p (n)
-  "Given an INTEGER N, return true if N is a power of 2, greater than 1."
-  (zerop (logand n (1- n))))
-
 (defun valid-pauli-dim (m n)
   "T if M and N are valid dimensions of a Pauli matrix, NIL otherwise."
-  (and (= m n) (>= m n 2) (power-of-two-p m) (power-of-two-p n)))
+  (and (= m n) (>= m n 2)
+       (cl-quil::power-of-two-p m)
+       (cl-quil::power-of-two-p n)))
 
 (defun concatenate-or-nil (a b)
   "If A and B are both not NIL, concatenate them and return a STRING."
