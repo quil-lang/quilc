@@ -475,18 +475,29 @@ Return the following values:
         (add-to-section end-jump)))
     code-section))
 
-(defun reconstitute-program (cfg)
-  "Reconstructs a Quil program given its control flow graph CFG"
+(defun reconstitute-program (cfg
+                             &key
+                               in-comments
+                               out-comments)
+  "Reconstructs a Quil program given its control flow graph CFG.  IN-COMMENTS and OUT-COMMENTS are hash tables mapping blocks in CFG to optional comment strings to be attached to the opening and closing of each reconstituted block."
   (let* ((blocks (cfg-blocks cfg))
-         (code-list '()))
+         (code-list '())
+         (in-comments (or in-comments (make-hash-table)))
+         (out-comments (or out-comments (make-hash-table))))
 
     ;; Loop though each basic-block
     (dolist (block blocks)
-      ;; If exit block, skip it. Otherwise, add the block to the program
-      (setq code-list
-            (if (eq block (entry-point cfg))
-                (concatenate 'vector (reconstitute-basic-block block cfg) code-list)
-                (concatenate 'vector code-list (reconstitute-basic-block block cfg)))))
+      (let ((reconstituted-code (reconstitute-basic-block block cfg)))
+        (alexandria:when-let ((in-comment (gethash block in-comments)))
+          (setf (slot-value (aref reconstituted-code 0) 'comment)
+                in-comment))
+        (alexandria:when-let ((out-comment (gethash block out-comments)))
+          (setf (slot-value (aref reconstituted-code (1- (length reconstituted-code))) 'comment)
+                out-comment))
+        (setq code-list
+              (if (eq block (entry-point cfg))
+                  (concatenate 'vector reconstituted-code code-list)
+                  (concatenate 'vector code-list reconstituted-code)))))
     
     (make-instance 'parsed-program
                    :gate-definitions '()
