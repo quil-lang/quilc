@@ -538,12 +538,12 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
 
 (defmethod gate-definition-to-gate ((gate-def permutation-gate-definition))
   (let* ((name (gate-definition-name gate-def))
-         (entries (gate-definition-entries gate-def))
-         (dim (isqrt (length entries))))
+         (entries (permutation-gate-definition-permutation gate-def))
+         (dim (length entries)))
     (make-instance 'permutation-gate
                    :name name
                    :dimension dim
-                   :permutation (permutation-from-gate-entries entries))))
+                   :permutation entries)))
 
 (defmethod gate-definition-to-gate ((gate-def parameterized-gate-definition))
   (flet ((lambda-form (params dimension entries)

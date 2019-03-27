@@ -42,9 +42,7 @@
                     (distinct-indices (remove-duplicates qubit-indices))
                     (expected-qubits
                       (+ addl-qubits
-                         (ilog2
-                          (isqrt
-                           (length (gate-definition-entries found-gate-defn)))))))
+                         (gate-definition-qubits-needed found-gate-defn))))
                ;; Check that all arguments are distinct
                (assert-and-print-instruction (= (length qubit-indices) (length distinct-indices))
                                              ()
