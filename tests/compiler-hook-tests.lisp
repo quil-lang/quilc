@@ -67,33 +67,34 @@ JUMP @a")))
       (quil::compiler-hook pp (quil::build-8Q-chip))
       (is t))))
 
+(defun compare-compiled (file architecture)
+  ;; note: we compress qubits twice. the first is a compression of
+  ;; logical qubits in the original, uncompiled program. for the
+  ;; compiled program, we also compress qubits when creating the
+  ;; logical matrix, since the compiler may use a larger range of
+  ;; physical qubits
+  (let* ((orig-prog (quil::transform 'quil::compress-qubits
+                                     (cl-quil::read-quil-file file)))
+         (proc-prog
+           (quil::compiler-hook (quil::transform 'quil::compress-qubits
+                                                 (cl-quil::read-quil-file file))
+                                (quil::build-nQ-linear-chip 5 :architecture architecture))))
+    (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
+                                  (quil::parsed-program-to-logical-matrix proc-prog :compress-qubits t)))))
+
 (deftest test-compiler-hook ()
   "Test whether the compiler hook preserves semantic equivalence for
 some test programs."
-  (labels ((compare-compiled (file architecture)
-             ;; note: we compress qubits twice. the first is a compression of
-             ;; logical qubits in the original, uncompiled program. for the
-             ;; compiled program, we also compress qubits when creating the
-             ;; logical matrix, since the compiler may use a larger range of
-             ;; physical qubits
-             (let* ((orig-prog (quil::transform 'quil::compress-qubits
-                                                (cl-quil::read-quil-file file)))
-                    (proc-prog
-                      (quil::compiler-hook (quil::transform 'quil::compress-qubits
-                                                            (cl-quil::read-quil-file file))
-                                           (quil::build-nQ-linear-chip 5 :architecture architecture))))
-               (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                             (quil::parsed-program-to-logical-matrix proc-prog :compress-qubits t))))))
-    (finish-output *debug-io*)
-    (dolist (state-prep '(nil t))
-      (let ((quil::*enable-state-prep-compression* state-prep))
-        (format *debug-io* "    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
-        (dolist (file (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))
-          (format *debug-io* "      Testing file ~a:" (pathname-name file))
-          (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
-            (format *debug-io* " ~a" architecture)
-            (compare-compiled file architecture))
-          (terpri *debug-io*))))))
+  (finish-output *debug-io*)
+  (dolist (state-prep '(nil t))
+    (let ((quil::*enable-state-prep-compression* state-prep))
+      (format *debug-io* "    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
+      (dolist (file (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))
+        (format *debug-io* "      Testing file ~a:" (pathname-name file))
+        (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
+          (format *debug-io* " ~a" architecture)
+          (compare-compiled file architecture))
+        (terpri *debug-io*)))))
 
 (deftest test-compression-bug-QUILC-152 ()
   "QUILC-152: A bug in state compression caused a failed assertion."
