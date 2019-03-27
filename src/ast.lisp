@@ -157,7 +157,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defclass jump-target ()
   ((label :initarg :label
-          :reader jump-target-label))
+          :reader jump-target-label)
+   (comment :initarg :comment
+            :reader jump-target-comment))
   (:documentation "A target which can be jumped to. Corresponds to the LABEL directive."))
 
 (declaim (inline jump-target-p))
@@ -231,7 +233,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 ;;; Instructions and their protocol.
 
 (defclass instruction ()
-  ()
+  ((comment :type string
+            :accessor instruction-comment
+            :initarg :comment))
   (:documentation "Abstract class representing an executable instruction.")
   (:metaclass abstract-class))
 
@@ -989,7 +993,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
   (:method (instr (stream null))
     (with-output-to-string (s)
       (print-instruction-generic instr s)))
-
+  
   ;; Atomic objects
   (:method ((thing qubit) (stream stream))
     (format stream "~D" (qubit-index thing)))
@@ -1243,6 +1247,25 @@ N.B., The fractions of pi will be printed up to a certain precision!")
    :memory-definitions nil
    :executable-code #()))
 
+(defun print-instruction-sequence (seq
+                                   &key
+                                     (stream *standard-output*)
+                                     (prefix ""))
+  (map nil (lambda (instr)
+             (cond
+               ((and (slot-exists-p instr 'comment)
+                     (slot-boundp instr 'comment))
+                (format stream "~a~a~40T# ~a~%"
+                        prefix
+                        (with-output-to-string (r)
+                          (print-instruction instr r))
+                        (slot-value instr 'comment)))
+               (t
+                (print prefix stream)
+                (print-instruction instr stream)
+                (terpri stream))))
+       seq))
+
 (defun print-parsed-program (parsed-program &optional (s *standard-output*))
   ;; write out memory definitions
   (dolist (memory-defn (parsed-program-memory-definitions parsed-program))
@@ -1256,7 +1279,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
       (alexandria:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
         (format s " OFFSET")
         (loop :for (type . count) :in x
-              :do (format s " ~a ~a" count (quil-type-string type)))))
+           :do (format s " ~a ~a" count (quil-type-string type)))))
     (format s "~%"))
   (unless (endp (parsed-program-memory-definitions parsed-program))
     (format s "~%"))
@@ -1295,15 +1318,12 @@ N.B., The fractions of pi will be printed up to a certain precision!")
       (format s "~{ ~a~}" (mapcar (lambda (thing) (print-instruction thing nil))
                                   (circuit-definition-arguments circuit-defn))))
     (format s ":~%")
-    (dolist (instr (circuit-definition-body circuit-defn))
-      (format s "    ~a~%"
-              (with-output-to-string (sprime)
-                (print-instruction instr sprime))))
+    (print-instruction-sequence (circuit-definition-body circuit-defn)
+                                :stream s
+                                :prefix "    ")
     (format s "~%"))
   (unless (endp (parsed-program-circuit-definitions parsed-program))
     (format s "~%"))
   ;; write out main block
-  (loop :for instr :across (parsed-program-executable-code parsed-program)
-        :do (progn
-              (print-instruction instr s)
-              (terpri s))))
+  (print-instruction-sequence (parsed-program-executable-code parsed-program)
+                              :stream s))
