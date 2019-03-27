@@ -1261,7 +1261,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                           (print-instruction instr r))
                         (slot-value instr 'comment)))
                (t
-                (print prefix stream)
+                (princ prefix stream)
                 (print-instruction instr stream)
                 (terpri stream))))
        seq))
