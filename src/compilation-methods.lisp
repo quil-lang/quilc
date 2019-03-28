@@ -141,8 +141,8 @@ Returns a value list: (processed-program, of type parsed-program
   
   ;; we disallow compilation of programs that use memory aliasing
   (loop :for mdesc :in (parsed-program-memory-definitions parsed-program)
-     :when (memory-descriptor-sharing-parent mdesc)
-     :do (error "Programs with aliased memory are currently unsupported."))
+        :when (memory-descriptor-sharing-parent mdesc)
+          :do (error "Programs with aliased memory are currently unsupported."))
   
   ;; check that the program obeys the dead qubit rule
   (when (eql ':naive rewiring-type)
@@ -180,10 +180,10 @@ Returns a value list: (processed-program, of type parsed-program
             (setf final-blk blk)))
         ;; segments its instructions into the MEASURES and the non-MEASURES
         (loop :for instr :across (basic-block-code final-blk)
-           :if (typep instr 'measure)
-           :do (push instr instrs-measures)
-           :else
-           :do (push instr instrs-rest))
+              :if (typep instr 'measure)
+                :do (push instr instrs-measures)
+              :else
+                :do (push instr instrs-rest))
         ;; store its non-MEASURE instructions back into the block
         (setf (basic-block-code final-blk) (coerce (nreverse instrs-rest) 'vector))
         ;; store its MEASURE instructions into the cordoned-off block

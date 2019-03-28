@@ -477,22 +477,20 @@ Return the following values:
 
 (defun reconstitute-program (cfg
                              &key
-                               in-comments
-                               out-comments)
+                               (in-comments (make-hash-table))
+                               (out-comments (make-hash-table)))
   "Reconstructs a Quil program given its control flow graph CFG.  IN-COMMENTS and OUT-COMMENTS are hash tables mapping blocks in CFG to optional comment strings to be attached to the opening and closing of each reconstituted block."
   (let* ((blocks (cfg-blocks cfg))
-         (code-list '())
-         (in-comments (or in-comments (make-hash-table)))
-         (out-comments (or out-comments (make-hash-table))))
+         (code-list '()))
 
     ;; Loop though each basic-block
     (dolist (block blocks)
       (let ((reconstituted-code (reconstitute-basic-block block cfg)))
         (alexandria:when-let ((in-comment (gethash block in-comments)))
-          (setf (slot-value (aref reconstituted-code 0) 'comment)
+          (setf (comment (aref reconstituted-code 0))
                 in-comment))
         (alexandria:when-let ((out-comment (gethash block out-comments)))
-          (setf (slot-value (aref reconstituted-code (1- (length reconstituted-code))) 'comment)
+          (setf (comment (aref reconstituted-code (1- (length reconstituted-code))))
                 out-comment))
         (setq code-list
               (if (eq block (entry-point cfg))
