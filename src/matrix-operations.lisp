@@ -121,7 +121,16 @@ as needed so that they are the same size."
     :for instr :across (parsed-program-executable-code pp)
     :do (typecase instr
           (gate-application
-           (setf mat (apply-gate mat instr)))
+           (setf mat (apply-gate mat instr pp))
+           (cond
+             ((and (comment instr)
+                   (uiop:string-prefix-p "Entering rewiring: "))
+              ;;
+              )
+             ((and (comment instr)
+                   (uiop:string-prefix-p "Exiting rewiring: "))
+              ;;
+              )))
           (pragma-expected-rewiring
            (let ((trimmed (trim-rewiring
                            (pragma-rewiring instr))))
