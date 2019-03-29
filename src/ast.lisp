@@ -159,7 +159,8 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ((label :initarg :label
           :reader jump-target-label)
    (comment :initarg :comment
-            :reader comment))
+            :initform nil
+            :accessor comment))
   (:documentation "A target which can be jumped to. Corresponds to the LABEL directive."))
 
 (declaim (inline jump-target-p))
@@ -235,7 +236,8 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defclass instruction ()
   ((comment :type string
             :accessor comment
-            :initarg :comment))
+            :initarg :comment
+            :initform nil))
   (:documentation "Abstract class representing an executable instruction.")
   (:metaclass abstract-class))
 

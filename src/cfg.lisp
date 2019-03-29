@@ -77,7 +77,15 @@
             :documentation "A LABEL that was originally used to reach this block of code, or NIL if not applicable.")
    (code :initarg :code
          :accessor basic-block-code
-         :documentation "A vector of instructions that this block contains."))
+         :documentation "A vector of instructions that this block contains.")
+   (in-rewiring :initarg :in-rewiring
+                :initform nil
+                :accessor basic-block-in-rewiring
+                :documentation "A REWIRING describing the assignment of qubits at block entry.")
+   (out-rewiring :initarg :out-rewiring
+                 :initform nil
+                 :accessor basic-block-out-rewiring
+                 :documentation "A REWIRING describing the assignment of qubits at block exit."))
   (:documentation "A basic block in a control flow graph.")
   (:default-initargs :name (gensym "BLK-")
                      :incoming nil
@@ -350,6 +358,10 @@ Return the following values:
   "Returns a new BASIC-BLOCK representing a merged BLK1 and BLK2, such that its incoming list is a copy of BLK1's incoming list, its outgoing edge is a copy of BLK2's outgoing edge, and its code is the concatentation of BLK1's code and BLK2's code. Any reference to BLK1 or BLK2 within this new block's edge or incoming list is replaced with a reference to itself."
   (assert (and (typep blk1 (type-of blk2))
                (typep blk2 (type-of blk1))))
+  (assert (or (not (basic-block-out-rewiring blk1))
+              (not (basic-block-in-rewiring blk2))
+              (equalp (basic-block-out-rewiring blk1)
+                      (basic-block-in-rewiring blk2))))
   (let ((new-blk (make-instance (type-of blk1)
                                 :code (concatenate 'vector (basic-block-code blk1)
                                                    (basic-block-code blk2))
@@ -358,6 +370,9 @@ Return the following values:
     (setf (incoming new-blk) (substitute new-blk blk2 (substitute new-blk blk1 (incoming blk1))))
     ;; If an outgoing edge includes a reference to itself, however, we need to update its name
     (setf (outgoing new-blk) (redirect-edge blk1 new-blk (redirect-edge blk2 new-blk (outgoing blk2))))
+    ;; set up the rewirings of the new block
+    (setf (basic-block-out-rewiring new-blk) (basic-block-out-rewiring blk2)
+          (basic-block-in-rewiring new-blk) (basic-block-in-rewiring blk1))
     new-blk))
 
 (defun empty-block-p (blk)
@@ -382,7 +397,17 @@ Return the following values:
                   (= 1 (length (children blk)))
                   (eq parent (first (children blk)))
                   (eq (type-of parent) (type-of blk))
-                  (empty-block-p blk))
+                  (empty-block-p blk)
+                  (or (not (basic-block-out-rewiring parent))
+                      (not (basic-block-in-rewiring blk))
+                      (equalp (basic-block-out-rewiring parent)
+                              (basic-block-in-rewiring blk)))
+                  (or (not (basic-block-out-rewiring parent))
+                      (not (basic-block-in-rewiring blk))
+                      (equalp (basic-block-out-rewiring parent)
+                              (basic-block-in-rewiring blk))))
+                 ;; update the rewiring data
+                 (setf (basic-block-in-rewiring parent) (basic-block-out-rewiring parent))
                  ;; Update the outgoing edge of the parent to point to itself, rather than this block
                  (setf (outgoing parent) (redirect-edge blk
                                                         parent
@@ -396,15 +421,16 @@ Return the following values:
 
                 ;; Condition 2) Paths can be contracted when a block has one parent, that parent has one outgoing edge, and neither are the exit or entry block. There is
                 ;; also the extra condition that and edge cannot be contracted if doing so would cause previously isolated code to be possibly run within a loop.
-                ((not (or
-                       (not (eq (type-of parent) (type-of blk)))
-                       (and
-                        (not (empty-block-p blk))
-                        (> (length (children parent)) 1))
-                       (and
-                        (not (empty-block-p parent))
-                        (find blk (incoming blk)))
-                       (/= 1 (length (children parent)))))
+                ((and (eq (type-of parent) (type-of blk))
+                      (or (empty-block-p blk)
+                          (not (> (length (children parent)) 1)))
+                      (or (empty-block-p parent)
+                          (not (find blk (incoming blk))))
+                      (= 1 (length (children parent)))
+                      (or (not (basic-block-out-rewiring parent))
+                          (not (basic-block-in-rewiring blk))
+                          (equalp (basic-block-out-rewiring parent)
+                                  (basic-block-in-rewiring parent))))
                  ;; The conditions are met to sequentially merge these blocks
                  (let ((new-blk (merge-sequentially parent blk)))
                    ;; After getting a merged block, update the CFG
@@ -473,12 +499,15 @@ Return the following values:
       ;; If a jump was never used, we better add one to the end
       (unless jump-used
         (add-to-section end-jump)))
+    (when (basic-block-in-rewiring blk)
+      (setf (comment (aref code-section 0))
+            (format nil "Entering rewiring: ~a" (rewiring-l2p (basic-block-in-rewiring blk)))))
+    (when (basic-block-out-rewiring blk)
+      (setf (comment (aref code-section (1- (length code-section))))
+            (format nil "Exiting rewiring: ~a" (rewiring-l2p (basic-block-out-rewiring blk)))))
     code-section))
 
-(defun reconstitute-program (cfg
-                             &key
-                               (in-comments (make-hash-table))
-                               (out-comments (make-hash-table)))
+(defun reconstitute-program (cfg)
   "Reconstructs a Quil program given its control flow graph CFG.  IN-COMMENTS and OUT-COMMENTS are hash tables mapping blocks in CFG to optional comment strings to be attached to the opening and closing of each reconstituted block."
   (let* ((blocks (cfg-blocks cfg))
          (code-list '()))
@@ -486,12 +515,6 @@ Return the following values:
     ;; Loop though each basic-block
     (dolist (block blocks)
       (let ((reconstituted-code (reconstitute-basic-block block cfg)))
-        (alexandria:when-let ((in-comment (gethash block in-comments)))
-          (setf (comment (aref reconstituted-code 0))
-                in-comment))
-        (alexandria:when-let ((out-comment (gethash block out-comments)))
-          (setf (comment (aref reconstituted-code (1- (length reconstituted-code))))
-                out-comment))
         (setq code-list
               (if (eq block (entry-point cfg))
                   (concatenate 'vector reconstituted-code code-list)

@@ -9,18 +9,27 @@
    ':cl-quil-tests
    "tests/compiler-hook-test-files/"))
 
+(defun attach-rewirings-to-program (pp in-rewiring-vector out-rewiring-vector)
+  (setf (quil::comment (aref (quil::parsed-program-executable-code pp) 0))
+        (with-output-to-string (s)
+          (format s "Entering rewiring: ~a" in-rewiring-vector)))
+  (setf (quil::comment (aref (quil::parsed-program-executable-code pp)
+                             (1- (length (quil::parsed-program-executable-code pp)))))
+        (with-output-to-string (s)
+          (format s "Exiting rewiring: ~a" out-rewiring-vector)))
+  pp)
+
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
 programs (modulo rewiring) to equivalent matrices."
   (let ((pp (quil::parse-quil-string "
 CNOT 1 2
 CNOT 1 0")) 
-        (pp-rewired (quil::parse-quil-string "
-PRAGMA EXPECTED_REWIRING \"#(2 0 1)\"
+        (pp-rewired (attach-rewirings-to-program (quil::parse-quil-string "
 CNOT 0 1
 CNOT 0 2
-PRAGMA CURRENT_REWIRING \"#(2 0 1)\"
-")))
+")
+                                                 #(2 0 1) #(2 0 1))))
     (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
                          (quil::parsed-program-to-logical-matrix pp-rewired)))))
 
@@ -29,11 +38,12 @@ PRAGMA CURRENT_REWIRING \"#(2 0 1)\"
 programs (modulo rewiring) to equivalent matrices."
   (let ((pp (quil::parse-quil-string "
 CNOT 0 1
+Z 0
 SWAP 0 1"))
-        (pp-rewired (quil::parse-quil-string "
-PRAGMA EXPECTED_REWIRING \"#(0 1)\"
+        (pp-rewired (attach-rewirings-to-program (quil::parse-quil-string "
 CNOT 0 1
-PRAGMA CURRENT_REWIRING \"#(1 0)\"")))
+Z 0")
+                                                 #(0 1) #(1 0))))
     (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
                          (quil::parsed-program-to-logical-matrix pp-rewired)))))
 
