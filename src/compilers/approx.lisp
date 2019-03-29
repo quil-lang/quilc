@@ -475,10 +475,10 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 (defvar *approximate-template-search-limit* 5000
   "Tolerance level for how many guesses an inexact template solver is allowed to make when it is unsure that an exact solution exists.")
 
-(defmacro define-approximate-template (name (coord q1 q0) (&rest requirements) pred &body body)
+(defmacro define-approximate-template (name (coord q1 q0) (&key requirements predicate) &body body)
   "This defines an two-qubit circuit template for use by the approximation algorithm. The template is stored both as a raw function under the name NAME as well as in a list of available templates, guarded by the value REQUIREMENTS of type OPTIMAL-2Q-TARGET.  BODY is a routine that returns a list of GATE-APPLICATION objects and is allowed to reference three arguments: the desired canonical coordinate COORD, the first desired qubit Q1, and the zeroth desired qubit Q0.
 
-Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is NIL, the template errors with GIVE-UP-COMPILATION and does not evaluate BODY; this mechanism is used to avoid the emission of approximate templates when they aren't wanted.  If a template author cannot provide a meaningful predicate, they must manually install a guard against such unwanted emissions."
+Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is NIL, the template errors with GIVE-UP-COMPILATION and does not evaluate BODY; this mechanism is used to avoid the emission of approximate templates when they aren't wanted.  If a template author cannot provide a meaningful predicate, they must manually install a guard against such unwanted emissions."
   (check-type name symbol)
   (check-type coord symbol)
   (check-type q1 symbol)
@@ -491,7 +491,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
          ,@(when docstring (list docstring))
          ,@decls
          (unless (or *enable-approximate-compilation*
-                     ,pred)
+                     ,predicate)
            (give-up-compilation))
          ,@body-prog)
        (let ((old-record (find ',name **approximate-template-records**
@@ -500,7 +500,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
                           :name ',name
                           :predicate (lambda (,coord ,q1 ,q0)
                                        (declare (ignorable ,coord ,q1 ,q0))
-                                       ,pred)
+                                       ,predicate)
                           :requirements ',requirements)))
          (cond
            (old-record
@@ -510,14 +510,14 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
             (push new-record **approximate-template-records**)))
          ',name))))
 
-(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) reqs pred parameter-count &body parametric-circuit)
+(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate requirements parameter-count) &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-APPROXIMATE-TEMPLATE, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
   (multiple-value-bind (body-prog decls docstring)
       (alexandria:parse-body parametric-circuit :documentation t)
     (alexandria:with-gensyms (a d b in goodness template-values)
       `(define-approximate-template ,name (,coord ,q1 ,q0)
-           ,reqs
-           ,pred
+           (:requirements ,requirements
+            :predicate ,predicate)
          ,@(when docstring (list docstring))
          ,@decls
          (labels
@@ -539,7 +539,7 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
                   (cond
                     ;; if we promised an exact solution but haven't found it yet,
                     ;; try again.
-                    ((and ,pred (not (double= 0d0 ,goodness)))
+                    ((and ,predicate (not (double= 0d0 ,goodness)))
                      (run-optimizer))
                     ;; if we are unsure about the existence of an exact solution, we
                     ;; haven't found one yet, but the user is demanding one, give up.
@@ -554,44 +554,44 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
 
 
 (define-approximate-template nearest-circuit-of-depth-0 (coord q1 q0)
-    ()
-    (every #'double= coord (list 0d0 0d0 0d0))
+    (:requirements ()
+     :predicate (every #'double= coord (list 0d0 0d0 0d0)))
   (list (build-gate "I" () q0)
         (build-gate "I" () q1)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-1 (coord q1 q0)
-    (:iswap)
-    (every #'double= coord (list (/ pi 2) (/ pi 2) 0))
+    (:requirements (:iswap)
+     :predicate (every #'double= coord (list (/ pi 2) (/ pi 2) 0)))
   (list (build-gate "ISWAP" '() q1 q0)))
 
 (define-approximate-template nearest-XY-circuit-of-depth-1 (coord q1 q0)
-    (:piswap)
-    (and (double= (first coord) (second coord))
-         (double= (third coord) 0d0))
+    (:requirements (:piswap)
+     :predicate (and (double= (first coord) (second coord))
+                     (double= (third coord) 0d0)))
   (list (build-gate "PISWAP" (list (* 2 (first coord))) q1 q0)))
 
 (define-approximate-template nearest-CZ-circuit-of-depth-1 (coord q1 q0)
-    (:cz)
-    (every #'double= coord (list (/ pi 2) 0d0 0d0))
+    (:requirements (:cz)
+     :predicate (every #'double= coord (list (/ pi 2) 0d0 0d0)))
   (list (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
-    (:cphase)
-    (every #'double= (rest coord) (list 0d0 0d0))
+    (:requirements (:cphase)
+     :predicate (every #'double= (rest coord) (list 0d0 0d0)))
   (list (build-gate "CPHASE" (list (* 2 (first coord))) q1 q0)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    (:iswap)
-    (double= 0d0 (third coord))
+    (:requirements (:iswap)
+     :predicate (double= 0d0 (third coord)))
   (list (build-gate "ISWAP" '()          q1 q0)
         (build-gate "RY"    (list (first coord)) q1)
         (build-gate "RY"    (list (second coord)) q0)
         (build-gate "ISWAP" '()          q1 q0)))
 
 (define-searching-approximate-template nearest-XY-XY-template-of-depth-2 (coord q1 q0 array)
-    (:piswap)
-    nil                     ; TODO: replace this with a convexity test
-    6
+    (:requirements (:piswap)
+     :predicate nil                     ; TODO: replace this with a convexity test
+     :parameter-count 6)
   (list
    (build-gate "PISWAP" (list (aref array 4))     q1 q0)
    (build-gate "RZ"     (list (aref array 5))     q0)
@@ -603,16 +603,16 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
 (define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    (:cz :iswap)
-    (double= (/ pi 2) (first coord))
+    (:requirements (:cz :iswap)
+     :predicate (double= (/ pi 2) (first coord)))
   (list (build-gate "ISWAP" () q1 q0)
         (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
         (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
         (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-ISWAP-circuit-of-depth-3 (coord q1 q0)
-    (:iswap)
-    t
+    (:requirements (:iswap)
+     :predicate t)
   (flet ((twist-to-real (m)
            ;; this magical formula was furnished to us by asking a CAS to compute
            ;; the trace of M' for a symbolic M and SIGMA, then solving
@@ -653,9 +653,9 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
                   a d b q1 q0)))))))
 
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
-    (:cphase :iswap)
-    nil                     ; TODO: replace this with a convexity test
-    3
+    (:requirements (:cphase :iswap)
+     :predicate nil ; TODO: replace this with a convexity test
+     :parameter-count 3)
   (list
    (build-gate "ISWAP"  ()                    q0 q1)
    (build-gate "RY"     (list (aref array 0)) q0)
@@ -663,9 +663,9 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
    (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
 
 (define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
-    (:cz :piswap)
-    nil                     ; TODO: replace this with a convexity test
-    4
+    (:requirements (:cz :piswap)
+     :predicate nil   ; TODO: replace this with a convexity test
+     :parameter-count 4)
   (list
    (build-gate "CZ"     ()                        q1 q0)
    (build-gate "RY"     (list (aref array 0))     q0)
@@ -675,9 +675,9 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
 (define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
-    (:cphase :piswap)
-    nil                     ; TODO: replace this with a convexity test
-    5
+    (:requirements (:cphase :piswap)
+     :predicate nil                     ; TODO: replace this with a convexity test
+     :parameter-count 5)
   (list
    (build-gate "CPHASE" (list (aref array 4))     q1 q0)
    (build-gate "RY"     (list (aref array 0))     q0)
@@ -687,16 +687,16 @@ Additionally, if PRED evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
 (define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
-    (:cz)
-    (double= 0d0 (third coord))
+    (:requirements (:cz)
+     :predicate (double= 0d0 (third coord)))    
   (list (build-gate "CZ" () q1 q0)
         (build-gate "RY" (list (first coord)) q1)
         (build-gate "RY" (list (second coord)) q0)
         (build-gate "CZ" () q1 q0)))
 
 (define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
-    (:cz)
-    t
+    (:requirements (:cz)
+     :predicate t)
   (let ((alpha (- (first coord) pi))
         (beta  (- pi            (second coord)))
         (gamma (- (/ pi 2)      (third coord))))
