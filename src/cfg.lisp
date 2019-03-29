@@ -430,7 +430,9 @@ Return the following values:
                       (or (not (basic-block-out-rewiring parent))
                           (not (basic-block-in-rewiring blk))
                           (equalp (basic-block-out-rewiring parent)
-                                  (basic-block-in-rewiring parent))))
+                                  (basic-block-in-rewiring blk))))
+                 
+                 
                  ;; The conditions are met to sequentially merge these blocks
                  (let ((new-blk (merge-sequentially parent blk)))
                    ;; After getting a merged block, update the CFG
