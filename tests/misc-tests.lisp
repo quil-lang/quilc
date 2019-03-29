@@ -79,8 +79,7 @@
          (parsed-prog (quil::parse-quil program-string)))
     (setf parsed-prog (quil::transform 'quil::resolve-applications parsed-prog))
     (is (quil::matrix-equality (magicl:make-identity-matrix (expt 2 qubit-count))
-                               (quil::make-matrix-from-quil (coerce (parsed-program-executable-code parsed-prog) 'list)
-                                                            parsed-prog)))))
+                               (quil::make-matrix-from-quil (coerce (parsed-program-executable-code parsed-prog) 'list))))))
 
 (defclass transformable-thing (quil::transformable)
   ((data

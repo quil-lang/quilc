@@ -326,7 +326,7 @@ other's."
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
-(defun expand-to-native-instructions (instrs chip-specification &optional environs output-string)
+(defun expand-to-native-instructions (instrs chip-specification &optional output-string)
   "Repeatedly applies nativization routines to expand a list of addressed instructions into a list of addressed, native instructions. Makes no attempt to perform any kind of rewiring or any kind of simplification."
   ;; dispatch on the top instruction type
   (cond
@@ -337,13 +337,11 @@ other's."
     ((typep (first instrs) 'no-operation)
      (expand-to-native-instructions (rest instrs)
                                     chip-specification
-                                    environs
                                     output-string))
     ;; pass any classical instructions through
     ((not (typep (first instrs) 'application))
      (expand-to-native-instructions (rest instrs)
                                     chip-specification
-                                    environs
                                     (cons (first instrs) output-string)))
     ;; otherwise, we have a quantum instruction
     (t
@@ -357,7 +355,6 @@ other's."
          (return-from expand-to-native-instructions
            (expand-to-native-instructions (rest instrs)
                                           chip-specification
-                                          environs
                                           (cons (first instrs) output-string))))
        ;; otherwise, we are nonnative. translate us.
        (let ((translation-results (apply-translation-compilers (first instrs)
@@ -368,10 +365,11 @@ other's."
          (cond
            (translation-results
             (when (and *compress-carefully*
+                       (not *enable-approximate-compilation*)
                        (notany (lambda (instr) (typep instr 'state-prep-application))
                                instrs))
-              (let ((ref-mat (make-matrix-from-quil (list (first instrs)) environs))
-                    (mat (make-matrix-from-quil translation-results environs)))
+              (let ((ref-mat (make-matrix-from-quil (list (first instrs))))
+                    (mat (make-matrix-from-quil translation-results)))
                 (setf mat (kron-matrix-up mat (1- (integer-length (magicl:matrix-rows ref-mat)))))
                 (assert
                  (matrix-equality
@@ -380,7 +378,6 @@ other's."
             (expand-to-native-instructions (append translation-results
                                                    (rest instrs))
                                            chip-specification
-                                           environs
                                            output-string))
            (t
             (error "Failed to expand ~a into native instructions."
@@ -455,18 +452,24 @@ other's."
     (labels
         ((check-quil-agrees-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
-             (let* ((decompiled-matrix (make-matrix-from-quil decompiled-instructions))
-                    (reduced-matrix (kron-matrix-up (make-matrix-from-quil reduced-instructions)
-                                                    (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
-                    (reduced-decompiled-matrix (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
-                                                               (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+             (let* ((decompiled-matrix
+                     (make-matrix-from-quil decompiled-instructions))
+                    (reduced-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                    (reduced-decompiled-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
                (assert (matrix-equality stretched-matrix
-                                        (scale-out-matrix-phases reduced-matrix stretched-matrix)))
+                                        (scale-out-matrix-phases reduced-matrix
+                                                                 stretched-matrix)))
                (when decompiled-instructions
                  (assert (matrix-equality stretched-matrix
-                                          (scale-out-matrix-phases decompiled-matrix stretched-matrix)))
+                                          (scale-out-matrix-phases decompiled-matrix
+                                                                   stretched-matrix)))
                  (assert (matrix-equality stretched-matrix
-                                          (scale-out-matrix-phases reduced-decompiled-matrix stretched-matrix)))))))
+                                          (scale-out-matrix-phases reduced-decompiled-matrix
+                                                                   stretched-matrix)))))))
          
          (check-quil-agrees-as-states (start-wf final-wf wf-qc)
            (let* ((final-wf-reduced-instrs (nondestructively-apply-instrs-to-wf
@@ -474,18 +477,18 @@ other's."
                                             start-wf
                                             wf-qc))
                   (final-wf-reduced-instrs-collinearp
-                    (or (and (eql final-wf ':not-simulated)
-                             (eql final-wf-reduced-instrs ':not-simulated))
-                        (collinearp final-wf final-wf-reduced-instrs)))
+                   (or (and (eql final-wf ':not-simulated)
+                            (eql final-wf-reduced-instrs ':not-simulated))
+                       (collinearp final-wf final-wf-reduced-instrs)))
                   (final-wf-reduced-prep (nondestructively-apply-instrs-to-wf
                                           reduced-decompiled-instructions
                                           start-wf
                                           wf-qc))
                   (final-wf-reduced-prep-collinearp
-                    (or (null decompiled-instructions)
-                        (and (eql final-wf ':not-simulated)
-                             (eql final-wf-reduced-prep ':not-simulated))
-                        (collinearp final-wf final-wf-reduced-prep))))
+                   (or (null decompiled-instructions)
+                       (and (eql final-wf ':not-simulated)
+                            (eql final-wf-reduced-prep ':not-simulated))
+                       (collinearp final-wf final-wf-reduced-prep))))
              (assert final-wf-reduced-instrs-collinearp
                      ()
                      "During careful checking of instruction compression, the produced ~
@@ -495,7 +498,38 @@ other's."
                      ()
                      "During careful checking of instruction compression, the produced ~
                    wavefunction by state prep reduction was detected to not be ~
-                   collinear with the target wavefunction."))))
+                   collinear with the target wavefunction.")))
+         
+         (check-quil-is-near-as-matrices ()
+           (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
+             (let* ((n (1- (integer-length (magicl:matrix-rows stretched-matrix))))
+                    (reduced-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                    (reduced-decompiled-matrix
+                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
+                                     (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+               (assert (matrix-equality stretched-matrix
+                                        (scale-out-matrix-phases reduced-matrix stretched-matrix)))
+               (when decompiled-instructions
+                 (let* ((prod (magicl:multiply-complex-matrices
+                               reduced-matrix (magicl:dagger reduced-decompiled-matrix)))
+                        (tr (matrix-trace prod))
+                        (trace-fidelity (/ (+ n (abs (* tr tr)))
+                                           (+ n (* n n))))
+                        (ls-reduced (make-lscheduler))
+                        (ls-reduced-decompiled (make-lscheduler))
+                        (chip-spec (compressor-context-chip-specification context)))
+                   (append-instructions-to-lschedule ls-reduced reduced-instructions)
+                   (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
+                   (assert (>= (* trace-fidelity
+                                  (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
+                               (lscheduler-calculate-fidelity ls-reduced chip-spec))
+                           ()
+                           "During careful checking of instruction compression, ~
+                            the recomputed instruction sequence has an ~
+                            unreasonably large a fidelity drop from the original ~
+                            sequence.")))))))
       
       (destructuring-bind (start-wf wf-qc)
           (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
@@ -506,8 +540,13 @@ other's."
                                                                wf-qc)))
             (return-from check-contextual-compression-was-well-behaved
               (check-quil-agrees-as-states start-wf final-wf wf-qc))))
-        ;; otherwise, we're obligated to do full unitary compilation.
-        (check-quil-agrees-as-matrices)))))
+        ;; otherwise, we're obligated to check the full unitary.
+        ;; we need only make a decision about whether we're allowing approximate methods.
+        (cond
+          (*enable-approximate-compilation*
+           (check-quil-is-near-as-matrices))
+          (t
+           (check-quil-agrees-as-matrices)))))))
 
 
 (defun compress-instructions-in-context (instructions chip-specification context)
@@ -672,7 +711,8 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
          (governors (make-list (length (chip-specification-objects chip-specification))))
          (global-governor (make-instance 'governed-queue))
          (context (set-up-compressor-context :qubit-count n-qubits
-                                             :simulate (and *enable-state-prep-compression* protoquil))))
+                                             :simulate (and *enable-state-prep-compression* protoquil)
+                                             :chip-specification chip-specification)))
     (labels (;; these are some routines that govern the behavior of the massive FSM
              ;; we're constructing.
              ;;

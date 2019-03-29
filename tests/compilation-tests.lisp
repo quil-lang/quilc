@@ -27,7 +27,8 @@
   (let* ((m (magicl:multiply-complex-matrices
              (cl-quil::su2-on-line 0 (quil::random-special-unitary 2))
              (cl-quil::su2-on-line 1 (quil::random-special-unitary 2))))
-         (compiled-list (cl-quil::optimal-2q-compiler (build-anonymous-gate m 1 0)))
+         (compiled-list (funcall (cl-quil::approximate-2q-compiler-for ':cz (build-8Q-chip))
+                                 (build-anonymous-gate m 1 0)))
          (u (quil::make-matrix-from-quil compiled-list)))
     (fiasco-assert-matrices-are-equal m u)))
 
@@ -42,7 +43,8 @@
                    (random-rotation "RZ" 1)
                    (random-rotation "RY" 1)
                    (random-rotation "RZ" 1))))
-    (let ((template-list '(("I")
+    (let ((*print-circle* nil)
+          (template-list '(("I")
                            ("CZ")
                            ("CZ" "CZ")
                            ("CZ" "CZ" "CZ")
@@ -84,8 +86,8 @@
                       ((string= operator "PISWAP") ':piswap))
                     target-type)))
           (let* ((ref-mat (cl-quil::make-matrix-from-quil random-quil))
-                 (processed-quil (cl-quil::optimal-2q-compiler (build-anonymous-gate ref-mat 1 0)
-                                                               :target target-type))
+                 (processed-quil (funcall (cl-quil::approximate-2q-compiler-for target-type (build-8Q-chip))
+                                          (build-anonymous-gate ref-mat 1 0)))
                  (mat (cl-quil::make-matrix-from-quil processed-quil))
                  (big-gates (mapcar (alexandria:compose
                                      #'quil::operator-description-name

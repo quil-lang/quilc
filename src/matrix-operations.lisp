@@ -9,7 +9,7 @@
 (in-package #:cl-quil)
 
 
-(defconstant +double-comparison-threshold-loose+ 1d-5)
+(defconstant +double-comparison-threshold-loose+  1d-5)
 (defconstant +double-comparison-threshold-strict+ 5d-11)
 (defun double~ (x y)
   "Loose equality of complex double floats, using the absolute threshold stored in +DOUBLE-COMPARISON-THRESHOLD-LOOSE+.  Use this comparison operator when testing for output correctness."
@@ -19,6 +19,12 @@
   "Stringent equality of complex double floats, using the absolute threshold stored in +DOUBLE-COMPARISON-THRESHOLD-STRICT+.  Use this comparison operator when testing for substitution viability."
   (let ((diff (abs (- x y))))
     (< diff +double-comparison-threshold-strict+)))
+
+(defun double>= (&rest args)
+  (loop :for (x y) :on args
+        :while y
+        :always (>= (+ x +double-comparison-threshold-strict+)
+                    (- y +double-comparison-threshold-strict+))))
 
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
@@ -115,7 +121,7 @@ as needed so that they are the same size."
     :for instr :across (parsed-program-executable-code pp)
     :do (typecase instr
           (gate-application
-           (setf mat (apply-gate mat instr pp)))
+           (setf mat (apply-gate mat instr)))
           (pragma-expected-rewiring
            (let ((trimmed (trim-rewiring
                            (pragma-rewiring instr))))
@@ -204,6 +210,10 @@ as needed so that they are the same size."
                           n
                           (alexandria:iota m :start (1- m) :step -1)))))
 
+(defun matrix-trace (m)
+  (assert (= (magicl:matrix-rows m) (magicl:matrix-cols m)))
+  (loop :for j :below (magicl:matrix-rows m) :sum (magicl:ref m j j)))
+
 ;; also, some routines for manipulating *vectors*, here expressed as Lisp lists
 (defun dot-product (u v)
   (loop
@@ -238,28 +248,32 @@ as needed so that they are the same size."
     ret))
 
 (defun collinearp (vect1 vect2)
-  "Tests whether two vectors of complex doubles are collinear."
-  (let ((peak-abs 0.0d0)
-        scalar)
-    (loop :for r :across vect1
-          :for s :across vect2
-          :do (cond
-                ((and (or (not (double= 0.0d0 r))
-                          (not (double= 0.0d0 s)))
-                      (or (double= 0.0d0 s)
-                          (not (double= 1.0d0 (abs (/ r s))))))
-                 (return-from collinearp nil))
-                ((and (not (double= 0.0d0 (abs r)))
-                      (> (abs r) peak-abs))
-                 (setf peak-abs (abs r))
-                 (setf scalar (/ r s)))))
-    ;; rather than computing the full norm, this could be replaced by the
-    ;; component-wise calculation (loop ... :always (double= 0d0 (expt ...)))
-    ;; which has the potential to terminate early on a negative result
-    (double= 0d0
-             (sqrt (loop :for r :across vect1
-                         :for s :across vect2
-                         :sum (expt (abs (- r (* scalar s))) 2))))))
+  "Tests whether two (complex double) vectors of unit norm are collinear."
+  (flet ((dot-product (v1 v2 &optional (scalar 1d0))
+           (loop :for r :across v1
+                 :for s :across v2
+                 :sum (* (conjugate r) s scalar))))
+    (assert (double= 1d0 (sqrt (dot-product vect1 vect1))))
+    (assert (double= 1d0 (sqrt (dot-product vect2 vect2))))
+    (let ((peak-abs 1.0d0)
+          scalar)
+      (loop :for r :across vect1
+            :for s :across vect2
+            :do (cond
+                  ((or (and (double= 0d0 r)
+                            (not (double= 0d0 s)))
+                       (and (not (double= 0d0 r))
+                            (double= 0d0 s)))
+                   (return-from collinearp nil))
+                  ((and (not (double= 0.0d0 (abs r)))
+                        (< (abs (- 1 (abs r))) peak-abs))
+                   (setf peak-abs (abs (- 1 (abs r))))
+                   (setf scalar (/ r s)))))
+      ;; rather than computing the full norm, this could be replaced by the
+      ;; component-wise calculation (loop ... :always (double= 0d0 (expt ...)))
+      ;; which has the potential to terminate early on a negative result
+      (let ((norm (sqrt (dot-product vect1 vect2 scalar))))
+        (double= 1d0 norm)))))
 
 
 ;; also just some general math routines

@@ -64,10 +64,11 @@
                              (:file "cs-compile")
                              (:file "euler-compile")
                              (:file "qs-compile")
-                             (:file "optimal-2q")
                              (:file "ucr-recognize")
+                             (:file "approx")
                              (:file "state-prep")
-                             (:file "translators")))
+                             (:file "translators")
+                             (:file "optimal-2q")))
                (:module "analysis"
                 :serial t
                 :components ((:file "process-includes")

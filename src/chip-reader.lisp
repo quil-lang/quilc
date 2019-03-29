@@ -164,7 +164,8 @@
               (let ((link (build-link q0 q1
                                       (if (gethash "type" link-hash)
                                           (target-parser (gethash "type" link-hash))
-                                          (list ':CZ))))
+                                          (list ':CZ))
+                                      chip-spec))
                     (link-index (length (vnth 1 (chip-specification-objects chip-spec)))))
                 ;; notify the qubits that they're attached to this link
                 (dolist (qubit-index (list q0 q1))

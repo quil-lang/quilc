@@ -1,217 +1,25 @@
 ;;;; optimal-2q.lisp
 ;;;;
 ;;;; Author: Eric Peterson
+;;;;
+;;;; This file contains attic routines of how we used to do optimal compilation
+;;;; of two-qubit programs, targeting various gate sets.  This logic has been
+;;;; completely subsumed by src/compilers/approx.lisp , and the non-historian
+;;;; user is advised to look there instead for how we do this in the modern age.
 
 (in-package #:cl-quil)
+
+;;;; REMEMBER: THIS FILE IS NO LONGER MAINTAINED!
+;;;;           PERUSE AT YOUR OWN RISK.
+;;;;           PROBABLY DON'T MODIFY.
+
 
 (define-global-counter **optimal-2q-twist-counter** generate-optimal-2q-twist-tag)
 
 (defconstant +makhlin-distance-to-operator-distance-postfactor+ 4
   "In the invocations of Nelder-Mead in the routine OPTIMAL-2Q-COMPILE below, GOODNESS is a measure of the L^2-distance between the vectors of Makhlin invariants of the input 2Q operator and the output of the Nelder-Mead finder for the circuit template.  This is a measure of distance between the two double-cosets, which is not an exact reflection of the L^2-distance between the two operators.  In fact, it's not possible to measure that distance until the rest of the routine has completed, which picks out a particular representative element of the coset carved out by the chosen template.  Nonetheless, we have to make a decision earlier as to whether a given template is appropriate.
-
 NOTE: I believe that even though both objects (the double-coset space and the space of projective unitaries) are compact, it actually does not suffice to scale up the distance by a constant factor (for some small fraction of gates): the Makhlin map has a degenerate derivative at the edge of the figure, so that 1/det D goes to infinity.  Bump this value up if the tests ever start failing.  A more long-lasting solution might be to work with alcove coordinates instead of Makhlin coordinates, which do not suffer from this degeneracy.")
 
-
-;; optimal-2Q-compile returns the smallest string of 2Q gates that it can, but
-;; what this means depends upon what gateset is available. the TARGET argument
-;; is either an OPTIMAL-2Q-TARGET-ATOM or a(n unsorted) sequence of such atoms,
-;; indicating which 2Q gates are available for use.
-(deftype optimal-2q-target-atom ()
-  '(member :cz :iswap :piswap :cphase :cnot))
-
-(defun sequence-of-optimal-2q-target-atoms-p (seq)
-  (and (typep seq 'sequence)
-       (every (lambda (a) (typep a 'optimal-2q-target-atom))
-              seq)))
-
-(deftype optimal-2q-target ()
-  "A valid TARGET value for OPTIMAL-2Q-COMPILE."
-  '(or optimal-2q-target-atom
-    (and sequence
-     (satisfies sequence-of-optimal-2q-target-atoms-p))))
-
-(defun optimal-2q-target-meets-requirements (target requirements)
-  (let ((targetl       (alexandria:ensure-list target))
-        (requirementsl (alexandria:ensure-list requirements)))
-    (when (member ':cphase targetl) (push ':cz targetl))
-    (when (member ':piswap targetl) (push ':iswap targetl))
-    (when (member ':cnot targetl) (push ':cz targetl))
-    (subsetp requirementsl targetl)))
-
-(defun convert-su4-to-su2x2 (m)
-  "Assuming m is in the subgroup SU(2) x SU(2) of SU(4), this computes the parent matrices."
-  (check-type m magicl:matrix)
-  ;; we assume that we're looking at a matrix of the form
-  ;; [ a00 b00, a00 b01, a01 b00, a01 b01;
-  ;;   a00 b10, a00 b11, a01 b10, a01 b11;
-  ;;   a10 b00, a10 b01, a11 b00, a11 b01;
-  ;;   a10 b10, a10 b11, a11 b10, a11 b11 ] .
-  ;; the goal is to extract the values aij and bij.
-  (let* (;; there are four cases in all, depending on which of the entries in
-         ;; the first column are nonzero. (because the entire matrix is unitary,
-         ;; we know that *at least one* entry is nonzero.)
-         (state (alexandria:extremum (alexandria:iota 4) #'>
-                                     :key (lambda (i) (abs (magicl:ref m 0 i)))))
-         ;; b can be taken to be either the UL block or the LL block, up to
-         ;; rescaling, by assigning the first nonzero value in the first column
-         ;; as belonging to a
-         (b
-           (magicl:scale (/ 1 (magicl:ref m 0 state))
-                         (cond
-                           ((or (= state 0) (= state 1))
-                            (magicl:make-complex-matrix 2 2
-                                                        (list (magicl:ref m 0 0) (magicl:ref m 1 0)
-                                                              (magicl:ref m 0 1) (magicl:ref m 1 1))))
-                           ((or (= state 2) (= state 3))
-                            (magicl:make-complex-matrix 2 2
-                                                        (list (magicl:ref m 2 0) (magicl:ref m 3 0)
-                                                              (magicl:ref m 2 1) (magicl:ref m 3 1)))))))
-         ;; the division in the above turned one of the entries of b into 1, so
-         ;; we can use that to read a off from all the entries of m where that b
-         ;; occurs
-         (a
-           (cond ((or (= state 0) (= state 2))
-                  (magicl:make-complex-matrix 2 2
-                                              (list (magicl:ref m 0 0) (magicl:ref m 2 0)
-                                                    (magicl:ref m 0 2) (magicl:ref m 2 2))))
-                 ((or (= state 1) (= state 3))
-                  (magicl:make-complex-matrix 2 2
-                                              (list (magicl:ref m 1 0) (magicl:ref m 3 0)
-                                                    (magicl:ref m 1 2) (magicl:ref m 3 2)))))))
-    ;; these are the "right" matrices, but they probably aren't special unitary.
-    ;; rescale them to fix this, then hand them back.
-    (values
-     (magicl:scale (/ (sqrt (magicl:det a))) a)
-     (magicl:scale (/ (sqrt (magicl:det b))) b))))
-
-;; these are special matrices that conjugate SU(2) x SU(2) onto SO(4).
-;;
-;; REM: if/when the above matrices get moved to somewhere central, *these*
-;; matrices should not be moved with them. no one cares about them except us.
-;; REM: according to /0308033, their only special property is:
-;;     e e^T = -(sigma_y (x) sigma_y) .
-;; there are several such matrices; this one is just easy to write down.
-(alexandria:define-constant
-    +e-basis+
-    (let* ((sqrt2 (/ (sqrt 2) 2))
-           (-sqrt2 (- sqrt2))
-           (isqrt2 (complex 0 sqrt2))
-           (-isqrt2 (complex 0 -sqrt2)))
-      (make-row-major-matrix 4 4
-                             (list sqrt2  isqrt2  0       0
-                                   0      0       isqrt2  sqrt2
-                                   0      0       isqrt2 -sqrt2
-                                   sqrt2 -isqrt2  0       0)))
-  :test #'matrix-equality
-  :documentation "This is an element of SU(4) that has the property e-basis e-basis^T = - sigma_y^((x) 2).")
-(alexandria:define-constant
-    +edag-basis+
-    (let* ((sqrt2 (/ (sqrt 2) 2))
-           (-sqrt2 (- sqrt2))
-           (isqrt2 (complex 0 sqrt2))
-           (-isqrt2 (complex 0 -sqrt2)))
-      (make-row-major-matrix 4 4
-                             (list sqrt2   0       0      sqrt2
-                                  -isqrt2  0       0      isqrt2
-                                   0      -isqrt2 -isqrt2 0
-                                   0       sqrt2  -sqrt2  0)))
-  :test #'matrix-equality
-  :documentation "This precomputes the Hermitian transpose of +E-BASIS+.")
-
-;; REM: this is a utility routine that supports diagonalizer-in-e-basis.
-;; it seems that when an eigenspace of a complex operator is one-dimensional and
-;; it admits a real generator, MAGICL will pick it automatically. (this is
-;; because forcing any nonzero entry of the vector to be real forces the rest to
-;; be too.) if the eigenspace is pluridimensional, the guarantee goes out the
-;; window :( because we expect/require the matrix of eigenvectors to be
-;; special-orthogonal, we have to correct this behavior manually.
-(defun find-real-spanning-set (vectors)
-  "VECTORS is a list of complex vectors in C^n (which, here, are of type LIST).  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
-  (assert (alexandria:proper-list-p vectors))
-  (let* ((coeff-matrix (magicl:make-complex-matrix
-                        (length (first vectors))
-                        (* 2 (length vectors))
-                        (nconc
-                         (loop :for v :in vectors :nconc (mapcar #'imagpart v))
-                         (loop :for v :in vectors :nconc (mapcar #'realpart v)))))
-         (reassemble-matrix (magicl:make-complex-matrix
-                             (length vectors)
-                             (* 2 (length vectors))
-                             (nconc
-                              (loop :for i :from 1 :to (length vectors)
-                                    :nconc (loop :for j :from 1 :to (length vectors)
-                                                 :collect (if (= i j) 1d0 0d0)))
-                              (loop :for i :from 1 :to (length vectors)
-                                    :nconc (loop :for j :from 1 :to (length vectors)
-                                                 :collect (if (= i j) #C(0d0 1d0) 0d0))))))
-         (backsolved-matrix (magicl:multiply-complex-matrices
-                             (magicl:multiply-complex-matrices
-                              (magicl:make-complex-matrix
-                               (length (first vectors))
-                               (length vectors)
-                               (reduce-append vectors))
-                              reassemble-matrix)
-                             (kernel coeff-matrix)))
-         (backsolved-vectors
-           (loop :for i :below (magicl:matrix-cols backsolved-matrix)
-                 :collect (loop :for j :below (magicl:matrix-rows backsolved-matrix)
-                                :collect (magicl:ref backsolved-matrix j i)))))
-    (gram-schmidt backsolved-vectors)))
-
-;; this is a support routine for optimal-2q-compile (which explains the funny
-;; prefactor multiplication it does).
-(defun diagonalizer-in-e-basis (m)
-  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
-  (check-type m magicl:matrix)
-  (let* ((u (magicl:multiply-complex-matrices +edag-basis+ (magicl:multiply-complex-matrices m +e-basis+)))
-         (gammag (magicl:multiply-complex-matrices u (magicl:transpose u))))
-    (multiple-value-bind (evals a) (magicl:eig gammag)
-      ;; the matrix "a" is almost what we want to return, but it needs to be
-      ;; spiced up in various ways:
-      ;; + we want its angle values to be sorted descending, so that if we
-      ;;   diagonalize two matrices with the same eigenvalues, we automatically
-      ;;   get a pair of matrices that conjugate one into the other.
-      ;; + we want its 2-dimensional eigenspaces to be spanned by real vectors.
-      ;; + we want it to be in SO(4), not O(4).
-      ;;
-      ;; first, we address the sort issue. the columns of a match the order of
-      ;; the the values in angles, so we sort the two lists in parallel.\
-      (let* ((angles (mapcar (lambda (x) (let ((ret (imagpart (log x))))
-                                           (if (double= ret (- pi)) pi ret)))
-                             evals))
-             (augmented-list
-               (sort
-                (loop :for i :below 4
-                      :collect (let ((col (loop :for j :below 4
-                                                :collect (magicl:ref a j i))))
-                                 (list (nth i angles) col)))
-                (lambda (x y) (< (first x) (first y)))))
-             ;; if vectors lie in the same eigenspace, make them real and orthonormal
-             (real-data
-               (let ((current-eval (first (first augmented-list)))
-                     (current-evects (list (second (first augmented-list)))))
-                 (reduce-append
-                  (loop
-                    :for pair :in (append (rest augmented-list)
-                                          (list (list most-positive-fixnum nil))) ;; this dummy tail item forces a flush
-                    :nconc
-                    (cond
-                      ;; we're still forming the current eigenspace...
-                      ((double= current-eval (first pair))
-                       (setf current-evects (append (list (second pair))
-                                                    current-evects))
-                       nil)
-                      (t
-                       ;; we're ready for a flush and a new eigenspace.
-                       (prog1 (find-real-spanning-set current-evects)
-                         (setf current-eval (first pair))
-                         (setf current-evects (list (second pair)))))))))))
-        ;; form a matrix out of the results so far.
-        (setf a (magicl:make-complex-matrix 4 4 real-data)))
-      ;; lastly, fix the determinant (if there's anything left to fix)
-      (when (minusp (realpart (magicl:det a)))
-        (setf a (magicl:multiply-complex-matrices a (magicl:diag 4 4 '(-1d0 1d0 1d0 1d0)))))
-      a)))
 
 (defun twist-to-real (m)
   "For a matrix M in SU(4), returns a values pair (SIGMA, M') such that M' = M * RZ(sigma) 1 * iSWAP and M' has real chi-gamma polynomial."
@@ -242,20 +50,6 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
               m
               (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
               (gate-matrix (lookup-standard-gate "ISWAP")))))))
-
-(defun gate-application-trivially-satisfies-2q-target-requirements (instr requirements)
-  "Does the gate application INSTR trivially satisfy the requirements imposed by REQUIREMENTS? (In other words, do we actually need to do decomposition?)"
-  (check-type instr gate-application)
-  (and (plain-operator-p (application-operator instr))
-       (let ((name (application-operator-name instr)))
-         (flet ((good (req)
-                  (case req
-                    (:cz       (string= name "CZ"))
-                    (:iswap    (string= name "ISWAP"))
-                    (:piswap   (string= name "PISWAP"))
-                    (:cphase   (string= name "CPHASE"))
-                    (otherwise nil))))
-           (some #'good requirements)))))
 
 (defun chi-from-evals (evals)
   "Computes the characteristic polynomial of a 4x4 matrix with all
@@ -300,7 +94,6 @@ a triple (A B C) such that the characteristic polynomial is given by 1
 
 (defun compare-circuit-angles (circuit chi &optional instr)
   "Computes a nonnegative cost function value between CHI, the result of CHI-FROM-EVALS, and the result of ANGLES-FROM-SU4 on the matrix form of CIRCUIT.  This cost function has a unique zero, corresponding to the case of equality.
-
 The optional argument INSTR is used to canonicalize the qubit indices of the instructions in CIRCUIT."
   (when instr
     (dolist (isn circuit)

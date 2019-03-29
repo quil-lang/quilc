@@ -217,8 +217,8 @@ used to specify CHIP-SPEC."
 
 ;;; constructors for hardware object building blocks
 
-(defun build-link (qubit0 qubit1 &optional (type (list ':CZ)))
-  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
+(defun build-link (qubit0 qubit1 &optional (type (list ':CZ)) chip-spec)
+  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT. The optional argument CHIP-SPEC is used by compilers to make decisions based on characteristics of the chip and its other hardware components."
   (check-type qubit0 unsigned-byte)
   (check-type qubit1 unsigned-byte)
   (assert (/= qubit0 qubit1))
@@ -347,7 +347,7 @@ used to specify CHIP-SPEC."
                    :do (vector-push-extend method
                                            (hardware-object-compilation-methods obj))))
     ;; set up the basic optimal 2Q compiler
-    (vector-push-extend (optimal-2q-compiler-for type)
+    (vector-push-extend (approximate-2q-compiler-for type chip-spec)
                         (hardware-object-compilation-methods obj))
     ;; based on the optimal 2Q compiler, tag this hardware object with the
     ;; longest duration any compiled sequence of instructions could possibly
@@ -495,8 +495,7 @@ used to specify CHIP-SPEC."
     (vector-push-extend #'state-prep-compiler ret)
     (vector-push-extend #'recognize-ucr ret)
     (when (typep architecture 'optimal-2q-target)
-      (vector-push-extend (lambda (instr)
-                            (optimal-2q-compiler instr :target architecture))
+      (vector-push-extend (approximate-2q-compiler-for architecture chip-spec)
                           ret))
     (vector-push-extend #'qs-compiler ret)
     (setf (chip-specification-generic-compilers chip-spec) ret)))
@@ -504,7 +503,7 @@ used to specify CHIP-SPEC."
 
 (defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz)))
   "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link."
-  (let ((link (build-link q0 q1 architecture))
+  (let ((link (build-link q0 q1 architecture chip-specification))
         (link-index (chip-spec-n-links chip-specification)))
     (adjoin-hardware-object link chip-specification)
     (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q0))))

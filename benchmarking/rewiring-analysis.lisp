@@ -40,7 +40,7 @@
            (loop
              :for (a . b) :in (graph-edges graph)
              :for link-index :from 0
-             :collect (quil::build-link a b architecture)
+             :collect (quil::build-link a b architecture chip-spec)
              :do (vector-push-extend link-index (quil::vnth 1 (quil::hardware-object-cxns (aref qubit-array a))))
              :do (vector-push-extend link-index (quil::vnth 1 (quil::hardware-object-cxns (aref qubit-array b)))))))
     (setf (quil::chip-specification-objects chip-spec)

@@ -10,12 +10,15 @@
 
 (defstruct compressor-context
   "COMPRESSOR-CONTEXT stores the information concerning the quantum device used by the compressor to perform state-aware reduction of instructions."
-  (aqvm nil))
+  (aqvm nil)
+  (chip-specification nil))
 
 
-(defun set-up-compressor-context (&key (qubit-count 0) (simulate nil))
+(defun set-up-compressor-context (&key (qubit-count 0) (simulate nil)
+                                       (chip-specification nil))
   "A helper function for instantiating a new COMPRESSOR-CONTEXT."
-  (make-compressor-context :aqvm (build-aqvm qubit-count :simulate simulate)))
+  (make-compressor-context :aqvm (build-aqvm qubit-count :simulate simulate)
+                           :chip-specification chip-specification))
 
 (defun update-compressor-context (context instr &key (destructive? nil))
   "This is called when the compressor walks over an instruction in its inner loops, which may in turn modify the active context."

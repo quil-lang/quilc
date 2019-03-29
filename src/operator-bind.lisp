@@ -34,6 +34,26 @@
                      :parameters (mapcar #'capture-param params)
                      :arguments (mapcar #'capture-arg qubits)))))
 
+(define-global-counter **anonymous-gate-counter** get-anonymous-gate-counter)
+
+(defun anon-gate (operator matrix &rest qubits)
+  "Variant of BUILD-GATE for constructing anonymous gate applications."
+  (check-type operator string)
+  (check-type matrix magicl:matrix)
+  (assert (not (endp qubits)))
+  (flet ((capture-arg (arg)
+           (typecase arg
+             (integer
+              (qubit arg))
+             (symbol
+              (formal (string-downcase (symbol-name arg))))
+             (otherwise
+              arg))))
+    (make-instance 'gate-application
+                   :operator (named-operator (format nil "~a-~a" operator (get-anonymous-gate-counter)))
+                   :gate matrix
+                   :arguments (mapcar #'capture-arg qubits))))
+
 
 ;; a typical use of operator-bind looks like
 ;;
