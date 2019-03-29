@@ -249,27 +249,28 @@ as needed so that they are the same size."
 
 (defun collinearp (vect1 vect2)
   "Tests whether two vectors of complex doubles are collinear."
-  (let ((peak-abs 0.0d0)
+  (let ((peak-abs 1.0d0)
         scalar)
     (loop :for r :across vect1
           :for s :across vect2
           :do (cond
-                ((and (or (not (double= 0.0d0 r))
-                          (not (double= 0.0d0 s)))
-                      (or (double= 0.0d0 s)
-                          (not (double= 1.0d0 (abs (/ r s))))))
+                ((or (and (double= 0d0 r)
+                          (not (double= 0d0 s)))
+                     (and (not (double= 0d0 r))
+                          (double= 0d0 s)))
                  (return-from collinearp nil))
                 ((and (not (double= 0.0d0 (abs r)))
-                      (> (abs r) peak-abs))
-                 (setf peak-abs (abs r))
+                      (< (abs (- 1 (abs r))) peak-abs))
+                 (setf peak-abs (abs (- 1 (abs r))))
                  (setf scalar (/ r s)))))
     ;; rather than computing the full norm, this could be replaced by the
     ;; component-wise calculation (loop ... :always (double= 0d0 (expt ...)))
     ;; which has the potential to terminate early on a negative result
-    (double= 0d0
-             (sqrt (loop :for r :across vect1
-                         :for s :across vect2
-                         :sum (expt (abs (- r (* scalar s))) 2))))))
+    (let ((norm (sqrt
+                 (loop :for r :across vect1
+                       :for s :across vect2
+                       :sum (* s (conjugate r) scalar)))))
+      (double= 1d0 norm))))
 
 
 ;; also just some general math routines
