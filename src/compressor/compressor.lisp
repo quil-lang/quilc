@@ -490,12 +490,12 @@ other's."
                             (eql final-wf-reduced-prep ':not-simulated))
                        (collinearp final-wf final-wf-reduced-prep))))
              (assert final-wf-reduced-instrs-collinearp
-                     ()
+                     (final-wf final-wf-reduced-instrs)
                      "During careful checking of instruction compression, the produced ~
                    wavefunction by instruction reduction was detected to not be ~
                    collinear with the target wavefunction.")
              (assert final-wf-reduced-prep-collinearp
-                     ()
+                     (final-wf final-wf-reduced-prep)
                      "During careful checking of instruction compression, the produced ~
                    wavefunction by state prep reduction was detected to not be ~
                    collinear with the target wavefunction.")))
