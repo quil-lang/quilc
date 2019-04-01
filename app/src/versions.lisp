@@ -31,11 +31,6 @@
   :test #'string=
   :documentation "The version of the quilc application.")
 
-(alexandria:define-constant +CL-QUIL-VERSION+
-    (system-version '#:cl-quil)
-  :test #'string=
-  :documentation "The version of the CL-Quil library.")
-
 (alexandria:define-constant +GIT-HASH+
     (git-hash '#:quilc)
   :test #'string=

@@ -166,7 +166,7 @@
   (command-line-arguments:show-option-help *option-spec* :sort-names t))
 
 (defun show-version ()
-  (format t "~A (library: ~A) [~A]~%" +QUILC-VERSION+ +CL-QUIL-VERSION+ +GIT-HASH+))
+  (format t "~A [~A]~%" +QUILC-VERSION+ +GIT-HASH+))
 
 (defun check-libraries ()
   "Check that the foreign libraries are adequate. Exits with status
