@@ -56,10 +56,12 @@
 
 (defun qubits-in-instr-list (instructions)
   "Produces a list of all of the (unboxed) qubit indices appearing in INSTRUCTIONS, a list of applications."
-  (remove-duplicates (mapcan (lambda (isn)
-                               (when (typep isn 'application)
-                                 (application-qubit-indices isn)))
-                             instructions)))
+  (delete-duplicates
+   (mapcan (lambda (isn)
+             (cond
+               ((typep isn 'application)
+                (application-qubit-indices isn))))
+           instructions)))
 
 
 ;;; helper functions for algebraically-reduce-instructions, including the doubly-linked
@@ -372,6 +374,9 @@ other's."
                        (notany (lambda (instr) (typep instr 'state-prep-application))
                                instrs))
               (let* ((reassignment
+                      ;; the actual reassignment we use is unimportant. this is
+                      ;; more along the lines of COMPRESS-QUBITs, so that our
+                      ;; matrices don't take up quite so much space.
                       (loop :for i :in (union (qubits-in-instr-list instrs)
                                               (qubits-in-instr-list translation-results))
                             :for j :from 0
@@ -465,11 +470,15 @@ other's."
     (labels
         ((check-quil-agrees-as-matrices ()
            (let* ((relabeling
+                   ;; the actual reassignment we use is unimportant. this is
+                   ;; more along the lines of COMPRESS-QUBITs, so that our
+                   ;; matrices don't take up quite so much space.
                    (loop :for i :in (reduce #'union
-                                            (list (qubits-in-instr-list instructions)
-                                                  (qubits-in-instr-list reduced-instructions)
-                                                  (qubits-in-instr-list decompiled-instructions)
-                                                  (qubits-in-instr-list reduced-decompiled-instructions)))
+                                            (list instructions
+                                                  reduced-instructions
+                                                  decompiled-instructions
+                                                  reduced-decompiled-instructions)
+                                            :key #'qubits-in-instr-list)
                          :for j :from 0
                          :collect (cons i j)))
                   (stretched-matrix (or (make-matrix-from-quil instructions :relabeling relabeling)
