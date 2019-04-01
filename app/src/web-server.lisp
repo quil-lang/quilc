@@ -183,8 +183,7 @@ If ALLOW-EMPTY-PAYLOADS is true, then an empty payload resolves to the same thin
     (with-timeout
         (with-output-to-string (s)
           (yason:encode (alexandria:alist-hash-table
-                         `(("cl-quil" . ,+CL-QUIL-VERSION+)
-                           ("quilc"   . ,+QUILC-VERSION+)
+                         `(("quilc"   . ,+QUILC-VERSION+)
                            ("githash" . ,+GIT-HASH+)))
                         s)))))
 

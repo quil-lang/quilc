@@ -7,8 +7,7 @@
 
 (defun get-version-info ()
   (alexandria:alist-hash-table
-   `(("cl-quil" . ,+CL-QUIL-VERSION+)
-     ("quilc"   . ,+QUILC-VERSION+)
+   `(("quilc"   . ,+QUILC-VERSION+)
      ("githash" . ,+GIT-HASH+))))
 
 (defun ensure-optional-real (x)
