@@ -48,7 +48,8 @@
       (setf entry-point "quilc::%entry-point"))
     (force-output)
     (sb-ext:save-lisp-and-die output-file
-                              :compression t
+                              :compression #+sb-core-compression t
+                                           #-sb-core-compression nil
                               :save-runtime-options t
                               :executable t
                               :toplevel (make-toplevel-function entry-point))))
