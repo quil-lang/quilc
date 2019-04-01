@@ -56,7 +56,10 @@
 
 (defun qubits-in-instr-list (instructions)
   "Produces a list of all of the (unboxed) qubit indices appearing in INSTRUCTIONS, a list of applications."
-  (remove-duplicates (mapcan #'application-qubit-indices instructions)))
+  (remove-duplicates (mapcan (lambda (isn)
+                               (when (typep isn 'application)
+                                 (application-qubit-indices isn)))
+                             instructions)))
 
 
 ;;; helper functions for algebraically-reduce-instructions, including the doubly-linked
@@ -368,13 +371,23 @@ other's."
                        (not *enable-approximate-compilation*)
                        (notany (lambda (instr) (typep instr 'state-prep-application))
                                instrs))
-              (let ((ref-mat (make-matrix-from-quil (list (first instrs))))
-                    (mat (make-matrix-from-quil translation-results)))
-                (setf mat (kron-matrix-up mat (1- (integer-length (magicl:matrix-rows ref-mat)))))
+              (let* ((reassignment
+                      (loop :for i :in (union (qubits-in-instr-list instrs)
+                                              (qubits-in-instr-list translation-results))
+                            :for j :from 0
+                            :collect (cons i j)))
+                     (ref-mat (make-matrix-from-quil (list (first instrs))
+                                                     :relabeling reassignment))
+                     (mat (make-matrix-from-quil translation-results
+                                                 :relabeling reassignment))
+                     (kron-size (max (1- (integer-length (magicl:matrix-rows ref-mat)))
+                                     (1- (integer-length (magicl:matrix-rows mat)))))
+                     (kroned-mat (kron-matrix-up mat kron-size))
+                     (kroned-ref-mat (kron-matrix-up ref-mat kron-size)))
                 (assert
                  (matrix-equality
-                  ref-mat
-                  (scale-out-matrix-phases mat ref-mat)))))
+                  kroned-ref-mat
+                  (scale-out-matrix-phases kroned-mat kroned-ref-mat)))))
             (expand-to-native-instructions (append translation-results
                                                    (rest instrs))
                                            chip-specification
@@ -451,25 +464,37 @@ other's."
                            (qubits-in-instr-list instructions))))
     (labels
         ((check-quil-agrees-as-matrices ()
-           (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
-             (let* ((decompiled-matrix
-                     (make-matrix-from-quil decompiled-instructions))
-                    (reduced-matrix
-                     (kron-matrix-up (make-matrix-from-quil reduced-instructions)
-                                     (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
-                    (reduced-decompiled-matrix
-                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
-                                     (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+           (let* ((relabeling
+                   (loop :for i :in (reduce #'union
+                                            (list (qubits-in-instr-list instructions)
+                                                  (qubits-in-instr-list reduced-instructions)
+                                                  (qubits-in-instr-list decompiled-instructions)
+                                                  (qubits-in-instr-list reduced-decompiled-instructions)))
+                         :for j :from 0
+                         :collect (cons i j)))
+                  (stretched-matrix (or (make-matrix-from-quil instructions :relabeling relabeling)
+                                        (return-from check-quil-agrees-as-matrices nil)))
+                  (decompiled-matrix
+                   (make-matrix-from-quil decompiled-instructions
+                                          :relabeling relabeling))
+                  (reduced-matrix
+                   (kron-matrix-up (make-matrix-from-quil reduced-instructions
+                                                          :relabeling relabeling)
+                                   (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                  (reduced-decompiled-matrix
+                   (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions
+                                                          :relabeling relabeling)
+                                   (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+             (assert (matrix-equality stretched-matrix
+                                      (scale-out-matrix-phases reduced-matrix
+                                                               stretched-matrix)))
+             (when decompiled-instructions
                (assert (matrix-equality stretched-matrix
-                                        (scale-out-matrix-phases reduced-matrix
+                                        (scale-out-matrix-phases decompiled-matrix
                                                                  stretched-matrix)))
-               (when decompiled-instructions
-                 (assert (matrix-equality stretched-matrix
-                                          (scale-out-matrix-phases decompiled-matrix
-                                                                   stretched-matrix)))
-                 (assert (matrix-equality stretched-matrix
-                                          (scale-out-matrix-phases reduced-decompiled-matrix
-                                                                   stretched-matrix)))))))
+               (assert (matrix-equality stretched-matrix
+                                        (scale-out-matrix-phases reduced-decompiled-matrix
+                                                                 stretched-matrix))))))
          
          (check-quil-agrees-as-states (start-wf final-wf wf-qc)
            (let* ((final-wf-reduced-instrs (nondestructively-apply-instrs-to-wf
