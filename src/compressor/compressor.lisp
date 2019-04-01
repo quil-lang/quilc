@@ -390,12 +390,12 @@ other's."
     (labels
         (;; produce a sequence of native instructions that have the effect of
          ;; carrying START-WF to FINAL-WF (= INSTRUCTIONS |START-WF>)
-         (decompile-instructions-into-state-prep (start-wf final-wf)
+         (decompile-instructions-into-state-prep (start-wf final-wf qc)
            (expand-to-native-instructions
             (list (make-instance 'state-prep-application
                                  :source-wf (copy-seq start-wf)
                                  :target-wf final-wf
-                                 :arguments (nreverse (mapcar #'qubit qubits-on-obj))))
+                                 :arguments (reverse (mapcar #'qubit qc))))
             chip-specification))
          
          ;; produce a sequence of native instructions that have the same effect
@@ -420,16 +420,16 @@ other's."
         ;;
         ;; it's conceivable that something more fine-grained could go here, if
         ;; there were a theory of multidimensional state prep.
-        (when (and (not (eql ':not-simulated start-wf))
-                   (subsetp wf-qc qubits-on-obj)
-                   *enable-state-prep-compression*)
+        (when (and *enable-state-prep-compression*
+                   (not (eql ':not-simulated start-wf))
+                   (subsetp wf-qc qubits-on-obj))
           (let ((final-wf (nondestructively-apply-instrs-to-wf instructions
                                                                start-wf
-                                                               qubits-on-obj)))
+                                                               wf-qc)))
             (when (and final-wf
                        (not (eql ':not-simulated final-wf)))
               (return-from decompile-instructions-in-context
-                (decompile-instructions-into-state-prep start-wf final-wf)))))
+                (decompile-instructions-into-state-prep start-wf final-wf wf-qc)))))
         ;; otherwise, we're obligated to do full unitary compilation.
         (decompile-instructions-into-full-unitary)))))
 
