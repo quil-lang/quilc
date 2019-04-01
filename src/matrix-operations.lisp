@@ -259,21 +259,17 @@ as needed so that they are the same size."
           scalar)
       (loop :for r :across vect1
             :for s :across vect2
-            :do (cond
-                  ((or (and (double= 0d0 r)
-                            (not (double= 0d0 s)))
-                       (and (not (double= 0d0 r))
-                            (double= 0d0 s)))
-                   (return-from collinearp nil))
-                  ((and (not (double= 0.0d0 (abs r)))
-                        (< (abs (- 1 (abs r))) peak-abs))
-                   (setf peak-abs (abs (- 1 (abs r))))
-                   (setf scalar (/ r s)))))
+            :when (and (not (double= 0.0d0 (abs r)))
+                       (not (double= 0d0 (abs s)))
+                       (< (abs (- 1 (abs r))) peak-abs))
+            :do (setf peak-abs (abs (- 1 (abs r))))
+                (setf scalar (- (phase r) (phase s))))
       ;; rather than computing the full norm, this could be replaced by the
       ;; component-wise calculation (loop ... :always (double= 0d0 (expt ...)))
       ;; which has the potential to terminate early on a negative result
-      (let ((norm (sqrt (dot-product vect1 vect2 scalar))))
-        (double= 1d0 norm)))))
+      (when scalar
+        (let ((norm (sqrt (dot-product vect1 vect2 (cis scalar)))))
+          (double= 1d0 norm))))))
 
 
 ;; also just some general math routines
