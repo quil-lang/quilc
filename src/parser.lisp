@@ -22,14 +22,17 @@
      :STRING :INDENTATION :INDENT :DEDENT :COMPLEX :PLUS
      :MINUS :TIMES :DIVIDE :EXPT :INTEGER :NAME :AREF)))
 
-(defvar *line-start-position*)
-(defvar *line-number*)
+(defvar *line-start-position* nil)
+(defvar *line-number* nil)
 
-(defstruct (token (:constructor tok (type &optional payload)))
+(defstruct (token (:constructor %tok (type &optional payload line)))
   "A lexical token."
   (line nil :type (or null (integer 1)))
   (type nil :type token-type)
   (payload nil))
+
+(defun tok (type &optional payload line)
+  (%tok type payload (or line *line-number*)))
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
@@ -224,6 +227,11 @@
   (error 'quil-parse-error :format-control format-control
                            :format-arguments format-args))
 
+(defun quil-parse-error-extended (token format-control &rest format-args)
+  "Signal a QUIL-PARSE-ERROR with a descriptive error message, including line number, described by FORMAT-CONTROL and FORMAT-ARGS."
+  (error 'quil-parse-error :format-control (concatenate 'string "At line ~A: " format-control)
+                           :format-arguments (concatenate 'list (list (token-line token)) format-args)))
+
 (defvar *definitions-allowed* t
   "Dynamic variable to control whether DEF* forms are allowed in the current parsing context.")
 
@@ -250,7 +258,7 @@
       ;; Circuit Definition
       ((:DEFCIRCUIT)
        (unless *definitions-allowed*
-         (quil-parse-error "Found DEFCIRCUIT where it's not allowed."))
+         (quil-parse-error-extended tok "Found DEFCIRCUIT where it's not allowed."))
 
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
