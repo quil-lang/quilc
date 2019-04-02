@@ -224,13 +224,8 @@
 
 (defun quil-parse-error (format-control &rest format-args)
   "Signal a QUIL-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
-  (error 'quil-parse-error :format-control format-control
-                           :format-arguments format-args))
-
-(defun quil-parse-error-extended (token format-control &rest format-args)
-  "Signal a QUIL-PARSE-ERROR with a descriptive error message, including line number, described by FORMAT-CONTROL and FORMAT-ARGS."
   (error 'quil-parse-error :format-control (concatenate 'string "At line ~A: " format-control)
-                           :format-arguments (concatenate 'list (list (token-line token)) format-args)))
+                           :format-arguments (concatenate 'list (list *line-number*) format-args)))
 
 (defvar *definitions-allowed* t
   "Dynamic variable to control whether DEF* forms are allowed in the current parsing context.")
@@ -246,7 +241,8 @@
 "
   (let* ((line (first tok-lines))
          (tok (first line))
-         (tok-type (token-type tok)))
+         (tok-type (token-type tok))
+         (*line-number* (token-line tok)))
     (case tok-type
       ;; Gate/Circuit Applications
       ((:CONTROLLED :DAGGER)
@@ -258,7 +254,7 @@
       ;; Circuit Definition
       ((:DEFCIRCUIT)
        (unless *definitions-allowed*
-         (quil-parse-error-extended tok "Found DEFCIRCUIT where it's not allowed."))
+         (quil-parse-error "Found DEFCIRCUIT where it's not allowed."))
 
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
