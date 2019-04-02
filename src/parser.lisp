@@ -224,8 +224,18 @@
 
 (defun quil-parse-error (format-control &rest format-args)
   "Signal a QUIL-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
-  (error 'quil-parse-error :format-control (concatenate 'string "At line ~A: " format-control)
-                           :format-arguments (concatenate 'list (list *line-number*) format-args)))
+  ;; There are callers of this function where *line-number* is not set
+  ;; appropriately (e.g. in expand-circuits.lisp) and where it may be impossible
+  ;; to set due to missing context. Most callers of this function however are
+  ;; right here in parser.lisp where *line-number* is more than likely set.
+  (let ((format-control (if *line-number*
+                            (concatenate 'string "At line ~A: " format-control)
+                            format-control))
+        (format-args (if *line-number*
+                         (concatenate 'list (list *line-number*) format-args)
+                         format-args)))
+    (error 'quil-parse-error :format-control format-control
+                             :format-arguments format-args)))
 
 (defvar *definitions-allowed* t
   "Dynamic variable to control whether DEF* forms are allowed in the current parsing context.")
