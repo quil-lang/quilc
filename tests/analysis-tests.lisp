@@ -281,7 +281,7 @@ B(b) 0 1
         (q01 (quil::make-grid-node 'q01 0 1))
         (q12 (quil::make-grid-node 'q12 1 2))
         (q02 (quil::make-grid-node 'q02 0 2)))
-    ;; All notes start as root nodes.
+    ;; All nodes start as root nodes.
     (is (every #'quil::root-node-p (list q0 q1 q2 q01 q12 q02)))
     ;; Set succeeding, check preceding.
     (setf (quil::succeeding-node-on-qubit q0 0) q01)
