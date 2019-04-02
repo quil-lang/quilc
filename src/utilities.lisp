@@ -26,9 +26,10 @@
 (defun (setf vnth) (val index vector)
   (setf (aref vector index) val))
 
-(defmacro dohash (((key val) hash) &body body)
-  `(maphash (lambda (,key ,val) ,@body)
-            ,hash))
+(defmacro dohash (((key val) hash &optional ret) &body body)
+  `(progn (maphash (lambda (,key ,val) ,@body)
+                   ,hash)
+          ,ret))
 
 (defmacro define-global-counter (counter-name incf-name)
   `(progn
@@ -74,3 +75,52 @@ appropriate method of comparison."
                     :do (rplacd last-cons new-cons)
                         (setf last-cons new-cons)))
     (cdr leash)))
+
+(defun partition-sequence-into-segments (predicate sequence)
+  "Partition a sequence SEQUENCE into segments S1, S2, ..., Sn such that
+
+    1. SEQUENCE == (concatenate (type-of sequence) S1 S2 ... Sn),
+
+    2. Each segment has elements that all satisfy or dissatisfy PREDICATE, and
+
+    3. Adjacent segments' elements have opposite satisfaction.
+
+Return two values:
+
+    1. The list (S1 S2 ... Sn).
+
+    2. Whether the elements of S1 satisfy PREDICATE."
+  (let ((segments nil)
+        (num-segments 0)
+        (current-segment nil)
+        (current-satisfaction ':unknown))
+    (labels ((finish-segment ()
+               (unless (null current-segment)
+                 (push (nreverse current-segment) segments)
+                 (incf num-segments)
+                 (setf current-segment nil)))
+             (process-item (item)
+               (cond
+                 ((eq current-satisfaction ':unknown)
+                  (setf current-satisfaction (and (funcall predicate item) t))
+                  (push item current-segment))
+                 (t
+                  (let ((satisfied (funcall predicate item)))
+                    (when (alexandria:xor satisfied current-satisfaction)
+                      ;; We have differing satisfactions.
+                      (finish-segment)
+                      (setf current-satisfaction satisfied))
+                    (push item current-segment))))))
+      (declare (dynamic-extent #'finish-segment #'process-item))
+      ;; Collect the elements in the segments.
+      (map nil #'process-item sequence)
+      ;; Check if we need to unload the last segment, which happens if
+      ;; we were provided an empty sequence.
+      (cond
+        ((eq current-satisfaction ':unknown)
+         (values nil nil))
+        (t
+         (finish-segment)
+         (values (nreverse segments)
+                 ;; I'm not even gonna comment this.
+                 (alexandria:xor current-satisfaction (evenp num-segments))))))))

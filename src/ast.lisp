@@ -72,6 +72,8 @@ WARNING: The default will work for instances of \"idiomatic\" classes that aren'
 
 (defstruct (label (:constructor label (name)))
   "A label name. Corresponds to names prepended with `@' in Quil."
+  ;; We allow an UNSIGNED-BYTE so that we can jump to absolute
+  ;; positions in the program. This is *NOT* exposed in Quil directly.
   (name nil :type (or string unsigned-byte)))
 
 (defstruct (param (:constructor param (name))
@@ -158,6 +160,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
           :reader jump-target-label))
   (:documentation "A target which can be jumped to. Corresponds to the LABEL directive."))
 
+(declaim (inline jump-target-p))
 (defun jump-target-p (x)
   "Is X a jump target?"
   (typep x 'jump-target))
@@ -841,6 +844,7 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
    (parameters :initarg :parameters
                :accessor application-parameters)
    (arguments :initarg :arguments
+              :reader arguments
               :accessor application-arguments))
   (:default-initargs
    :parameters nil
@@ -862,6 +866,17 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
     * Application is an invalid application.
 
 Determining this requires the context of the surrounding program."))
+
+(declaim (inline gate-application-p))
+(defun gate-application-p (x)
+  "Is X a gate application?"
+  (typep x 'gate-application))
+
+(declaim (inline static-gate-application-p))
+(defun static-gate-application-p (x)
+  "Is X a gate application with constant parameters?"
+  (and (gate-application-p x)
+       (every #'is-constant (application-parameters x))))
 
 (defclass gate-application (application)
   ((name-resolution :initarg :name-resolution

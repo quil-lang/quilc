@@ -52,10 +52,11 @@ DEFGATE I:
 
 (deftest test-repeat-labels ()
   "Test that repeat labels are detected."
-  (signals simple-error
-    (with-output-to-quil
-      "LABEL @a"
-      "LABEL @a")))
+  (let ((pp (with-output-to-quil
+              "LABEL @a"
+              "LABEL @a")))
+    (signals simple-error
+      (quil::transform 'quil::patch-labels pp))))
 
 (defun identity-test-program (quil-instr)
   (with-output-to-string (s)
@@ -269,3 +270,92 @@ B(b) 0 1
                  (subsetp mem-descriptors old-defs)))
         ;; Are there no new memory descriptors (no __P)?
         (is (= (length old-defs) (length mem-descriptors)))))))
+
+;;; Fusion tests
+
+(deftest test-grid-node ()
+  "Tests on the grid node data structure and associated functions."
+  (let ((q0 (quil::make-grid-node 'q0 0))
+        (q1 (quil::make-grid-node 'q1 1))
+        (q2 (quil::make-grid-node 'q2 2))
+        (q01 (quil::make-grid-node 'q01 0 1))
+        (q12 (quil::make-grid-node 'q12 1 2))
+        (q02 (quil::make-grid-node 'q02 0 2)))
+    ;; All nodes start as root nodes.
+    (is (every #'quil::root-node-p (list q0 q1 q2 q01 q12 q02)))
+    ;; Set succeeding, check preceding.
+    (setf (quil::succeeding-node-on-qubit q0 0) q01)
+    (is (eq q01 (quil::succeeding-node-on-qubit q0 0)))
+    ;; Set preceding, check succeeding
+    (setf (quil::preceding-node-on-qubit q12 2) q2)
+    (is (eq q2 (quil::preceding-node-on-qubit q12 2)))
+    ;; Check that we can't set a preceding or succeeding node on
+    ;; invalid qubits.
+    (signals error (setf (quil::succeeding-node-on-qubit q2 0) q02))
+    (signals error (setf (quil::preceding-node-on-qubit q02 1) q1))
+    ;; Check trailer dealios.
+    (is (quil::trailer-node-on-qubit-p q01 0))
+    (is (not (quil::trailer-node-on-qubit-p q0 0)))))
+
+(defclass dummy-node ()
+  ((value :initarg :value
+          :accessor dummy-node-value)))
+
+(defun dummy-node (x)
+  (make-instance 'dummy-node :value (alexandria:ensure-list x)))
+
+(defmethod quil::fuse-objects ((a dummy-node) (b dummy-node))
+  (make-instance 'dummy-node
+                 :value (append
+                         (alexandria:ensure-list (dummy-node-value a))
+                         (alexandria:ensure-list (dummy-node-value b)))))
+
+(deftest test-fuse-dummy-objects ()
+  "Test that FUSE-OBJECTS behaves properly in MERGE-GRID-NODES."
+  (is (equal '(a b)
+             (dummy-node-value
+              (quil::grid-node-tag
+               (quil::merge-grid-nodes
+                (quil::make-grid-node (dummy-node 'a) 1)
+                (quil::make-grid-node (dummy-node 'b) 1)))))))
+
+(defun build-grid (&rest proto-nodes)
+  (loop :with pg := (make-instance 'quil::program-grid)
+        :for (x . qs) :in proto-nodes
+        :for gn := (apply #'quil::make-grid-node
+                          (dummy-node x)
+                          qs)
+        :do (quil::append-node pg gn)
+        :finally (return pg)))
+
+(deftest test-trivial-fusion ()
+  "Test that a bunch of trivially fuseable gates can be fused."
+  (flet ((test-it (&rest proto-nodes)
+           (let ((output-pg (quil::fuse-trivially (apply #'build-grid proto-nodes))))
+             (is (= 1 (length (quil::roots output-pg))))
+             (let ((root (first (quil::roots output-pg))))
+               (is (quil::root-node-p root))
+               (is (every (alexandria:curry #'eq root) (quil::trailers output-pg)))
+               (is (every #'null (quil::grid-node-back root)))
+               (is (every #'null (quil::grid-node-forward root)))
+               (is (equalp (mapcar #'first proto-nodes)
+                           (dummy-node-value (quil::grid-node-tag root))))))))
+    (test-it '(a 0)
+             '(b 0 1)
+             '(c 0 1 2)
+             '(d 0 1 2 3))
+    (test-it '(a 0 1 2 3)
+             '(b 0 1 2)
+             '(c 0 1)
+             '(d 0))
+    (test-it '(a 0 1 2 3)
+             '(b 0 1 2 3)
+             '(c 0 1 2 3)
+             '(d 0 1 2 3))
+    (test-it '(a 0)
+             '(b 0 1)
+             '(c 0 1 2)
+             '(d 0 1 2 3)
+             '(e 0 1 2)
+             '(f 0 1)
+             '(g 0))))
