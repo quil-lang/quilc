@@ -413,7 +413,7 @@ other's."
             (list (make-instance 'state-prep-application
                                  :source-wf (copy-seq start-wf)
                                  :target-wf final-wf
-                                 :arguments (reverse (mapcar #'qubit qc))))
+                                 :arguments (nreverse (mapcar #'qubit qc))))
             chip-specification))
          
          ;; produce a sequence of native instructions that have the same effect
