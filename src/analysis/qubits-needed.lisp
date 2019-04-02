@@ -10,6 +10,8 @@
   (:documentation "Helper function to determine the maximum qubit index involved in an instruction.")
   (:method ((isn instruction))
     -1)
+  (:method ((isn jump-target))
+    -1)
   (:method ((isn measurement))
     (qubit-index (measurement-qubit isn)))
   (:method ((isn application))
