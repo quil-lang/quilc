@@ -816,13 +816,19 @@
             ;; Remove right paren.
             (pop rest-line)
 
+            ;; Some sanity checks for the parameter list. Must be of odd length,
+            ;; and every other token should be a :COMMA
+            (unless (and (oddp (length found-params))
+                         (or (= 1 (length found-params))
+                             (loop :for c :in (rest found-params) :by #'cddr
+                                   :always (eql ':COMMA (token-type c)))))
+              ;; TODO Some printer for tokens?
+              (quil-parse-error "Malformed parameter list in DEFGATE: ~A" found-params))
             ;; Go through the supposed parameters, checking that they
             ;; are, and parsing them out.
-            ;;
-            ;; FIXME: This allows erroneous cases like (%a,,%a) and (%a %a)
             (setf params (loop :for p :in (remove ':comma found-params :key #'token-type)
                                :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list.")
+                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list: ~A" p)
                                :collect (parse-parameter p)))
 
             ;; Ensure the colon (and nothing else) is there.
@@ -991,13 +997,19 @@
             ;; Remove right paren and stash away params.
             (pop rest-line)
 
+            ;; Some sanity checks for the parameter list. Must be of odd length,
+            ;; and every other token should be a :COMMA
+            (unless (and (oddp (length found-params))
+                         (or (= 1 (length found-params))
+                             (loop :for c :in (rest found-params) :by #'cddr
+                                   :always (eql ':COMMA (token-type c)))))
+              ;; TODO Some printer for tokens?
+              (quil-parse-error "Malformed parameter list in DEFCIRCUIT: ~A" found-params))
             ;; Parse out the parameters.
-            ;;
-            ;; FIXME: This allows erroneous cases like (%a,,%a) and (%a %a)
-            (setf params     (loop :for p :in (remove ':comma found-params :key #'token-type)
-                                   :when (not (eql ':PARAMETER (token-type p)))
-                                     :do (quil-parse-error "Found something other than a parameter in a DEFCIRCUIT parameter list.")
-                                   :collect (parse-parameter p))
+            (setf params (loop :for p :in (remove ':COMMA found-params :key #'token-type)
+                               :when (not (eql ':PARAMETER (token-type p)))
+                                 :do (quil-parse-error "Found something other than a parameter in a DEFCIRCUIT parameter list: ~A" p)
+                               :collect (parse-parameter p))
                   params-args rest-line)))
 
         ;; Check for colon and incise it.
