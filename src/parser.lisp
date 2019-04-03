@@ -819,9 +819,8 @@
             ;; Some sanity checks for the parameter list. Must be of odd length,
             ;; and every other token should be a :COMMA
             (unless (and (oddp (length found-params))
-                         (or (= 1 (length found-params))
-                             (loop :for c :in (rest found-params) :by #'cddr
-                                   :always (eql ':COMMA (token-type c)))))
+                         (loop :for c :in (rest found-params) :by #'cddr
+                               :always (eql ':COMMA (token-type c))))
               ;; TODO Some printer for tokens?
               (quil-parse-error "Malformed parameter list in DEFGATE: ~A" found-params))
             ;; Go through the supposed parameters, checking that they
@@ -1000,9 +999,8 @@
             ;; Some sanity checks for the parameter list. Must be of odd length,
             ;; and every other token should be a :COMMA
             (unless (and (oddp (length found-params))
-                         (or (= 1 (length found-params))
-                             (loop :for c :in (rest found-params) :by #'cddr
-                                   :always (eql ':COMMA (token-type c)))))
+                         (loop :for c :in (rest found-params) :by #'cddr
+                               :always (eql ':COMMA (token-type c))))
               ;; TODO Some printer for tokens?
               (quil-parse-error "Malformed parameter list in DEFCIRCUIT: ~A" found-params))
             ;; Parse out the parameters.
