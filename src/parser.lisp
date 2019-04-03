@@ -25,14 +25,11 @@
 (defvar *line-start-position* nil)
 (defvar *line-number* nil)
 
-(defstruct (token (:constructor %tok (type &optional payload line)))
+(defstruct (token (:constructor tok (type &optional payload (line *line-number*))))
   "A lexical token."
   (line nil :type (or null (integer 1)))
   (type nil :type token-type)
   (payload nil))
-
-(defun tok (type &optional payload line)
-  (%tok type payload (or line *line-number*)))
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
@@ -222,20 +219,26 @@
   ()
   (:documentation "Representation of an error parsing Quil."))
 
+(define-condition quil-parse-error-at-line (quil-parse-error)
+  ((line :initarg :line :reader quil-parse-error-at-line-line))
+  (:report (lambda (condition stream)
+             (format stream "At line ~A: "
+                     (quil-parse-error-at-line-line condition))
+             (apply #'format stream (simple-condition-format-control condition)
+                    (simple-condition-format-arguments condition)))))
+
 (defun quil-parse-error (format-control &rest format-args)
   "Signal a QUIL-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
   ;; There are callers of this function where *line-number* is not set
   ;; appropriately (e.g. in expand-circuits.lisp) and where it may be impossible
   ;; to set due to missing context. Most callers of this function however are
   ;; right here in parser.lisp where *line-number* is more than likely set.
-  (let ((format-control (if *line-number*
-                            (concatenate 'string "At line ~A: " format-control)
-                            format-control))
-        (format-args (if *line-number*
-                         (concatenate 'list (list *line-number*) format-args)
-                         format-args)))
-    (error 'quil-parse-error :format-control format-control
-                             :format-arguments format-args)))
+  (if *line-number*
+      (error 'quil-parse-error-at-line :line *line-number*
+                                       :format-control format-control
+                                       :format-arguments format-args)
+      (error 'quil-parse-error :format-control format-control
+                               :format-arguments format-args)))
 
 (defvar *definitions-allowed* t
   "Dynamic variable to control whether DEF* forms are allowed in the current parsing context.")
