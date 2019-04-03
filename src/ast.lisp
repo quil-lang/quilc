@@ -153,6 +153,14 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (setf (delayed-expression-params c) (mapcar f (delayed-expression-params de)))
     c))
 
+;;;;;;;;;;;;;; Protocols common to (pseudo-)instructions ;;;;;;;;;;;;;
+
+(defgeneric comment (object)
+  (:documentation "Accessor for inline comments associated to (pseudo-)instructions.")
+  (:method ((object t))
+    (declare (ignore object))
+    nil))
+
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass jump-target ()
@@ -1248,9 +1256,6 @@ N.B., The fractions of pi will be printed up to a certain precision!")
    :circuit-definitions nil
    :memory-definitions nil
    :executable-code #()))
-
-(defmethod comment ((object t))
-  nil)
 
 (defun print-instruction-sequence (seq
                                    &key

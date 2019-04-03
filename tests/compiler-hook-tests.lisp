@@ -11,12 +11,10 @@
 
 (defun attach-rewirings-to-program (pp in-rewiring-vector out-rewiring-vector)
   (setf (quil::comment (aref (quil::parsed-program-executable-code pp) 0))
-        (with-output-to-string (s)
-          (format s "Entering rewiring: ~a" in-rewiring-vector)))
+        (format nil "Entering rewiring: ~a" in-rewiring-vector))
   (setf (quil::comment (aref (quil::parsed-program-executable-code pp)
                              (1- (length (quil::parsed-program-executable-code pp)))))
-        (with-output-to-string (s)
-          (format s "Exiting rewiring: ~a" out-rewiring-vector)))
+        (format nil "Exiting rewiring: ~a" out-rewiring-vector))
   pp)
 
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
