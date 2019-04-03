@@ -1261,19 +1261,20 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                                    &key
                                      (stream *standard-output*)
                                      (prefix ""))
-  (flet ((print-one-line (instr)
-           (cond
-             ((comment instr)
-              (format stream "~a~a~40T# ~a~%"
-                      prefix
-                      (with-output-to-string (r)
-                        (print-instruction instr r))
-                      (comment instr)))
-             (t
-              (princ prefix stream)
-              (print-instruction instr stream)
-              (terpri stream)))))
-    (map nil #'print-one-line seq)))
+  (let ((*print-pretty* nil))
+    (flet ((print-one-line (instr)
+             (cond
+               ((comment instr)
+                (format stream "~a~a~40T# ~a~%"
+                        prefix
+                        (with-output-to-string (r)
+                          (print-instruction instr r))
+                        (comment instr)))
+               (t
+                (princ prefix stream)
+                (print-instruction instr stream)
+                (terpri stream)))))
+      (map nil #'print-one-line seq))))
 
 (defun print-parsed-program (parsed-program &optional (s *standard-output*))
   ;; write out memory definitions

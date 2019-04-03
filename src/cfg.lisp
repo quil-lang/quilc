@@ -501,12 +501,13 @@ Return the following values:
       ;; If a jump was never used, we better add one to the end
       (unless jump-used
         (add-to-section end-jump)))
-    (when (basic-block-in-rewiring blk)
-      (setf (comment (aref code-section 0))
-            (format nil "Entering rewiring: ~a" (rewiring-l2p (basic-block-in-rewiring blk)))))
-    (when (basic-block-out-rewiring blk)
-      (setf (comment (aref code-section (1- (length code-section))))
-            (format nil "Exiting rewiring: ~a" (rewiring-l2p (basic-block-out-rewiring blk)))))
+    (let ((*print-pretty* nil))
+      (when (basic-block-in-rewiring blk)
+        (setf (comment (aref code-section 0))
+              (format nil "Entering rewiring: ~a" (rewiring-l2p (basic-block-in-rewiring blk)))))
+      (when (basic-block-out-rewiring blk)
+        (setf (comment (aref code-section (1- (length code-section))))
+              (format nil "Exiting rewiring: ~a" (rewiring-l2p (basic-block-out-rewiring blk))))))
     code-section))
 
 (defun reconstitute-program (cfg)
