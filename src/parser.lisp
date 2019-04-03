@@ -22,10 +22,10 @@
      :STRING :INDENTATION :INDENT :DEDENT :COMPLEX :PLUS
      :MINUS :TIMES :DIVIDE :EXPT :INTEGER :NAME :AREF)))
 
-(defvar *line-start-position*)
-(defvar *line-number*)
+(defvar *line-start-position* nil)
+(defvar *line-number* nil)
 
-(defstruct (token (:constructor tok (type &optional payload)))
+(defstruct (token (:constructor tok (type &optional payload (line *line-number*))))
   "A lexical token."
   (line nil :type (or null (integer 1)))
   (type nil :type token-type)
@@ -219,10 +219,26 @@
   ()
   (:documentation "Representation of an error parsing Quil."))
 
+(define-condition quil-parse-error-at-line (quil-parse-error)
+  ((line :initarg :line :reader line-of-quil-parse-error))
+  (:report (lambda (condition stream)
+             (format stream "At line ~D: "
+                     (line-of-quil-parse-error condition))
+             (apply #'format stream (simple-condition-format-control condition)
+                    (simple-condition-format-arguments condition)))))
+
 (defun quil-parse-error (format-control &rest format-args)
   "Signal a QUIL-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
-  (error 'quil-parse-error :format-control format-control
-                           :format-arguments format-args))
+  ;; There are callers of this function where *line-number* is not set
+  ;; appropriately (e.g. in expand-circuits.lisp) and where it may be impossible
+  ;; to set due to missing context. Most callers of this function however are
+  ;; right here in parser.lisp where *line-number* is more than likely set.
+  (if *line-number*
+      (error 'quil-parse-error-at-line :line *line-number*
+                                       :format-control format-control
+                                       :format-arguments format-args)
+      (error 'quil-parse-error :format-control format-control
+                               :format-arguments format-args)))
 
 (defvar *definitions-allowed* t
   "Dynamic variable to control whether DEF* forms are allowed in the current parsing context.")
@@ -238,7 +254,8 @@
 "
   (let* ((line (first tok-lines))
          (tok (first line))
-         (tok-type (token-type tok)))
+         (tok-type (token-type tok))
+         (*line-number* (token-line tok)))
     (case tok-type
       ;; Gate/Circuit Applications
       ((:CONTROLLED :DAGGER)
