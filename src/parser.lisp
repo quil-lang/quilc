@@ -220,10 +220,10 @@
   (:documentation "Representation of an error parsing Quil."))
 
 (define-condition quil-parse-error-at-line (quil-parse-error)
-  ((line :initarg :line :reader quil-parse-error-at-line-line))
+  ((line :initarg :line :reader line-of-quil-parse-error))
   (:report (lambda (condition stream)
-             (format stream "At line ~A: "
-                     (quil-parse-error-at-line-line condition))
+             (format stream "At line ~D: "
+                     (line-of-quil-parse-error condition))
              (apply #'format stream (simple-condition-format-control condition)
                     (simple-condition-format-arguments condition)))))
 
