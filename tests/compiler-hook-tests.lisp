@@ -45,7 +45,6 @@ Z 0")
     (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
                          (quil::parsed-program-to-logical-matrix pp-rewired)))))
 
-
 (deftest test-rewiring-modes ()
   "Iterates over the rewiring modes and tests that the addresser is well-behaved on each of them."
   ;; first, the straight-line rewiring methods
@@ -88,7 +87,7 @@ JUMP @a")))
                                                  (cl-quil::read-quil-file file))
                                 (quil::build-nQ-linear-chip 5 :architecture architecture))))
     (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                  (quil::parsed-program-to-logical-matrix proc-prog :compress-qubits t)))))
+                                  (quil::parsed-program-to-logical-matrix proc-prog)))))
 
 (deftest test-compiler-hook ()
   "Test whether the compiler hook preserves semantic equivalence for
