@@ -69,7 +69,7 @@ qubits."
       (map-pauli-basis n #'collect-element)
       (nreverse list))))
 
-(declaim (ftype (function (T) simple-vector) basis-map))
+(declaim (ftype (function (t) simple-vector) basis-map))
 (defstruct (clifford (:include qubit-algebra))
   "An element of the Clifford group on NUM-QUBITS qubits."
   (num-qubits 0 :type unsigned-fixnum)
@@ -223,7 +223,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
    (every #'pauli= (basis-map a) (basis-map b))))
 
 (defun clifford-hash (c)
-  "Hash function for Clifford's."
+  "Hash function for CLIFFORD objects."
   (declare (optimize speed (safety 0) (debug 0) (space 0)))
   (declare (type clifford c))
   (declare (inline pauli-hash))
@@ -234,7 +234,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
          :finally (return h))))
 
 (defun make-clifford-hash-table (&key pre-allocate synchronized)
-  "Make a hash-table that has Clifford objects as keys."
+  "Make a hash-table that has CLIFFORD objects as keys."
   (declare (ignorable synchronized))
   (check-type pre-allocate (or null (integer 1)))
   ;; LispWorks and ClozureCL hash tables support concurrent writers by
@@ -281,7 +281,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
      :basis-map bm)))
 
 (defun clifford-symplectic (c)
-  "Return the symplectic representation of the  Clifford C."
+  "Return the symplectic representation of the Clifford C."
   (let* ((n (num-qubits c))
          (r (make-array n :element-type 'bit :initial-element 0))
          (s (make-array n :element-type 'bit :initial-element 0))
