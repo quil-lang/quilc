@@ -101,6 +101,13 @@
           (write-char #\-))
         (terpri)))))
 
+(defun zero-out-tableau (tab)
+  "Bring the tableau to the zero state."
+  (dotimes (i (array-total-size tab))
+    (setf (row-major-aref tab i) 0))
+  (dotimes (i (* 2 (tableau-qubits tab)))
+    (setf (aref tab i i) 1)))
+
 (defun make-tableau-zero-state (n)
   "Create a tableau of N qubits in the zero state."
   (let ((zero (make-blank-tableau n)))
