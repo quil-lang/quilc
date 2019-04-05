@@ -4,8 +4,11 @@
 
 (in-package #:cl-quil.clifford)
 
-(declaim (optimize speed (safety 0) (debug 0)))
+(declaim (optimize (speed 0) safety debug))
+
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
+;;;
+;;; Gottesman's paper is also helpful https://arxiv.org/pdf/quant-ph/9807006.pdf
 
 (deftype tableau-index ()
   '(integer 0 (#.array-total-size-limit)))
@@ -26,16 +29,6 @@
   (let ((size (1+ (* 2 n))))
     (make-array (list size size) :element-type 'bit
                                  :initial-element 0)))
-
-(declaim (inline tableau-qubits
-                 tableau-x
-                 tableau-z
-                 tableau-r
-                 tableau-scratch
-                 (setf tableau-x)
-                 (setf tableau-z)
-                 (setf tableau-r)
-                 (setf tableau-scratch)))
 
 (defun tableau-qubits (tab)
   (declare (type tableau tab))
@@ -178,6 +171,106 @@
       (xorf (tableau-x tab h j) (tableau-x tab i j))
       (xorf (tableau-z tab h j) (tableau-z tab i j)))))
 
+(declaim (inline %band b* %bior bmax %bxor b+ bnot))
+(defun %band (a b)
+  (declare (type bit a b))
+  (logand a b))
+(defun b* (&rest bits)
+  (reduce #'%band bits :initial-value 1))
+(defun %bior (a b)
+  (declare (type bit a b))
+  (logior a b))
+(defun bmax (&rest bits)
+  (reduce #'%bior bits :initial-value 0))
+(defun %bxor (a b)
+  (declare (type bit a b))
+  (logxor a b))
+(defun b+ (&rest bits)
+  (reduce #'%bxor bits :initial-value 0))
+(defun bnot (b)
+  (declare (type bit b))
+  (the bit (- 1 b)))
+
+(defun clifford-symplectic-action (c)
+  (let* ((num-qubits (clifford-num-qubits c))
+         (num-variables (* 2 num-qubits))
+         (variables (loop :for i :below num-variables
+                          :collect (if (evenp i)
+                                       (alexandria:format-symbol nil "X~D" (floor i 2))
+                                       (alexandria:format-symbol nil "Z~D" (floor i 2)))))
+         (phase-factor nil)
+         (new-variables (make-array num-variables :initial-element nil)))
+    (map-all-paulis num-qubits
+                    (lambda (i p)
+                      (let* ((cp (apply-clifford c p))
+                             (cp-phase (phase-factor cp)))
+                        (assert (zerop (mod cp-phase 2)))
+                        (setf cp-phase (ash cp-phase -1))
+                        ;; Collect phase contribution.
+                        (when (= 1 cp-phase)
+                          (loop :with bits := i
+                                :for variable :in variables
+                                :collect (if (zerop (ldb (byte 1 0) bits)) ; EVENP
+                                             `(bnot ,variable)
+                                             variable)
+                                  :into conjunction
+                                :do (setf bits (ash bits -1))
+                                :finally (push `(b* ,@conjunction) phase-factor)))
+                        ;; When we have X or Z (i = a power of 2),
+                        ;; check out where they get shuffled.
+                        (when (power-of-two-p i)
+                          (let ((var (nth (1- (integer-length i)) variables)))
+                            ;; The var that contributes to X- and Z-FACTORS
+                            (loop :with bits := (pauli-index cp)
+                                  :for i :below num-variables
+                                  :when (= 1 (ldb (byte 1 0) bits)) ; ODDP
+                                    :do (push var (aref new-variables i))
+                                  :do (setf bits (ash bits -1))))
+                          ;(format t "~A -> ~A~%" p cp)
+                          ;(format t "~2,'0B -> ~2,'0B~%" (pauli-index p) (pauli-index cp))
+                          )
+                        ;(format t "  ~v,'0B -> ~B~%" num-variables i cp-phase)
+                        )))
+    (map-into new-variables (lambda (sum) `(b+ ,@sum)) new-variables)
+    (values
+     variables
+     `(b+ ,@phase-factor)
+     (coerce new-variables 'list))))
+
+(defun compile-tableau-operation (c)
+  "Compile a Clifford element into a tableau operation."
+  (check-type c clifford)
+  (let* ((num-qubits (num-qubits c))
+         ;; Gensyms
+         (i      (gensym "I-"))
+         (tab    (gensym "TAB-"))
+         (qubits (loop :for i :below num-qubits
+                       :collect (alexandria:format-symbol nil "Q~D" i))))
+    (multiple-value-bind (variables phase-kickback new-variables)
+        (clifford-symplectic-action c)
+      `(lambda (,tab ,@qubits)
+         (declare (type tableau ,tab)
+                  (type tableau-index ,@qubits))
+         (dotimes (,i ,(* 2 num-qubits))
+           (declare (type tableau-index ,i))
+           (let (,@(loop :for qubit :in qubits
+                         :for (x z) :on variables :by #'cddr
+                         :collect `(,x (tableau-x ,tab ,i ,qubit))
+                         :collect `(,z (tableau-z ,tab ,i ,qubit))))
+             ;; Calculate the new phase.
+             (xorf (tableau-r ,tab ,i) ,phase-kickback)
+             (setf
+              ,@(loop :for qubit :in qubits
+                      :for (x z) :on new-variables :by #'cddr
+                      ;; Set this...
+                      :collect `(tableau-x ,tab ,i ,qubit)
+                      ;; to this...
+                      :collect x
+                      ;; And set this...
+                      :collect `(tableau-z ,tab ,i ,qubit)
+                      ;; to this...
+                      :collect z))))))))
+
 (defun tableau-apply-cnot (tab a b)
   (declare (type tableau tab)
            (type fixnum a b))
@@ -304,22 +397,21 @@
 
 ;;; For testing
 
-(defun interpret-chp (num-qubits code)
-  (loop :with tab := (make-tableau-zero-state num-qubits)
-        :for i :from 1
+(defun interpret-chp (code tab)
+  (loop :for i :from 1
         :for isn :in code
         :do
-           (let ((*print-pretty* nil))
-             ;(format t "~D: ~A~%" i isn)
-             (alexandria:destructuring-ecase isn
-               ((H q)       (tableau-apply-h tab q))
-               ((PHASE q)   (tableau-apply-phase tab q))
-               ((CNOT p q)  (tableau-apply-cnot tab p q))
-               ((MEASURE q) (multiple-value-bind (outcome determ?)
-                                (tableau-measure tab q)
-                              #+ihn
-                              (format t "~&qubit ~D measured to ~D~:[ (random)~;~]~%" q outcome determ?)))))
-        :finally (return tab)))
+                                        ;(format t "~D: ~A" i isn)
+           (alexandria:destructuring-ecase isn
+             ((H q)       (tableau-apply-h tab q))
+             ((PHASE q)   (tableau-apply-phase tab q))
+             ((CNOT p q)  (tableau-apply-cnot tab p q))
+             ((MEASURE q) (multiple-value-bind (outcome determ?)
+                              (tableau-measure tab q)
+                                        ;(format t " => ~D~:[ (random)~;~]" outcome determ?)
+                            )))
+           ;(terpri)
+        ))
 
 (defun read-chp-file (file)
   "Parse a .chp file as defined by Aaronson."
@@ -373,4 +465,5 @@
 (defun interpret-chp-file (file)
   (multiple-value-bind (code num-qubits)
       (read-chp-file file)
-    (time (interpret-chp num-qubits code))))
+    (let ((tab (make-tableau-zero-state num-qubits)))
+      (time (interpret-chp code tab)))))
