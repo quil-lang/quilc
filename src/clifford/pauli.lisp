@@ -72,6 +72,14 @@
     (check-type y base4)
     (logxor (ash x 2) y)))
 
+(defun pauli-index (p)
+  "What is the index of the Pauli operator P up to phase?"
+  (loop :with idx := 0
+        :for i :from 0
+        :for c :in (reverse (base4-list p))
+        :do (setf idx (logior c (ash idx 2)))
+        :finally (return idx)))
+
 (defmacro pair-membership (u v &rest cases)
   `(or ,@(loop :for (ui vi) :in cases
                :collect `(and (= ,u ,ui)
