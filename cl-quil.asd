@@ -56,6 +56,7 @@
                              (:file "pauli")
                              (:file "symplectic")
                              (:file "clifford")
+                             (:file "stabilizer")
                              (:file "god-table")
                              (:file "god-table-utilities")
                              (:file "swap-representation")
