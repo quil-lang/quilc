@@ -235,6 +235,10 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (:documentation "Abstract class representing an executable instruction.")
   (:metaclass abstract-class))
 
+(defclass classical-instruction (instruction)
+  ()
+  (:metaclass abstract-class))
+
 (defgeneric arguments (instruction)
   (:documentation "Return a simple vector of arguments to an instruction."))
 
@@ -314,7 +318,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defmethod arguments ((instruction wait)) #())
 (defmethod mnemonic  ((instruction wait)) (values "WAIT" 'wait))
 
-(defclass unary-classical-instruction (instruction)
+(defclass unary-classical-instruction (classical-instruction)
   ((target :initarg :target
            :reader classical-target))
   (:documentation "An instruction representing a unary classical function.")
@@ -323,7 +327,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defmethod arguments ((inst unary-classical-instruction))
   (vector (classical-target inst)))
 
-(defclass binary-classical-instruction (instruction)
+(defclass binary-classical-instruction (classical-instruction)
   ((left :initarg :left
          :reader classical-left-operand
          :accessor classical-target)
@@ -336,7 +340,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   (vector (classical-left-operand inst)
           (classical-right-operand inst)))
 
-(defclass trinary-classical-instruction (instruction)
+(defclass trinary-classical-instruction (classical-instruction)
   ((target :initarg :target
            :reader classical-target)
    (left :initarg :left
@@ -983,6 +987,9 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defun print-instruction (instr &optional (stream *standard-output*))
   (print-instruction-generic instr stream))
 
+(defun print-instruction-to-string (instr)
+  (print-instruction instr nil))
+
 (defgeneric print-instruction-generic (instr stream) ; total function
   (:documentation "Print the Quil instruction INSTR nicely to the stream STREAM.")
   ;; Support NIL stream.
@@ -1062,105 +1069,10 @@ N.B., The fractions of pi will be printed up to a certain precision!")
   (:method ((instr no-operation) (stream stream))
     (format stream "NOP"))
 
-  (:method ((instr classical-negate) (stream stream))
-    (format stream "NEG ~a"
-            (print-instruction (classical-target instr) nil)))
-
-  (:method ((instr classical-not) (stream stream))
-    (format stream "NOT ~a"
-            (print-instruction (classical-target instr) nil)))
-
-  (:method ((instr classical-and) (stream stream))
-    (format stream "AND ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-inclusive-or) (stream stream))
-    (format stream "IOR ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-exclusive-or) (stream stream))
-    (format stream "XOR ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-move) (stream stream))
-    (format stream "MOVE ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-exchange) (stream stream))
-    (format stream "EXCHANGE ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-convert) (stream stream))
-    (format stream "CONVERT ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-addition) (stream stream))
-    (format stream "ADD ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-subtraction) (stream stream))
-    (format stream "SUB ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-multiplication) (stream stream))
-    (format stream "MUL ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-division) (stream stream))
-    (format stream "DIV ~a ~a"
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-load) (stream stream))
-    (format stream "LOAD ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-store) (stream stream))
-    (format stream "STORE ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-equality) (stream stream))
-    (format stream "EQ ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-greater-than) (stream stream))
-    (format stream "GT ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-greater-equal) (stream stream))
-    (format stream "GE ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-less-than) (stream stream))
-    (format stream "LT ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
-
-  (:method ((instr classical-less-equal) (stream stream))
-    (format stream "LE ~a ~a ~a"
-            (print-instruction (classical-target instr) nil)
-            (print-instruction (classical-left-operand instr) nil)
-            (print-instruction (classical-right-operand instr) nil)))
+  (:method ((instr classical-instruction) (stream stream))
+    (format stream "~A~{ ~A~}"
+            (mnemonic instr)
+            (map 'list #'print-instruction-to-string (arguments instr))))
 
   (:method ((instr pragma) (stream stream))
     (format stream "PRAGMA ~{~A~^ ~}~@[ ~S~]"
