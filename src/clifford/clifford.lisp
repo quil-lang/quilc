@@ -59,6 +59,14 @@ For qubit i, X_i will have index 2i and Z_i will have index 2i+1, for 0 <= i < 2
     (funcall f (* 2 idx)      (embed +X+ n (list idx)))
     (funcall f (1+ (* 2 idx)) (embed +Z+ n (list idx)))))
 
+(defun map-all-paulis (n f)
+  "Iterate of the single qubit X, Y, and Z pauli operators represented on
+N qubits and call F on each operator and the bitwise representation."
+  (dotimes (idx n)
+    (funcall f (ash #b01 (* 2 idx)) (embed +X+ n (list idx)))
+    (funcall f (ash #b10 (* 2 idx)) (embed +Z+ n (list idx)))
+    (funcall f (ash #b11 (* 2 idx)) (embed +Y+ n (list idx)))))
+
 (defun enumerate-pauli-basis (n)
   "Enumerate the single qubit X and Z pauli operators represented on N
 qubits."
@@ -250,14 +258,15 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
 
 (defmethod print-object ((c clifford) stream)
   (print-unreadable-object (c stream :type t)
-    (format stream "~Dq" (num-qubits c))
-    (map-pauli-basis (num-qubits c)
-                     (lambda (i input-pauli)
-                       (let ((output-pauli (aref (basis-map c) i)))
-                         (unless (pauli= input-pauli output-pauli)
-                           (format stream "~%  ~A -> ~A"
-                                   (print-pauli input-pauli nil)
-                                   (print-pauli output-pauli nil))))))))
+    (let ((*print-circle* nil))
+      (format stream "~Dq" (num-qubits c))
+      (map-pauli-basis (num-qubits c)
+                       (lambda (i input-pauli)
+                         (let ((output-pauli (aref (basis-map c) i)))
+                           (unless (pauli= input-pauli output-pauli)
+                             (format stream "~%  ~A -> ~A"
+                                     (print-pauli input-pauli nil)
+                                     (print-pauli output-pauli nil)))))))))
 
 (defun symplectic-clifford (sp &optional r s)
   "Return the Clifford corresponding to the symplectic matrix SP."
