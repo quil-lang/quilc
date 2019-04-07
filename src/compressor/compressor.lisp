@@ -385,8 +385,8 @@ other's."
                                                      :relabeling reassignment))
                      (mat (make-matrix-from-quil translation-results
                                                  :relabeling reassignment))
-                     (kron-size (max (1- (integer-length (magicl:matrix-rows ref-mat)))
-                                     (1- (integer-length (magicl:matrix-rows mat)))))
+                     (kron-size (max (ilog2 (magicl:matrix-rows ref-mat))
+                                     (ilog2 (magicl:matrix-rows mat))))
                      (kroned-mat (kron-matrix-up mat kron-size))
                      (kroned-ref-mat (kron-matrix-up ref-mat kron-size)))
                 (assert
@@ -489,11 +489,11 @@ other's."
                   (reduced-matrix
                    (kron-matrix-up (make-matrix-from-quil reduced-instructions
                                                           :relabeling relabeling)
-                                   (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                                   (ilog2 (magicl:matrix-rows stretched-matrix))))
                   (reduced-decompiled-matrix
                    (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions
                                                           :relabeling relabeling)
-                                   (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+                                   (ilog2 (magicl:matrix-rows stretched-matrix)))))
              (assert (matrix-equality stretched-matrix
                                       (scale-out-matrix-phases reduced-matrix
                                                                stretched-matrix)))
@@ -536,13 +536,13 @@ other's."
          
          (check-quil-is-near-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
-             (let* ((n (1- (integer-length (magicl:matrix-rows stretched-matrix))))
+             (let* ((n (ilog2 (magicl:matrix-rows stretched-matrix)))
                     (reduced-matrix
                      (kron-matrix-up (make-matrix-from-quil reduced-instructions)
-                                     (1- (integer-length (magicl:matrix-rows stretched-matrix)))))
+                                     (ilog2 (magicl:matrix-rows stretched-matrix))))
                     (reduced-decompiled-matrix
                      (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
-                                     (1- (integer-length (magicl:matrix-rows stretched-matrix))))))
+                                     (ilog2 (magicl:matrix-rows stretched-matrix)))))
                (assert (matrix-equality stretched-matrix
                                         (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions

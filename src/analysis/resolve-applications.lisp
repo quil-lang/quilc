@@ -42,9 +42,9 @@
                     (distinct-indices (remove-duplicates qubit-indices))
                     (expected-qubits
                       (+ addl-qubits
-                         (1- (integer-length
-                              (isqrt
-                               (length (gate-definition-entries found-gate-defn))))))))
+                         (ilog2
+                          (isqrt
+                           (length (gate-definition-entries found-gate-defn)))))))
                ;; Check that all arguments are distinct
                (assert-and-print-instruction (= (length qubit-indices) (length distinct-indices))
                                              ()
@@ -82,7 +82,7 @@
                       (distinct-indices (remove-duplicates args :test 'equalp))
                       (default-gate-dimension (gate-dimension in-default-gateset))
                       (expected-qubits (+ addl-qubits
-                                          (1- (integer-length default-gate-dimension))))
+                                          (ilog2 default-gate-dimension)))
                       (default-gate-arity (dynamic-gate-arity in-default-gateset)))
 
                  ;; Check that the parameters are the correct number

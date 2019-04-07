@@ -553,7 +553,7 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
   (check-type m magicl:matrix)
   (check-type instr application)
   (alexandria:when-let ((defn (gate-matrix instr)))
-    (let* ((mat-size (1- (integer-length (magicl:matrix-rows m))))
+    (let* ((mat-size (ilog2 (magicl:matrix-rows m)))
            (size (max mat-size
                       (apply #'max
                              (map 'list (lambda (x) (1+ (qubit-index x)))

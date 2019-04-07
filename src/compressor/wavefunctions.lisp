@@ -70,7 +70,7 @@ Both arrays may be populated instead by the keyword :NOT-SIMULATED, which indica
 
 (defun qubit-count (wf)
   "For a wavefunction WF expressed as an array of components, return the number of qubits involved."
-  (1- (integer-length (length wf))))
+  (ilog2 (length wf)))
 
 (defun wavefunction-size (qubit-indices)
   "For a collection of qubit indices, calculate how large of an array is needed to store a wavefunction on these qubits."

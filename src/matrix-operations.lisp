@@ -26,6 +26,10 @@
         :always (>= (+ x +double-comparison-threshold-strict+)
                     (- y +double-comparison-threshold-strict+))))
 
+(defun ilog2 (x)
+  "Compute integer logarithm of x to the base 2."
+  (1- (integer-length x)))
+
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
   (check-type y magicl:matrix)
@@ -71,7 +75,7 @@
   d. It is required that MAT is n x n with n <= d. Returns the matrix
   MAT (+) I, where (+) denotes direct sum and I is the (d-n) x (d-n)
   identity matrix."
-  (let ((n (1- (integer-length (magicl:matrix-rows mat)))))
+  (let ((n (ilog2 (magicl:matrix-rows mat))))
     (assert (<= n d)
             (d)
             "The resulting matrix must have at least ~D rows, but only ~D were requested."
@@ -86,8 +90,8 @@
   "Given square matrices MAT1 and MAT2, returns a pair of matrices of
 equal dimensions, extending the smaller matrix by a tensor product
 with the identity matrix."
-  (let ((size1 (1- (integer-length (magicl:matrix-rows mat1))))
-        (size2 (1- (integer-length (magicl:matrix-rows mat2)))))
+  (let ((size1 (ilog2 (magicl:matrix-rows mat1)))
+        (size2 (ilog2 (magicl:matrix-rows mat2))))
     (cond ((< size1 size2)
            (setf mat1 (extend-by-identity mat1 size2)))
           ((< size2 size1)
@@ -202,7 +206,7 @@ as needed so that they are the same size."
 
 (defun kron-matrix-up (matrix n)
   "Thinking of a 2^m x 2^m MATRIX as an operator on m qubits, m < N, produces a 2^n x 2^n matrix acting on qubits 0, ..., m, ..., n-1."
-  (let ((m (1- (integer-length (magicl:matrix-rows matrix)))))
+  (let ((m (ilog2 (magicl:matrix-rows matrix))))
     (assert (<= m n))
     (if (= m n)
         matrix
