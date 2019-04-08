@@ -14,7 +14,7 @@
                                                   :name nil
                                                   :defaults *load-truename*))
       (output-file (make-pathname :name "quilc"
-                                  :type #+windows "exe" #-windows nil))
+                                  :type #+win32 "exe" #-win32 nil))
       (system-table (make-hash-table :test 'equal))
       (entry-point "quilc::entry-point"))
   (flet ((option-present-p (name)
@@ -39,6 +39,7 @@
     (load-systems-table)
     (push #'local-system-search asdf:*system-definition-search-functions*)
     (asdf:load-system "quilc")
+    #-win32
     (funcall (read-from-string "quilc::zap-info"))
     (funcall (read-from-string "quilc::setup-debugger"))
     (when (option-present-p "--quilc-sdk")

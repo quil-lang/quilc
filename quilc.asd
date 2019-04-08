@@ -21,6 +21,7 @@
                #:cl-syslog
                #:rpcq                 ; to replace HUNCHENTOOT and B-T
                #:drakma
+               #:trivial-features     ; for portable *features*
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)
