@@ -4,7 +4,7 @@
 
 (in-package #:cl-quil.clifford)
 
-(declaim (optimize (speed 0) safety debug))
+(declaim (optimize speed (safety 0) (debug 0) (space 0)))
 
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
@@ -29,6 +29,12 @@
   (let ((size (1+ (* 2 n))))
     (make-array (list size size) :element-type 'bit
                                  :initial-element 0)))
+
+(declaim (inline tableau-qubits
+                 tableau-x (setf tableau-x)
+                 tableau-z (setf tableau-z)
+                 tableau-r (setf tableau-r)
+                 tableau-scratch (setf tableau-scratch)))
 
 (defun tableau-qubits (tab)
   "How many qubits does the tableau TAB represent?"
@@ -127,19 +133,28 @@
   (the bit (logand a b)))
 (defun b* (&rest bits)
   (declare (dynamic-extent bits))
-  (the bit (reduce #'%band bits :initial-value 1)))
+  (let ((result 1))
+    (declare (type bit result))
+    (dolist (bit bits result)
+      (setf result (%band result bit)))))
 (defun %bior (a b)
   (declare (type bit a b))
   (the bit (logior a b)))
 (defun bmax (&rest bits)
   (declare (dynamic-extent bits))
-  (the bit (reduce #'%bior bits :initial-value 0)))
+  (let ((result 0))
+    (declare (type bit result))
+    (dolist (bit bits result)
+      (setf result (%bior result bit)))))
 (defun %bxor (a b)
   (declare (type bit a b))
   (the bit (logxor a b)))
 (defun b+ (&rest bits)
   (declare (dynamic-extent bits))
-  (the bit (reduce #'%bxor bits :initial-value 0)))
+  (let ((result 0))
+    (declare (type bit result))
+    (dolist (bit bits result)
+      (setf result (%bxor result bit)))))
 (defun bnot (b)
   (declare (type bit b))
   (the bit (- 1 b)))
@@ -160,7 +175,7 @@
                       :do (incf sum ph)
                       :finally (return sum)))))
     (setf sum (mod sum 4))
-    (unless (member sum '(0 2))
+    (unless (or (= sum 0) (= sum 2))
       (error "invalid prod between row ~D and ~D (got ~D):~%~A~%~A~%" h i sum
              (with-output-to-string (*standard-output*)
                (display-row tab h))
@@ -168,6 +183,7 @@
                (display-row tab i))))
     sum))
 
+(declaim (inline row-product))
 (defun row-product (tab h i)
   ;; Set generator h to h + i, where + is the Pauli group operation.
   (let ((sum (incurred-phase-from-row-product tab h i)))
@@ -246,7 +262,8 @@
     (multiple-value-bind (variables phase-kickback new-variables)
         (clifford-symplectic-action c)
       `(lambda (,tab ,@qubits)
-         (declare (type tableau ,tab)
+         (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
+                  (type tableau ,tab)
                   (type tableau-index ,@qubits))
          (dotimes (,i (* 2 (tableau-qubits ,tab)))
            (declare (type tableau-index ,i))
@@ -294,6 +311,7 @@
     (xorf (tableau-r tab i) (logand (tableau-x tab i q) (tableau-z tab i q)))
     (xorf (tableau-z tab i q) (tableau-x tab i q))))
 
+(declaim (inline tableau-set-row-to-pauli tableau-copy-row))
 (defun tableau-set-row-to-pauli (tab i b)
   "Given a tableau TAB, set row I to be the single qubit Pauli term B, where if 0 <= B < N, the X_B will be set, and if N <= B < 2*N, then Z_(B - N) will be set."
   (declare (type tableau tab)
@@ -316,7 +334,8 @@
 ;;; didn't work. I had to look at their C code for inspiration, which
 ;;; oddly does work (and doesn't do precisely what the paper says.)
 (defun tableau-measure (tab q)
-  (declare (type tableau tab)
+  (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
+           (type tableau tab)
            (type tableau-index q))
   ;; return measurement outcome, and boolean indicating if it was
   ;; deterministic
