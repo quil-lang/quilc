@@ -39,6 +39,8 @@
     (load-systems-table)
     (push #'local-system-search asdf:*system-definition-search-functions*)
     (asdf:load-system "quilc")
+    ;; TODO Something is broken here. If zap-info is left to do it's thing on
+    ;; Windows, there is a weird error. This is a short-term fix.
     #-win32
     (funcall (read-from-string "quilc::zap-info"))
     (funcall (read-from-string "quilc::setup-debugger"))
