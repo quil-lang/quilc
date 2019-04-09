@@ -171,7 +171,7 @@
   (loop :for gate-application :across (quil::parsed-program-executable-code parsed-quil)
         :collect
         (let* ((gate (quil:gate-matrix gate-application))
-               (num-qubits (1- (integer-length (magicl:matrix-cols gate)))))
+               (num-qubits (quil:ilog2 (magicl:matrix-cols gate))))
           (make-clifford
            :num-qubits num-qubits
            :basis-map (make-array

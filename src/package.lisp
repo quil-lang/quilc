@@ -407,6 +407,11 @@
   (:export
    #:quil-type-error                    ; FUNCTION
    )
+
+  ;; utilities.lisp
+  (:export
+   #:ilog2                              ; FUNCTION
+   )
   )
 
 (defpackage #:cl-quil.clifford

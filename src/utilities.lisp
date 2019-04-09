@@ -124,3 +124,7 @@ Return two values:
          (values (nreverse segments)
                  ;; I'm not even gonna comment this.
                  (alexandria:xor current-satisfaction (evenp num-segments))))))))
+
+(defun ilog2 (x)
+  "Compute integer logarithm of X to the base 2."
+  (1- (integer-length x)))
