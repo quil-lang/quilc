@@ -7,6 +7,7 @@
   (error "This file is meant to be loaded."))
 
 (pushnew :hunchentoot-no-ssl *features*)
+(pushnew :drakma-no-ssl *features*)
 
 (require 'asdf)
 
@@ -53,4 +54,3 @@
                               :save-runtime-options t
                               :executable t
                               :toplevel (make-toplevel-function entry-point))))
-
