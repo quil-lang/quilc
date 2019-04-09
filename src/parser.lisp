@@ -33,7 +33,7 @@
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
-    (format stream "~A~:[~;*~]~:[~;@L~D~]"
+    (format stream "~A~@[*~*~]~@[@L~D~]"
             (token-type obj)
             (token-payload obj)
             (token-line obj))))
