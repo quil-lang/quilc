@@ -133,14 +133,44 @@
   ("[^\\S\\n\\r]+"
    nil))
 
+(defun tokenization-failure-context (input-string condition)
+  "Given an ALEXA:LEXER-MATCH-ERROR in CONDITION, return as multiple
+values the individual line and individual character within
+INPUT-STRING that triggered the condition."
+  (flet ((alexa-failure-position (condition)
+           ;; This parses the error string of ALEXA, which looks like
+           ;; "Couldn't find match at position 42 ...". This is
+           ;; obviously a fragile and silly thing to do, so when ALEXA
+           ;; is updated to have an error condition with direct access
+           ;; to the failing position, update this code to suit.
+           (let* ((text (princ-to-string condition))
+                  (start (position-if #'digit-char-p text)))
+             (parse-integer text :start start :junk-allowed t))))
+    (let* ((pos (alexa-failure-position condition))
+           (previous-newline (position #\Newline input-string
+                                       :end pos :from-end t))
+           (start (if previous-newline (1+ previous-newline) 0))
+           (end (position #\Newline input-string
+                          :start pos)))
+      (values (subseq input-string start end)
+              (char input-string pos)))))
+
 (defun tokenize-line (lexer string)
   "Given a lexer (as defined by DEFINE-STRING-LEXER) and a string, return a list of tokens represented by that string."
-  (let ((f (funcall lexer string))
-        (*line-number* 1)
+  (let ((*line-number* 1)
         (*line-start-position* 0))
-    (loop :for tok := (funcall f)
-          :until (null tok)
-          :collect tok)))
+    (handler-case
+        (let ((f (funcall lexer string)))
+          (loop :for tok := (funcall f)
+            :until (null tok)
+            :collect tok))
+      (alexa:lexer-match-error (c)
+        (multiple-value-bind (context-line failing-char)
+            (tokenization-failure-context string c)
+          (error "At line ~D: unexpected input text ~S in ~S"
+                 *line-number*
+                 (string failing-char)
+                 context-line))))))
 
 (defun process-indentation (toks)
   "Given a list of token lines TOKS, map all changes to :INDENTATION levels to :INDENT and :DEDENT tokens."
