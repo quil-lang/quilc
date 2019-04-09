@@ -26,10 +26,6 @@
         :always (>= (+ x +double-comparison-threshold-strict+)
                     (- y +double-comparison-threshold-strict+))))
 
-(defun ilog2 (x)
-  "Compute integer logarithm of x to the base 2."
-  (1- (integer-length x)))
-
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
   (check-type y magicl:matrix)
