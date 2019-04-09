@@ -21,11 +21,13 @@
 
 (defun string-to-quil-type (name)
   "Convert a Quil string name of a data type to our internal representation."
-  (alexandria:eswitch (name :test #'string=)
+  (alexandria:switch (name :test #'string=)
     ("BIT"     quil-bit)
     ("OCTET"   quil-octet)
     ("INTEGER" quil-integer)
-    ("REAL"    quil-real)))
+    ("REAL"    quil-real)
+    (otherwise
+     (error "Unrecognized type ~S" name))))
 
 (defun quil-type-string (type)
   "Convert our internal representation of a Quil data type to a string name."

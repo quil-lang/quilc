@@ -325,8 +325,10 @@
         (quil-integer
          t)
         (_
-         (quil-type-error "MEASURE instruction must target BIT or INTEGER, but got ~A"
-                          (print-instruction (measure-address instr) nil))))))
+         (quil-type-error "MEASURE instruction target must be of type ~
+                           BIT or INTEGER, but got ~A of type ~A"
+                          (print-instruction (measure-address instr) nil)
+                          (quil-type-string (memory-descriptor-type mdesc)))))))
 
   ;; gate parameters must be REAL
   (:method ((instr application) memory-regions)
