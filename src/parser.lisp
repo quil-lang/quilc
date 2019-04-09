@@ -33,7 +33,7 @@
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
-    (format stream "~A~:[~;*~]~:[~;@L~D~]"
+    (format stream "~A~@[*~*~]~@[@L~D~]"
             (token-type obj)
             (token-payload obj)
             (token-line obj))))
@@ -429,7 +429,7 @@
          ((:PARAMETER)
           (unless *formal-arguments-allowed*
             (quil-parse-error "Found formal parameter where not allowed: ~S"
-                              arg-tok))
+                              (token-payload arg-tok)))
           (token-payload arg-tok))
          ((:COMPLEX)
           (token-payload arg-tok))
@@ -451,7 +451,7 @@
        (unless (or names-memory-region-p
                    *formal-arguments-allowed*)
          (quil-parse-error "Found formal argument where not allowed: ~S"
-                           arg-tok))
+                           (token-payload arg-tok)))
        (if names-memory-region-p
            (mref (token-payload arg-tok) 0)
            (formal (token-payload arg-tok)))))
