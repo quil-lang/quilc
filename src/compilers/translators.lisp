@@ -4,16 +4,36 @@
 
 (in-package #:cl-quil)
 
-;; a helper macro for building translator functions
+(global-vars:define-global-var **translators** (make-hash-table :test 'eq)
+  "A record of all translator names.")
+
+(defmacro do-translators ((tr bind-expr &optional ret) &body body)
+  "Iterate through all of the translator function names and the associated binding expression. Optionally return RET.
+
+TR will be bound to a function *name*, whose function object can be accessed with SYMBOL-FUNCTION.
+
+BIND-EXPR will be bound to an expression that can be matched against OPERATOR-MATCH."
+  (check-type tr symbol)
+  (check-type bind-expr symbol)
+  `(progn
+     (maphash (lambda (,tr ,bind-expr)
+                ,@body)
+              **translators**)
+     ,ret))
+
+;;; a helper macro for building translator functions
 
 (defmacro define-translator (fn-name (bind-expression gate-var) &body body)
   "Defines a function whose single argument is passed to operator-bind, which wraps BODY. In the event of a match failure, GIVE-UP-COMPILATION is called."
-  `(defun ,fn-name (,gate-var)
-     (operator-match
-       (((,bind-expression ,gate-var))
-        ,@body)
-       (_
-        (give-up-compilation)))))
+  `(progn
+     (eval-when (:compile-toplevel :load-toplevel)
+       (setf (gethash ',fn-name **translators**) ',bind-expression))
+     (defun ,fn-name (,gate-var)
+            (operator-match
+              (((,bind-expression ,gate-var))
+               ,@body)
+              (_
+               (give-up-compilation))))))
 
 ;; standard 1Q gate translators
 ;;
