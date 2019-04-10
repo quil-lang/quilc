@@ -507,7 +507,7 @@ Return the following values:
               (basic-block-out-rewiring blk)
               (= 1 (length code-section)))
          (setf (comment (aref code-section 0))
-               (format nil "Entering/exiting rewiring: '(~a . ~a)"
+               (format nil "Entering/exiting rewiring: (~a . ~a)"
                        (rewiring-l2p (basic-block-in-rewiring blk))
                        (rewiring-l2p (basic-block-out-rewiring blk)))))
         (t
