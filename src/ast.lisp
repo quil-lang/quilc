@@ -161,6 +161,13 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (declare (ignore object))
     nil))
 
+(defgeneric (setf comment) (val obj)
+  (:documentation "Setter for inline comments associated to (pseudo-)instructions.")
+  (:method (val (obj t))
+    (declare (ignore val obj))
+    (warn "SETF COMMENT does not make sense on arbitrary objects. Only apply this to INSTRUCTION-like objects that support a COMMENT slot.")
+    nil))
+
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass jump-target ()
@@ -1263,17 +1270,11 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                                      (prefix ""))
   (let ((*print-pretty* nil))
     (flet ((print-one-line (instr)
-             (cond
-               ((comment instr)
-                (format stream "~a~a~40T# ~a~%"
-                        prefix
-                        (with-output-to-string (r)
-                          (print-instruction instr r))
-                        (comment instr)))
-               (t
-                (princ prefix stream)
-                (print-instruction instr stream)
-                (terpri stream)))))
+             (write-string prefix stream)
+             (print-instruction instr stream)
+             (alexandria:when-let ((c (comment instr)))
+               (format stream "~40T# ~a" c))
+             (terpri stream)))
       (map nil #'print-one-line seq))))
 
 (defun print-parsed-program (parsed-program &optional (s *standard-output*))
