@@ -167,10 +167,9 @@ INPUT-STRING that triggered the condition."
       (alexa:lexer-match-error (c)
         (multiple-value-bind (context-line failing-char)
             (tokenization-failure-context string c)
-          (error "At line ~D: unexpected input text ~S in ~S"
-                 *line-number*
-                 (string failing-char)
-                 context-line))))))
+          (quil-parse-error "unexpected input text ~S in ~S"
+                            (string failing-char)
+                            context-line))))))
 
 (defun process-indentation (toks)
   "Given a list of token lines TOKS, map all changes to :INDENTATION levels to :INDENT and :DEDENT tokens."
