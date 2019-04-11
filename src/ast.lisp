@@ -153,29 +153,24 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (setf (delayed-expression-params c) (mapcar f (delayed-expression-params de)))
     c))
 
-;;;;;;;;;;;;;; Protocols common to (pseudo-)instructions ;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
 
-(defgeneric comment (object)
-  (:documentation "Accessor for inline comments associated to (pseudo-)instructions.")
-  (:method ((object t))
-    (declare (ignore object))
-    nil))
+(global-vars:define-global-var **comments**
+    (tg:make-weak-hash-table :test 'eq :weakness ':key)
+  "Weak hash table populated with comments associated to different parts of an AST.")
 
-(defgeneric (setf comment) (val obj)
-  (:documentation "Setter for inline comments associated to (pseudo-)instructions.")
-  (:method (val (obj t))
-    (declare (ignore val obj))
-    (warn "SETF COMMENT does not make sense on arbitrary objects. Only apply this to INSTRUCTION-like objects that support a COMMENT slot.")
-    nil))
+(defun comment (x)
+  (values (gethash x **comments**)))
+
+(defun (setf comment) (comment-string x)
+  (check-type comment-string string)
+  (setf (gethash x **comments**) comment-string))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass jump-target ()
   ((label :initarg :label
-          :reader jump-target-label)
-   (comment :initarg :comment
-            :initform nil
-            :accessor comment))
+          :reader jump-target-label))
   (:documentation "A target which can be jumped to. Corresponds to the LABEL directive."))
 
 (declaim (inline jump-target-p))
@@ -249,10 +244,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 ;;; Instructions and their protocol.
 
 (defclass instruction ()
-  ((comment :type string
-            :accessor comment
-            :initarg :comment
-            :initform nil))
+  ()
   (:documentation "Abstract class representing an executable instruction.")
   (:metaclass abstract-class))
 
