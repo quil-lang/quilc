@@ -33,6 +33,8 @@ Prerequisites to building `quilc` are:
 1. Standard UNIX build tools
 2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
+4. [ZeroMQ](http://zeromq.org/intro:get-the-software): Messaging library
+   required by RPCQ. Development headers are required at build time.
 
 Follow [these instructions](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md)
 to get started from scratch.
