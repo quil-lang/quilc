@@ -52,7 +52,7 @@
   (check-type request rpcq::|RandomizedBenchmarkingRequest|)
   (let ((k (rpcq::|RandomizedBenchmarkingRequest-depth| request))
         (n (rpcq::|RandomizedBenchmarkingRequest-qubits| request))
-        (gateset (rpcq::|RandomizedBenchmarkingRequest-gateset| request))
+        (gateset (coerce (rpcq::|RandomizedBenchmarkingRequest-gateset| request) 'list))
         (seed (rpcq::|RandomizedBenchmarkingRequest-seed| request))
         (interleaver (rpcq::|RandomizedBenchmarkingRequest-interleaver| request)))
     #-sbcl
@@ -103,8 +103,8 @@
   (check-type request rpcq::|ConjugateByCliffordRequest|)
   (let* ((pauli (rpcq::|ConjugateByCliffordRequest-pauli| request))
          (clifford-program (rpcq::|ConjugateByCliffordRequest-clifford| request))
-         (pauli-indices (rpcq::|PauliTerm-indices| pauli))
-         (pauli-terms (rpcq::|PauliTerm-symbols| pauli))
+         (pauli-indices (coerce (rpcq::|PauliTerm-indices| pauli) 'list))
+         (pauli-terms (coerce (rpcq::|PauliTerm-symbols| pauli) 'list))
          (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil-string clifford-program))) #'<))
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
          (pauli (quil.clifford:pauli-from-string
