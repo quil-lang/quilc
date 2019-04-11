@@ -520,7 +520,7 @@ Return the following values:
     code-section))
 
 (defun reconstitute-program (cfg)
-  "Reconstructs a Quil program given its control flow graph CFG.  IN-COMMENTS and OUT-COMMENTS are hash tables mapping blocks in CFG to optional comment strings to be attached to the opening and closing of each reconstituted block."
+  "Reconstructs a Quil program given its control flow graph CFG."
   (let* ((blocks (cfg-blocks cfg))
          (code-list '()))
 
