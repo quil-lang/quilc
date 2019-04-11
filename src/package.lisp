@@ -416,6 +416,11 @@
   (:export
    #:ilog2                              ; FUNCTION
    )
+
+  ;; relabeling.lisp
+  (:export
+   #:standard-qubit-relabeler           ; FUNCTION
+   )
   )
 
 (defpackage #:cl-quil.clifford

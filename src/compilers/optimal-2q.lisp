@@ -385,8 +385,10 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
              ;; we also want to know a matrix representation of the bare circuit, so
              ;; that we can use MAGICL to adorn it with SU(2) x SU(2) conjugators.
              (bare-matrix
-               (let ((temp (make-gate-matrix-from-gate-string (application-arguments instr)
-                                                              bare-circuit)))
+               (let ((temp (make-matrix-from-quil bare-circuit
+                                                  :relabeling (standard-qubit-relabeler
+                                                               (mapcar #'qubit-index
+                                                                       (application-arguments instr))))))
                  (unless (= 4 (magicl:matrix-rows temp))
                    (setf temp (kron-matrix-up temp 2)))
                  (let ((det-factor (expt (magicl:det temp) -1/4)))

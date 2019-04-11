@@ -714,7 +714,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, and B are matrices; and Q1, Q0 are qubit indices."
   (multiple-value-bind (ua ub fidelity)
       (match-matrix-to-an-e-basis-diagonalization
-       (make-matrix-from-quil center-circuit :relabeling `((,q1 . 1) (,q0 . 0)))
+       (make-matrix-from-quil center-circuit :relabeling (standard-qubit-relabeler `(,q1 ,q0)))
        a d b)
     
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
