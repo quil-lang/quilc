@@ -36,6 +36,19 @@ CNOT 0 2
 programs (modulo rewiring) to equivalent matrices."
   (let ((pp (quil::parse-quil "
 CNOT 0 1
+SWAP 0 1"))
+        (pp-rewired (quil::parse-quil "
+PRAGMA EXPECTED_REWIRING \"#(0 1)\"
+CNOT 0 1
+PRAGMA CURRENT_REWIRING \"#(1 0)\"")))
+    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
+                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+
+(deftest test-parsed-program-to-logical-matrix-swap-rewiring ()
+  "Test whether quil::parsed-program-to-logical-matrix converts equivalent
+programs (modulo rewiring) to equivalent matrices."
+  (let ((pp (quil::parse-quil "
+CNOT 0 1
 Z 0
 SWAP 0 1"))
         (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
@@ -65,7 +78,7 @@ CNOT 1 3")
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
     (format t "    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
     (finish-output)
-    (let* ((pp (quil::parse-quil "
+    (let* ((pp (quil::parse-quil-into-raw-program "
 LABEL @a
 CNOT 0 1
 CNOT 1 2
@@ -82,7 +95,7 @@ JUMP @a")))
                                                  (cl-quil::read-quil-file file))
                                 (quil::build-nQ-linear-chip 5 :architecture architecture))))
     (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                  (quil::parsed-program-to-logical-matrix proc-prog)))))
+                                  (quil::parsed-program-to-logical-matrix proc-prog :compress-qubits t)))))
 
 (deftest test-compiler-hook ()
   "Test whether the compiler hook preserves semantic equivalence for
