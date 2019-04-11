@@ -115,7 +115,7 @@
       (fiasco-assert-matrices-are-equal m u))))
 
 (deftest test-cnot->cnot ()
-  (let ((progm (parse-quil-string "CNOT 1 0"))
+  (let ((progm (parse-quil "CNOT 1 0"))
         (chip (quil::build-ibm-qx5)))
     (let* ((comp (compiler-hook progm chip))
            (code (remove-if-not (lambda (isn) (typep isn 'application))
@@ -135,7 +135,7 @@
                  (program-applications parsed-prog)))
 
 (deftest test-cnot-flipped-edge ()
-  (let ((progm (parse-quil-string "CNOT 0 1"))
+  (let ((progm (parse-quil "CNOT 0 1"))
         (chip (quil::build-ibm-qx5)))
     (let* ((comp (compiler-hook progm chip))
            (code (program-applications comp))
@@ -161,7 +161,7 @@
 
 (defun test-rewiring-in-cnot-for (gate-name i j)
   (let* ((chip (quil::build-ibm-qx5))
-         (sssppp (quil::parse-quil-string (format nil "~A ~D ~D" gate-name i j)))
+         (sssppp (quil::parse-quil (format nil "~A ~D ~D" gate-name i j)))
          (code (program-2q-instructions (quil::compiler-hook sssppp chip))))
     (is (= 1 (length code)))
     (is (funcall (link-nativep chip) (aref code 0)))))
@@ -203,7 +203,7 @@
 
 (deftest test-absolute-unit-cnot-compilation ()
   (let* ((chip (quil::build-ibm-qx5))
-         (pp (parse-quil-string "
+         (pp (parse-quil "
 # in awe at the size of this lad
 CCNOT 8 9 2
 CNOT 15 4
@@ -217,7 +217,7 @@ ISWAP 5 2"))
 
 (deftest test-cnot-triangle ()
   (let* ((chip (quil::build-nq-linear-chip 3 :architecture ':cnot))
-         (orig-prog (quil::parse-quil-string "
+         (orig-prog (quil::parse-quil "
 CNOT 1 0
 CNOT 2 1
 CNOT 0 2"))
@@ -231,7 +231,7 @@ CNOT 0 2"))
 (deftest test-ccnot-compilation-on-cphase-iswap ()
   "Test that CCNOT compiles nicely on a line having the (:CPHASE ISWAP) architecture."
   (let* ((chip (quil::build-nq-linear-chip 3 :architecture '(:cphase :iswap)))
-         (orig-prog (quil::parse-quil-string "CCNOT 0 1 2"))
+         (orig-prog (quil::parse-quil "CCNOT 0 1 2"))
          (orig-matrix (quil::parsed-program-to-logical-matrix orig-prog))
          (proc-prog (quil::compiler-hook orig-prog chip))
          (proc-matrix (quil::parsed-program-to-logical-matrix proc-prog))

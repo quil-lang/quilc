@@ -1577,7 +1577,7 @@ INPUT-STRING that triggered the condition."
               (nreverse memory-defs)
               (nreverse exec-code)))))
 
-(defun parse-quil (string)
+(defun parse-quil-into-raw-program (string)
   "Parse a string STRING into a raw, untransformed PARSED-PROGRAM object."
   (check-type string string)
   (let* ((tok-lines (tokenize string)))
@@ -1634,11 +1634,11 @@ INPUT-STRING that triggered the condition."
         (let ((*resolve-include-pathname* #'resolve-safely))
           (read-it filename)))))
 
-(defun safely-parse-quil-string (string)
+(defun safely-parse-quil (string)
   "Safely parse a Quil string STRING."
   (flet ((parse-it (string)
            (let ((*allow-unresolved-applications* t))
-             (parse-quil-string string))))
+             (parse-quil string))))
     (if (null *safe-include-directory*)
         (parse-it string)
         (let ((*resolve-include-pathname* #'resolve-safely))

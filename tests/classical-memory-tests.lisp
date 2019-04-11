@@ -21,7 +21,7 @@
   "Test that we correctly build a model for an OCTET tree of memory."
   (let ((model (memory-descriptors-to-model
                 (parsed-program-memory-definitions
-                 (parse-quil-string
+                 (parse-quil
                   (binary-memory-tree 128)))
                 :alignment 8
                 :real-bits 64
@@ -52,7 +52,7 @@ DECLARE ix INTEGER SHARING o
       (signals quil:quil-memory-model-error
         (memory-descriptors-to-model
          (parsed-program-memory-definitions
-          (parse-quil-string bad))
+          (parse-quil bad))
          :alignment 8
          :real-bits 64
          :integer-bits 64)))))
@@ -99,7 +99,7 @@ DECLARE y OCTET SHARING x                   # no no
       (not-signals quil:quil-memory-model-error
         (memory-descriptors-to-model
          (parsed-program-memory-definitions
-          (parse-quil-string
+          (parse-quil
            (format nil "DECLARE mem OCTET[128]~%~A~%" p)))
          :alignment 8
          :real-bits 64
@@ -109,7 +109,7 @@ DECLARE y OCTET SHARING x                   # no no
       (signals quil:quil-memory-model-error
         (memory-descriptors-to-model
          (parsed-program-memory-definitions
-          (parse-quil-string
+          (parse-quil
            (format nil "DECLARE mem OCTET[128]~%~A~%" p)))
          :alignment 8
          :real-bits 64

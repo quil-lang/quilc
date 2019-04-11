@@ -20,10 +20,10 @@
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
 programs (modulo rewiring) to equivalent matrices."
-  (let ((pp (quil::parse-quil-string "
+  (let ((pp (quil::parse-quil "
 CNOT 1 2
-CNOT 1 0")) 
-        (pp-rewired (attach-rewirings-to-program (quil::parse-quil-string "
+CNOT 1 0"))
+        (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
 CNOT 0 1
 CNOT 0 2
 ")
@@ -34,11 +34,11 @@ CNOT 0 2
 (deftest test-parsed-program-to-logical-matrix-swap-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
 programs (modulo rewiring) to equivalent matrices."
-  (let ((pp (quil::parse-quil-string "
+  (let ((pp (quil::parse-quil "
 CNOT 0 1
 Z 0
 SWAP 0 1"))
-        (pp-rewired (attach-rewirings-to-program (quil::parse-quil-string "
+        (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
 CNOT 0 1
 Z 0")
                                                  #(0 1) #(1 0))))
@@ -54,8 +54,8 @@ Z 0")
     (let* ((pstring "
 CNOT 0 2
 CNOT 1 3")
-           (pp (quil::parse-quil-string pstring))
-           (cpp (quil::compiler-hook (quil::parse-quil-string pstring)
+           (pp (quil::parse-quil pstring))
+           (cpp (quil::compiler-hook (quil::parse-quil pstring)
                                      (quil::build-nQ-linear-chip 4)
                                      :protoquil t)))
       (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
@@ -103,7 +103,7 @@ some test programs."
   (let ((quil::*enable-state-prep-compression* t)
         (quil::*compress-carefully* t)
         (instructions (quil:parsed-program-executable-code
-                       (quil:parse-quil-string "
+                       (quil:parse-quil "
 RZ(0.9800157744729435) 2
 RX(pi/2) 2
 RZ(1.2991200310990418) 2
@@ -166,7 +166,7 @@ RX(pi) 2
 (deftest test-compiler-hook-reset-naive-rewiring ()
   ;; Note this numbering depends on the fact that the CZ gates are
   ;; native on the 8Q chip.
-  (let* ((pp (quil::parse-quil "
+  (let* ((pp (quil::parse-quil-into-raw-program "
 PRAGMA INITIAL_REWIRING \"NAIVE\"
 CZ 1 2
 CZ 3 4
@@ -182,7 +182,7 @@ CZ 5 6
                                (_ nil))))))))
 
 (deftest test-compiler-hook-reset-partial-rewiring ()
-  (let* ((pp (quil::parse-quil "
+  (let* ((pp (quil::parse-quil-into-raw-program "
 PRAGMA INITIAL_REWIRING \"PARTIAL\"
 CZ 1 2
 CZ 7 6
@@ -199,7 +199,7 @@ CZ 2 7
 
 (deftest test-compiling-empty-program ()
   "Test that an empty program goes through the pipes correctly."
-  (let* ((pp (quil::parse-quil ""))
+  (let* ((pp (quil::parse-quil-into-raw-program ""))
          (processed-program (quil::compiler-hook pp (quil::build-8Q-chip))))
     (is (every (lambda (isn)
                  (or (typep isn 'quil:halt)
@@ -227,7 +227,7 @@ CZ 2 7
 
          (make-pp ()
            (quil::transform 'quil::resolve-applications
-                            (quil::parse-quil program-string))))
+                            (quil::parse-quil-into-raw-program program-string))))
     (let* ((chip (quil::build-8Q-chip :architecture ':cz))
            (processed-pp (compiler-hook (make-pp) chip))
            (orig-pp (make-pp)))
@@ -270,7 +270,7 @@ RX(pi/3) 0
   \"1\": {},
   \"2\": {}},
  \"2Q\": {\"1-2\": {}}}}")))
-             (pp (quil::parse-quil-string "
+             (pp (quil::parse-quil "
 H 1
 CNOT 1 2"))
              (old-matrix (quil::parsed-program-to-logical-matrix pp))
@@ -279,7 +279,7 @@ CNOT 1 2"))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
-  (let ((pp (quil::parse-quil "
+  (let ((pp (quil::parse-quil-into-raw-program "
 DECLARE beta REAL[1]
 DECLARE gamma REAL[1]
 DECLARE ro BIT[3]
@@ -332,7 +332,7 @@ MEASURE 2 ro[2]
       (is (every #'identity (quil::rewiring-p2l final))))))
 
 (deftest test-pragma-preserve-block ()
-  (let* ((pp (parse-quil-string "
+  (let* ((pp (parse-quil "
 H 0
 PRAGMA PRESERVE_BLOCK
 H 0
@@ -342,7 +342,7 @@ PRAGMA END_PRESERVE_BLOCK
          (cp (remove-if (lambda (instr) (or (typep instr 'pragma)
                                        (typep instr 'halt)))
                         (parsed-program-executable-code (compiler-hook pp (build-8q-chip)))))
-         (ph (parse-quil-string "H 0"))
+         (ph (parse-quil "H 0"))
          (ch (remove-if (lambda (instr) (or (typep instr 'pragma)
                                        (typep instr 'halt)))
                         (parsed-program-executable-code (compiler-hook ph (build-8q-chip))))))
@@ -357,7 +357,7 @@ PRAGMA END_PRESERVE_BLOCK
                  (print-instruction (elt (parsed-program-executable-code ph) 0) nil)))))
 
 (deftest test-check-protoquil-program ()
-  (let* ((valid-pp (parse-quil-string "
+  (let* ((valid-pp (parse-quil "
 PRAGMA PRESERVE_BLOCK
 RESET
 PRAGMA END_PRESERVE_BLOCK
@@ -368,7 +368,7 @@ MEASURE 0
 PRAGMA END_PRESERVE_BLOCK
 MEASURE 1
 "))
-         (invalid-pp-1in2 (parse-quil-string "
+         (invalid-pp-1in2 (parse-quil "
 PRAGMA PRESERVE_BLOCK
 RESET
 PRAGMA END_PRESERVE_BLOCK
@@ -380,7 +380,7 @@ MEASURE 0
 PRAGMA END_PRESERVE_BLOCK
 MEASURE 1
 "))
-         (invalid-pp-1in3 (parse-quil-string "
+         (invalid-pp-1in3 (parse-quil "
 PRAGMA PRESERVE_BLOCK
 RESET
 PRAGMA END_PRESERVE_BLOCK
@@ -392,7 +392,7 @@ RESET
 PRAGMA END_PRESERVE_BLOCK
 MEASURE 1
 "))
-         (invalid-pp-2in3 (parse-quil-string "
+         (invalid-pp-2in3 (parse-quil "
 PRAGMA PRESERVE_BLOCK
 RESET
 PRAGMA END_PRESERVE_BLOCK
@@ -429,7 +429,7 @@ MEASURE 1
 
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
-  (let ((p (quil::compiler-hook (quil::parse-quil "
+  (let ((p (quil::compiler-hook (quil::parse-quil-into-raw-program "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
                                 (quil::build-8Q-chip)))

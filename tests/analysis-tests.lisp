@@ -68,19 +68,19 @@ DEFGATE I:
 (deftest test-repeat-qubits ()
   "Test that repeated qubits on a gate are detected."
   (signals simple-error
-    (cl-quil:parse-quil-string
+    (cl-quil:parse-quil
      (identity-test-program "I 1 1"))))
 
 (deftest test-too-few-qubits ()
   "Test that a gate applied to too few qubits is detected."
   (signals simple-error
-    (cl-quil:parse-quil-string
+    (cl-quil:parse-quil
      (identity-test-program "I 0"))))
 
 (deftest test-too-many-qubits ()
   "Test that a gate applied to too many qubits is detected."
   (signals simple-error
-    (cl-quil:parse-quil-string "I 1 2 3")))
+    (cl-quil:parse-quil "I 1 2 3")))
 
 (deftest test-standard-gate-resolution ()
   "Test that all standard gates resolve."
@@ -149,7 +149,7 @@ DEFGATE I:
 
 (deftest test-kraus-stuff-rewritten-properly ()
   "Test that COMPRESS-QUBITS acts correctly on Kraus/POVM PRAGMAs."
-  (let ((p (quil:parse-quil-string "
+  (let ((p (quil:parse-quil "
 DECLARE ro BIT[6]
 PRAGMA ADD-KRAUS X 0 \"(0 0 0 0)\"
 PRAGMA ADD-KRAUS X 5 \"(5 0 0 0)\"
@@ -170,7 +170,7 @@ MEASURE 5 ro[5]
 (deftest test-parameter-arithmetic-rewriting ()
   "Test rewriting arithmetic for gates with and without parameters."
   (let ((in-p (let ((quil:*allow-unresolved-applications* t))
-                (quil:parse-quil-string "
+                (quil:parse-quil "
 DECLARE a REAL
 DECLARE b REAL[2]
 A(1, 1 + 1, a, 1 + a)
@@ -250,7 +250,7 @@ E(a + 3 * b[1]) 0 1 2 3
 (deftest test-plain-arithmetic-rewriting ()
   "Test rewriting arithmetic for a program without any parameters to rewrite."
   (let ((in-p (let ((quil:*allow-unresolved-applications* t))
-                (quil:parse-quil-string "
+                (quil:parse-quil "
 DECLARE a REAL
 DECLARE b REAL[2]
 A(1, 1 + 1, a)

@@ -6,7 +6,7 @@
   (:use #:cl)
   (:export
    #:make-resource-collection           ; FUNCTION
-   #:make-qubit-resource                ; FUNCTION   
+   #:make-qubit-resource                ; FUNCTION
    #:make-null-resource                 ; FUNCTION
    #:make-all-resource                  ; FUNCTION
    #:make-resource-range                ; FUNCTION
@@ -20,7 +20,7 @@
    #:resource-subsetp                   ; PREDICATE
    #:resource-null-p                    ; PREDICATE
    #:resource-all-p                     ; PREDICATE
-   
+
    #:build-qubit-pair-resource          ; FUNCTION
    ))
 
@@ -359,6 +359,7 @@
 
   ;; parser.lisp
   (:export
+   #:parse-quil-into-raw-program        ; FUNCTION
    #:quil-parse-error                   ; CONDITION
    )
 
@@ -379,7 +380,7 @@
 
   ;; cl-quil.lisp
   (:export
-   #:parse-quil-string                  ; FUNCTION
+   #:parse-quil                         ; FUNCTION
    #:read-quil-file                     ; FUNCTION
    )
 
@@ -405,7 +406,7 @@
   (:export
    #:parsed-program-to-logical-matrix ; FUNCTION
    )
-  
+
   ;; type-safety.lisp
   (:export
    #:quil-type-error                    ; FUNCTION

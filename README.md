@@ -163,14 +163,14 @@ $ sbcl
 * (ql:quickload :cl-quil)
 ;;; <snip>compilation output</snip>
 (:CL-QUIL)
-* (cl-quil:parse-quil-string "H 0")
+* (cl-quil:parse-quil "H 0")
 #<CL-QUIL:PARSED-PROGRAM {100312C643}>
 ```
 
 A few good entry points to exploring the library are:
 
 * The functions `cl-quil::parse-quil` in [`src/parser.lisp`](src/parser.lisp), and
-  `cl-quil:parse-quil-string` in [`src/cl-quil.lisp`](src/cl-quil.lisp) and the various
+  `cl-quil:parse-quil` in [`src/cl-quil.lisp`](src/cl-quil.lisp) and the various
   transforms therein.
 * The function `cl-quil:compiler-hook` which constructs a control-flow
   graph (CFG) and then performs various optimizations on the CFG.

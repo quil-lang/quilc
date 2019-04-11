@@ -8,7 +8,7 @@
 (in-package #:cl-quil-tests)
 
 (deftest test-typed-circuit-expansion ()
-  (let ((pp (quil::parse-quil "
+  (let ((pp (quil::parse-quil-into-raw-program "
 DECLARE a BIT
 
 DEFCIRCUIT CLEAR q scratch-bit:
@@ -29,7 +29,7 @@ CLEAR 0 a")))
                   (quil::mref "a" 0 (first (quil::parsed-program-memory-definitions pp))))))))
 
 (deftest test-constant-coercion ()
-  (let ((pp (quil::parse-quil "
+  (let ((pp (quil::parse-quil-into-raw-program "
 DECLARE stats INTEGER
 DECLARE angle REAL
 
@@ -51,7 +51,7 @@ RX(-2.0*angle) 0")))
         (is (typep param 'quil::delayed-expression))))))
 
 (deftest test-compression-with-classical-angles ()
-  (let ((pp (quil::parse-quil "
+  (let ((pp (quil::parse-quil-into-raw-program "
 DECLARE val REAL[8]
 DECLARE ro BIT
 DECLARE int INTEGER
@@ -68,7 +68,7 @@ RZ(val[3]) 1")))
       (is (= 3 (length (quil::parsed-program-executable-code cpp)))))))
 
 (deftest test-compression-with-classical-angles-+-resource-usage ()
-  (let ((pp (quil::parse-quil "
+  (let ((pp (quil::parse-quil-into-raw-program "
 DECLARE val REAL[8]
 DECLARE ro BIT
 DECLARE int INTEGER
@@ -88,7 +88,7 @@ RZ(val[3]) 1")))
 (deftest test-paltry-type-conversions ()
   "Test that we convert classical base classes into specialized classes correctly."
   (let ((code (quil:parsed-program-executable-code
-               (quil:parse-quil-string "
+               (quil:parse-quil "
 DECLARE w BIT
 DECLARE x OCTET
 DECLARE y INTEGER

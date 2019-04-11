@@ -20,7 +20,7 @@
 (defun quil-to-native-quil (request)
   "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA."
   (check-type request rpcq::|NativeQuilRequest|)
-  (let* ((quil-program (quil::parse-quil (rpcq::|NativeQuilRequest-quil| request)))
+  (let* ((quil-program (quil::parse-quil-into-raw-program (rpcq::|NativeQuilRequest-quil| request)))
          (target-device (rpcq::|NativeQuilRequest-target_device| request))
          (qpu-hash (alexandria:plist-hash-table (list "isa" (rpcq::|TargetDevice-isa| target-device)
                                                       "specs" (rpcq::|TargetDevice-specs| target-device))
@@ -66,13 +66,13 @@
            (qubits-used (mapcar (alexandria:compose
                                  (alexandria:curry #'reduce #'union)
                                  #'cl-quil.clifford::extract-qubits-used
-                                 #'cl-quil:parse-quil-string)
+                                 #'cl-quil:parse-quil)
                                 gateset))
            (qubits-used-by-interleaver
              (when interleaver
                (reduce #'union
                        (cl-quil.clifford::extract-qubits-used
-                        (cl-quil:parse-quil-string interleaver)))))
+                        (cl-quil:parse-quil interleaver)))))
            (qubits (union qubits-used-by-interleaver (reduce #'union qubits-used)))
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
@@ -105,7 +105,7 @@
          (clifford-program (rpcq::|ConjugateByCliffordRequest-clifford| request))
          (pauli-indices (coerce (rpcq::|PauliTerm-indices| pauli) 'list))
          (pauli-terms (coerce (rpcq::|PauliTerm-symbols| pauli) 'list))
-         (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil-string clifford-program))) #'<))
+         (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil clifford-program))) #'<))
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
          (pauli (quil.clifford:pauli-from-string
                  (with-output-to-string (s)
@@ -126,7 +126,7 @@
 (defun rewrite-arithmetic (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
-  (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-quil| request))))
+  (let ((program (quil::parse-quil-into-raw-program (rpcq::|RewriteArithmeticRequest-quil| request))))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
       (let ((reformatted-rt (make-hash-table)))

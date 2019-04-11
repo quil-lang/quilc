@@ -24,7 +24,7 @@
   (is (string= (format nil "H 0~%CNOT 0 1~%")
                (with-output-to-string (out)
                  (quil::print-code-list (quil:parsed-program-executable-code
-                                         (quil::parse-quil (format nil "H 0~%CNOT 0 1"))) out)))))
+                                         (quil::parse-quil-into-raw-program (format nil "H 0~%CNOT 0 1"))) out)))))
 
 (defun assert-cfg-edge-invariant (cfg)
   "Asserts that the outgoing and incoming fields of blocks in CFG are a valid match."
@@ -44,7 +44,7 @@
 
 (deftest test-reconstitute-unconditional-jump ()
   "Test that the correct program is parsed from a CFG with one edge"
-  (let* ((p (quil::parse-quil (format nil "H 0~%JUMP @NEXT~%LABEL @NEXT~%X 1")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "H 0~%JUMP @NEXT~%LABEL @NEXT~%X 1")))
          (blk-1 (format nil "H 0~%JUMP"))
          (blk-2 "X 1")
          (cfg (quil::program-cfg p))
@@ -55,7 +55,7 @@
     (is (search blk-2 string-result))))
 
 (deftest test-reconstitute-conditional-jump ()
-  (let* ((p (quil::parse-quil (format nil "DECLARE ro BIT~%H 0~%JUMP-UNLESS @NEXT ro[0]~%LABEL @NEXT~%Z 0")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "DECLARE ro BIT~%H 0~%JUMP-UNLESS @NEXT ro[0]~%LABEL @NEXT~%Z 0")))
          (blk-0 (format nil "H 0~%JUMP-WHEN"))
          (blk-1 "LABEL @NEXT")
          (blk-2 "Z 0")
@@ -79,7 +79,7 @@
 
 (deftest test-remove-block ()
   "Tests that removing a block from the CFG preserves the validity of the CFG."
-  (let* ((p (quil::parse-quil (format nil "X 0~%JUMP @END~%LABEL @END")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "X 0~%JUMP @END~%LABEL @END")))
          (cfg (quil::program-cfg p))
          (to-remove (first (quil::cfg-blocks cfg))))
     
@@ -89,14 +89,14 @@
 
 (deftest test-dce-none ()
   "Tests the operation of dead code elimination when the cfg is already optimal."
-  (let* ((p (quil::parse-quil (format nil "X 0~%JUMP @END~%LABEL @END")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "X 0~%JUMP @END~%LABEL @END")))
          (cfg (quil::program-cfg p :dce t))
          (blocks-result (quil::cfg-blocks cfg)))
     (is (= 2 (length blocks-result)))))
 
 (deftest test-dce-simple-extras ()
   "Tests the operation of dead code elimination when presented with a simple graph with extra labels."
-  (let* ((p (quil::parse-quil (format nil "X 0~%JUMP @END~%LABEL @END~%Y 0~%JUMP @ANOTHER~%LABEL @ANOTHER~%Z 0~%JUMP @END~%LABEL @END")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "X 0~%JUMP @END~%LABEL @END~%Y 0~%JUMP @ANOTHER~%LABEL @ANOTHER~%Z 0~%JUMP @END~%LABEL @END")))
          (cfg (quil::program-cfg p :dce t))
          (blocks-result (quil::cfg-blocks cfg)))
 
@@ -105,7 +105,7 @@
 
 (deftest test-dce-dead-loop ()
   "Tests the operation of dead code elimination when the cfg has a dead loop."
-  (let* ((p (quil::parse-quil (format nil "JUMP @L~%LABEL @D~%X 0~%JUMP @D~%LABEL @L~%H 0")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "JUMP @L~%LABEL @D~%X 0~%JUMP @D~%LABEL @L~%H 0")))
          (cfg (quil::program-cfg p :dce t))
          (blocks-result (quil::cfg-blocks cfg)))
 
@@ -119,7 +119,7 @@
 
 (deftest test-block-fusion-maximally-simplified ()
   "Tests the operation of block fusion when the CGF is already maximally simplified."
-  (let* ((p (quil::parse-quil (format nil "X 0")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "X 0")))
          (cfg (quil::program-cfg p :dce t :simplify t))
          (blocks-result (quil::cfg-blocks cfg))
          (entry (quil::entry-point cfg))
@@ -132,7 +132,7 @@
 
 (deftest test-block-fusion-simple-contraction ()
   "Tests the operation of block fusion when the CFG has a single edge that can be contracted."
-  (let* ((p (quil::parse-quil (format nil "X 0~%JUMP @NEXT~%LABEL @NEXT~%JUMP @ANOTHER~%LABEL @ANOTHER~%JUMP @END~%LABEL @END")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "X 0~%JUMP @NEXT~%LABEL @NEXT~%JUMP @ANOTHER~%LABEL @ANOTHER~%JUMP @END~%LABEL @END")))
          (cfg (quil::program-cfg p :dce t :simplify t))
          (blocks-result (quil::cfg-blocks cfg)))
 
@@ -141,7 +141,7 @@
 
 (deftest test-block-fusion-multiple-contraction-unique-code ()
   "Tests the operation of block fusion when the CFG has multiple edges that can be contracted, where each block has disimilar code."
-  (let* ((p (quil::parse-quil (format nil "LABEL @START~%X 0~%JUMP @MID~%LABEL @MID~%Y 0~%JUMP @END~%LABEL @END~%Z 0")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "LABEL @START~%X 0~%JUMP @MID~%LABEL @MID~%Y 0~%JUMP @END~%LABEL @END~%Z 0")))
          (cfg (quil::program-cfg p :dce t :simplify t))
          (blocks-result (quil::cfg-blocks cfg))
          (merged-blk (first (remove-if (lambda (blk)
@@ -159,7 +159,7 @@
 
 (deftest test-block-fusion-empty-single-unconditional-self-loop ()
   "Tests the operation of block fusion when the CFG has an unconditional self-loop with a single empty block."
-  (let* ((p (quil::parse-quil (format nil "LABEL @START~%H 0~%JUMP @LOOPER~%LABEL @LOOPER~%JUMP @START")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "LABEL @START~%H 0~%JUMP @LOOPER~%LABEL @LOOPER~%JUMP @START")))
          (cfg (quil::program-cfg p :dce t :simplify t))
          (blocks-result (quil::cfg-blocks cfg)))
 
@@ -169,7 +169,7 @@
 
 (deftest test-block-fusion-nonempty-conditional-multiple-self-loop ()
   "Tests the operation of block fusion when the CFG has a long self loop with code inside."
-  (let* ((p (quil::parse-quil (format nil "DECLARE ro BIT~%LABEL @START~%H 0~%JUMP-WHEN @LOOPER ro[0]~%JUMP @END~%LABEL @LOOPER~%JUMP @LOOPER2~%LABEL @LOOPER2~%X 0~%JUMP @LOOPER3~%LABEL @LOOPER3~%JUMP @START~%LABEL @END")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "DECLARE ro BIT~%LABEL @START~%H 0~%JUMP-WHEN @LOOPER ro[0]~%JUMP @END~%LABEL @LOOPER~%JUMP @LOOPER2~%LABEL @LOOPER2~%X 0~%JUMP @LOOPER3~%LABEL @LOOPER3~%JUMP @START~%LABEL @END")))
          (cfg (quil::program-cfg p :dce t :simplify t))
          (blocks-result (quil::cfg-blocks cfg)))
 
@@ -179,7 +179,7 @@
 
 (deftest test-block-fusion-empty-conditional-self-loop ()
   "Tests the operaton of block fusion when the CFG has an empty self loop with a conditional control."
-  (let* ((p (quil::parse-quil (format nil "DECLARE ro BIT~%LABEL @START~%H 0~%JUMP-WHEN @LOOPER ro[0]~%JUMP @END~%LABEL @LOOPER~%JUMP @LOOPER2~%LABEL @LOOPER2~%JUMP @LOOPER3~%LABEL @LOOPER3~%JUMP @START~%LABEL @END")))
+  (let* ((p (quil::parse-quil-into-raw-program (format nil "DECLARE ro BIT~%LABEL @START~%H 0~%JUMP-WHEN @LOOPER ro[0]~%JUMP @END~%LABEL @LOOPER~%JUMP @LOOPER2~%LABEL @LOOPER2~%JUMP @LOOPER3~%LABEL @LOOPER3~%JUMP @START~%LABEL @END")))
          (cfg (quil::program-cfg p :dce t :simplify t))
          (blocks-result (quil::cfg-blocks cfg)))
 

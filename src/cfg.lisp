@@ -431,8 +431,8 @@ Return the following values:
                           (not (basic-block-in-rewiring blk))
                           (equalp (basic-block-out-rewiring parent)
                                   (basic-block-in-rewiring blk))))
-                 
-                 
+
+
                  ;; The conditions are met to sequentially merge these blocks
                  (let ((new-blk (merge-sequentially parent blk)))
                    ;; After getting a merged block, update the CFG
@@ -531,7 +531,7 @@ Return the following values:
               (if (eq block (entry-point cfg))
                   (concatenate 'vector reconstituted-code code-list)
                   (concatenate 'vector code-list reconstituted-code)))))
-    
+
     (make-instance 'parsed-program
                    :gate-definitions '()
                    :circuit-definitions '()
@@ -645,9 +645,9 @@ Return the following values:
   nil)
 
 (defun output-cfg (quil out-file &key parallel dce simplify)
-  (let ((pp (parse-quil (if (pathnamep quil)
-                            (alexandria:read-file-into-string quil)
-                            quil))))
+  (let ((pp (parse-quil-into-raw-program (if (pathnamep quil)
+                                             (alexandria:read-file-into-string quil)
+                                             quil))))
     (setf pp (transform 'process-includes pp (if (pathnamep quil) quil nil)))
     (output-cfg-from-program pp out-file :parallel parallel :dce dce :simplify simplify)))
 
