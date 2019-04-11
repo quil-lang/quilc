@@ -420,9 +420,19 @@ HTTP server for good.
         (setf (quil::parsed-program-executable-code processed-program)
               (coerce
                (loop :for instr :across (quil::parsed-program-executable-code processed-program)
-                     :when (and (typep instr 'quil::pragma-current-rewiring))
-                       :do (setf (gethash "final-rewiring" *statistics-dictionary*)
-                                 (quil::pragma-rewiring instr))
+                     :when (quil::comment instr)
+                       :do (cond
+                             ((uiop:string-prefix-p "Entering rewiring: " (quil::comment instr))
+                              (setf (gethash "final_rewiring" *statistics-dictionary*)
+                                    (subseq (quil::comment instr) (length "Entering rewiring: "))))
+                             ((uiop:string-prefix-p "Entering/exiting rewiring: " (quil::comment instr))
+                              (let ((comment (quil::comment instr))
+                                    (length (length "Entering/exiting rewiring: (")))
+                                (setf (gethash "final_rewiring" *statistics-dictionary*)
+                                      (subseq (quil::comment instr) length (- (length comment)
+                                                                              (/ (- (length comment) length) 2)
+                                                                              2)))))
+                             (t nil))
                      :unless (typep instr 'quil::halt)
                        :collect instr)
                'vector)))
@@ -430,7 +440,6 @@ HTTP server for good.
       ;; now that we've compiled the program, we have various things to output
       ;; one thing we're always going to want to output is the program itself.
       (print-program processed-program *quil-stream*)
-
 
       (when *topological-swaps*
         (print-topological-swap-count topological-swaps))

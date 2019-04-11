@@ -65,7 +65,7 @@ RZ(val[3]) 1")))
     (quil::transform 'quil::expand-circuits pp)
     (quil::transform 'quil::type-check pp)
     (let ((cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
-      (is (= 5 (length (quil::parsed-program-executable-code cpp)))))))
+      (is (= 3 (length (quil::parsed-program-executable-code cpp)))))))
 
 (deftest test-compression-with-classical-angles-+-resource-usage ()
   (let ((pp (quil::parse-quil "
@@ -83,7 +83,7 @@ RZ(val[3]) 1")))
     (quil::transform 'quil::expand-circuits pp)
     (quil::transform 'quil::type-check pp)
     (let ((cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
-      (is (= 7 (length (quil::parsed-program-executable-code cpp)))))))
+      (is (= 5 (length (quil::parsed-program-executable-code cpp)))))))
 
 (deftest test-paltry-type-conversions ()
   "Test that we convert classical base classes into specialized classes correctly."

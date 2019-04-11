@@ -26,6 +26,7 @@
                #:cl-algebraic-data-type
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
+               #:trivial-garbage        ; weak hash tables
                #:cl-permutation
                #:queues.priority-queue
                )

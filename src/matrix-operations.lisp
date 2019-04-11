@@ -113,33 +113,65 @@ as needed so that they are the same size."
   ;; to handle a l2p rewiring, we need to conjugate the "physical"
   ;; matrix of a block by the permutation matrix associated with the
   ;; rewiring. this is somewhat complicated by the fact that rewirings
-  ;; when we enter a block (EXPECTED_REWIRING) and when we exit a
-  ;; block (CURRENT_REWIRING) may differ
+  ;; when we enter a block and when we exit a block may differ.
   (loop
     :with mat := (magicl:make-complex-matrix 1 1 '(1d0))
     :with rewiring := (make-rewiring 1)
     :for instr :across (parsed-program-executable-code pp)
-    :do (typecase instr
-          (gate-application
-           (setf mat (apply-gate mat instr)))
-          (pragma-expected-rewiring
-           (let ((trimmed (trim-rewiring
-                           (pragma-rewiring instr))))
-             (setf mat (reduce #'matrix-rescale-and-multiply
-                               (list (rewiring-to-permutation-matrix-l2p trimmed)
-                                     (rewiring-to-permutation-matrix-p2l rewiring)
-                                     mat))
-                   rewiring trimmed)))
-          (pragma-current-rewiring
-           (setf rewiring (trim-rewiring (pragma-rewiring instr))))
-          (halt
-           (loop-finish))
-          (no-operation
-           t)
-          (pragma                 ; we ignore all other pragmas
-           t)
-          (otherwise 
-           (error "Instruction ~a is not a gate application." instr)))
+    :do (progn
+          (flet ((apply-entering-rewiring (instr &optional vector)
+                   (let* ((*read-eval* nil)
+                          (raw-rewiring (if vector
+                                            (make-rewiring-from-l2p vector)
+                                            (make-rewiring-from-l2p
+                                             (read-from-string (subseq (comment instr)
+                                                                       (length "Entering rewiring: "))))))
+                          (trimmed (trim-rewiring raw-rewiring)))
+                     (setf mat (reduce #'matrix-rescale-and-multiply
+                                       (list (rewiring-to-permutation-matrix-l2p trimmed)
+                                             (rewiring-to-permutation-matrix-p2l rewiring)
+                                             mat))
+                           rewiring trimmed)))
+                 (apply-exiting-rewiring (instr &optional vector)
+                   (let* ((*read-eval* nil)
+                          (raw-rewiring (if vector
+                                            (make-rewiring-from-l2p vector)
+                                            (make-rewiring-from-l2p
+                                             (read-from-string (subseq (comment instr)
+                                                                       (length "Exiting rewiring: ")))))))
+                     (setf rewiring (trim-rewiring raw-rewiring))))
+                 (apply-instr (instr)
+                   (typecase instr
+                     (gate-application
+                      (setf mat (apply-gate mat instr)))
+                     (halt
+                      t)
+                     (no-operation
+                      t)
+                     (pragma
+                      t)
+                     (otherwise 
+                      (error "Instruction ~a is not a gate application." instr)))))
+            (cond
+              ((and (comment instr)
+                    (uiop:string-prefix-p "Entering/exiting rewiring: " (comment instr)))
+               (let ((*read-eval* nil))
+                 (destructuring-bind (entering-vector . exiting-vector)
+                     (read-from-string (subseq (comment instr)
+                                               (length "Entering/exiting rewiring: ")))
+                   (apply-entering-rewiring instr exiting-vector)
+                   (apply-instr instr)
+                   (apply-exiting-rewiring instr entering-vector))))
+              (t
+               (when (and (comment instr)
+                          (uiop:string-prefix-p "Entering rewiring: " (comment instr)))
+                 (apply-entering-rewiring instr))
+               (apply-instr instr)
+               (when (and (comment instr)
+                          (uiop:string-prefix-p "Exiting rewiring: " (comment instr)))
+                 (apply-exiting-rewiring instr)))))
+          (when (typep instr 'halt)
+            (loop-finish)))
     :finally (return (matrix-rescale-and-multiply
                       (rewiring-to-permutation-matrix-p2l rewiring)
                       mat))))

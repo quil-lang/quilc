@@ -158,8 +158,6 @@ Returns a value list: (processed-program, of type parsed-program
          (cfg (program-cfg parsed-program :dce t :simplify t))
          ;; this is a list of pairs (block-to-be-traversed registrant)
          (block-stack (list (list (entry-point cfg) nil)))
-         (block-initial-l2p (make-hash-table))
-         (block-final-l2p (make-hash-table))
          (topological-swaps 0)
          (unpreserved-duration 0))
     
@@ -222,15 +220,8 @@ Returns a value list: (processed-program, of type parsed-program
            ;; if so, then we don't have any business compiling it. treat
            ;; it as marked, with the identity rewiring on both ends,
            ;; and proceed 
-           (setf (basic-block-code blk)
-                 (concatenate 'vector
-                              (list (make-instance 'pragma-expected-rewiring
-                                                   :rewiring (make-rewiring (chip-spec-n-qubits chip-specification))))
-                              (basic-block-code blk)
-                              (list (make-instance 'pragma-current-rewiring
-                                                   :rewiring (make-rewiring (chip-spec-n-qubits chip-specification))))))
-           (setf (gethash blk block-initial-l2p) (make-rewiring (chip-spec-n-qubits chip-specification)))
-           (setf (gethash blk block-final-l2p) (make-rewiring (chip-spec-n-qubits chip-specification)))
+           (setf (basic-block-in-rewiring blk) (make-rewiring (chip-spec-n-qubits chip-specification)))
+           (setf (basic-block-out-rewiring blk) (make-rewiring (chip-spec-n-qubits chip-specification)))
            (change-class blk 'basic-block))
          
          (touch-unpreserved-block (blk registrant)
@@ -241,7 +232,7 @@ Returns a value list: (processed-program, of type parsed-program
                  chip-specification
                  :environs parsed-program
                  :initial-rewiring (if registrant
-                                       (gethash blk block-initial-l2p)
+                                       (basic-block-in-rewiring blk)
                                        initial-rewiring)
                  :use-free-swaps (null registrant))
              (let* ((duration (chip-schedule-duration chip-schedule))
@@ -255,15 +246,9 @@ Returns a value list: (processed-program, of type parsed-program
                        (compress-instructions processed-quil chip-specification
                                               :protoquil (null registrant))))
                ;; we're done processing. store the results back into the CFG block.
-               (setf (basic-block-code blk)
-                     (concatenate 'vector
-                                  (list (make-instance 'pragma-expected-rewiring
-                                                       :rewiring initial-l2p))
-                                  processed-quil
-                                  (list (make-instance 'pragma-current-rewiring
-                                                       :rewiring final-l2p))))
-               (setf (gethash blk block-initial-l2p) initial-l2p)
-               (setf (gethash blk block-final-l2p) final-l2p)
+               (setf (basic-block-code blk) processed-quil)
+               (setf (basic-block-in-rewiring blk) initial-l2p)
+               (setf (basic-block-out-rewiring blk) final-l2p)
                (incf topological-swaps local-topological-swaps)
                (incf unpreserved-duration duration)
                (format *compiler-noise-stream* "COMPILER-HOOK: Done processing block ~a.~%" (basic-block-name blk)))))
@@ -288,16 +273,9 @@ Returns a value list: (processed-program, of type parsed-program
                        (compress-instructions processed-quil chip-specification
                                               :protoquil t)))
                ;; we're done processing. store the results back into the CFG block.
-               (setf (basic-block-code blk)
-                     (concatenate 'vector
-                                  (list (make-instance 'reset)
-                                        (make-instance 'pragma-expected-rewiring
-                                                       :rewiring initial-l2p))
-                                  processed-quil
-                                  (list (make-instance 'pragma-current-rewiring
-                                                       :rewiring final-l2p))))
-               (setf (gethash blk block-initial-l2p) initial-l2p)
-               (setf (gethash blk block-final-l2p) final-l2p)
+               (setf (basic-block-code blk) processed-quil)
+               (setf (basic-block-in-rewiring blk) initial-l2p)
+               (setf (basic-block-out-rewiring blk) final-l2p)
                (incf topological-swaps local-topological-swaps)
                (incf unpreserved-duration duration)
                (format *compiler-noise-stream* "COMPILER-HOOK: Done processing block ~a.~%" (basic-block-name blk)))))
@@ -307,13 +285,13 @@ Returns a value list: (processed-program, of type parsed-program
            ;; exit/enter rewirings match.
            (when (and registrant
                       (not (typep blk 'reset-block))
-                      (or (gethash blk block-initial-l2p)
+                      (or (basic-block-in-rewiring blk)
                           (typep blk 'preserved-block)))
              ;; compare incoming and outgoing l2ps.
-             (let ((final-l2p (gethash registrant block-final-l2p))
+             (let ((final-l2p (basic-block-out-rewiring registrant))
                    (initial-l2p (if (typep blk 'preserved-block)
                                     (make-rewiring (chip-spec-n-qubits chip-specification))
-                                    (gethash blk block-initial-l2p))))
+                                    (basic-block-in-rewiring blk))))
                (format *compiler-noise-stream* "COMPILER-HOOK: Matching rewiring from ~a (~a) to ~a (~a).~%"
                        (basic-block-name registrant)
                        final-l2p
@@ -326,18 +304,18 @@ Returns a value list: (processed-program, of type parsed-program
            
            ;; the source's exit rewiring now matches the target's entry rewiring.
            ;; if this block has already been visited, skip it.
-           (when (gethash blk block-initial-l2p)
+           (when (basic-block-in-rewiring blk)
              (return-from process-block))
            
            (let ((*print-pretty* nil))
              (format *compiler-noise-stream* "COMPILER-HOOK: Visiting ~a for the first time, coming from ~a (~a).~%"
                      (basic-block-name blk)
                      (and registrant (basic-block-name registrant))
-                     (gethash registrant block-final-l2p)))
+                     (and registrant (basic-block-out-rewiring registrant))))
            ;; set the block-initial-l2p, forced by the previous block
            (when registrant
-             (setf (gethash blk block-initial-l2p)
-                   (gethash registrant block-final-l2p)))
+             (setf (basic-block-in-rewiring blk)
+                   (basic-block-out-rewiring registrant)))
            ;; add the block's children to the traversal stack
            (adt:match outgoing-edge (outgoing blk)
              ((conditional-edge _ true-target false-target)

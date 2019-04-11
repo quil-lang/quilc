@@ -153,6 +153,19 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (setf (delayed-expression-params c) (mapcar f (delayed-expression-params de)))
     c))
 
+;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
+
+(global-vars:define-global-var **comments**
+    (tg:make-weak-hash-table :test 'eq :weakness ':key)
+  "Weak hash table populated with comments associated to different parts of an AST.")
+
+(defun comment (x)
+  (values (gethash x **comments**)))
+
+(defun (setf comment) (comment-string x)
+  (check-type comment-string string)
+  (setf (gethash x **comments**) comment-string))
+
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass jump-target ()
@@ -1155,6 +1168,19 @@ N.B., The fractions of pi will be printed up to a certain precision!")
    :memory-definitions nil
    :executable-code #()))
 
+(defun print-instruction-sequence (seq
+                                   &key
+                                     (stream *standard-output*)
+                                     (prefix ""))
+  (let ((*print-pretty* nil))
+    (flet ((print-one-line (instr)
+             (write-string prefix stream)
+             (print-instruction instr stream)
+             (alexandria:when-let ((c (comment instr)))
+               (format stream "~40T# ~a" c))
+             (terpri stream)))
+      (map nil #'print-one-line seq))))
+
 (defun print-parsed-program (parsed-program &optional (s *standard-output*))
   ;; write out memory definitions
   (dolist (memory-defn (parsed-program-memory-definitions parsed-program))
@@ -1207,15 +1233,12 @@ N.B., The fractions of pi will be printed up to a certain precision!")
       (format s "~{ ~a~}" (mapcar (lambda (thing) (print-instruction thing nil))
                                   (circuit-definition-arguments circuit-defn))))
     (format s ":~%")
-    (dolist (instr (circuit-definition-body circuit-defn))
-      (format s "    ~a~%"
-              (with-output-to-string (sprime)
-                (print-instruction instr sprime))))
-    (format s "~%"))
+    (print-instruction-sequence (circuit-definition-body circuit-defn)
+                                :stream s
+                                :prefix "    ")
+    (terpri s))
   (unless (endp (parsed-program-circuit-definitions parsed-program))
-    (format s "~%"))
+    (terpri s))
   ;; write out main block
-  (loop :for instr :across (parsed-program-executable-code parsed-program)
-        :do (progn
-              (print-instruction instr s)
-              (terpri s))))
+  (print-instruction-sequence (parsed-program-executable-code parsed-program)
+                              :stream s))
