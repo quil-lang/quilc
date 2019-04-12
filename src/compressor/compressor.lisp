@@ -48,11 +48,10 @@
 (defun format-quil-sequence (s instructions &optional prefix)
   "Nicely prints a sequence of INSTRUCTIONS to a stream S. If PREFIX is present, prepend it to the overall output."
   (when prefix
-    (format s prefix))
+    (format s prefix)
+    (terpri s))
   (dolist (instr instructions)
-    (write-string "    " s)
-    (print-instruction instr s)
-    (terpri s)))
+    (format s "    ~/cl-quil:instruction-fmt/~%" instr)))
 
 (defun qubits-in-instr-list (instructions)
   "Produces a list of all of the (unboxed) qubit indices appearing in INSTRUCTIONS, a list of applications."

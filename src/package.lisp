@@ -319,7 +319,8 @@
    #:parsed-program-executable-code     ; READER
 
    #:*print-fractional-radians*         ; PARAMETER
-   #:print-instruction                  ; GENERIC, METHOD
+   #:print-instruction                  ; FUNCTION
+   #:instruction-fmt                    ; FUNCTION (format directive)
    )
 
   ;; gates.lisp
