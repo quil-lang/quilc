@@ -998,9 +998,23 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                 (format nil "~Fi" (imagpart z))))))))
 
 (defun print-instruction (instr &optional (stream *standard-output*))
+  "Print the Qul instruction INSTR to the stream STREAM.
+
+If STREAM is NIL, then it will be printed to a string."
   (print-instruction-generic instr stream))
 
+(defun instruction-fmt (stream instr &optional colon-modifier at-modifier)
+  "Like the function PRINT-INSTRUCTION, but is compatible with format strings using the ~/.../ directive.
+
+For example,
+
+    (format t \"the instruction was ~/cl-quil:instruction-fmt/\" instr)
+"
+  (declare (ignore colon-modifier at-modifier))
+  (print-instruction instr stream))
+
 (defun print-instruction-to-string (instr)
+  "Print the Quil instruction INSTR to a string."
   (print-instruction instr nil))
 
 (defgeneric print-instruction-generic (instr stream) ; total function
