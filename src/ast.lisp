@@ -950,6 +950,9 @@ If this slot is not supplied, then the gate is considered *anonymous*. If this i
 
 N.B., The fractions of pi will be printed up to a certain precision!")
 
+(defvar *print-polar-form* nil
+  "When true, FORMAT-COMPLEX prints our complex number in polar form with syntax r∠theta.")
+
 (defun format-complex (z stream)
   "Print the real or complex number Z nicely to the stream STREAM."
   (check-type z number)
@@ -986,6 +989,8 @@ N.B., The fractions of pi will be printed up to a certain precision!")
      (cond
        ((zerop (imagpart z))
         (format-complex (realpart z) stream))
+       (*print-polar-form*
+        (format stream "~A∠~A" (format-complex (abs z) nil) (format-complex (phase z) nil)))
        (t
         (format stream "~a~a~a"
                 (if (zerop (realpart z))
