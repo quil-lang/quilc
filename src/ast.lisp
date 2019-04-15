@@ -235,7 +235,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (loop :for i :below n :do
       (let ((found-one nil))
         (loop :for j :below n :do
-          (case (coerce (pop entries) 'double-float)
+          (case (pop entries)
             ((0.0d0) nil)
             ((1.0d0) (cond
                        ((or found-one (nth j perm))
@@ -253,21 +253,21 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (assert (every #'symbolp parameters))
-  (let ((perm (permutation-from-gate-entries-p entries)))
-    (cond
-      (parameters
-       (make-instance 'parameterized-gate-definition
-                      :name name
-                      :parameters parameters
-                      :entries entries))
-      (perm
-       (make-instance 'permutation-gate-definition
-                      :name name
-                      :permutation perm))
-      (t
-       (make-instance 'static-gate-definition
-                      :name name
-                      :entries entries)))))
+  (cond
+    (parameters
+     (make-instance 'parameterized-gate-definition
+                    :name name
+                    :parameters parameters
+                    :entries entries))
+    ;; TODO It feels wrong calling this function twice.
+    ((permutation-from-gate-entries-p entries)
+     (make-instance 'permutation-gate-definition
+                    :name name
+                    :permutation (permutation-from-gate-entries-p entries)))
+    (t
+     (make-instance 'static-gate-definition
+                    :name name
+                    :entries entries))))
 
 (defclass circuit-definition ()
   ((name :initarg :name

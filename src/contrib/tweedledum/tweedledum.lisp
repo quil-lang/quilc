@@ -66,7 +66,6 @@
                 (relabler (lambda (q)
                             (setf (quil::qubit-index q)
                                   (quil::qubit-index (nth (quil::qubit-index q) qubits))))))
-           (break "here")
            (map nil (alexandria:rcurry #'quil::%relabel-qubits relabler) code)
            (coerce code 'list)))
         (t
