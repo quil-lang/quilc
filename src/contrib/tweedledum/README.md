@@ -130,3 +130,42 @@ H 0
 
 The shared library has been automagically compiled, CFFI has installed its
 hooks, and now `cl-quil` has some more neat-o compilation routines.
+
+For an example of how this improves compilation, we can compile a notoriously
+difficult test-case which uses a 8-qubit oracle for the Bernstein-Vazirani
+algorithm.
+ - Without `cl-quil/tweedledum`:
+ ```
+ CL-USER> (time (cl-quil-tests::compare-compiled #P"./tests/compiler-hook-test-files/sohaib.quil" ':cnot))
+WARNING: Condition FIASCO::IS-ASSERTION was signalled.
+.
+Evaluation took:
+  6.439 seconds of real time
+  6.470664 seconds of total run time (6.283246 user, 0.187418 system)
+  [ Run times consist of 0.420 seconds GC time, and 6.051 seconds non-GC time. ]
+  100.50% CPU
+  2,051 forms interpreted
+  17,462,268,343 processor cycles
+  4,891,270,304 bytes consed
+
+T
+ ```
+ - With `cl-quil/tweedledum`:
+ ```
+ CL-USER> (ql:quickload :cl-quil/tweedledum)
+ CL-USER> (time (cl-quil-tests::compare-compiled #P"./tests/compiler-hook-test-files/sohaib.quil" ':cnot))
+WARNING: Condition FIASCO::IS-ASSERTION was signalled.
+.
+Evaluation took:
+  0.416 seconds of real time
+  0.418083 seconds of total run time (0.384058 user, 0.034025 system)
+  [ Run times consist of 0.042 seconds GC time, and 0.377 seconds non-GC time. ]
+  100.48% CPU
+  2,055 forms interpreted
+  1,128,897,003 processor cycles
+  259,116,096 bytes consed
+
+T
+ ```
+
+A big reduction in both the time and memory used!
