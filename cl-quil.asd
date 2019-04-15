@@ -159,8 +159,6 @@
                                 (nn c-file))))
           (restart-case
               (compile-it c++17 c++17-args)
-            ;; TODO Somehow exit the defsystem/compilation stuff here
-            (continue-without-contrib () nil)
             (restart-with-c++17-path-input (c++17)
               :report "Enter path to C++17 compiler and restart"
               :interactive (lambda ()
