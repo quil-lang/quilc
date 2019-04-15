@@ -112,53 +112,71 @@
 
 ;;; Contribs
 
-;; Adapted from magicl's magicl-transcendental adapted from commonqt's
-;; qt.asd.
-(defclass c->so (asdf:source-file)
- ())
+#+(or :darwin :unix)
+(progn
+  ;; Adapted from magicl's magicl-transcendental adapted from commonqt's
+  ;; qt.asd.
+  (defclass c->so (asdf:source-file)
+    ())
 
-(defmethod output-files ((operation compile-op) (component c->so))
-  (values (list (make-pathname :name "libtweedledum"
-                               :type #-darwin "so" #+darwin "dylib"
-                               :defaults (component-pathname component)))
-          t))
+  (defmethod output-files ((operation compile-op) (component c->so))
+    (values (list (make-pathname :name "libtweedledum"
+                                 :type #-darwin "so" #+darwin "dylib"
+                                 :defaults (component-pathname component)))
+            t))
 
-(defmethod perform ((operation load-op) (component c->so))
-  t)
+  (defmethod perform ((operation load-op) (component c->so))
+    t)
 
-(defmethod perform ((operation compile-op) (component c->so))
-  (flet ((nn (x) (uiop:native-namestring x)))
-    (let* ((c-file (component-pathname component))
-           (shared-object (make-pathname :type #+darwin "dylib" #-darwin "so"
-                                         :name "libtweedledum"
-                                         :defaults c-file))
-           (dir (namestring (make-pathname :directory (pathname-directory c-file)))))
-      (uiop:run-program
-       ;; TODO This needs to be platform agnostic. The difficulty is
-       ;; in picking up a c++17 compiler automatically.
-       (list "/usr/local/opt/llvm/bin/clang++"
-             "-L/usr/local/opt/llvm/lib"
-             "-shared"
-             "-fPIC"
-             "-std=c++17"
-             "-Wl,-rpath,/usr/local/opt/llvm/lib"
-             "-DFMT_HEADER_ONLY"
-             (format nil "-I~a/tweedledum/libs/fmt" dir)
-             (format nil "-I~a/tweedledum/libs/easy" dir)
-             (format nil "-I~a/tweedledum/libs/glucose" dir)
-             (format nil "-I~a/tweedledum/libs/kitty" dir)
-             (format nil "-I~a/tweedledum/include" dir)
-             "-o" (nn shared-object)
-             (nn c-file))))))
+  (defmethod perform ((operation compile-op) (component c->so))
+    (labels ((nn (x) (uiop:native-namestring x))
+             (compile-it (c++17 c++17-args)
+               (uiop:run-program
+                ;; TODO This needs to be platform agnostic. The difficulty is
+                ;; in picking up a c++17 compiler automatically.
+                (cons c++17 c++17-args))))
+      (let* ((c-file (component-pathname component))
+             (shared-object (make-pathname :type #+darwin "dylib" #-darwin "so"
+                                           :name "libtweedledum"
+                                           :defaults c-file))
+             (dir (namestring (make-pathname :directory (pathname-directory c-file))))
+             (lib-dir (concatenate 'string dir "/tweedledum")))
+        (unless (uiop:directory-exists-p lib-dir)
+          (error "tweedledum library directory missing"))
+        (let ((c++17 "/usr/local/opt/llvm/bin/clang+++")
+              (c++17-args (list "-L/usr/local/opt/llvm/lib"
+                                "-shared"
+                                "-fPIC"
+                                "-std=c++17"
+                                "-Wl,-rpath,/usr/local/opt/llvm/lib"
+                                "-DFMT_HEADER_ONLY"
+                                (format nil "-I~a/tweedledum/libs/fmt" dir)
+                                (format nil "-I~a/tweedledum/libs/easy" dir)
+                                (format nil "-I~a/tweedledum/libs/glucose" dir)
+                                (format nil "-I~a/tweedledum/libs/kitty" dir)
+                                (format nil "-I~a/tweedledum/include" dir)
+                                "-o" (nn shared-object)
+                                (nn c-file))))
+          (restart-case
+              (compile-it c++17 c++17-args)
+            ;; TODO Somehow exit the defsystem/compilation stuff here
+            (continue-without-contrib () nil)
+            (restart-with-c++17-path-input (c++17)
+              :report "Enter path to C++17 compiler and restart"
+              :interactive (lambda ()
+                             (format *query-io* "Enter path to C++17 compiler and restart: ")
+                             (force-output *query-io*)
+                             (list (read-line)))
+              (compile-it c++17 c++17-args)))))))
 
-(asdf:defsystem #:cl-quil/tweedledum
-  :license "Apache License 2.0 (See LICENSE.txt)"
-  :maintainer "Rigetti Computing"
-  :author "Rigetti Computing"
-  :description "C++17 Library for writing, manipulating, and optimizing quantum circuits"
-  :depends-on (#:cffi #:cl-quil)
-  :pathname "src/contrib/tweedledum/"
-  :serial t
-  :components
-  ((c->so "tweedledum.c")
-   (:file "tweedledum")))
+  (asdf:defsystem #:cl-quil/tweedledum
+    :license "Apache License 2.0 (See LICENSE.txt)"
+    :maintainer "Rigetti Computing"
+    :author "Rigetti Computing"
+    :description "C++17 Library for writing, manipulating, and optimizing quantum circuits"
+    :depends-on (#:cffi #:cl-quil)
+    :pathname "src/contrib/tweedledum/"
+    :serial t
+    :components
+    ((c->so "tweedledum.c")
+     (:file "tweedledum"))))
