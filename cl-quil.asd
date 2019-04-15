@@ -173,8 +173,19 @@
     :author "Rigetti Computing"
     :description "C++17 Library for writing, manipulating, and optimizing quantum circuits"
     :depends-on (#:cffi #:cl-quil)
+    :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/tweedledum-tests)))
     :pathname "src/contrib/tweedledum/"
     :serial t
     :components
     ((c->so "tweedledum.c")
-     (:file "tweedledum"))))
+     (:file "tweedledum")))
+
+  (asdf:defsystem #:cl-quil/tweedledum-tests
+    :depends-on (#:cl-quil-tests #:cl-quil/tweedledum)
+    :perform (asdf:test-op (o s)
+                           (unless cl-quil.tweedledum::*tweedledum-contrib-loaded*
+                             (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum)
+                                   cl-quil::*global-compilers*))
+                           (uiop:symbol-call ':cl-quil-tests
+                                             '#:run-cl-quil-tests))
+    :serial t))
