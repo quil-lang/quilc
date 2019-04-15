@@ -1,3 +1,0 @@
-[submodule "src/contrib/tweedledum/tweedledum"]
-	path = src/contrib/tweedledum/tweedledum
-	url = https://github.com/boschmitt/tweedledum.git
