@@ -143,7 +143,7 @@
              (lib-dir (concatenate 'string dir "/tweedledum")))
         (unless (uiop:directory-exists-p lib-dir)
           (error "tweedledum library directory missing"))
-        (let ((c++17 "/usr/local/opt/llvm/bin/clang+++")
+        (let ((c++17 "/usr/local/opt/llvm/bin/clang++")
               (c++17-args (list "-L/usr/local/opt/llvm/lib"
                                 "-shared"
                                 "-fPIC"
@@ -183,9 +183,6 @@
   (asdf:defsystem #:cl-quil/tweedledum-tests
     :depends-on (#:cl-quil-tests #:cl-quil/tweedledum)
     :perform (asdf:test-op (o s)
-                           (unless cl-quil.tweedledum::*tweedledum-contrib-loaded*
-                             (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum)
-                                   cl-quil::*global-compilers*))
-                           (uiop:symbol-call ':cl-quil-tests
-                                             '#:run-cl-quil-tests))
+                           (uiop:symbol-call ':cl-quil.tweedledum
+                                             '#:run-tweedledum-tests))
     :serial t))

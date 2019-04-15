@@ -91,6 +91,13 @@
   (contrib-load contrib-instance)
   (setf (gethash :tweedledum quil::*contribs*) contrib-instance))
 
+(defun run-tweedledum-tests ()
+  (unless cl-quil.tweedledum::*tweedledum-contrib-loaded*
+    (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum)
+          cl-quil::*global-compilers*))
+  (uiop:symbol-call ':cl-quil-tests
+                    '#:run-cl-quil-tests))
+
 #+#:testcode
 (progn
   (let ((lschedule (quil::make-lscheduler)))
