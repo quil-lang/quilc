@@ -530,12 +530,6 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
                    :dimension dim
                    :matrix (make-row-major-matrix dim dim entries))))
 
-(defun permutation-from-gate-entries (entries)
-  (loop :with size := (isqrt (length entries))
-        :for i :below size
-        :collect (position 1 (loop :for j :below size :collect (nth (+ i (* j size)) entries))
-                           :test #'=)))
-
 (defmethod gate-definition-to-gate ((gate-def permutation-gate-definition))
   (let* ((name (gate-definition-name gate-def))
          (entries (permutation-gate-definition-permutation gate-def))

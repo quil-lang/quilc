@@ -222,32 +222,45 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
   (1- (integer-length (length (permutation-gate-definition-permutation gate)))))
 
-(defun permutation-entries-p (entries)
-  (loop :with size := (isqrt (length entries))
-        :for row-start :below (length entries) :by size
-        :for row-end := (+ size row-start)
-        :always (and (= 1
-                        (count 1 entries :start row-start :end row-end :test #'=)
-                        (reduce #'+ entries :start row-start :end row-end)))))
+(defun permutation-from-gate-entries-p (entries)
+  (let* ((n (isqrt (length entries)))
+         (perm (make-list n)))
+    (loop :for i :below n :do
+      (let ((found-one nil))
+        (loop :for j :below n :do
+          (case (coerce (pop entries) 'double-float)
+            ((0.0d0) nil)
+            ((1.0d0) (cond
+                       ((or found-one (nth j perm))
+                        (return-from permutation-from-gate-entries-p nil))
+                       (t
+                        (setf (nth j perm) i)
+                        (setf found-one t))))
+            (otherwise (return-from permutation-from-gate-entries-p nil)))
+              :finally
+                 (unless found-one
+                   (return-from permutation-from-gate-entries-p nil))))
+          :finally (return perm))))
 
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (assert (every #'symbolp parameters))
-  (cond
-    (parameters
-     (make-instance 'parameterized-gate-definition
-                    :name name
-                    :parameters parameters
-                    :entries entries))
-    ((permutation-entries-p entries)
-     (make-instance 'permutation-gate-definition
-                    :name name
-                    :permutation (permutation-from-gate-entries entries)))
-    (t
-     (make-instance 'static-gate-definition
-                    :name name
-                    :entries entries))))
+  (let ((perm (permutation-from-gate-entries-p entries)))
+    (cond
+      (parameters
+       (make-instance 'parameterized-gate-definition
+                      :name name
+                      :parameters parameters
+                      :entries entries))
+      (perm
+       (make-instance 'permutation-gate-definition
+                      :name name
+                      :permutation perm))
+      (t
+       (make-instance 'static-gate-definition
+                      :name name
+                      :entries entries)))))
 
 (defclass circuit-definition ()
   ((name :initarg :name
