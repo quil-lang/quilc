@@ -137,12 +137,12 @@
               ;; in picking up a c++17 compiler automatically.
               (cons c++17 c++17-args))))
     (let* ((c-file (component-pathname component))
+           (cwd (namestring (make-pathname :directory (pathname-directory c-file))))
+           (tweedlelibdir (merge-pathnames "tweedledum/" cwd))
            (shared-object (make-pathname :type #+darwin "dylib" #-darwin "so"
                                          :name "libtweedledum"
-                                         :defaults c-file))
-           (dir (namestring (make-pathname :directory (pathname-directory c-file))))
-           (lib-dir (concatenate 'string dir "/tweedledum")))
-      (unless (uiop:directory-exists-p lib-dir)
+                                         :defaults c-file)))
+      (unless (uiop:directory-exists-p tweedlelibdir)
         (error "tweedledum library directory missing. Did you run ~
                 `git submodule init && git submodule update --init`?"))
       (let ((c++17 "/usr/local/opt/llvm/bin/clang++")
@@ -152,11 +152,11 @@
                               "-std=c++17"
                               "-Wl,-rpath,/usr/local/opt/llvm/lib"
                               "-DFMT_HEADER_ONLY"
-                              (format nil "-I~a/tweedledum/libs/fmt" dir)
-                              (format nil "-I~a/tweedledum/libs/easy" dir)
-                              (format nil "-I~a/tweedledum/libs/glucose" dir)
-                              (format nil "-I~a/tweedledum/libs/kitty" dir)
-                              (format nil "-I~a/tweedledum/include" dir)
+                              (format nil "-I~a" (merge-pathnames "libs/fmt" tweedlelibdir))
+                              (format nil "-I~a" (merge-pathnames "libs/easy" tweedlelibdir))
+                              (format nil "-I~a" (merge-pathnames "libs/glucose" tweedlelibdir))
+                              (format nil "-I~a" (merge-pathnames "libs/kitty" tweedlelibdir))
+                              (format nil "-I~a" (merge-pathnames "include" tweedlelibdir))
                               "-o" (nn shared-object)
                               (nn c-file))))
         (restart-case
