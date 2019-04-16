@@ -139,7 +139,8 @@
            (dir (namestring (make-pathname :directory (pathname-directory c-file))))
            (lib-dir (concatenate 'string dir "/tweedledum")))
       (unless (uiop:directory-exists-p lib-dir)
-        (error "tweedledum library directory missing"))
+        (error "tweedledum library directory missing. Did you run ~
+                `git submodule init && git submodule update --init`?"))
       (let ((c++17 "/usr/local/opt/llvm/bin/clang++")
             (c++17-args (list "-L/usr/local/opt/llvm/lib"
                               "-shared"
