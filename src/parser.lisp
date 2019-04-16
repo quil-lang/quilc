@@ -1011,14 +1011,21 @@ INPUT-STRING that triggered the condition."
 
     (multiple-value-bind (dedented? dedented-line)
         (dedented-line-p (pop tok-lines))
-      (declare (ignore dedented?))
+      ;; AS PERMUTATION expects a single line, followed by a dedented line or no
+      ;; lines
+      (when (and (not dedented?) dedented-line)
+        (quil-parse-error "Expected dedented line following permutation gate entries."))
       (let* ((entries (remove-if (lambda (tok) (eql ':COMMA (token-type tok)))
                                  modified-line)))
         (unless (every (lambda (tok) (eql ':INTEGER (token-type tok)))
                        entries)
-          (error "Expected integers"))
+          (quil-parse-error "Expected integers"))
+        ;; Be careful to continue parsing only when a (by definition) dedented
+        ;; line follows
         (values (mapcar #'token-payload entries)
-                (cons dedented-line tok-lines))))))
+                (if dedented?
+                    (cons dedented-line tok-lines)
+                    nil))))))
 
 (defun split-by (f list)
   (labels ((rec (list parts)
