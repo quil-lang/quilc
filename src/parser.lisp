@@ -12,9 +12,7 @@
     :NEG :NOT :AND :IOR :XOR :MOVE :EXCHANGE :CONVERT :ADD :SUB :MUL :DIV
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :DECLARE :SHARING :OFFSET
-    :PRAGMA :AS :MATRIX :PERMUTATION
-    ;; :EXPI
-    ))
+    :PRAGMA :AS :MATRIX :PERMUTATION))
 
 (deftype token-type ()
   '(or
@@ -889,29 +887,25 @@ INPUT-STRING that triggered the condition."
               (quil-parse-error "Found unexpected gate type ~A." parsed-gate-type))
             (setf gate-type parsed-gate-type))))
 
-      ;; Ensure the colon (and nothing else) is there.
-      ;; (unless (and (= 1 (length rest-line)
-      ;;              (eql ':COLON (token-type (first rest-line))))
-      ;;   (quil-parse-error "Expected a colon in DEFGATE line"))
-
-      (case gate-type
+      (ecase gate-type
         (:MATRIX
+         (when params
+           (quil-parse-error "Permutation gate definitions do not support parameters."))
          (parse-gate-entries-as-matrix body-lines params name))
         (:PERMUTATION
          (parse-gate-entries-as-permutation body-lines params name))))))
 
-(defun parse-gate-entries-as-permutation (body-lines params name)
-  (unless (endp params)
-    (quil-parse-error "Permutation gate definitions do not support parameters."))
+(defun parse-gate-entries-as-permutation (body-lines name)
   (multiple-value-bind (parsed-entries rest-lines)
       (parse-permutation-gate-entries body-lines)
-    (validate-gate-permutation-size (length parsed-entries))
+    (unless (validate-gate-permutation-size-p (length parsed-entries))
+      (quil-parse-error "Permutation gate entries do not represent a square matrix."))
     (values (make-instance 'permutation-gate-definition
                            :name name
                            :permutation parsed-entries)
             rest-lines)))
 
-(defun validate-gate-permutation-size (size)
+(defun validate-gate-permutation-size-p (size)
   (power-of-two-p size))
 
 (defun parse-gate-entries-as-matrix (body-lines params name)
