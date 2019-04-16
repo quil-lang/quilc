@@ -889,11 +889,11 @@ INPUT-STRING that triggered the condition."
 
       (ecase gate-type
         (:MATRIX
-         (when params
-           (quil-parse-error "Permutation gate definitions do not support parameters."))
          (parse-gate-entries-as-matrix body-lines params name))
         (:PERMUTATION
-         (parse-gate-entries-as-permutation body-lines params name))))))
+         (when params
+           (quil-parse-error "Permutation gate definitions do not support parameters."))
+         (parse-gate-entries-as-permutation body-lines name))))))
 
 (defun parse-gate-entries-as-permutation (body-lines name)
   (multiple-value-bind (parsed-entries rest-lines)
