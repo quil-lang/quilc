@@ -1000,14 +1000,14 @@ INPUT-STRING that triggered the condition."
 (defun parse-permutation-gate-entries (tok-lines)
   ;; Do we have any lines to parse?
   (when (null tok-lines)
-    (error "End of program each when indented gate entries was expected."))
+    (quil-parse-error "End of program each when indented gate entries was expected."))
 
   ;; Check for indentation.
   (multiple-value-bind (indented? modified-line)
       (indented-line (pop tok-lines))
     ;; Is the first line indented?
     (unless indented?
-      (error "Expected indented gate entries but alas, they weren't found."))
+      (quil-parse-error "Expected indented gate entries but alas, they weren't found."))
 
     (multiple-value-bind (dedented? dedented-line)
         (dedented-line-p (pop tok-lines))
