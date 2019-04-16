@@ -50,7 +50,7 @@
                ;; Check that number of arguments matches gate matrix dimension
                (assert-and-print-instruction (= expected-qubits num-qubits)
                                              ()
-                                             "Expected ~D qubit~:P, but ~D were provided."
+                                             "Expected ~D qubit~:P, but ~D ~:*~[were~;was~:;were~] provided."
                                              expected-qubits num-qubits)))
            ;; Verification finished. Transform the application.
            (change-class app 'gate-application :name-resolution found-gate-defn))
