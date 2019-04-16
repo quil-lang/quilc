@@ -420,6 +420,7 @@ HTTP server for good.
         (setf (quil::parsed-program-executable-code processed-program)
               (coerce
                (loop :for instr :across (quil::parsed-program-executable-code processed-program)
+                     :for j :from 0
                      :when (quil::comment instr)
                        :do (cond
                              ((uiop:string-prefix-p "Entering rewiring: " (quil::comment instr))
@@ -433,6 +434,10 @@ HTTP server for good.
                                                                               (/ (- (length comment) length) 2)
                                                                               2)))))
                              (t nil))
+                     :when (and (typep instr 'quil::halt) (quil::comment instr))
+                       :do (setf (quil::comment (aref (quil::parsed-program-executable-code processed-program)
+                                                      (1- j)))
+                                 (quil::comment instr))
                      :unless (typep instr 'quil::halt)
                        :collect instr)
                'vector)))
