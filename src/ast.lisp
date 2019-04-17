@@ -985,7 +985,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defun real-fmt (stream r &optional colon-modifier at-modifier)
   "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
 For example,
-    (format t \"the instruction was ~/cl-quil:real-fmt/\" r)"
+    (format t \"the number was ~/cl-quil:real-fmt/\" r)"
   (declare (ignore colon-modifier at-modifier))
   (format-real r stream))
 
@@ -1019,7 +1019,7 @@ For example,
 (defun complex-fmt (stream z &optional colon-modifier at-modifier)
   "Like the function format-complex, but is compatible with format strings using the ~/.../ directive.
 For example,
-    (format t \"the instruction was ~/cl-quil:complex-fmt/\" z)"
+    (format t \"the number was ~/cl-quil:complex-fmt/\" z)"
   (declare (ignore colon-modifier at-modifier))
   (format-complex z stream))
 
