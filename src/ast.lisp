@@ -953,6 +953,34 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defvar *print-polar-form* nil
   "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
 
+(defun format-real (r stream)
+  "Print the real number R nicely to the stream STREAM."
+  (when *print-fractional-radians*
+    (when (double~ r pi)
+      (return-from format-real (format stream "pi")))
+    (when (double~ r (- pi))
+      (return-from format-real (format stream "-pi")))
+    (dolist (denom '(2 3 4 6 8 16))
+      (dotimes (numer (* 2 denom))
+        (when (/= numer denom)
+          (when (double~ r (/ (* pi numer) denom))
+            (return-from format-real
+              (cond
+                ((= numer 1)
+                 (format stream "pi/~d" denom))
+                ((zerop numer)
+                 (format stream "~F" r))
+                (t (format stream "~d*pi/~d" numer denom)))))
+          (when (double~ r (/ (* -1 pi numer) denom))
+            (return-from format-real
+              (cond
+                ((= numer 1)
+                 (format stream "-pi/~d" denom))
+                ((zerop numer)
+                 (format stream "~F" r))
+                (t (format stream "-~d*pi/~d" numer denom)))))))))
+  (format stream "~F" r))
+
 (defun format-complex (z stream)
   "Print the real or complex number Z nicely to the stream STREAM."
   (check-type z number)
@@ -960,37 +988,13 @@ N.B., The fractions of pi will be printed up to a certain precision!")
     ((zerop z)
      (format stream "0.0"))
     ((realp z)
-     (when *print-fractional-radians*
-       (when (double~ z pi)
-         (return-from format-complex (format stream "pi")))
-       (when (double~ z (- pi))
-         (return-from format-complex (format stream "-pi")))
-       (dolist (denom '(2 3 4 6 8 16))
-         (dotimes (numer (* 2 denom))
-           (when (/= numer denom)
-             (when (double~ z (/ (* pi numer) denom))
-               (return-from format-complex
-                 (cond
-                   ((= numer 1)
-                    (format stream "pi/~d" denom))
-                   ((zerop numer)
-                    (format stream "~F" z))
-                   (t (format stream "~d*pi/~d" numer denom)))))
-             (when (double~ z (/ (* -1 pi numer) denom))
-               (return-from format-complex
-                 (cond
-                   ((= numer 1)
-                    (format stream "-pi/~d" denom))
-                   ((zerop numer)
-                    (format stream "~F" z))
-                   (t (format stream "-~d*pi/~d" numer denom)))))))))
-     (format stream "~F" z))
+     (format-real z stream))
     ((complexp z)
      (cond
        ((zerop (imagpart z))
         (format-complex (realpart z) stream))
        (*print-polar-form*
-        (format stream "~A∠~A" (format-complex (abs z) nil) (format-complex (phase z) nil)))
+        (format stream "~F∠~A" (abs z) (format-real (phase z) nil)))
        (t
         (format stream "~a~a~a"
                 (if (zerop (realpart z))
