@@ -955,6 +955,8 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 
 (defun format-real (r stream)
   "Print the real number R nicely to the stream STREAM."
+  (check-type r real)
+  (check-type stream stream)
   (when *print-fractional-radians*
     (when (double~ r pi)
       (return-from format-real (format stream "pi")))
@@ -984,6 +986,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defun format-complex (z stream)
   "Print the real or complex number Z nicely to the stream STREAM."
   (check-type z number)
+  (check-type stream stream)
   (cond
     ((zerop z)
      (format stream "0.0"))
