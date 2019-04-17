@@ -957,31 +957,31 @@ N.B., The fractions of pi will be printed up to a certain precision!")
   "Print the real number R nicely to the stream STREAM."
   (check-type r real)
   (check-type stream stream)
-  (when *print-fractional-radians*
-    (when (double~ r pi)
-      (return-from format-real (format stream "pi")))
-    (when (double~ r (- pi))
-      (return-from format-real (format stream "-pi")))
-    (dolist (denom '(2 3 4 6 8 16))
-      (dotimes (numer (* 2 denom))
-        (when (/= numer denom)
-          (when (double~ r (/ (* pi numer) denom))
-            (return-from format-real
+  (cond
+    (*print-fractional-radians*
+     (cond
+       ((double~ r pi)
+        (format stream "pi"))
+       ((double~ r (- pi))
+        (format stream "-pi"))
+       (t
+        (dolist (denom '(2 3 4 6 8 16))
+          (dotimes (numer (* 2 denom))
+            (when (and (/= numer denom)
+                       (double~ (abs r) (/ (* pi numer) denom)))
               (cond
                 ((= numer 1)
-                 (format stream "pi/~d" denom))
+                 (format stream "~:[~;-~]pi/~d" (minusp r) denom))
                 ((zerop numer)
                  (format stream "~F" r))
-                (t (format stream "~d*pi/~d" numer denom)))))
-          (when (double~ r (/ (* -1 pi numer) denom))
-            (return-from format-real
-              (cond
-                ((= numer 1)
-                 (format stream "-pi/~d" denom))
-                ((zerop numer)
-                 (format stream "~F" r))
-                (t (format stream "-~d*pi/~d" numer denom)))))))))
-  (format stream "~F" r))
+                (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
+              (return-from format-real)
+              )))
+        ;; If we cannot find a nice fraction of pi, just print the
+        ;; real number
+        (format stream "~F" r))))
+    (t
+     (format stream "~F" r))))
 
 (defun format-complex (z stream)
   "Print the real or complex number Z nicely to the stream STREAM."
@@ -997,7 +997,9 @@ N.B., The fractions of pi will be printed up to a certain precision!")
        ((zerop (imagpart z))
         (format-complex (realpart z) stream))
        (*print-polar-form*
-        (format stream "~F∠~A" (abs z) (format-real (phase z) nil)))
+        (format stream "~F∠" (abs z))
+        (format-real (phase z) stream)
+        )
        (t
         (format stream "~a~a~a"
                 (if (zerop (realpart z))
