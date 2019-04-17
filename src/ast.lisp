@@ -1098,8 +1098,7 @@ For example,
                              (first expr)
                              (print-delayed-expression (second expr) nil)))))
                  (number
-                  (format stream "(~a)"
-                          (format-complex expr nil)))
+                  (format stream "(~/cl-quil:complex-fmt/)" expr))
                  (symbol
                   (format stream "%~a" expr))
                  (otherwise

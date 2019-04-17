@@ -32,7 +32,7 @@
 
 (defun format-complex-list (list)
   (format nil "(~{~A~^ ~})"
-          (mapcar (lambda (n) (format-complex n nil))
+          (mapcar (lambda (n) (format nil "~/cl-quil:complex-fmt/" n))
                   list)))
 
 ;; Dedicated element list lexer contributed by Zach Beane
