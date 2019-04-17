@@ -998,7 +998,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
         (format-complex (realpart z) stream))
        (*print-polar-form*
         (format stream "~F∠" (abs z))
-        (format-real (phase z) stream)
+        (format-real (mod (phase z) (* 2 pi)) stream)
         )
        (t
         (format stream "~a~a~a"
