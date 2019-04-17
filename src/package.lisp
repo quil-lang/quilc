@@ -321,6 +321,8 @@
    #:*print-fractional-radians*         ; PARAMETER
    #:print-instruction                  ; FUNCTION
    #:instruction-fmt                    ; FUNCTION (format directive)
+   #:real-fmt                           ; FUNCTION (format directive)
+   #:complex-fmt                        ; FUNCTION (format directive)
    )
 
   ;; gates.lisp

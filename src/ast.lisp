@@ -975,13 +975,19 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                 ((zerop numer)
                  (format stream "~F" r))
                 (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
-              (return-from format-real)
-              )))
+              (return-from format-real))))
         ;; If we cannot find a nice fraction of pi, just print the
         ;; real number
         (format stream "~F" r))))
     (t
      (format stream "~F" r))))
+
+(defun real-fmt (stream r &optional colon-modifier at-modifier)
+  "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
+For example,
+    (format t \"the instruction was ~/cl-quil:real-fmt/\" r)"
+  (declare (ignore colon-modifier at-modifier))
+  (format-real r stream))
 
 (defun format-complex (z stream)
   "Print the real or complex number Z nicely to the stream STREAM."
@@ -998,8 +1004,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
         (format-complex (realpart z) stream))
        (*print-polar-form*
         (format stream "~F∠" (abs z))
-        (format-real (mod (phase z) (* 2 pi)) stream)
-        )
+        (format-real (mod (phase z) (* 2 pi)) stream))
        (t
         (format stream "~a~a~a"
                 (if (zerop (realpart z))
@@ -1010,6 +1015,13 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                     (format nil "+")
                     "")
                 (format nil "~Fi" (imagpart z))))))))
+
+(defun complex-fmt (stream z &optional colon-modifier at-modifier)
+  "Like the function format-complex, but is compatible with format strings using the ~/.../ directive.
+For example,
+    (format t \"the instruction was ~/cl-quil:complex-fmt/\" z)"
+  (declare (ignore colon-modifier at-modifier))
+  (format-complex z stream))
 
 (defun print-instruction (instr &optional (stream *standard-output*))
   "Print the Qul instruction INSTR to the stream STREAM.
