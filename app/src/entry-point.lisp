@@ -65,6 +65,7 @@
     (("help" #\h) :type boolean :optional t :documentation "print this help information and exit")
     (("server-mode-http" #\S) :type boolean :optional t :documentation "run as a web server *and* an RPCQ server. ignores --port and uses 6000 and 5555 respectively")
     (("server-mode-rpc" #\R) :type boolean :optional t :documentation "run as an RPCQ server")
+    (("host") :type string :optional t :documentation "host on which to run the RPCQ server")
     (("port" #\p) :type integer :optional t :documentation "port to run the RPCQ server on")
     (("time-limit") :type integer :initial-value 0 :documentation "time limit (in seconds) for server requests (0 => unlimited)")
     (("version" #\v) :type boolean :optional t :documentation "print version information")
@@ -258,6 +259,7 @@
                           (benchmark nil)
                           (server-mode-http nil)
                           (server-mode-rpc nil)
+                          (host nil)
                           (port nil)
                           time-limit
                           (help nil)
@@ -369,6 +371,8 @@ HTTP server for good.
            *quil-stream* (make-broadcast-stream))
 
      ;; configure the server
+     (unless host
+       (setf host "*"))
      (unless port
        (setf port 5555)
 
@@ -377,7 +381,8 @@ HTTP server for good.
          (show-banner)))
      (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
        (:msgid "LOG0001"))
-     (start-rpc-server :port port
+     (start-rpc-server :host host
+                       :port port
                        :logger *logger*))
 
     ;; server modes not requested, so continue parsing arguments
