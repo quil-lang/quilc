@@ -13,7 +13,7 @@
 
 (deftest test-faithfulness ()
   "Test whether compilation preserves semantic equivalence for some test programs."
-  (finish-output *debug-io*)
+  (finish-output)
   (let ((test-files (uiop:directory-files *faithfulness-test-file-directory* #P"*.quil")))
     (is (not (null test-files)))
     (fresh-line)
