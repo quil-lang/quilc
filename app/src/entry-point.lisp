@@ -421,11 +421,13 @@ HTTP server for good.
               (coerce
                (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                      :for j :from 0
+                     ;; if there's a comment, consider extracting from it the final_rewiring
+                     ;; entry for use in the statistics dictionary.
                      :when (quil::comment instr)
                        :do (cond
-                             ((uiop:string-prefix-p "Entering rewiring: " (quil::comment instr))
+                             ((uiop:string-prefix-p "Exiting rewiring: " (quil::comment instr))
                               (setf (gethash "final_rewiring" *statistics-dictionary*)
-                                    (subseq (quil::comment instr) (length "Entering rewiring: "))))
+                                    (subseq (quil::comment instr) (length "Exiting rewiring: "))))
                              ((uiop:string-prefix-p "Entering/exiting rewiring: " (quil::comment instr))
                               (let ((comment (quil::comment instr))
                                     (length (length "Entering/exiting rewiring: (")))
@@ -434,10 +436,29 @@ HTTP server for good.
                                                                               (/ (- (length comment) length) 2)
                                                                               2)))))
                              (t nil))
-                     :when (and (typep instr 'quil::halt) (quil::comment instr))
-                       :do (setf (quil::comment (aref (quil::parsed-program-executable-code processed-program)
-                                                      (1- j)))
-                                 (quil::comment instr))
+                     ;; if there's a HALT instruction with a rewiring comment on
+                     ;; it, we need to migrate the comment up one instruction
+                     ;; (and perhaps merge it with any comment already present)
+                     :when (and (< 0 j)
+                                (typep instr 'quil::halt)
+                                (quil::comment instr))
+                       :do (cond
+                             ((quil::comment (aref (quil::parsed-program-executable-code processed-program)
+                                                   (1- j)))
+                              (let ((*print-pretty* nil)
+                                    (prev-rewiring (subseq (quil::comment (aref (quil::parsed-program-executable-code processed-program)
+                                                                                (1- j)))
+                                                           (length "Entering rewiring: ")))
+                                    (this-rewiring (subseq (quil::comment instr)
+                                                           (length "Exiting rewiring: "))))
+                                (setf (quil::comment (aref (quil::parsed-program-executable-code processed-program)
+                                                           (1- j)))
+                                      (format nil "Entering/exiting rewiring: (~a . ~a)"
+                                              prev-rewiring this-rewiring))))
+                             (t
+                              (setf (quil::comment (aref (quil::parsed-program-executable-code processed-program)
+                                                         (1- j)))
+                                    (quil::comment instr))))
                      :unless (typep instr 'quil::halt)
                        :collect instr)
                'vector)))
