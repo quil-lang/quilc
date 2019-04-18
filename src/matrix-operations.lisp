@@ -31,7 +31,7 @@
   (check-type y magicl:matrix)
   (and (= (magicl:matrix-rows x) (magicl:matrix-rows y))
        (= (magicl:matrix-cols x) (magicl:matrix-cols y))
-       (loop :for j :below (magicl:matrix-cols x)
+       (loop :for j :below (magicl:matrix-rows x)
              :always (double~ (magicl:ref x j 0) (magicl:ref y j 0)))))
 
 (defun matrix-equality (x y)
