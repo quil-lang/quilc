@@ -155,6 +155,7 @@
 
 (declaim (special *program-name*))
 (defun start-rpc-server (&key
+                           (host "*")
                            (port 5555)
                            (logger (make-instance 'cl-syslog:rfc5424-logger
                                                   :log-writer (cl-syslog:null-log-writer))))
@@ -166,6 +167,6 @@
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
     (rpcq:dispatch-table-add-handler dt 'get-version-info)
     (rpcq:start-server :dispatch-table dt
-                       :listen-addresses (list (format nil "tcp://*:~a" port))
+                       :listen-addresses (list (format nil "tcp://~a:~a" host port))
                        :logger logger
                        :timeout *time-limit*)))
