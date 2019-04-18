@@ -950,42 +950,61 @@ If this slot is not supplied, then the gate is considered *anonymous*. If this i
 
 N.B., The fractions of pi will be printed up to a certain precision!")
 
+(defvar *print-polar-form* nil
+  "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
+
+(defun format-real (r stream)
+  "Print the real number R nicely to the stream STREAM."
+  (check-type r real)
+  (check-type stream stream)
+  (cond
+    (*print-fractional-radians*
+     (cond
+       ((double~ r pi)
+        (format stream "pi"))
+       ((double~ r (- pi))
+        (format stream "-pi"))
+       (t
+        (dolist (denom '(2 3 4 6 8 16))
+          (dotimes (numer (* 2 denom))
+            (when (and (/= numer denom)
+                       (double~ (abs r) (/ (* pi numer) denom)))
+              (cond
+                ((= numer 1)
+                 (format stream "~:[~;-~]pi/~d" (minusp r) denom))
+                ((zerop numer)
+                 (format stream "~F" r))
+                (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
+              (return-from format-real))))
+        ;; If we cannot find a nice fraction of pi, just print the
+        ;; real number
+        (format stream "~F" r))))
+    (t
+     (format stream "~F" r))))
+
+(defun real-fmt (stream r &optional colon-modifier at-modifier)
+  "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
+For example,
+    (format t \"the number was ~/cl-quil:real-fmt/\" r)"
+  (declare (ignore colon-modifier at-modifier))
+  (format-real r stream))
+
 (defun format-complex (z stream)
   "Print the real or complex number Z nicely to the stream STREAM."
   (check-type z number)
+  (check-type stream stream)
   (cond
     ((zerop z)
      (format stream "0.0"))
     ((realp z)
-     (when *print-fractional-radians*
-       (when (double~ z pi)
-         (return-from format-complex (format stream "pi")))
-       (when (double~ z (- pi))
-         (return-from format-complex (format stream "-pi")))
-       (dolist (denom '(2 3 4 6 8 16))
-         (dotimes (numer (* 2 denom))
-           (when (/= numer denom)
-             (when (double~ z (/ (* pi numer) denom))
-               (return-from format-complex
-                 (cond
-                   ((= numer 1)
-                    (format stream "pi/~d" denom))
-                   ((zerop numer)
-                    (format stream "~F" z))
-                   (t (format stream "~d*pi/~d" numer denom)))))
-             (when (double~ z (/ (* -1 pi numer) denom))
-               (return-from format-complex
-                 (cond
-                   ((= numer 1)
-                    (format stream "-pi/~d" denom))
-                   ((zerop numer)
-                    (format stream "~F" z))
-                   (t (format stream "-~d*pi/~d" numer denom)))))))))
-     (format stream "~F" z))
+     (format-real z stream))
     ((complexp z)
      (cond
        ((zerop (imagpart z))
         (format-complex (realpart z) stream))
+       (*print-polar-form*
+        (format stream "~F∠" (abs z))
+        (format-real (mod (phase z) (* 2 pi)) stream))
        (t
         (format stream "~a~a~a"
                 (if (zerop (realpart z))
@@ -996,6 +1015,13 @@ N.B., The fractions of pi will be printed up to a certain precision!")
                     (format nil "+")
                     "")
                 (format nil "~Fi" (imagpart z))))))))
+
+(defun complex-fmt (stream z &optional colon-modifier at-modifier)
+  "Like the function format-complex, but is compatible with format strings using the ~/.../ directive.
+For example,
+    (format t \"the number was ~/cl-quil:complex-fmt/\" z)"
+  (declare (ignore colon-modifier at-modifier))
+  (format-complex z stream))
 
 (defun print-instruction (instr &optional (stream *standard-output*))
   "Print the Qul instruction INSTR to the stream STREAM.
@@ -1072,8 +1098,7 @@ For example,
                              (first expr)
                              (print-delayed-expression (second expr) nil)))))
                  (number
-                  (format stream "(~a)"
-                          (format-complex expr nil)))
+                  (format stream "(~/cl-quil:complex-fmt/)" expr))
                  (symbol
                   (format stream "%~a" expr))
                  (otherwise
