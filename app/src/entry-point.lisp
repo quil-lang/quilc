@@ -203,17 +203,8 @@
 (defun entry-point (argv)
   (setup-debugger)
 
-  ;; grab the CLI arguments
-  (setf *program-name* (pop argv))
-
   (handler-case
-      (command-line-arguments:handle-command-line
-       *option-spec*
-       'process-options
-       :command-line argv
-       :name "quilc"
-       :positional-arity 0
-       :rest-arity nil)
+      (%entry-point argv)
     (interactive-interrupt (c)
       (declare (ignore c))
       (format *error-output* "~&! ! ! Caught keyboard interrupt. Exiting.~%")
