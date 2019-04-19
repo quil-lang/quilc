@@ -229,7 +229,7 @@ We welcome and encourage community contributions! Peruse our
 [guidelines for contributing](CONTRIBUTING.md) to get you up to speed on
 expectations. Once that's clear, a good place to start is the
 [good first issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-section. If you have any find bugs, please create an
+section. If you find any bugs, please create an
 [issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 If you need help with some code or want to discuss some technical issues, you can find us in the
 `#dev` channel on [Slack](https://slack.rigetti.com/).
