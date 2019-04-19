@@ -21,7 +21,7 @@
 (defparameter *gate-whitelist* nil)
 (defparameter *gate-blacklist* nil)
 (defparameter *without-pretty-printing* nil)
-(defparameter *ISA-descriptor* nil)
+(defparameter *isa-descriptor* nil)
 (defparameter *verbose* (make-broadcast-stream))
 (defparameter *protoquil* nil)
 (defparameter *log-level* ':info)
