@@ -225,7 +225,7 @@ CNOT 0 2"))
          (proc-prog (quil::compiler-hook orig-prog chip))
          (proc-matrix (quil::parsed-program-to-logical-matrix proc-prog))
          (2q-code (program-2q-instructions proc-prog)))
-    (is (matrix-equals-dwim orig-matrix proc-matrix))
+    (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))))
 
 (deftest test-ccnot-compilation-on-cphase-iswap ()
@@ -236,7 +236,7 @@ CNOT 0 2"))
          (proc-prog (quil::compiler-hook orig-prog chip))
          (proc-matrix (quil::parsed-program-to-logical-matrix proc-prog))
          (2q-code (program-2q-instructions proc-prog)))
-    (is (matrix-equals-dwim orig-matrix proc-matrix))
+    (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))
     ;; NOTE: Decomposing into five 2q gates is more of a regression
     ;; test on quality of compilation, and not on correctness.
