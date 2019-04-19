@@ -11,7 +11,7 @@
 ;;;
 ;;; See also:
 ;;;
-;;;  From config.lisp:
+;;;  From options.lisp:
 ;;;
 ;;;     - *COMPRESS-CAREFULLY*
 ;;;     - *ENABLE-APPROXIMATE-COMPILATION*
