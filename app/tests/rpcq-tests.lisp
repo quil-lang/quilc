@@ -33,7 +33,7 @@
                                                 :|isa| isa
                                                 :|specs| specs))
                   (server-payload (make-instance 'rpcq::|NativeQuilRequest|
-                                                 :|quil| "H 0"
+                                                 :|quil| quil
                                                  :|target_device| target-device))
                   (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload))
                   (pp (quil::parse-quil-string quil))
