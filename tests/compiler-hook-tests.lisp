@@ -75,11 +75,6 @@ JUMP @a")))
       (is t))))
 
 (defun compare-compiled (file architecture)
-  ;; note: we compress qubits twice. the first is a compression of
-  ;; logical qubits in the original, uncompiled program. for the
-  ;; compiled program, we also compress qubits when creating the
-  ;; logical matrix, since the compiler may use a larger range of
-  ;; physical qubits
   (let* ((orig-prog (quil::transform 'quil::compress-qubits
                                      (cl-quil::read-quil-file file)))
          (proc-prog
