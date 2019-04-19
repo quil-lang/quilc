@@ -56,10 +56,10 @@
     (is (equalp (serialize-clifford-sequence cliff-id2) (list (list "XI" "ZI" "IX" "IZ"))))))
 
 (defun matrix-equalp (a b)
-  (let ((ma (magicl::matrix-rows a))
-        (na (magicl::matrix-cols a))
-        (mb (magicl::matrix-rows b))
-        (nb (magicl::matrix-cols b)))
+  (let ((ma (magicl:matrix-rows a))
+        (na (magicl:matrix-cols a))
+        (mb (magicl:matrix-rows b))
+        (nb (magicl:matrix-cols b)))
     (and (= ma mb)
          (= na nb)
          (loop :for i :below ma
