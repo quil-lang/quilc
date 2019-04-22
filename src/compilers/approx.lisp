@@ -81,51 +81,44 @@
 ;;; we do some very hands-on linear algebra far below. these next routines are
 ;;; all in support for that.
 
-(defun convert-su4-to-su2x2 (m)
-  "Assuming m is in the subgroup SU(2) x SU(2) of SU(4), this computes the parent matrices."
-  (check-type m magicl:matrix)
-  ;; we assume that we're looking at a matrix of the form
-  ;; [ a00 b00, a00 b01, a01 b00, a01 b01;
-  ;;   a00 b10, a00 b11, a01 b10, a01 b11;
-  ;;   a10 b00, a10 b01, a11 b00, a11 b01;
-  ;;   a10 b10, a10 b11, a11 b10, a11 b11 ] .
-  ;; the goal is to extract the values aij and bij.
-  (let* (;; there are four cases in all, depending on which of the entries in
-         ;; the first column are nonzero. (because the entire matrix is unitary,
-         ;; we know that *at least one* entry is nonzero.)
-         (state (alexandria:extremum (alexandria:iota 4) #'>
-                                     :key (lambda (i) (abs (magicl:ref m 0 i)))))
-         ;; b can be taken to be either the UL block or the LL block, up to
-         ;; rescaling, by assigning the first nonzero value in the first column
-         ;; as belonging to a
-         (b
-           (magicl:scale (/ (magicl:ref m 0 state))
-                         (cond
-                           ((or (= state 0) (= state 1))
-                            (magicl:make-complex-matrix 2 2
-                                                        (list (magicl:ref m 0 0) (magicl:ref m 1 0)
-                                                              (magicl:ref m 0 1) (magicl:ref m 1 1))))
-                           ((or (= state 2) (= state 3))
-                            (magicl:make-complex-matrix 2 2
-                                                        (list (magicl:ref m 2 0) (magicl:ref m 3 0)
-                                                              (magicl:ref m 2 1) (magicl:ref m 3 1)))))))
-         ;; the division in the above turned one of the entries of b into 1, so
-         ;; we can use that to read a off from all the entries of m where that b
-         ;; occurs
-         (a
-           (cond ((or (= state 0) (= state 2))
-                  (magicl:make-complex-matrix 2 2
-                                              (list (magicl:ref m 0 0) (magicl:ref m 2 0)
-                                                    (magicl:ref m 0 2) (magicl:ref m 2 2))))
-                 ((or (= state 1) (= state 3))
-                  (magicl:make-complex-matrix 2 2
-                                              (list (magicl:ref m 1 0) (magicl:ref m 3 0)
-                                                    (magicl:ref m 1 2) (magicl:ref m 3 2)))))))
-    ;; these are the "right" matrices, but they probably aren't special unitary.
-    ;; rescale them to fix this, then hand them back.
-    (values
-     (magicl:scale (/ (sqrt (magicl:det a))) a)
-     (magicl:scale (/ (sqrt (magicl:det b))) b))))
+(defun convert-su4-to-su2x2 (SU2x2)
+  "Assuming SU2x2 is in the subgroup SU(2) (x) SU(2) of SU(4), this computes the parent matrices."
+  (check-type SU2x2 magicl:matrix)
+  ;; the algorithm presented here was cooked up by van Loan and Pitsianis in
+  ;; _Approximation with Kronecker Products_. the good news is that, because it
+  ;; sits atop SVD, it has pretty good numerical stability properties.
+  ;; previously, we were picking the term with the largest magnitude in the
+  ;; first column and using it to brute-force a factorization, but the term with
+  ;; the largest magnitude may also have the largest magnitude of jitter. this
+  ;; eventually bit us. the bad news is that, even though it provably constructs
+  ;; the best approximation to a kronecker product, but the factors in the best
+  ;; approximation may not, in general, be unitary. this is a remark in the
+  ;; original paper, toward the very end, and i honestly don't understand it:
+  ;; i think that in the one-summand case, it's safe to ignore this caveat.
+  ;;
+  ;; NOTE: this logic extends just as well to SU(m) (x) SU(n) and could arguably
+  ;;       be moved into MAGICL.
+  (let ((m (magicl:make-zero-matrix 4 4)))
+    (dotimes (block-i 2)
+      (dotimes (block-j 2)
+        (dotimes (inner-i 2)
+          (dotimes (inner-j 2)
+            (setf (magicl:ref m (+ (* 2 block-j) block-i) (+ (* 2 inner-j) inner-i))
+                  (magicl:ref SU2x2 (+ (* 2 block-i) inner-i) (+ (* 2 block-j) inner-j)))))))
+    (multiple-value-bind (u sigma vt) (magicl:svd m)
+      (let ((a (magicl:make-zero-matrix 2 2))
+            (b (magicl:make-zero-matrix 2 2)))
+        (dotimes (i 2)
+          (dotimes (j 2)
+            (setf (magicl:ref a i j)
+                  (magicl:ref u (+ (* 2 j) i) 0))))
+        (setf a (magicl:scale (sqrt (magicl:ref sigma 0 0)) a))
+        (dotimes (i 2)
+          (dotimes (j 2)
+            (setf (magicl:ref b i j)
+                  (magicl:ref vt 0 (+ (* 2 j) i)))))
+        (setf b (magicl:scale (sqrt (magicl:ref sigma 0 0)) b))
+        (values a b)))))
 
 ;; these are special matrices that conjugate SU(2) x SU(2) onto SO(4).
 ;;
