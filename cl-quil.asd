@@ -103,8 +103,7 @@
                              (:file "compressor")
                              (:file "wavefunctions")
                              (:file "rewriting-rules")))
-               (:file "cl-quil")
-               (:file "contribs")))
+               (:file "cl-quil")))
 
 ;;; Contribs
 
