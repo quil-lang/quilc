@@ -882,9 +882,10 @@ INPUT-STRING that triggered the condition."
 
         (when (eql ':AS (token-type (first params-args)))
           (pop params-args)
-          (let ((parsed-gate-type (token-type (first params-args))))
+          (let* ((parsed-gate-tok (first params-args))
+                 (parsed-gate-type (token-type parsed-gate-tok)))
             (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
-              (quil-parse-error "Found unexpected gate type ~A." parsed-gate-type))
+              (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
             (setf gate-type parsed-gate-type))))
 
       (ecase gate-type
