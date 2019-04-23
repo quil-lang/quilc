@@ -4,8 +4,6 @@
 
 (in-package #:cl-quil.clifford)
 
-(declaim (optimize speed (safety 0) (debug 0) (space 0)))
-
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
 ;;; Gottesman's paper is also helpful https://arxiv.org/pdf/quant-ph/9807006.pdf
@@ -18,9 +16,10 @@
   ;;
   ;; Rows 0 to N - 1 are "destabilizer generators"
   ;; Rows N to 2N - 1 are "stabilizer generators"
-  ;; Row 2N is for scratch space, as suggested by the paper.
-  ;; Columns 0 to N are x
-  ;; Columns N to 2N - 1 are z
+  ;; Row 2N is for scratch space, as suggested by the Aaronson et al. paper.
+  ;;
+  ;; Columns 0 to N are Pauli X factors (x_i)
+  ;; Columns N to 2N - 1 are Pauli Z factors (z_i)
   ;; Column 2N is are the phases r
   '(simple-array bit (* *)))
 
@@ -122,7 +121,7 @@
 
 (declaim (inline phase-of-product))
 (defun phase-of-product (x1 z1 x2 z2)
-  ;; This function is called "g" in the Aaronson paper.
+  ;; This function is called "g" in the Aaronson et al. paper.
   (declare (type bit x1 z1 x2 z2))
   (levi-civita (logior x1 (ash z1 1))
                (logior x2 (ash z2 1))))
@@ -197,14 +196,23 @@
       (xorf (tableau-x tab h j) (tableau-x tab i j))
       (xorf (tableau-z tab h j) (tableau-z tab i j)))))
 
-(defun clifford-symplectic-action (c)
-  "Given a Clifford C, calculate three values:
+;;; This is intended to be a helper function for
+;;; COMPILE-TABLEAU-OPERATION. Look at that function to see if it
+;;; helps understanding this one.
+(defun clifford-stabilizer-action (c)
+  "Compute a symbolic representation of the action of the Clifford element C on the stabilizer representation of a state, namely the \"tableau representation\".
 
-1. A list of variable names representing X-Z pairs on qubits 0, 1, ....
+Given a Clifford C, calculate three values:
 
-2. A Boolean expression which calculates the additional phase.
+1. A list of variable names representing X-Z pairs on qubits 0, 1, .... A typical value will look like
 
-3. A list of updates to the variables of (1), represented as Boolean expressions."
+    (X0 Z0 X1 Z1 ... Xn Zn),
+
+but the symbols may be uninterned or named differently.
+
+2. A Boolean expression which calculates the additional phase. If this boolean function were evaluated with the variables of (1) bound, then this would produce the action's contribution to the phase.
+
+3. A list of updates to the variables of (1), represented as Boolean expressions. Similarly to (2), these are expressions in 1-1 correspondence with (1) which, if evaluated, would produce the updates to said variables."
   (let* ((num-qubits (clifford-num-qubits c))
          (num-variables (* 2 num-qubits))
          (variables (loop :for i :below num-variables
@@ -213,45 +221,78 @@
                                        (alexandria:format-symbol nil "Z~D" (floor i 2)))))
          (phase-factor nil)
          (new-variables (make-array num-variables :initial-element nil)))
+    ;; We will be mapping over all Paulis operating on a single
+    ;; qubit. We will compute the action on the Pauli and use this to
+    ;; produce part of the action.
     (map-all-paulis num-qubits
                     (lambda (i p)
                       (let* ((cp (apply-clifford c p))
                              (cp-phase (phase-factor cp)))
                         (assert (zerop (mod cp-phase 2)))
+                        ;; We normalize the phase to be as follows:
+                        ;;
+                        ;;     0 - phase of 1
+                        ;;     1 - phase of -1
+                        ;;
+                        ;; Note that this will _always_ be the case; a
+                        ;; Clifford will maintain a real
+                        ;; eigenvalue. So the factors +/-i can be
+                        ;; thrown out.
                         (setf cp-phase (ash cp-phase -1))
-                        ;; Collect phase contribution.
+                        ;; If we did accumulate a phase, we need to
+                        ;; note how this phase gets accumulated.
+                        ;;
+                        ;; Below, BITS starts off as the bitwise
+                        ;; representation of the Pauli P. This loop is
+                        ;; iterating through the bits and variables in
+                        ;; parallel, and we are building up a
+                        ;; corresponding Boolean expression. This is
+                        ;; the age-old trick of building a Boolean
+                        ;; expression corresponding to a truth
+                        ;; table.
+                        ;;
+                        ;; In the end, we want PHASE-FACTOR to have a
+                        ;; conjunctive term which contributes a -1
+                        ;; phase factor when the variables look like
+                        ;; the Pauli P.
                         (when (= 1 cp-phase)
                           (loop :with bits := i
                                 :for variable :in variables
-                                :collect (if (zerop (ldb (byte 1 0) bits)) ; EVENP
+                                :collect (if (zerop (ldb (byte 1 0) bits)) ; Equiv. to EVENP
                                              `(bnot ,variable)
                                              variable)
                                   :into conjunction
                                 :do (setf bits (ash bits -1))
                                 :finally (push `(b* ,@conjunction) phase-factor)))
-                        ;; When we have X or Z (i = a power of 2),
-                        ;; check out where they get shuffled.
-                        (when (power-of-two-p i)
+                        ;; When the Pauli P is a generator (i.e., X or
+                        ;; Z), then we want to record which other
+                        ;; variables see an effect from this generator
+                        ;; under C. Similarly to the last loop, we
+                        ;; loop over the bitwise representation of the
+                        ;; Pauli _acted on by the Clifford_ (CP
+                        ;; instead of P). When we find any bit, we
+                        ;; record the X or Z variable in that bit's
+                        ;; running list. In the end, the running list
+                        ;; represents a disjunction of contributions.
+                        (when (power-of-two-p i) ; X and Z's will have power of two indexes.
                           (let ((var (nth (1- (integer-length i)) variables)))
                             ;; The var that contributes to X- and Z-FACTORS
                             (loop :with bits := (pauli-index cp)
                                   :for i :below num-variables
-                                  :when (= 1 (ldb (byte 1 0) bits)) ; ODDP
+                                  :when (= 1 (ldb (byte 1 0) bits)) ; Equiv. to ODDP
                                     :do (push var (aref new-variables i))
-                                  :do (setf bits (ash bits -1))))
-                          ;(format t "~A -> ~A~%" p cp)
-                          ;(format t "~2,'0B -> ~2,'0B~%" (pauli-index p) (pauli-index cp))
-                          )
-                        ;(format t "  ~v,'0B -> ~B~%" num-variables i cp-phase)
-                        )))
+                                  :do (setf bits (ash bits -1))))))))
+    ;; We didn't actually construct the disjunction yet out of the
+    ;; running lists, so do that here.
     (map-into new-variables (lambda (sum) `(b+ ,@sum)) new-variables)
+    ;; Return the values.
     (values
      variables
      `(b+ ,@phase-factor)
      (coerce new-variables 'list))))
 
 (defun compile-tableau-operation (c)
-  "Compile a Clifford element into a tableau operation. This will be a lambda form whose first argument is the tableau to operate on, and whose remaining arguments are the qubit indexes to operate on."
+  "Compile a Clifford element into a tableau operation. This will be a lambda form whose first argument is the tableau to operate on, and whose remaining arguments are the qubit indexes to operate on. Upon applying this function to a tableau, it will be mutated "
   (check-type c clifford)
   (let* ((num-qubits (num-qubits c))
          ;; Gensyms
@@ -260,31 +301,41 @@
          (qubits (loop :for i :below num-qubits
                        :collect (alexandria:format-symbol nil "Q~D" i))))
     (multiple-value-bind (variables phase-kickback new-variables)
-        (clifford-symplectic-action c)
+        (clifford-stabilizer-action c)
+      ;; Most of this lambda can be understood by understanding the
+      ;; return values of CLIFFORD-STABILIZER-ACTION. See the
+      ;; documentation of that function.
       `(lambda (,tab ,@qubits)
          (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
                   (type tableau ,tab)
                   (type tableau-index ,@qubits))
          (dotimes (,i (* 2 (tableau-qubits ,tab)))
            (declare (type tableau-index ,i))
+           ;; First, we construct bindings to these variables
+           ;; according to the qubits we are operating on.
            (let (,@(loop :for qubit :in qubits
                          :for (x z) :on variables :by #'cddr
                          :collect `(,x (tableau-x ,tab ,i ,qubit))
                          :collect `(,z (tableau-z ,tab ,i ,qubit))))
+             (declare (type bit ,@variables))
              ;; Calculate the new phase.
              (xorf (tableau-r ,tab ,i) ,phase-kickback)
+             ;; Update the tableau with the new values.
              (setf
               ,@(loop :for qubit :in qubits
                       :for (x z) :on new-variables :by #'cddr
                       ;; Set this...
                       :collect `(tableau-x ,tab ,i ,qubit)
-                      ;; to this...
+                      ;; ...to this...
                       :collect x
                       ;; And set this...
                       :collect `(tableau-z ,tab ,i ,qubit)
                       ;; to this...
                       :collect z))))))))
 
+;;; These functions: TABLEAU-APPLY-{CNOT, H, PHASE} are hard-coded
+;;; from the Aaronson et al. paper. These can be readily generated
+;;; from the above procedure.
 (defun tableau-apply-cnot (tab a b)
   (declare (type tableau tab)
            (type tableau-index a b))
@@ -329,10 +380,15 @@
   (dotimes (j (array-dimension tab 1))
     (setf (aref tab i j) (aref tab k j))))
 
-;;; For some reason that I'm not sure about, the procedure for
+;;; Robert: For some reason that I'm not sure about, the procedure for
 ;;; non-deterministic measurement from the Aaronson et al. paper
 ;;; didn't work. I had to look at their C code for inspiration, which
-;;; oddly does work (and doesn't do precisely what the paper says.)
+;;; oddly does work (and doesn't seem to do precisely what the paper
+;;; says.)
+;;;
+;;; The general idea is a two step operation: (1) determine if the
+;;; measurement would produce a deterministic result, (2) determine
+;;; the result.
 (defun tableau-measure (tab q)
   (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
            (type tableau tab)
@@ -341,11 +397,14 @@
   ;; deterministic
   (let* ((n (tableau-qubits tab))
          (p (loop :for p :below n
+                  ;; Look at the stabilizer generators, hence the + N.
                   :when (= 1 (tableau-x tab (+ p n) q))
                     :do (return p)
                   :finally (return nil))))
     (declare (type (or tableau-index null) p)
              (type tableau-index n))
+    ;; The value of P is a reference to the Pth stabilizer
+    ;; generator such that a Pauli X_q is present.
     (cond
       ;; Case I: Outcome is not deterministic.
       (p
@@ -358,6 +417,10 @@
            (row-product tab i p)))
        (tableau-r tab (+ p n)))
       ;; Case II: Outcome is determined.
+      ;;
+      ;; The work below will not modify the tableau (except for the
+      ;; scratch space). This is used simply to compute what the
+      ;; measurement would be.
       (t
        ;; Zero out the scratch space.
        (dotimes (i (* 2 n))
@@ -437,6 +500,7 @@
                 (1+ max-qubit))))))
 
 (defun interpret-chp-file (file)
+  "Execute one of Aaronson's .chp files."
   (multiple-value-bind (code num-qubits)
       (read-chp-file file)
     (let ((tab (make-tableau-zero-state num-qubits)))

@@ -60,12 +60,12 @@ For qubit i, X_i will have index 2i and Z_i will have index 2i+1, for 0 <= i < 2
     (funcall f (1+ (* 2 idx)) (embed +Z+ n (list idx)))))
 
 (defun map-all-paulis (n f)
-  "Iterate of the single qubit X, Y, and Z pauli operators represented on
+  "Iterate over the single qubit X, Y, and Z pauli operators represented on
 N qubits and call F on each operator and the bitwise representation."
   (dotimes (idx n)
-    (funcall f (ash #b01 (* 2 idx)) (embed +X+ n (list idx)))
-    (funcall f (ash #b10 (* 2 idx)) (embed +Z+ n (list idx)))
-    (funcall f (ash #b11 (* 2 idx)) (embed +Y+ n (list idx)))))
+    (funcall f (ash #.(sym-to-base4 'X) (* 2 idx)) (embed +X+ n (list idx)))
+    (funcall f (ash #.(sym-to-base4 'Z) (* 2 idx)) (embed +Z+ n (list idx)))
+    (funcall f (ash #.(sym-to-base4 'Y) (* 2 idx)) (embed +Y+ n (list idx)))))
 
 (defun enumerate-pauli-basis (n)
   "Enumerate the single qubit X and Z pauli operators represented on N

@@ -169,22 +169,22 @@
 (defun matrix-to-clifford (gate)
   "Convert a matrix GATE into a CLIFFORD object."
   (let ((num-qubits (quil:ilog2 (magicl:matrix-cols gate))))
-          (make-clifford
-           :num-qubits num-qubits
-           :basis-map (make-array
-                       (* 2 num-qubits)
-                       :initial-contents
-                       (loop :for pauli :in (n-qubit-pauli-basis-matrices num-qubits)
-                             :collect
-                             (multiple-value-bind (phase conj)
-                                 (pauli-matrix-p
-                                  (reduce #'magicl:multiply-complex-matrices
-                                          (list gate
-                                                pauli
-                                                (magicl:conjugate-transpose gate))))
-                               (assert (not (null conj)) ()
-                                       "The given matrix does not represent a Clifford element.")
-                               (pauli-from-string (concatenate 'string phase conj))))))))
+    (make-clifford
+     :num-qubits num-qubits
+     :basis-map (make-array
+                 (* 2 num-qubits)
+                 :initial-contents
+                 (loop :for pauli :in (n-qubit-pauli-basis-matrices num-qubits)
+                       :collect
+                       (multiple-value-bind (phase conj)
+                           (pauli-matrix-p
+                            (reduce #'magicl:multiply-complex-matrices
+                                    (list gate
+                                          pauli
+                                          (magicl:conjugate-transpose gate))))
+                         (assert (not (null conj)) ()
+                                 "The given matrix does not represent a Clifford element.")
+                         (pauli-from-string (concatenate 'string phase conj))))))))
 
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
