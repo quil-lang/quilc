@@ -52,7 +52,9 @@ Quil comment. Gate volume is defined as the total number of gates in
 the compiled program. (Requires -P.)
 .IP "-r, --compute-runtime"
 Print a calculated estimated runtime for the provided circuit as an
-appended Quil comment. (Requires -P.)
+appended Quil comment. Assumes that chains of instructions that do
+have overlapping resources (qubits) can be run in parallel. Currently,
+should be taken with a hefty helping of salt. (Requires -P.)
 .IP "-f, --compute-fidelity"
 Print a calculated estimated compiled circuit fidelity for the
 provided circuit as an appended Quil comment. (Requires -P.)
