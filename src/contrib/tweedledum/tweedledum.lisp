@@ -23,12 +23,11 @@
 
 (defvar *tweedledum-libs-loaded* nil
   "T if the tweedledum shared library has been loaded by CFFI")
-(defvar *tweedledum-contrib-loaded* nil
-  "T if the contrib module has been loaded by CL-QUIL")
 
 ;; TODO Some error handling here
 (unless *tweedledum-libs-loaded*
   (cffi:load-foreign-library 'libtweedledum)
+  (push (constantly 'compile-perm-gate-with-tweedledum) quil::*global-compilers*)
   (setf *tweedledum-libs-loaded* t))
 
 (defcfun (%synthesis-dbs "tweedledum_synthesis_dbs")
@@ -71,28 +70,8 @@
         (t
          (quil::give-up-compilation))))))
 
-(defclass tweedledum (quil::contrib) ())
-
-(defmethod contrib-load ((contrib tweedledum))
-  (when *tweedledum-libs-loaded*
-    (push (constantly 'compile-perm-gate-with-tweedledum) quil::*global-compilers*)
-    (setf *tweedledum-contrib-loaded* t)))
-
-(defmethod contrib-unload ((contrib tweedledum))
-  (when *tweedledum-contrib-loaded*
-    ;; TODO Implement a system that will allow multiple contribs to install and
-    ;; remove compilers as they see fit. Currently, this will only work with a
-    ;; single contrib, and will break if cl-quil chooses to push more compilers
-    ;; *after* loading tweedledum
-    (pop quil::*global-compilers*)
-    (setf *tweedledum-contrib-loaded* nil)))
-
-(let ((contrib-instance (make-instance 'tweedledum)))
-  (contrib-load contrib-instance)
-  (setf (gethash :tweedledum quil::*contribs*) contrib-instance))
-
 (defun run-tweedledum-tests ()
-  (unless cl-quil.tweedledum::*tweedledum-contrib-loaded*
+  (unless *tweedledum-libs-loaded*
     (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum)
           cl-quil::*global-compilers*))
   (uiop:symbol-call ':cl-quil-tests
