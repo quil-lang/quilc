@@ -180,13 +180,34 @@
   ;; (is (quil.clifford:clifford= (canonical-swap-representative (quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))) (SWAP 2 (cl-permutation:perm-identity 2))))
   (let ((gt (make-god-table (default-gateset 2)))
         (equivalence-classes (quil.clifford::make-clifford-hash-table)))
-    (loop for key being the hash-keys of (quil.clifford::mapping gt) :do
+    (loop :for key :being :the :hash-keys :of (quil.clifford::mapping gt) :do
       ;;Check that each element canonizes to the same representative
-      (is (clifford= (canonical-swap-representative key) (canonical-swap-representative (quil.clifford:group-mul (quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))  key))))
+      (is (clifford= (canonical-swap-representative key)
+                     (canonical-swap-representative
+                      (quil.clifford:group-mul
+                       (quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))
+                       key))))
       (let ((rep (canonical-swap-representative key)))
         (if (not (gethash rep equivalence-classes))
             (push (list key) (gethash rep equivalence-classes))
-            (setf (gethash rep equivalence-classes) (cons key (gethash rep equivalence-classes))))))
+            (setf (gethash rep equivalence-classes)
+                  (cons key (gethash rep equivalence-classes))))))
     ;;Check that all 2Q classes contain two elements
-    (loop for class in (alexandria:hash-table-values equivalence-classes) :do
-      (is (= (length class) 2)))))
+    (dolist (class (alexandria:hash-table-values equivalence-classes))
+      (is (= 2 (length class))))))
+
+(defparameter *chp-test-files-directory*
+  (asdf:system-relative-pathname ':cl-quil-tests "tests/chp-test-files/"))
+
+(defun test-chp-files ()
+  "Check that basic CHP interpretation works."
+  (fresh-line)
+  (dolist (file (uiop:directory-files *chp-test-files-directory* "*.chp"))
+    (format t "Interpreting CHP file ~A... " (pathname-name file))
+    (finish-output)
+    (let ((start-time (get-internal-real-time)))
+      (not-signals error
+        (let ((*standard-output* (make-broadcast-stream)))
+          (cl-quil.clifford::interpret-chp-file file)))
+      (format t "~D ms~%" (round (* 1000 (- (get-internal-real-time) start-time))
+                                 internal-time-units-per-second)))))

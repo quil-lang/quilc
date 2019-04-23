@@ -488,9 +488,7 @@ but the symbols may be uninterned or named differently.
               :do (cond
                     ((eq ':eof line) (error "Didn't find a # line"))
                     ;; We can start processing lines.
-                    ((string= line "#") (loop-finish))
-                    #+ig
-                    ((cl-ppcre:scan "^#\\s*$"  line) (loop-finish))))
+                    ((string= line "#") (loop-finish))))
         ;; Read the actual gate lines.
         (values (loop :for line := (read-line s nil ':eof)
                       :until (eq ':eof line)
@@ -504,4 +502,4 @@ but the symbols may be uninterned or named differently.
   (multiple-value-bind (code num-qubits)
       (read-chp-file file)
     (let ((tab (make-tableau-zero-state num-qubits)))
-      (time (interpret-chp code tab)))))
+      (interpret-chp code tab))))

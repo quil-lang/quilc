@@ -1,0 +1,35 @@
+Uses the Bennett-Wiesner dense quantum coding
+protocol to transmit 2 classical bits using 1
+EPR pair and 1 bit of quantum communication.
+You can specify the bits to be transmitted at
+the command line by typing
+chp densecoding zz	for 00
+chp densecoding zZ	for 01
+chp densecoding Zz	for 10
+chp densecoding ZZ	for 11
+These will be stored in qubits 0 and 1.
+The program first prepares an EPR pair across
+qubits 2 and 3 (2 is Alice's half and 3 is Bob's
+half).  Alice then applies unitaries to her half
+of the EPR pair depending on qubits 0 and 1.
+Next, Alice's half is transferred to qubit 4,
+which represents the 1 bit of quantum
+communication to Bob.  Finally, Bob applies
+unitaries to his qubits (4 and 3), and then
+measures them to read Alice's message.
+#
+h 2
+c 2 3
+
+c 1 2
+h 2
+c 0 2
+h 2
+
+c 2 4
+c 4 2
+
+c 4 3
+h 4
+m 4
+m 3

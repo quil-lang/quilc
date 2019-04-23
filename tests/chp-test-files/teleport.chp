@@ -1,0 +1,36 @@
+Runs the quantum teleportation protocol.
+The state to be teleported is in qubit 0.
+You can specify that state at the command line by typing
+chp teleport z	  for |0>
+chp teleport Z	  for |1>
+chp teleport x	  for |0>+|1>
+chp teleport X	  for |0>-|1>
+chp teleport y	  for |0>+i|1>
+chp teleport Y	  for |0>-i|1>
+The program first prepares an EPR pair (|00>+|11>) across
+qubits 1 and 2 (1 is Alice's half and 2 is Bob's half).
+Alice then applies the teleportation circuit, and measures
+qubits 0 and 1 to obtain the two-bit error syndrome.  She
+CNOT's this syndrome into qubits 3 and 4, representing
+classical communication to Bob.  Finally, Bob uses the
+syndrome to correct the teleported state, and measures it
+in the standard basis.  When qubit 2 is measured, the
+result should be 0 if the input was z, 1 if the input was
+Z, and random if the input was x, X, y, or Y.
+#
+h 1
+c 1 2
+
+c 0 1
+h 0
+m 0
+m 1
+
+c 0 3
+c 1 4
+
+c 4 2
+h 2
+c 3 2
+h 2
+m 2

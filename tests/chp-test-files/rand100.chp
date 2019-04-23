@@ -1,0 +1,104 @@
+Randomly-generated Clifford group quantum circuit
+n=100 qubits, T=100 gates
+Instruction mix: 50.000000% CNOT, 20.000000% Hadamard, 20.000000% Phase, 10.000000% Measurement
+#
+c 67 95
+h 48
+c 15 71
+h 1
+c 96 12
+c 12 74
+c 2 50
+c 1 6
+c 28 74
+m 74
+c 3 46
+c 87 56
+m 45
+h 57
+c 1 79
+c 12 11
+h 39
+h 92
+c 87 21
+c 3 22
+h 75
+m 99
+p 40
+c 5 92
+p 86
+c 54 50
+p 85
+c 72 92
+p 25
+c 99 27
+p 52
+h 41
+c 65 1
+h 12
+c 47 10
+c 9 37
+c 85 11
+m 96
+p 32
+m 82
+c 37 4
+h 38
+c 56 88
+h 15
+c 47 48
+h 28
+m 91
+c 68 38
+c 29 21
+h 95
+c 2 7
+c 81 66
+c 14 48
+h 17
+c 92 57
+p 56
+c 58 52
+p 7
+c 93 24
+p 58
+m 55
+p 34
+p 0
+c 2 99
+p 42
+c 28 25
+p 36
+c 67 56
+c 47 84
+c 94 8
+h 63
+c 29 16
+c 10 32
+m 22
+p 95
+c 48 58
+h 8
+h 78
+m 57
+m 91
+c 91 17
+h 31
+m 26
+c 3 78
+c 64 98
+p 23
+c 87 52
+c 79 91
+p 41
+c 90 8
+h 6
+h 16
+h 56
+h 13
+c 58 92
+m 85
+c 72 30
+p 2
+p 4
+m 77

@@ -1,0 +1,48 @@
+Uses Simon's algorithm to learn about the "hidden
+shift" of a function f (the string s such that
+f(x)=f(y) if and only if y=x+s, where + denotes
+bitwise XOR).  The function is the following
+linear map from 5 bits to 4 bits:
+f(a,b,c,d,e)=(a+b,b+c,c+d,d+e)
+Clearly s=11111 for this function.
+The program first prepares a uniform superposition
+over 5-bit strings in qubits 0 to 4.  It then
+computes f in qubits 5 to 8, and measures those
+qubits "for pedagogical purposes."  Finally it
+performs a Fourier transform on qubits 0 to 4 and
+measures them.  The first round of measurements
+should produce a random 4-bit string; the second
+should produce a random 5-bit string y such that
+y*s=0 (that is, y has even parity).
+#
+h 0
+h 1
+h 2
+h 3
+h 4
+
+c 0 5
+c 1 5
+c 1 6
+c 2 6
+c 2 7
+c 3 7
+c 3 8
+c 4 8
+
+m 5
+m 6
+m 7
+m 8
+
+h 0
+h 1
+h 2
+h 3
+h 4
+
+m 0
+m 1
+m 2
+m 3
+m 4
