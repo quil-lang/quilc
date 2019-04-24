@@ -415,7 +415,7 @@ but the symbols may be uninterned or named differently.
          (when (and (/= i p)
                     (= 1 (tableau-x tab i q)))
            (row-product tab i p)))
-       (tableau-r tab (+ p n)))
+       (values (tableau-r tab (+ p n)) nil))
       ;; Case II: Outcome is determined.
       ;;
       ;; The work below will not modify the tableau (except for the
@@ -425,13 +425,15 @@ but the symbols may be uninterned or named differently.
        ;; Zero out the scratch space.
        (dotimes (i (* 2 n))
          (setf (tableau-scratch tab i) 0))
-       ;; Update the scratch space. Sum up the stabilizers into the
-       ;; scratch space.
-       (dotimes (i n)
-         (when (= 1 (tableau-x tab i q))
-           (row-product tab (* 2 n) (+ i n))))
-       ;; Extract the answer from the phase bit of the scratch space.
-       (values (tableau-r tab (* 2 n)) t)))))
+       (let ((m (loop :for m :below n
+                      :when (= 1 (tableau-x tab m q))
+                        :do (return m)
+                      :finally (return n))))
+         (tableau-copy-row tab (* 2 n) (+ m n))
+         (loop :for i :from (1+ m) :below n :do
+           (when (= 1 (tableau-x tab i q))
+             (row-product tab (* 2 n) (+ i n))))
+         (values (tableau-r tab (* 2 n)) t))))))
 
 
 ;;; For testing
