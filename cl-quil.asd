@@ -134,7 +134,8 @@
              (uiop:run-program
               ;; TODO This needs to be platform agnostic. The difficulty is
               ;; in picking up a c++17 compiler automatically.
-              (cons c++17 c++17-args))))
+              (cons c++17 c++17-args)
+              :error-output t)))
     (let* ((c-file (component-pathname component))
            (cwd (namestring (make-pathname :directory (pathname-directory c-file))))
            (tweedlelibdir (merge-pathnames "tweedledum/" cwd))
