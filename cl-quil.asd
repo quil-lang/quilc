@@ -144,12 +144,10 @@
       (unless (uiop:directory-exists-p tweedlelibdir)
         (error "tweedledum library directory missing. Did you run ~
                 `git submodule init && git submodule update --init`?"))
-      (let ((c++17 "/usr/local/opt/llvm/bin/clang++")
-            (c++17-args (list "-L/usr/local/opt/llvm/lib"
+      (let ((c++17 "g++")
+            (c++17-args (list "-std=c++17"
                               "-shared"
                               "-fPIC"
-                              "-std=c++17"
-                              "-Wl,-rpath,/usr/local/opt/llvm/lib"
                               "-DFMT_HEADER_ONLY"
                               (format nil "-I~a" (merge-pathnames "libs/fmt" tweedlelibdir))
                               (format nil "-I~a" (merge-pathnames "libs/easy" tweedlelibdir))
