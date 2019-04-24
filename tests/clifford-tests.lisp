@@ -199,15 +199,51 @@
 (defparameter *chp-test-files-directory*
   (asdf:system-relative-pathname ':cl-quil-tests "tests/chp-test-files/"))
 
-(defun test-chp-files ()
+(deftest test-chp-files ()
   "Check that basic CHP interpretation works."
   (fresh-line)
   (dolist (file (uiop:directory-files *chp-test-files-directory* "*.chp"))
-    (format t "Interpreting CHP file ~A... " (pathname-name file))
+    (format t "    Interpreting CHP file ~A..." (pathname-name file))
     (finish-output)
     (let ((start-time (get-internal-real-time)))
       (not-signals error
         (let ((*standard-output* (make-broadcast-stream)))
           (cl-quil.clifford::interpret-chp-file file)))
-      (format t "~D ms~%" (round (* 1000 (- (get-internal-real-time) start-time))
+      (format t " ~D ms~%" (round (* 1000 (- (get-internal-real-time) start-time))
                                  internal-time-units-per-second)))))
+
+(deftest test-chp-cnot-hadamard-measure ()
+  "Simple statistical tests for CNOT, H, and MEASURE for the stabilizer formalism."
+  (loop :with results := (vector 0 0)
+        :repeat 500
+        :do
+           (let ((tab (cl-quil.clifford::make-tableau-zero-state 6))
+                 (qubits (alexandria:iota 6) #+igh(alexandria:shuffle '(0 1 2 3 4 5))))
+             (cl-quil.clifford::tableau-apply-h    tab 0)
+             (cl-quil.clifford::tableau-apply-cnot tab 0 1)
+             (cl-quil.clifford::tableau-apply-cnot tab 1 2)
+             (cl-quil.clifford::tableau-apply-cnot tab 2 3)
+             (cl-quil.clifford::tableau-apply-cnot tab 3 4)
+             (cl-quil.clifford::tableau-apply-cnot tab 4 5)
+             (multiple-value-bind (v d?)
+                 (cl-quil.clifford::tableau-measure tab (pop qubits))
+               ;; First measurement is *not* deterministic! It's a GHZ
+               ;; state!
+               (is (not d?))
+               (is (typep v 'bit))
+               (incf (aref results v))
+               (loop :repeat 5 :do
+                 (multiple-value-bind (v1 d?)
+                     (cl-quil.clifford::tableau-measure tab (pop qubits))
+                   ;; This measurement *is* deterministic, and the
+                   ;; same as V.
+                   (is d?)
+                   (is (typep v1 'bit))
+                   (is (= v1 v))))))
+           ;; We should have approx 50/50 distribution of results,
+           ;; which means there should be 250 of each. We just check
+           ;; that their difference doesn't exceed 100, which is
+           ;; *VERY* forgiving.
+        :finally (is (< (abs (- (aref results 0)
+                                (aref results 1)))
+                        100))))
