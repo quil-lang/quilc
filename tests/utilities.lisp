@@ -7,7 +7,7 @@
 ;;; Cribbed from QVM-TESTS
 (defmacro with-output-to-quil (&body body)
   `(let ((quil:*allow-unresolved-applications* t))
-     (quil:parse-quil-string
+     (quil:parse-quil
       (with-output-to-string (*standard-output*)
         ,@(loop :for form :in body
                 :if (stringp form)

@@ -36,8 +36,8 @@
                                                  :|quil| quil
                                                  :|target_device| target-device))
                   (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload))
-                  (pp (quil::parse-quil-string quil))
-                  (cpp (quil::parse-quil-string (rpcq::|NativeQuilResponse-quil| server-response))))
+                  (pp (quil::parse-quil quil))
+                  (cpp (quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
              (multiple-value-bind (mat1 mat2)
                  (quil::matrix-rescale (quil::make-matrix-from-quil
                                         (coerce (quil:parsed-program-executable-code pp) 'list))

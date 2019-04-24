@@ -214,7 +214,7 @@ and replies with the JSON
 }."
   (declare (ignore data api-key user-id))
   (check-payload-for-keys json "program")
-  (let ((program (quil::parse-quil (gethash "program" json))))
+  (let ((program (quil::parse-quil-into-raw-program (gethash "program" json))))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
       (let (reformatted-omd
@@ -260,13 +260,13 @@ and replies with the JSON
            (qubits-used (mapcar (alexandria:compose
                                  (alexandria:curry #'reduce #'union)
                                  #'cl-quil.clifford::extract-qubits-used
-                                 #'cl-quil:parse-quil-string)
+                                 #'cl-quil:parse-quil)
                                 gateset))
            (qubits-used-by-interleaver
              (when interleaver
                (reduce #'union
                        (cl-quil.clifford::extract-qubits-used
-                        (cl-quil:parse-quil-string interleaver)))))
+                        (cl-quil:parse-quil interleaver)))))
            (qubits (union qubits-used-by-interleaver (reduce #'union qubits-used)))
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
@@ -298,7 +298,7 @@ and replies with the JSON
          (clifford-program (gethash "clifford" json))
          (pauli-indices (first indices-and-terms))
          (pauli-terms (second indices-and-terms))
-         (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil-string clifford-program))) #'<))
+         (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil clifford-program))) #'<))
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
 	 (pauli (quil.clifford:pauli-from-string
 		 (with-output-to-string (s)
@@ -326,7 +326,7 @@ and replies with the JSON
                                         have \"uncompiled-quil\" or ~
                                         \"quil-instructions\", but they ~
                                         were nowhere to be found.")))
-         (quil-program (quil::parse-quil quil-instructions))
+         (quil-program (quil::parse-quil-into-raw-program quil-instructions))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification
                               (gethash "target-device" json)))
          (*statistics-dictionary* (process-program quil-program chip-specification)))

@@ -206,5 +206,5 @@
 
 (defun clifford-from-quil (quil)
   "Given a STRING of quil, produce the associated CLIFFORD element. If QUIL does not represent a Clifford circuit, return NIL. "
-  (clifford-circuit-p (quil::safely-parse-quil-string quil)))
+  (clifford-circuit-p (quil::safely-parse-quil quil)))
 

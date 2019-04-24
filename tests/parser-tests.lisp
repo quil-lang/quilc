@@ -169,9 +169,9 @@ R 0")))
     (dolist (before befores)
       (let ((after (with-output-to-string (s)
                      (quil::print-parsed-program
-                      (quil::parse-quil-string before)
+                      (quil::parse-quil before)
                       s))))
-        (quil::parse-quil-string after)))))
+        (quil::parse-quil after)))))
 
 (deftest test-circuit-and-declare-printing ()
   (let* ((before "DECLARE theta REAL[16]
@@ -186,5 +186,5 @@ TEST(0.5) 0 1
 ")
          (after (with-output-to-string (s)
                   (cl-quil::print-parsed-program
-                   (cl-quil::parse-quil before) s))))
+                   (cl-quil::parse-quil-into-raw-program before) s))))
     (is (string= before after))))

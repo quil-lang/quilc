@@ -93,7 +93,7 @@
                    (format s ", ")))
                (format s "~%"))
              (format s "TEST ~{~d ~}" (alexandria:iota qubit-count))))
-         (parsed-prog (quil::parse-quil program-string)))
+         (parsed-prog (quil::parse-quil-into-raw-program program-string)))
     (setf parsed-prog (quil::transform 'quil::resolve-applications parsed-prog))
     (is (quil::matrix-equality (magicl:make-identity-matrix (expt 2 qubit-count))
                                (quil::make-matrix-from-quil (coerce (parsed-program-executable-code parsed-prog) 'list))))))
@@ -219,7 +219,7 @@
 (deftest test-bristlecone-chip ()
   "Test construction of Google's Bristlecone 72-qubit chip"
   (let* ((chip (quil::build-bristlecone-chip))
-         (prgm (parse-quil-string
+         (prgm (parse-quil
                 (with-output-to-string (s)
                   (loop :for i :below (quil::chip-spec-n-qubits chip)
                         :do (format s "H ~D~%" i)))))

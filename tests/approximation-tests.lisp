@@ -10,7 +10,7 @@
          (fidelity-hash (alexandria:plist-hash-table (list "fCZ"   0.50d0
                                                            "f1QRB" 0.99d0)
                                                      :test #'equalp))
-         (pp (quil::parse-quil-string "CPHASE(pi/4) 0 1"))
+         (pp (quil::parse-quil "CPHASE(pi/4) 0 1"))
          (m-in (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code pp) 'list)))
          cpp m-out)
     (loop
