@@ -1,6 +1,6 @@
 #include <iostream>
 #include <tweedledum/gates/gate_set.hpp>
-#include <tweedledum/gates/mcst_gate.hpp>
+#include <tweedledum/gates/mcmt_gate.hpp>
 #include <tweedledum/io/write_unicode.hpp>
 #include <tweedledum/io/quil.hpp>
 #include <tweedledum/io/qasm.hpp>
@@ -17,7 +17,7 @@ extern "C" {
   extern char* tweedledum_synthesis_dbs(uint32_t* perm, uint32_t size) {
     using namespace tweedledum;
     std::vector<uint32_t> permutation(perm, perm+size);
-    auto network = dbs<netlist<mcst_gate>>(permutation, stg_from_spectrum());
+    auto network = dbs<netlist<mcmt_gate>>(permutation, stg_from_spectrum());
     
     std::stringstream ss;
     write_quil(network, ss);
