@@ -436,7 +436,8 @@ but the symbols may be uninterned or named differently.
          (values (tableau-r tab (* 2 n)) t))))))
 
 
-;;; For testing
+;;; The .chp file format is an input to Aaronson's chp program written
+;;; in C. Below is a parser and interpreter for it.
 
 (defun interpret-chp (code tab)
   (loop :for i :from 1
