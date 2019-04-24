@@ -24,12 +24,6 @@
 (defvar *tweedledum-libs-loaded* nil
   "T if the tweedledum shared library has been loaded by CFFI")
 
-;; TODO Some error handling here
-(unless *tweedledum-libs-loaded*
-  (cffi:load-foreign-library 'libtweedledum)
-  (push (constantly 'compile-perm-gate-with-tweedledum) quil::*global-compilers*)
-  (setf *tweedledum-libs-loaded* t))
-
 (defcfun (%synthesis-dbs "tweedledum_synthesis_dbs")
     :string
   (perm (:pointer :uint32))
@@ -76,6 +70,13 @@
           cl-quil::*global-compilers*))
   (uiop:symbol-call ':cl-quil-tests
                     '#:run-cl-quil-tests))
+
+;; TODO Some error handling here
+(unless *tweedledum-libs-loaded*
+  (cffi:load-foreign-library 'libtweedledum)
+  (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
+  (setf *tweedledum-libs-loaded* t))
+
 
 #+#:testcode
 (progn
