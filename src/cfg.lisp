@@ -591,9 +591,7 @@ Return the following values:
 
 (defun print-code-list (code &optional (out *standard-output*))
   "Prints a representation of CODE, which is valid sequence of Quil instructions, to an optional stream OUT, with the *standard-output* stream as the default."
-  (loop :for x :across code :do
-    (print-instruction x out)
-    (terpri out)))
+  (map nil (lambda (isn) (print-instruction isn out) (terpri out)) code))
 
 (defun underscorize (name)
   (substitute #\_ #\- name))
