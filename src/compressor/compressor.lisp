@@ -584,46 +584,58 @@ other's."
 
 (defun compress-instructions-in-context (instructions chip-specification context)
   "Dispatch routine for doing rewriting, algebraic and linear-algebraic, on a sequence of INSTRUCTIONS."
-  ;; start by making a decision about how we're going to do linear algebraic compression
-  (let ((decompiled-instructions (decompile-instructions-in-context instructions
-                                                                    chip-specification
-                                                                    context))
-        reduced-instructions
-        reduced-decompiled-instructions)
+  (handler-case
+      ;; start by making a decision about how we're going to do linear algebraic compression
+      (let ((decompiled-instructions (decompile-instructions-in-context instructions
+                                                                        chip-specification
+                                                                        context))
+            reduced-instructions
+            reduced-decompiled-instructions)
     
-    ;; now proceed to do the reductions
-    (format *compiler-noise-stream*
-            "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
-    (setf reduced-instructions
-          (algebraically-reduce-instructions instructions chip-specification context))
-    (format *compiler-noise-stream*
-            "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.~%")
-    (when decompiled-instructions
-      (setf reduced-decompiled-instructions
-            (algebraically-reduce-instructions decompiled-instructions
-                                               chip-specification
-                                               context)))
+        ;; now proceed to do the reductions
+        (format *compiler-noise-stream*
+                "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
+        (setf reduced-instructions
+              (algebraically-reduce-instructions instructions chip-specification context))
+        (format *compiler-noise-stream*
+                "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.~%")
+        (when decompiled-instructions
+          (setf reduced-decompiled-instructions
+                (algebraically-reduce-instructions decompiled-instructions
+                                                   chip-specification
+                                                   context)))
     
-    ;; check that the quil that came out was the same as the quil that went in
-    (check-contextual-compression-was-well-behaved instructions
-                                                   decompiled-instructions
-                                                   reduced-instructions
-                                                   reduced-decompiled-instructions
-                                                   context)
+        ;; check that the quil that came out was the same as the quil that went in
+        (check-contextual-compression-was-well-behaved instructions
+                                                       decompiled-instructions
+                                                       reduced-instructions
+                                                       reduced-decompiled-instructions
+                                                       context)
     
-    ;; compare their respective runtimes and return the shorter one
-    (let ((result-instructions
-            (cond
-              ((and decompiled-instructions
-                    (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
-                       (calculate-instructions-duration reduced-instructions chip-specification)))
-               reduced-decompiled-instructions)
-              (t
-               reduced-instructions))))
-      (format-quil-sequence *compiler-noise-stream*
-                            result-instructions
-                            "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
-      result-instructions)))
+        ;; compare their respective runtimes and return the shorter one
+        (let ((result-instructions
+                (cond
+                  ((and decompiled-instructions
+                        (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
+                           (calculate-instructions-duration reduced-instructions chip-specification)))
+                   reduced-decompiled-instructions)
+                  (t
+                   reduced-instructions))))
+          (format-quil-sequence *compiler-noise-stream*
+                                result-instructions
+                                "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
+          result-instructions))
+    (error (c)
+      (let ((*print-circle* nil)
+            (*print-pretty* nil)
+            (*print-fractional-radians* nil))
+        (write-line "A violent error occurred when compressing a subsequence." *error-output*)
+        (write-line "The offending subsequence is:" *error-output*)
+        (print-code-list instructions *error-output*)
+        (write-line "The current compression context is:" *error-output*)
+        (princ context *error-output*)
+        (finish-output *error-output*))
+      (error c))))
 
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
