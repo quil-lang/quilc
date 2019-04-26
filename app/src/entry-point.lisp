@@ -268,7 +268,6 @@
     (check-libraries))
   #+forest-sdk
   (unless skip-version-check
-    (format t "hi")
     (multiple-value-bind (available-p version)
         (sdk-update-available-p +QUILC-VERSION+)
       (when available-p
