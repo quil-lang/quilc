@@ -38,13 +38,17 @@
 
 (defun latest-sdk-version ()
   "Get the latest SDK quilc version, or NIL if unavailable."
-  (let* ((s (drakma:http-request "http://downloads.rigetti.com/qcs-sdk/version"
-                                 :want-stream t))
-         (p (yason:parse s)))
-    (multiple-value-bind (version success)
-        (gethash "quilc" p)
-      (when success
-        version))))
+  (handler-case
+      (let* ((s (drakma:http-request "http://downloads.rigetti.com/qcs-sdk/version"
+                                     :want-stream t))
+             (p (yason:parse s)))
+        (multiple-value-bind (version success)
+            (gethash "quilc" p)
+          (when success
+            version)))
+    (usocket:ns-host-not-found-error (condition)
+      (declare (ignore condition))
+      nil)))
 
 (defun sdk-update-available-p (current-version)
   "Test whether the current SDK version is the latest SDK
