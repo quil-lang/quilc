@@ -268,8 +268,9 @@
     (check-libraries))
   #+forest-sdk
   (unless skip-version-check
+    (format t "hi")
     (multiple-value-bind (available-p version)
-        (ignore-errors (sdk-update-available-p))
+        (sdk-update-available-p +QUILC-VERSION+)
       (when available-p
         (format t "An update is available to the SDK. You have version ~A. ~
 Version ~A is available from downloads.rigetti.com/qcs-sdk/forest-sdk.dmg~%"
