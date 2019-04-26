@@ -54,4 +54,5 @@
   "Test whether the current SDK version is the latest SDK
 version. Second value returned indicates the latest version."
   (let ((latest (latest-sdk-version)))
-    (values (not (string= latest current-version)) latest)))
+    (values (and latest (not (string= latest current-version)))
+            latest)))
