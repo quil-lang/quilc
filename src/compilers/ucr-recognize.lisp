@@ -6,12 +6,9 @@
 
 ;; NOTE: the loops in this function do exactly twice as much work as is needed,
 ;; but rewriting them to do minimal work makes the loop structure nastier.
-(defun recognize-ucr (instr &optional environs)
+(define-compiler recognize-ucr ((instr
+                                 :where (anonymous-gate-application-p instr)))
   "Checks whether an anonymous gate is a UCRY or UCRZ instruction, in which case it relabels it as such."
-  (declare (ignore environs))
-  ;; punt if we're not an anonymous gate
-  (unless (anonymous-gate-application-p instr)
-    (give-up-compilation))
   (let* ((matrix (gate-matrix instr))
          (dimension (magicl:matrix-rows matrix))
          (log-dimension (length (application-arguments instr)))

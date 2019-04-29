@@ -47,7 +47,7 @@ RX(-2.0*angle) 0")))
                                       (quil::classical-right-operand (aref code 0)))))
       (is (equalp quil::quil-real (quil::constant-value-type
                                    (quil::classical-right-operand (aref code 1)))))
-      (quil::operator-bind (((_ (param) _) (aref code 2)))
+      (let ((param (first (application-parameters (aref code 2)))))
         (is (typep param 'quil::delayed-expression))))))
 
 (deftest test-compression-with-classical-angles ()

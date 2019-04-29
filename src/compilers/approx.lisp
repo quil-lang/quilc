@@ -753,7 +753,8 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                     target
                                     (approximate-template-record-requirements record)))
                                  **approximate-template-records**)))))
-    (lambda (instr)
+    (lambda (instr &key context)
+      (declare (ignore context))
       (approximate-2Q-compiler instr
                                :chip-spec chip-spec
                                :crafters crafters))))

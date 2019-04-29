@@ -9,7 +9,7 @@
 
 (define-global-counter **qsc-counter** generate-qsc-tag)
 
-(defun qs-compiler (instr)
+(define-compiler qs-compiler (instr)
   "Performs Quantum Shannon Compilation, emitting a list of anonymous gates and UCR instructions that describe an equivalent circuit."
   (unless (or (>= (length (application-arguments instr)) 3)
               (adt:match operator-description (application-operator instr)

@@ -1,8 +1,16 @@
 ;;;; operator-bind.lisp
 ;;;;
 ;;;; Authors: Eric Peterson, Zach Beane
+;;;;
+;;;; The bulk of this file concerns itself with syntactic sugar for
+;;;; destructuring gate objects and otherwise extracting information from them.
+;;;; The main use of these routines is to support `define-compiler`, which does
+;;;; a lot of clever destructuring of its arguments.
 
 (in-package #:cl-quil)
+
+
+;;; first, some simple utilities for constructing gate objects
 
 (defun build-gate (operator params &rest qubits)
   "Shorthand function for constructing a GATE-APPLICATION object from QUIL-like input. OPERATOR must be a standard gate name."
@@ -72,27 +80,56 @@
                    :arguments (mapcar #'capture-arg qubits))))
 
 
-;; a typical use of operator-bind looks like
-;;
-;; (operator-bind ((("CNOT"   ()    p q) x)
-;;                 (("CPHASE" (phi) q _) y))
-;;   ...)
-;;
-;; the individual bindings are of the form (gate-var op (&rest params) &rest args)
+;;; this data structure captures a compilation routine, annotated with various
+;;; information about how and when to apply it.
+
+(defclass compiler ()
+  ((name
+    :initarg :name
+    :reader compiler-name
+    :documentation "A human-readable name for the compiler.")
+   (instruction-count
+    :initarg :instruction-count
+    :reader compiler-instruction-count
+    :documentation "The number of instructions that this compiler consumes at a time.")
+   (%function
+    :initarg :function
+    :reader compiler-%function
+    :documentation "A funcallable that does the compilation. Signature (compressor-context &rest instructions) -> instructions."))
+  (:metaclass closer-mop:funcallable-standard-class))
+
+(defmethod initialize-instance :after ((c compiler) &key)
+  ;; We could generate the function dynamically, but BOOLEAN-FORMULA
+  ;; will typically be made with a macro below.
+  (closer-mop:set-funcallable-instance-function c (compiler-%function c)))
+
+
+;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
+;;; non-specialized instances of the above class COMPILER and installs them into
+;;; the function namespace.
 
 (defun binding-gate-var (binding)
-  (unless (second binding)
+  (unless (first binding)
     (error "Binding ~a is missing a source." binding))
-  (second binding))
+  (first binding))
 
 (defun binding-op (binding)
-  (first (first binding)))
+  (first (second binding)))
 
 (defun binding-parameters (binding)
-  (second (first binding)))
+  (second (second binding)))
 
 (defun binding-arguments (binding)
-  (nthcdr 2 (first binding)))
+  (rest (rest (second binding))))
+
+(defun binding-options (binding)
+  (cond
+    ((endp (rest binding))
+     nil)
+    ((typep (second binding) 'keyword)
+     (rest binding))
+    (t
+     (rest (rest binding)))))
 
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users
@@ -106,20 +143,29 @@
        (string= "_" x)))
 
 (defun binding-environment (binding)
-  "Return an alist of (name . t) for each variable element in
-  BINDING."
-  (nconc
-   (when (match-symbol-p (binding-op binding))
-     (list (cons (binding-op binding) t)))
-   (unless (wildcard-pattern-p (binding-parameters binding))
-     (mapcan (lambda (param)
-               (when (match-symbol-p param)
-                 (list (cons param t))))
-             (binding-parameters binding)))
-   (mapcan (lambda (arg)
-             (when (match-symbol-p arg)
-               (list (cons arg t))))
-           (binding-arguments binding))))
+  "Return an alist of (name . t) for each variable element in BINDING."
+  (cond
+    ((typep binding 'symbol)
+     nil)
+    ((and (typep binding 'cons)
+          (> 2 (length binding)))
+     nil)
+    ((and (typep binding 'cons)
+          (not (typep (second binding) 'cons)))
+     nil)
+    (t
+     (nconc
+      (when (match-symbol-p (binding-op binding))
+        (list (cons (binding-op binding) t)))
+      (unless (wildcard-pattern-p (binding-parameters binding))
+        (mapcan (lambda (param)
+                  (when (match-symbol-p param)
+                    (list (cons param t))))
+                (binding-parameters binding)))
+      (mapcan (lambda (arg)
+                (when (match-symbol-p arg)
+                  (list (cons arg t))))
+              (binding-arguments binding))))))
 
 (defun extend-environment (binding environment)
   (setf environment
@@ -128,12 +174,13 @@
 (defun lookup (name env)
   (cdr (assoc name env)))
 
-(defun operator-bind-form (bindings body)
+(defun define-compiler-form (bindings body)
   (labels ((expand-bindings (bindings env)
              (cond
                ((endp bindings)
-                `(progn ,@body))
-               ((wildcard-pattern-p (first (first bindings)))
+                `(values (progn ,@body)
+                         t))
+               ((typep (first bindings) 'symbol)
                 (expand-bindings (rest bindings)
                                  env))
                (t
@@ -144,9 +191,32 @@
                                                    (extend-environment binding env)))))))
            
            (expand-binding (binding env body)
-             (expand-op binding env
-                        (expand-parameters binding env
-                                           (expand-arguments binding env body))))
+             (cond
+               ;; raw binding w/ no specializations
+               ((typep binding 'symbol)
+                body)
+               ;; specialized binding w/ a destructuring
+               ((and (typep binding 'cons)
+                     (typep (second binding) 'cons))
+                (assert (and (typep (first binding) 'symbol)
+                             (not (wildcard-pattern-p (first binding))))
+                        ()
+                        "Leftmost term in a compiler form binding must be a symbol, but got ~a"
+                        binding)
+                (expand-op binding env
+                           (expand-parameters binding env
+                                              (expand-arguments binding env
+                                                                (expand-options binding env body)))))
+               ;; specialized binding w/o destructuring
+               ((typep binding 'cons)
+                (assert (and (typep (first binding) 'symbol)
+                             (not (wildcard-pattern-p (first binding))))
+                        ()
+                        "Leftmost term in a compiler form binding must be a symbol, but got ~a"
+                        binding)
+                (expand-options binding env body))
+               (t
+                (error "Malformed binding in compiler form: ~a" binding))))
            
            (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name ele-accessor ele-type eq-predicate)
              (let* ((target-length (length seq))
@@ -185,7 +255,6 @@
                                                   :eq-predicate eq-predicate)))
                (cond
                  ((wildcard-pattern-p ele)
-                  ;; ignore
                   new-rest)
                  ((and (match-symbol-p ele)
                        (not (lookup ele env)))
@@ -224,6 +293,32 @@
                               :ele-type 'qubit
                               :eq-predicate '=))
            
+           (fast-forward-to-options (binding)
+             (unless (endp binding)
+               (cond
+                 ((typep (first binding) 'keyword)
+                  binding)
+                 (t
+                  (fast-forward-to-options (rest binding))))))
+           
+           (expand-options (binding env rest)
+             (declare (ignore env))
+             (let ((option-plist (fast-forward-to-options binding))
+                   (rest rest))
+               (loop :for (val key) :on (reverse option-plist) :by #'cddr
+                     :do (setf rest
+                               (case key
+                                 (:where
+                                  `(when ,val
+                                     ,rest))
+                                 (:acting-on
+                                  (destructuring-bind (wf qc) val
+                                    `(unpack-wf ,(first binding) context (,wf ,qc)
+                                       ,rest)))
+                                 (otherwise
+                                  (error "Illegal OPERATOR-BIND option: ~a" key)))))
+               rest))
+           
            (expand-op (binding env body)
              (let ((op (binding-op binding)))
                (cond
@@ -242,39 +337,48 @@
                      ,body))))))
     (expand-bindings bindings nil)))
 
-(defmacro operator-bind ((&rest bindings) &body body)
-  "For a sequence of OPERATOR objects, performs a match and destructuring bind over the lexical environment of BODY.
+(defmacro define-compiler (name (&rest bindings) &body body)
+  (labels ((collect-variable-names (bindings)
+             (when (endp bindings) (return-from collect-variable-names nil))
+             (let ((binding (first bindings)))
+               (etypecase binding
+                 (symbol (cons binding
+                               (collect-variable-names (rest bindings))))
+                 (cons   (cons (first binding)
+                               (collect-variable-names (rest bindings))))))))
+    (let ((variable-names (collect-variable-names bindings)))
+      (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
+        (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
+              (1+ pos) (string name)))
+      (alexandria:with-gensyms (ret-val ret-bool struct-name)
+        ;; TODO: do the alexandria destructuring to catch the docstring or whatever
+        `(labels ((,name (,@variable-names &key context)
+                    (declare (ignorable context))
+                    (multiple-value-bind (,ret-val ,ret-bool)
+                        ,(define-compiler-form bindings body)
+                      (if ,ret-bool ,ret-val (give-up-compilation)))))
+           (let ((,struct-name
+                   (make-instance 'compiler
+                                  :name ,(string name)
+                                  :instruction-count ,(length variable-names)
+                                  :function #',name)))
+             (setf (fdefinition ',name) ,struct-name)))))))
 
-Example usage:
-(let ((g (build-gate \"CZ\" () 0 1))
-      (h (build-gate \"CNOT\" () 2 3)))
-  (operator-bind (((\"CZ\" _ _ p) g)
-                  ((\"CNOT\" _ _ q) h))
-    (list p q))) ;; => (1 3)
-
-(let ((g (build-gate \"CZ\" () 0 1))
-      (h (build-gate \"CNOT\" () 2 3)))
-  (operator-bind (((\"CZ\" _ _ p) g)
-                  ((\"CZ\" _ _ q) h))
-    (list p q))) ;; => NIL
-
-NOTE: Returns NIL without executing BODY if any one of BINDINGS does not match."
-  (operator-bind-form bindings body))
-
-(defmacro lambda-on-operators (binding-list &body body)
-  "Defines an anonymous function on operator arguments that automatically performs a destructuring bind+match on its arguments.
-
-Example usage:
-(let ((g (build-gate \"CZ\" () 0 1))
-      (fn (lambda-on-operators (((\"CZ\" () p q) h))
-            ;; defines a function with argument h,
-            ;; and matches h against the pattern (\"CZ\" () p q)
-            )))
-  (funcall fn g))"
-  `(lambda ,(mapcar #'second binding-list)
-     (operator-bind ,binding-list
-      ,@body)))
-
+(defmacro with-compilation-context ((&rest bindings-plist) &body body)
+  (setf body `(progn ,@body))
+  (loop :for (val key) :on (reverse bindings-plist) :by #'cddr
+        :do (setf body
+                  (ecase key
+                    (:full-context
+                     `(let ((,val context))
+                        ,body))
+                    (:chip-specification
+                     `(progn
+                        (unless context (give-up-compilation))
+                        (let ((,val (compressor-context-chip-specification context)))
+                          (unless ,val (give-up-compilation))
+                          ,body)))))
+        :finally (return body)))
 
 (defun operator-match-p (gate pattern)
   "Tests whether a single GATE matches PATTERN, without performing any binding."
@@ -303,36 +407,3 @@ Example usage:
                         (equal (measure-address gate) (third pattern))))
                (assert "operator-match-p on MEASURE patterns can only use _ for the measurement address"
                        nil)))))
-
-
-(define-condition operator-match-fell-through (serious-condition)
-  ())
-
-
-(defmacro operator-match (&body binding-clauses)
-  "Performs a sequence of OPERATOR-BINDs. The first that does not fall through has its body executed and its result returned. If all the clauses provided fall through, this results in an OPERATOR-MATCH-FELL-THROUGH error. The special binding clause \"_\" will always match.
-
-Syntax:
-(operator-match
- (((binding-clause-1-1)
-   (binding-clause-1-2)
-   ...)
-  body-1)
- (((binding-clause-2-1)
-   (binding-clause-2-2)
-   ...)
-  body-2)
- ...)
-
-See also the documentation for MAKE-REWRITING-RULE."
-  (let ((match-tag (gensym "OPERATOR-MATCH-TAG-")))
-    `(block ,match-tag
-       ,@(loop :for (match-clauses . code) :in binding-clauses
-               :if (wildcard-pattern-p match-clauses)
-                 :collect `(return-from ,match-tag (progn ,@code))
-               :else
-                 :collect `(operator-bind ,match-clauses
-                             (return-from ,match-tag
-                               (progn
-                                 ,@code))))
-       (error 'operator-match-fell-through))))

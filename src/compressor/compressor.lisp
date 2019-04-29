@@ -229,7 +229,7 @@ other's."
                                           context)
   "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      (;; let the context know that we've passed inspection of NODE, so that the
+      ( ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
        (update-context (node)
          (setf (peephole-rewriter-node-context node)
@@ -255,10 +255,11 @@ other's."
                             (subseq nodes-for-inspection 0 (rewriting-rule-count rule)))))
                    (let ((output
                            (apply (rewriting-rule-consumer rule)
-                                  (peephole-rewriter-node-context
-                                   (peephole-rewriter-node-prev
-                                    (first relevant-nodes-for-inspection)))
-                                  (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection))))
+                                  (append
+                                   (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection)
+                                   (list :context (peephole-rewriter-node-context
+                                                   (peephole-rewriter-node-prev
+                                                    (first relevant-nodes-for-inspection))))))))
                      (format *compiler-noise-stream*
                              "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~a.~%"
                              (rewriting-rule-readable-name rule))
@@ -462,8 +463,7 @@ other's."
   ;;      off the qubit complex because a state-preparation circuit might
   ;;      involve a strictly larger qubit complex than the one associated to
   ;;      the original instruction sequence.
-  (let ((qubits-on-obj (or (qubits-in-instr-list decompiled-instructions)
-                           (qubits-in-instr-list instructions))))
+  (let ((qubits-on-obj (qubits-in-instr-list (append decompiled-instructions instructions))))
     (labels
         ((check-quil-agrees-as-matrices ()
            (let* ((relabeling
@@ -622,6 +622,7 @@ other's."
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
           result-instructions))
+    #+ignore
     (error (c)
       (let ((*print-circle* nil)
             (*print-pretty* nil)
@@ -656,6 +657,8 @@ other's."
            ;; grouping together blocks by their determination type, this extracts
            ;; the top two blocks of instructions
            (grab-first-two-blocks (instructions)
+             (when (endp instructions)
+               (return-from grab-first-two-blocks nil))
              (let ((first-type (instruction-type (first instructions)))
                    second-type
                    first-block

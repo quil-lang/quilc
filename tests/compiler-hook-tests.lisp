@@ -484,12 +484,10 @@ CCNOT 0 1 2")
            (cond
              ((not (typep instr 'gate-application))
               value)
-             (t
-              (quil::operator-match
-                (((("CZ" () _ _) instr))
-                 (1+ value))
-                (_
-                 value))))))
+             ((adt:with-data (named-operator name) (application-operator instr)
+                (string= "CZ" name))
+              (1+ value))
+             (t value))))
       (let ((CZ-depth (quil::lscheduler-walk-graph ls :bump-value #'value-bumper)))
         (is (>= 8 CZ-depth))))))
 
