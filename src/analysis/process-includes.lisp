@@ -42,7 +42,7 @@
                                         (parsed-program-executable-code incl-pp)))
       pp)))
 
-(defun process-includes (pp originating-file)
+(defun process-includes (pp &optional originating-file)
   "Process all INCLUDE forms by reading files off the disk. Produces a new PARSED-PROGRAM object."
   (let ((originating-directory (if (null originating-file)
                                    (pathname (uiop:getcwd))
