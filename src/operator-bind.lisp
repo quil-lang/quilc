@@ -83,6 +83,8 @@
 ;;; this data structure captures a compilation routine, annotated with various
 ;;; information about how and when to apply it.
 
+(global-vars:define-global-var **compilers-available** nil)
+
 (defclass compiler ()
   ((name
     :initarg :name
@@ -92,6 +94,14 @@
     :initarg :instruction-count
     :reader compiler-instruction-count
     :documentation "The number of instructions that this compiler consumes at a time.")
+   (bindings
+    :initarg :bindings
+    :reader compiler-bindings
+    :documentation "Raw list of bindings that the compiler matches against.")
+   (body
+    :initarg :body
+    :reader compiler-body
+    :documentation "Raw source of the compiler.")
    (%function
     :initarg :function
     :reader compiler-%function
@@ -350,19 +360,29 @@
       (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
         (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
               (1+ pos) (string name)))
-      (alexandria:with-gensyms (ret-val ret-bool struct-name)
+      (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
         ;; TODO: do the alexandria destructuring to catch the docstring or whatever
         `(labels ((,name (,@variable-names &key context)
                     (declare (ignorable context))
                     (multiple-value-bind (,ret-val ,ret-bool)
                         ,(define-compiler-form bindings body)
                       (if ,ret-bool ,ret-val (give-up-compilation)))))
-           (let ((,struct-name
+           (let ((,old-record (find ,(string name) **compilers-available**
+                                    :key #'compiler-name))
+                 (,struct-name
                    (make-instance 'compiler
                                   :name ,(string name)
                                   :instruction-count ,(length variable-names)
+                                  :bindings (quote ,bindings)
+                                  :body (quote ,body)
                                   :function #',name)))
-             (setf (fdefinition ',name) ,struct-name)))))))
+             (setf (fdefinition ',name) ,struct-name)
+             (cond
+               (,old-record
+                (setf **compilers-available**
+                      (substitute ,struct-name ,old-record **compilers-available**)))
+               (t
+                (push ,struct-name **compilers-available**)))))))))
 
 (defmacro with-compilation-context ((&rest bindings-plist) &body body)
   (setf body `(progn ,@body))
