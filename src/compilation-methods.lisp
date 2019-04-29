@@ -60,7 +60,8 @@
               If it fails, cede control by returning NIL."
              (restart-case
                  (handler-case
-                     (let ((result (funcall compilation-method instruction)))
+                     (let ((result (funcall compilation-method instruction
+                                            :context (make-compressor-context :chip-specification chip-spec))))
                        (let ((*print-pretty* nil))
                          (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Applying compiler ~a to ~a.~%"
                                  compilation-method

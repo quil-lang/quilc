@@ -115,7 +115,9 @@
         (format *debug-io* "~&    Testing global-to-local ~a expansion~%" operator)
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
-               (mat (cl-quil::make-matrix-from-quil (funcall expander chip-spec instr))))
+               (mat (cl-quil::make-matrix-from-quil (funcall expander instr
+                                                             :context (quil::make-compressor-context
+                                                                       :chip-specification chip-spec)))))
           (is (cl-quil::matrix-equality ref-mat
                                         (cl-quil::scale-out-matrix-phases mat ref-mat))))))))
 

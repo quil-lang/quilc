@@ -98,7 +98,78 @@
                (_                    nil))))
     (op-walker (application-operator instr))))
 
-(defun ucr-compiler (instr &key (arch ':cz))
+(define-compiler ucr-compiler-to-cz ((instr
+                                      :where (uniformly-controlled-roll-p instr)))
+  "Compiles a UCR into UCRs of one smaller order (or, in the base case, into plain rolls)."
+  ;; if this isn't a UCR, skip it.
+  (adt:match operator-description (application-operator instr)
+    ((forked-operator op)
+     (let* ((roll-type (uniformly-controlled-roll-p instr))
+            (parameters (application-parameters instr))
+            (arguments (mapcar #'qubit-index (application-arguments instr)))
+            (control (first arguments))
+            (target (first (last arguments)))
+            (rest (rest arguments))
+            (high-order-params
+              (subseq parameters
+                      0 (/ (length parameters) 2)))
+            (low-order-params
+              (subseq parameters
+                      (/ (length parameters) 2)))
+            (averages
+              (mapcar (lambda (x y) (constant
+                                     (/ (+ (constant-value x)
+                                           (constant-value y))
+                                        2)))
+                      high-order-params
+                      low-order-params))
+            (differences
+              (mapcar (lambda (x y) (constant
+                                     (/ (- (constant-value x)
+                                           (constant-value y))
+                                        2)))
+                      high-order-params
+                      low-order-params)))
+       (cond
+         ((every (lambda (param) (double= 0d0 (constant-value param)))
+                 parameters)
+          nil)
+         ((every (lambda (param) (double= (constant-value (first parameters))
+                                          (constant-value param)))
+                 parameters)
+          (list (build-gate roll-type (list (constant-value (first parameters))) target)))
+         (t
+          ;; see the comments above this function for an explanation of what's
+          ;; going on here and why.
+          ;;
+          ;; future invocations of this function will again try to decompose the parameter
+          ;; list into components of averages and differences. if we want them to come out
+          ;; in the other order (as indicated in the comments above), we'll need to fuss
+          ;; with the emitted parameter list now. we replace `differences` by `differences-prime`
+          ;; with the property that the differences of differences matches the averages
+          ;; of differences-prime, and the averages of differences matches the differences
+          ;; of differences-prime.
+          (let* ((param-count (length differences))
+                 (differences-prime
+                   (append (subseq differences 0 (/ param-count 2))
+                           (mapcar (lambda (x)
+                                     (constant (- (constant-value x))))
+                                   (subseq differences (/ param-count 2))))))
+            ;; by feeding it differences-prime, the second UCR will give the alternative
+            ;; decomposition indicated in the comments, and the extra BUILD-GATEs will
+            ;; move the controlled gate into place.
+            (list
+             (apply #'build-gate op (alexandria:ensure-list averages) (alexandria:ensure-list rest))
+             (build-gate "CNOT" () (first rest) target)
+             (build-gate "CNOT" () control      target)
+             (apply #'build-gate op (alexandria:ensure-list differences-prime) (alexandria:ensure-list rest))
+             (build-gate "CNOT" () (first rest) target)
+             (build-gate "CNOT" () control      target)))))))
+    (_
+     (give-up-compilation))))
+
+(define-compiler ucr-compiler-to-iswap ((instr
+                                         :where (uniformly-controlled-roll-p instr)))
   "Compiles a UCR into UCRs of one smaller order (or, in the base case, into plain rolls)."
   ;; if this isn't a UCR, skip it.
   (adt:match operator-description (application-operator instr)
@@ -110,138 +181,90 @@
             (target (first (last arguments)))
             (rest (rest arguments))
             (pi/2 (constant (/ pi 2)))
-            (-pi/2 (constant (/ pi -2))))
-       (unless roll-type
-         (give-up-compilation))
+            (-pi/2 (constant (/ pi -2)))
+            (high-order-params
+              (subseq parameters
+                      0 (/ (length parameters) 2)))
+            (low-order-params
+              (subseq parameters
+                      (/ (length parameters) 2)))
+            (averages
+              (mapcar (lambda (x y) (constant
+                                     (/ (+ (constant-value x)
+                                           (constant-value y))
+                                        2)))
+                      high-order-params
+                      low-order-params))
+            (differences
+              (mapcar (lambda (x y) (constant
+                                     (/ (- (constant-value x)
+                                           (constant-value y))
+                                        2)))
+                      high-order-params
+                      low-order-params)))
        (labels ((ucr (params args)
                   (apply #'build-gate op (alexandria:ensure-list params) (alexandria:ensure-list args)))
-                (iswap ()
-                  (build-gate "ISWAP" () control target))
-                (cnot ()
-                  (build-gate "CNOT" () control target))
                 (build-gates (gate-data)
                   (mapcar (lambda (arg-list) (apply #'build-gate arg-list)) gate-data))
                 (but-last (ell)
                   (reverse (rest (reverse ell)))))
-         ;; if all the UCR parameters are zero, return a NOP (or the CNOT we were meant to cancel with)
-         (when (every (lambda (param) (double= 0d0 (constant-value param)))
-                      parameters)
-           (return-from ucr-compiler
-             nil))
-         ;; if all the UCR parameters are the same, return an uncontrolled roll
-         (when (every (lambda (param) (double= (constant-value (first parameters))
-                                          (constant-value param)))
-                      parameters)
-           (return-from ucr-compiler
-             (list (build-gate roll-type (list (constant-value (first parameters))) target))))
-         (let* ((high-order-params
-                  (subseq parameters
-                          0 (/ (length parameters) 2)))
-                (low-order-params
-                  (subseq parameters
-                          (/ (length parameters) 2)))
-                (averages
-                  (mapcar (lambda (x y) (constant
-                                    (/ (+ (constant-value x)
-                                          (constant-value y))
-                                       2)))
-                          high-order-params
-                          low-order-params))
-                (differences
-                  (mapcar (lambda (x y) (constant
-                                    (/ (- (constant-value x)
-                                          (constant-value y))
-                                       2)))
-                          high-order-params
-                          low-order-params))
-                (avgroll  (build-gate roll-type averages    target))
-                (diffroll (build-gate roll-type differences target)))
+         (cond
+           ;; if all the UCR parameters are zero, return a NOP (or the CNOT we were meant to cancel with)
+           ((every (lambda (param) (double= 0d0 (constant-value param)))
+                   parameters)
+            nil)
+           ;; if all the UCR parameters are the same, return an uncontrolled roll
+           ((every (lambda (param) (double= (constant-value (first parameters))
+                                            (constant-value param)))
+                   parameters)
+            (list (build-gate roll-type (list (constant-value (first parameters))) target)))
            ;; we're ready to output the list of compiled instructions. we do case
            ;; analysis to decide whether we need to emit smaller UCRs or just rolls.
-           (cond
-             ((and (member arch '(:cnot :cz))
-                   (= 1 (length averages)))
-              ;; in this case, we just emit rolls, encoded with CNOTs
-              (list avgroll (cnot) diffroll (cnot)))
-             ;; otherwise, we need to emit shorter UCRs encoded with CNOTs
-             ((member arch '(:cnot :cz))
-              ;; see the comments above this function for an explanation of what's
-              ;; going on here and why.
-              ;;
-              ;; future invocations of this function will again try to decompose the parameter
-              ;; list into components of averages and differences. if we want them to come out
-              ;; in the other order (as indicated in the comments above), we'll need to fuss
-              ;; with the emitted parameter list now. we replace `differences` by `differences-prime`
-              ;; with the property that the differences of differences matches the averages
-              ;; of differences-prime, and the averages of differences matches the differences
-              ;; of differences-prime.
-              (let* ((param-count (length differences))
-                     (differences-prime
-                       (append (subseq differences 0 (/ param-count 2))
-                               (mapcar (lambda (x)
-                                         (constant (- (constant-value x))))
-                                       (subseq differences (/ param-count 2))))))
-                ;; by feeding it differences-prime, the second UCR will give the alternative
-                ;; decomposition indicated in the comments, and the extra BUILD-GATEs will
-                ;; move the controlled gate into place.
-                (list
-                 (ucr averages rest)
-                 (build-gate "CNOT" () (first rest) target)
-                 (cnot)
-                 (ucr differences-prime rest)
-                 (build-gate "CNOT" () (first rest) target)
-                 (cnot))))
-             ;; these next two are also just rolls, this time with ISWAPs.
-             ;; the emitted code is different for RY and RZ, so we have to do case work.
-             ((and (eql arch ':iswap)
-                   (= 1 (length averages))
-                   (string= "RY" roll-type))
-              (build-gates `(("RY"    ,averages    ,target)
-                             ("Z"     ()           ,control)
-                             ("Z"     ()           ,target)
-                             ("RZ"    (,pi/2)      ,target)
-                             ("ISWAP" ()           ,target ,control)
-                             ("RY"    ,differences ,control)
-                             ("ISWAP" ()           ,target ,control)
-                             ("RZ"    (,-pi/2)     ,target))))
-             ((and (eql arch ':iswap)
-                   (= 1 (length averages))
-                   (string= "RZ" roll-type))
-              (build-gates `(("RZ"    ,averages    ,target)
-                             ("X"     ()           ,target)
-                             ("Z"     ()           ,control)
-                             ("RY"    (,-pi/2)     ,target)
-                             ("ISWAP" ()           ,target ,control)
-                             ("RY"    ,differences ,control)
-                             ("ISWAP" ()           ,target ,control)
-                             ("RY"    (,pi/2)      ,target))))
-             ;; also shorter UCRs, this time with ISWAPs.
-             ((and (eql arch ':iswap)
-                   (string= "RY" roll-type))
-              (list
-               (ucr averages rest)      ; skip first control
-               (build-gate "Z" nil control)
-               (build-gate "Z" nil target)
-               (build-gate "RZ" (list pi/2) target)
-               (iswap)
-               (ucr differences (append (but-last rest) (list control)))
-               (iswap)
-               (build-gate "RZ" (list -pi/2) target)))
-             ((and (eql arch ':iswap)
-                   (string= "RZ" roll-type))
-              (list
-               (ucr averages rest)
-               (build-gate "X" nil target)
-               (build-gate "Z" nil control)
-               (build-gate "RY" (list -pi/2) target)
-               (iswap)
-               (build-gate "RX" (list pi/2) control)
-               (ucr differences (append (but-last rest) (list control)))
-               (build-gate "RX" (list -pi/2) control)
-               (iswap)
-               (build-gate "RY" (list pi/2) target)))
-             (t
-              (give-up-compilation)))))))
+           ((and (= 1 (length averages))
+                 (string= "RY" roll-type))
+            (build-gates `(("RY"    ,averages    ,target)
+                           ("Z"     ()           ,control)
+                           ("Z"     ()           ,target)
+                           ("RZ"    (,pi/2)      ,target)
+                           ("ISWAP" ()           ,target ,control)
+                           ("RY"    ,differences ,control)
+                           ("ISWAP" ()           ,target ,control)
+                           ("RZ"    (,-pi/2)     ,target))))
+           ((and (= 1 (length averages))
+                 (string= "RZ" roll-type))
+            (build-gates `(("RZ"    ,averages    ,target)
+                           ("X"     ()           ,target)
+                           ("Z"     ()           ,control)
+                           ("RY"    (,-pi/2)     ,target)
+                           ("ISWAP" ()           ,target ,control)
+                           ("RY"    ,differences ,control)
+                           ("ISWAP" ()           ,target ,control)
+                           ("RY"    (,pi/2)      ,target))))
+           ;; also shorter UCRs, this time with ISWAPs.
+           ((string= "RY" roll-type)
+            (list
+             (ucr averages rest)        ; skip first control
+             (build-gate "Z" nil control)
+             (build-gate "Z" nil target)
+             (build-gate "RZ" (list pi/2) target)
+             (build-gate "ISWAP" () control target)
+             (ucr differences (append (but-last rest) (list control)))
+             (build-gate "ISWAP" () control target)
+             (build-gate "RZ" (list -pi/2) target)))
+           ((string= "RZ" roll-type)
+            (list
+             (ucr averages rest)
+             (build-gate "X" nil target)
+             (build-gate "Z" nil control)
+             (build-gate "RY" (list -pi/2) target)
+             (build-gate "ISWAP" () control target)
+             (build-gate "RX" (list pi/2) control)
+             (ucr differences (append (but-last rest) (list control)))
+             (build-gate "RX" (list -pi/2) control)
+             (build-gate "ISWAP" () control target)
+             (build-gate "RY" (list pi/2) target)))
+           (t
+            (error "It shouldn't be possible to get here, because of the guard in uniformly-controlled-roll-p."))))))
     (_
      (give-up-compilation))))
 

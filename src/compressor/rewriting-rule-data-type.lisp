@@ -26,40 +26,12 @@ CONSUMER is a function that consumes a COMPRESSOR-CONTEXT followed by a list of 
               (error 'compiler-rewrite-does-not-apply))
    :read-only t))
 
-(defmacro make-rewriting-rule (readable-name (context-var &rest bind-clauses) &body body)
-  "Create a new REWRITING-RULE object.
-
-READABLE-NAME is an evaluated parameter that should result in a STRING.
-
-CONTEXT-VAR should be a symbol that will be bound to a context, or the symbol _ should it be ignored.
-
-BINDING-CLAUSES is a list of bindings, as if by OPERATOR-MATCH. Specifically, it has the following grammar:
-
-    <BINDING-CLAUSES> ::= (<MATCH-CLAUSE> <VARIABLE>)
-    <MATCH-CLAUSE>    ::= (<GATE-NAME> <PARAM-LIST> <QUBIT> <QUBIT>*)
-    <PARAM-LIST>      ::= (<PARAM>*) | _
-    <GATE-NAME>       ::= <STRING>
-    <PARAM>           ::= <VARIABLE> | <FLOAT>
-    <QUBIT>           ::= <VARIABLE> | <INTEGER>
-    <VARIABLE>        ::= <SYMBOL> | _           ; symbol will be bound in BODY
-
-BODY is a list of forms that, by the end, should construct a list of instructions, should the rule succeed. It might use CONTEXT-VAR to help decide what instructions to produce. (BODY is free to GIVE-UP-COMPILATION as well.)"
-  (check-type context-var symbol)
-  (let* ((context-var-p (not (wildcard-pattern-p context-var)))
-         (context-var-name (if context-var-p
-                               context-var
-                               (gensym "CONTEXT-VAR-"))))
-    `(%make-rewriting-rule
-      :readable-name ,readable-name
-      :count ,(length bind-clauses)
-      :consumer (lambda (,context-var-name ,@(mapcar #'second bind-clauses))
-                  ,@(unless context-var-p
-                      `((declare (ignore ,context-var-name))))
-                  (operator-match
-                    (,bind-clauses
-                     ,@body)
-                    (_
-                     (give-up-compilation)))))))
+(defun make-rewriting-rule (readable-name compiler)
+  "Create a new REWRITING-RULE object."
+  (%make-rewriting-rule
+      :readable-name readable-name
+      :count (compiler-instruction-count compiler)
+      :consumer compiler))
 
 ;;; Some helpers for writing REWRITING-RULEs
 

@@ -98,3 +98,7 @@
                      (list (* (realpart (/ (log u1) #C(0 1/2)))
                               (third gate-scalars)))
                      qubit))))))
+
+(define-compiler euler-ZYZ-compiler
+    ((instr (_ _ _)))
+  (euler-compiler instr :target ':zyz))

@@ -344,8 +344,7 @@ used to specify CHIP-SPEC."
                                :adjustable t
                                :initial-contents rewriting-rules))
              (loop :for method :in compilation-methods
-                   :do (vector-push-extend method
-                                           (hardware-object-compilation-methods obj))))
+                   :do (vector-push-extend method (hardware-object-compilation-methods obj))))
     ;; set up the basic optimal 2Q compiler
     (vector-push-extend (approximate-2q-compiler-for type chip-spec)
                         (hardware-object-compilation-methods obj))
@@ -425,7 +424,7 @@ used to specify CHIP-SPEC."
                     (list #'PHASE-to-RZ
                           #'RY-to-XZX
                           #'RX-to-ZXZXZ
-                          #'euler-compiler)))
+                          #'euler-ZYZ-compiler)))
             :into compilation-methods
           :do (push current-type higher-precedence)
           :finally
@@ -450,27 +449,31 @@ used to specify CHIP-SPEC."
 ;;; routines for populating the fields of a CHIP-SPECIFICATION object (and
 ;;; maintaining the appropriate interrelations).
 (defvar *global-compilers*
-  (list (lambda (chip-spec arch)
-          (declare (ignore arch))
-          (a:curry #'swap-to-native-swaps chip-spec))
+  (list (constantly #'swap-to-native-swaps)
         (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            (a:curry #'cnot-to-native-cnots chip-spec)))
+            #'cnot-to-native-cnots))
         (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            (a:curry #'cz-to-native-czs chip-spec)))
+            #'cz-to-native-czs))
         (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
-            (a:curry #'ISWAP-to-native-ISWAPs chip-spec)))
+            #'ISWAP-to-native-ISWAPs))
         (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cphase)
-            (a:curry #'CPHASE-to-native-CPHASEs chip-spec)))
+            #'CPHASE-to-native-CPHASEs))
         (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':piswap)
-            (a:curry #'PISWAP-to-native-PISWAPs chip-spec)))
+            #'PISWAP-to-native-PISWAPs))
         (lambda (chip-spec arch)
-          (when (find ':cnot (a:ensure-list arch))
-            (a:curry #'CNOT-to-native-CNOTs chip-spec)))
+          (declare (ignore chip-spec))
+          (when (find ':cnot (alexandria:ensure-list arch))
+            #'CNOT-to-native-CNOTs))
         ;; We make this unconditional. We could later conditionalize it if
         ;; we happen to have better CCNOT translations for specific target
         ;; gate sets.
@@ -479,20 +482,21 @@ used to specify CHIP-SPEC."
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            #'ucr-compiler))
+            #'ucr-compiler-to-cz))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
-            (lambda (instr) (ucr-compiler instr :arch ':iswap))))
+            #'ucr-compiler-to-iswap))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
-          (when (find ':cnot (a:ensure-list arch))
-            (lambda (instr) (ucr-compiler instr :arch ':cnot))))
-        (constantly #'state-prep-compiler)
+          (when (find ':cnot (alexandria:ensure-list arch))
+            (lambda (instr) (ucr-compiler instr :target ':cnot))))
+        (constantly #'state-prep-1q-compiler)
+        (constantly #'state-prep-2q-compiler)
+        (constantly #'state-prep-trampolining-compiler)
         (constantly #'recognize-ucr)
         (lambda (chip-spec arch)
-          (when (typep arch 'optimal-2q-target)
-            (approximate-2q-compiler-for arch chip-spec)))
+          (approximate-2q-compiler-for arch chip-spec))
         (constantly #'qs-compiler))
   "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
 

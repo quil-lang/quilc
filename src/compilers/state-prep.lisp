@@ -1,6 +1,9 @@
 ;;;; state-prep.lisp
 ;;;;
 ;;;; Author: Eric Peterson
+;;;;
+;;;; The trampolining decomposition algorithm is based off of Section 4 of
+;;;; arXiv:0406176, our old QSC favorite.
 
 (in-package #:cl-quil)
 
@@ -35,11 +38,10 @@
 
 ;; first we do base case work.
 ;; the most basic base case is the case of a 1-qubit operator.
-(defun state-prep-1Q-compiler (instr)
+(define-compiler state-prep-1Q-compiler
+    ((instr (_ _ _)
+            :where (typep instr 'state-prep-application)))
   "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
-  (unless (and (typep instr 'state-prep-application)
-               (= 1 (length (application-arguments instr))))
-    (give-up-compilation))
   (let* ((source-wf (vector-scale
                      (/ (norm (coerce (state-prep-application-source-wf instr) 'list)))
                      (coerce (state-prep-application-source-wf instr) 'list)))
@@ -156,12 +158,10 @@
 
 ;; TODO: this should be made architecture-sensitive, with separate templates
 ;;       for ISWAP-based chips
-(defun state-prep-2Q-compiler (instr &optional (target ':cz)) 
+(define-compiler state-prep-2Q-compiler
+    ((instr (_ _ _ _)
+            :where (typep instr 'state-prep-application))) 
   "Compiler for STATE-PREP-APPLICATION instances that target a pair of qubits."
-  (declare (ignore target))     ; for now, everything compiles to CNOT
-  (unless (and (typep instr 'state-prep-application)
-               (= 2 (length (application-arguments instr))))
-    (give-up-compilation))
   (let ((qubit-complex (reverse (mapcar #'qubit-index (application-arguments instr))))
         prefix-circuit
         (source-wf (state-prep-application-source-wf instr))
@@ -241,11 +241,9 @@
                                      :operator #.(named-operator "RHS-state-prep-gate")
                                      :arguments (list (first (application-arguments instr))))))))))
 
-(defun state-prep-trampolining-compiler (instr &key (target ':cz))
+(define-compiler state-prep-trampolining-compiler
+    ((instr :where (typep instr 'state-prep-application)))
   "Recursive compiler for STATE-PREP-APPLICATION instances. It's probably wise to use this only if the state preparation instruction targets at least two qubits."
-  (declare (ignore target))
-  (unless (typep instr 'state-prep-application)
-    (give-up-compilation))
   (flet ((calculate-state-prep-angles (wf &optional (prefactor 1.0d0))
            ;; computes UCR angles for a circuit satisfying
            ;; UCRY(phi) UCRZ(theta) |wf> = |wf'> (x) |0>.

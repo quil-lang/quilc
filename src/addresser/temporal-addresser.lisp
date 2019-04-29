@@ -920,15 +920,15 @@ Optional arguments:
                     (format *compiler-noise-stream*
                             "GREEDY-TEMPORAL-ADDRESSING: ~a is non-native in the current rewiring, compiling.~%"
                             (print-instruction instr nil))
+                    
                     ;; release the hounds
-                    (lscheduler-replace-instruction
-                     lschedule instr
-                     (apply-translation-compilers
-                      instr
-                      chip-spec
-                      (chip-spec-nth-link chip-spec link-line)))))))
+                    (let ((compiled-seq (apply-translation-compilers
+                                          instr
+                                          chip-spec
+                                          (chip-spec-nth-link chip-spec link-line))))
+                      (lscheduler-replace-instruction lschedule instr compiled-seq))))))
 
-             ;; we schedule something, so return t
+             ;; we scheduled something, so return t
              t))
 
          ;; the FSM governor
