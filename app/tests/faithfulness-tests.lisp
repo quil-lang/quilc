@@ -19,12 +19,7 @@
     (fresh-line)
     (dolist (file test-files)
       (format t "    Testing file ~a~%" (pathname-name file))
-      (let ((*standard-output* (make-broadcast-stream))
-            ;; quilc::process-options sets *protoquil* and *compute-matrix-reps* when passed "-mP"
-            ;; flags. Bind them here so that the global bindings are not affected; otherwise,
-            ;; subsequent tests that depend on the default values will fail.
-            quilc::*protoquil*
-            quilc::*compute-matrix-reps*)
+      (let ((*standard-output* (make-broadcast-stream)))
         (is (search "#Matrices are equal"
                     (with-open-file (*standard-input* file :direction :input)
                       (with-output-to-string (*error-output*)
