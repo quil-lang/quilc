@@ -127,9 +127,6 @@
         (build-gate "CNOT" () q1 q0)
         (build-gate "CNOT" () q0 q1)))
 
-(define-compiler SWAP-to-CZ ((swap-gate ("SWAP" () _ _)))
-  (mapcan #'CNOT-to-CZ (SWAP-to-CNOT swap-gate)))
-
 (define-compiler SWAP-to-PSWAP ((swap-gate ("SWAP" () q0 q1)))
   (list (build-gate "PSWAP" '(0d0) q0 q1)))
 

@@ -39,41 +39,107 @@
                   (< (abs (- (magicl:ref compiled-matrix i j) (magicl:ref master-matrix i j))) 0.01)))
             "Euler translation test failed: ~a~%" type)))))
 
-(defmacro build-translator-test (translator-fn input-instr)
-  "Designs a test for TRANSLATOR-FN, which swallows the single INPUT-INSTR gate and emits an equivalent list of instructions."
-  `(let* ((input-instr ,input-instr)
-          (old-matrix (quil::apply-gate (magicl:diag 2 2 (list 1d0 1d0)) input-instr))
-          (translator-output (,translator-fn input-instr))
-          (new-matrix (quil::make-matrix-from-quil translator-output)))
-     (setf new-matrix (quil::scale-out-matrix-phases new-matrix old-matrix))
-     (is (loop :for i :below (magicl:matrix-rows new-matrix) :always
-            (loop :for j :below (magicl:matrix-cols new-matrix) :always
-               (< (abs (- (magicl:ref new-matrix i j) (magicl:ref old-matrix i j))) 0.01)))
-         "On pass: ~a~%Goal matrix:~%~a~%Constructed matrix:~%~a~%"
-         (symbol-name ',translator-fn)
-         (with-output-to-string (s)
-           (print-matrix old-matrix s))
-         (with-output-to-string (s)
-           (print-matrix new-matrix s)))))
+(defun generate-test-case (bindings)
+  ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
+  (let ((adjacency-table (make-hash-table))
+        qubit-bound)
+    (labels ((random-with-exceptions (bound exceptions)
+               (assert (> bound (length exceptions)))
+               (let ((val (random bound)))
+                 (if (member val exceptions)
+                     (random-with-exceptions bound exceptions)
+                     val)))
+             (add-clique (qubits)
+               (cond
+                 ((endp qubits)
+                  t)
+                 ((eql '_ (first qubits))
+                  (add-clique (rest qubits)))
+                 (t
+                  (unless (gethash (first qubits) adjacency-table)
+                    (setf (gethash (first qubits) adjacency-table) nil))
+                  (dolist (distant-qubit (rest qubits))
+                    (unless (eq '_ distant-qubit)
+                      (push (first qubits) (gethash distant-qubit adjacency-table))
+                      (push distant-qubit (gethash (first qubits) adjacency-table))))
+                  (add-clique (rest qubits))))))
+      (dolist (binding bindings)
+        (unless (typep binding 'cons)
+          (error "I don't know how to make tests for permissive compilers."))
+        (destructuring-bind (variable-name binding &rest options) binding
+          (declare (ignore variable-name))
+          (when options
+            (error "I don't know how to make test cases for guarded compilers."))
+          (add-clique (cddr binding))))
+      ;; color the graph with qubit indices. it'd be :cool: if this were randomized.
+      (quil::dohash ((qubit collision-names) adjacency-table)
+        (let ((collision-qubits (mapcar (lambda (name) (gethash name adjacency-table))
+                                        collision-names)))
+          (loop :for j :from 0
+                :unless (member j collision-qubits)
+                  :do (setf (gethash qubit adjacency-table) j)
+                      (return))))
+      ;; save the max of the largest instruction qubit number & the k in the k-coloring
+      (setf qubit-bound (max (loop :for (variable-name binding) :in bindings
+                                   :maximize (1+ (length (cddr binding))))
+                             (loop :for name :being :the :hash-keys :of adjacency-table
+                                     :using (hash-value qubit-assignment)
+                                   :maximize (1+ qubit-assignment))))
+      ;; walk the instructions, doing parameter/argument instantiation
+      (loop :for binding :in bindings
+            :collect
+            (destructuring-bind (variable-name (name params &rest qubits)) binding
+              (declare (ignore variable-name))
+              (let* ((params (mapcar (lambda (param)
+                                       (cond
+                                         ((numberp param)
+                                          param)
+                                         ((typep param 'symbol)
+                                          (random (* 2 pi)))
+                                         (t
+                                          (error "I don't know how to generate this parameter."))))
+                                     params))
+                     (qubits (mapcar (lambda (qubit)
+                                       (cond
+                                         ((numberp qubit)
+                                          qubit)
+                                         ((eql '_ qubit)
+                                          '_)
+                                         ((symbolp qubit)
+                                          (gethash qubit adjacency-table))))
+                                     qubits))
+                     (occupied-qubits (remove-if #'symbolp qubits))
+                     (qubits
+                       (let ((output-qubits nil))
+                         (dolist (qubit qubits (reverse output-qubits))
+                           (cond
+                             ((numberp qubit)
+                              (push qubit output-qubits))
+                             ((eql '_ qubit)
+                              (push (random-with-exceptions qubit-bound
+                                                            (append output-qubits occupied-qubits))
+                                    output-qubits)))))))
+                (apply #'quil::build-gate name params qubits)))))))
 
 (deftest test-translators ()
-  "Tests the various hard-coded translators."
-  (build-translator-test quil::H-to-YX        (cl-quil::build-gate "H"      ()             0))
-  (build-translator-test quil::Z-to-XYX       (cl-quil::build-gate "Z"      ()             0))
-  (build-translator-test quil::Yhalf-to-HX    (cl-quil::build-gate "RY"     '(#.(/ pi 2))  0))
-  (build-translator-test quil::RY-to-XZX      (cl-quil::build-gate "RY"     '(#.(/ pi -9)) 0))
-  (build-translator-test quil::CZ-to-CPHASE   (cl-quil::build-gate "CZ"     ()             0 1))
-  (build-translator-test quil::CPHASE-to-CNOT (cl-quil::build-gate "CPHASE" '(#.(/ pi 7))  0 1))
-  (build-translator-test quil::CNOT-to-CZ     (cl-quil::build-gate "CNOT"   ()             0 1))
-  (build-translator-test quil::iSWAP-to-CNOT  (cl-quil::build-gate "ISWAP"  ()             0 1))
-  (build-translator-test quil::CZ-to-CNOT     (cl-quil::build-gate "CZ"     ()             0 1))
-  (build-translator-test quil::iSWAP-to-PSWAP (cl-quil::build-gate "ISWAP"  ()             0 1))
-  (build-translator-test quil::PSWAP-to-CNOT  (cl-quil::build-gate "PSWAP"  '(#.(/ pi 5))  0 1))
-  (build-translator-test quil::CNOT-to-iSWAP  (cl-quil::build-gate "CNOT"   ()             0 1))
-  (build-translator-test quil::SWAP-to-CNOT   (cl-quil::build-gate "SWAP"   ()             0 1))
-  (build-translator-test quil::SWAP-to-CZ     (cl-quil::build-gate "SWAP"   ()             0 1))
-  (build-translator-test quil::SWAP-to-PSWAP  (cl-quil::build-gate "SWAP"   ()             0 1))
-  (build-translator-test quil::SWAP-to-iSWAP  (cl-quil::build-gate "SWAP"   ()             0 1)))
+  (labels
+      ((test-a-compiler (compiler)
+         (let (test-case input-matrix compiled-output output-matrix)
+           ;; building the test case can throw an error if the compiler itself is
+           ;; too complicated. we don't intend for that to break the tests.
+           (handler-case (setf test-case (generate-test-case (quil::compiler-bindings compiler)))
+             (error ()
+               (return-from test-a-compiler nil)))
+           (setf input-matrix (quil::make-matrix-from-quil test-case))
+           (handler-case (setf compiled-output (apply compiler test-case))
+             (quil::compiler-does-not-apply ()
+               (return-from test-a-compiler nil)))
+           (setf output-matrix (quil::make-matrix-from-quil compiled-output))
+           (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
+           (is (quil::matrix-equals-dwim input-matrix output-matrix)))))
+    (dolist (compiler quil::**compilers-available**)
+      (test-a-compiler compiler))))
+
 
 (defun random-permutation (list)
   (unless (null list)

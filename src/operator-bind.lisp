@@ -113,6 +113,42 @@
   ;; will typically be made with a macro below.
   (closer-mop:set-funcallable-instance-function c (compiler-%function c)))
 
+(defmethod print-object ((obj compiler) stream)
+  (print-unreadable-object (obj stream :type t :identity t)
+    (format stream "~a" (compiler-name obj))))
+
+
+;;;
+
+(defun walk-compiler-body (body)
+  (unless (typep body 'cons)
+    (return-from walk-compiler-body (make-hash-table)))
+  (case (first body)
+    (build-gate
+     (destructuring-bind (head name param-list &rest qubit-list) body
+       (declare (ignore head qubit-list))
+       ;; TODO: emit '?s sometimes.
+       (let ((table (make-hash-table :test #'equalp)))
+         (setf (gethash name table) (list param-list))
+         table)))
+    (otherwise
+     (let ((param-table (make-hash-table :test #'equalp)))
+       (dolist (subbody (rest body) param-table)
+         (let ((incoming-table (walk-compiler-body subbody)))
+           (dohash ((key val) incoming-table)
+             (cond
+               ((gethash key param-table)
+                (cond
+                  ((or (eql '? (gethash key param-table))
+                       (eql '? val))
+                   (setf (gethash key param-table) '?))
+                  (t
+                   (setf (gethash key param-table)
+                         (remove-duplicates (union (gethash key param-table)
+                                                   (gethash key incoming-table)))))))
+               (t
+                (setf (gethash key param-table) val))))))))))
+
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
 ;;; non-specialized instances of the above class COMPILER and installs them into
@@ -374,7 +410,7 @@
                                   :name ,(string name)
                                   :instruction-count ,(length variable-names)
                                   :bindings (quote ,bindings)
-                                  :body (quote ,body)
+                                  :body (quote (progn ,@body))
                                   :function #',name)))
              (setf (fdefinition ',name) ,struct-name)
              (cond
