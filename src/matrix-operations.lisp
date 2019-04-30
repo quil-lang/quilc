@@ -159,9 +159,9 @@ as needed so that they are the same size."
                  (destructuring-bind (entering-vector . exiting-vector)
                      (read-from-string (subseq (comment instr)
                                                (length "Entering/exiting rewiring: ")))
-                   (apply-entering-rewiring instr exiting-vector)
+                   (apply-entering-rewiring instr entering-vector)
                    (apply-instr instr)
-                   (apply-exiting-rewiring instr entering-vector))))
+                   (apply-exiting-rewiring instr exiting-vector))))
               (t
                (when (and (comment instr)
                           (uiop:string-prefix-p "Entering rewiring: " (comment instr)))

@@ -10,11 +10,18 @@
    "tests/compiler-hook-test-files/"))
 
 (defun attach-rewirings-to-program (pp in-rewiring-vector out-rewiring-vector)
-  (setf (quil::comment (aref (quil::parsed-program-executable-code pp) 0))
-        (format nil "Entering rewiring: ~a" in-rewiring-vector))
-  (setf (quil::comment (aref (quil::parsed-program-executable-code pp)
-                             (1- (length (quil::parsed-program-executable-code pp)))))
-        (format nil "Exiting rewiring: ~a" out-rewiring-vector))
+  (let ((code (quil::parsed-program-executable-code pp)))
+    (cond
+      ((< (length code) 1)
+       (error "Cannot attach rewirings to program with no instructions"))
+      ((= (length code) 1)
+       (setf (quil::comment (aref code 0))
+	     (format nil "Entering/exiting rewiring: (~a . ~a)" in-rewiring-vector out-rewiring-vector)))
+      (t
+       (setf (quil::comment (aref code 0))
+             (format nil "Entering rewiring: ~a" in-rewiring-vector))
+       (setf (quil::comment (aref code (1- (length code))))
+             (format nil "Exiting rewiring: ~a" out-rewiring-vector)))))
   pp)
 
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
@@ -41,6 +48,18 @@ SWAP 0 1"))
         (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
 CNOT 0 1
 Z 0")
+                                                 #(0 1) #(1 0))))
+    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
+                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+
+(deftest test-parsed-program-to-logical-matrix-entering-exiting-rewiring ()
+  "Test whether quil::parsed-program-to-logical-matrix handles single-instruction entering/exiting
+rewirings correctly."
+  (let ((pp (quil::parse-quil "
+CNOT 0 1
+SWAP 0 1"))
+        (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
+CNOT 0 1")
                                                  #(0 1) #(1 0))))
     (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
                          (quil::parsed-program-to-logical-matrix pp-rewired)))))
