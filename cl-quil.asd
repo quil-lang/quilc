@@ -35,7 +35,10 @@
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
                       (funcall compile)))
   :serial t
-  :components ((:file "package")
+  :components ((:module "quil"
+                :serial t
+                :components ((:static-file "stdgates.quil")))
+               (:file "package")
                (:file "options")
                (:file "utilities")
                (:file "matrix-operations")

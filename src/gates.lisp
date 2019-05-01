@@ -72,21 +72,15 @@
   ((dimension :initarg :dimension
               :reader gate-dimension
               :documentation "The minimal dimension of the space the gate acts on.")
-   ;; TODO move name+documentation into the gate-definition class?
+   ;; TODO move name into the gate-definition class?
+   ;;
+   ;; Eric sez that the name is useful for tracking anonymous gates.
    (name :initarg :name
          :reader gate-name
-         :documentation "The name of the gate.")
-   (documentation :initarg :documentation
-                  :reader gate-documentation
-                  :documentation "Documentation about the gate."))
+         :documentation "The name of the gate."))
   (:metaclass abstract-class)
-  (:default-initargs :name nil
-                     :documentation nil)
+  (:default-initargs :name nil)
   (:documentation "Abstract class for gates."))
-
-(defmethod documentation ((object gate) symbol)
-  (declare (ignore symbol))
-  (gate-documentation object))
 
 (defclass static-gate (gate)
   ()
@@ -129,6 +123,21 @@
          (permutation-gate-permutation gate))
     m))
 
+(defun check-permutation (perm)
+  "Check that PERM is a valid permutation. Error if it's not."
+  (let* ((n (length perm))
+         (bits (make-array n :element-type 'bit :initial-element 0)))
+    (flet ((mark-bit (i)
+             (cond
+               ((zerop (sbit bits i)) (setf (sbit bits i) 1))
+               (t (error "Invalid permutation ~A. Found duplicate entry: ~A" perm i)))))
+      ;; Mark all of the bits.
+      (mapc #'mark-bit perm)
+      ;; Check that they're all marked.
+      (dotimes (i n t)
+        (when (zerop (sbit bits i))
+          (error "Invalid permutation ~A. Missing entry: ~A" perm i))))))
+
 (defun make-permutation-gate (name documentation &rest permutation)
   "Make a permutation gate with the permut"
   (check-type name (or nil string))
@@ -138,6 +147,7 @@
           (permutation)
           "Permutation ~A must be of a power-of-two number of elements."
           permutation)
+  (check-permutation permutation)
   (make-instance
    'permutation-gate
    :name name
@@ -156,6 +166,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;; Gate Operators ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;; Controlled Gates
+
 (defclass controlled-gate ()
   ((target :initarg :target
            :reader target
@@ -169,6 +181,19 @@
 (defmethod gate-dimension ((gate controlled-gate))
   (* 2 (gate-dimension (target gate))))
 
+(defgeneric control-gate (target)
+  (:documentation "Construct a controlled gate out of TARGET. (This representation may be more efficient than an instance of CONTROLLED-GATE.")
+  (:method ((target t))
+    (make-instance 'controlled-gate :target target))
+  (:method ((target permutation-gate))
+    (let* ((permutation (permutation-gate-permutation target))
+           (size (length permutation)))
+      (make-instance 'permutation-gate
+                     :permutation (append (alexandria:iota size)
+                                          (mapcar (lambda (j) (+ j size)) permutation))))))
+
+;;; Daggered Gates
+
 (defclass dagger-gate ()
   ((target :initarg :target
            :reader target
@@ -181,25 +206,53 @@
 (defmethod gate-dimension ((gate dagger-gate))
   (gate-dimension (target gate)))
 
+(defgeneric dagger-gate (target)
+  (:documentation "Construct a daggered gate out of TARGET. (This representation may be more efficient than an instance of DAGGER-GATE.")
+  (:method ((target t))
+    (make-instance 'dagger-gate :target target))
+  (:method ((target permutation-gate))
+    (let ((permutation (permutation-gate-permutation target)))
+      (make-instance
+       'permutation-gate
+       :permutation (loop :for i :below (length permutation)
+                          ;; Simple inversion. Could be done in linear
+                          ;; time with an array or CL-PERMUTATION.
+                          :for inv-i := (position i permutation :test #'=)
+                          :collect inv-i)))))
+
+
+;;; Taking gates and lifting them to CONTROLLED/DAGGER gates
+
 (defun operator-description-gate-lifter (descr)
-  "Given an OPERATOR-DESCRIPTION DESCR, return a unary function that takes a gate, and returns said gate lifted according to the description (i.e., has all proper gate modifiers applied)."
+  "Given an OPERATOR-DESCRIPTION DESCR, return a unary function that takes a gate, and returns said gate lifted according to the description (i.e., has all proper gate modifiers applied). This may return any manner of GATE-like object, including ones that are optimized in their representation."
   (adt:match operator-description descr
     ((named-operator _)
      (lambda (gate) gate))
     ((controlled-operator od)
-     (alexandria:compose
-      (lambda (gate) (make-instance 'controlled-gate :target gate))
-      (operator-description-gate-lifter od)))
+     (alexandria:compose #'control-gate (operator-description-gate-lifter od)))
     ((dagger-operator od)
-     (alexandria:compose
-      (lambda (gate) (make-instance 'dagger-gate :target gate))
-      (operator-description-gate-lifter od)))))
+     (alexandria:compose #'dagger-gate (operator-description-gate-lifter od)))))
 
+(defmethod gate-application-gate ((app gate-application))
+  (funcall (operator-description-gate-lifter (application-operator app))
+           (gate-definition-to-gate
+            (gate-application-resolution app))))
 
 ;;;;;;;;;;;;;;;;;;;;;; Default Gate Definitions ;;;;;;;;;;;;;;;;;;;;;;
 
-(global-vars:define-global-var **default-gate-definitions** (make-hash-table :test 'equal)
-  "A table of default gate definitions, mapping string name to a gate object.")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (global-vars:define-global-var **default-gate-definitions** (make-hash-table :test 'equal)
+    "A table of default gate definitions, mapping string name to a GATE-DEFINITION object."))
+
+;;; Load all of the standard gates from src/quil/stdgates.quil
+(eval-when (:compile-toplevel)
+  (let ((gate-defs (parsed-program-gate-definitions
+                    (parse-quil-into-raw-program
+                     (alexandria:read-file-into-string
+                      (asdf:system-relative-pathname "cl-quil" "src/quil/stdgates.quil"))))))
+    (dolist (gate-def gate-defs)
+      (setf (gethash (gate-definition-name gate-def) **default-gate-definitions**)
+            gate-def))))
 
 (defun standard-gate-names ()
   "Query for the list of standard Quil gate names."
@@ -211,305 +264,6 @@
   (check-type gate-name alexandria:string-designator)
   (values (gethash (string gate-name) **default-gate-definitions**)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun record-standard-gate (name gate)
-    "Record the standard gate GATE under the name NAME in the default collection of Quil standard gates."
-    (check-type name alexandria:string-designator)
-    (check-type gate gate)
-    (setf (gethash (string name) **default-gate-definitions**) gate)
-    (values)))
-
-(defmacro define-default-gate (name num-qubits (&rest params) &body matrix-code)
-  "Defines a gate and adds it to the default-provided gate table.
-
-    NAME: The name of the gate (symbol)
-    NUM-QUBITS: The number of qubits the gate intends to act on.
-    PARAMS: Parameter list for the gate (may be empty)
-    MATRIX-CODE: The code, which may depend on PARAMS, to generate the gate's operator.
-"
-  (check-type name symbol)
-  (check-type num-qubits (integer 1))
-  (let ((name-string (symbol-name name))
-        (dimension (expt 2 num-qubits)))
-    (multiple-value-bind (forms decls doc-string)
-        (alexandria:parse-body matrix-code :documentation t)
-      (cond
-        ;; Simple gate.
-        ((null params)
-         (let ((matrix (gensym "MATRIX-")))
-           `(record-standard-gate
-             ',name-string
-             (let ((,matrix (locally ,@decls ,@forms)))
-               (assert (= (magicl:matrix-rows ,matrix)
-                          (magicl:matrix-cols ,matrix)
-                          ,dimension))
-               (make-instance 'simple-gate
-                              :name ',name-string
-                              :documentation ',doc-string
-                              :dimension ',dimension
-                              :matrix ,matrix)))))
-        ;; Parameterized gate.
-        (t
-         (let ((arity (length params))
-               (matrix-fn (gensym (format nil "~A-MATRIX-FN-" name-string))))
-           `(record-standard-gate
-             ',name-string
-             (flet ((,matrix-fn ,params
-                      ,@decls
-                      ;; TODO: Check that DIMENSION matches the generated matrix.
-                      ,@forms))
-               (make-instance 'parameterized-gate
-                              :name ',name-string
-                              :documentation ',doc-string
-                              :dimension ,dimension
-                              :arity ,arity
-                              :matrix-function #',matrix-fn)))))))))
-
-(defun operator-matrix-from-truth-table (truth-table-outputs)
-    "Return an appropriate matrix which can act as an operator for the truth table outputs TRUTH-TABLE-OUTPUTS (represented as a list) encoded in binary lexicographic order.
-
-Example: A NAND gate can be made with
-
-    (operator-matrix-from-truth-table '(1 1 1 0))
-"
-    (let* ((column-length (length truth-table-outputs))
-           (operator-size (* 2 column-length))
-           (matrix (magicl:make-zero-matrix operator-size operator-size)))
-      (loop :for i :below column-length
-            :for x :in truth-table-outputs
-            :for offset := (* 2 i)
-            :do (if (zerop x)
-                    (setf (magicl:ref matrix offset offset)           #C(1.0d0 0.0d0)
-                          (magicl:ref matrix (1+ offset) (1+ offset)) #C(1.0d0 0.0d0))
-                    (setf (magicl:ref matrix offset (1+ offset))      #C(1.0d0 0.0d0)
-                          (magicl:ref matrix (1+ offset) offset)      #C(1.0d0 0.0d0))))
-      matrix))
-
-;; Evaluate this stuff earlier so we can have access during compile
-;; time.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun controlled (U)
-    "Construct a controlled version of the one-qubit matrix operator U."
-    (assert (= 2
-               (magicl:matrix-rows U)
-               (magicl:matrix-cols U)))
-    (let ((u00 (magicl:ref U 0 0))
-          (u01 (magicl:ref U 0 1))
-          (u10 (magicl:ref U 1 0))
-          (u11 (magicl:ref U 1 1)))
-      (make-row-major-matrix 4 4
-                             (list 1 0 0 0
-                                   0 1 0 0
-                                   0 0 u00 u01
-                                   0 0 u10 u11)))))
-
-;;; The default gate set
-
-(define-default-gate H 1 ()
-  "The Hadamard gate."
-  '#.(let ((1/sqrt2 (/ (sqrt 2.0d0))))
-       (make-row-major-matrix 2 2
-                              (list 1/sqrt2 1/sqrt2
-                                    1/sqrt2 (- 1/sqrt2)))))
-
-(record-standard-gate "I" (make-permutation-gate
-                           "I"
-                           "The identity gate."
-                           0 1))
-
-(record-standard-gate "X" (make-permutation-gate
-                           "X"
-                           "The Pauli-X gate."
-                           1 0))
-
-(define-default-gate Y 1 ()
-  "The Pauli-Y gate."
-  '#.(make-row-major-matrix 2 2
-                            '(0       #C(0 -1)
-                              #C(0 1) 0)))
-
-(define-default-gate Z 1 ()
-  "The Pauli-Z gate."
-  '#.(make-row-major-matrix 2 2
-                            '(1 0
-                              0 -1)))
-
-(record-standard-gate "CNOT" (make-permutation-gate
-                              "CNOT"
-                              "The controlled-X or controlled-NOT gate."
-                              0 1 3 2))
-
-(record-standard-gate "CCNOT" (make-permutation-gate
-                               "CCNOT"
-                               "The Toffoli gate, AKA the CCNOT gate."
-                               0 1 2 3
-                               4 5 7 6))
-
-(define-default-gate RX 1 (theta)
-  "The R_x(theta) gate."
-  (assert (realp theta)
-          nil
-          "RX(~a) has nonreal argument."
-          theta)
-  (let* ((theta/2 (/ theta 2))
-         (cos (cos theta/2))
-         (isin (complex 0.0d0 (- (sin theta/2)))))
-    (make-row-major-matrix 2 2
-                           (list cos isin
-                                 isin cos))))
-
-(define-default-gate RY 1 (theta)
-  "The R_y(theta) gate."
-  (assert (realp theta)
-          nil
-          "RY(~a) has nonreal argument."
-          theta)
-  (let* ((theta/2 (/ theta 2))
-         (cos (cos theta/2))
-         (sin (sin theta/2)))
-    (make-row-major-matrix 2 2
-                           (list cos (- sin)
-                                 sin cos))))
-
-(define-default-gate RZ 1 (theta)
-  "The R_z(theta) gate."
-  (assert (realp theta)
-          nil
-          "RZ(~a) has nonreal argument."
-          theta)
-  (let ((theta/2 (/ theta 2)))
-    (make-row-major-matrix 2 2
-                           (list (cis (- theta/2)) 0
-                                 0                 (cis theta/2)))))
-
-(define-default-gate phase 1 (alpha)
-  "A regular phase gate. Equivalent to R_z multiplied by a phase."
-  (assert (realp alpha)
-          nil
-          "PHASE(~a) has nonreal argument."
-          alpha)
-  (make-row-major-matrix 2 2
-                         (list 1 0
-                               0 (cis alpha))))
-
-(define-default-gate S 1 ()
-  "The S gate."
-  '#.(make-row-major-matrix 2 2
-                            '(1 0
-                              0 #C(0 1))))
-
-(define-default-gate T 1 ()
-  "The T gate."
-  '#.(make-row-major-matrix 2 2
-                            (list 1 0
-                                  0 (cis (/ pi 4)))))
-
-(define-default-gate CZ 2 ()
-  "The controlled-Z gate."
-  '#.(make-row-major-matrix 4 4
-                            '(1 0 0  0
-                              0 1 0  0
-                              0 0 1  0
-                              0 0 0 -1)))
-
-(define-default-gate CPHASE00 2 (alpha)
-  "The controlled phase gate (00-variant)."
-  (assert (realp alpha)
-          nil
-          "CPHASE00(~a) has nonreal argument."
-          alpha)
-  (make-row-major-matrix 4 4
-                         (list (cis alpha) 0 0 0
-                               0           1 0 0
-                               0           0 1 0
-                               0           0 0 1)))
-
-(define-default-gate CPHASE01 2 (alpha)
-  "The controlled phase gate (01-variant)."
-  (assert (realp alpha)
-          nil
-          "CPHASE01(~a) has nonreal argument."
-          alpha)
-  (make-row-major-matrix 4 4
-                         (list 1 0           0 0
-                               0 (cis alpha) 0 0
-                               0 0           1 0
-                               0 0           0 1)))
-
-(define-default-gate CPHASE10 2 (alpha)
-  "The controlled phase gate (10-variant)."
-  (assert (realp alpha)
-          nil
-          "CPHASE10(~a) has nonreal argument."
-          alpha)
-  (make-row-major-matrix 4 4
-                         (list 1 0 0           0
-                               0 1 0           0
-                               0 0 (cis alpha) 0
-                               0 0 0           1)))
-
-(define-default-gate CPHASE 2 (alpha)
-  "The controlled phase gate (11-variant).
-
-Note that this is a controlled version of a R_z gate multiplied by a phase."
-  (assert (realp alpha)
-          nil
-          "CPHASE(~a) has nonreal argument."
-          alpha)
-  (make-row-major-matrix 4 4
-                         (list 1 0 0 0
-                               0 1 0 0
-                               0 0 1 0
-                               0 0 0 (cis alpha))))
-
-(define-default-gate SWAP 2 ()
-  "A quantum gate that swaps the relevant amplitudes of two qubits."
-  '#.(make-row-major-matrix 4 4
-                            (list 1 0 0 0
-                                  0 0 1 0
-                                  0 1 0 0
-                                  0 0 0 1)))
-
-(record-standard-gate "CSWAP" (make-permutation-gate
-                               "CSWAP"
-                               "The Fredkin gate, AKA the CSWAP gate."
-                               0 1 2 3
-                               4 6 5 7))
-
-(define-default-gate ISWAP 2 ()
-  "The ISWAP gate, for superconducting quantum computers."
-  '#.(make-row-major-matrix 4 4
-                            (list 1 0       0       0
-                                  0 0       #C(0 1) 0
-                                  0 #C(0 1) 0       0
-                                  0 0       0       1)))
-
-(define-default-gate PSWAP 2 (theta)
-  "The parametric SWAP gate, for superconducting quantum computers."
-  (assert (realp theta)
-          nil
-          "PSWAP(~a) has nonreal argument."
-          theta)
-  (make-row-major-matrix 4 4
-                         (list 1 0           0           0
-                               0 0           (cis theta) 0
-                               0 (cis theta) 0           0
-                               0 0           0           1)))
-
-(define-default-gate PISWAP 2 (theta)
-  "The parametric ISWAP gate, for superconducting quantum computers. NOTE: This definition is 4 PI PERIODIC rather than 2 PI PERIODIC, but theta = 2 Pi is the local gate Z (x) Z."
-  (assert (realp theta)
-          nil
-          "PISWAP(~a) has nonreal argument."
-          theta)
-  (let ((cos (cos (/ theta 2)))
-        (isin (* #C(0 1)
-                 (sin (/ theta 2)))))
-    (make-row-major-matrix 4 4
-                           (list 1 0    0    0
-                                 0 cos  isin 0
-                                 0 isin cos  0
-                                 0 0    0    1))))
 
 ;;;;;;;;;;;;;; Conversion of GATE-DEFINITIONs to GATEs ;;;;;;;;;;;;;;;
 

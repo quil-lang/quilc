@@ -1,0 +1,137 @@
+### Quil standard gate defintions.
+
+## Pauli Gates
+
+DEFGATE I:
+    1, 0
+    0, 1
+
+DEFGATE X:
+    0, 1
+    1, 0
+
+DEFGATE Y:
+    0, -i
+    i, 0
+
+DEFGATE Z:
+    1, 0
+    0, -1
+
+
+## Hadamard Gate
+
+DEFGATE H:
+    1/sqrt(2), 1/sqrt(2)
+    1/sqrt(2), -1/sqrt(2)
+
+
+## Cartesian Rotation Gates
+
+DEFGATE RX(%theta):
+    cos(%theta/2),    -i*sin(%theta/2)
+    -i*sin(%theta/2), cos(%theta/2)
+
+DEFGATE RY(%theta):
+    cos(%theta/2), -sin(%theta/2)
+    sin(%theta/2), cos(%theta/2)
+
+DEFGATE RZ(%theta):
+    cis(-%theta/2), 0
+    0,              cis(%theta/2)
+
+
+## Controlled-NOT Variants
+
+DEFGATE CNOT:
+    1, 0, 0, 0
+    0, 1, 0, 0
+    0, 0, 0, 1
+    0, 0, 1, 0
+
+# Also known as the Toffoli gate.
+DEFGATE CCNOT:
+    1, 0, 0, 0, 0, 0, 0, 0
+    0, 1, 0, 0, 0, 0, 0, 0
+    0, 0, 1, 0, 0, 0, 0, 0
+    0, 0, 0, 1, 0, 0, 0, 0
+    0, 0, 0, 0, 1, 0, 0, 0
+    0, 0, 0, 0, 0, 1, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 1
+    0, 0, 0, 0, 0, 0, 1, 0
+
+
+## Phase Gates
+
+DEFGATE S:
+    1, 0
+    0, i
+
+DEFGATE T:
+    1, 0
+    0, cis(pi/4)
+
+DEFGATE PHASE(%alpha):
+    1, 0
+    0, cis(%alpha)
+
+DEFGATE CPHASE00(%alpha):
+    cis(%alpha), 0, 0, 0
+    0,           1, 0, 0
+    0,           0, 1, 0
+    0,           0, 0, 1
+
+DEFGATE CPHASE01(%alpha):
+    1, 0,           0, 0
+    0, cis(%alpha), 0, 0
+    0, 0,           1, 0
+    0, 0,           0, 1
+
+DEFGATE CPHASE10(%alpha):
+    1, 0, 0,           0
+    0, 1, 0,           0
+    0, 0, cis(%alpha), 0
+    0, 0, 0,           1
+
+DEFGATE CPHASE(%alpha):
+    1, 0, 0, 0
+    0, 1, 0, 0
+    0, 0, 1, 0
+    0, 0, 0, cis(%alpha)
+
+DEFGATE CZ:
+    1, 0, 0,  0
+    0, 1, 0,  0
+    0, 0, 1,  0
+    0, 0, 0, -1
+
+## Swap Gates
+
+DEFGATE SWAP:
+    1, 0, 0, 0
+    0, 0, 1, 0
+    0, 1, 0, 0
+    0, 0, 0, 1
+
+# Also known as the Fredkin gate.
+DEFGATE CSWAP:
+    1, 0, 0, 0, 0, 0, 0, 0
+    0, 1, 0, 0, 0, 0, 0, 0
+    0, 0, 1, 0, 0, 0, 0, 0
+    0, 0, 0, 1, 0, 0, 0, 0
+    0, 0, 0, 0, 1, 0, 0, 0
+    0, 0, 0, 0, 0, 0, 1, 0
+    0, 0, 0, 0, 0, 1, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 1
+
+DEFGATE ISWAP:
+    1, 0, 0, 0
+    0, 0, i, 0
+    0, i, 0, 0
+    0, 0, 0, 1
+
+DEFGATE PSWAP(%theta):
+    1, 0,           0,           0
+    0, 0,           cis(%theta), 0
+    0, cis(%theta), 0,           0
+    0, 0,           0,           1

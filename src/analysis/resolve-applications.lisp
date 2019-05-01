@@ -21,13 +21,13 @@
       (let* ((operator (application-operator app))
              (addl-qubits (operator-description-additional-qubits operator))
              (name (operator-description-root-name operator))
-             (found-gate-defn (find name gate-definitions
-                                    :test #'string=
-                                    :key #'gate-definition-name))
+             (found-gate-defn (or (find name gate-definitions
+                                        :test #'string=
+                                        :key #'gate-definition-name)
+                                  (lookup-standard-gate name)))
              (found-circ-defn (find name circuit-definitions
                                     :test #'string=
-                                    :key #'circuit-definition-name))
-             (in-default-gateset (lookup-standard-gate name)))
+                                    :key #'circuit-definition-name)))
         (cond
           ;; Gate application
           (found-gate-defn
@@ -60,45 +60,6 @@
           ;; Circuit application
           (found-circ-defn
            (change-class app 'circuit-application :circuit-definition found-circ-defn))
-
-          ;; Resolved in default gateset. In this case we won't have a
-          ;; gate definition object, but a gate object directly.
-          (in-default-gateset
-           (prog1 (change-class app 'gate-application
-                                ;; Make sure we have the correct gate
-                                ;; object according to the operator
-                                ;; description.
-                                :gate (funcall
-                                       (operator-description-gate-lifter
-                                        (application-operator app))
-                                       in-default-gateset))
-             (let ((args (application-arguments app))
-                   (params (application-parameters app)))
-               ;; Check that all arguments are qubits
-               (assert-and-print-instruction (every (alexandria:disjoin #'qubit-p #'is-formal) args)
-                                             ()
-                                             "All arguments must be qubits. Check type of args: ~S." args)
-               (let* ((num-qubits (length args))
-                      (distinct-indices (remove-duplicates args :test 'equalp))
-                      (default-gate-dimension (gate-dimension in-default-gateset))
-                      (expected-qubits (+ addl-qubits
-                                          (ilog2 default-gate-dimension)))
-                      (default-gate-arity (dynamic-gate-arity in-default-gateset)))
-
-                 ;; Check that the parameters are the correct number
-                 (assert-and-print-instruction (= (length params) default-gate-arity)
-                                               ()
-                                               "The number of gate parameters must match.")
-
-                 ;; Check that all arguments are distinct
-                 (assert-and-print-instruction (= (length args) (length distinct-indices))
-                                               ()
-                                               "All arguments must have distinct indices. Check indices for duplicates.")
-                 ;; Check that number of arguments matches gate matrix dimension
-                 (assert-and-print-instruction (= expected-qubits num-qubits)
-                                               ()
-                                               "Expected ~D qubit~:P, but ~D were provided."
-                                               expected-qubits num-qubits)))))
 
           ;; None of the above.
           (t
