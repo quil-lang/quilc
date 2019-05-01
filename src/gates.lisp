@@ -187,9 +187,17 @@
     ((named-operator _)
      (lambda (gate) gate))
     ((controlled-operator od)
-     (alexandria:compose
-      (lambda (gate) (make-instance 'controlled-gate :target gate))
-      (operator-description-gate-lifter od)))
+     (lambda (gate)
+       (let ((inner (funcall (operator-description-gate-lifter od) gate)))
+         (typecase inner
+           (permutation-gate
+            (let* ((permutation (permutation-gate-permutation inner))
+                   (size (length permutation)))
+              (make-instance 'permutation-gate
+                             :permutation (append (alexandria:iota size)
+                                                  (mapcar (lambda (j) (+ j size)) permutation)))))
+           (otherwise
+            (make-instance 'controlled-gate :target gate))))))
     ((dagger-operator od)
      (alexandria:compose
       (lambda (gate) (make-instance 'dagger-gate :target gate))
