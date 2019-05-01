@@ -449,6 +449,10 @@ other's."
         ;; otherwise, we're obligated to do full unitary compilation.
         (decompile-instructions-into-full-unitary)))))
 
+(define-condition quil-compression-error (simple-error))
+(define-condition quil-compression-matrices-disagree (quil-compression-error))
+(define-condition quil-compression-states-disagree (quil-compression-error))
+(define-condition quil-compression-matrices-not-close (quil-compression-error))
 
 (defun check-contextual-compression-was-well-behaved (instructions
                                                       decompiled-instructions
@@ -481,19 +485,20 @@ other's."
                   (stretched-matrix (or (make-matrix-from-quil instructions :relabeling relabeling)
                                         (return-from check-quil-agrees-as-matrices nil)))
                   (decompiled-matrix
-                   (make-matrix-from-quil decompiled-instructions
-                                          :relabeling relabeling))
+                    (make-matrix-from-quil decompiled-instructions
+                                           :relabeling relabeling))
                   (reduced-matrix
-                   (kron-matrix-up (make-matrix-from-quil reduced-instructions
-                                                          :relabeling relabeling)
-                                   (ilog2 (magicl:matrix-rows stretched-matrix))))
+                    (kron-matrix-up (make-matrix-from-quil reduced-instructions
+                                                           :relabeling relabeling)
+                                    (ilog2 (magicl:matrix-rows stretched-matrix))))
                   (reduced-decompiled-matrix
-                   (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions
-                                                          :relabeling relabeling)
-                                   (ilog2 (magicl:matrix-rows stretched-matrix)))))
-             (assert (matrix-equality stretched-matrix
+                    (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions
+                                                           :relabeling relabeling)
+                                    (ilog2 (magicl:matrix-rows stretched-matrix)))))
+             (unless (matrix-equality stretched-matrix
                                       (scale-out-matrix-phases reduced-matrix
-                                                               stretched-matrix)))
+                                                               stretched-matrix))
+               (signal ))
              (when decompiled-instructions
                (assert (matrix-equality stretched-matrix
                                         (scale-out-matrix-phases decompiled-matrix
@@ -508,18 +513,18 @@ other's."
                                             start-wf
                                             wf-qc))
                   (final-wf-reduced-instrs-collinearp
-                   (or (and (eql final-wf ':not-simulated)
-                            (eql final-wf-reduced-instrs ':not-simulated))
-                       (collinearp final-wf final-wf-reduced-instrs)))
+                    (or (and (eql final-wf ':not-simulated)
+                             (eql final-wf-reduced-instrs ':not-simulated))
+                        (collinearp final-wf final-wf-reduced-instrs)))
                   (final-wf-reduced-prep (nondestructively-apply-instrs-to-wf
                                           reduced-decompiled-instructions
                                           start-wf
                                           wf-qc))
                   (final-wf-reduced-prep-collinearp
-                   (or (null decompiled-instructions)
-                       (and (eql final-wf ':not-simulated)
-                            (eql final-wf-reduced-prep ':not-simulated))
-                       (collinearp final-wf final-wf-reduced-prep))))
+                    (or (null decompiled-instructions)
+                        (and (eql final-wf ':not-simulated)
+                             (eql final-wf-reduced-prep ':not-simulated))
+                        (collinearp final-wf final-wf-reduced-prep))))
              (assert final-wf-reduced-instrs-collinearp
                      (final-wf final-wf-reduced-instrs)
                      "During careful checking of instruction compression, the produced ~
@@ -535,11 +540,11 @@ other's."
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
              (let* ((n (ilog2 (magicl:matrix-rows stretched-matrix)))
                     (reduced-matrix
-                     (kron-matrix-up (make-matrix-from-quil reduced-instructions)
-                                     (ilog2 (magicl:matrix-rows stretched-matrix))))
+                      (kron-matrix-up (make-matrix-from-quil reduced-instructions)
+                                      (ilog2 (magicl:matrix-rows stretched-matrix))))
                     (reduced-decompiled-matrix
-                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
-                                     (ilog2 (magicl:matrix-rows stretched-matrix)))))
+                      (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
+                                      (ilog2 (magicl:matrix-rows stretched-matrix)))))
                (assert (matrix-equality stretched-matrix
                                         (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions
