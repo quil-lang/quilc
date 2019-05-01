@@ -102,6 +102,10 @@
     :initarg :body
     :reader compiler-body
     :documentation "Raw source of the compiler.")
+   (output-gates
+    :initarg :output-gates
+    :reader compiler-output-gates
+    :documentation "Information automatically extracted about the target gate set.")
    (%function
     :initarg :function
     :reader compiler-%function
@@ -120,21 +124,27 @@
 
 ;;;
 
-(defun walk-compiler-body (body)
+(defun get-output-gates-from-raw-code (body)
   (unless (typep body 'cons)
-    (return-from walk-compiler-body (make-hash-table)))
+    (return-from get-output-gates-from-raw-code (make-hash-table)))
   (case (first body)
     (build-gate
      (destructuring-bind (head name param-list &rest qubit-list) body
        (declare (ignore head qubit-list))
        ;; TODO: emit '?s sometimes.
        (let ((table (make-hash-table :test #'equalp)))
-         (setf (gethash name table) (list param-list))
+         (cond
+           ((and (typep param-list 'cons)
+                 (eql 'quote (first param-list))
+                 (every #'numberp (second param-list)))
+            (setf (gethash name table) (list (second param-list))))
+           (t
+            (setf (gethash name table) '?)))
          table)))
     (otherwise
      (let ((param-table (make-hash-table :test #'equalp)))
-       (dolist (subbody (rest body) param-table)
-         (let ((incoming-table (walk-compiler-body subbody)))
+       (dolist (subbody body param-table)
+         (let ((incoming-table (get-output-gates-from-raw-code subbody)))
            (dohash ((key val) incoming-table)
              (cond
                ((gethash key param-table)
@@ -291,29 +301,40 @@
              (when (endp seq)
                (return-from expand-each-element rest))
              (let ((ele (first seq))
-                   (var (first ele-vars))
-                   (new-rest (expand-each-element (rest seq)
-                                                  (rest ele-vars)
-                                                  env
-                                                  rest
-                                                  :ele-accessor ele-accessor
-                                                  :ele-type ele-type
-                                                  :eq-predicate eq-predicate)))
+                   (var (first ele-vars)))
                (cond
                  ((wildcard-pattern-p ele)
-                  new-rest)
+                  (expand-each-element (rest seq)
+                                           (rest ele-vars)
+                                           env
+                                           rest
+                                           :ele-accessor ele-accessor
+                                           :ele-type ele-type
+                                           :eq-predicate eq-predicate))
                  ((and (match-symbol-p ele)
                        (not (lookup ele env)))
                   ;; fresh binding
                   `(let ((,ele (if (typep ,var ',ele-type)
                                    (,ele-accessor ,var)
                                    ,var)))
-                     ,new-rest))
+                     ,(expand-each-element (rest seq)
+                                           (rest ele-vars)
+                                           (list* (cons ele t) env)
+                                           rest
+                                           :ele-accessor ele-accessor
+                                           :ele-type ele-type
+                                           :eq-predicate eq-predicate)))
                  (t
                   ;; existing binding / data. insert eq-predicate check
                   `(when (and (typep ,var ',ele-type)
                               (,eq-predicate ,ele (,ele-accessor ,var)))
-                     ,new-rest)))))
+                     ,(expand-each-element (rest seq)
+                                           (rest ele-vars)
+                                           env
+                                           rest
+                                           :ele-accessor ele-accessor
+                                           :ele-type ele-type
+                                           :eq-predicate eq-predicate))))))
            
            (expand-parameters (binding env rest)
              (if (wildcard-pattern-p (binding-parameters binding))
@@ -384,7 +405,15 @@
     (expand-bindings bindings nil)))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
-  (labels ((collect-variable-names (bindings)
+  (labels ((cleave-options (bindings-and-options &optional backlog)
+             (cond
+               ((or (endp bindings-and-options)
+                    (keywordp (first bindings-and-options)))
+                (values (reverse backlog) bindings-and-options))
+               (t
+                (cleave-options (rest bindings-and-options)
+                                (cons (first bindings-and-options) backlog)))))
+           (collect-variable-names (bindings)
              (when (endp bindings) (return-from collect-variable-names nil))
              (let ((binding (first bindings)))
                (etypecase binding
@@ -392,33 +421,36 @@
                                (collect-variable-names (rest bindings))))
                  (cons   (cons (first binding)
                                (collect-variable-names (rest bindings))))))))
-    (let ((variable-names (collect-variable-names bindings)))
-      (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
-        (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
-              (1+ pos) (string name)))
-      (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
-        ;; TODO: do the alexandria destructuring to catch the docstring or whatever
-        `(labels ((,name (,@variable-names &key context)
-                    (declare (ignorable context))
-                    (multiple-value-bind (,ret-val ,ret-bool)
-                        ,(define-compiler-form bindings body)
-                      (if ,ret-bool ,ret-val (give-up-compilation)))))
-           (let ((,old-record (find ,(string name) **compilers-available**
-                                    :key #'compiler-name))
-                 (,struct-name
-                   (make-instance 'compiler
-                                  :name ,(string name)
-                                  :instruction-count ,(length variable-names)
-                                  :bindings (quote ,bindings)
-                                  :body (quote (progn ,@body))
-                                  :function #',name)))
-             (setf (fdefinition ',name) ,struct-name)
-             (cond
-               (,old-record
-                (setf **compilers-available**
-                      (substitute ,struct-name ,old-record **compilers-available**)))
-               (t
-                (push ,struct-name **compilers-available**)))))))))
+    (multiple-value-bind (bindings options) (cleave-options bindings)
+      (let ((variable-names (collect-variable-names bindings)))
+        (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
+          (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
+                (1+ pos) (string name)))
+        (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
+          ;; TODO: do the alexandria destructuring to catch the docstring or whatever
+          `(labels ((,name (,@variable-names &key context)
+                      (declare (ignorable context))
+                      (multiple-value-bind (,ret-val ,ret-bool)
+                          ,(define-compiler-form bindings body)
+                        (if ,ret-bool ,ret-val (give-up-compilation)))))
+             (let ((,old-record (find ,(string name) **compilers-available**
+                                      :key #'compiler-name))
+                   (,struct-name
+                     (make-instance ',(getf options :class 'compiler)
+                                    :name ,(string name)
+                                    :instruction-count ,(length variable-names)
+                                    :bindings (quote ,bindings)
+                                    :body (quote (progn ,@body))
+                                    :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
+                                    :function #',name)))
+               (setf (fdefinition ',name) ,struct-name)
+               (cond
+                 (,old-record
+                  (setf **compilers-available**
+                        (substitute ,struct-name ,old-record **compilers-available**)))
+                 (t
+                  (push ,struct-name **compilers-available**)))
+               #',name)))))))
 
 (defmacro with-compilation-context ((&rest bindings-plist) &body body)
   (setf body `(progn ,@body))
