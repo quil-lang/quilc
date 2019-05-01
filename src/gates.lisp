@@ -240,19 +240,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;; Default Gate Definitions ;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (global-vars:define-global-var **default-gate-definitions** (make-hash-table :test 'equal)
-    "A table of default gate definitions, mapping string name to a GATE-DEFINITION object."))
-
 ;;; Load all of the standard gates from src/quil/stdgates.quil
-(eval-when (:compile-toplevel)
-  (let ((gate-defs (parsed-program-gate-definitions
-                    (parse-quil-into-raw-program
-                     (alexandria:read-file-into-string
-                      (asdf:system-relative-pathname "cl-quil" "src/quil/stdgates.quil"))))))
-    (dolist (gate-def gate-defs)
-      (setf (gethash (gate-definition-name gate-def) **default-gate-definitions**)
-            gate-def))))
+(global-vars:define-global-var **default-gate-definitions**
+    (let ((table (make-hash-table :test 'equal))
+          (gate-defs (parsed-program-gate-definitions
+                      (parse-quil-into-raw-program
+                       (alexandria:read-file-into-string
+                        (asdf:system-relative-pathname
+                         "cl-quil" "src/quil/stdgates.quil"))))))
+      (dolist (gate-def gate-defs table)
+        (setf (gethash (gate-definition-name gate-def) table)
+              gate-def)))
+  "A table of default gate definitions, mapping string name to a GATE-DEFINITION object.")
 
 (defun standard-gate-names ()
   "Query for the list of standard Quil gate names."

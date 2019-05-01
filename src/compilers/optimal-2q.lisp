@@ -48,8 +48,8 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
      (reduce #'magicl:multiply-complex-matrices
              (list
               m
-              (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
-              (gate-matrix (lookup-standard-gate "ISWAP")))))))
+              (su2-on-line 0 (gate-matrix (gate-definition-to-gate (lookup-standard-gate "RY")) sigma))
+              (gate-matrix (gate-definition-to-gate (lookup-standard-gate "ISWAP"))))))))
 
 (defun chi-from-evals (evals)
   "Computes the characteristic polynomial of a 4x4 matrix with all
