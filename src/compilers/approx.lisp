@@ -402,18 +402,34 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
             ((test option-4) option-4)
             (t (error "Failed to put the canonical coordinates ~a into the preferred Weyl chamber." (list first second third)))))))))
 
-(defun build-canonical-gate (coord)
+(defun build-canonical-gate-in-magic-basis (coord)
   "Given a canonical coordinate, construct the associated canonical gate at that coordinate."
   (destructuring-bind (c1 c2 c3) coord
-    (reduce #'magicl:multiply-complex-matrices
-            (list +e-basis+
-                  (magicl:diag 4 4
-                               (mapcar (lambda (z) (cis (* 0.5d0 z)))
-                                       (list    (+    c1 (- c2)   c3)
-                                                (+    c1    c2 (- c3))
-                                             (- (+    c1    c2    c3))
-                                                (+ (- c1)   c2    c3))))
-                  +edag-basis+))))
+    (magicl:diag 4 4
+                 (mapcar (lambda (z) (cis (* 0.5d0 z)))
+                         (list (+       c1 (- c2)   c3)
+                               (+       c1    c2 (- c3))
+                               (- (+    c1    c2    c3))
+                               (+    (- c1)   c2    c3))))))
+
+(defun sandwich-with-local-gates (center-circuit a d b q1 q0)
+  "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
+
+Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, and B are matrices; and Q1, Q0 are qubit indices."
+  (multiple-value-bind (ua ub fidelity)
+      (match-matrix-to-an-e-basis-diagonalization
+       (make-matrix-from-quil center-circuit :relabeling `((,q1 . 1) (,q0 . 0)))
+       a d b)
+    
+    (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
+      (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
+        (values
+         (append (list (anon-gate "B0" b0 q0)
+                       (anon-gate "B1" b1 q1))
+                 center-circuit
+                 (list (anon-gate "A0" a0 q0)
+                       (anon-gate "A1" a1 q1)))
+         fidelity)))))
 
 
 ;;; now, finally, we start writing approximation-specific things.  what follows
@@ -436,54 +452,41 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 (defvar *approximate-template-search-limit* 5000
   "Tolerance level for how many guesses an inexact template solver is allowed to make when it is unsure that an exact solution exists.")
 
-(defmacro define-approximate-template (name (coord q1 q0) (&key requirements predicate) &body body)
+(defclass approximate-compiler (compiler)
+  ()
+  (:metaclass closer-mop:funcallable-standard-class))
+
+(defmacro define-canonical-circuit-approximation (name (&rest bindings) &body body)
   "This defines an two-qubit circuit template for use by the approximation algorithm. The template is stored both as a raw function under the name NAME as well as in a list of available templates, guarded by the value REQUIREMENTS of type OPTIMAL-2Q-TARGET.  BODY is a routine that returns a list of GATE-APPLICATION objects and is allowed to reference three arguments: the desired canonical coordinate COORD, the first desired qubit Q1, and the zeroth desired qubit Q0.
 
 Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is NIL, the template errors with GIVE-UP-COMPILATION and does not evaluate BODY; this mechanism is used to avoid the emission of approximate templates when they aren't wanted.  If a template author cannot provide a meaningful predicate, they must manually install a guard against such unwanted emissions."
-  (check-type name symbol)
-  (check-type coord symbol)
-  (check-type q1 symbol)
-  (check-type q0 symbol)
+  (a:with-gensyms (circuit coord q0 q1)
+    (let ((instr-name (if (typep (first bindings) 'symbol)
+                          (first bindings)
+                          (first (first bindings)))))
+      `(progn
+         (define-compiler ,name (,@bindings
+                                 :class approximate-compiler)
+           (let ((,circuit (progn ,@body))
+                 (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
+                 (,q1 (qubit-index (first (application-arguments ,instr-name))))
+                 (,q0 (qubit-index (second (application-arguments ,instr-name)))))
+             (sandwich-with-local-gates ,circuit
+                                        (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
+                                        (build-canonical-gate-in-magic-basis ,coord)
+                                        (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
+                                        ,q1 ,q0)))))))
 
-  (multiple-value-bind (body-prog decls docstring)
-      (a:parse-body body :documentation t)
-    `(progn
-       (defun ,name (,coord ,q1 ,q0)
-         ,@(when docstring (list docstring))
-         ,@decls
-         (unless (or *enable-approximate-compilation*
-                     ,predicate)
-           (give-up-compilation))
-         ,@body-prog)
-       (let ((old-record (find ',name **approximate-template-records**
-                               :key #'approximate-template-record-name))
-             (new-record (make-approximate-template-record
-                          :name ',name
-                          :predicate (lambda (,coord ,q1 ,q0)
-                                       (declare (ignorable ,coord ,q1 ,q0))
-                                       ,predicate)
-                          :requirements ',requirements)))
-         (cond
-           (old-record
-            (setf **approximate-template-records**
-                  (substitute new-record old-record **approximate-template-records**)))
-           (t
-            (push new-record **approximate-template-records**)))
-         ',name))))
-
-(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate requirements parameter-count) &body parametric-circuit)
-  "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-APPROXIMATE-TEMPLATE, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
-  (multiple-value-bind (body-prog decls docstring)
-      (a:parse-body parametric-circuit :documentation t)
-    (a:with-gensyms (a d b in goodness template-values)
-      `(define-approximate-template ,name (,coord ,q1 ,q0)
-           (:requirements ,requirements
-            :predicate ,predicate)
-         ,@(when docstring (list docstring))
-         ,@decls
+(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
+  "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
+  (a:with-gensyms (instr a d b in goodness template-values evaluated-predicate)
+    `(define-canonical-circuit-approximation ,name
+         ((,instr ("CAN" _ ,q1 ,q0)))
+       (let* ((,coord (mapcar #'constant-value (application-parameters ,instr)))
+              (,evaluated-predicate ,predicate))
          (labels
              ((circuit-template (,parameter-array ,q1 ,q0)
-                ,@body-prog)
+                ,@parametric-circuit)
               (run-optimizer ()
                 (multiple-value-bind (,template-values ,goodness)
                     (cl-grnm:nm-optimize
@@ -500,7 +503,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                   (cond
                     ;; if we promised an exact solution but haven't found it yet,
                     ;; try again.
-                    ((and ,predicate (not (double= 0d0 ,goodness)))
+                    ((and ,evaluated-predicate (not (double= 0d0 ,goodness)))
                      (run-optimizer))
                     ;; if we are unsure about the existence of an exact solution, we
                     ;; haven't found one yet, but the user is demanding one, give up.
@@ -513,45 +516,36 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
            (run-optimizer))))))
 
 
-
-(define-approximate-template nearest-circuit-of-depth-0 (coord q1 q0)
-    (:requirements ()
-     :predicate (every #'double= coord (list 0d0 0d0 0d0)))
+(define-canonical-circuit-approximation nearest-circuit-of-depth-0
+    ((instr ("CAN" (0 0 0) q1 q0)))
   (list (build-gate "I" () q0)
         (build-gate "I" () q1)))
 
-(define-approximate-template nearest-ISWAP-circuit-of-depth-1 (coord q1 q0)
-    (:requirements (:iswap)
-     :predicate (every #'double= coord (list (/ pi 2) (/ pi 2) 0)))
+(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-1
+    ((instr ("CAN" (#.(/ pi 2) #.(/ pi 2) 0) q1 q0)))
   (list (build-gate "ISWAP" '() q1 q0)))
 
-(define-approximate-template nearest-XY-circuit-of-depth-1 (coord q1 q0)
-    (:requirements (:piswap)
-     :predicate (and (double= (first coord) (second coord))
-                     (double= (third coord) 0d0)))
-  (list (build-gate "PISWAP" (list (* 2 (first coord))) q1 q0)))
+(define-canonical-circuit-approximation nearest-XY-circuit-of-depth-1
+    ((instr ("CAN" (alpha alpha 0) q1 q0)))
+  (list (build-gate "PISWAP" (list (* 2 alpha)) q1 q0)))
 
-(define-approximate-template nearest-CZ-circuit-of-depth-1 (coord q1 q0)
-    (:requirements (:cz)
-     :predicate (every #'double= coord (list (/ pi 2) 0d0 0d0)))
+(define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-1
+    ((instr ("CAN" (#.(/ pi 2) 0 0) q1 q0)))
   (list (build-gate "CZ" () q1 q0)))
 
-(define-approximate-template nearest-CPHASE-circuit-of-depth-1 (coord q1 q0)
-    (:requirements (:cphase)
-     :predicate (every #'double= (rest coord) (list 0d0 0d0)))
-  (list (build-gate "CPHASE" (list (* 2 (first coord))) q1 q0)))
+(define-canonical-circuit-approximation nearest-CPHASE-circuit-of-depth-1
+    ((instr ("CAN" (alpha 0 0) q1 q0)))
+  (list (build-gate "CPHASE" (list (* 2 alpha)) q1 q0)))
 
-(define-approximate-template nearest-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    (:requirements (:iswap)
-     :predicate (double= 0d0 (third coord)))
+(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-2 
+    ((instr ("CAN" (alpha beta 0) q1 q0)))
   (list (build-gate "ISWAP" '()          q1 q0)
-        (build-gate "RY"    (list (first coord)) q1)
-        (build-gate "RY"    (list (second coord)) q0)
+        (build-gate "RY"    (list alpha) q1)
+        (build-gate "RY"    (list beta)  q0)
         (build-gate "ISWAP" '()          q1 q0)))
 
 (define-searching-approximate-template nearest-XY-XY-template-of-depth-2 (coord q1 q0 array)
-    (:requirements (:piswap)
-     :predicate nil                     ; TODO: replace this with a convexity test
+    (:predicate nil                     ; TODO: replace this with a convexity test
      :parameter-count 6)
   (list
    (build-gate "PISWAP" (list (aref array 4))     q1 q0)
@@ -563,22 +557,19 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
    (build-gate "RZ"     (list (- (aref array 2))) q1)
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
-(define-approximate-template nearest-CZ-ISWAP-circuit-of-depth-2 (coord q1 q0)
-    (:requirements (:cz :iswap)
-     :predicate (double= (/ pi 2) (first coord)))
+(define-canonical-circuit-approximation nearest-CZ-ISWAP-circuit-of-depth-2
+    ((instr ("CAN" (#.(/ pi 2) beta gamma) q1 q0)))
   (list (build-gate "ISWAP" () q1 q0)
-        (build-gate "RY" (list (- (/ pi 2) (second coord))) q0)
-        (build-gate "RY" (list (- (/ pi 2) (third coord))) q1)
+        (build-gate "RY" (list (- (/ pi 2) beta)) q0)
+        (build-gate "RY" (list (- (/ pi 2) gamma)) q1)
         (build-gate "CZ" () q1 q0)))
 
-(define-approximate-template nearest-ISWAP-circuit-of-depth-3 (coord q1 q0)
-    (:requirements (:iswap)
-     :predicate t)
+(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-3
+    ((instr ("CAN" (_ _ _) q1 q0)))
   (flet ((twist-to-real (m)
            ;; this magical formula was furnished to us by asking a CAS to compute
            ;; the trace of M' for a symbolic M and SIGMA, then solving
-           ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)) ,
-           ;; where a and b work out to be these disgusting sums below.
+           ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)).
            (let* ((sigma (atan (imagpart (+ (*  1d0 (magicl:ref m 1 3) (magicl:ref m 2 0))
                                             (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 1))
                                             (*  1d0 (magicl:ref m 1 1) (magicl:ref m 2 2))
@@ -602,23 +593,15 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                        m
                        (su2-on-line 0 (gate-matrix (gate-definition-to-gate (lookup-standard-gate "RY")) sigma))
                        (gate-matrix (gate-definition-to-gate (lookup-standard-gate "ISWAP")))))))))
-    (multiple-value-bind (sigma mprime) (twist-to-real (build-canonical-gate coord))
-      (multiple-value-bind (a d b) (orthogonal-decomposition mprime)
-        (let* ((coordprime (get-canonical-coords-from-diagonal d)))
-          (multiple-value-bind (subcircuit subfidelity)
-              (sandwich-with-local-gates
-               (nearest-ISWAP-circuit-of-depth-2 coordprime q1 q0)
-               a d b q1 q0)
-            (assert (double= subfidelity 1d0))
-            (list* (build-gate "RY"    (list (- sigma)) q0)
-                   (build-gate "ISWAP" '()              q1 q0)
-                   (build-gate "Z"     '()              q0)
-                   (build-gate "Z"     '()              q1)
-                   subcircuit)))))))
+    (multiple-value-bind (sigma mprime) (twist-to-real (gate-matrix instr))
+      (list* (build-gate "RY"    (list (- sigma)) q0)
+             (build-gate "ISWAP" '()              q1 q0)
+             (build-gate "Z"     '()              q0)
+             (build-gate "Z"     '()              q1)
+             (canonical-decomposition (anon-gate "CAN-2" mprime q1 q0))))))
 
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
-    (:requirements (:cphase :iswap)
-     :predicate nil ; TODO: replace this with a convexity test
+    (:predicate nil ; TODO: replace this with a convexity test
      :parameter-count 3)
   (list
    (build-gate "ISWAP"  ()                    q0 q1)
@@ -627,8 +610,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
    (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
 
 (define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
-    (:requirements (:cz :piswap)
-     :predicate nil   ; TODO: replace this with a convexity test
+    (:predicate nil   ; TODO: replace this with a convexity test
      :parameter-count 4)
   (list
    (build-gate "CZ"     ()                        q1 q0)
@@ -639,8 +621,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
 (define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
-    (:requirements (:cphase :piswap)
-     :predicate nil                     ; TODO: replace this with a convexity test
+    (:predicate nil                     ; TODO: replace this with a convexity test
      :parameter-count 5)
   (list
    (build-gate "CPHASE" (list (aref array 4))     q1 q0)
@@ -650,32 +631,37 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
    (build-gate "RZ"     (list (- (aref array 2))) q1)
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
+<<<<<<< HEAD
 (define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
     (:requirements (:cz)
      :predicate (double= 0d0 (third coord)))
+=======
+(define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-2
+    ((instr ("CAN" (alpha beta _) q1 q0)))    
+>>>>>>> approximate compilation rework checkpoint
   (list (build-gate "CZ" () q1 q0)
-        (build-gate "RY" (list (first coord)) q1)
-        (build-gate "RY" (list (second coord)) q0)
+        (build-gate "RY" (list alpha) q1)
+        (build-gate "RY" (list beta) q0)
         (build-gate "CZ" () q1 q0)))
 
-(define-approximate-template nearest-CZ-circuit-of-depth-3 (coord q1 q0)
-    (:requirements (:cz)
-     :predicate t)
-  (let ((alpha (- (first coord) pi))
-        (beta  (- pi            (second coord)))
-        (gamma (- (/ pi 2)      (third coord))))
+(define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-3
+    ((instr ("CAN" (alpha beta gamma) q1 q0)))
+  (let ((a (- alpha    pi))
+        (b (- pi       beta))
+        (c (- (/ pi 2) gamma)))
     (list (build-gate "CZ" '()            q0 q1)
           (build-gate "RY" '(#.(/ pi -2)) q0)
-          (build-gate "RY" (list beta)   q1)
-          (build-gate "RZ" (list gamma)   q0)
+          (build-gate "RY" (list b)       q1)
+          (build-gate "RZ" (list c)       q0)
           (build-gate "CZ" '()            q0 q1)
-          (build-gate "RY" (list alpha)   q1)
+          (build-gate "RY" (list a)       q1)
           (build-gate "RY" '(#.(/ pi 2))  q0)
           (build-gate "CZ" '()            q0 q1))))
 
 
 ;;; here lies the logic underlying the approximate compilation routine.
 
+<<<<<<< HEAD
 (defun sandwich-with-local-gates (center-circuit a d b q1 q0)
   "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
 
@@ -695,6 +681,8 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
                        (anon-gate "A1" a1 q1)))
          fidelity)))))
 
+=======
+>>>>>>> approximate compilation rework checkpoint
 (defun approximate-2Q-compiler (instr &key (chip-spec nil) (crafters nil))
   "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through.
 
@@ -706,6 +694,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
     (give-up-compilation))
 
   ;; extract matrix, canonical decomposition
+<<<<<<< HEAD
   (let* ((q1 (qubit-index (first (application-arguments instr))))
          (q0 (qubit-index (second (application-arguments instr))))
          (m (or (gate-matrix instr) (error 'compiler-invalid-domain)))
@@ -742,19 +731,70 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                          (double= 1d0 fidelity))
                (give-up-compilation))
              (values circuit fidelity))))))))
+=======
+  (destructuring-bind (left1 left2 can right1 right2) (canonical-decomposition instr)
+    (let ((q1 (qubit-index (first (application-arguments instr))))
+          (q0 (qubit-index (second (application-arguments instr))))
+          (candidate-pairs nil))
+      
+      ;; now we manufacture a bunch of candidate circuits
+      (dolist (circuit-crafter crafters)
+        (unless (and (first candidate-pairs)
+                     (double= 1d0 (car (first candidate-pairs))))
+          (format *compiler-noise-stream*
+                  "APPROXIMATE-2Q-COMPILER: Trying ~a on ~a.~%"
+                  circuit-crafter
+                  (with-output-to-string (s) (print-instruction instr s)))
+          (handler-case
+              (let* ((center-circuit (funcall circuit-crafter can))
+                     (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
+                     (circuit-cost (or (and chip-spec (lscheduler-calculate-fidelity ls chip-spec))
+                                       1d0))
+                     (sandwiched-circuit (append (list left1 left2)
+                                                 center-circuit
+                                                 (list right1 right2)))
+                     (m (make-matrix-from-quil sandwiched-circuit
+                                               :relabeling `((,q1 . 1) (,q0 . 0))))
+                     (fidelity (trace-distance (gate-matrix instr) m)))
+                (push (cons (* circuit-cost fidelity) sandwiched-circuit)
+                      candidate-pairs))
+            (compiler-does-not-apply () nil))))
+      
+      ;; now vomit the results
+      (when (endp candidate-pairs)
+        (give-up-compilation))
+      (destructuring-bind (fidelity . circuit) (a:extremum candidate-pairs #'> :key #'car)
+        (unless (or *enable-approximate-compilation*
+                    (double= 1d0 fidelity))
+          (give-up-compilation))
+        (values circuit fidelity)))))
+>>>>>>> approximate compilation rework checkpoint
 
 (defun approximate-2Q-compiler-for (target chip-spec)
   "Constructs an approximate 2Q compiler suitable for a TARGET architecture and a CHIP-SPEC with fidelity data.  Returns a function to be installed into the compilers present on CHIP-SPEC."
   (let ((crafters
-         (mapcar #'approximate-template-record-name
-                 (reverse
-                  (remove-if-not (lambda (record)
-                                   (optimal-2q-target-meets-requirements
-                                    target
-                                    (approximate-template-record-requirements record)))
-                                 **approximate-template-records**)))))
+          (reverse
+           (remove-if-not (lambda (record)
+                            (and (typep record 'approximate-compiler)
+                                 (optimal-2q-target-meets-requirements
+                                  target
+                                  (loop :with dict := '(("CZ" . :cz) ("CNOT" . :cz) ("ISWAP" . :iswap)
+                                                        ("CPHASE" . :cphase) ("PISWAP" . :piswap))
+                                        :for k :being :the hash-keys :of (compiler-output-gates record)
+                                        :when (assoc k dict :test #'string=)
+                                          :collect (cdr (assoc k dict :test #'string=))))))
+                          **compilers-available**))))
     (lambda (instr &key context)
       (declare (ignore context))
       (approximate-2Q-compiler instr
                                :chip-spec chip-spec
                                :crafters crafters))))
+
+(define-compiler canonical-decomposition
+    ((instr (_ _ q1 q0)))
+  (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
+         (m (magicl:scale (expt (magicl:det m) -1/4) m)))
+    (multiple-value-bind (a d b) (orthogonal-decomposition m)
+      (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
+        (sandwich-with-local-gates (list (build-gate "CAN" `(,alpha ,beta ,gamma) q1 q0))
+                                   a d b q1 q0)))))

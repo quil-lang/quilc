@@ -24,9 +24,9 @@
 
 (deftest test-optimal-2q-on-su2x2 ()
   "Tests that optimal 2Q compilation can handle a gate of the form SU(2) x SU(2)."
-  (let* ((m (magicl:multiply-complex-matrices
-             (cl-quil::su2-on-line 0 (quil::random-special-unitary 2))
-             (cl-quil::su2-on-line 1 (quil::random-special-unitary 2))))
+  (let* ((m (quil::make-matrix-from-quil
+             (list (quil::anon-gate "U0" (quil::random-special-unitary 2) 0)
+                   (quil::anon-gate "U1" (quil::random-special-unitary 2) 1))))
          (compiled-list (funcall (cl-quil::approximate-2q-compiler-for ':cz (build-8Q-chip))
                                  (build-anonymous-gate m 1 0)))
          (u (quil::make-matrix-from-quil compiled-list)))
