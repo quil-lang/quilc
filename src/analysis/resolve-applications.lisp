@@ -7,6 +7,8 @@
 (define-transform resolve-applications (resolve-applications)
   "A transform which converts a parsed program with unresolved applications to one where the applications have been resolved into gate or circuit applications.")
 
+(defvar *in-circuit-body* nil)
+
 ;;; TODO: Factor out this gate arity computation to something nicer.
 (defgeneric resolve-application (app &key gate-definitions circuit-definitions)
   (:method ((app unresolved-application) &key gate-definitions circuit-definitions)
@@ -34,10 +36,13 @@
            ;; Verify correct arguments
            (let ((args (application-arguments app)))
              ;; Check that all arguments are qubits
-             (assert-and-print-instruction (every #'qubit-p args)
-                                           ()
-                                           "All arguments must be qubits.")
-             (let* ((qubit-indices (map 'list #'qubit-index args))
+             (unless *in-circuit-body*
+               (assert-and-print-instruction (every #'qubit-p args)
+                                             ()
+                                             "All arguments must be qubits."))
+             (let* ((qubit-indices (if *in-circuit-body*
+                                       args
+                                       (map 'list #'qubit-index args)))
                     (num-qubits (length qubit-indices))
                     (distinct-indices (remove-duplicates qubit-indices))
                     (expected-qubits
@@ -87,7 +92,8 @@
                   seq)))
       (resolve-instruction-sequence (parsed-program-executable-code parsed-prog))
       (map nil (lambda (cd)
-                 (resolve-instruction-sequence
-                  (circuit-definition-body cd)))
+                 (let ((*in-circuit-body* t))
+                   (resolve-instruction-sequence
+                    (circuit-definition-body cd))))
            circ-defs)))
   parsed-prog)
