@@ -135,3 +135,9 @@ DEFGATE PSWAP(%theta):
     0, 0,           cis(%theta), 0
     0, cis(%theta), 0,           0
     0, 0,           0,           1
+
+DEFGATE PISWAP(%theta):
+    1, 0,               0,               0
+    0, cos(%theta/2),   i*sin(%theta/2), 0
+    0, i*sin(%theta/2), cos(%theta/2),   0
+    0, 0,               0,               1
