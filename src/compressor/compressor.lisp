@@ -401,7 +401,7 @@ other's."
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
   "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
-  (let* ((qubits-on-obj (qubits-in-instr-list instructions)))
+  (let ((qubits-on-obj (qubits-in-instr-list instructions)))
     (labels
         (;; produce a sequence of native instructions that have the effect of
          ;; carrying START-WF to FINAL-WF (= INSTRUCTIONS |START-WF>)
