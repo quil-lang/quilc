@@ -55,7 +55,7 @@
          (let* ((perm (coerce (quil::permutation-gate-permutation perm-gate) 'list))
                 (synth (synthesis-dbs perm))
                 (code (quil::parsed-program-executable-code
-                       (quil::parse-quil-string synth)))
+                       (quil::parse-quil synth)))
                 (relabler (lambda (q)
                             (setf (quil::qubit-index q)
                                   (quil::qubit-index (nth (quil::qubit-index q) qubits))))))
@@ -83,7 +83,7 @@
   (let ((lschedule (quil::make-lscheduler)))
     (loop :for instr
             :across (quil::parsed-program-executable-code
-                     (quil::compiler-hook (quil::parse-quil-string "CCNOT 3 2 1")
+                     (quil::compiler-hook (quil::parse-quil "CCNOT 3 2 1")
                                           (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
           :when (and (typep instr 'quil::gate-application)
                      (<= 2 (length (quil::application-arguments instr))))
@@ -93,7 +93,7 @@
     (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum) quil::*global-compilers*)
     (loop :for instr
             :across (quil::parsed-program-executable-code
-                     (quil::compiler-hook (quil::parse-quil-string "CCNOT 3 2 1")
+                     (quil::compiler-hook (quil::parse-quil "CCNOT 3 2 1")
                                           (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
           :when (and (typep instr 'quil::gate-application)
                      (<= 2 (length (quil::application-arguments instr))))

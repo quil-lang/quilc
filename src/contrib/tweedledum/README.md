@@ -14,7 +14,7 @@ being gate of three qubits -- can be decomposed some number of 1-qubit gates
 does quilc give optimal output when compiling `CCNOT 2 1 0`? Check it out:
 
 ```common-lisp
-(print-parsed-program (compiler-hook (parse-quil-string "CCNOT 2 1 0") (build-nq-fully-connected-chip 3 :architecture '(:CNOT))))
+(print-parsed-program (compiler-hook (parse-quil "CCNOT 2 1 0") (build-nq-fully-connected-chip 3 :architecture '(:CNOT))))
 ```
 ```
 RZ(pi/2) 1                              # Entering rewiring: #(0 1 2)
@@ -41,7 +41,7 @@ That is, this compilation is hard-coded (and hand-coded) into the compiler. If
 we disable that translator, then we get the less-than-optimal result:
 
 ```common-lisp
-(print-parsed-program (compiler-hook (parse-quil-string "CCNOT 2 1 0") (build-nq-fully-connected-chip 3 :architecture '(:CNOT))))
+(print-parsed-program (compiler-hook (parse-quil "CCNOT 2 1 0") (build-nq-fully-connected-chip 3 :architecture '(:CNOT))))
 ```
 ```
 RZ(-3*pi/4) 0                           # Entering rewiring: #(0 1 2)

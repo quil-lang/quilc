@@ -196,7 +196,7 @@ DEFGATE TEST AS MATRIX:
     0, exp(4*i)
 
 TEST 0")
-         (quil-parsed (not-signals quil-parse-error (parse-quil-string quil))))
+         (quil-parsed (not-signals quil-parse-error (parse-quil quil))))
     (let ((gates (parsed-program-gate-definitions quil-parsed)))
       (is (= 1 (length gates)))
       (is (typep (first gates) 'quil::static-gate-definition)))))
@@ -212,8 +212,8 @@ DEFGATE TEST AS PERMUTATION:
     0, 1, 2, 3, 4, 5, 7, 6, 8
 
 TEST 0 1 2"))
-    (let* ((quil-parsed (not-signals quil-parse-error (quil::parse-quil-string quil)))
+    (let* ((quil-parsed (not-signals quil-parse-error (quil::parse-quil quil)))
            (gates (parsed-program-gate-definitions quil-parsed)))
       (is (= 1 (length gates)))
       (is (typep (first gates) 'quil::permutation-gate-definition)))
-    (signals quil-parse-error (parse-quil-string quil-bad))))
+    (signals quil-parse-error (parse-quil quil-bad))))
