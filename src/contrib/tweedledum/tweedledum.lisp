@@ -76,27 +76,3 @@
   (cffi:load-foreign-library 'libtweedledum)
   (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
   (setf *tweedledum-libs-loaded* t))
-
-
-#+#:testcode
-(progn
-  (let ((lschedule (quil::make-lscheduler)))
-    (loop :for instr
-            :across (quil::parsed-program-executable-code
-                     (quil::compiler-hook (quil::parse-quil "CCNOT 3 2 1")
-                                          (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
-          :when (and (typep instr 'quil::gate-application)
-                     (<= 2 (length (quil::application-arguments instr))))
-            :do (quil::append-instruction-to-lschedule lschedule instr))
-    (quil::lscheduler-calculate-depth lschedule))
-  (let ((lschedule (quil::make-lscheduler)))
-    (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum) quil::*global-compilers*)
-    (loop :for instr
-            :across (quil::parsed-program-executable-code
-                     (quil::compiler-hook (quil::parse-quil "CCNOT 3 2 1")
-                                          (quil::build-nQ-trivalent-chip 1 1 8 4 '(:cz :iswap))))
-          :when (and (typep instr 'quil::gate-application)
-                     (<= 2 (length (quil::application-arguments instr))))
-            :do (quil::append-instruction-to-lschedule lschedule instr))
-    (pop quil::*global-compilers*)
-    (quil::lscheduler-calculate-depth lschedule)))
