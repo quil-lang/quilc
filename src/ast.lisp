@@ -209,7 +209,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 
 (defmethod gate-definition-qubits-needed ((gate matrix-gate-definition))
-  (1- (integer-length (isqrt (length (gate-definition-entries gate))))))
+  (ilog2 (isqrt (length (gate-definition-entries gate)))))
 
 (defclass static-gate-definition (matrix-gate-definition)
   ()
@@ -224,17 +224,20 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defclass permutation-gate-definition (gate-definition)
   ((permutation :initarg :permutation
                 :reader permutation-gate-definition-permutation))
-  (:documentation "A gate definition whose entries can be represented by a permutation matrix."))
+  (:documentation "A gate definition whose entries can be represented by a permutation of natural numbers."))
 
 (defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
-  (1- (integer-length (length (permutation-gate-definition-permutation gate)))))
+  (ilog2 (length (permutation-gate-definition-permutation gate))))
 
 (defun permutation-from-gate-entries-p (entries)
+  "Create the permutation (list of natural numbers) that represents
+the input matrix ENTRIES. Return nil if ENTRIES cannot be represented
+as a permutation."
   (let* ((n (isqrt (length entries)))
          (perm (make-list n)))
-    (loop :for i :below n :do
+    (dotimes (i n perm)
       (let ((found-one nil))
-        (loop :for j :below n :do
+        (dotimes (j n)
           (case (pop entries)
             ((0.0d0) nil)
             ((1.0d0) (cond
@@ -243,31 +246,26 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                        (t
                         (setf (nth j perm) i)
                         (setf found-one t))))
-            (otherwise (return-from permutation-from-gate-entries-p nil)))
-              :finally
-                 (unless found-one
-                   (return-from permutation-from-gate-entries-p nil))))
-          :finally (return perm))))
+            (otherwise (return-from permutation-from-gate-entries-p nil))))
+        (unless found-one
+          (return-from permutation-from-gate-entries-p nil))))))
 
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (assert (every #'symbolp parameters))
-  (cond
-    (parameters
-     (make-instance 'parameterized-gate-definition
+  (if parameters
+      (make-instance 'parameterized-gate-definition
                     :name name
                     :parameters parameters
-                    :entries entries))
-    ;; TODO It feels wrong calling this function twice.
-    ((permutation-from-gate-entries-p entries)
-     (make-instance 'permutation-gate-definition
-                    :name name
-                    :permutation (permutation-from-gate-entries-p entries)))
-    (t
-     (make-instance 'static-gate-definition
-                    :name name
-                    :entries entries))))
+                    :entries entries)
+      (alexandria:if-let ((perm (permutation-from-gate-entries-p entries)))
+        (make-instance 'permutation-gate-definition
+                       :name name
+                       :permutation perm)
+        (make-instance 'static-gate-definition
+                       :name name
+                       :entries entries))))
 
 (defclass circuit-definition ()
   ((name :initarg :name
@@ -1270,11 +1268,10 @@ For example,
                         (subseq (gate-definition-entries gate)
                                 (* i gate-size)
                                 (* (1+ i) gate-size)))))
-      (format stream "~%")))
+      (terpri stream)))
   (:method ((gate permutation-gate-definition) (stream stream))
-    (format stream "DEFGATE ~a AS PERMUTATION:~%"
-            (gate-definition-name gate))
-    (format stream "    ~{~a~^, ~}~%"
+    (format stream "DEFGATE ~a AS PERMUTATION:~%    ~{~D~^, ~}~%"
+            (gate-definition-name gate)
             (permutation-gate-definition-permutation gate))))
 
 (defmethod print-object ((object instruction) stream)

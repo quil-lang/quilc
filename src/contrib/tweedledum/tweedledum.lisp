@@ -22,7 +22,7 @@
   (t (:default "libtweedledum")))
 
 (defvar *tweedledum-libs-loaded* nil
-  "T if the tweedledum shared library has been loaded by CFFI")
+  "T if the tweedledum shared library has been loaded by CFFI.")
 
 (defcfun (%synthesis-dbs "tweedledum_synthesis_dbs")
     :string
@@ -36,9 +36,12 @@
             (setf (cffi:mem-aref perm :uint32 i) p_i))
     (%synthesis-dbs perm (length permutation))))
 
-;; TODO There is code smell here, and some changes will probably need to be made
-;; to quilc proper.
+;; TODO  ecpeterson a minute ago
+;;         As the overripe plum scent might indicate, some changes will probably need to be made
 (defun compile-perm-gate-with-tweedledum (instr)
+  "Compile the cl-quil instruction INSTR using tweedledum's permutation gate
+compilation routines. Conforms to the cl-quil compiler interface, and calls
+GIVE-UP-COMPILATION if INSTR is not a permutation gate."
   (unless (slot-boundp instr 'quil::name-resolution)
     (quil::give-up-compilation))
   (let ((res (quil::gate-application-resolution instr)))

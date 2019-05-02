@@ -2,16 +2,16 @@
 
 The Quil compiler (quilc), being a compiler of quantum programs, must be able to
 operate on the group of unitary matrices. In the general case, quilc produces
-efficient and optimized output that can be run on some QPU architecture. In some
-cases, however, quilc may produce non-optimal output.
+efficient and optimized output that can be run on some QPU architecture. Often
+times, however, quilc produces inefficient output.
 
 ## How quilc compiles the Toffoli gate
 
 Take for example the compilation of the [Toffoli gate](https://en.wikipedia.org/wiki/Toffoli_gate) (also known as the
-controlled-controlled-not gate). It is known that the Toffoli gate -- itself
-being gate of three qubits -- can be decomposed some number of 1-qubit gates
-(rotations, etc.) and a minimum of six 2-qubit gates (e.g. controlled-not). So
-does quilc give optimal output when compiling `CCNOT 2 1 0`? Check it out:
+`CCNOT`). It is known that the Toffoli gate --- itself being gate of three qubits
+--- can be decomposed some number of 1-qubit gates (rotations, etc.) and a
+minimum of six 2-qubit gates (e.g. controlled-not). So does quilc give optimal
+output when compiling `CCNOT 2 1 0`? Check it out:
 
 ```common-lisp
 (print-parsed-program (compiler-hook (parse-quil "CCNOT 2 1 0") (build-nq-fully-connected-chip 3 :architecture '(:CNOT))))
@@ -34,7 +34,7 @@ CNOT 1 2
 HALT                                    # Exiting rewiring: #(0 1 2)
 ```
 
-That's six 2-qubit gates. Optimal! Neat! But not quite -- there is a translation
+That's six 2-qubit gates. Optimal! Neat! But not quite --- there is a translation
 rule within the compiler that says: if the input instruction is of the form
 `CCNOT a b c` then immediately replace it by the known optimal decomposition.
 That is, this compilation is hard-coded (and hand-coded) into the compiler. If
@@ -73,22 +73,24 @@ and we ought to do it automatically, without relying on hard-coded translators.
 One of those cases in which quilc tends to produce non-optimal output is
 compilation of classical logic gates. A classical logic gate is one whose matrix
 representation has in any column or row one *and only one* `1` (that's an ugly
-mouthful), and the rest of the matrix is made up of zeros. For example, the
-Toffoli gate is a classical logic gate: it is defined by the matrix
+mouthful), and the rest of the matrix is made up of zeros. These are called
+permutation matrices, because they have the effect of re-ordering the vectors to
+which they're applied. For example, the Toffoli gate is a classical logic gate:
+it is defined by the matrix
 
 ```
-        / 1 0 0 0 0 0 0 0 \
-        | 0 1 0 0 0 0 0 0 |
-        | 0 0 1 0 0 0 0 0 |
-CCNOT = | 0 0 0 1 0 0 0 0 |
-        | 0 0 0 0 1 0 0 0 |
-        | 0 0 0 0 0 1 0 0 |
-        | 0 0 0 0 0 0 0 1 |
-        \ 0 0 0 0 0 0 1 0 /.
+         / 1 0 0 0 0 0 0 0 \
+         | 0 1 0 0 0 0 0 0 |
+         | 0 0 1 0 0 0 0 0 |
+CCNOT =: | 0 0 0 1 0 0 0 0 |
+         | 0 0 0 0 1 0 0 0 |
+         | 0 0 0 0 0 1 0 0 |
+         | 0 0 0 0 0 0 0 1 |
+         \ 0 0 0 0 0 0 1 0 /.
 ```
 
-quilc is designed with this larger goal in mind: as noted before, quilc will
-usually compile anything you can throw at it -- any *unitary* matrix, that is.
+Quilc is designed with this larger goal in mind: as noted before, quilc will
+usually compile anything you can throw at it --- any *unitary* matrix, that is.
 Tweedledum, on the other hand, is/was developed to specifically compile
 classical logic gates. This is good news because (1) classical logic
 synthesis/decomposition is a better understood problem, allowing its authors to

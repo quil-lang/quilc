@@ -184,5 +184,4 @@
   :depends-on (#:cl-quil-tests #:cl-quil/tweedledum)
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':cl-quil.tweedledum
-                                           '#:run-tweedledum-tests))
-  :serial t)
+                                           '#:run-tweedledum-tests)))
