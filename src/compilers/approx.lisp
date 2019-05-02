@@ -632,8 +632,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
               (reduce #'magicl:multiply-complex-matrices
                       (list
                        m
-                       (su2-on-line 0 (gate-matrix (lookup-standard-gate "RY") sigma))
-                       (gate-matrix (lookup-standard-gate "ISWAP"))))))))
+                       (su2-on-line 0 (gate-matrix (gate-definition-to-gate (lookup-standard-gate "RY")) sigma))
+                       (gate-matrix (gate-definition-to-gate (lookup-standard-gate "ISWAP")))))))))
     (multiple-value-bind (sigma mprime) (twist-to-real (build-canonical-gate coord))
       (multiple-value-bind (a d b) (orthogonal-decomposition mprime)
         (let* ((coordprime (get-canonical-coords-from-diagonal d)))

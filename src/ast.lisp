@@ -190,7 +190,12 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ((name :initarg :name
          :reader gate-definition-name)
    (entries :initarg :entries
-            :reader gate-definition-entries))
+            :reader gate-definition-entries)
+   ;; This is a private slot and is here to increase the performance
+   ;; of many repeated calculations of a GATE object. See the function
+   ;; GATE-DEFINITION-TO-GATE.
+   (cached-gate :initform nil
+                :accessor %gate-definition-cached-gate))
   (:metaclass abstract-class)
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 
@@ -905,10 +910,23 @@ Determining this requires the context of the surrounding program."))
 This definition does *not* incorporate the operator description (i.e., any operator modifiers like CONTROLLED).
 
 If this slot is not supplied, then the gate is considered *anonymous*. If this is the case, then the GATE slot must be supplied.")
+   ;; N.B. See the generic function GATE-APPLICATION-GATE as well.
    (gate :initarg :gate
-         :accessor gate-application-gate
-         :documentation "The actual gate object that is being applied. N.B. After applications are resolved, one can always look at the definition of a gate via GATE-APPLICATION-RESOLUTION. But this slot is reserved for actual *execution*, which may depend on the execution backend and how one wishes to optimize."))
+         :initform nil
+         :reader %get-gate-application-gate
+         :writer %set-gate-application-gate
+         :documentation "The actual gate object that is being applied. N.B. After applications are resolved, one can always look at the definition of a gate via GATE-APPLICATION-RESOLUTION. But this slot is reserved for actual *execution*, which may depend on the execution backend and how one wishes to optimize.
+
+N.B. This slot shoould not be accessed directly! Consider using GATE-APPLICATION-GATE, or, if you really know what you're doing, %SET-GATE-APPLICATION-GATE."))
   (:documentation "An instruction representing an application of a known gate."))
+
+(defgeneric gate-application-gate (app)
+  ;; See the actual definition of this in gates.lisp.
+  (:documentation "Return a gate-like object represented in the application APP.")
+  (:method :around ((app gate-application))
+    (alexandria:if-let ((gate (%get-gate-application-gate app)))
+      gate
+      (%set-gate-application-gate (call-next-method) app))))
 
 (defgeneric anonymous-gate-application-p (app)
   (:documentation "Is the gate application APP an anonymous application?")

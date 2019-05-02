@@ -26,11 +26,12 @@
               (formal (string-downcase (symbol-name arg))))
              (otherwise
               arg))))
-    (let ((gate (lookup-standard-gate operator)))
-      (assert (not (null gate)) (operator) "BUILD-GATE only takes standard gate names.")
+    (let ((gate-def (lookup-standard-gate operator)))
+      (assert (not (null gate-def)) (operator) "BUILD-GATE only takes standard gate names.")
       (make-instance 'gate-application
                      :operator (named-operator operator)
-                     :gate gate
+                     :name-resolution gate-def
+                     :gate (gate-definition-to-gate gate-def)
                      :parameters (mapcar #'capture-param params)
                      :arguments (mapcar #'capture-arg qubits)))))
 

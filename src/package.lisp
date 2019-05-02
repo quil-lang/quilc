@@ -304,6 +304,7 @@
    #:unresolved-application             ; CLASS
 
    #:gate-application                   ; CLASS
+   #:gate-application-gate              ; GENERIC, METHOD
 
    #:gate-definition                    ; CLASS
    #:static-gate-definition             ; CLASS
