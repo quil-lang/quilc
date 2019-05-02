@@ -145,7 +145,6 @@
       (unless (uiop:directory-exists-p tweedlelibdir)
         (error "tweedledum library directory missing. Did you run ~
                 `git submodule init && git submodule update --init`?"))
-      (uiop:run-program (list "g++" "--version") :output t)
       (let ((c++17 "clang++-7")
             (c++17-args (list "-std=c++17"
                               "-shared"
