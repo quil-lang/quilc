@@ -188,3 +188,32 @@ TEST(0.5) 0 1
                   (cl-quil::print-parsed-program
                    (cl-quil::parse-quil-into-raw-program before) s))))
     (is (string= before after))))
+
+(deftest test-defgate-as-matrix ()
+  (let* ((quil "
+DEFGATE TEST AS MATRIX:
+    exp(2*i), 0
+    0, exp(4*i)
+
+TEST 0")
+         (quil-parsed (not-signals quil-parse-error (parse-quil quil))))
+    (let ((gates (parsed-program-gate-definitions quil-parsed)))
+      (is (= 1 (length gates)))
+      (is (typep (first gates) 'quil::static-gate-definition)))))
+
+(deftest test-defgate-as-permutation ()
+  (let ((quil "
+DEFGATE TEST AS PERMUTATION:
+    0, 1, 2, 3, 4, 5, 7, 6
+
+TEST 0 1 2")
+        (quil-bad "
+DEFGATE TEST AS PERMUTATION:
+    0, 1, 2, 3, 4, 5, 7, 6, 8
+
+TEST 0 1 2"))
+    (let* ((quil-parsed (not-signals quil-parse-error (quil::parse-quil quil)))
+           (gates (parsed-program-gate-definitions quil-parsed)))
+      (is (= 1 (length gates)))
+      (is (typep (first gates) 'quil::permutation-gate-definition)))
+    (signals quil-parse-error (parse-quil quil-bad))))

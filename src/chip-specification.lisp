@@ -442,63 +442,72 @@ used to specify CHIP-SPEC."
     ;; return the qubit
     obj))
 
+(defun architecture-has-ucr-compiler-p (architecture)
+  (or (optimal-2q-target-meets-requirements architecture ':cz)
+      (optimal-2q-target-meets-requirements architecture ':iswap)
+      (find ':cnot (alexandria:ensure-list architecture))))
 
 ;;; routines for populating the fields of a CHIP-SPECIFICATION object (and
 ;;; maintaining the appropriate interrelations).
+(defvar *global-compilers*
+  (list (lambda (chip-spec arch)
+          (declare (ignore arch))
+          (alexandria:curry #'swap-to-native-swaps chip-spec))
+        (lambda (chip-spec arch)
+          (when (optimal-2q-target-meets-requirements arch ':cz)
+            (alexandria:curry #'cnot-to-native-cnots chip-spec)))
+        (lambda (chip-spec arch)
+          (when (optimal-2q-target-meets-requirements arch ':cz)
+            (alexandria:curry #'cz-to-native-czs chip-spec)))
+        (lambda (chip-spec arch)
+          (when (optimal-2q-target-meets-requirements arch ':iswap)
+            (alexandria:curry #'ISWAP-to-native-ISWAPs chip-spec)))
+        (lambda (chip-spec arch)
+          (when (optimal-2q-target-meets-requirements arch ':cphase)
+            (alexandria:curry #'CPHASE-to-native-CPHASEs chip-spec)))
+        (lambda (chip-spec arch)
+          (when (optimal-2q-target-meets-requirements arch ':piswap)
+            (alexandria:curry #'PISWAP-to-native-PISWAPs chip-spec)))
+        (lambda (chip-spec arch)
+          (when (find ':cnot (alexandria:ensure-list arch))
+            (alexandria:curry #'CNOT-to-native-CNOTs chip-spec)))
+        ;; We make this unconditional. We could later conditionalize it if
+        ;; we happen to have better CCNOT translations for specific target
+        ;; gate sets.
+        (constantly #'ccnot-to-cnot)
+        (constantly #'phase-to-rz)
+        (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
+          (when (optimal-2q-target-meets-requirements arch ':cz)
+            #'ucr-compiler))
+        (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
+          (when (optimal-2q-target-meets-requirements arch ':iswap)
+            (lambda (instr) (ucr-compiler instr :target ':iswap))))
+        (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
+          (when (find ':cnot (alexandria:ensure-list arch))
+            (lambda (instr) (ucr-compiler instr :target ':cnot))))
+        (constantly #'state-prep-compiler)
+        (constantly #'recognize-ucr)
+        (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
+          (when (typep arch 'optimal-2q-target)
+            (lambda (instr)
+              (optimal-2q-compiler instr :target arch))))
+        (constantly #'qs-compiler))
+  "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
+
+Compilers are listed in descending precedence.")
 
 (defun install-generic-compilers (chip-spec architecture)
+  (assert (architecture-has-ucr-compiler-p architecture))
+
   (let ((ret (make-adjustable-vector)))
-    (vector-push-extend (lambda (instr)
-                          (SWAP-to-native-SWAPs chip-spec instr))
-                        ret)
-    (when (optimal-2q-target-meets-requirements architecture ':cz)
-      (vector-push-extend (lambda (instr)
-                            (CNOT-to-native-CNOTs chip-spec instr))
-                          ret)
-      (vector-push-extend (lambda (instr)
-                            (CZ-to-native-CZs chip-spec instr))
-                          ret))
-    (when (optimal-2q-target-meets-requirements architecture ':iswap)
-      (vector-push-extend (lambda (instr)
-                            (ISWAP-to-native-ISWAPs chip-spec instr))
-                          ret))
-    (when (optimal-2q-target-meets-requirements architecture ':cphase)
-      (vector-push-extend (lambda (instr)
-                            (CPHASE-to-native-CPHASEs chip-spec instr))
-                          ret))
-    (when (optimal-2q-target-meets-requirements architecture ':piswap)
-      (vector-push-extend (lambda (instr)
-                            (PISWAP-to-native-PISWAPs chip-spec instr))
-                          ret))
-    (when (find ':cnot (alexandria:ensure-list architecture))
-      (vector-push-extend (lambda (instr)
-                            (CNOT-to-native-CNOTs chip-spec instr))
-                          ret))
-    ;; We make this unconditional. We could later conditionalize it if
-    ;; we happen to have better CCNOT translations for specific target
-    ;; gate sets.
-    (vector-push-extend #'CCNOT-to-CNOT ret)
-    (vector-push-extend #'PHASE-to-RZ ret)
-    (cond
-      ((optimal-2q-target-meets-requirements architecture ':cz)
-       (vector-push-extend #'ucr-compiler ret))
-      ((optimal-2q-target-meets-requirements architecture ':iswap)
-       (vector-push-extend (lambda (instr)
-                             (ucr-compiler instr :target ':iswap))
-                           ret))
-      ((find ':cnot (alexandria:ensure-list architecture))
-       (vector-push-extend (lambda (instr)
-                             (ucr-compiler instr :target ':cnot))
-                           ret))
-      (t
-       (error "Can't find a general UCR compiler for this target type.")))
-    (vector-push-extend #'state-prep-compiler ret)
-    (vector-push-extend #'recognize-ucr ret)
-    (when (typep architecture 'optimal-2q-target)
-      (vector-push-extend (approximate-2q-compiler-for architecture chip-spec)
-                          ret))
-    (vector-push-extend #'qs-compiler ret)
-    (setf (chip-specification-generic-compilers chip-spec) ret)))
+    (setf (chip-specification-generic-compilers chip-spec) ret)
+    (dolist (get-compiler *global-compilers*)
+      (alexandria:when-let ((compiler (funcall get-compiler chip-spec architecture)))
+        (vector-push-extend compiler ret)))))
 
 
 (defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz)))
@@ -545,7 +554,7 @@ used to specify CHIP-SPEC."
 ;; 7               2
 ;; |               |
 ;; |               |
-;; 
+;;
 ;; 7               3
 ;;
 ;; |               |
@@ -673,7 +682,7 @@ used to specify CHIP-SPEC."
         ;;      *-*  2
         ;;      | |
         ;;      *-*  3,
-        ;;     /   \  
+        ;;     /   \
         ;;
         ;; which is shaded when the two indices share a 2^1-bit. these are
         ;; the locations that need a new qubit to get generated.

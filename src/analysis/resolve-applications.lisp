@@ -47,9 +47,7 @@
                     (distinct-args (remove-duplicates args :test 'equalp))
                     (expected-qubits
                       (+ addl-qubits
-                         (ilog2
-                          (isqrt
-                           (length (gate-definition-entries found-gate-defn)))))))
+                         (gate-definition-qubits-needed found-gate-defn))))
                ;; Check that all arguments are distinct
                (assert-and-print-instruction (= (length args) (length distinct-args))
                                              ()
@@ -57,7 +55,7 @@
                ;; Check that number of arguments matches gate matrix dimension
                (assert-and-print-instruction (= expected-qubits num-qubits)
                                              ()
-                                             "Expected ~D qubit~:P, but ~D were provided."
+                                             "Expected ~D qubit~:P, but ~D ~:*~[were~;was~:;were~] provided."
                                              expected-qubits num-qubits)))
            ;; Verification finished. Transform the application.
            (change-class app 'gate-application :name-resolution found-gate-defn))

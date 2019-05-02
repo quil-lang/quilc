@@ -4,6 +4,7 @@ include:
 
 variables:
   IMAGE: rigetti/quilc
+  GIT_SUBMODULE_STRATEGY: recursive
 
 test-cl-quil:
   stage: test

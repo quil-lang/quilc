@@ -482,7 +482,7 @@
 
 
    ;; swap-representation.lisp
-   #:canonical-swap-representative           ; FUNCTION
+   #:canonical-swap-representative      ; FUNCTION
 
    ;; benchmarking-procedures.lisp
    #:apply-clifford-string              ; FUNCTION

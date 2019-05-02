@@ -12,7 +12,7 @@
     :NEG :NOT :AND :IOR :XOR :MOVE :EXCHANGE :CONVERT :ADD :SUB :MUL :DIV
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :DECLARE :SHARING :OFFSET
-    :PRAGMA))
+    :PRAGMA :AS :MATRIX :PERMUTATION))
 
 (deftype token-type ()
   '(or
@@ -99,7 +99,7 @@
    (return (tok ':DAGGER)))
   ((eager #.(string #\HELM_SYMBOL))
    (return (tok ':CONTROLLED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|AS|MATRIX|PERMUTATION"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -826,7 +826,9 @@ INPUT-STRING that triggered the condition."
     (quil-parse-error "EOF reached when gate definition expected"))
 
   ;; Get the parameter and body lines
-  (let (name params)
+  (let (name
+        params
+        (gate-type ':MATRIX))
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFGATE.
@@ -853,7 +855,9 @@ INPUT-STRING that triggered the condition."
 
           ;; Parse out until the right paren.
           (multiple-value-bind (found-params rest-line)
-              (take-until (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
+              (take-until (lambda (x)
+                            (pop params-args)
+                            (eql ':RIGHT-PAREN (token-type x)))
                           params-args)
             ;; ... or error if it doesn't exist.
             (when (null rest-line)
@@ -873,52 +877,75 @@ INPUT-STRING that triggered the condition."
             ;; are, and parsing them out.
             (setf params (loop :for p :in (remove ':comma found-params :key #'token-type)
                                :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list: ~A" p)
-                               :collect (parse-parameter p)))
+                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list. ~A" p)
+                               :collect (parse-parameter p)))))
 
-            ;; Ensure the colon (and nothing else) is there.
-            (unless (and (= 1 (length rest-line))
-                         (eql ':COLON (token-type (first rest-line))))
-              (quil-parse-error "Expected a colon in DEFGATE line")))))
+        (when (eql ':AS (token-type (first params-args)))
+          (pop params-args)
+          (let* ((parsed-gate-tok (first params-args))
+                 (parsed-gate-type (token-type parsed-gate-tok)))
+            (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
+              (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
+            (setf gate-type parsed-gate-type))))
 
-      ;; Parse out the gate entries.
-      (let ((*arithmetic-parameters* nil)
-            (*segment-encountered* nil))
-        (multiple-value-bind (parsed-entries rest-lines)
-            (parse-gate-entries body-lines)
-          ;; Check that we only refered to parameters in our param list.
-          (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
-                :unless (find (param-name body-p) params :key #'param-name
-                                                         :test #'string=)
-                  :do (quil-parse-error
-                       "The parameter ~A was found in the body of the gate definition of ~
+      (ecase gate-type
+        (:MATRIX
+         (parse-gate-entries-as-matrix body-lines params name))
+        (:PERMUTATION
+         (when params
+           (quil-parse-error "Permutation gate definitions do not support parameters."))
+         (parse-gate-entries-as-permutation body-lines name))))))
+
+(defun parse-gate-entries-as-permutation (body-lines name)
+  (multiple-value-bind (parsed-entries rest-lines)
+      (parse-permutation-gate-entries body-lines)
+    (unless (validate-gate-permutation-size-p (length parsed-entries))
+      (quil-parse-error "Permutation gate entries do not represent a square matrix."))
+    (values (make-instance 'permutation-gate-definition
+                           :name name
+                           :permutation parsed-entries)
+            rest-lines)))
+
+(defun validate-gate-permutation-size-p (size)
+  (power-of-two-p size))
+
+(defun parse-gate-entries-as-matrix (body-lines params name)
+  ;; Parse out the gate entries.
+  (let ((*arithmetic-parameters* nil)
+        (*segment-encountered* nil))
+    (multiple-value-bind (parsed-entries rest-lines)
+        (parse-gate-entries body-lines)
+      ;; Check that we only refered to parameters in our param list.
+      (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
+            :unless (find (param-name body-p) params :key #'param-name
+                                                     :test #'string=)
+              :do (quil-parse-error
+                   "The parameter ~A was found in the body of the gate definition of ~
                         ~A but wasn't in the declared parameter list."
-                       (param-name body-p)
-                       name))
+                   (param-name body-p)
+                   name))
 
-          ;; Validate the number of gate entries.
-          (validate-gate-matrix-size name (length parsed-entries))
+      ;; Validate the number of gate entries.
+      (validate-gate-matrix-size name (length parsed-entries))
 
-          (let ((param-symbols
-                  ;; Make sure we have symbols for everything. Collect
-                  ;; a list of them in the same order as PARAMS.
-                  (loop :for p :in params
-                        :for found-p := (assoc (param-name p) *arithmetic-parameters*
-                                               :key #'param-name
-                                               :test #'string=)
-                        :if (null found-p)
-                          :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
-                        :else
-                          :collect (second found-p))))
-
-            ;; Return the gate definition.
-            (values (make-gate-definition name param-symbols parsed-entries)
-                    rest-lines)))))))
+      (let ((param-symbols
+              ;; Make sure we have symbols for everything. Collect
+              ;; a list of them in the same order as PARAMS.
+              (loop :for p :in params
+                    :for found-p := (assoc (param-name p) *arithmetic-parameters*
+                                           :key #'param-name
+                                           :test #'string=)
+                    :if (null found-p)
+                      :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
+                    :else
+                      :collect (second found-p))))
+        ;; Return the gate definition.
+        (values (make-gate-definition name param-symbols parsed-entries)
+                rest-lines)))))
 
 (defun parse-arithmetic-entries (entries)
   "Given a list of entries, each of which is a list of tokens, return the entries evaluated, unless there are formal parameters. Return the simplified entries.
 "
-
   (labels ((simplify (entry)
              (parse-arithmetic-tokens entry :eval t)))
     (let ((simple-entries (mapcar #'simplify entries)))
@@ -970,6 +997,36 @@ INPUT-STRING that triggered the condition."
              (parse-gate-line tok-lines)
            (setf gate-entries (append gate-entries parsed))
            (setf tok-lines rest-lines)))))))
+
+(defun parse-permutation-gate-entries (tok-lines)
+  ;; Do we have any lines to parse?
+  (when (null tok-lines)
+    (quil-parse-error "End of program each when indented gate entries was expected."))
+
+  ;; Check for indentation.
+  (multiple-value-bind (indented? modified-line)
+      (indented-line (pop tok-lines))
+    ;; Is the first line indented?
+    (unless indented?
+      (quil-parse-error "Expected indented gate entries but alas, they weren't found."))
+
+    (multiple-value-bind (dedented? dedented-line)
+        (dedented-line-p (pop tok-lines))
+      ;; AS PERMUTATION expects a single line, followed by a dedented line or no
+      ;; lines
+      (when (and (not dedented?) dedented-line)
+        (quil-parse-error "Expected dedented line following permutation gate entries."))
+      (let* ((entries (remove-if (lambda (tok) (eql ':COMMA (token-type tok)))
+                                 modified-line)))
+        (unless (every (lambda (tok) (eql ':INTEGER (token-type tok)))
+                       entries)
+          (quil-parse-error "Expected integers"))
+        ;; Be careful to continue parsing only when a (by definition) dedented
+        ;; line follows
+        (values (mapcar #'token-payload entries)
+                (if dedented?
+                    (cons dedented-line tok-lines)
+                    nil))))))
 
 (defun split-by (f list)
   (labels ((rec (list parts)

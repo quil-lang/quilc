@@ -287,6 +287,15 @@
                    :dimension dim
                    :matrix (make-row-major-matrix dim dim entries))))
 
+(defmethod gate-definition-to-gate ((gate-def permutation-gate-definition))
+  (let* ((name (gate-definition-name gate-def))
+         (entries (permutation-gate-definition-permutation gate-def))
+         (dim (length entries)))
+    (make-instance 'permutation-gate
+                   :name name
+                   :dimension dim
+                   :permutation entries)))
+
 (defmethod gate-definition-to-gate ((gate-def parameterized-gate-definition))
   (flet ((lambda-form (params dimension entries)
            `(lambda ,params
