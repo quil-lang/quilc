@@ -36,24 +36,24 @@
            ;; Verify correct arguments
            (let ((args (application-arguments app)))
              ;; Check that all arguments are qubits
-             (unless *in-circuit-body*
-               (assert-and-print-instruction (every #'qubit-p args)
-                                             ()
-                                             "All arguments must be qubits."))
-             (let* ((qubit-indices (if *in-circuit-body*
-                                       args
-                                       (map 'list #'qubit-index args)))
-                    (num-qubits (length qubit-indices))
-                    (distinct-indices (remove-duplicates qubit-indices))
+             (assert-and-print-instruction (every (alexandria:disjoin #'qubit-p
+                                                                      (if *in-circuit-body*
+                                                                          #'is-formal
+                                                                          (constantly nil)))
+                                                  args)
+                                           ()
+                                           "All arguments must be qubits. Check type of args: ~S." args)
+             (let* ((num-qubits (length args))
+                    (distinct-args (remove-duplicates args :test 'equalp))
                     (expected-qubits
                       (+ addl-qubits
                          (ilog2
                           (isqrt
                            (length (gate-definition-entries found-gate-defn)))))))
                ;; Check that all arguments are distinct
-               (assert-and-print-instruction (= (length qubit-indices) (length distinct-indices))
+               (assert-and-print-instruction (= (length args) (length distinct-args))
                                              ()
-                                             "All arguments must have distinct indices. Check indices for duplicates.")
+                                             "All arguments must have distinct arguments. Check arguments for duplicates.")
                ;; Check that number of arguments matches gate matrix dimension
                (assert-and-print-instruction (= expected-qubits num-qubits)
                                              ()
