@@ -51,7 +51,7 @@ ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
 	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
 	curl $(ZMQ_REPO)/Release.key | apt-key add -
-	apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev
+	apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev gcc-7 g++-7
 else
 	echo "Centos-based platforms unsupported"
 endif
