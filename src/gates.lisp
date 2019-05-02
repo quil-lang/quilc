@@ -272,7 +272,11 @@
 ;;; analysis on the gate.
 
 (defgeneric gate-definition-to-gate (gate-def)
-  (:documentation "Convert a parsed Quil gate definition to a usable, executable gate."))
+  (:documentation "Convert a parsed Quil gate definition to a usable, executable gate.")
+  (:method :around ((gate-def gate-definition))
+    (alexandria:if-let ((gate (%gate-definition-cached-gate gate-def)))
+      gate
+      (setf (%gate-definition-cached-gate gate-def) (call-next-method)))))
 
 (defmethod gate-definition-to-gate ((gate-def static-gate-definition))
   (let* ((name (gate-definition-name gate-def))

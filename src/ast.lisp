@@ -190,7 +190,12 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ((name :initarg :name
          :reader gate-definition-name)
    (entries :initarg :entries
-            :reader gate-definition-entries))
+            :reader gate-definition-entries)
+   ;; This is a private slot and is here to increase the performance
+   ;; of many repeated calculations of a GATE object. See the function
+   ;; GATE-DEFINITION-TO-GATE.
+   (cached-gate :initform nil
+                :accessor %gate-definition-cached-gate))
   (:metaclass abstract-class)
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 

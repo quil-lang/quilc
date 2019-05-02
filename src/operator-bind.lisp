@@ -31,6 +31,7 @@
       (make-instance 'gate-application
                      :operator (named-operator operator)
                      :name-resolution gate-def
+                     :gate (gate-definition-to-gate gate-def)
                      :parameters (mapcar #'capture-param params)
                      :arguments (mapcar #'capture-arg qubits)))))
 
