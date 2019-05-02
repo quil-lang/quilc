@@ -39,8 +39,6 @@
            (values (gethash name system-table))))
     (load-systems-table)
     (push #'local-system-search asdf:*system-definition-search-functions*)
-    #-win32
-    (asdf:load-system :cl-quil/tweedledum)
     (asdf:load-system "quilc")
     ;; TODO Something is broken here. If zap-info is left to do it's thing on
     ;; Windows, there is a weird error. This is a short-term fix.
