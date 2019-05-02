@@ -53,7 +53,7 @@
                ;; Check that all arguments are distinct
                (assert-and-print-instruction (= (length args) (length distinct-args))
                                              ()
-                                             "All arguments must have distinct arguments. Check arguments for duplicates.")
+                                             "All arguments must be distinct. Check arguments for duplicates.")
                ;; Check that number of arguments matches gate matrix dimension
                (assert-and-print-instruction (= expected-qubits num-qubits)
                                              ()
