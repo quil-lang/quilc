@@ -38,6 +38,7 @@
   :components ((:file "package")
                (:file "options")
                (:file "utilities")
+               (:file "relabeling")
                (:file "matrix-operations")
                (:file "transformable-mixin")
                (:file "classical-memory")

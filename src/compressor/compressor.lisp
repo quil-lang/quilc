@@ -224,7 +224,7 @@ other's."
                                            (peephole-rewriter-node-prev node))
                                           (peephole-rewriter-node-instr node)
                                           :destructive? nil)))
-       
+
        ;; having selected an appropriate sequence of instructions, actually
        ;; apply the available rewriting rules. if we find one that applies,
        ;; splices the results in to replace the nodes and return the location
@@ -262,7 +262,7 @@ other's."
                        (mapc #'delete-node relevant-nodes-for-inspection)
                        (return-from apply-rules new-node))))
                (compiler-does-not-apply () nil)))))
-       
+
        ;; main loop for the peephole rewriter. for any particular node, it
        ;; assembles a list of instructions which might be subject to rewriting
        ;; rules, then passes those to APPLY-RULES. if APPLY-RULES returns
@@ -272,9 +272,9 @@ other's."
          ;; for each instruction...
          (setf node (peephole-rewriter-node-next node))
          (unless node (return-from outer-instruction-loop))
-         
+
          (update-context node)
-         
+
          ;; build the noncommuting instruction list
          (let* ((nodes-for-inspection (find-noncommuting-instructions node))
                 (qubit-complex nil)
@@ -313,19 +313,19 @@ other's."
                        (return-from outer-instruction-loop
                          (outer-instruction-loop node-to-jump-to)))))))))
          (outer-instruction-loop node)))
-    
+
     ;; strip out all the NOPs.
     (let* ((instructions (remove-if (lambda (x) (typep x 'no-operation)) instructions))
            (head (instrs->peephole-rewriter-nodes instructions))
            (node head))
-      
+
       ;; actually, we need to prepend a dummy head
       (setf head (make-peephole-rewriter-node :instr (build-gate "Z" () 0)
                                               :next head
                                               :context context))
       (setf (peephole-rewriter-node-prev (peephole-rewriter-node-next head)) head)
       (setf node head)
-    
+
       (outer-instruction-loop head)
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
@@ -373,13 +373,11 @@ other's."
                        (notany (lambda (instr) (typep instr 'state-prep-application))
                                instrs))
               (let* ((reassignment
-                      ;; the actual reassignment we use is unimportant. this is
-                      ;; more along the lines of COMPRESS-QUBITs, so that our
-                      ;; matrices don't take up quite so much space.
-                      (loop :for i :in (union (qubits-in-instr-list instrs)
-                                              (qubits-in-instr-list translation-results))
-                            :for j :from 0
-                            :collect (cons i j)))
+                       ;; the actual reassignment we use is unimportant. this is
+                       ;; more along the lines of COMPRESS-QUBITs, so that our
+                       ;; matrices don't take up quite so much space.
+                       (standard-qubit-relabeler (union (qubits-in-instr-list instrs)
+                                                        (qubits-in-instr-list translation-results))))
                      (ref-mat (make-matrix-from-quil (list (first instrs))
                                                      :relabeling reassignment))
                      (mat (make-matrix-from-quil translation-results
@@ -414,19 +412,20 @@ other's."
                                  :target-wf final-wf
                                  :arguments (nreverse (mapcar #'qubit qc))))
             chip-specification))
-         
+
          ;; produce a sequence of native instructions that have the same effect
          ;; as the matrix representation of INSTRUCTIONS
          (decompile-instructions-into-full-unitary ()
-           (alexandria:when-let ((matrix (make-gate-matrix-from-gate-string (mapcar #'qubit qubits-on-obj)
-                                                                            instructions)))
+           (alexandria:when-let ((matrix (make-matrix-from-quil
+                                          instructions
+                                          :relabeling (standard-qubit-relabeler qubits-on-obj))))
              (expand-to-native-instructions
               (list (make-instance 'gate-application
                                    :operator #.(named-operator "WHOLEPROGRAM")
                                    :arguments (mapcar #'qubit qubits-on-obj)
                                    :gate matrix))
               chip-specification))))
-      
+
       (destructuring-bind (start-wf wf-qc)
           (if (compressor-context-aqvm context)
               (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
@@ -459,7 +458,7 @@ other's."
   "Checks that INSTRUCTIONS, DECOMPILED-INSTRUCTIONS, REDUCED-INSTRUCTIONS, and REDUCED-DECOMPILED-INSTRUCTIONS are sufficiently faithful models of one another (whose precise meaning depends upon CONTEXT)."
   (unless *compress-carefully*
     (return-from check-contextual-compression-was-well-behaved t))
-  
+
   ;; REM: we use DECOMPILED-INSTRUCTIONS here rather than INSTRUCTIONS to read
   ;;      off the qubit complex because a state-preparation circuit might
   ;;      involve a strictly larger qubit complex than the one associated to
@@ -472,14 +471,13 @@ other's."
                    ;; the actual reassignment we use is unimportant. this is
                    ;; more along the lines of COMPRESS-QUBITs, so that our
                    ;; matrices don't take up quite so much space.
-                   (loop :for i :in (reduce #'union
-                                            (list instructions
-                                                  reduced-instructions
-                                                  decompiled-instructions
-                                                  reduced-decompiled-instructions)
-                                            :key #'qubits-in-instr-list)
-                         :for j :from 0
-                         :collect (cons i j)))
+                    (standard-qubit-relabeler
+                     (reduce #'union
+                             (list instructions
+                                   reduced-instructions
+                                   decompiled-instructions
+                                   reduced-decompiled-instructions)
+                             :key #'qubits-in-instr-list)))
                   (stretched-matrix (or (make-matrix-from-quil instructions :relabeling relabeling)
                                         (return-from check-quil-agrees-as-matrices nil)))
                   (decompiled-matrix
@@ -503,7 +501,7 @@ other's."
                (assert (matrix-equality stretched-matrix
                                         (scale-out-matrix-phases reduced-decompiled-matrix
                                                                  stretched-matrix))))))
-         
+
          (check-quil-agrees-as-states (start-wf final-wf wf-qc)
            (let* ((final-wf-reduced-instrs (nondestructively-apply-instrs-to-wf
                                             reduced-instructions
@@ -532,7 +530,7 @@ other's."
                      "During careful checking of instruction compression, the produced ~
                    wavefunction by state prep reduction was detected to not be ~
                    collinear with the target wavefunction.")))
-         
+
          (check-quil-is-near-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
              (let* ((n (ilog2 (magicl:matrix-rows stretched-matrix)))
@@ -563,7 +561,7 @@ other's."
                             the recomputed instruction sequence has an ~
                             unreasonably large a fidelity drop from the original ~
                             sequence.")))))))
-      
+
       (destructuring-bind (start-wf wf-qc)
           (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
         (when (and (not (eql ':not-simulated start-wf))

@@ -569,8 +569,8 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
                   m)))
       (magicl:multiply-complex-matrices mat m))))
 
-(defun make-matrix-from-quil (instruction-list &key relabeling)
-  "If possible, create a matrix out of the instructions INSTRUCTION-LIST, within the context of the environment ENVIRONS. If one can't be created, then return NIL.
+(defun make-matrix-from-quil (instruction-list &key (relabeling #'identity))
+  "If possible, create a matrix out of the instructions INSTRUCTION-LIST using the optional function RELABELING that maps an input qubit index to an output qubit index. If one can't be created, then return NIL.
 
 Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
 
@@ -596,14 +596,9 @@ as matrices."
         (let ((new-instr (copy-instance instr)))
           (setf (application-arguments new-instr)
                 (mapcar (lambda (a)
-                          (cond
-                            ((typep a 'formal)
-                             (qubit (parse-integer (formal-name a) :start 1)))
-                            ((and (typep a 'qubit)
-                                  (assoc (qubit-index a) relabeling))
-                             (qubit (cdr (assoc (qubit-index a) relabeling))))
-                            (t
-                             a)))
+                          (if (typep a 'formal)
+                              (qubit (parse-integer (formal-name a) :start 1))
+                              (funcall relabeling a)))
                         (application-arguments new-instr)))
           (setf u (apply-gate u new-instr)))))))
 
@@ -628,20 +623,6 @@ as matrices."
                                      (ash 1 (- (length lines) 1 s))
                                      0)))))))
     out-mat))
-
-(defun make-gate-matrix-from-gate-string (qubit-list gate-string)
-  "Produces a gate matrix from the product of the gate matrices for the gates in GATE-STRING, where each has its qubits remapped onto the positions in QUBIT-LIST.  (This is a kind of inverse to KQ-GATE-ON-LINES.)"
-  (make-matrix-from-quil
-   (loop :for i :in gate-string
-         :for j := (copy-instance i)
-         :do (setf (application-arguments j)
-                   (mapcar (lambda (q)
-                             (qubit (- (length qubit-list)
-                                       1
-                                       (position (qubit-index q) qubit-list
-                                                 :key #'qubit-index))))
-                           (application-arguments j)))
-         :collect j)))
 
 (defun su2-on-line (line m)
   "Treats m in SU(2) as either m (x) Id or Id (x) m."
