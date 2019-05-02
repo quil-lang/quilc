@@ -570,7 +570,7 @@ Note that this is a controlled version of a R_z gate multiplied by a phase."
       (magicl:multiply-complex-matrices mat m))))
 
 (defun make-matrix-from-quil (instruction-list &key (relabeling #'identity))
-  "If possible, create a matrix out of the instructions INSTRUCTION-LIST using the optional function RELABELLING that maps an input qubit index to an output qubit index. If one can't be created, then return NIL.
+  "If possible, create a matrix out of the instructions INSTRUCTION-LIST using the optional function RELABELING that maps an input qubit index to an output qubit index. If one can't be created, then return NIL.
 
 Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
 
