@@ -631,14 +631,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
    (build-gate "RZ"     (list (- (aref array 2))) q1)
    (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
 
-<<<<<<< HEAD
-(define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
-    (:requirements (:cz)
-     :predicate (double= 0d0 (third coord)))
-=======
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-2
-    ((instr ("CAN" (alpha beta _) q1 q0)))    
->>>>>>> approximate compilation rework checkpoint
+    ((instr ("CAN" (alpha beta 0d0) q1 q0)))    
   (list (build-gate "CZ" () q1 q0)
         (build-gate "RY" (list alpha) q1)
         (build-gate "RY" (list beta) q0)
@@ -661,28 +655,6 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 ;;; here lies the logic underlying the approximate compilation routine.
 
-<<<<<<< HEAD
-(defun sandwich-with-local-gates (center-circuit a d b q1 q0)
-  "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
-
-Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, and B are matrices; and Q1, Q0 are qubit indices."
-  (multiple-value-bind (ua ub fidelity)
-      (match-matrix-to-an-e-basis-diagonalization
-       (make-matrix-from-quil center-circuit :relabeling (standard-qubit-relabeler `(,q1 ,q0)))
-       a d b)
-
-    (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
-      (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
-        (values
-         (append (list (anon-gate "B0" b0 q0)
-                       (anon-gate "B1" b1 q1))
-                 center-circuit
-                 (list (anon-gate "A0" a0 q0)
-                       (anon-gate "A1" a1 q1)))
-         fidelity)))))
-
-=======
->>>>>>> approximate compilation rework checkpoint
 (defun approximate-2Q-compiler (instr &key (chip-spec nil) (crafters nil))
   "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through.
 
@@ -694,44 +666,6 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
     (give-up-compilation))
 
   ;; extract matrix, canonical decomposition
-<<<<<<< HEAD
-  (let* ((q1 (qubit-index (first (application-arguments instr))))
-         (q0 (qubit-index (second (application-arguments instr))))
-         (m (or (gate-matrix instr) (error 'compiler-invalid-domain)))
-         (m (magicl:scale (expt (magicl:det m) -1/4) m)))
-    (multiple-value-bind (a d b) (orthogonal-decomposition m)
-      ;; now we manufacture a bunch of candidate circuits
-      (let* ((candidate-pairs nil)
-             (coord (get-canonical-coords-from-diagonal d)))
-        (dolist (circuit-crafter crafters)
-          (unless (and (first candidate-pairs)
-                       (double= 1d0 (car (first candidate-pairs))))
-            (format *compiler-noise-stream*
-                    "APPROXIMATE-2Q-COMPILER: Trying ~a on ~/cl-quil:instruction-fmt/.~%"
-                    circuit-crafter
-                    instr)
-            (handler-case
-                (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
-                                                                            (application-arguments instr))))
-                       (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
-                       (circuit-cost (or (and chip-spec (lscheduler-calculate-fidelity ls chip-spec))
-                                         1d0)))
-                  (multiple-value-bind (sandwiched-circuit fidelity)
-                      (sandwich-with-local-gates center-circuit a d b q1 q0)
-                    (push (cons (* circuit-cost fidelity) sandwiched-circuit)
-                          candidate-pairs)))
-              (compiler-does-not-apply () nil))))
-        ;; now vomit the results
-        (cond
-          ((endp candidate-pairs)
-           (give-up-compilation))
-          (t
-           (destructuring-bind (fidelity . circuit) (a:extremum candidate-pairs #'> :key #'car)
-             (unless (or *enable-approximate-compilation*
-                         (double= 1d0 fidelity))
-               (give-up-compilation))
-             (values circuit fidelity))))))))
-=======
   (destructuring-bind (left1 left2 can right1 right2) (canonical-decomposition instr)
     (let ((q1 (qubit-index (first (application-arguments instr))))
           (q0 (qubit-index (second (application-arguments instr))))
@@ -754,10 +688,13 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                                  center-circuit
                                                  (list right1 right2)))
                      (m (make-matrix-from-quil sandwiched-circuit
-                                               :relabeling `((,q1 . 1) (,q0 . 0))))
-                     (fidelity (trace-distance (gate-matrix instr) m)))
-                (push (cons (* circuit-cost fidelity) sandwiched-circuit)
-                      candidate-pairs))
+                                               :relabeling `((,q1 . 1) (,q0 . 0)))))
+                (let ((infidelity (fidelity-coord-distance
+                                   (mapcar #'constant-value (application-parameters can))
+                                   (get-canonical-coords-from-diagonal
+                                    (nth-value 1 (orthogonal-decomposition m))))))
+                  (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
+                        candidate-pairs)))
             (compiler-does-not-apply () nil))))
       
       ;; now vomit the results
@@ -768,7 +705,6 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                     (double= 1d0 fidelity))
           (give-up-compilation))
         (values circuit fidelity)))))
->>>>>>> approximate compilation rework checkpoint
 
 (defun approximate-2Q-compiler-for (target chip-spec)
   "Constructs an approximate 2Q compiler suitable for a TARGET architecture and a CHIP-SPEC with fidelity data.  Returns a function to be installed into the compilers present on CHIP-SPEC."
