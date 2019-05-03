@@ -201,8 +201,6 @@
   (disable-debugger))
 
 (defun entry-point (argv)
-  (setup-debugger)
-
   (handler-case
       (%entry-point argv)
     (interactive-interrupt (c)
