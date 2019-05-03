@@ -16,8 +16,8 @@
   :pathname "app/tests/"
   :serial t
   :components ((:file "package")
+               (:file "utils")
                (:file "suite")
                (:file "faithfulness-tests")
                (:file "rpcq-tests")
-               (:file "misc-tests")
-               (:file "utils")))
+               (:file "misc-tests")))

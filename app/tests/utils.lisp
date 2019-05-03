@@ -1,4 +1,4 @@
-(in-package :quilc-tests)
+(in-package #:quilc-tests)
 
 (defmacro with-mocked-function-definitions (defs &body body)
   "Dynamically re-define global functions named in DEFS within BODY.
