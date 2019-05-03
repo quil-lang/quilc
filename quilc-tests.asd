@@ -19,4 +19,5 @@
                (:file "suite")
                (:file "faithfulness-tests")
                (:file "rpcq-tests")
-               (:file "misc-tests")))
+               (:file "misc-tests")
+               (:file "utils")))

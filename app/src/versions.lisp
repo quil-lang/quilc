@@ -36,6 +36,23 @@
   :test #'string=
   :documentation "The git hash of the quilc repo.")
 
+(defun version-string-values (version &key (delimiter #\.))
+  (check-type version string)
+  (split-sequence:split-sequence delimiter version))
+
+(defun version> (version-a version-b &key (test #'>) (key #'parse-integer))
+  "Test whether VERSION-A is \"greater than\" VERSION-B, where both
+are version strings with components \"major.minor.patch\". Comparison
+is made left-to-right component-wise with the binary predicate TEST on
+the result of applying KEY to each component, terminating with the
+first non-nil result."
+  (check-type version-a string)
+  (check-type version-b string)
+  (loop :for a :in (mapcar key (version-string-values version-a))
+        :for b :in (mapcar key (version-string-values version-b))
+        :when (funcall test a b) :do
+          (return-from version> t)))
+
 (defun latest-sdk-version ()
   "Get the latest SDK quilc version, or NIL if unavailable."
   (handler-case
@@ -54,5 +71,5 @@
   "Test whether the current SDK version is the latest SDK
 version. Second value returned indicates the latest version."
   (let ((latest (latest-sdk-version)))
-    (values (and latest (not (string= latest current-version)))
+    (values (and latest (version> latest current-version))
             latest)))
