@@ -449,10 +449,22 @@ other's."
         ;; otherwise, we're obligated to do full unitary compilation.
         (decompile-instructions-into-full-unitary)))))
 
+(defmacro assert-compiler-correctness (condition-name check-form &rest init-forms &key &allow-other-keys)
+  (check-type condition-name symbol)
+  `(unless ,check-form
+     (error ',condition-name ,@init-forms)))
+
 (define-condition quil-compression-error (simple-error) ())
 (define-condition quil-compression-matrices-disagree (quil-compression-error) ())
-(define-condition quil-compression-states-disagree (quil-compression-error) ())
-(define-condition quil-compression-matrices-not-close (quil-compression-error) ())
+(define-condition quil-compression-states-disagree (quil-compression-error)
+  ((final-wf :initarg :final-wf :accessor quil-compression-error-final-wf)
+   (final-wf-reduced :initarg :final-wf-reduced :accessor quil-compression-error-final-wf-reduced)
+   (type :initarg :type :accessor quil-compression-error-type))
+  (:report (lambda (c s) (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
+                            (quil-compression-error-type c)))))
+(define-condition quil-compression-matrices-not-close (quil-compression-error)
+  ()
+  (:report (lambda (c s) (format s "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))))
 
 (defun check-contextual-compression-was-well-behaved (instructions
                                                       decompiled-instructions
@@ -495,19 +507,21 @@ other's."
                     (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions
                                                            :relabeling relabeling)
                                     (ilog2 (magicl:matrix-rows stretched-matrix)))))
-             (unless (and (matrix-equality stretched-matrix
-                                           (scale-out-matrix-phases reduced-matrix
-                                                                    stretched-matrix)))
-               (signal 'quil-compression-matrices-disagree))
+             (assert-compiler-correctness
+              quil-compression-matrices-disagree
+              (and (matrix-equality stretched-matrix
+                                    (scale-out-matrix-phases reduced-matrix
+                                                             stretched-matrix))))
              (when decompiled-instructions
-               (unless (and (matrix-equality stretched-matrix
-                                             (scale-out-matrix-phases decompiled-matrix
-                                                                      stretched-matrix))
-                            (matrix-equality stretched-matrix
-                                             (scale-out-matrix-phases reduced-decompiled-matrix
-                                                                      stretched-matrix)))
-                 (signal 'quil-compression-matrices-disagree)))))
-         
+               (assert-compiler-correctness
+                quil-compression-matrices-disagree
+                (and (matrix-equality stretched-matrix
+                                      (scale-out-matrix-phases decompiled-matrix
+                                                               stretched-matrix))
+                     (matrix-equality stretched-matrix
+                                      (scale-out-matrix-phases reduced-decompiled-matrix
+                                                               stretched-matrix)))))))
+
          (check-quil-agrees-as-states (start-wf final-wf wf-qc)
            (let* ((final-wf-reduced-instrs (nondestructively-apply-instrs-to-wf
                                             reduced-instructions
@@ -526,11 +540,13 @@ other's."
                         (and (eql final-wf ':not-simulated)
                              (eql final-wf-reduced-prep ':not-simulated))
                         (collinearp final-wf final-wf-reduced-prep))))
-             (unless final-wf-reduced-instrs-collinearp
-               (signal 'quil-compression-states-disagree))
-             (unless final-wf-reduced-prep-collinearp
-               (signal 'quil-compression-states-disagree))))
-         
+             (assert-compiler-correctness
+              quil-compression-states-disagree
+              final-wf-reduced-instrs-collinearp)
+             (assert-compiler-correctness
+              quil-compression-states-disagree
+              final-wf-reduced-prep-collinearp)))
+
          (check-quil-is-near-as-matrices ()
            (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
              (let* ((n (ilog2 (magicl:matrix-rows stretched-matrix)))
@@ -540,9 +556,10 @@ other's."
                     (reduced-decompiled-matrix
                       (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
                                       (ilog2 (magicl:matrix-rows stretched-matrix)))))
-               (unless (matrix-equality stretched-matrix
-                                        (scale-out-matrix-phases reduced-matrix stretched-matrix))
-                 (signal 'quil-compression-matrices-not-close))
+               (assert-compiler-correctness
+                quil-compression-matrices-not-close
+                (matrix-equality stretched-matrix
+                                 (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions
                  (let* ((prod (magicl:multiply-complex-matrices
                                reduced-matrix (magicl:dagger reduced-decompiled-matrix)))
@@ -554,11 +571,12 @@ other's."
                         (chip-spec (compressor-context-chip-specification context)))
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
-                   (unless (>= (* trace-fidelity
-                                  (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
-                               (lscheduler-calculate-fidelity ls-reduced chip-spec))
-                     (signal 'quil-compression-matrices-not-close))))))))
-      
+                   (assert-compiler-correctness
+                    quil-compression-matrices-not-close
+                    (>= (* trace-fidelity
+                           (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
+                        (lscheduler-calculate-fidelity ls-reduced chip-spec)))))))))
+
       (destructuring-bind (start-wf wf-qc)
           (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
         (when (and (not (eql ':not-simulated start-wf))
@@ -586,7 +604,7 @@ other's."
                                                                         context))
             reduced-instructions
             reduced-decompiled-instructions)
-    
+
         ;; now proceed to do the reductions
         (format *compiler-noise-stream*
                 "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
@@ -599,14 +617,14 @@ other's."
                 (algebraically-reduce-instructions decompiled-instructions
                                                    chip-specification
                                                    context)))
-    
+
         ;; check that the quil that came out was the same as the quil that went in
         (check-contextual-compression-was-well-behaved instructions
                                                        decompiled-instructions
                                                        reduced-instructions
                                                        reduced-decompiled-instructions
                                                        context)
-    
+
         ;; compare their respective runtimes and return the shorter one
         (let ((result-instructions
                 (cond
