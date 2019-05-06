@@ -484,6 +484,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
          ((,instr ("CAN" _ ,q1 ,q0)))
        (let* ((,coord (mapcar #'constant-value (application-parameters ,instr)))
               (,evaluated-predicate ,predicate))
+         (unless (or *enable-approximate-compilation* ,evaluated-predicate)
+           (give-up-compilation))
          (labels
              ((circuit-template (,parameter-array ,q1 ,q0)
                 ,@parametric-circuit)
