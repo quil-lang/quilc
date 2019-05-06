@@ -460,66 +460,74 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
   "This defines an two-qubit circuit template for use by the approximation algorithm. The template is stored both as a raw function under the name NAME as well as in a list of available templates, guarded by the value REQUIREMENTS of type OPTIMAL-2Q-TARGET.  BODY is a routine that returns a list of GATE-APPLICATION objects and is allowed to reference three arguments: the desired canonical coordinate COORD, the first desired qubit Q1, and the zeroth desired qubit Q0.
 
 Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATION* is NIL, the template errors with GIVE-UP-COMPILATION and does not evaluate BODY; this mechanism is used to avoid the emission of approximate templates when they aren't wanted.  If a template author cannot provide a meaningful predicate, they must manually install a guard against such unwanted emissions."
-  (a:with-gensyms (circuit coord q0 q1)
-    (let ((instr-name (if (typep (first bindings) 'symbol)
-                          (first bindings)
-                          (first (first bindings)))))
-      `(progn
-         (define-compiler ,name (,@bindings
-                                 :class approximate-compiler)
-           (let ((,circuit (progn ,@body))
-                 (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
-                 (,q1 (qubit-index (first (application-arguments ,instr-name))))
-                 (,q0 (qubit-index (second (application-arguments ,instr-name)))))
-             (sandwich-with-local-gates ,circuit
-                                        (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
-                                        (build-canonical-gate-in-magic-basis ,coord)
-                                        (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
-                                        ,q1 ,q0)))))))
+  (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
+    (a:with-gensyms (circuit coord q0 q1)
+      (let ((instr-name (if (typep (first bindings) 'symbol)
+                            (first bindings)
+                            (first (first bindings)))))
+        `(progn
+           (define-compiler ,name (,@bindings
+                                   :class approximate-compiler)
+             ,@decls
+             ,docstring
+             (let ((,circuit (progn ,@body))
+                   (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
+                   (,q1 (qubit-index (first (application-arguments ,instr-name))))
+                   (,q0 (qubit-index (second (application-arguments ,instr-name)))))
+               (sandwich-with-local-gates ,circuit
+                                          (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
+                                          (build-canonical-gate-in-magic-basis ,coord)
+                                          (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
+                                          ,q1 ,q0))))))))
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
   (a:with-gensyms (instr a d b in goodness template-values evaluated-predicate)
-    `(define-canonical-circuit-approximation ,name
-         ((,instr ("CAN" _ ,q1 ,q0)))
-       (let* ((,coord (mapcar #'constant-value (application-parameters ,instr)))
-              (,evaluated-predicate ,predicate))
-         (unless (or *enable-approximate-compilation* ,evaluated-predicate)
-           (give-up-compilation))
-         (labels
-             ((circuit-template (,parameter-array ,q1 ,q0)
-                ,@parametric-circuit)
-              (run-optimizer ()
-                (multiple-value-bind (,template-values ,goodness)
-                    (cl-grnm:nm-optimize
-                     (lambda (,in)
-                       (multiple-value-bind (,a ,d ,b)
-                           (orthogonal-decomposition (make-matrix-from-quil (circuit-template ,in 1 0)))
-                         (declare (ignore ,a ,b))
-                         (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal ,d))))
-                     (make-array ,parameter-count
-                                 :initial-contents (mapcar #'random
-                                                           (make-list ,parameter-count
-                                                                      :initial-element (* 2 pi))))
-                     :max-function-calls *approximate-template-search-limit*)
-                  (cond
-                    ;; if we promised an exact solution but haven't found it yet,
-                    ;; try again.
-                    ((and ,evaluated-predicate (not (double= 0d0 ,goodness)))
-                     (run-optimizer))
-                    ;; if we are unsure about the existence of an exact solution, we
-                    ;; haven't found one yet, but the user is demanding one, give up.
-                    ((and (not *enable-approximate-compilation*)
-                          (not (double= 0d0 ,goodness)))
-                     (give-up-compilation))
-                    ;; otherwise, this solution will do.
-                    (t
-                     (values (circuit-template ,template-values ,q1 ,q0) (- 1 ,goodness)))))))
-           (run-optimizer))))))
+    (multiple-value-bind (parametric-circuit decls docstring)
+        (alexandria:parse-body parametric-circuit :documentation t)
+      `(define-canonical-circuit-approximation ,name
+           ((,instr ("CAN" _ ,q1 ,q0)))
+         ,@decls
+         ,@(when docstring (list docstring))
+         (let* ((,coord (mapcar #'constant-value (application-parameters ,instr)))
+                (,evaluated-predicate ,predicate))
+           (unless (or *enable-approximate-compilation* ,evaluated-predicate)
+             (give-up-compilation))
+           (labels
+               ((circuit-template (,parameter-array ,q1 ,q0)
+                  ,@parametric-circuit)
+                (run-optimizer ()
+                  (multiple-value-bind (,template-values ,goodness)
+                      (cl-grnm:nm-optimize
+                       (lambda (,in)
+                         (multiple-value-bind (,a ,d ,b)
+                             (orthogonal-decomposition (make-matrix-from-quil (circuit-template ,in 1 0)))
+                           (declare (ignore ,a ,b))
+                           (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal ,d))))
+                       (make-array ,parameter-count
+                                   :initial-contents (mapcar #'random
+                                                             (make-list ,parameter-count
+                                                                        :initial-element (* 2 pi))))
+                       :max-function-calls *approximate-template-search-limit*)
+                    (cond
+                      ;; if we promised an exact solution but haven't found it yet,
+                      ;; try again.
+                      ((and ,evaluated-predicate (not (double= 0d0 ,goodness)))
+                       (run-optimizer))
+                      ;; if we are unsure about the existence of an exact solution, we
+                      ;; haven't found one yet, but the user is demanding one, give up.
+                      ((and (not *enable-approximate-compilation*)
+                            (not (double= 0d0 ,goodness)))
+                       (give-up-compilation))
+                      ;; otherwise, this solution will do.
+                      (t
+                       (values (circuit-template ,template-values ,q1 ,q0) (- 1 ,goodness)))))))
+             (run-optimizer)))))))
 
 
 (define-canonical-circuit-approximation nearest-circuit-of-depth-0
     ((instr ("CAN" (0 0 0) q1 q0)))
+  "Produces a decomposition of the canonical gate using zero two-qubit operations."
   (list (build-gate "I" () q0)
         (build-gate "I" () q1)))
 
