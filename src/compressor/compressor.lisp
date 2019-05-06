@@ -229,14 +229,14 @@ other's."
                                           context)
   "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      ( ;; let the context know that we've passed inspection of NODE, so that the
+      (;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
        (update-context (node)
          (setf (peephole-rewriter-node-context node)
-               (update-compressor-context (peephole-rewriter-node-context
-                                           (peephole-rewriter-node-prev node))
-                                          (peephole-rewriter-node-instr node)
-                                          :destructive? nil)))
+               (update-compilation-context (peephole-rewriter-node-context
+                                            (peephole-rewriter-node-prev node))
+                                           (peephole-rewriter-node-instr node)
+                                           :destructive? nil)))
 
        ;; having selected an appropriate sequence of instructions, actually
        ;; apply the available rewriting rules. if we find one that applies,
@@ -427,8 +427,8 @@ other's."
               chip-specification))))
 
       (destructuring-bind (start-wf wf-qc)
-          (if (compressor-context-aqvm context)
-              (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
+          (if (compilation-context-aqvm context)
+              (aqvm-extract-state (compilation-context-aqvm context) qubits-on-obj)
               '(:not-simulated :not-simulated))
         ;; there's one case where we know state prep applies: when qubits-on-obj
         ;; exhausts wf-qc. in this case, wf corresponds to a single column of the
@@ -549,7 +549,7 @@ other's."
                                            (+ n (* n n))))
                         (ls-reduced (make-lscheduler))
                         (ls-reduced-decompiled (make-lscheduler))
-                        (chip-spec (compressor-context-chip-specification context)))
+                        (chip-spec (compilation-context-chip-specification context)))
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert (>= (* trace-fidelity
@@ -562,7 +562,7 @@ other's."
                             sequence.")))))))
 
       (destructuring-bind (start-wf wf-qc)
-          (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
+          (aqvm-extract-state (compilation-context-aqvm context) qubits-on-obj)
         (when (and (not (eql ':not-simulated start-wf))
                    *enable-state-prep-compression*)
           (let ((final-wf (nondestructively-apply-instrs-to-wf instructions
@@ -711,7 +711,7 @@ other's."
       (let ((new-context context))
         (dolist (instr first-block)
           (setf new-context
-                (update-compressor-context new-context instr
+                (update-compilation-context new-context instr
                                            :destructive? nil)))
         (return-from compress-instructions-with-possibly-unknown-params
           (compress-instructions-with-possibly-unknown-params
@@ -754,10 +754,10 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
   (let* ((output nil)
          (n-qubits (chip-spec-n-qubits chip-specification))
          (governors (make-list (length (chip-specification-objects chip-specification))))
-         (global-governor (make-governed-queue))
-         (context (set-up-compressor-context :qubit-count n-qubits
-                                             :simulate (and *enable-state-prep-compression* protoquil)
-                                             :chip-specification chip-specification)))
+         (global-governor (make-instance 'governed-queue))
+         (context (set-up-compilation-context :qubit-count n-qubits
+                                              :simulate (and *enable-state-prep-compression* protoquil)
+                                              :chip-specification chip-specification)))
     (labels (;; these are some routines that govern the behavior of the massive FSM
              ;; we're constructing.
              ;;
@@ -1040,7 +1040,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                     :downto 0
                     :do (dotimes (address (length (nth order governors)))
                           (transition-governor-state order address ':flushing)))
-                  (update-compressor-context context instr :destructive? t)
+                  (update-compilation-context context instr :destructive? t)
                   ;; and output this instruction
                   (push instr output))
 
@@ -1069,7 +1069,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                     ;; if we were passing, this might be a two-flusher.
                                     (unless (eq (governed-queue-state governed-queue) ':empty)
                                       (transition-governor-state order address ':flushing))))))
-                    (update-compressor-context context instr :destructive? t))
+                    (update-compilation-context context instr :destructive? t))
                   ;; and write out the instruction
                   (push instr output))
 
@@ -1095,7 +1095,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                        (apply #'process-instruction instr
                               (governed-queue-contents governed-queue)))
                       (:flushing
-                       (update-compressor-context context instr :destructive? t)
+                       (update-compilation-context context instr :destructive? t)
                        (push instr output))
                       (:fragile
                        (transition-governor-state order address ':flushing)
@@ -1117,7 +1117,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
       ;; iterate over the incoming instructions
       (dolist (instr instructions)
         (process-instruction instr)
-        (clean-up-compressor-context context :destructive? t))
+        (clean-up-compilation-context context :destructive? t))
       ;; we're done processing the instructions, but the queueing system might
       ;; still have gunk left in it.  flush all of the governors, biggest first
       (transition-governor-state ':global ':global ':flushing)

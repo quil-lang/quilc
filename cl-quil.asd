@@ -54,6 +54,7 @@
                (:file "parser")
                (:file "gates")
                (:file "environment")
+               (:file "context")
                (:file "operator-bind")
                (:module "clifford"
                 :serial t
@@ -107,7 +108,6 @@
                 :serial t
                 :components ((:file "rewriting-rule-data-type")
                              (:file "compressor-configuration")
-                             (:file "context")
                              (:file "compressor")
                              (:file "wavefunctions")
                              (:file "rewriting-rules")))
