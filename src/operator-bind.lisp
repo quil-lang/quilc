@@ -405,52 +405,54 @@
     (expand-bindings bindings nil)))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
-  (labels ((cleave-options (bindings-and-options &optional backlog)
-             (cond
-               ((or (endp bindings-and-options)
-                    (keywordp (first bindings-and-options)))
-                (values (reverse backlog) bindings-and-options))
-               (t
-                (cleave-options (rest bindings-and-options)
-                                (cons (first bindings-and-options) backlog)))))
-           (collect-variable-names (bindings)
-             (when (endp bindings) (return-from collect-variable-names nil))
-             (let ((binding (first bindings)))
-               (etypecase binding
-                 (symbol (cons binding
-                               (collect-variable-names (rest bindings))))
-                 (cons   (cons (first binding)
-                               (collect-variable-names (rest bindings))))))))
-    (multiple-value-bind (bindings options) (cleave-options bindings)
-      (let ((variable-names (collect-variable-names bindings)))
-        (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
-          (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
-                (1+ pos) (string name)))
-        (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
-          ;; TODO: do the alexandria destructuring to catch the docstring or whatever
-          `(labels ((,name (,@variable-names &key context)
-                      (declare (ignorable context))
-                      (multiple-value-bind (,ret-val ,ret-bool)
-                          ,(define-compiler-form bindings body)
-                        (if ,ret-bool ,ret-val (give-up-compilation)))))
-             (let ((,old-record (find ,(string name) **compilers-available**
-                                      :key #'compiler-name))
-                   (,struct-name
-                     (make-instance ',(getf options :class 'compiler)
-                                    :name ,(string name)
-                                    :instruction-count ,(length variable-names)
-                                    :bindings (quote ,bindings)
-                                    :body (quote (progn ,@body))
-                                    :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
-                                    :function #',name)))
-               (setf (fdefinition ',name) ,struct-name)
+  (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
+    (labels ((cleave-options (bindings-and-options &optional backlog)
                (cond
-                 (,old-record
-                  (setf **compilers-available**
-                        (substitute ,struct-name ,old-record **compilers-available**)))
+                 ((or (endp bindings-and-options)
+                      (keywordp (first bindings-and-options)))
+                  (values (reverse backlog) bindings-and-options))
                  (t
-                  (push ,struct-name **compilers-available**)))
-               #',name)))))))
+                  (cleave-options (rest bindings-and-options)
+                                  (cons (first bindings-and-options) backlog)))))
+             (collect-variable-names (bindings)
+               (when (endp bindings) (return-from collect-variable-names nil))
+               (let ((binding (first bindings)))
+                 (etypecase binding
+                   (symbol (cons binding
+                                 (collect-variable-names (rest bindings))))
+                   (cons   (cons (first binding)
+                                 (collect-variable-names (rest bindings))))))))
+      (multiple-value-bind (bindings options) (cleave-options bindings)
+        (let ((variable-names (collect-variable-names bindings)))
+          (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
+            (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
+                  (1+ pos) (string name)))
+          (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
+            ;; TODO: do the alexandria destructuring to catch the docstring or whatever
+            `(labels ((,name (,@variable-names &key context)
+                        (declare (ignorable context))
+                        (multiple-value-bind (,ret-val ,ret-bool)
+                            ,(define-compiler-form bindings (append decls body))
+                          (if ,ret-bool ,ret-val (give-up-compilation)))))
+               (let ((,old-record (find ,(string name) **compilers-available**
+                                        :key #'compiler-name))
+                     (,struct-name
+                       (make-instance ',(getf options :class 'compiler)
+                                      :name ,(string name)
+                                      :instruction-count ,(length variable-names)
+                                      :bindings (quote ,bindings)
+                                      :body (quote (progn ,@decls ,@body))
+                                      :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
+                                      :function #',name)))
+                 (setf (fdefinition ',name) ,struct-name)
+                 (setf (documentation ',name 'function) ,docstring)
+                 (cond
+                   (,old-record
+                    (setf **compilers-available**
+                          (substitute ,struct-name ,old-record **compilers-available**)))
+                   (t
+                    (push ,struct-name **compilers-available**)))
+                 ',name))))))))
 
 (defmacro with-compilation-context ((&rest bindings-plist) &body body)
   (setf body `(progn ,@body))
