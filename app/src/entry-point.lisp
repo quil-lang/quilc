@@ -417,15 +417,19 @@ HTTP server for good.
                      :when (quil::comment instr)
                        :do (cond
                              ((uiop:string-prefix-p "Exiting rewiring: " (quil::comment instr))
-                              (setf (gethash "final_rewiring" *statistics-dictionary*)
-                                    (subseq (quil::comment instr) (length "Exiting rewiring: "))))
+                              (let ((*read-eval* nil))
+                                (setf (gethash "final_rewiring" *statistics-dictionary*)
+                                      (read-from-string
+                                       (subseq (quil::comment instr) (length "Exiting rewiring: "))))))
                              ((uiop:string-prefix-p "Entering/exiting rewiring: " (quil::comment instr))
                               (let ((comment (quil::comment instr))
-                                    (length (length "Entering/exiting rewiring: (")))
+                                    (length (length "Entering/exiting rewiring: ("))
+                                    (*read-eval* nil))
                                 (setf (gethash "final_rewiring" *statistics-dictionary*)
-                                      (subseq (quil::comment instr) length (- (length comment)
-                                                                              (/ (- (length comment) length) 2)
-                                                                              2)))))
+                                      (read-from-string
+                                       (subseq (quil::comment instr) length (- (length comment)
+                                                                               (/ (- (length comment) length) 2)
+                                                                               2))))))
                              (t nil))
                      ;; if there's a HALT instruction with a rewiring comment on
                      ;; it, we need to migrate the comment up one instruction
