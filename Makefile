@@ -137,6 +137,13 @@ test-quilc:
 		--eval "(ql:quickload :quilc-tests)" \
 		--eval "(asdf:test-system :quilc)"
 
+# You can specify a different c++17-compatible compiler via the CXX
+# variable. For example: make CXX=/usr/bin/clang++ test-tweedledum
+test-tweedledum:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil/tweedledum-tests)" \
+		--eval "(asdf:test-system :cl-quil/tweedledum-tests)"
+
 test-ccl:
 	ccl -n --batch --load $(QUICKLISP_HOME)/setup.lisp \
 		--eval '(push (truename ".") asdf:*central-registry*)' \
