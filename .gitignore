@@ -2,3 +2,5 @@
 quilc
 .idea/
 system-index.txt
+*.so
+*.dylib
