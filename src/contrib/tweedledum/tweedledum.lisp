@@ -25,7 +25,7 @@
   "T if the tweedledum shared library has been loaded by CFFI.")
 
 (defcfun (%synthesis-dbs "tweedledum_synthesis_dbs")
-    :string
+    (:string :free-from-foreign t)
   (perm (:pointer :uint32))
   (size :int))
 
