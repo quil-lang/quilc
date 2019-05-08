@@ -158,6 +158,7 @@ test-ccl:
 clean:
 	rm -f quilc system-index.txt build-output.log
 	rm -f coverage-report/*.html
+	rm -f src/contrib/**/*.so src/contrib/**/*.dylib
 
 clean-cache:
 	@echo "Deleting $(LISP_CACHE)"
