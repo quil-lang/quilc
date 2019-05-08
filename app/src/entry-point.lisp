@@ -21,7 +21,6 @@
 (defparameter *gate-whitelist* nil)
 (defparameter *gate-blacklist* nil)
 (defparameter *without-pretty-printing* nil)
-(defparameter *isa-descriptor* nil)
 (defparameter *verbose* (make-broadcast-stream))
 (defparameter *protoquil* nil)
 (defparameter *log-level* ':info)
@@ -369,13 +368,12 @@ HTTP server for good.
 	    (setf *quil-stream* *standard-output*)))
          (when verbose
            (setf *verbose* *human-readable-stream*))
-         (let ((*isa-descriptor* (lookup-isa-descriptor-for-name isa)))
-           (run-CLI-mode)))))))
+         (run-CLI-mode (lookup-isa-descriptor-for-name isa)))))))
 
-(defun run-CLI-mode ()
+(defun run-CLI-mode (isa-descriptor)
   (let* ((program-text (slurp-lines))
          (program (quil::parse-quil program-text)))
-    (process-program program *isa-descriptor*)))
+    (process-program program isa-descriptor)))
 
 (defun process-program (program chip-specification)
   (let* ((original-matrix
