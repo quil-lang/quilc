@@ -455,14 +455,14 @@ other's."
      (error ',condition-name ,@init-forms)))
 
 (define-condition quil-compression-error (simple-error) ())
-(define-condition quil-compression-matrices-disagree (quil-compression-error) ())
-(define-condition quil-compression-states-disagree (quil-compression-error)
+(define-condition quil-compression-matrices-disagree-error (quil-compression-error) ())
+(define-condition quil-compression-states-disagree-error (quil-compression-error)
   ((final-wf :initarg :final-wf :accessor quil-compression-error-final-wf)
    (final-wf-reduced :initarg :final-wf-reduced :accessor quil-compression-error-final-wf-reduced)
    (type :initarg :type :accessor quil-compression-error-type))
   (:report (lambda (c s) (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
                             (quil-compression-error-type c)))))
-(define-condition quil-compression-matrices-not-close (quil-compression-error)
+(define-condition quil-compression-matrices-not-close-error (quil-compression-error)
   ()
   (:report (lambda (c s) (format s "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))))
 
@@ -508,13 +508,13 @@ other's."
                                                            :relabeling relabeling)
                                     (ilog2 (magicl:matrix-rows stretched-matrix)))))
              (assert-compiler-correctness
-              quil-compression-matrices-disagree
+              quil-compression-matrices-disagree-error
               (and (matrix-equality stretched-matrix
                                     (scale-out-matrix-phases reduced-matrix
                                                              stretched-matrix))))
              (when decompiled-instructions
                (assert-compiler-correctness
-                quil-compression-matrices-disagree
+                quil-compression-matrices-disagree-error
                 (and (matrix-equality stretched-matrix
                                       (scale-out-matrix-phases decompiled-matrix
                                                                stretched-matrix))
@@ -541,10 +541,10 @@ other's."
                              (eql final-wf-reduced-prep ':not-simulated))
                         (collinearp final-wf final-wf-reduced-prep))))
              (assert-compiler-correctness
-              quil-compression-states-disagree
+              quil-compression-states-disagree-error
               final-wf-reduced-instrs-collinearp)
              (assert-compiler-correctness
-              quil-compression-states-disagree
+              quil-compression-states-disagree-error
               final-wf-reduced-prep-collinearp)))
 
          (check-quil-is-near-as-matrices ()
@@ -557,7 +557,7 @@ other's."
                       (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
                                       (ilog2 (magicl:matrix-rows stretched-matrix)))))
                (assert-compiler-correctness
-                quil-compression-matrices-not-close
+                quil-compression-matrices-not-close-error
                 (matrix-equality stretched-matrix
                                  (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions
@@ -572,7 +572,7 @@ other's."
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert-compiler-correctness
-                    quil-compression-matrices-not-close
+                    quil-compression-matrices-not-close-error
                     (>= (* trace-fidelity
                            (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
                         (lscheduler-calculate-fidelity ls-reduced chip-spec)))))))))
