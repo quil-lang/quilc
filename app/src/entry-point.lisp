@@ -76,15 +76,6 @@
     #+forest-sdk
     (("skip-version-check") :type boolean :optional t :initial-value nil :documentation "Do not check for a new SDK version at launch.")))
 
-(defparameter *isa-descriptors*
-  (alexandria::alist-hash-table
-   `(("8Q" . ,(quil::build-8Q-chip))
-     ("20Q" . ,(quil::build-skew-rectangular-chip 0 4 5))
-     ("16QMUX" . ,(quil::build-16QMUX-chip))
-     ("bristlecone" . ,(quil::build-bristlecone-chip))
-     ("ibmqx5" . ,(quil::build-ibm-qx5)))
-   :test 'equal))
-
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
     (with-output-to-string (s)
@@ -114,14 +105,16 @@
            (coerce #(#\Newline #\#) 'string))))
 
 (defun lookup-isa-descriptor-for-name (isa)
-  (let ((isa-hash-value (gethash isa *isa-descriptors*)))
-    (cond
-      ((not (null isa-hash-value))
-       isa-hash-value)
-      ((probe-file isa)
-       (quil::read-chip-spec-file isa))
-      (t
-       (error "ISA descriptor does not name a known template or an extant file.")))))
+  (alexandria:switch (isa :test #'equal)
+    ("8Q" (quil::build-8Q-chip))
+    ("20Q" (quil::build-skew-rectangular-chip 0 4 5))
+    ("16QMUX" (quil::build-16QMUX-chip))
+    ("bristlecone" (quil::build-bristlecone-chip))
+    ("ibmqx5" (quil::build-ibm-qx5))
+    (t
+     (if (probe-file isa)
+         (quil::read-chip-spec-file isa)
+         (error "ISA descriptor does not name a known template or an extant file.")))))
 
 (defun log-level-string-to-symbol (log-level)
   (alexandria:eswitch (log-level :test #'string=)
