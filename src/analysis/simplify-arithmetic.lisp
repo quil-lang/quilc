@@ -4,7 +4,7 @@
 
 (in-package #:cl-quil)
 
-(define-transform simplify-arithmetic (simplify-arithmetic)
+(define-transform simplify-arithmetic (simplify-arithmetics)
   "A transform which converts a parsed program with potentially complicated arithmetic to one that has simplified arithmetic expressions")
 
 (defstruct affine-representation
@@ -76,18 +76,40 @@
                     (/ coefficient (affine-representation-constant right))))
             rep)))))))
 
+(defun affine-representation->expression (rep)
+  ""
+  (let ((expr nil))
+    (dohash ((ref coefficient) (affine-representation-coefficients rep))
+      (unless (double= 0 coefficient)
+        (setf expr (if expr
+                       (list '+ (list '* coefficient ref) expr)
+                       (list '* coefficient ref)))))
+    (cond
+      ((null expr)
+       (affine-representation-constant rep))
+      ((double= 0 (affine-representation-constant rep))
+       expr)
+      (t
+       (list '+ (affine-representation-constant rep) expr)))))
+
 (defgeneric simplify-arithmetic (thing)
   (:method ((thing t))
     thing)
   (:method ((thing gate-application))
     (map-into (application-parameters thing)
               (lambda (param)
-                (etypecase param
-                  (constant
-                   param)
-                  (delayed-expression
-                   ;; TODO: extract expression and use expression->affine-representation
-                   param)))
+                (handler-case
+                    (etypecase param
+                      (constant
+                       param)
+                      (delayed-expression
+                       (make-delayed-expression (delayed-expression-params param)
+                                                (delayed-expression-lambda-params param)
+                                                (affine-representation->expression
+                                                 (expression->affine-representation
+                                                  (delayed-expression-expression param))))))
+                  ;; TODO: use custom error class
+                  (error () param)))
               (application-parameters thing))))
 
 (defun simplify-arithmetics (parsed-prog)
