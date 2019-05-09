@@ -69,14 +69,12 @@
 ;;; made into a matrix with GATE-MATRIX.
 
 (defclass gate ()
-  ((dimension :initarg :dimension
-              :reader gate-dimension
-              :documentation "The minimal dimension of the space the gate acts on.")
-   ;; TODO move name into the gate-definition class?
+  (;; TODO move name into the gate-definition class?
    ;;
    ;; Eric sez that the name is useful for tracking anonymous gates.
    (name :initarg :name
          :reader gate-name
+         :type (or null string)
          :documentation "The name of the gate."))
   (:metaclass abstract-class)
   (:default-initargs :name nil)
@@ -103,6 +101,19 @@
            :documentation "The matrix of the gate."))
   (:documentation "Non-parameterized gate represented as a dense matrix."))
 
+(defmethod initialize-instance :after ((gate simple-gate) &key)
+  (with-slots (matrix) gate
+    (assert (and (magicl:square-matrix-p matrix)
+                 (power-of-two-p (magicl:matrix-rows matrix)))
+            (matrix)
+            "MATRIX must be of dimension NxN where N is a power of two. ~
+             Actual dimensions are ~a x ~a."
+            (magicl:matrix-rows matrix)
+            (magicl:matrix-cols matrix))))
+
+(defmethod gate-dimension ((gate simple-gate))
+  (magicl:matrix-rows (simple-gate-matrix gate)))
+
 (defmethod gate-matrix ((gate simple-gate) &rest parameters)
   (assert (null parameters))
   (simple-gate-matrix gate))
@@ -112,6 +123,18 @@
                 :reader permutation-gate-permutation
                 :documentation "The permutation representation of the gate."))
   (:documentation "A gate which could be realized as a permutation matrix."))
+
+(defmethod initialize-instance :after ((gate permutation-gate) &key)
+  (with-slots (permutation) gate
+    (assert (power-of-two-p (length permutation))
+            (permutation)
+            "PERMUTATION length must be a power of two. ~@
+             PERMUTATION ~A has length ~a which is not a power of two."
+            permutation (length permutation))
+    (check-permutation permutation)))
+
+(defmethod gate-dimension ((gate permutation-gate))
+  (length (permutation-gate-permutation gate)))
 
 (defmethod gate-matrix ((gate permutation-gate) &rest parameters)
   (assert (null parameters))
@@ -138,28 +161,28 @@
         (when (zerop (sbit bits i))
           (error "Invalid permutation ~A. Missing entry: ~A" perm i))))))
 
-(defun make-permutation-gate (name documentation &rest permutation)
-  "Make a permutation gate with the permut"
-  (check-type name (or nil string))
-  (check-type documentation (or null string))
-  (assert (zerop (logand (length permutation)
-                         (1- (length permutation))))
-          (permutation)
-          "Permutation ~A must be of a power-of-two number of elements."
-          permutation)
-  (check-permutation permutation)
+(defun make-permutation-gate (name &rest permutation)
+  "Make a permutation gate from the given PERMUTATION."
   (make-instance
    'permutation-gate
    :name name
-   :documentation documentation
-   :dimension (length permutation)
    :permutation permutation))
 
 (defclass parameterized-gate (dynamic-gate)
-  ((matrix-function :initarg :matrix-function
+  ((dimension :initarg :dimension
+              :reader gate-dimension
+              :documentation "The minimal dimension of the space the gate acts on.")
+   (matrix-function :initarg :matrix-function
                     :reader parameterized-gate-matrix-function
                     :documentation "Function mapping ARITY complex numbers to a DIMENSION x DIMENSION MAGICL matrix."))
   (:documentation "A gate parameterized by complex numbers."))
+
+(defmethod initialize-instance :after ((gate parameterized-gate) &key)
+  (with-slots (dimension) gate
+    (assert (power-of-two-p dimension)
+            (dimension)
+            "DIMENSION ~A must be a power of two."
+            dimension)))
 
 (defmethod gate-matrix ((gate parameterized-gate) &rest parameters)
   (apply (parameterized-gate-matrix-function gate) parameters))
@@ -284,16 +307,13 @@
          (dim (isqrt (length entries))))
     (make-instance 'simple-gate
                    :name name
-                   :dimension dim
                    :matrix (make-row-major-matrix dim dim entries))))
 
 (defmethod gate-definition-to-gate ((gate-def permutation-gate-definition))
-  (let* ((name (gate-definition-name gate-def))
-         (entries (permutation-gate-definition-permutation gate-def))
-         (dim (length entries)))
+  (let ((name (gate-definition-name gate-def))
+        (entries (permutation-gate-definition-permutation gate-def)))
     (make-instance 'permutation-gate
                    :name name
-                   :dimension dim
                    :permutation entries)))
 
 (defmethod gate-definition-to-gate ((gate-def parameterized-gate-definition))
@@ -430,9 +450,7 @@ as matrices."
                                            (application-arguments instr)))
                  u))))
     (make-instance 'gate-application
-                   :gate (make-instance 'simple-gate
-                                        :dimension (expt 2 (length qubits))
-                                        :matrix u)
+                   :gate (make-instance 'simple-gate :matrix u)
                    :operator (named-operator (format nil "FUSED-GATE-~D"
                                                      (incf-premultiplied-gate-count)))
                    :arguments (mapcar #'qubit qubits))))
