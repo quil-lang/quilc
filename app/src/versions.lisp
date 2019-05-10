@@ -36,10 +36,6 @@
   :test #'string=
   :documentation "The git hash of the quilc repo.")
 
-(defun version-string-values (version &key (delimiter #\.))
-  (check-type version string)
-  (split-sequence:split-sequence delimiter version))
-
 (defun latest-sdk-version ()
   "Get the latest SDK quilc version, or NIL if unavailable."
   (handler-case
