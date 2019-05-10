@@ -328,7 +328,7 @@ HTTP server for good.
 ~%~%"))
 
 	 (when port
-           (cl-syslog:rfc-log (*logger* :debug "WARNING: -p and -S are incompatible. Dropping -p.")
+           (cl-syslog:rfc-log (*logger* :warning "WARNING: -p and -S are incompatible. Dropping -p.")
              (:msgid "LOG0001")))
 
 	 ;; start the RPCQ server in parallel
