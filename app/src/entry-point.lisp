@@ -105,7 +105,7 @@
            (coerce #(#\Newline #\#) 'string))))
 
 (defun lookup-isa-descriptor-for-name (isa)
-  (alexandria:switch (isa :test #'equal)
+  (alexandria:switch (isa :test #'string=)
     ("8Q" (quil::build-8Q-chip))
     ("20Q" (quil::build-skew-rectangular-chip 0 4 5))
     ("16QMUX" (quil::build-16QMUX-chip))
