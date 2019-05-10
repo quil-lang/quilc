@@ -292,7 +292,8 @@
       (when available-p
         (format t "An update is available to the SDK. You have version ~A. ~
 Version ~A is available from https://www.rigetti.com/forest~%"
-                +QUILC-VERSION+ version))))
+                +QUILC-VERSION+ version))
+      (uiop:quit (if (and available-p version) 0 1))))
   #-forest-sdk
   (when benchmark
     (benchmarks))
