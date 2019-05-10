@@ -36,21 +36,29 @@
   :test #'string=
   :documentation "The git hash of the quilc repo.")
 
-(defun latest-sdk-version ()
+(defun latest-sdk-version (&key (proxy nil))
   "Get the latest SDK quilc version, or NIL if unavailable."
   (handler-case
       (let* ((s (drakma:http-request "http://downloads.rigetti.com/qcs-sdk/version"
-                                     :want-stream t))
+                                     :want-stream t
+                                     :proxy proxy))
              (p (yason:parse s)))
         (multiple-value-bind (version success)
             (gethash "quilc" p)
           (when success
             version)))
-    (usocket:ns-host-not-found-error (condition)
+    (usocket:ns-error (condition)
       (declare (ignore condition))
+      (cl-syslog:rfc-log (*logger* :warning "Encountered a name resolution error when fetching latest SDK version.")
+        (:msgid "LOG0001"))
+      nil)
+    (usocket:socket-error (condition)
+      (declare (ignore condition))
+      (cl-syslog:rfc-log (*logger* :warning "Encountered a socket error when fetching latest SDK version.")
+        (:msgid "LOG0001"))
       nil)))
 
-(defun sdk-update-available-p (current-version)
+(defun sdk-update-available-p (current-version &key (proxy nil))
   "Test whether the current SDK version is the latest SDK
 version. Second value returned indicates the latest version."
   (let ((latest (latest-sdk-version)))

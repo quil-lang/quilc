@@ -74,7 +74,9 @@
     (("log-level") :type string :optional t :initial-value "info" :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
     (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")
     #+forest-sdk
-    (("skip-version-check") :type boolean :optional t :initial-value nil :documentation "Do not check for a new SDK version at launch.")))
+    (("check-sdk-version") :type boolean :optional t :initial-value nil :documentation "Check for a new SDK version at launch.")
+    #+forest-sdk
+    (("proxy" :type string :optional t :initial-value nil :documentation "Proxy to use when checking for an SDK update."))))
 
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
@@ -255,19 +257,38 @@
                           (log-level nil)
                           (quiet nil)
                           #+forest-sdk
-                          (skip-version-check nil))
+                          (check-sdk-version nil)
+                          #+forest-sdk
+                          (proxy nil))
   (when help
     (show-help)
     (uiop:quit 0))
+
   (when version
     (show-version)
     (uiop:quit 0))
+
   (when check-libraries
     (check-libraries))
+
+  (when log-level
+    (setf *log-level* (log-level-string-to-symbol log-level)))
+
+  (setf *logger*
+        (make-instance 'cl-syslog:rfc5424-logger
+                       :app-name *program-name*
+                       :facility ':local0
+                       :maximum-priority *log-level*
+                       :log-writer
+                       #+windows (cl-syslog:stream-log-writer)
+                       #-windows (cl-syslog:tee-to-stream
+                                  (cl-syslog:syslog-log-writer "quilc" :local0)
+                                  *error-output*)))
+
   #+forest-sdk
-  (unless skip-version-check
+  (when check-sdk-version
     (multiple-value-bind (available-p version)
-        (sdk-update-available-p +QUILC-VERSION+)
+        (sdk-update-available-p +QUILC-VERSION+ :proxy proxy)
       (when available-p
         (format t "An update is available to the SDK. You have version ~A. ~
 Version ~A is available from https://www.rigetti.com/forest~%"
