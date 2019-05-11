@@ -152,14 +152,11 @@
          (bits (make-array n :element-type 'bit :initial-element 0)))
     (flet ((mark-bit (i)
              (cond
+               ((not (<= 0 i (1- n)))
+                (error "Invalid permutation ~A. Entry out of range [0, ~A): ~A" perm n i))
                ((zerop (sbit bits i)) (setf (sbit bits i) 1))
                (t (error "Invalid permutation ~A. Found duplicate entry: ~A" perm i)))))
-      ;; Mark all of the bits.
-      (mapc #'mark-bit perm)
-      ;; Check that they're all marked.
-      (dotimes (i n t)
-        (when (zerop (sbit bits i))
-          (error "Invalid permutation ~A. Missing entry: ~A" perm i))))))
+      (mapc #'mark-bit perm))))
 
 (defun make-permutation-gate (name &rest permutation)
   "Make a permutation gate from the given PERMUTATION."
