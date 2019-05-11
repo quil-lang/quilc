@@ -229,7 +229,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
   (ilog2 (length (permutation-gate-definition-permutation gate))))
 
-(defun permutation-from-gate-entries-p (entries)
+(defun permutation-from-gate-entries (entries)
   "Create the permutation (list of natural numbers) that represents
 the input matrix ENTRIES. Return nil if ENTRIES cannot be represented
 as a permutation."
@@ -242,13 +242,13 @@ as a permutation."
             ((0.0d0) nil)
             ((1.0d0) (cond
                        ((or found-one (nth j perm))
-                        (return-from permutation-from-gate-entries-p nil))
+                        (return-from permutation-from-gate-entries nil))
                        (t
                         (setf (nth j perm) i)
                         (setf found-one t))))
-            (otherwise (return-from permutation-from-gate-entries-p nil))))
+            (otherwise (return-from permutation-from-gate-entries nil))))
         (unless found-one
-          (return-from permutation-from-gate-entries-p nil))))))
+          (return-from permutation-from-gate-entries nil))))))
 
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
@@ -259,7 +259,7 @@ as a permutation."
                     :name name
                     :parameters parameters
                     :entries entries)
-      (alexandria:if-let ((perm (permutation-from-gate-entries-p entries)))
+      (alexandria:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
                        :permutation perm)
