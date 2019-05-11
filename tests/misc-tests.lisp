@@ -242,3 +242,27 @@
         :do (progn
               (is (quil::positive-power-of-two-p power-of-two))
               (is (not (quil::positive-power-of-two-p (1- power-of-two)))))))
+
+(deftest test-check-permutation ()
+  "Test that CHECK-PERMUTATION signals error iff input is not valid."
+  ;; Duplicates
+  (signals simple-error (quil::check-permutation '(0 0)))
+  (signals simple-error (quil::check-permutation '(0 0 1)))
+  (signals simple-error (quil::check-permutation '(0 1 0)))
+  (signals simple-error (quil::check-permutation '(1 0 0)))
+  (signals simple-error (quil::check-permutation '(0 1 2 3 4 5 2)))
+  ;; Out of range values
+  (signals simple-error (quil::check-permutation '(1)))
+  (signals simple-error (quil::check-permutation '(-1)))
+  (signals simple-error (quil::check-permutation '(0 2)))
+  (signals simple-error (quil::check-permutation '(2 0)))
+  (signals simple-error (quil::check-permutation '(0 1 3)))
+  (signals simple-error (quil::check-permutation '(0 3 1)))
+  (signals simple-error (quil::check-permutation '(3 1 0)))
+  (signals simple-error (quil::check-permutation '(0 1 2 5 3)))
+  ;; Valid permutations. Grows as n!, so don't get too crazy here.
+  (dotimes (n 6)
+    (alexandria:map-permutations
+     (lambda (permutation)
+       (not-signals simple-error (quil::check-permutation permutation)))
+     (alexandria:iota n))))
