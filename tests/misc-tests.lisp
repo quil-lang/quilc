@@ -231,3 +231,14 @@
     (is (= (* 11 11) (quil::chip-spec-n-links chip)))
     (is (plusp (length (parsed-program-executable-code prgm))))
     (is (plusp (length (parsed-program-executable-code (compiler-hook prgm chip)))))))
+
+(deftest test-positive-power-of-two-p ()
+  "Test that POSITIVE-POWER-OF-TWO-P does what it says on the tin."
+  (is (not (quil::positive-power-of-two-p -2)))
+  (is (not (quil::positive-power-of-two-p -1)))
+  (is (not (quil::positive-power-of-two-p 0)))
+  (loop :for power-of-two = 2 :then (* 2 power-of-two)
+        :while (<= power-of-two 1024)
+        :do (progn
+              (is (quil::positive-power-of-two-p power-of-two))
+              (is (not (quil::positive-power-of-two-p (1- power-of-two)))))))

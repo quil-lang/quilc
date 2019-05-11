@@ -104,10 +104,10 @@
 (defmethod initialize-instance :after ((gate simple-gate) &key)
   (with-slots (matrix) gate
     (assert (and (magicl:square-matrix-p matrix)
-                 (power-of-two-p (magicl:matrix-rows matrix)))
+                 (positive-power-of-two-p (magicl:matrix-rows matrix)))
             (matrix)
-            "MATRIX must be of dimension NxN where N is a power of two. ~
-             Actual dimensions are ~a x ~a."
+            "MATRIX must be square whose dimension is a positive power of two.~@
+             Actual dimensions are ~D x ~D."
             (magicl:matrix-rows matrix)
             (magicl:matrix-cols matrix))))
 
@@ -126,10 +126,10 @@
 
 (defmethod initialize-instance :after ((gate permutation-gate) &key)
   (with-slots (permutation) gate
-    (assert (power-of-two-p (length permutation))
+    (assert (positive-power-of-two-p (length permutation))
             (permutation)
-            "PERMUTATION length must be a power of two. ~@
-             PERMUTATION ~A has length ~a which is not a power of two."
+            "PERMUTATION length must be a positive power of two. ~@
+             PERMUTATION ~A has length ~D which is not a power of two."
             permutation (length permutation))
     (check-permutation permutation)))
 
@@ -179,9 +179,9 @@
 
 (defmethod initialize-instance :after ((gate parameterized-gate) &key)
   (with-slots (dimension) gate
-    (assert (power-of-two-p dimension)
+    (assert (positive-power-of-two-p dimension)
             (dimension)
-            "DIMENSION ~A must be a power of two."
+            "DIMENSION ~D must be a positive power of two."
             dimension)))
 
 (defmethod gate-matrix ((gate parameterized-gate) &rest parameters)

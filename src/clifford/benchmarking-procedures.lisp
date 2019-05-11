@@ -101,9 +101,8 @@
 
 (defun valid-pauli-dim (m n)
   "T if M and N are valid dimensions of a Pauli matrix, NIL otherwise."
-  (and (= m n) (>= m n 2)
-       (cl-quil::power-of-two-p m)
-       (cl-quil::power-of-two-p n)))
+  (and (= m n)
+       (cl-quil::positive-power-of-two-p m)))
 
 (defun concatenate-or-nil (a b)
   "If A and B are both not NIL, concatenate them and return a STRING."

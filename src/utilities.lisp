@@ -129,6 +129,6 @@ Return two values:
   "Compute integer logarithm of X to the base 2."
   (1- (integer-length x)))
 
-(defun power-of-two-p (n)
+(defun positive-power-of-two-p (n)
   "Given an INTEGER N, return true if N is a power of 2, greater than 1."
-  (zerop (logand n (1- n))))
+  (and (> n 1) (= 1 (logcount n))))

@@ -797,9 +797,7 @@ INPUT-STRING that triggered the condition."
 (defun validate-gate-matrix-size (gate-name num-entries)
   "For the gate named GATE-NAME, check that NUM-ENTRIES is a valid number of entries for a gate matrix."
   (flet ((perfect-square-p (n)
-           (= n (expt (isqrt n) 2)))
-         (power-of-two-p (n)
-           (zerop (logand n (1- n)))))
+           (= n (expt (isqrt n) 2))))
     (unless (<= 4 num-entries)
       (quil-parse-error "There must be at least 4 entries (a one-qubit ~
                          operator) for the gate ~A being defined. Got ~D."
@@ -811,7 +809,7 @@ INPUT-STRING that triggered the condition."
                          matrix. I got ~D entries."
                         gate-name
                         num-entries))
-    (unless (power-of-two-p (isqrt num-entries))
+    (unless (positive-power-of-two-p (isqrt num-entries))
       (quil-parse-error "The gate ~A being defined isn't a square 2^n x 2^n ~
                          matrix. In particular, it is a ~D x ~D matrix."
                         gate-name
@@ -907,7 +905,7 @@ INPUT-STRING that triggered the condition."
             rest-lines)))
 
 (defun validate-gate-permutation-size-p (size)
-  (power-of-two-p size))
+  (positive-power-of-two-p size))
 
 (defun parse-gate-entries-as-matrix (body-lines params name)
   ;; Parse out the gate entries.
