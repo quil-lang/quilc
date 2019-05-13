@@ -19,13 +19,15 @@ Server Mode runs the compiler as an HTTP server, taking simple POST
 requests with JSON payloads which are known to the companion library
 PyQuil.
 .SH OPTIONS
-.IP "-S, --server"
+.IP "-S, --server-mode-http"
 (Server Mode) Run the compiler in Server Mode. Start an HTTP server and
 process HTTP API calls. To stop the server, use Ctrl-C.
 .IP "-R, --server-mode-rpc"
 (Server RPCQ Mode) Run as a RPCQ server.
 .IP "-p <port>, --port <port>"
 (Server Mode) Run quilc in server mode on port <port>.
+.IP "--host <host>"
+Host on which to start the server. The default is "*".
 .IP "-h, --help"
 Show the help message.
 .IP "-v, --version"
@@ -95,6 +97,24 @@ produced. The possible levels are: debug, info, notice, warning, err,
 crit, alert, emerg. Logs are written to stderr. (Defaults to info.)
 .IP "--quiet"
 Disable any non-logging output, like the banner.
+.IP "--verbose"
+Verbose compiler trace output. Peer into the compiler's deepest
+thoughts. (Not available on SDK builds.)
+.IP "-j, --json-serialize"
+Serialize output as JSON. (Not available on SDK builds.)
+.IP "-s, --print-logical-schedule"
+Include logically parallelized schedule in JSON output; requires
+-P. (Not available on SDK builds.)
+.IP "--check-libraries"
+Check that required foreign libraries are present and that their
+versions are adequate.
+.IP "--benchmark"
+Run benchmarks and print results.
+.IP "--log-level"
+Maximum logging level. Any logs with a less sever level will be
+ignored. Available options are "debug" (default), "info", "notice", 
+"warning", "err", "crit", "alert", or "emerg".
+
 .SH HTTP API
 In Server Mode, the QVM accepts a number of POST requests over HTTP to
 accomplish tasks. In this section, we describe each such request.
