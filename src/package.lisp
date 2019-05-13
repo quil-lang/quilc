@@ -422,6 +422,14 @@
   (:export
    #:standard-qubit-relabeler           ; FUNCTION
    )
+
+  ;; compressor/compressor.lisp
+  (:export
+   #:quil-compression-error                      ; CONDITION
+   #:quil-compression-matrices-disagree-error    ; CONDITION
+   #:quil-compression-states-disagree-error      ; CONDITION
+   #:quil-compression-matrices-not-close-error   ; CONDITION
+   )
   )
 
 (defpackage #:cl-quil.clifford

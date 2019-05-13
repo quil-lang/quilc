@@ -454,14 +454,20 @@ other's."
   `(unless ,check-form
      (error ',condition-name ,@init-forms)))
 
-(define-condition quil-compression-error (simple-error) ())
-(define-condition quil-compression-matrices-disagree-error (quil-compression-error) ())
+(define-condition quil-compression-error (error)
+  ())
+
+(define-condition quil-compression-matrices-disagree-error (quil-compression-error)
+  ())
+
 (define-condition quil-compression-states-disagree-error (quil-compression-error)
   ((final-wf :initarg :final-wf :accessor quil-compression-error-final-wf)
    (final-wf-reduced :initarg :final-wf-reduced :accessor quil-compression-error-final-wf-reduced)
    (type :initarg :type :accessor quil-compression-error-type))
-  (:report (lambda (c s) (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
-                            (quil-compression-error-type c)))))
+  (:report
+   (lambda (c s) (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
+                    (quil-compression-error-type c)))))
+
 (define-condition quil-compression-matrices-not-close-error (quil-compression-error)
   ()
   (:report (lambda (c s) (format s "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))))
