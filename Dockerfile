@@ -12,4 +12,7 @@ ADD . /src/quilc
 WORKDIR /src/quilc
 RUN git clean -fdx && make ${build_target}
 
+EXPOSE 5555
+EXPOSE 6000
+
 ENTRYPOINT ["./quilc"]
