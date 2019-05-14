@@ -54,5 +54,5 @@
   "Test whether the current SDK version is the latest SDK
 version. Second value returned indicates the latest version."
   (let ((latest (latest-sdk-version)))
-    (values (and latest (not (string= latest current-version)))
+    (values (and latest (uiop:version< current-version latest))
             latest)))
