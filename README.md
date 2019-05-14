@@ -1,6 +1,7 @@
 # QUILC
 
 [![pipeline status](https://gitlab.com/rigetti/quilc/badges/master/pipeline.svg)](https://gitlab.com/rigetti/quilc/commits/master)
+[![docker pulls](https://img.shields.io/docker/pulls/rigetti/quilc.svg)](https://hub.docker.com/r/rigetti/quilc)
 
 Quilc is an advanced optimizing compiler for the quantum instruction
 language Quil, licensed under the [Apache 2.0 license](LICENSE.txt).
@@ -215,8 +216,8 @@ docker run --rm -it -p PORT:PORT rigetti/quilc -R -p PORT
 ```
 
 Ports 5555 and 6000 are exposed using the EXPOSE directive in the `rigetti/quilc` image, so
-you can additionally use the `-P` to automatically bind these ports to randomly assigned
-host ports. You can then inspect the mapping using `docker port CONTAINER [PORT]`.
+you can additionally use the `-P` option to automatically bind these container ports to randomly
+assigned host ports. You can then inspect the mapping using `docker port CONTAINER [PORT]`.
 
 ## Release Process
 
