@@ -177,9 +177,15 @@ TEST 0 1 2")
 DEFGATE TEST AS PERMUTATION:
     0, 1, 2, 3, 4, 5, 7, 6, 8
 
+TEST 0 1 2")
+        (quil-badder "
+DEFGATE TEST AS PERMUTATION:
+    0, 1, 1, 3, 4, 5, 7, 6
+
 TEST 0 1 2"))
     (let* ((quil-parsed (not-signals quil-parse-error (quil::parse-quil quil)))
            (gates (parsed-program-gate-definitions quil-parsed)))
       (is (= 1 (length gates)))
       (is (typep (first gates) 'quil::permutation-gate-definition)))
-    (signals quil-parse-error (parse-quil quil-bad))))
+    (signals quil-parse-error (parse-quil quil-bad))
+    (signals quil-parse-error (parse-quil quil-badder))))

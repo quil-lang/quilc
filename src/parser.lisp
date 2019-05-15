@@ -904,15 +904,17 @@ INPUT-STRING that triggered the condition."
 (defun parse-gate-entries-as-permutation (body-lines name)
   (multiple-value-bind (parsed-entries rest-lines)
       (parse-permutation-gate-entries body-lines)
-    (validate-gate-permutation-size (length parsed-entries))
+    (unless (gate-permutation-p parsed-entries)
+      (quil-parse-error "Permutation gate entries do not represent a square matrix."))
     (values (make-instance 'permutation-gate-definition
                            :name name
                            :permutation parsed-entries)
             rest-lines)))
 
-(defun validate-gate-permutation-size (size)
-  (unless (positive-power-of-two-p size)
-    (quil-parse-error "Permutation gate entries do not represent a square matrix.")))
+(defun gate-permutation-p (entries)
+  (and (power-of-two-p (length entries))
+       (equal (sort entries #'<)
+              (alexandria:iota (length entries)))))
 
 (defun parse-gate-entries-as-matrix (body-lines params name)
   ;; Parse out the gate entries.
