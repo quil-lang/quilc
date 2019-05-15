@@ -73,9 +73,7 @@
     (("benchmark") :type boolean :optional t :documentation "run benchmarks and print results")
     (("log-level") :type string :optional t :initial-value "info" :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
     (("quiet") :type boolean :optional t :initial-value nil :documentation "Disable all non-logging output (banner, etc.)")
-    #+forest-sdk
     (("check-sdk-version") :type boolean :optional t :initial-value nil :documentation "Check for a new SDK version at launch.")
-    #+forest-sdk
     (("proxy") :type string :optional t :initial-value nil :documentation "Proxy to use when checking for an SDK update.")))
 
 (defun slurp-lines (&optional (stream *standard-input*))
@@ -256,9 +254,7 @@
                           (help nil)
                           (log-level nil)
                           (quiet nil)
-                          #+forest-sdk
                           (check-sdk-version nil)
-                          #+forest-sdk
                           (proxy nil))
   (when help
     (show-help)
@@ -285,7 +281,6 @@
                                   (cl-syslog:syslog-log-writer "quilc" :local0)
                                   *error-output*)))
 
-  #+forest-sdk
   (when check-sdk-version
     (multiple-value-bind (available-p version)
         (sdk-update-available-p +QUILC-VERSION+ :proxy proxy)
@@ -294,6 +289,7 @@
 Version ~A is available from https://www.rigetti.com/forest~%"
                 +QUILC-VERSION+ version))
       (uiop:quit (if (and available-p version) 0 1))))
+
   #-forest-sdk
   (when benchmark
     (benchmarks))
