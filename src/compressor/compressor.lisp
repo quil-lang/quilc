@@ -461,13 +461,13 @@ other's."
   ())
 
 (define-condition compression-states-disagree-error (compiler-correctness-error)
-  ((final-wf :initarg :final-wf :accessor compiler-correctness-error-final-wf)
-   (final-wf-reduced :initarg :final-wf-reduced :accessor compiler-correctness-error-final-wf-reduced)
-   (type :initarg :type :accessor compiler-correctness-error-type))
+  ((final-wf :initarg :final-wf :reader compiler-correctness-error-final-wf)
+   (final-wf-reduced :initarg :final-wf-reduced :reader compiler-correctness-error-final-wf-reduced)
+   (type :initarg :type :reader compiler-correctness-error-type))
   (:report
    (lambda (c s)
      (declare (ignore c))
-     (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
+     (format s "During careful checking of instruction compression, the wavefunction produced by ~A was detected to not be collinear with the target wavefunction."
              (compiler-correctness-error-type c)))))
 
 (define-condition compression-matrices-not-close-error (compiler-correctness-error)
