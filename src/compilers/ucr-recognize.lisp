@@ -43,17 +43,15 @@
                                                 (conjugate (magicl:ref matrix jpp jpp)))))
                    (return-from recognize-ucr
                      (list
-                      (make-instance 'ucr-application
-                                     :roll-type "RZ"
-                                     :parameters angles
-                                     :arguments (append
-                                                 (list (nth (- log-dimension d 1)
-                                                            (application-arguments instr)))
-                                                 (subseq (application-arguments instr)
-                                                         0
-                                                         (- log-dimension d 1))
-                                                 (subseq (application-arguments instr)
-                                                         (- log-dimension d))))))))
+                      (apply #'build-UCR "RZ" angles
+                             (append
+                              (subseq (application-arguments instr)
+                                      0
+                                      (- log-dimension d 1))
+                              (subseq (application-arguments instr)
+                                      (- log-dimension d))
+                              (list (nth (- log-dimension d 1)
+                                         (application-arguments instr)))))))))
        (give-up-compilation))
       ;; are we a UCRY matrix? these have three salient properties:
       ;;
@@ -91,15 +89,13 @@
                                             (double= m-jp-jpp (- m-jpp-jp)))))
                    (return-from recognize-ucr
                      (list
-                      (make-instance 'ucr-application
-                                     :roll-type "RY"
-                                     :parameters angles
-                                     :arguments (append
-                                                 (list (nth (- log-dimension d 1)
-                                                            (application-arguments instr)))
-                                                 (subseq (application-arguments instr)
-                                                         0
-                                                         (- log-dimension d 1))
-                                                 (subseq (application-arguments instr)
-                                                         (- log-dimension d))))))))
+                      (apply #'build-UCR "RY" angles
+                             (append
+                              (subseq (application-arguments instr)
+                                      0
+                                      (- log-dimension d 1))
+                              (subseq (application-arguments instr)
+                                      (- log-dimension d))
+                              (list (nth (- log-dimension d 1)
+                                         (application-arguments instr)))))))))
        (give-up-compilation)))))
