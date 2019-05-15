@@ -44,7 +44,6 @@
                              ((forked-operator o)
                               (recurse o)))))
                   (recurse operator))))))
-      (format t "~a, ~a, ~a.~%" operator operator-adt gate-def)
       (assert (not (null gate-def)) (operator) "BUILD-GATE only takes standard gate names.")
       (make-instance 'gate-application
                      :operator operator-adt

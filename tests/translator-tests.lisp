@@ -89,10 +89,7 @@
                                  (declare (ignore x))
                                  (constant (random (* 2 pi))))
                                (make-list (expt 2 (1- qubit-count)))))
-           (ucr-instruction (make-instance 'quil::ucr-application
-                                           :roll-type roll-type
-                                           :arguments argument-list
-                                           :parameters angle-list))
+           (ucr-instruction (apply #'quil::build-UCR roll-type angle-list argument-list))
            (ucr-matrix (quil::make-matrix-from-quil (list ucr-instruction)))
            (anonymous-instr (make-instance 'quil::gate-application
                                            :operator #.(named-operator "ANONYMOUS-UCR")

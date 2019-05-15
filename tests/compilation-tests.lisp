@@ -103,16 +103,11 @@
 (deftest test-QSD-on-4Q ()
   "Tests Quantum Shannon Compilation on a random 4Q gate."
   (let* ((m (quil::random-special-unitary 16))
-         (compiled-list (quil::qs-compiler (build-anonymous-gate m 3 2 1 0))))
-    (let* ((expanded-string
-             (loop :for instr :in compiled-list
-                   :nconc (if (typep instr 'quil::ucr-application)
-                              (quil::ucr-explode-instr instr)
-                              (list instr))))
-           (u (quil::make-matrix-from-quil expanded-string)))
-      (check-type u magicl:matrix)
-      (quil::scale-out-matrix-phases u m)
-      (fiasco-assert-matrices-are-equal m u))))
+         (compiled-list (quil::qs-compiler (build-anonymous-gate m 3 2 1 0)))
+         (u (quil::make-matrix-from-quil compiled-list)))
+    (check-type u magicl:matrix)
+    (quil::scale-out-matrix-phases u m)
+    (fiasco-assert-matrices-are-equal m u)))
 
 (deftest test-cnot->cnot ()
   (let ((progm (parse-quil "CNOT 1 0"))

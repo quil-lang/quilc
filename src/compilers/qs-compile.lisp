@@ -102,28 +102,28 @@
                                 :operator (named-operator (format nil "QSC-VR-~d" tag))
                                 :arguments (rest (application-arguments instr))
                                 :gate vR)
-                 (make-instance 'UCR-application
-                                :roll-type "RZ"
-                                :parameters (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
-                                :arguments (application-arguments instr))
+                 (apply #'build-UCR "RZ"
+                        (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
+                        (append (rest (application-arguments instr))
+                                (list (first (application-arguments instr)))))
                  (make-instance 'gate-application
                                 :operator (named-operator (format nil "QSC-VL-~d" tag))
                                 :arguments (rest (application-arguments instr))
                                 :gate vL)
                  (build-gate "RZ" (list (* -2 Rphi)) (first (application-arguments instr)))
-                 (make-instance 'UCR-application
-                                :roll-type "RY"
-                                :parameters (mapcar (lambda (x) (constant (* 2 x))) thetas)
-                                :arguments (application-arguments instr))
+                 (apply #'build-UCR "RY"
+                        (mapcar (lambda (x) (constant (* 2 x))) thetas)
+                        (append (rest (application-arguments instr))
+                                (list (first (application-arguments instr)))))
                  (build-gate "RZ" (list (* -2 Lphi)) (first (application-arguments instr)))
                  (make-instance 'gate-application
                                 :operator (named-operator (format nil "QSC-UR-~d" tag))
                                 :arguments (rest (application-arguments instr))
                                 :gate uR)
-                 (make-instance 'UCR-application
-                                :roll-type "RZ"
-                                :parameters (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
-                                :arguments (application-arguments instr))
+                 (apply #'build-UCR "RZ"
+                        (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
+                        (append (rest (application-arguments instr))
+                                (list (first (application-arguments instr)))))
                  (make-instance 'gate-application
                                 :operator (named-operator (format nil "QSC-UL-~d" tag))
                                 :arguments (rest (application-arguments instr))
