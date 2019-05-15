@@ -268,16 +268,6 @@
                           :for inv-i := (position i permutation :test #'=)
                           :collect inv-i)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;; Extensible Gate Def'ns ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defclass extensible-gate (parametried-gate)
-  ()
-  (:documentation "Represents a family of gate definitions describing several different kinds of gates."))
-
-(defmethod gate-dimension ((gate extensible-gate))
-  (error "The dimension of an extensible gate is not known in isolation of an application."))
-
-
 ;;; Taking gates and lifting them to CONTROLLED/DAGGER gates
 
 (defun operator-description-gate-lifter (descr)
