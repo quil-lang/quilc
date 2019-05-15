@@ -20,7 +20,7 @@
   ;;
   ;; Columns 0 to N are Pauli X factors (x_i)
   ;; Columns N to 2N - 1 are Pauli Z factors (z_i)
-  ;; Column 2N is are the phases r
+  ;; Column 2N are the phases r
   '(simple-array bit (* *)))
 
 (defun make-blank-tableau (n)
