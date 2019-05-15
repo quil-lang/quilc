@@ -268,6 +268,15 @@
                           :for inv-i := (position i permutation :test #'=)
                           :collect inv-i)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;; Extensible Gate Def'ns ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass extensible-gate (parametried-gate)
+  ()
+  (:documentation "Represents a family of gate definitions describing several different kinds of gates."))
+
+(defmethod gate-dimension ((gate extensible-gate))
+  (error "The dimension of an extensible gate is not known in isolation of an application."))
+
 
 ;;; Taking gates and lifting them to CONTROLLED/DAGGER gates
 
@@ -312,24 +321,6 @@
   "Lookup the gate named by GATE-NAME in the collection of *standard* Quil gates. Return NIL if non-standard."
   (check-type gate-name a:string-designator)
   (values (gethash (string gate-name) **default-gate-definitions**)))
-
-
-(define-default-gate CAN 2 (alpha beta gamma)
-  "The canonical family of gates."
-  (assert (realp alpha))
-  (assert (realp beta))
-  (assert (realp gamma))
-  (let ((a+b-g  (* 2 (cis (*  1/2 (+    alpha    beta (- gamma))))))
-        (a-b+g  (* 2 (cis (*  1/2 (+    alpha (- beta)   gamma)))))
-        (-a-b-g (* 2 (cis (* -1/2 (+    alpha    beta    gamma)))))
-        (-a+b+g (* 2 (cis (*  1/2 (+ (- alpha)   beta    gamma))))))
-    (make-row-major-matrix
-     4 4
-     (mapcar (lambda (z) (/ z 4))
-             (list (+ a+b-g a-b+g) 0                 0                 (- a-b+g a+b-g)
-                   0               (+ -a-b-g -a+b+g) (- -a-b-g -a+b+g) 0
-                   0               (- -a-b-g -a+b+g) (+ -a-b-g -a+b+g) 0
-                   (- a-b+g a+b-g) 0                 0                 (+ a+b-g a-b+g))))))
 
 ;;;;;;;;;;;;;; Conversion of GATE-DEFINITIONs to GATEs ;;;;;;;;;;;;;;;
 
