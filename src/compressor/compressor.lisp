@@ -38,6 +38,11 @@
 ;; [ instructions  ]        >?<       [ recompiled instructions]
 ;;
 
+(defmacro assert-compiler-correctness (condition-name check-form &rest init-forms &key &allow-other-keys)
+  "Assert CHECK-FORM, otherwise raise error CONDITION-NAME. Optional INIT-FORMS are passed to ERROR."
+  (check-type condition-name symbol)
+  `(unless ,check-form
+     (error ',condition-name ,@init-forms)))
 
 ;;; generic helper functions
 
@@ -449,28 +454,28 @@ other's."
         ;; otherwise, we're obligated to do full unitary compilation.
         (decompile-instructions-into-full-unitary)))))
 
-(defmacro assert-compiler-correctness (condition-name check-form &rest init-forms &key &allow-other-keys)
-  (check-type condition-name symbol)
-  `(unless ,check-form
-     (error ',condition-name ,@init-forms)))
-
-(define-condition quil-compression-error (error)
+(define-condition compiler-correctness-error (error)
   ())
 
-(define-condition quil-compression-matrices-disagree-error (quil-compression-error)
+(define-condition compression-matrices-disagree-error (compiler-correctness-error)
   ())
 
-(define-condition quil-compression-states-disagree-error (quil-compression-error)
-  ((final-wf :initarg :final-wf :accessor quil-compression-error-final-wf)
-   (final-wf-reduced :initarg :final-wf-reduced :accessor quil-compression-error-final-wf-reduced)
-   (type :initarg :type :accessor quil-compression-error-type))
+(define-condition compression-states-disagree-error (compiler-correctness-error)
+  ((final-wf :initarg :final-wf :accessor compiler-correctness-error-final-wf)
+   (final-wf-reduced :initarg :final-wf-reduced :accessor compiler-correctness-error-final-wf-reduced)
+   (type :initarg :type :accessor compiler-correctness-error-type))
   (:report
-   (lambda (c s) (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
-                    (quil-compression-error-type c)))))
+   (lambda (c s)
+     (declare (ignore c))
+     (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
+             (compiler-correctness-error-type c)))))
 
-(define-condition quil-compression-matrices-not-close-error (quil-compression-error)
+(define-condition compression-matrices-not-close-error (compiler-correctness-error)
   ()
-  (:report (lambda (c s) (format s "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))))
+  (:report
+   (lambda (c s)
+     (declare (ignore c))
+     (format s "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))))
 
 (defun check-contextual-compression-was-well-behaved (instructions
                                                       decompiled-instructions
@@ -514,13 +519,13 @@ other's."
                                                            :relabeling relabeling)
                                     (ilog2 (magicl:matrix-rows stretched-matrix)))))
              (assert-compiler-correctness
-              quil-compression-matrices-disagree-error
+              compression-matrices-disagree-error
               (and (matrix-equality stretched-matrix
                                     (scale-out-matrix-phases reduced-matrix
                                                              stretched-matrix))))
              (when decompiled-instructions
                (assert-compiler-correctness
-                quil-compression-matrices-disagree-error
+                compression-matrices-disagree-error
                 (and (matrix-equality stretched-matrix
                                       (scale-out-matrix-phases decompiled-matrix
                                                                stretched-matrix))
@@ -547,10 +552,10 @@ other's."
                              (eql final-wf-reduced-prep ':not-simulated))
                         (collinearp final-wf final-wf-reduced-prep))))
              (assert-compiler-correctness
-              quil-compression-states-disagree-error
+              compression-states-disagree-error
               final-wf-reduced-instrs-collinearp)
              (assert-compiler-correctness
-              quil-compression-states-disagree-error
+              compression-states-disagree-error
               final-wf-reduced-prep-collinearp)))
 
          (check-quil-is-near-as-matrices ()
@@ -563,7 +568,7 @@ other's."
                       (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
                                       (ilog2 (magicl:matrix-rows stretched-matrix)))))
                (assert-compiler-correctness
-                quil-compression-matrices-not-close-error
+                compression-matrices-not-close-error
                 (matrix-equality stretched-matrix
                                  (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions
@@ -578,7 +583,7 @@ other's."
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert-compiler-correctness
-                    quil-compression-matrices-not-close-error
+                    compression-matrices-not-close-error
                     (>= (* trace-fidelity
                            (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
                         (lscheduler-calculate-fidelity ls-reduced chip-spec)))))))))
@@ -644,7 +649,7 @@ other's."
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
           result-instructions))
-    (quil-compression-error (c)
+    (compiler-correctness-error (c)
       (let ((*print-circle* nil)
             (*print-pretty* nil)
             (*print-fractional-radians* nil))

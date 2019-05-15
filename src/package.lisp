@@ -425,10 +425,10 @@
 
   ;; compressor/compressor.lisp
   (:export
-   #:quil-compression-error                      ; CONDITION
-   #:quil-compression-matrices-disagree-error    ; CONDITION
-   #:quil-compression-states-disagree-error      ; CONDITION
-   #:quil-compression-matrices-not-close-error   ; CONDITION
+   #:compiler-correctness-error                  ; CONDITION
+   #:compression-matrices-disagree-error         ; CONDITION
+   #:compression-states-disagree-error           ; CONDITION
+   #:compression-matrices-not-close-error        ; CONDITION
    )
   )
 
