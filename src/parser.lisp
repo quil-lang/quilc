@@ -11,8 +11,9 @@
     :JUMP :JUMP-WHEN :JUMP-UNLESS :INCLUDE :MEASURE
     :NEG :NOT :AND :IOR :XOR :MOVE :EXCHANGE :CONVERT :ADD :SUB :MUL :DIV
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
-    :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :DECLARE :SHARING :OFFSET
-    :PRAGMA :AS :MATRIX :PERMUTATION))
+    :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
+    :DECLARE :SHARING :OFFSET :PRAGMA
+    :AS :MATRIX :PERMUTATION))
 
 (deftype token-type ()
   '(or
@@ -99,7 +100,9 @@
    (return (tok ':DAGGER)))
   ((eager #.(string #-ccl #\HELM_SYMBOL #+ccl #\u+2388))
    (return (tok ':CONTROLLED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|AS|MATRIX|PERMUTATION"
+  ((eager #.(string #\OCR_FORK))
+   (return (tok ':FORKED)))
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -287,7 +290,7 @@ INPUT-STRING that triggered the condition."
          (*line-number* (token-line tok)))
     (case tok-type
       ;; Gate/Circuit Applications
-      ((:CONTROLLED :DAGGER)
+      ((:CONTROLLED :DAGGER :FORKED)
        (parse-modified-application tok-lines))
 
       ((:NAME)
@@ -528,7 +531,7 @@ INPUT-STRING that triggered the condition."
       "A special variable to collect the names of declared memory regions.")
 
 (defun gate-modifier-token-p (tok)
-  (member (token-type tok) '(:CONTROLLED :DAGGER)))
+  (member (token-type tok) '(:CONTROLLED :DAGGER :FORKED)))
 
 (defun apply-modifiers-to-operator (processed-modifiers base-operator)
   (if (endp processed-modifiers)
@@ -542,7 +545,10 @@ INPUT-STRING that triggered the condition."
                                         (controlled-operator base-operator)))
           (:DAGGER
            (apply-modifiers-to-operator (rest processed-modifiers)
-                                        (involutive-dagger-operator base-operator)))))))
+                                        (involutive-dagger-operator base-operator)))
+          (:FORKED
+           (apply-modifiers-to-operator (rest processed-modifiers)
+                                        (forked-operator base-operator)))))))
 
 (defun parse-modified-application (tok-lines)
   (multiple-value-bind (modifiers rest-line)
@@ -554,7 +560,8 @@ INPUT-STRING that triggered the condition."
       (loop :for modifier :in modifiers
             :collect (ecase (token-type modifier)
                        (:CONTROLLED (list ':CONTROLLED))
-                       (:DAGGER     (list ':DAGGER)))
+                       (:DAGGER     (list ':DAGGER))
+                       (:FORKED     (list ':FORKED)))
               :into processed-modifiers
             :finally (progn
                        (setf (application-operator app)

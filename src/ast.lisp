@@ -833,13 +833,23 @@ Each addressing mode will be a vector of symbols:
 (defmethod mnemonic  ((inst measure-discard)) (values "MEASURE" 'measure-discard))
 
 (adt:defdata operator-description
-  "A description of an operator that Quil takes."
+  "A family of recipes for attaching meaning to a Quil operator, typically either by table look-up or by some prescribed mathematical combination."
   (named-operator      string)
   (controlled-operator operator-description)
   ;; Note that reduction of consecutive dagger operators is not
   ;; performed here. Use the alternative constructor
   ;; INVOLUTIVE-DAGGER-OPERATOR.
-  (dagger-operator     operator-description))
+  (dagger-operator     operator-description)
+  (forked-operator     operator-description))
+
+(setf (documentation 'named-operator 'function)
+      "Describes a gate using a string name, which is later looked up in a table of DEFGATE definitions.  In Quil code, this corresponds to a raw gate name, like ISWAP.")
+(setf (documentation 'controlled-operator 'function)
+      "Describes a gate as the direct sum of the identity gate (i.e., \"do nothing when the control bit is low\") and some other specified gate G (i.e., \"do G when the control bit is high\").  In Quil code, this corresponds to the descriptor CONTROLLED.")
+(setf (documentation 'dagger-operator 'function)
+      "Describes a gate as the inverse to some other gate.  In Quil code, this corresponds to the descriptor DAGGER.")
+(setf (documentation 'forked-operator 'function)
+      "Describes a gate as the direct sum of two instances of some other specified gate G with input parameters either p_low or p_high, conditioned on whether a control bit is low or high.  In Quil code, this corresponds to the descriptor FORKED.")
 
 (defun involutive-dagger-operator (od)
   "Instantiate a dagger operator on the operator description OD and
@@ -860,14 +870,16 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
   (adt:match operator-description od
     ((named-operator name)   name)
     ((controlled-operator o) (operator-description-root-name o))
-    ((dagger-operator o)     (operator-description-root-name o))))
+    ((dagger-operator o)     (operator-description-root-name o))
+    ((forked-operator o)     (operator-description-root-name o))))
 
 (defun operator-description-additional-qubits (od)
   "The number of additional qubits incurred by this operator description (e.g., CONTROLLED adds one qubit)."
   (adt:match operator-description od
     ((named-operator _)   0)
     ((controlled-operator o) (1+ (operator-description-additional-qubits o)))
-    ((dagger-operator o)     (operator-description-additional-qubits o))))
+    ((dagger-operator o)     (operator-description-additional-qubits o))
+    ((forked-operator o)     (1+ (operator-description-additional-qubits o)))))
 
 (defun print-operator-description (od stream)
   (adt:match operator-description od
@@ -875,6 +887,8 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
     ((controlled-operator o) (write-string "CONTROLLED " stream)
                              (print-operator-description o stream))
     ((dagger-operator o) (write-string "DAGGER " stream)
+                         (print-operator-description o stream))
+    ((forked-operator o) (write-string "FORKED " stream)
                          (print-operator-description o stream))))
 
 (defun operator-description-string (od)

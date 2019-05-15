@@ -39,7 +39,7 @@
   (labels ((check-parameters (gate)
              (unless (every #'is-constant (application-parameters gate))
                (error 'unknown-gate-parameter :gate gate)))
-           (recurse (od)
+           (recurse (od parameters)
              (adt:match operator-description od
                ((named-operator _)
                 ;; We've already resolved the gate name.
@@ -48,18 +48,23 @@
                        (gate-definition-to-gate (gate-application-resolution gate))
                        (mapcar #'constant-value (application-parameters gate))))
                ((controlled-operator o)
-                (let ((summand (recurse o)))
+                (let ((summand (recurse o parameters)))
                   (magicl:direct-sum
                    (magicl:make-identity-matrix (gate-dimension summand))
                    summand)))
                ((dagger-operator o)
-                (magicl:dagger (recurse o))))))
+                (magicl:dagger (recurse o parameters)))
+               ((forked-operator o)
+                (let* ((parameter-count (length parameters))
+                       (left-summand (recurse o (subseq parameters 0 (/ parameter-count 2))))
+                       (right-summand (recurse o (subseq parameters (/ parameter-count 2)))))
+                  (magicl:direct-sum left-summand right-summand))))))
     (cond ((slot-boundp gate 'gate)
            (check-parameters gate)
            (apply #'gate-matrix (gate-application-gate gate)
                   (mapcar #'constant-value (application-parameters gate))))
           (t
-           (recurse (application-operator gate))))))
+           (recurse (application-operator gate) (application-parameters gate))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;; Gate Object Definitions ;;;;;;;;;;;;;;;;;;;;;;;
@@ -212,6 +217,29 @@
                      :permutation (append (a:iota size)
                                           (mapcar (lambda (j) (+ j size)) permutation))))))
 
+;;; Forked Gates
+
+(defclass forked-gate ()
+  ((target :initarg :target
+           :reader target
+           :documentation "The targeted gate of a single qubit \"fork\", where a \"fork\" is a special case of multiplexing where the same gate is used to form both blocks, with different parameters passed to the gate constructor.")))
+
+(defmethod gate-matrix ((gate forked-gate) &rest parameters)
+  (let* ((target (target gate))
+         (length (/ (length parameters) 2))
+         (first-half (subseq parameters 0 length))
+         (second-half (subseq parameters length)))
+    (magicl:direct-sum (apply #'gate-matrix target first-half)
+                       (apply #'gate-matrix target second-half))))
+
+(defmethod gate-dimension ((gate forked-gate))
+  (* 2 (gate-dimension (target gate))))
+
+(defgeneric fork-gate (target)
+  (:documentation "Construct a forked gate out of TARGET.")
+  (:method ((target t))
+    (make-instance 'forked-gate :target target)))
+
 ;;; Daggered Gates
 
 (defclass dagger-gate ()
@@ -251,7 +279,9 @@
     ((controlled-operator od)
      (a:compose #'control-gate (operator-description-gate-lifter od)))
     ((dagger-operator od)
-     (a:compose #'dagger-gate (operator-description-gate-lifter od)))))
+     (a:compose #'dagger-gate (operator-description-gate-lifter od)))
+    ((forked-operator od)
+     (a:compose #'fork-gate (operator-description-gate-lifter od)))))
 
 (defmethod gate-application-gate ((app gate-application))
   (funcall (operator-description-gate-lifter (application-operator app))
