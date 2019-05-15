@@ -459,7 +459,7 @@
    #:pauli-from-index                   ; FUNCTION
    #:map-pauli-basis                    ; FUNCTION
    #:enumerate-pauli-basis              ; FUNCTION
-   #:clifford                           ; FUNCTION
+   #:clifford                           ; STRUCTURE
    #:apply-clifford                     ; FUNCTION
    #:clifford-identity                  ; FUNCTION
    #:clifford-identity-p                ; FUNCTION
@@ -467,6 +467,7 @@
    #:clifford=                          ; FUNCTION
    #:clifford-from-pauli                ; FUNCTION
    #:random-clifford                    ; FUNCTION
+   #:make-clifford-hash-table           ; FUNCTION
 
    ;; god-table.lisp
    #:hadamard                           ; FUNCTION
@@ -493,6 +494,7 @@
    #:apply-clifford-string              ; FUNCTION
    #:pauli-matrix-p                     ; FUNCTION
    #:n-qubit-pauli-basis-matrices       ; FUNCTION
+   #:matrix-to-clifford                 ; FUNCTION
    #:clifford-from-quil                 ; FUNCTION
    )
   )

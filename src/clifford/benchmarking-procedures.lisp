@@ -164,28 +164,30 @@
                       :collect (quil::kq-gate-on-lines X n `(,i))
                       :collect (quil::kq-gate-on-lines Z n `(,i))))))))
 
+(defun matrix-to-clifford (gate)
+  "Convert a matrix GATE into a CLIFFORD object."
+  (let ((num-qubits (quil:ilog2 (magicl:matrix-cols gate))))
+    (make-clifford
+     :num-qubits num-qubits
+     :basis-map (make-array
+                 (* 2 num-qubits)
+                 :initial-contents
+                 (loop :for pauli :in (n-qubit-pauli-basis-matrices num-qubits)
+                       :collect
+                       (multiple-value-bind (phase conj)
+                           (pauli-matrix-p
+                            (reduce #'magicl:multiply-complex-matrices
+                                    (list gate
+                                          pauli
+                                          (magicl:conjugate-transpose gate))))
+                         (assert (not (null conj)) ()
+                                 "The given matrix does not represent a Clifford element.")
+                         (pauli-from-string (concatenate 'string phase conj))))))))
+
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
   (loop :for gate-application :across (quil::parsed-program-executable-code parsed-quil)
-        :collect
-        (let* ((gate (quil:gate-matrix gate-application))
-               (num-qubits (quil:ilog2 (magicl:matrix-cols gate))))
-          (make-clifford
-           :num-qubits num-qubits
-           :basis-map (make-array
-                       (* 2 num-qubits)
-                       :initial-contents
-                       (loop :for pauli :in (n-qubit-pauli-basis-matrices num-qubits)
-                             :collect
-                             (multiple-value-bind (phase conj)
-                                 (pauli-matrix-p
-                                  (reduce #'magicl:multiply-complex-matrices
-                                          (list gate
-                                                pauli
-                                                (magicl:conjugate-transpose gate))))
-                               (assert (not (null conj)) () "The given program does not represent a Clifford element.")
-                               (pauli-from-string (concatenate 'string phase conj)))))))))
-
+        :collect (matrix-to-clifford (quil:gate-matrix gate-application))))
 
 (defun extract-qubits-used (parsed-quil)
   "Given PARSED-QUIL return the indices of the qubits used. The result is given as a list of the qubits used per instruction in the PARSED-QUIL."

@@ -1,0 +1,27 @@
+Runs a GHZ (Greenberger-Horne-Zeilinger) experiment:
+Players A, B, and C are given the state
+|000>-|011>-|101>-|110>,
+as well as bits a,b,c (a=b=1 and c=0 in this example).
+Their goal is to output bits x,y,z respectively such
+that x+y+z(mod 2) = a OR b OR c, under the promise that
+a+b+c=0(mod 2).  In contrast to the classical case, there
+exists a quantum strategy that always succeeds: each
+player measures in the standard basis if his bit is 0,
+or in the Hadamard basis if his bit is 1, then outputs
+whatever he observes.  When this program is run, the
+outcomes of the 3 measurements should be uniformly random
+conditioned on having parity=1.
+#
+h 0
+h 1
+c 0 2
+c 1 2
+p 0
+p 1
+p 2
+
+h 0
+m 0
+h 1
+m 1
+m 2

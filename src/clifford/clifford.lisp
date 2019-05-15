@@ -59,6 +59,14 @@ For qubit i, X_i will have index 2i and Z_i will have index 2i+1, for 0 <= i < 2
     (funcall f (* 2 idx)      (embed +X+ n (list idx)))
     (funcall f (1+ (* 2 idx)) (embed +Z+ n (list idx)))))
 
+(defun map-all-paulis (n f)
+  "Iterate over the single qubit X, Y, and Z pauli operators represented on
+N qubits and call F on each operator and the bitwise representation."
+  (dotimes (idx n)
+    (funcall f (ash #.(sym-to-base4 'X) (* 2 idx)) (embed +X+ n (list idx)))
+    (funcall f (ash #.(sym-to-base4 'Z) (* 2 idx)) (embed +Z+ n (list idx)))
+    (funcall f (ash #.(sym-to-base4 'Y) (* 2 idx)) (embed +Y+ n (list idx)))))
+
 (defun enumerate-pauli-basis (n)
   "Enumerate the single qubit X and Z pauli operators represented on N
 qubits."
@@ -69,7 +77,7 @@ qubits."
       (map-pauli-basis n #'collect-element)
       (nreverse list))))
 
-(declaim (ftype (function (T) simple-vector) basis-map))
+(declaim (ftype (function (t) simple-vector) basis-map))
 (defstruct (clifford (:include qubit-algebra))
   "An element of the Clifford group on NUM-QUBITS qubits."
   (num-qubits 0 :type unsigned-fixnum)
@@ -223,7 +231,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
    (every #'pauli= (basis-map a) (basis-map b))))
 
 (defun clifford-hash (c)
-  "Hash function for Clifford's."
+  "Hash function for CLIFFORD objects."
   (declare (optimize speed (safety 0) (debug 0) (space 0)))
   (declare (type clifford c))
   (declare (inline pauli-hash))
@@ -234,7 +242,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
          :finally (return h))))
 
 (defun make-clifford-hash-table (&key pre-allocate synchronized)
-  "Make a hash-table that has Clifford objects as keys."
+  "Make a hash-table that has CLIFFORD objects as keys."
   (declare (ignorable synchronized))
   (check-type pre-allocate (or null (integer 1)))
   ;; LispWorks and ClozureCL hash tables support concurrent writers by
@@ -250,14 +258,15 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
 
 (defmethod print-object ((c clifford) stream)
   (print-unreadable-object (c stream :type t)
-    (format stream "~Dq" (num-qubits c))
-    (map-pauli-basis (num-qubits c)
-                     (lambda (i input-pauli)
-                       (let ((output-pauli (aref (basis-map c) i)))
-                         (unless (pauli= input-pauli output-pauli)
-                           (format stream "~%  ~A -> ~A"
-                                   (print-pauli input-pauli nil)
-                                   (print-pauli output-pauli nil))))))))
+    (let ((*print-circle* nil))
+      (format stream "~Dq" (num-qubits c))
+      (map-pauli-basis (num-qubits c)
+                       (lambda (i input-pauli)
+                         (let ((output-pauli (aref (basis-map c) i)))
+                           (unless (pauli= input-pauli output-pauli)
+                             (format stream "~%  ~A -> ~A"
+                                     (print-pauli input-pauli nil)
+                                     (print-pauli output-pauli nil)))))))))
 
 (defun symplectic-clifford (sp &optional r s)
   "Return the Clifford corresponding to the symplectic matrix SP."
@@ -281,7 +290,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
      :basis-map bm)))
 
 (defun clifford-symplectic (c)
-  "Return the symplectic representation of the  Clifford C."
+  "Return the symplectic representation of the Clifford C."
   (let* ((n (num-qubits c))
          (r (make-array n :element-type 'bit :initial-element 0))
          (s (make-array n :element-type 'bit :initial-element 0))
