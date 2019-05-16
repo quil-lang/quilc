@@ -268,10 +268,21 @@ Version ~A is available from https://www.rigetti.com/forest~%"
 
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
-
-  (let* ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
+  
+  (macrolet
+      ((special-bindings-let* (bindings &body body)
+         "Bind BINDINGS as in LET, and add those BINDINGS to BORDEAUX-THREADS:*DEFAULT-SPECIAL-BINDINGS* in the same LET."
+         `(let* (,@(loop :for (name value) :in bindings
+                         :collect `(,name ,value))
+                 (bordeaux-threads:*default-special-bindings*
+                   (list* ,@(loop :for (name value) :in bindings
+                                  :collect `(cons ',name ,name))
+                          bordeaux-threads:*default-special-bindings*)))
+            ,@body)))
+    (special-bindings-let*
+        ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
 			  *log-level*))
-	 (*logger* (make-instance 'cl-syslog:rfc5424-logger
+         (*logger* (make-instance 'cl-syslog:rfc5424-logger
 				  :app-name *program-name*
 				  :facility ':local0
 				  :maximum-priority *log-level*
@@ -280,46 +291,44 @@ Version ~A is available from https://www.rigetti.com/forest~%"
 				  #-windows (cl-syslog:tee-to-stream
 					     (cl-syslog:syslog-log-writer "quilc" :local0)
 					     *error-output*)))
-	 (*time-limit* time-limit)
-	 (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
-	 (*compute-gate-depth* compute-gate-depth)
-	 (*compute-gate-volume* compute-gate-volume)
-	 (*compute-runtime* compute-runtime)
-	 (*compute-fidelity* compute-fidelity)
-	 (*compute-matrix-reps* compute-matrix-reps)
-	 (*compute-2Q-gate-depth* compute-2Q-gate-depth)
-	 (*compute-unused-qubits* compute-unused-qubits)
-	 (*without-pretty-printing* without-pretty-printing)
-	 (*print-logical-schedule* print-logical-schedule)
-	 (*gate-blacklist* (and gate-blacklist
-				(split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
-	 (*gate-whitelist* (and gate-whitelist
-				(split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
-	 (*topological-swaps* show-topological-overhead)
-	 (*protoquil* protoquil)
-	 (quil::*enable-state-prep-compression* enable-state-prep-reductions)
+         (*time-limit* time-limit)
+         (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
+         (*compute-gate-depth* compute-gate-depth)
+         (*compute-gate-volume* compute-gate-volume)
+         (*compute-runtime* compute-runtime)
+         (*compute-fidelity* compute-fidelity)
+         (*compute-matrix-reps* compute-matrix-reps)
+         (*compute-2Q-gate-depth* compute-2Q-gate-depth)
+         (*compute-unused-qubits* compute-unused-qubits)
+         (*without-pretty-printing* without-pretty-printing)
+         (*print-logical-schedule* print-logical-schedule)
+         (*gate-blacklist* (and gate-blacklist
+			        (split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
+         (*gate-whitelist* (and gate-whitelist
+			        (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
+         (*topological-swaps* show-topological-overhead)
+         (*protoquil* protoquil)
+         (quil::*enable-state-prep-compression* enable-state-prep-reductions)
          ;; Null out the streams. If no server mode is requested, these bindings will be modified
          ;; before calling run-CLI-mode, below.
          (*json-stream* (make-broadcast-stream))
          (*human-readable-stream* (make-broadcast-stream))
          (*quil-stream* (make-broadcast-stream))
-         (*verbose* (make-broadcast-stream))
-         (bordeaux-threads:*default-special-bindings* (append bordeaux-threads:*default-special-bindings*
-                                                              `((*protoquil* . ,*protoquil*)))))
-    ;; at this point we know we're doing something. strap in LAPACK.
-    (magicl:with-blapack
-      (reload-foreign-libraries)
+         (*verbose* (make-broadcast-stream)))
+      ;; at this point we know we're doing something. strap in LAPACK.
+      (magicl:with-blapack
+        (reload-foreign-libraries)
 
-      (cond
-	;; web server mode requested.
-	;; currently provides both web and RPCQ server as a transition.
-	(server-mode-http
-         ;; launch the polling loop
-	 (unless quiet
-           (show-banner))
+        (cond
+          ;; web server mode requested.
+          ;; currently provides both web and RPCQ server as a transition.
+	  (server-mode-http
+           ;; launch the polling loop
+	   (unless quiet
+             (show-banner))
 
-	 (unless quiet
-           (format t "~%
+	   (unless quiet
+             (format t "~%
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
 future, it will be removed.  In the meanwhile, we are launching *both* an HTTP
@@ -329,41 +338,41 @@ HTTP server for good.
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ~%~%"))
 
-	 (when port
-           (cl-syslog:rfc-log (*logger* :warning "WARNING: -p and -S are incompatible. Dropping -p.")
-             (:msgid "LOG0001")))
+	   (when port
+             (cl-syslog:rfc-log (*logger* :warning "WARNING: -p and -S are incompatible. Dropping -p.")
+               (:msgid "LOG0001")))
 
-	 ;; start the RPCQ server in parallel
-	 (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
-           (:msgid "LOG0001"))
-	 (bt:make-thread (lambda ()
-                           (start-rpc-server :host host :port 5555 :logger *logger*)))
+           ;; start the RPCQ server in parallel
+	   (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
+             (:msgid "LOG0001"))
+	   (bt:make-thread (lambda ()
+                             (start-rpc-server :host host :port 5555 :logger *logger*)))
 
-	 (start-web-server))
+	   (start-web-server))
 
-	;; RPCQ server mode requested
-	(server-mode-rpc
-         (unless quiet
-	   (show-banner))
+          ;; RPCQ server mode requested
+	  (server-mode-rpc
+           (unless quiet
+	     (show-banner))
 
-	 (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
-	   (:msgid "LOG0001"))
-	 ;; launch the polling loop
-	 (start-rpc-server :host host
-			   :port port
-			   :logger *logger*))
+	   (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
+	     (:msgid "LOG0001"))
+           ;; launch the polling loop
+	   (start-rpc-server :host host
+			     :port port
+			     :logger *logger*))
 
-	;; server modes not requested, so continue parsing arguments
-	(t
-	 (cond
-	   (json-serialize
-	    (setf *json-stream* *standard-output*))
-	   (t
-	    (setf *human-readable-stream* *error-output*)
-	    (setf *quil-stream* *standard-output*)))
-         (when verbose
-           (setf *verbose* *human-readable-stream*))
-         (run-CLI-mode (lookup-isa-descriptor-for-name isa)))))))
+          ;; server modes not requested, so continue parsing arguments
+	  (t
+	   (cond
+	     (json-serialize
+	      (setf *json-stream* *standard-output*))
+	     (t
+	      (setf *human-readable-stream* *error-output*)
+	      (setf *quil-stream* *standard-output*)))
+           (when verbose
+             (setf *verbose* *human-readable-stream*))
+           (run-CLI-mode (lookup-isa-descriptor-for-name isa))))))))
 
 (defun run-CLI-mode (isa-descriptor)
   (let* ((program-text (slurp-lines))
