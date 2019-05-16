@@ -159,9 +159,7 @@
                            (port 5555)
                            (logger (make-instance 'cl-syslog:rfc5424-logger
                                                   :log-writer (cl-syslog:null-log-writer))))
-  (let ((dt (rpcq:make-dispatch-table))
-        (bordeaux-threads:*default-special-bindings* (append bordeaux-threads:*default-special-bindings*
-                                                             `((*protoquil* . ,*protoquil*)))))
+  (let ((dt (rpcq:make-dispatch-table)))
     (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil)
     (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
     (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)

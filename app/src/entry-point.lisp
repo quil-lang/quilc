@@ -303,7 +303,9 @@ Version ~A is available from https://www.rigetti.com/forest~%"
          (*json-stream* (make-broadcast-stream))
          (*human-readable-stream* (make-broadcast-stream))
          (*quil-stream* (make-broadcast-stream))
-         (*verbose* (make-broadcast-stream)))
+         (*verbose* (make-broadcast-stream))
+         (bordeaux-threads:*default-special-bindings* (append bordeaux-threads:*default-special-bindings*
+                                                              `((*protoquil* . ,*protoquil*)))))
     ;; at this point we know we're doing something. strap in LAPACK.
     (magicl:with-blapack
       (reload-foreign-libraries)
