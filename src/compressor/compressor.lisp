@@ -354,13 +354,10 @@ other's."
                  (funcall (hardware-object-native-instructions obj) instr))
             (pop instructions)
             (push instr processed))
-           ;; otherwise, we are nonnative. translate us. error on null.
-           ((null (setf translation-results
-                        (apply-translation-compilers instr chip obj)))
-            (error "Failed to expand ~/cl-quil:instruction-fmt/ into native instructions."
-                   instr))
-           ;; we managed a translation, use these instructions instead.
+           ;; apply a translation and use those instructions instead.
            (t
+            (setf translation-results
+                  (apply-translation-compilers instr chip obj))
             ;; elaborate assertion follows
             (when (and *compress-carefully*
                        (not *enable-approximate-compilation*)
