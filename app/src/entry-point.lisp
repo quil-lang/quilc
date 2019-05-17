@@ -213,6 +213,16 @@
      :positional-arity 0
      :rest-arity nil)))
 
+(defmacro special-bindings-let* (let-defs &body body)
+  "Bind LET-DEFS as in LET, and add those LET-DEFS to bordeaux-threads:*default-special-bindings* in the same LET."
+  `(let* (,@(loop :for (name value) :in let-defs
+                  :collect `(,name ,value))
+          (bordeaux-threads:*default-special-bindings*
+            (list* ,@(loop :for (name value) :in let-defs
+                           :collect `(cons ',name ,name))
+                   bordeaux-threads:*default-special-bindings*)))
+     ,@body))
+
 (defun process-options (&key
                           (prefer-gate-ladders nil)
                           (compute-gate-depth nil)
@@ -268,42 +278,43 @@ Version ~A is available from https://www.rigetti.com/forest~%"
 
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
-
-  (let* ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
-			  *log-level*))
-	 (*logger* (make-instance 'cl-syslog:rfc5424-logger
-				  :app-name *program-name*
-				  :facility ':local0
-				  :maximum-priority *log-level*
-				  :log-writer
-				  #+windows (cl-syslog:stream-log-writer)
-				  #-windows (cl-syslog:tee-to-stream
-					     (cl-syslog:syslog-log-writer "quilc" :local0)
-					     *error-output*)))
-	 (*time-limit* time-limit)
-	 (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
-	 (*compute-gate-depth* compute-gate-depth)
-	 (*compute-gate-volume* compute-gate-volume)
-	 (*compute-runtime* compute-runtime)
-	 (*compute-fidelity* compute-fidelity)
-	 (*compute-matrix-reps* compute-matrix-reps)
-	 (*compute-2Q-gate-depth* compute-2Q-gate-depth)
-	 (*compute-unused-qubits* compute-unused-qubits)
-	 (*without-pretty-printing* without-pretty-printing)
-	 (*print-logical-schedule* print-logical-schedule)
-	 (*gate-blacklist* (and gate-blacklist
-				(split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
-	 (*gate-whitelist* (and gate-whitelist
-				(split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
-	 (*topological-swaps* show-topological-overhead)
-	 (*protoquil* protoquil)
-	 (quil::*enable-state-prep-compression* enable-state-prep-reductions)
-         ;; Null out the streams. If no server mode is requested, these bindings will be modified
-         ;; before calling run-CLI-mode, below.
-         (*json-stream* (make-broadcast-stream))
-         (*human-readable-stream* (make-broadcast-stream))
-         (*quil-stream* (make-broadcast-stream))
-         (*verbose* (make-broadcast-stream)))
+  
+  (special-bindings-let*
+      ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
+			*log-level*))
+       (*logger* (make-instance 'cl-syslog:rfc5424-logger
+				:app-name *program-name*
+				:facility ':local0
+				:maximum-priority *log-level*
+				:log-writer
+				#+windows (cl-syslog:stream-log-writer)
+				#-windows (cl-syslog:tee-to-stream
+					   (cl-syslog:syslog-log-writer "quilc" :local0)
+					   *error-output*)))
+       (*time-limit* time-limit)
+       (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
+       (*compute-gate-depth* compute-gate-depth)
+       (*compute-gate-volume* compute-gate-volume)
+       (*compute-runtime* compute-runtime)
+       (*compute-fidelity* compute-fidelity)
+       (*compute-matrix-reps* compute-matrix-reps)
+       (*compute-2Q-gate-depth* compute-2Q-gate-depth)
+       (*compute-unused-qubits* compute-unused-qubits)
+       (*without-pretty-printing* without-pretty-printing)
+       (*print-logical-schedule* print-logical-schedule)
+       (*gate-blacklist* (and gate-blacklist
+			      (split-sequence:split-sequence #\, (remove #\Space gate-blacklist))))
+       (*gate-whitelist* (and gate-whitelist
+			      (split-sequence:split-sequence #\, (remove #\Space gate-whitelist))))
+       (*topological-swaps* show-topological-overhead)
+       (*protoquil* protoquil)
+       (quil::*enable-state-prep-compression* enable-state-prep-reductions)
+       ;; Null out the streams. If no server mode is requested, these bindings will be modified
+       ;; before calling run-CLI-mode, below.
+       (*json-stream* (make-broadcast-stream))
+       (*human-readable-stream* (make-broadcast-stream))
+       (*quil-stream* (make-broadcast-stream))
+       (*verbose* (make-broadcast-stream)))
     ;; at this point we know we're doing something. strap in LAPACK.
     (magicl:with-blapack
       (reload-foreign-libraries)
