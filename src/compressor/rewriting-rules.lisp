@@ -381,7 +381,7 @@
                  (#b1011
                   (list (build-gate "RZ" (list pi) control)))
                  (#b1101
-                  (list (build-gate "RZ" (list pi) control)))
+                  (list (build-gate "RZ" (list pi) target)))
                  (#b1110
                   (list (build-gate "RZ" (list pi) control)
                         (build-gate "RZ" (list pi) target)))
