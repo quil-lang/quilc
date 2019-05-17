@@ -71,6 +71,11 @@ or (2) communicating with the `quilc` server.
 
 #### quilc
 
+> *Note*: If you're on Windows and using the Command Prompt, the echo
+> command is slightly different to the examples shown below: do not
+> wrap your quil code in quotes. For example, in Command Prompt, you
+> would do `echo H 0 | quilc` *not* `echo "H 0" | quilc`.
+
 The `quilc` binary reads Quil code provided on `stdin`:
 
 ``` shell
