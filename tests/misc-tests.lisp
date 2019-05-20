@@ -232,16 +232,25 @@
     (is (plusp (length (parsed-program-executable-code prgm))))
     (is (plusp (length (parsed-program-executable-code (compiler-hook prgm chip)))))))
 
-(deftest test-positive-power-of-two-p ()
-  "Test that POSITIVE-POWER-OF-TWO-P does what it says on the tin."
+(deftest test-power-of-two-p ()
+  "Test that POWER-OF-TWO-P and POSITIVE-POWER-OF-TWO-P do what they say on the tin."
+  (is (not (quil::power-of-two-p -2)))
+  (is (not (quil::power-of-two-p -1)))
+  (is (not (quil::power-of-two-p 0)))
   (is (not (quil::positive-power-of-two-p -2)))
   (is (not (quil::positive-power-of-two-p -1)))
   (is (not (quil::positive-power-of-two-p 0)))
+
+  (is (quil::power-of-two-p 1))
+  (is (not (quil::positive-power-of-two-p 1)))
+
   (loop :for power-of-two = 2 :then (* 2 power-of-two)
         :while (<= power-of-two 1024)
         :do (progn
+              (is (quil::power-of-two-p power-of-two))
+              (is (not (quil::power-of-two-p (1+ power-of-two))))
               (is (quil::positive-power-of-two-p power-of-two))
-              (is (not (quil::positive-power-of-two-p (1- power-of-two)))))))
+              (is (not (quil::positive-power-of-two-p (1+ power-of-two)))))))
 
 (deftest test-check-permutation ()
   "Test that CHECK-PERMUTATION signals error iff input is not valid."
