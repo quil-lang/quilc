@@ -203,6 +203,17 @@
       (format *error-output* "~&! ! ! Error: ~A~%" c)
       (uiop:quit 1))))
 
+(defun clamp-syslog-name (name)
+  "Produces a name like \"<A>...<B>\" where <A> is a 15-char chunk
+from the beginning of the name, and <B> is a 30-char chunk from the
+end of the name."
+  (let ((len (length name)))
+    (if (<= len 48)
+        name
+        (format nil "~A...~A"
+                (subseq name 0 15)
+                (subseq name (- (length name) 30))))))
+
 (defun %entry-point (argv)
   (let ((*program-name* (pop argv)))
     (command-line-arguments:handle-command-line
@@ -272,7 +283,7 @@
 
   (setf *logger*
         (make-instance 'cl-syslog:rfc5424-logger
-                       :app-name *program-name*
+                       :app-name (clamp-syslog-name *program-name*)
                        :facility ':local0
                        :maximum-priority *log-level*
                        :log-writer
@@ -301,7 +312,7 @@ Version ~A is available from https://www.rigetti.com/forest~%"
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
 			*log-level*))
        (*logger* (make-instance 'cl-syslog:rfc5424-logger
-				:app-name *program-name*
+				:app-name (clamp-syslog-name *program-name*)
 				:facility ':local0
 				:maximum-priority *log-level*
 				:log-writer
