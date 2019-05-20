@@ -63,6 +63,6 @@
 (defun sdk-update-available-p (current-version &key (proxy nil))
   "Test whether the current SDK version is the latest SDK
 version. Second value returned indicates the latest version."
-  (let ((latest (latest-sdk-version)))
+  (let ((latest (latest-sdk-version :proxy proxy)))
     (values (and latest (uiop:version< current-version latest))
             latest)))

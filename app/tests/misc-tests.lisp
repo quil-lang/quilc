@@ -14,7 +14,10 @@
         (skip)))
 
   (with-mocked-function-definitions
-      ((quilc::latest-sdk-version (lambda () "1.0.0")))
+      ((quilc::latest-sdk-version (lambda (&rest args)
+                                    (declare (ignore args))
+                                    "1.0.0")))
     (multiple-value-bind (update-available-p update)
         (quilc::sdk-update-available-p "1.5.0")
+      (declare (ignore update))
       (is (not update-available-p)))))
