@@ -913,7 +913,7 @@ INPUT-STRING that triggered the condition."
 
 (defun gate-permutation-p (entries)
   (and (power-of-two-p (length entries))
-       (equal (sort entries #'<)
+       (equal (sort (copy-list entries) #'<)
               (alexandria:iota (length entries)))))
 
 (defun parse-gate-entries-as-matrix (body-lines params name)
