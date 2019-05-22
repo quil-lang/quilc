@@ -186,3 +186,11 @@
     ;; Originally this program has an unnecessary jump-when loop with 3 blocks when it could be completely removed,
     ;; as well as a trail of blocks to the end. This 8 block program should now be a 3 block program (at most).
     (is (>= 3 (length blocks-result)))))
+
+(deftest test-program-terminated-by-conditional-jump ()
+  "Verify that quil programs ending with a JUMP-WHEN or JUMP-UNLESS do not signal an UNBOUND-SLOT error.
+
+This is a regression test for https://github.com/rigetti/quilc/issues/244"
+  (dolist (jump-instr '("JUMP-WHEN" "JUMP-UNLESS"))
+    (let ((p (quil::parse-quil-into-raw-program (format nil "DECLARE ro BIT~%LABEL @START~%~A @START ro[0]" jump-instr))))
+      (not-signals error (quil::program-cfg p :dce t :simplify t)))))
