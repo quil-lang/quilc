@@ -32,9 +32,10 @@
                   (defun ,name ,args ,@body)
                   (declaim (notinline ,name))))))
 
-  (define-inlineable integer-bits-equal (bits1 bits2)
-      (bit-set bit-set -> boolean)
-    (= bits1 bits2))
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (define-inlineable integer-bits-equal (bits1 bits2)
+        (bit-set bit-set -> boolean)
+      (= bits1 bits2)))
   (define-inlineable infinite-integer-set-p (bits)
       (bit-set -> boolean)
     (minusp bits))
