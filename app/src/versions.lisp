@@ -36,6 +36,8 @@
   :test #'string=
   :documentation "The git hash of the quilc repo.")
 
+(declaim (special *logger*))
+
 (defun latest-sdk-version (&key (proxy nil))
   "Get the latest SDK quilc version, or NIL if unavailable."
   (handler-case
