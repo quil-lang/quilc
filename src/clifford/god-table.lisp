@@ -163,7 +163,7 @@ allows to compute a minimal length sequence of generators to invert it."))
     ;; are 2 generator applications away from the identity, then 3,
     ;; etc. until we have reached all cliffords.
     (let ((explored 0)
-          (time (get-internal-real-time)))
+          #+#:debug(time (get-internal-real-time)))
       (loop :until (queue-empty-p q)
             :for next := (dequeue q)
             :do
