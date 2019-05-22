@@ -136,3 +136,9 @@ Return two values:
 (defun positive-power-of-two-p (n)
   "Given an INTEGER N, return true if N is a power of 2, greater than 1."
   (and (> n 1) (power-of-two-p n)))
+
+(alexandria:define-constant double-float-positive-infinity
+    #+ccl ccl::double-float-positive-infinity
+    #+ecl ext:double-float-positive-infinity
+    #+sbcl sb-ext:double-float-positive-infinity
+    #-(or ccl ecl sbcl) (error "double-float-positive-infinity not available."))
