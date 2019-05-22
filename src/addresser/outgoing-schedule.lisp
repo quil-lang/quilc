@@ -19,7 +19,7 @@
     :initarg :chip-spec
     :reader chip-schedule-spec)
    (lschedule
-    :type 'logical-scheduler
+    :type logical-scheduler
     :initform (make-lscheduler)
     :reader chip-schedule-data)))
 
