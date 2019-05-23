@@ -108,6 +108,9 @@ classical memory regions. "
     (qubits +empty+ :type bit-set :read-only t)
     (memory-regions nil :read-only t))  ; Either an alist mapping region names to bit sets, or the sentinel value T
 
+  (defmethod make-load-form ((object resource-collection) &optional env)
+    (make-load-form-saving-slots object :environment env))
+
   (defun resource= (rc1 rc2)
     "Returns true if resource collections RC1 and RC2 contain the same qubit and region resources."
     (and (integer-bits-equal (resource-collection-qubits rc1)
