@@ -134,13 +134,12 @@
             (read-quil-file prog-source))))
 
        (by-assignment (prog-source chip assn)
-         #+sbcl (sb-ext:gc :full t)
          (handler-bind
              ((simple-error
-                (lambda (e)
-                  (when break-on-error
-                    (break "~a" e))
-                  (return-from by-assignment (list nil nil 1)))))
+               (lambda (e)
+                 (when break-on-error
+                   (break "~a" e))
+                 (return-from by-assignment (list nil nil 1)))))
            (funcall assn (lambda ()
                            (rest (multiple-value-list (compiler-hook (get-prog prog-source) chip)))))))
 
@@ -191,7 +190,9 @@
                      (list (make-instance 'application-force-rewiring :target target)))))
 
 (defun generate-random-rewiring-prog (n-qubits state)
-  (let ((*random-state* (sb-ext:seed-random-state state)))
+  (let ((*random-state* #+sbcl (sb-ext:seed-random-state state)
+                        #+ecl  (make-random-state state)
+                        #-(or sbcl ecl) (error "don't know how to seed random state")))
     (make-rewiring-prog (quil::generate-random-rewiring n-qubits))))
 
 (defun measure-rewiring-swap-search (assn &rest args
@@ -212,7 +213,9 @@
 
 (defvar *basic-swap-search-assn*
     (make-assignments
-        ((*random-state* (sb-ext:seed-random-state 1))
+        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                         #+ecl  (make-random-state 1)
+                         #-(or sbcl ecl) (error "don't know how to seed random state"))
          (quil::*compressor-passes* 0))
         (quil::*addresser-swap-search-type*
          quil::*addresser-move-to-rewiring-swap-search-type*)
@@ -223,7 +226,9 @@
 
 (defvar *2q-tiers-assn*
   (make-assignments
-      ((*random-state* (sb-ext:seed-random-state 1))
+      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                       #+ecl  (make-random-state 1)
+                       #-(or sbcl ecl) (error "don't know how to seed random state"))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -243,7 +248,9 @@
 
 (defvar *swap-search-assn*
   (make-assignments
-      ((*random-state* (sb-ext:seed-random-state 1))
+      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                       #+ecl  (make-random-state 1)
+                       #-(or sbcl ecl) (error "don't know how to seed random state"))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -260,7 +267,9 @@
 
 (defvar *initial-rewiring-assn*
   (make-assignments
-      ((*random-state* (sb-ext:seed-random-state 1))
+      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                       #+ecl  (make-random-state 1)
+                       #-(or sbcl ecl) (error "don't know how to seed random state"))
        (quil::*compressor-passes* 0)
        (quil::*addresser-swap-search-type* :greedy-qubit))
       (quil::*initial-rewiring-default-type*)
@@ -272,7 +281,9 @@
 
 (defvar *depth-vs-swaps-assn*
   (make-assignments
-      ((*random-state* (sb-ext:seed-random-state 1))
+      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                       #+ecl  (make-random-state 1)
+                       #-(or sbcl ecl) (error "don't know how to seed random state"))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
