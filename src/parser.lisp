@@ -95,9 +95,9 @@
    (return (tok :PARAMETER (param $1))))
   ((eager "{{STRING}}")
    (return (tok :STRING (read-from-string $@))))
-  ((eager #.(string #\DAGGER))
+  ((eager #.(string #-ccl #\DAGGER #+ccl #\u+2020))
    (return (tok ':DAGGER)))
-  ((eager #.(string #\HELM_SYMBOL))
+  ((eager #.(string #-ccl #\HELM_SYMBOL #+ccl #\u+2388))
    (return (tok ':CONTROLLED)))
   ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|AS|MATRIX|PERMUTATION"
    (return (tok (intern $@ :keyword))))
