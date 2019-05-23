@@ -164,7 +164,8 @@
     (is (quil::memory-ref= a0 a0!))
     (is (not (quil::memory-ref= a0 a1)))
     (is (not (quil::memory-ref= a0 b0)))
-    (let ((T-A-B-L-E (make-hash-table :test 'quil::memory-ref=)))
+    (let ((T-A-B-L-E (make-hash-table :test 'quil::memory-ref=
+                                      :hash-function 'quil::memory-ref-hash)))
       (setf (gethash a0  T-A-B-L-E) t
             (gethash a0* T-A-B-L-E) t
             (gethash a0! T-A-B-L-E) t

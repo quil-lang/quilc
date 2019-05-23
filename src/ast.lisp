@@ -54,9 +54,6 @@ WARNING: The default will work for instances of \"idiomatic\" classes that aren'
   #-sbcl
   (logxor (sxhash (memory-ref-name m)) (sxhash (memory-ref-position m))))
 
-;; Used to make a memory reference - keyed hashmap in analysis/rewrite-arithmetic.lisp
-(sb-ext:define-hash-table-test memory-ref= memory-ref-hash)
-
 (defmethod print-object ((mref memory-ref) stream)
   (print-unreadable-object (mref stream :type t :identity nil)
     (format stream "~A[~D]~:[~;*~]"
