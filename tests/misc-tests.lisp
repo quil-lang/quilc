@@ -114,7 +114,7 @@
   "Double the data values in a thing."
   identity)
 
-(deftest transform-predecessor-checking ()
+(deftest test-transform-predecessor-checking ()
   "Test that omitting a predecessor tranform signals an error."
   (let ((transform (quil::find-transform 'double-data)))
     (is (not (null transform)))

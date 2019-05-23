@@ -68,7 +68,7 @@ CNOT 0 1")
   "Iterates over the rewiring modes and tests that the addresser is well-behaved on each of them."
   ;; first, the straight-line rewiring methods
   (dolist (quil::*initial-rewiring-default-type* '(:naive :random :partial :greedy))
-    (format t "    Testing rewiring type ~A~%" quil::*initial-rewiring-default-type*)
+    (format t "~&    Testing rewiring type ~A~%" quil::*initial-rewiring-default-type*)
     (finish-output)
     (let* ((pstring "
 CNOT 0 2
@@ -82,7 +82,7 @@ CNOT 1 3")
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
-    (format t "    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
+    (format t "~&    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
     (finish-output)
     (let* ((pp (quil::parse-quil-into-raw-program "
 LABEL @a
@@ -109,7 +109,7 @@ some test programs."
   (finish-output *debug-io*)
   (dolist (state-prep '(nil t))
     (let ((quil::*enable-state-prep-compression* state-prep))
-      (format *debug-io* "    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
+      (format *debug-io* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
       (dolist (file (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))
         (format *debug-io* "      Testing file ~a:" (pathname-name file))
         (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
@@ -160,7 +160,7 @@ RX(pi) 2
   (finish-output *debug-io*)
   (dolist (state-prep '(nil t))
     (let ((quil::*enable-state-prep-compression* state-prep))
-      (format *debug-io* "    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
+      (format *debug-io* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
       (dolist (architecture '(:cz :iswap :cphase :piswap :cnot))
         (format *debug-io* "      Working on architecture ~a.~%" architecture)
         (let* ((num-qubits 4)

@@ -115,7 +115,7 @@
                               (list "CPHASE" (list (random 1.0d0)) #'cl-quil::CPHASE-to-native-CPHASEs)
                               (list "PISWAP" (list (random 1.0d0)) #'cl-quil::PISWAP-to-native-PISWAPs)))
       (destructuring-bind (operator params expander) instr-type
-        (format *debug-io* "    Testing global-to-local ~a expansion~%" operator)
+        (format *debug-io* "~&    Testing global-to-local ~a expansion~%" operator)
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
                (mat (cl-quil::make-matrix-from-quil (funcall expander chip-spec instr))))
