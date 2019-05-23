@@ -112,8 +112,9 @@ and J-th (target) qubit."
   (make-hash-table :test 'gateset=
                    :hash-function 'gateset-hash
                    ;; We need to synchronize because this table will
-                   ;; be used as a cache from the server.
-                   :synchronized t))
+                   ;; be used as a cache from the server. LW and CCL
+                   ;; support that by default.
+                   #+(or sbcl ecl) :synchronized #+(or sbcl ecl) t))
 
 (defclass god-table ()
   ((mapping :initarg :mapping :reader mapping)

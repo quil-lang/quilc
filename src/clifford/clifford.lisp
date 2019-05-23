@@ -250,10 +250,10 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
   (if pre-allocate
       (make-hash-table :test 'clifford=
                        :hash-function 'clifford-hash
-                       #+sbcl :synchronized #+sbcl synchronized
+                       #+(or sbcl ecl) :synchronized #+(or sbcl ecl) synchronized
                        :size (count-clifford pre-allocate))
       (make-hash-table :test 'clifford=
-                       #+sbcl :synchronized #+sbcl synchronized
+                       #+(or sbcl ecl) :synchronized #+(or sbcl ecl) synchronized
                        :hash-function 'clifford-hash)))
 
 (defmethod print-object ((c clifford) stream)
