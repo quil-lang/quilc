@@ -40,7 +40,11 @@
        (sb-ext:atomic-incf ,counter-name)
        #+lispworks
        (system:atomic-incf ,counter-name)
-       #-(or sbcl lispworks)
+       #+ecl
+       (mp:atomic-incf ,counter-name)
+       #+ccl
+       (ccl::atomic-incf ,counter-name)
+       #-(or ccl ecl sbcl lispworks)
        (incf ,counter-name))))
 
 (defun first-column-operator= (mat1 mat2)
