@@ -246,7 +246,7 @@ appear in the same connected component of the qpu"
              (loop
                :with l-multiplier := (aref l2l-multiplier qubit)
                :with best := nil
-               :with best-cost := most-positive-long-float
+               :with best-cost := most-positive-double-float
 
                :for physical-target :in cc
                :for cost
