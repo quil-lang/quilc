@@ -1,0 +1,89 @@
+# Input
+DEFGATE TEST(%arg):
+    %arg+%arg, %arg-%arg
+    %arg/%arg, %arg^%arg
+
+# Output
+DEFGATE TEST(%arg):
+    (%arg+%arg), (%arg-%arg)
+    (%arg/%arg), (%arg^%arg)
+
+
+
+# Input
+DEFGATE TEST(%arg):
+    2*%arg+%arg/pi, %arg^2-%arg+2*%arg
+    %arg*2/2*%arg,  %arg^%arg^%arg
+
+# Output
+DEFGATE TEST(%arg):
+    (((2.0)*%arg)+(%arg/(pi))), (((%arg^(2.0))-%arg)+((2.0)*%arg))
+    (((%arg*(2.0))/(2.0))*%arg), (%arg^(%arg^%arg))
+
+
+
+# Input
+DEFGATE TEST(%arg):
+    COS(%arg),      SIN(%arg),               CIS(%arg),           SQRT(%arg)
+    EXP(%arg),      SIN(pi/%arg),            COS(pi/2*%arg),      CIS(%arg*i),
+    SIN(2*%arg),    EXP(1+%arg),             SQRT(%arg^2),        SQRT(%arg)^2
+    COS(SIN(%arg)), SIN(%arg)^2+COS(%arg)^2, SIN(%arg)/SIN(%arg), SIN(%arg)/COS(%arg)
+
+# Output
+DEFGATE TEST(%arg):
+    COS(%arg), SIN(%arg), CIS(%arg), SQRT(%arg)
+    EXP(%arg), SIN(((pi)/%arg)), COS((((pi)/(2.0))*%arg)), CIS((%arg*(1.0i)))
+    SIN(((2.0)*%arg)), EXP(((1.0)+%arg)), SQRT((%arg^(2.0))), (SQRT(%arg)^(2.0))
+    COS(SIN(%arg)), ((SIN(%arg)^(2.0))+(COS(%arg)^(2.0))), (SIN(%arg)/SIN(%arg)), (SIN(%arg)/COS(%arg))
+
+
+
+# Input
+DEFGATE TEST(%arg):
+    %arg*COS(%arg/2+2^2)^2^4, 0
+    0, 0
+
+# Output
+DEFGATE TEST(%arg):
+    (%arg*(COS(((%arg/(2.0))+((2.0)^(2.0))))^((2.0)^(4.0)))), 0.0
+    0.0, 0.0
+
+
+
+# Input
+DEFGATE TEST(%arg1, %arg2, %arg3):
+    (%arg1*%arg2+(%arg3/pi)^2)/pi, 0
+    0, 0
+
+# Output
+DEFGATE TEST(%arg1, %arg2, %arg3):
+    (((%arg1*%arg2)+((%arg3/(pi))^(2.0)))/(pi)), 0.0
+    0.0, 0.0
+
+
+
+# Input
+DEFGATE TEST(%arg1, %arg2):
+    0, 0
+    0, %arg1^%arg2
+
+# Output
+DEFGATE TEST(%arg1, %arg2):
+    0.0, 0.0
+    0.0, (%arg1^%arg2)
+
+
+
+# Input
+DEFCIRCUIT TEST(%arg1, %arg2) p:
+    RX(%arg1-%arg2) p
+
+TEST(pi, pi*SIN(pi/2)) 0
+
+# Output
+DEFCIRCUIT TEST(%arg1, %arg2) p:
+    RX((%arg1-%arg2)) p
+
+
+RX(0.0) 0
+

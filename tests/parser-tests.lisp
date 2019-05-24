@@ -155,40 +155,6 @@
       (is (string= "H" instr-dagger^2))
       (is (string= "DAGGER H" instr-dagger^3)))))
 
-(deftest test-defgate-printing ()
-  (let ((befores (list "DEFGATE R(%theta, %beta):
-    exp(%beta/3*i), 0
-    0, exp(%theta/2*i)
-
-R(pi/2, pi/8) 0"
-                       "DEFGATE R:
-    exp(2*i), 0
-    0, exp(4*i)
-
-R 0")))
-    (dolist (before befores)
-      (let ((after (with-output-to-string (s)
-                     (quil::print-parsed-program
-                      (quil::parse-quil before)
-                      s))))
-        (quil::parse-quil after)))))
-
-(deftest test-circuit-and-declare-printing ()
-  (let* ((before "DECLARE theta REAL[16]
-DECLARE theta-bits BIT[100] SHARING theta OFFSET 1 REAL
-
-DEFCIRCUIT TEST(%a) b c:
-    RZ(%a) b
-    RZ(%a) c
-
-
-TEST(0.5) 0 1
-")
-         (after (with-output-to-string (s)
-                  (cl-quil::print-parsed-program
-                   (cl-quil::parse-quil-into-raw-program before) s))))
-    (is (string= before after))))
-
 (deftest test-defgate-as-matrix ()
   (let* ((quil "
 DEFGATE TEST AS MATRIX:

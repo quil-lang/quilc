@@ -1,0 +1,18 @@
+# Input
+DEFGATE TEST:
+    pi/pi, 0
+    0, 2^4/16
+# Output
+DEFGATE TEST AS PERMUTATION:
+    0, 1
+
+
+# Input
+DEFGATE TEST:
+    0, 1
+    1, 0
+# Output
+DEFGATE TEST AS PERMUTATION:
+    1, 0
+
+

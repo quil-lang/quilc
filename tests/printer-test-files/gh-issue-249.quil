@@ -1,0 +1,14 @@
+# Input
+DEFGATE TEST(%arg):
+    COS(%arg)^2, 0
+    0, SIN(%arg)^2
+
+TEST(0.5) 0
+# Output
+DEFGATE TEST(%arg):
+    (COS(%arg)^(2.0)), 0.0
+    0.0, (SIN(%arg)^(2.0))
+
+
+TEST(0.5) 0
+

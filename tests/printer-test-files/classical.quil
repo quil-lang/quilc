@@ -1,0 +1,65 @@
+# Input
+DECLARE int INTEGER[4]
+DECLARE ro BIT[4]
+DECLARE b BIT
+
+NEG int[0]
+NOT ro[1]
+MOVE int[2] 1
+EXCHANGE int[0] int[1]
+CONVERT ro[0] int[0]
+LOAD b b int[0]
+STORE b int[0] b
+
+# Output
+DECLARE int INTEGER[4]
+DECLARE ro BIT[4]
+DECLARE b BIT
+
+NEG int[0]
+NOT ro[1]
+MOVE int[2] 1
+EXCHANGE int[0] int[1]
+CONVERT ro[0] int[0]
+LOAD b[0] b int[0]
+STORE b int[0] b[0]
+
+# Input
+# Stolen from tests/good-test-files/good-classical-binaries.quil
+DECLARE ro BIT[4]
+DECLARE oct OCTET
+DECLARE x REAL[2]
+
+AND ro[0] ro[1]
+XOR ro[1] ro[2]
+IOR ro[2] ro[3]
+
+EQ ro[0] ro[1] ro[2]
+LE ro[0] ro[1] ro[2]
+LT ro[0] ro[1] ro[2]
+GE ro[0] ro[1] ro[2]
+GT ro[0] ro[1] ro[2]
+
+ADD x[0] x[1]
+SUB x[0] x[1]
+MUL x[0] x[1]
+DIV x[0] x[1]
+
+# Output
+DECLARE ro BIT[4]
+DECLARE oct OCTET
+DECLARE x REAL[2]
+
+AND ro[0] ro[1]
+XOR ro[1] ro[2]
+IOR ro[2] ro[3]
+EQ ro[0] ro[1] ro[2]
+LE ro[0] ro[1] ro[2]
+LT ro[0] ro[1] ro[2]
+GE ro[0] ro[1] ro[2]
+GT ro[0] ro[1] ro[2]
+ADD x[0] x[1]
+SUB x[0] x[1]
+MUL x[0] x[1]
+DIV x[0] x[1]
+
