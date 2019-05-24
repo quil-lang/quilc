@@ -262,3 +262,13 @@
       (is (eq lisp-symbol (quil::quil-function->lisp-symbol quil-string)))
       (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
+     (a:iota n))))
+
+(deftest test-measure-semantics ()
+  "Test that something or other is what it is"
+  (let ((qvm (qvm:make-density-qvm 1))
+        (p (parse-quil "H 0
+MEAUSURE 0
+H 0")))
+    (qvm:load-program qvm :supersede-memory-subsystem t)
+    (setf (qvm::program-compiled-p qvm) t)))
