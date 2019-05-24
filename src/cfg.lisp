@@ -175,27 +175,23 @@ Return the following values:
   (vector-push-extend instr (basic-block-code blk))
   (values blk nil nil))
 
-(defmethod process-instruction (cfg blk (instr pragma))
-  (cond
-    ((string= "PRESERVE_BLOCK" (first (pragma-words instr)))
-     (if (= 0 (length (basic-block-code blk)))
-         ;; we don't need to make a new empty block. just change the current one
-         ;; to be preserved
-         (progn
-           (change-class blk 'preserved-block)
-           (values blk nil nil))
-         ;; the old block is non-empty, so make a new preserved block
-         (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
-           (change-class label-blk 'preserved-block)
-           (link-blocks blk (unconditional-edge label-blk))
-           (values label-blk blk nil))))
+(defmethod process-instruction (cfg blk (instr pragma-preserve-block))
+  (if (= 0 (length (basic-block-code blk)))
+      ;; we don't need to make a new empty block. just change the current one
+      ;; to be preserved
+      (progn
+        (change-class blk 'preserved-block)
+        (values blk nil nil))
+      ;; the old block is non-empty, so make a new preserved block
+      (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
+        (change-class label-blk 'preserved-block)
+        (link-blocks blk (unconditional-edge label-blk))
+        (values label-blk blk nil))))
 
-    ((string= "END_PRESERVE_BLOCK" (first (pragma-words instr)))
-     (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
-       (link-blocks blk (unconditional-edge label-blk))
-       (values label-blk blk nil)))
-    (t
-     (call-next-method))))
+(defmethod process-instruction (cfg blk (instr pragma-end-preserve-block))
+  (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
+    (link-blocks blk (unconditional-edge label-blk))
+    (values label-blk blk nil)))
 
 (defmethod process-instruction (cfg blk (instr halt))
   (assert (not (null blk)) (blk))
