@@ -132,7 +132,7 @@ allows to compute a minimal length sequence of generators to invert it."))
   "Compute the God table for the closure of some specific generators."
   (let* ((q (make-queue))
          (n (num-qubits gateset))
-         (num-cliffords (count-clifford n))
+         #+#:debug(num-cliffords (count-clifford n))
          (generators (cliffords gateset))
          (gt (make-clifford-hash-table :pre-allocate n
                                        :synchronized nil)))
