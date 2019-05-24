@@ -7,4 +7,5 @@
   
   ;; suite.lisp
   (:export
-   #:run-quilc-tests))
+   #:run-quilc-tests)
+  (:shadowing-import-from #:cl-quil #:pi))

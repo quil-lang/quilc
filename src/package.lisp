@@ -421,7 +421,9 @@
   ;; relabeling.lisp
   (:export
    #:standard-qubit-relabeler           ; FUNCTION
-   ))
+   )
+  (:shadow
+   #:pi))
 
 (defpackage #:cl-quil.clifford
   (:nicknames #:quil.clifford)
