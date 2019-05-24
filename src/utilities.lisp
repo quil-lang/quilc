@@ -146,3 +146,5 @@ Return two values:
     #+ecl ext:double-float-positive-infinity
     #+sbcl sb-ext:double-float-positive-infinity
     #-(or ccl ecl sbcl) (error "double-float-positive-infinity not available."))
+
+(alexandria:define-constant pi #.(coerce cl:pi 'double-float))

@@ -10,4 +10,5 @@
 
   ;; suite.lisp
   (:export
-   #:run-benchmarks))
+   #:run-benchmarks)
+  (:shadowing-import-from #:cl-quil #:pi))
