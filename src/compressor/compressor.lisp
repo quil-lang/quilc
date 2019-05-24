@@ -752,7 +752,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
   (let* ((output nil)
          (n-qubits (chip-spec-n-qubits chip-specification))
          (governors (make-list (length (chip-specification-objects chip-specification))))
-         (global-governor (make-instance 'governed-queue))
+         (global-governor (make-governed-queue))
          (context (set-up-compressor-context :qubit-count n-qubits
                                              :simulate (and *enable-state-prep-compression* protoquil)
                                              :chip-specification chip-specification)))
