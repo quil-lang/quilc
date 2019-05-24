@@ -109,7 +109,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   "Evaluate the delayed expression DE to a numerical value (represented in a CONSTANT data structure). MEMORY-MODEL is an association list with keys MEMORY-REF structures and values the value stored at that location."
   (labels ((lookup-function (expr)
              (case expr
-               ((+ - * / cos sin tan) expr)
+               ((+ - * / expt cos sin sqrt exp cis) expr)
                (otherwise (error "Illegal function in arithmetic expression: ~a." expr))))
            (evaluate-parameter (param)
              (etypecase param
@@ -1142,7 +1142,11 @@ For example,
     (format stream "~A" (formal-name thing)))
 
   (:method ((thing delayed-expression) (stream stream))
-    (labels ((print-delayed-expression (expr stream)
+    (labels ((lisp-symbol-to-infix-operator (symbol)
+               (case symbol
+                 (cl:expt "^")
+                 (otherwise (symbol-name symbol))))
+             (print-delayed-expression (expr stream)
                (typecase expr
                  (cons
                   (cond
@@ -1151,7 +1155,7 @@ For example,
                     ((= (length expr) 3)
                      (format stream "(~a~a~a)"
                              (print-delayed-expression (second expr) nil)
-                             (first expr)
+                             (lisp-symbol-to-infix-operator (first expr))
                              (print-delayed-expression (third expr) nil)))
                     ((= (length expr) 2)
                      (format stream "~a(~a)"
