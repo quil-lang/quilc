@@ -52,7 +52,7 @@
 (defun apply-translation-compilers (instruction chip-spec hardware-object)
   "Wrapper function that calls the compilers associated to HARDWARE-OBJECT and the generic compilers associated to CHIP-SPEC in precedence order, returning the first found expansion of INSTRUCTION as a sequence."
   (labels ((try-compiler (compilation-method)
-             "Applies COMPILATION-METHOD to INSTRUCTION. If it succeeds, end 
+             "Applies COMPILATION-METHOD to INSTRUCTION. If it succeeds, end
               the whole procedure and return the resulting instruction sequence.
               If it fails, cede control by returning NIL."
              (restart-case
@@ -90,7 +90,7 @@
 (defun check-protoquil-program (program)
   "Checks that PROGRAM, an application-resolved parsed-program instance, conforms to the present definition of \"protoQuil\". Signals an error on failure."
   ;; a protoquil program carves up into 3 regions, each optional, of the form:
-  ;; (1) a RESET instruction 
+  ;; (1) a RESET instruction
   ;; (2) quantum gates, perhaps with classical memory references or classical arithmetic
   ;; (3) a collection of MEASURE instructions
   (let ((region-counter 1))
@@ -133,25 +133,25 @@ Returns a value list: (processed-program, of type parsed-program
                        topological-swaps, of type integer
                        unpreserved-block-duration, of type real)"
   (format *compiler-noise-stream* "COMPILER-HOOK: entrance.~%")
-  
+
   (warm-chip-spec-lookup-cache chip-specification)
-  
+
   ;; start by doing some basic expansion transformations
   (transform 'resolve-applications parsed-program)
-  
+
   ;; we disallow compilation of programs that use memory aliasing
   (loop :for mdesc :in (parsed-program-memory-definitions parsed-program)
         :when (memory-descriptor-sharing-parent mdesc)
           :do (error "Programs with aliased memory are currently unsupported."))
-  
+
   ;; check that the program obeys the dead qubit rule
   (when (eql ':naive rewiring-type)
     (check-program-skips-dead-qubits parsed-program chip-specification))
-  
+
   ;; check that a protoquil program is in fact protoquil
   (when protoquil
     (check-protoquil-program parsed-program))
-  
+
   ;; now we walk the CFG associated to the program
   (let* ((initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                   :type rewiring-type))
@@ -160,7 +160,7 @@ Returns a value list: (processed-program, of type parsed-program
          (block-stack (list (list (entry-point cfg) nil)))
          (topological-swaps 0)
          (unpreserved-duration 0))
-    
+
     (let ((*print-pretty* nil))
       (format *compiler-noise-stream* "COMPILER-HOOK: initial rewiring ~a~%" initial-rewiring))
 
@@ -190,7 +190,7 @@ Returns a value list: (processed-program, of type parsed-program
         (push new-final-blk (cfg-blocks cfg))
         (link-blocks new-final-blk (make-instance 'terminating-edge))
         (link-blocks final-blk (unconditional-edge new-final-blk))))
-    
+
     ;; these local functions describe how we traverse / modify the CFG.
     (labels
         ;; this function introduces a new block that cajoles the compiler into
@@ -215,15 +215,15 @@ Returns a value list: (processed-program, of type parsed-program
              (push (list fresh-block registrant) block-stack)
              (format *compiler-noise-stream* "COMPILER-HOOK: Introduced ~a to deal with the rewiring.~%"
                      (basic-block-name fresh-block))))
-         
+
          (touch-preserved-block (blk)
            ;; if so, then we don't have any business compiling it. treat
            ;; it as marked, with the identity rewiring on both ends,
-           ;; and proceed 
+           ;; and proceed
            (setf (basic-block-in-rewiring blk) (make-rewiring (chip-spec-n-qubits chip-specification)))
            (setf (basic-block-out-rewiring blk) (make-rewiring (chip-spec-n-qubits chip-specification)))
            (change-class blk 'basic-block))
-         
+
          (touch-unpreserved-block (blk registrant)
            ;; actually process this block
            (multiple-value-bind (initial-l2p chip-schedule final-l2p)
@@ -252,7 +252,7 @@ Returns a value list: (processed-program, of type parsed-program
                (incf topological-swaps local-topological-swaps)
                (incf unpreserved-duration duration)
                (format *compiler-noise-stream* "COMPILER-HOOK: Done processing block ~a.~%" (basic-block-name blk)))))
-         
+
          (touch-reset-block (blk)
            ;; actually process this block
            (multiple-value-bind (initial-l2p chip-schedule final-l2p)
@@ -279,7 +279,7 @@ Returns a value list: (processed-program, of type parsed-program
                (incf topological-swaps local-topological-swaps)
                (incf unpreserved-duration duration)
                (format *compiler-noise-stream* "COMPILER-HOOK: Done processing block ~a.~%" (basic-block-name blk)))))
-         
+
          (process-block (blk registrant)
            ;; if this block is expecting a rewiring, we should make sure the
            ;; exit/enter rewirings match.
@@ -301,12 +301,12 @@ Returns a value list: (processed-program, of type parsed-program
                (unless (equalp final-l2p initial-l2p)
                  (return-from process-block
                    (edge-to-rewiring-block blk registrant initial-l2p)))))
-           
+
            ;; the source's exit rewiring now matches the target's entry rewiring.
            ;; if this block has already been visited, skip it.
            (when (basic-block-in-rewiring blk)
              (return-from process-block))
-           
+
            (let ((*print-pretty* nil))
              (format *compiler-noise-stream* "COMPILER-HOOK: Visiting ~a for the first time, coming from ~a (~a).~%"
                      (basic-block-name blk)
@@ -324,7 +324,7 @@ Returns a value list: (processed-program, of type parsed-program
              ((unconditional-edge target)
               (push (list target blk) block-stack))
              (terminating-edge nil))
-           
+
            ;; now fork based on whether the block is PRESERVEd.
            ;; note that touch-* will set block-initial-l2p, which indicates the block has been visited
            (typecase blk
@@ -334,14 +334,14 @@ Returns a value list: (processed-program, of type parsed-program
               (touch-reset-block blk))
              (otherwise
               (touch-unpreserved-block blk registrant))))
-         
+
          ;; this is the main loop that pushes through the CFG
          (exhaust-stack ()
            (unless (endp block-stack)
              (destructuring-bind (blk registrant) (pop block-stack)
                (process-block blk registrant))
              (exhaust-stack))))
-      
+
       ;; kick off the traversal
       (exhaust-stack)
       ;; untag all the reset blocks
