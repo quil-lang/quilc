@@ -479,11 +479,13 @@ mapping instructions to their tags. "
                (every (lambda (ancestor) (gethash ancestor visited-hash-table))
                       (gethash candidate (lscheduler-earlier-instrs lschedule))))
              (walk-graph-with-candidates (candidates)
-               (let* ((candidate (find-if #'candidate-has-no-ancestors
-                                          candidates))
-                      ;; TODO: use a queue to make this more like a normal topological sort
-                      (candidates (append (gethash candidate (lscheduler-later-instrs lschedule))
-                                          (remove candidate candidates))))
+               (do* (;; TODO: use a queue to make this more like a normal topological sort
+                     (candidates candidates
+                                 (append (gethash candidate (lscheduler-later-instrs lschedule))
+                                         (remove candidate candidates)))
+                     (candidate (find-if #'candidate-has-no-ancestors candidates)
+                                (find-if #'candidate-has-no-ancestors candidates)))
+                    ((null candidates))
                  (setf (gethash candidate visited-hash-table) t)
                  (let ((bumped-value (funcall bump-value candidate (gethash candidate distance-hash-table))))
                    (setf max-distance
@@ -492,9 +494,7 @@ mapping instructions to their tags. "
                      (setf (gethash child distance-hash-table)
                            (if (gethash child distance-hash-table)
                                (funcall test-values bumped-value (gethash child distance-hash-table))
-                               bumped-value))))
-                 (unless (endp candidates)
-                   (walk-graph-with-candidates candidates)))))
+                               bumped-value)))))))
       (dolist (instr (lscheduler-topmost-instructions lschedule))
         (setf (gethash instr distance-hash-table) base-value))
       (walk-graph-with-candidates (lscheduler-topmost-instructions lschedule))

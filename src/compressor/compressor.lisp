@@ -269,50 +269,48 @@ other's."
        ;; successfully, we rewind by the peephole window and try again. if it
        ;; fails, we fall through, step through to the next node, and try again.
        (outer-instruction-loop (node)
-         ;; for each instruction...
-         (setf node (peephole-rewriter-node-next node))
-         (unless node (return-from outer-instruction-loop))
-
-         (update-context node)
-
-         ;; build the noncommuting instruction list
-         (let* ((nodes-for-inspection (find-noncommuting-instructions node))
-                (qubit-complex nil)
-                (exhausted-specializations nil))
-           ;; for each instruction in the noncommuting tail...
-           (dolist (inspection-node nodes-for-inspection)
-             (let ((new-complex (application-qubit-indices (peephole-rewriter-node-instr inspection-node))))
-               ;; if we've already hit the generic object, continue to the next list head element.
-               (when exhausted-specializations
-                 (return-from outer-instruction-loop
-                   (outer-instruction-loop node)))
-               ;; does the next noncommuting instruction yield some new set of rules?
-               ;; if not, skip it.
-               (when (subsetp new-complex qubit-complex)
-                 (return))
-               ;; enlarge the complex
-               (setf qubit-complex (union qubit-complex new-complex))
-               ;; try to find an associated hardware object for this complex
-               (let ((obj (nth-value 2 (lookup-hardware-address-by-qubits chip-specification qubit-complex))))
-                 ;; if we can, then we want to loop over the object's rewrite rules.
-                 ;; if we can't, we fall through and do nothing.
-                 (alexandria:when-let
-                     ((rewrite-rules
-                       (cond
-                         ;; if we found a new hardware object, then use its rules
-                         (obj (hardware-object-rewriting-rules obj))
-                         ;; if we didn't find a new object but we haven't tried the
-                         ;; generic rules, try them now
-                         ((not exhausted-specializations)
-                          (setf exhausted-specializations t)
-                          (chip-specification-generic-rewriting-rules chip-specification))
-                         ;; otherwise, give up.
-                         (t nil))))
-                   (let ((node-to-jump-to (apply-rules rewrite-rules nodes-for-inspection)))
-                     (when node-to-jump-to
-                       (return-from outer-instruction-loop
-                         (outer-instruction-loop node-to-jump-to)))))))))
-         (outer-instruction-loop node)))
+         (do (;; for each instruction...
+              (node #1=(peephole-rewriter-node-next node) #1#))
+             ((null node))
+           (update-context node)
+           ;; build the noncommuting instruction list
+           (let* ((nodes-for-inspection (find-noncommuting-instructions node))
+                  (qubit-complex nil)
+                  (exhausted-specializations nil))
+             ;; for each instruction in the noncommuting tail...
+             (dolist (inspection-node nodes-for-inspection)
+               (let ((new-complex (application-qubit-indices (peephole-rewriter-node-instr inspection-node))))
+                 ;; if we've already hit the generic object, continue to the next list head element.
+                 (when exhausted-specializations
+                   (go :ADVANCE-NODE))
+                 ;; does the next noncommuting instruction yield some new set of rules?
+                 ;; if not, skip it.
+                 (when (subsetp new-complex qubit-complex)
+                   (return))
+                 ;; enlarge the complex
+                 (setf qubit-complex (union qubit-complex new-complex))
+                 ;; try to find an associated hardware object for this complex
+                 (let ((obj (nth-value 2 (lookup-hardware-address-by-qubits chip-specification qubit-complex))))
+                   ;; if we can, then we want to loop over the object's rewrite rules.
+                   ;; if we can't, we fall through and do nothing.
+                   (alexandria:when-let
+                       ((rewrite-rules
+                         (cond
+                           ;; if we found a new hardware object, then use its rules
+                           (obj (hardware-object-rewriting-rules obj))
+                           ;; if we didn't find a new object but we haven't tried the
+                           ;; generic rules, try them now
+                           ((not exhausted-specializations)
+                            (setf exhausted-specializations t)
+                            (chip-specification-generic-rewriting-rules chip-specification))
+                           ;; otherwise, give up.
+                           (t nil))))
+                     (let ((node-to-jump-to (apply-rules rewrite-rules nodes-for-inspection)))
+                       (when node-to-jump-to
+                         (setf node node-to-jump-to)
+                         (go :ADVANCE-NODE))))))))
+          :ADVANCE-NODE
+          nil)))
 
     ;; strip out all the NOPs.
     (let* ((instructions (remove-if (lambda (x) (typep x 'no-operation)) instructions))
@@ -330,55 +328,52 @@ other's."
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
-(defun expand-to-native-instructions (instrs chip-specification &optional output-string)
+(defun expand-to-native-instructions (instructions chip)
   "Repeatedly applies nativization routines to expand a list of addressed instructions into a list of addressed, native instructions. Makes no attempt to perform any kind of rewiring or any kind of simplification."
-  ;; dispatch on the top instruction type
-  (cond
-    ;; if we've exhausted the input, then return
-    ((endp instrs)
-     (nreverse output-string))
-    ;; discard any NOPs
-    ((typep (first instrs) 'no-operation)
-     (expand-to-native-instructions (rest instrs)
-                                    chip-specification
-                                    output-string))
-    ;; pass any classical instructions through
-    ((not (typep (first instrs) 'application))
-     (expand-to-native-instructions (rest instrs)
-                                    chip-specification
-                                    (cons (first instrs) output-string)))
-    ;; otherwise, we have a quantum instruction
-    (t
-     ;; try to locate it on hardware.
-     (multiple-value-bind (order address obj)
-         (lookup-hardware-address chip-specification (first instrs))
-       (declare (ignore order) (ignore address))
-       ;; are we native? then stick this instruction onto the output.
-       (when (and obj
-                  (funcall (hardware-object-native-instructions obj) (first instrs)))
-         (return-from expand-to-native-instructions
-           (expand-to-native-instructions (rest instrs)
-                                          chip-specification
-                                          (cons (first instrs) output-string))))
-       ;; otherwise, we are nonnative. translate us.
-       (let ((translation-results (apply-translation-compilers (first instrs)
-                                                               chip-specification
-                                                               obj)))
-         ;; if we managed a translation, use these instructions instead.
-         ;; otherwise, throw an error: we failed to perform translation.
+  (do* ((processed nil)
+        (instructions instructions)
+        (instr (first instructions) (first instructions)))
+       ;; if we've exhausted the input, then return
+       ((endp instructions) (nreverse processed))
+    (cond
+      ;; discard any NOPs
+      ((typep instr 'no-operation)
+       (pop instructions))
+      ;; pass any classical instructions through
+      ((not (typep instr  'application))
+       (pop instructions)
+       (push instr processed))
+      ;; otherwise, we have a quantum instruction
+      (t
+       ;; try to locate it on hardware.
+       (let ((obj (nth-value 2 (lookup-hardware-address chip instr)))
+             (translation-results nil))
          (cond
-           (translation-results
+           ;; are we native? then stick this instruction onto the output.
+           ((and obj
+                 (funcall (hardware-object-native-instructions obj) instr))
+            (pop instructions)
+            (push instr processed))
+           ;; otherwise, we are nonnative. translate us. error on null.
+           ((null (setf translation-results
+                        (apply-translation-compilers instr chip obj)))
+            (error "Failed to expand ~/cl-quil:instruction-fmt/ into native instructions."
+                   instr))
+           ;; we managed a translation, use these instructions instead.
+           (t
+            ;; elaborate assertion follows
             (when (and *compress-carefully*
                        (not *enable-approximate-compilation*)
-                       (notany (lambda (instr) (typep instr 'state-prep-application))
-                               instrs))
+                       (notany (lambda (instr)
+                                 (typep instr 'state-prep-application))
+                               instructions))
               (let* ((reassignment
-                       ;; the actual reassignment we use is unimportant. this is
-                       ;; more along the lines of COMPRESS-QUBITs, so that our
-                       ;; matrices don't take up quite so much space.
-                       (standard-qubit-relabeler (union (qubits-in-instr-list instrs)
-                                                        (qubits-in-instr-list translation-results))))
-                     (ref-mat (make-matrix-from-quil (list (first instrs))
+                      ;; the actual reassignment we use is unimportant. this is
+                      ;; more along the lines of COMPRESS-QUBITs, so that our
+                      ;; matrices don't take up quite so much space.
+                      (standard-qubit-relabeler (union (qubits-in-instr-list instructions)
+                                                       (qubits-in-instr-list translation-results))))
+                     (ref-mat (make-matrix-from-quil (list instr)
                                                      :relabeling reassignment))
                      (mat (make-matrix-from-quil translation-results
                                                  :relabeling reassignment))
@@ -390,14 +385,8 @@ other's."
                  (matrix-equality
                   kroned-ref-mat
                   (scale-out-matrix-phases kroned-mat kroned-ref-mat)))))
-            (expand-to-native-instructions (append translation-results
-                                                   (rest instrs))
-                                           chip-specification
-                                           output-string))
-           (t
-            (error "Failed to expand ~a into native instructions."
-                   (print-instruction (first instrs) nil)))))))))
-
+            ;; expand the set of instructions which need to be processed.
+            (setf instructions (append translation-results (rest instructions))))))))))
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
   "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
