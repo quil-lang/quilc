@@ -337,10 +337,8 @@ Returns a value list: (processed-program, of type parsed-program
 
          ;; this is the main loop that pushes through the CFG
          (exhaust-stack ()
-           (unless (endp block-stack)
-             (destructuring-bind (blk registrant) (pop block-stack)
-               (process-block blk registrant))
-             (exhaust-stack))))
+           (loop :until (endp block-stack) :do
+             (apply #'process-block (pop block-stack)))))
 
       ;; kick off the traversal
       (exhaust-stack)
