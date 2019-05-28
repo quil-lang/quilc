@@ -266,9 +266,16 @@
 
 (deftest test-measure-semantics ()
   "Test that something or other is what it is"
-  (let ((qvm (qvm:make-density-qvm 1))
-        (p (parse-quil "H 0
-MEAUSURE 0
-H 0")))
-    (qvm:load-program qvm :supersede-memory-subsystem t)
-    (setf (qvm::program-compiled-p qvm) t)))
+  (let* ((qvm (qvm:make-density-qvm 1))
+         (qvm-comp (qvm:make-density-qvm 1))
+         (p (parse-quil "H 0
+MEASURE 0
+H 0"))
+         (p-comp (quil::compiler-hook p (quil::build-nq-fully-connected-chip 1))))
+    (qvm:load-program qvm p :supersede-memory-subsystem t)
+    (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
+    (qvm:run qvm)
+    (qvm:run qvm-comp)
+    (let* ((amplitudes (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm) 'list)))
+           (amplitudes-comp (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm-comp) 'list))))
+      (quil::matrix-equality amplitudes amplitudes-comp))))
