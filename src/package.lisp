@@ -425,11 +425,13 @@
 
   ;; compressor/compressor.lisp
   (:export
-   #:quil-compression-error                     ; CONDITION
-   #:quil-compression-matrices-disagree-error   ; CONDITION
-   #:quil-compression-states-disagree-error     ; CONDITION
-   #:quil-compression-matrices-not-equal-error  ; CONDITION
-   #:quil-compression-unnacceptable-trace-fidelity-drop-error ; CONDITION
+   #:compression-error                    ; CONDITION
+   #:compression-matrices-disagree-error  ; CONDITION
+   #:compression-states-disagree-error    ; CONDITION
+   #:compression-matrices-not-equal-error ; CONDITION
+   #:compression-error-final-wf           ; FUNCTION
+   #:compression-error-final-wf-reduced   ; FUNCTION
+   #:compression-error-type               ; FUNCTION
    )
   )
 

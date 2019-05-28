@@ -169,13 +169,14 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
   "Given a wavefunction WF, represented as an array of complex doubles, together with a list QC of qubit indices describing what the components of the wavefunction represent, applies the instruction INSTR and returns the resulting wavefunction (with the same qubit ordering).  Does not modify any of its inputs."
   (unless (eq wf ':not-simulated)
     (handler-case 
-        (let* ((qubit-indices (mapcar #'qubit-index (application-arguments instr)))
-               (rewiring (mapcar (lambda (q) (- (length qc) 1 (position q qc)))
-                                 qubit-indices))
-               (matrix (gate-matrix instr)))
-          (nondestructively-apply-matrix-to-vector
-           (kq-gate-on-lines matrix (length qc) rewiring)
-           wf))
+        (progn
+          (let* ((qubit-indices (mapcar #'qubit-index (application-arguments instr)))
+                 (rewiring (mapcar (lambda (q) (- (length qc) 1 (position q qc)))
+                                   qubit-indices))
+                 (matrix (gate-matrix instr)))
+            (nondestructively-apply-matrix-to-vector
+             (kq-gate-on-lines matrix (length qc) rewiring)
+             wf)))
       (unknown-gate-parameter () ':not-simulated))))
 
 (defun nondestructively-apply-instrs-to-wf (instrs wf qc)
