@@ -265,17 +265,24 @@
      (a:iota n))))
 
 (deftest test-measure-semantics ()
-  "Test that something or other is what it is"
-  (let* ((qvm (qvm:make-density-qvm 1))
-         (qvm-comp (qvm:make-density-qvm 1))
-         (p (parse-quil "H 0
+  "Test that artifacts of compilation (namely moving MEASUREs) does
+not change the semantics of the program."
+  (let ((ps (list "MEASURE 0
+H 0"
+                  "H 0
 MEASURE 0
-H 0"))
-         (p-comp (quil::compiler-hook p (quil::build-nq-fully-connected-chip 1))))
-    (qvm:load-program qvm p :supersede-memory-subsystem t)
-    (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
-    (qvm:run qvm)
-    (qvm:run qvm-comp)
-    (let* ((amplitudes (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm) 'list)))
-           (amplitudes-comp (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm-comp) 'list))))
-      (quil::matrix-equality amplitudes amplitudes-comp))))
+H 0
+"
+                  "H 0
+MEASURE 0")))
+    (dolist (p (mapcar #'quil:parse-quil ps))
+      (let* ((qvm (qvm:make-density-qvm 1))
+             (qvm-comp (qvm:make-density-qvm 1))
+             (p-comp (quil::compiler-hook p (quil::build-nq-fully-connected-chip 1))))
+        (qvm:load-program qvm p :supersede-memory-subsystem t)
+        (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
+        (qvm:run qvm)
+        (qvm:run qvm-comp)
+        (let* ((amplitudes (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm) 'list)))
+               (amplitudes-comp (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm-comp) 'list))))
+          (is (quil::matrix-equality amplitudes amplitudes-comp)))))))
