@@ -454,28 +454,28 @@ other's."
         ;; otherwise, we're obligated to do full unitary compilation.
         (decompile-instructions-into-full-unitary)))))
 
-(define-condition compiler-correctness-error (error)
-  ())
+(define-condition quil-compression-error (error) ())
 
-(define-condition compression-matrices-disagree-error (compiler-correctness-error)
-  ())
-
-(define-condition compression-states-disagree-error (compiler-correctness-error)
-  ((final-wf :initarg :final-wf :reader compiler-correctness-error-final-wf)
-   (final-wf-reduced :initarg :final-wf-reduced :reader compiler-correctness-error-final-wf-reduced)
-   (type :initarg :type :reader compiler-correctness-error-type))
-  (:report
-   (lambda (c s)
-     (declare (ignore c))
-     (format s "During careful checking of instruction compression, the wavefunction produced by ~A was detected to not be collinear with the target wavefunction."
-             (compiler-correctness-error-type c)))))
-
-(define-condition compression-matrices-not-close-error (compiler-correctness-error)
+(define-condition quil-compression-matrices-disagree-error (quil-compression-error)
   ()
-  (:report
-   (lambda (c s)
-     (declare (ignore c))
-     (format s "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))))
+  (:documentation "Raised when if either DECOMPILED-MATRIX or REDUCED-DECOMPILED-MATRIX are found to be not equal to STRETCHED-MATRIX after scaling."))
+
+(define-condition quil-compression-states-disagree-error (quil-compression-error)
+  ((final-wf :initarg :final-wf :reader quil-compression-error-final-wf)
+   (final-wf-reduced :initarg :final-wf-reduced :reader quil-compression-error-final-wf-reduced)
+   (type :initarg :type :reader quil-compression-error-type))
+  (:report (lambda (c s) (format s "During careful checking of instruction compression, the wavefunction produced by by ~A was detected to not be collinear with the target wavefunction."
+                            (quil-compression-error-type c)))))
+
+(define-condition quil-compression-matrices-not-equal-error (quil-compression-error)
+  ()
+  (:documentation "Raised when the matrices produced by two instruction sequences are not equal (defined by MATRIX-EQUALITY) after stretching and scaling.")
+  (:report "During instruction compression of instructions, matrices were found to be not equal after stretching and scaling."))
+
+(define-condition quil-compression-unacceptable-trace-fidelity-drop-error (quil-compression-error)
+  ()
+  (:documentation "This error is raised when the matrices produced by two instruction sequences result in a significant drop in trace fidelity.")
+  (:report "During careful checking of instruction compression, the recomputed instruction sequence has an unreasonably large fidelity drop from the original sequence."))
 
 (defun check-contextual-compression-was-well-behaved (instructions
                                                       decompiled-instructions
@@ -519,10 +519,10 @@ other's."
                                                            :relabeling relabeling)
                                     (ilog2 (magicl:matrix-rows stretched-matrix)))))
              (assert-compiler-correctness
-              compression-matrices-disagree-error
-              (and (matrix-equality stretched-matrix
-                                    (scale-out-matrix-phases reduced-matrix
-                                                             stretched-matrix))))
+              quil-compression-matrices-not-equal-error
+              (matrix-equality stretched-matrix
+                               (scale-out-matrix-phases reduced-matrix
+                                                        stretched-matrix)))
              (when decompiled-instructions
                (assert-compiler-correctness
                 compression-matrices-disagree-error
@@ -552,10 +552,10 @@ other's."
                              (eql final-wf-reduced-prep ':not-simulated))
                         (collinearp final-wf final-wf-reduced-prep))))
              (assert-compiler-correctness
-              compression-states-disagree-error
+              quil-compression-states-disagree-error
               final-wf-reduced-instrs-collinearp)
              (assert-compiler-correctness
-              compression-states-disagree-error
+              quil-compression-states-disagree-error
               final-wf-reduced-prep-collinearp)))
 
          (check-quil-is-near-as-matrices ()
@@ -568,7 +568,7 @@ other's."
                       (kron-matrix-up (make-matrix-from-quil reduced-decompiled-instructions)
                                       (ilog2 (magicl:matrix-rows stretched-matrix)))))
                (assert-compiler-correctness
-                compression-matrices-not-close-error
+                quil-compression-matrices-not-equal-error
                 (matrix-equality stretched-matrix
                                  (scale-out-matrix-phases reduced-matrix stretched-matrix)))
                (when decompiled-instructions
@@ -583,7 +583,7 @@ other's."
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert-compiler-correctness
-                    compression-matrices-not-close-error
+                    quil-compression-unacceptable-trace-fidelity-drop-error
                     (>= (* trace-fidelity
                            (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
                         (lscheduler-calculate-fidelity ls-reduced chip-spec)))))))))
