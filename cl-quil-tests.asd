@@ -7,7 +7,7 @@
   :author "Robert Smith <robert@rigetti.com>"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
-               (:version #:qvm "1.8.2")
+               #:qvm
                #:magicl
                #:alexandria
                #:fiasco
