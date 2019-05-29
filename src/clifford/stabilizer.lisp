@@ -380,6 +380,16 @@ but the symbols may be uninterned or named differently.
   (dotimes (j (array-dimension tab 1))
     (setf (aref tab i j) (aref tab k j))))
 
+(defun tableau-swap-row (tab i k)
+  "Given a tableau TAB, swap row I with row K."
+  (declare (type tableau tab)
+           (type tableau-index i k))
+  (let ((n (tableau-qubits tab)))
+    ;; use scratch row as temporary storage, which is OK because swapping is only ever done during gaussian elimination
+    (tableau-copy-row tab (* 2 n) k)
+    (tableau-copy-row tab k i)
+    (tableau-copy-row tab i (* 2 n))))
+
 ;;; Robert: For some reason that I'm not sure about, the procedure for
 ;;; non-deterministic measurement from the Aaronson et al. paper
 ;;; didn't work. I had to look at their C code for inspiration, which
@@ -435,6 +445,104 @@ but the symbols may be uninterned or named differently.
              (row-product tab (* 2 n) (+ i n))))
          (values (tableau-r tab (* 2 n)) t))))))
 
+(defun gaussian-elim (tab)
+  "Perform Gaussian elimination to mutate the generators of a tableau tab, putting them in quasi-upper-triangular form. The modified generators will have the form
+|1 x x x x x x x x x x x|
+|. 1 x x x x x x x x x x|
+|. . . 1 x x x x x x x x|
+|. . . . . 1 x x x x x x|
+|. . 0 . . . . 1 x x x x|
+|. . . . . . . . 1 x x x|
+^-----X----^ ^----Z-----^
+where the upper generators comprise only X's and Y's while the lower generators comprise only Z's. This makes it easy to 1) determine how many nonzero basis states are present, based on the number of purely X/Y generators (which = log(# of nonzero basis states)), 2) easily find a nonzero basis state using the purely Z generators (done in the seed-op function below).
+Also returns the number of purely X/Y generators (log-nonzero).
+"
+  (let* ((n (tableau-qubits tab))
+         (log-nonzero 0)
+         (elim-row n))
+    ;; for each column j
+    (dotimes (j n)
+      ;; find a generator with X in the jth column
+      (let ((k (loop :for k :from elim-row :below (* 2 n)
+                     :when (= 1 (tableau-x tab k j))
+                       :do (return k)
+                     :finally (return nil))))
+        ;; swap this generator up, and eliminate Xs in this column from all other rows
+        (when k
+          (tableau-swap-row tab elim-row k)
+          (tableau-swap-row tab (- elim-row n) (- k n))
+          (loop :for k2 :from (+ 1 elim-row) :below (* 2 n)
+                :when (= 1 (tableau-x tab k2 j))
+                  :do (row-product tab k2 elim-row) (row-product tab (- elim-row n) (- k2 n)))
+          (incf elim-row))))
+    (setf log-nonzero (- elim-row n))
+    ;; repeat the previous loop, but this time for the Z tableau
+    (dotimes (j n)
+      (let ((k (loop :for k :from elim-row :below (* 2 n)
+                     :when (= 1 (tableau-z tab k j))
+                       :do (return k)
+                     :finally (return nil))))
+        (when k
+          (tableau-swap-row tab elim-row k)
+          (tableau-swap-row tab (- elim-row n) (- k n))
+          (loop :for k2 :from (+ 1 elim-row) :below (* 2 n)
+                :when (= 1 (tableau-z tab k2 j))
+                  :do (row-product tab k2 elim-row) (row-product tab (- elim-row n) (- k2 n)))
+          (incf elim-row))))
+    log-nonzero))
+
+(defun seed-op (tab)
+  "Given a tableau tab, find a Pauli operator P such that P|0...0> has nonzero amplitude in the state represented by tab. Write this operator to the scratch space of tab. Gaussian elimination must first be performed, since this is operator is found using the purely Z generators."
+  (let ((n (tableau-qubits tab))
+        (log-nonzero (gaussian-elim tab)))
+    ;; zero out scratch space
+    (dotimes (i (* 2 n))
+      (setf (tableau-scratch tab i) 0))
+    ;; for each row i, starting from the bottom of the Z generators
+    (loop :for i :from (- (* 2 n) 1) :downto (+ n log-nonzero)
+          :do (let ((phase (tableau-r tab i))
+                    (first-z n))
+                ;; find the leftmost Z in this generator
+                (loop :for j :from (- n 1) :downto 0
+                      :when (= 1 (tableau-z tab i j))
+                        :do (setf first-z j)
+                            (when (= 1 (tableau-x tab (* 2 n) j))
+                              (xorf phase 1)))
+                ;; change the corresponding X in the P operator as necessary
+                (when (= phase 1)
+                  (xorf (tableau-x tab (* 2 n) first-z) 1))))))
+
+(defun read-scratch (tab)
+  "Given a tableau tab, read off the operator on the scratch row as a basis state. Returns two values: 1) the basis state as an integer and 2) the phase of the state as a complex number."
+  (let ((n (tableau-qubits tab))
+        (state 0)
+        (phase 0))
+    (dotimes (i n)
+      (when (= 1 (tableau-x tab (* 2 n) i))
+        (incf state (expt 2 i))
+        (when (= 1 (tableau-z tab (* 2 n) i))
+          (setf phase (mod (1+ phase) 4)))))
+    (cond ((= phase 0) (setf phase #C(1.0d0 0.0d0)))
+          ((= phase 1) (setf phase #C(0.0d0 1.0d0)))
+          ((= phase 2) (setf phase #C(-1.0d0 0.0d0)))
+          ((= phase 3) (setf phase #C(0.0d0 -1.0d0))))
+    (values state phase)))
+
+(defun tableau-print-wf (tab)
+  "Given a tableau tab, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers. This operator sum will be performed on P|0...0>, where P is in the scratch space of tab, calculated by seed-op (above)."
+  (let* ((n (tableau-qubits tab))
+         (log-nonzero (gaussian-elim tab))
+         (wf (qvm::make-lisp-cflonum-vector (expt 2 n))))
+    (seed-op tab)
+    (loop :for i :from 0 :below (expt 2 log-nonzero) :do
+      (let ((x (logxor i (+ i 1))))
+        (dotimes (j log-nonzero)
+          (when (/= (logand x (expt 2 j)) 0)
+            (row-product tab (* 2 n) (+ n j))))
+        (multiple-value-bind (state phase) (read-scratch tab)
+          (setf (aref wf state) phase))))
+    (qvm::normalize-wavefunction wf)
+    wf))
 
 ;;; The .chp file format is an input to Aaronson's chp program written
 ;;; in C. Below is a parser and interpreter for it.
