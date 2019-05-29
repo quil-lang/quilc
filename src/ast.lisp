@@ -152,8 +152,12 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 ;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-comment-table ()
+    (tg:make-weak-hash-table :test 'eq :weakness ':key)))
+
 (global-vars:define-global-var **comments**
-    (tg:make-weak-hash-table :test 'eq :weakness ':key)
+    (make-comment-table)
   "Weak hash table populated with comments associated to different parts of an AST.")
 
 (defun comment (x)
