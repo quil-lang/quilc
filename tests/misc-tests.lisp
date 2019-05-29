@@ -264,7 +264,25 @@
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
      (a:iota n))))
 
-(deftest test-measure-semantics ()
+;; Helper function for below. Should probably be made more general and
+;; useful elsewhere.
+(defun cheeky-relabeler (parsed-program qubits)
+  "Send all application/measurement arguments to their position in the
+list of qubits QUBITS."
+  (check-type parsed-program parsed-program)
+  (dolist (instr (coerce (parsed-program-executable-code parsed-program) 'list) parsed-program)
+    (typecase instr
+      (quil::measure
+       (setf (quil::measurement-qubit instr)
+             (quil::qubit (position (quil::qubit-index (quil::measurement-qubit instr))
+                                    qubits))))
+      (quil::application
+       (setf (quil::application-arguments instr)
+             (mapcar (lambda (arg) (quil::qubit (position (quil::qubit-index arg)
+                                                     qubits)))
+                     (quil::application-arguments instr)))))))
+
+(deftest test-measure-discard-semantics ()
   "Test that artifacts of compilation (namely moving MEASUREs) does
 not change the semantics of the program."
   (let ((ps (list "MEASURE 0
@@ -283,6 +301,57 @@ MEASURE 0")))
         (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
         (qvm:run qvm)
         (qvm:run qvm-comp)
-        (let* ((amplitudes (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm) 'list)))
-               (amplitudes-comp (magicl:make-complex-matrix 2 2 (coerce (qvm::amplitudes qvm-comp) 'list))))
-          (is (quil::matrix-equality amplitudes amplitudes-comp)))))))
+        (is (every #'quil::double=
+                   (qvm::amplitudes qvm)
+                   (qvm::amplitudes qvm-comp)))))))
+
+(deftest test-measure-semantics ()
+  (let* ((p (parse-quil "
+CNOT 0 2
+MEASURE 0
+MEASURE 1
+MEASURE 2"))
+         (p-comp (parse-quil "
+MEASURE 1
+RZ(2.0462649535435387) 1
+RX(pi/2) 1
+RZ(2.6276182302215974) 1
+RX(-pi/2) 1
+RZ(2.1566650242473755) 2
+RX(pi/2) 2
+RZ(2.290773480066417) 2
+RX(-pi/2) 2
+RZ(-1.5507674946240224) 2
+CZ 2 1
+RZ(-1.427075742470092) 1
+RX(pi/2) 1
+RX(-pi/2) 2
+CZ 2 1
+RX(-pi/2) 1
+RX(pi/2) 2
+CZ 2 1
+RZ(-0.45936992593626824) 1
+RX(pi/2) 1
+RZ(1.9260402359030482) 1
+RX(-pi/2) 1
+CZ 1 0
+RZ(-0.9301817540950879) 1
+RX(-pi/2) 1
+RZ(pi/2) 1
+MEASURE 1
+RZ(pi) 0
+MEASURE 0
+RZ(1.651484668090844) 2
+RX(pi/2) 2
+RZ(2.078959324140279) 2
+RX(-pi/2) 2
+RZ(-1.8815794754856947) 2")))
+    (let* ((qvm (qvm:make-density-qvm 3))
+           (qvm-comp (qvm:make-density-qvm 3)))
+      (qvm:load-program qvm p :supersede-memory-subsystem t)
+      (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
+      (qvm:run qvm)
+      (qvm:run qvm-comp)
+      (is (every #'quil::double=
+                 (qvm::amplitudes qvm)
+                 (qvm::amplitudes qvm-comp))))))
