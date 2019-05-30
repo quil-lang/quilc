@@ -257,10 +257,16 @@ CNOT 0 1")))
         (phased-bell-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
 CNOT 0 1
 S 1")))
+        (phased-bell-2-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
+CNOT 0 1
+S 1
+S 1
+S 1")))
         (zero-tab (cl-quil.clifford::make-tableau-zero-state 2))
         (bell-tab (cl-quil.clifford::make-tableau-zero-state 2))
         (x-tab (cl-quil.clifford::make-tableau-zero-state 2))
-        (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2)))
+        (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2))
+        (phased-bell-2-tab (cl-quil.clifford::make-tableau-zero-state 2)))
     ;; zero state wavefunction
     (is (every #'cl-quil.clifford::complex=
                (qvm::amplitudes zero-qvm)
@@ -285,4 +291,13 @@ S 1")))
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
     (is (every #'cl-quil.clifford::complex=
                (qvm::amplitudes phased-bell-qvm)
-               (cl-quil.clifford::tableau-wf phased-bell-tab)))))
+               (cl-quil.clifford::tableau-wf phased-bell-tab)))
+    ;; another phase test
+    (cl-quil.clifford::tableau-apply-h phased-bell-2-tab 0)
+    (cl-quil.clifford::tableau-apply-cnot phased-bell-2-tab 0 1)
+    (cl-quil.clifford::tableau-apply-phase phased-bell-2-tab 1)
+    (cl-quil.clifford::tableau-apply-phase phased-bell-2-tab 1)
+    (cl-quil.clifford::tableau-apply-phase phased-bell-2-tab 1)
+    (is (every #'cl-quil.clifford::complex=
+               (qvm::amplitudes phased-bell-2-qvm)
+               (cl-quil.clifford::tableau-wf phased-bell-2-tab)))))

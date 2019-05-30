@@ -385,10 +385,8 @@ but the symbols may be uninterned or named differently.
   (declare (type tableau tab)
            (type tableau-index i k))
   (let ((n (tableau-qubits tab)))
-    ;; use scratch row as temporary storage, which is OK because swapping is only ever done during gaussian elimination
-    (tableau-copy-row tab (* 2 n) k)
-    (tableau-copy-row tab k i)
-    (tableau-copy-row tab i (* 2 n))))
+    (dotimes (j (1+ (* 2 n)))
+      (rotatef (aref tab i j) (aref tab k j)))))
 
 ;;; Robert: For some reason that I'm not sure about, the procedure for
 ;;; non-deterministic measurement from the Aaronson et al. paper
@@ -445,104 +443,112 @@ but the symbols may be uninterned or named differently.
              (row-product tab (* 2 n) (+ i n))))
          (values (tableau-r tab (* 2 n)) t))))))
 
+
 (defun gaussian-elim (tab)
   "Perform Gaussian elimination to mutate the generators of a tableau tab, putting them in quasi-upper-triangular form. The modified generators will have the form
-|1 x x x x x x x x x x x|
-|. 1 x x x x x x x x x x|
-|. . . 1 x x x x x x x x|
-|. . . . . 1 x x x x x x|
-|. . 0 . . . . 1 x x x x|
-|. . . . . . . . 1 x x x|
-^-----X----^ ^----Z-----^
-where the upper generators comprise only X's and Y's while the lower generators comprise only Z's. This makes it easy to 1) determine how many nonzero basis states are present, based on the number of purely X/Y generators (which = log(# of nonzero basis states)), 2) easily find a nonzero basis state using the purely Z generators (done in the seed-op function below).
+    |1 x x x x x x x x x x x|
+    |. 1 x x x x x x x x x x|
+    |. . . 1 x x x x x x x x|
+    |. . . . . 1 x x x x x x|
+    |. . 0 . . . . 1 x x x x|
+    |. . . . . . . . 1 x x x|
+    ^-----X----^ ^----Z-----^
+
+The upper generators comprise only X's and Y's while the lower generators comprise only Z's. This makes it easy to 1) determine how many nonzero basis states are present, based on the number of purely X/Y generators (which = log(# of nonzero basis states)), 2) easily find a nonzero basis state using the purely Z generators (done in the seed-op function below).
 Also returns the number of purely X/Y generators (log-nonzero).
 "
   (let* ((n (tableau-qubits tab))
          (log-nonzero 0)
-         (elim-row n))
-    ;; for each column j
-    (dotimes (j n)
-      ;; find a generator with X in the jth column
-      (let ((k (loop :for k :from elim-row :below (* 2 n)
-                     :when (= 1 (tableau-x tab k j))
-                       :do (return k)
-                     :finally (return nil))))
-        ;; swap this generator up, and eliminate Xs in this column from all other rows
-        (when k
-          (tableau-swap-row tab elim-row k)
-          (tableau-swap-row tab (- elim-row n) (- k n))
-          (loop :for k2 :from (+ 1 elim-row) :below (* 2 n)
-                :when (= 1 (tableau-x tab k2 j))
-                  :do (row-product tab k2 elim-row) (row-product tab (- elim-row n) (- k2 n)))
-          (incf elim-row))))
-    (setf log-nonzero (- elim-row n))
-    ;; repeat the previous loop, but this time for the Z tableau
-    (dotimes (j n)
-      (let ((k (loop :for k :from elim-row :below (* 2 n)
-                     :when (= 1 (tableau-z tab k j))
-                       :do (return k)
-                     :finally (return nil))))
-        (when k
-          (tableau-swap-row tab elim-row k)
-          (tableau-swap-row tab (- elim-row n) (- k n))
-          (loop :for k2 :from (+ 1 elim-row) :below (* 2 n)
-                :when (= 1 (tableau-z tab k2 j))
-                  :do (row-product tab k2 elim-row) (row-product tab (- elim-row n) (- k2 n)))
-          (incf elim-row))))
-    log-nonzero))
+         (curr-row n))
+    (flet ((elim-generator (gen-type)
+             (dotimes (column n)
+               ;; Find a generator of gen-type in this column
+               (let ((gen-row (loop :for gen-row :from curr-row :below (* 2 n)
+                                    :when (= 1 (funcall gen-type tab gen-row column))
+                                      :do (return gen-row)
+                                    :finally (return nil))))
+                 ;; Swap this generator up, and eliminate gen-type generators in this column from all other rows
+                 (unless (null gen-row)
+                   (tableau-swap-row tab curr-row gen-row)
+                   (tableau-swap-row tab (- curr-row n) (- gen-row n))
+                   (loop :for elim-row :from (1+ curr-row) :below (* 2 n)
+                         ;; When there is a generator of gen-type in this column of elim-row...
+                         :when (= 1 (funcall gen-type tab elim-row column))
+                           ;; !!ELIMINATE!!
+                           :do (row-product tab elim-row curr-row) (row-product tab (- curr-row n) (- elim-row n)))
+                   (incf curr-row))))))
+      ;; Eliminate X's to get upper generators (X/Y only)
+      (elim-generator #'tableau-x)
+      ;; The number of rows we've used to eliminate is the log of how
+      ;; many nonzero basis states we have. This is because the states
+      ;; generated by these X/Y generators cannot destructively
+      ;; interfere with each other: they each flip an unique bit.
+      (setf log-nonzero (- curr-row n))
+      ;; Eliminate Z's to get lower generators (Z only)
+      (elim-generator #'tableau-z)
+      log-nonzero)))
 
-(defun seed-op (tab)
-  "Given a tableau tab, find a Pauli operator P such that P|0...0> has nonzero amplitude in the state represented by tab. Write this operator to the scratch space of tab. Gaussian elimination must first be performed, since this is operator is found using the purely Z generators."
+;; The general procedure of extracting the wavefunction from the
+;; tableau is just generating all of the state's stabilizers (and
+;; applying them to some state). However, this state has to be chosen
+;; carefully, since it's possible that the stabilizer operator sum
+;; will cause everything to destructively interfere and return nothing
+;; (not the |0...0> state, literally nothing, as if the state is in
+;; the "nullspace" of the stabilizer sum). This function ensures we
+;; have a good state to operate on that gives us the correct
+;; stabilizer state.
+(defun find-nonzero-operator (tab)
+  "Given a tableau TAB, find a Pauli operator P such that P|0...0> has nonzero amplitude in the state represented by tab. Write this operator to the scratch space of tab. Gaussian elimination must first be performed, since this is operator is found using the purely Z generators."
   (let ((n (tableau-qubits tab))
         (log-nonzero (gaussian-elim tab)))
-    ;; zero out scratch space
+    ;; Zero out scratch space
     (dotimes (i (* 2 n))
       (setf (tableau-scratch tab i) 0))
-    ;; for each row i, starting from the bottom of the Z generators
-    (loop :for i :from (- (* 2 n) 1) :downto (+ n log-nonzero)
-          :do (let ((phase (tableau-r tab i))
+    ;; For each row, starting from the bottom of the Z generators
+    (loop :for row :from (1- (* 2 n)) :downto (+ n log-nonzero)
+          :do (let ((phase (tableau-r tab row))
                     (first-z n))
-                ;; find the leftmost Z in this generator
-                (loop :for j :from (- n 1) :downto 0
-                      :when (= 1 (tableau-z tab i j))
+                ;; Find the leftmost Z in this generator
+                (loop :for j :from (1- n) :downto 0
+                      :when (= 1 (tableau-z tab row j))
                         :do (setf first-z j)
                             (when (= 1 (tableau-x tab (* 2 n) j))
                               (xorf phase 1)))
-                ;; change the corresponding X in the P operator as necessary
+                ;; Change the corresponding X in the P operator as necessary
                 (when (= phase 1)
                   (xorf (tableau-x tab (* 2 n) first-z) 1))))))
 
-(defun read-scratch (tab)
-  "Given a tableau tab, read off the operator on the scratch row as a basis state. Returns two values: 1) the basis state as an integer and 2) the phase of the state as a complex number."
-  (let ((n (tableau-qubits tab))
-        (state 0)
-        (phase 0))
+(defun read-basis-state-from-scratch-row (tab)
+  "Given a tableau TAB, read off the operator on the scratch row as a basis state. Returns two values:
+    1) the basis state as an integer
+    2) the phase of the state as a complex number."
+  (let* ((n (tableau-qubits tab))
+         (state 0)
+         (phase (* 2 (tableau-r tab (* 2 n)))))
     (dotimes (i n)
       (when (= 1 (tableau-x tab (* 2 n) i))
         (incf state (expt 2 i))
         (when (= 1 (tableau-z tab (* 2 n) i))
-          (setf phase (mod (1+ phase) 4)))))
-    (cond ((= phase 0) (setf phase #C(1.0d0 0.0d0)))
-          ((= phase 1) (setf phase #C(0.0d0 1.0d0)))
-          ((= phase 2) (setf phase #C(-1.0d0 0.0d0)))
-          ((= phase 3) (setf phase #C(0.0d0 -1.0d0))))
+          (incf phase))))
+    (setf phase (expt #C(0.0d0 1.0d0) phase))
     (values state phase)))
 
-#+ignore
-(defun tableau-wf (tab)
-  "Given a tableau tab, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers. This operator sum will be performed on P|0...0>, where P is in the scratch space of tab, calculated by seed-op (above)."
+
+(defun tableau-wavefunction (tab)
+  "Given a tableau TAB, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers.
+Note: the scratch space is used as an area to write intermediate state values, and starts with the operator returned by find-nonzero-operator."
   (let* ((n (tableau-qubits tab))
          (log-nonzero (gaussian-elim tab))
-         (wf (qvm::make-lisp-cflonum-vector (expt 2 n))))
-    (seed-op tab)
-    (loop :for i :from 0 :below (expt 2 log-nonzero) :do
-      (let ((x (logxor i (+ i 1))))
+         (norm (sqrt (expt 2 log-nonzero)))
+         (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0))))
+    (find-nonzero-operator tab)
+    (dotimes (i (expt 2 log-nonzero))
+      (let ((x (logxor i (1+ i))))
         (dotimes (j log-nonzero)
-          (when (/= (logand x (expt 2 j)) 0)
+          (unless (zerop (logand x (expt 2 j)))
             (row-product tab (* 2 n) (+ n j))))
-        (multiple-value-bind (state phase) (read-scratch tab)
-          (setf (aref wf state) phase))))
-    (qvm::normalize-wavefunction wf)
+        (multiple-value-bind (state phase) (read-basis-state-from-scratch-row tab)
+          (setf (aref wf state) (/ phase norm)))))
     wf))
 
 ;;; The .chp file format is an input to Aaronson's chp program written
