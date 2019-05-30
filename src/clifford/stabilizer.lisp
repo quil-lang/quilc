@@ -528,7 +528,8 @@ Also returns the number of purely X/Y generators (log-nonzero).
           ((= phase 3) (setf phase #C(0.0d0 -1.0d0))))
     (values state phase)))
 
-(defun tableau-print-wf (tab)
+#+ignore
+(defun tableau-wf (tab)
   "Given a tableau tab, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers. This operator sum will be performed on P|0...0>, where P is in the scratch space of tab, calculated by seed-op (above)."
   (let* ((n (tableau-qubits tab))
          (log-nonzero (gaussian-elim tab))

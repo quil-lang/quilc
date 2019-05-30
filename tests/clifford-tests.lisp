@@ -247,3 +247,42 @@
         :finally (is (< (abs (- (aref results 0)
                                 (aref results 1)))
                         100))))
+
+(deftest test-tableau-wavefunction ()
+  "Some simple tests to see if wavefunctions are correctly generated from tableaus."
+  (let ((zero-qvm (qvm::make-qvm 2))
+        (bell-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
+CNOT 0 1")))
+        (x-qvm (qvm::run-program 2 (cl-quil::parse-quil "X 0")))
+        (phased-bell-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
+CNOT 0 1
+S 1")))
+        (zero-tab (cl-quil.clifford::make-tableau-zero-state 2))
+        (bell-tab (cl-quil.clifford::make-tableau-zero-state 2))
+        (x-tab (cl-quil.clifford::make-tableau-zero-state 2))
+        (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2)))
+    ;; zero state wavefunction
+    (is (every #'cl-quil.clifford::complex=
+               (qvm::amplitudes zero-qvm)
+               (cl-quil.clifford::tableau-wf zero-tab)))
+    ;; bell state wavefunction
+    (cl-quil.clifford::tableau-apply-h bell-tab 0)
+    (cl-quil.clifford::tableau-apply-cnot bell-tab 0 1)
+    (is (every #'cl-quil.clifford::complex=
+               (qvm::amplitudes bell-qvm)
+               (cl-quil.clifford::tableau-wf bell-tab)))
+    ;; simple x gate test
+    (cl-quil.clifford::tableau-apply-h x-tab 0)
+    (cl-quil.clifford::tableau-apply-phase x-tab 0)
+    (cl-quil.clifford::tableau-apply-phase x-tab 0)
+    (cl-quil.clifford::tableau-apply-h x-tab 0)
+    (is (every #'cl-quil.clifford::complex=
+               (qvm::amplitudes x-qvm)
+               (cl-quil.clifford::tableau-wf x-tab)))
+    ;; wavefunction with complex phase
+    (cl-quil.clifford::tableau-apply-h phased-bell-tab 0)
+    (cl-quil.clifford::tableau-apply-cnot phased-bell-tab 0 1)
+    (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
+    (is (every #'cl-quil.clifford::complex=
+               (qvm::amplitudes phased-bell-qvm)
+               (cl-quil.clifford::tableau-wf phased-bell-tab)))))
