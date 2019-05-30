@@ -280,7 +280,7 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (initial-l2p chip-schedule final-l2p)
                (do-greedy-temporal-addressing
-                   (rest (coerce (basic-block-code blk) 'list))
+                 (coerce (basic-block-code blk) 'list)
                  chip-specification
                  :environs parsed-program
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification

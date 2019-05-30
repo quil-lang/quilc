@@ -209,8 +209,6 @@ Return the following values:
       (setf blk new-blk)))
   ;; set the block type to a reset-block
   (change-class blk 'reset-block)
-  ;; upcall to push the RESET instruction on
-  (vector-push-extend instr (basic-block-code blk))
   (values blk nil nil))
 
 (defmethod process-instruction (cfg blk (instr include))
