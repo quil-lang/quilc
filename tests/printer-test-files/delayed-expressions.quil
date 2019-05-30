@@ -75,6 +75,18 @@ DEFGATE TEST(%arg1, %arg2):
 
 
 # Input
+DEFGATE UNARY-MINUS(%arg1):
+    0, -1
+    0, -%arg1
+
+# Output
+DEFGATE UNARY-MINUS(%arg1):
+    0.0, -1.0
+    0.0, -(%arg1)
+
+
+
+# Input
 DEFCIRCUIT TEST(%arg1, %arg2) p:
     RX(%arg1-%arg2) p
 

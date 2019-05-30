@@ -240,3 +240,25 @@
      (lambda (permutation)
        (not-signals simple-error (quil::check-permutation permutation)))
      (a:iota n))))
+
+(deftest test-quil<->lisp-bridge ()
+  "Test that the functions for mapping between quil<->lisp work."
+  (loop :for (quil-string . lisp-symbol) :in quil::+quil<->lisp-prefix-arithmetic-operators+ :do
+    (progn
+      (is (quil::valid-quil-function-or-operator-p lisp-symbol))
+      (is (eq lisp-symbol (quil::quil-prefix-operator->lisp-symbol quil-string)))
+      (is (string= quil-string (quil::lisp-symbol->quil-prefix-operator lisp-symbol)))
+      (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol)))))
+
+  (loop :for (quil-string . lisp-symbol) :in quil::+quil<->lisp-infix-arithmetic-operators+ :do
+    (progn
+      (is (quil::valid-quil-function-or-operator-p lisp-symbol))
+      (is (eq lisp-symbol (quil::quil-infix-operator->lisp-symbol quil-string)))
+      (is (string= quil-string (quil::lisp-symbol->quil-infix-operator lisp-symbol)))))
+
+  (loop :for (quil-string . lisp-symbol) :in quil::+quil<->lisp-functions+ :do
+    (progn
+      (is (quil::valid-quil-function-or-operator-p lisp-symbol))
+      (is (eq lisp-symbol (quil::quil-function->lisp-symbol quil-string)))
+      (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
+      (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))

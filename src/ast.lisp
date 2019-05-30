@@ -108,9 +108,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defun evaluate-delayed-expression (de &optional (memory-model-evaluator #'identity))
   "Evaluate the delayed expression DE to a numerical value (represented in a CONSTANT data structure). MEMORY-MODEL is an association list with keys MEMORY-REF structures and values the value stored at that location."
   (labels ((lookup-function (expr)
-             (case expr
-               ((+ - * / expt cos sin sqrt exp cis) expr)
-               (otherwise (error "Illegal function in arithmetic expression: ~a." expr))))
+             (if (valid-quil-function-or-operator-p expr)
+                 expr
+                 (error "Illegal function in arithmetic expression: ~a." expr)))
            (evaluate-parameter (param)
              (etypecase param
                (constant (constant-value param))
@@ -1146,11 +1146,7 @@ For example,
     (format stream "~A" (formal-name thing)))
 
   (:method ((thing delayed-expression) (stream stream))
-    (labels ((lisp-symbol-to-infix-operator (symbol)
-               (case symbol
-                 (cl:expt "^")
-                 (otherwise (symbol-name symbol))))
-             (print-delayed-expression (expr stream)
+    (labels ((print-delayed-expression (expr stream)
                (typecase expr
                  (cons
                   (cond
@@ -1159,11 +1155,11 @@ For example,
                     ((= (length expr) 3)
                      (format stream "(~a~a~a)"
                              (print-delayed-expression (second expr) nil)
-                             (lisp-symbol-to-infix-operator (first expr))
+                             (lisp-symbol->quil-infix-operator (first expr))
                              (print-delayed-expression (third expr) nil)))
                     ((= (length expr) 2)
                      (format stream "~a(~a)"
-                             (first expr)
+                             (lisp-symbol->quil-function-or-prefix-operator (first expr))
                              (print-delayed-expression (second expr) nil)))))
                  (number
                   (format stream "(~/cl-quil:complex-fmt/)" expr))

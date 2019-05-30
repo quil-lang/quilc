@@ -1515,25 +1515,79 @@ INPUT-STRING that triggered the condition."
                   (token-payload tok))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (alexandria:define-constant +quil<->lisp-functions+
+      '(("SIN"  . cl:sin)
+        ("COS"  . cl:cos)
+        ("SQRT" . cl:sqrt)
+        ("EXP"  . cl:exp)
+        ("CIS"  . cl:cis))
+    :test #'equal
+    :documentation
+    "Functions usable from within Quil, and their associated Lisp function symbols.")
+
+  (alexandria:define-constant +quil<->lisp-prefix-arithmetic-operators+
+      '(("-" . cl:-))
+    :test #'equal
+    :documentation
+    "Prefix arithmetic operators usable from within Quil, and their associated Lisp function symbols.")
+
+  ;; If you add a new arithmetic operator here, you must also add it to *ARITHMETIC-GRAMMAR*, below.
+  (alexandria:define-constant +quil<->lisp-infix-arithmetic-operators+
+      '(("+" . cl:+)
+        ("-" . cl:-)
+        ("/" . cl:/)
+        ("*" . cl:*)
+        ("^" . cl:expt))
+    :test #'equal
+    :documentation
+    "Infix arithmetic operators usable from within Quil, and their associated Lisp function symbols.")
+
+  (flet ((lisp->quil (lisp-symbol alist)
+           (check-type lisp-symbol symbol)
+           (alexandria:when-let ((found (rassoc lisp-symbol alist :test #'eq)))
+             (car found)))
+         (quil->lisp (quil-string alist)
+           (check-type quil-string string)
+           (alexandria:when-let ((found (assoc quil-string alist :test #'string-equal)))
+             (cdr found))))
+
+    (defun lisp-symbol->quil-prefix-operator (symbol)
+      (lisp->quil symbol +quil<->lisp-prefix-arithmetic-operators+))
+
+    (defun quil-prefix-operator->lisp-symbol (quil-prefix-operator)
+      (quil->lisp quil-prefix-operator +quil<->lisp-prefix-arithmetic-operators+))
+
+    (defun lisp-symbol->quil-infix-operator (symbol)
+      (lisp->quil symbol +quil<->lisp-infix-arithmetic-operators+))
+
+    (defun quil-infix-operator->lisp-symbol (quil-infix-operator)
+      (quil->lisp quil-infix-operator +quil<->lisp-infix-arithmetic-operators+))
+
+    (defun lisp-symbol->quil-function (symbol)
+      (lisp->quil symbol +quil<->lisp-functions+))
+
+    (defun quil-function->lisp-symbol (quil-function)
+      (quil->lisp quil-function +quil<->lisp-functions+))
+
+    (defun lisp-symbol->quil-function-or-prefix-operator (symbol)
+      (or (lisp-symbol->quil-function symbol)
+          (lisp-symbol->quil-prefix-operator symbol)))
+
+    (defun valid-quil-function-or-operator-p (symbol)
+      (not (null (or (lisp-symbol->quil-function symbol)
+                     (lisp-symbol->quil-prefix-operator symbol)
+                     (lisp-symbol->quil-infix-operator symbol))))))
+
   (defun binary (head)
     (lambda (a i0 b)
       (declare (ignore i0))
       (list head a b)))
 
-  (defparameter *valid-functions*
-    '(("SIN"  cl:sin)
-      ("COS"  cl:cos)
-      ("SQRT" cl:sqrt)
-      ("EXP"  cl:exp)
-      ("CIS"  cl:cis))
-    "Functions usable from within Quil, and their associated Lisp function symbols.")
-
   (defun validate-function (func-name)
-    "Validate the function named FUNC-NAME against *VALID-FUNCTIONS*. Signal a QUIL-PARSE-ERROR if it's invalid."
-    (let ((found (assoc func-name *valid-functions* :test #'string-equal)))
-      (if found
-          (second found)
-          (quil-parse-error "Invalid function name: ~A" func-name))))
+    "Return the lisp symbol that corresponds to the Quil function named FUNC-NAME, or signal a QUIL-PARSE-ERROR if FUNC-NAME is invalid."
+    (alexandria:if-let ((lisp-symbol (quil-function->lisp-symbol func-name)))
+      lisp-symbol
+      (quil-parse-error "Invalid function name: ~A" func-name)))
 
   (defun find-or-make-parameter-symbol (param)
     (let ((found (assoc (param-name param)
@@ -1563,18 +1617,20 @@ INPUT-STRING that triggered the condition."
   (:precedence ((:right :EXPT) (:left :TIMES :DIVIDE) (:left :PLUS :MINUS)))
 
   (expr
-   (expr :PLUS expr (binary 'cl:+))
-   (expr :MINUS expr (binary 'cl:-))
-   (expr :TIMES expr (binary 'cl:*))
-   (expr :DIVIDE expr (binary 'cl:/))
-   (expr :EXPT expr (binary 'cl:expt))
+   ;; If you add a new arithmetic operator here, you must also add it to
+   ;; +quil<->lisp-infix-arithmetic-operators+, above.
+   (expr :PLUS expr (binary (quil-infix-operator->lisp-symbol "+")))
+   (expr :MINUS expr (binary (quil-infix-operator->lisp-symbol "-")))
+   (expr :TIMES expr (binary (quil-infix-operator->lisp-symbol "*")))
+   (expr :DIVIDE expr (binary (quil-infix-operator->lisp-symbol "/")))
+   (expr :EXPT expr (binary (quil-infix-operator->lisp-symbol "^")))
    term)
 
   (term
    (:MINUS expr
            (lambda (i0 x)
              (declare (ignore i0))
-             (list 'cl:- x)))
+             (list (quil-prefix-operator->lisp-symbol "-") x)))
    (:NAME :LEFT-PAREN expr :RIGHT-PAREN
           (lambda (f i0 x i1)
             (declare (ignore i0 i1))
