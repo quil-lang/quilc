@@ -369,6 +369,15 @@ Returns a value list: (processed-program, of type parsed-program
       ;; one more pass of CFG collapse
       (simplify-cfg cfg)
       
+      ;; if there are any lingering reset blocks, declassify them
+      (dolist (blk (cfg-blocks cfg))
+        (when (typep blk 'reset-block)
+          (setf (basic-block-code blk)
+                (concatenate 'vector
+                             (list (make-instance 'reset))
+                             (basic-block-code blk)))
+          (change-class blk 'basic-block)))
+      
       (let ((processed-program (reconstitute-program cfg)))
         ;; Keep global PRAGMAS in the code, at the top of the file.
         (setf (parsed-program-executable-code processed-program)
