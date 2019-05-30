@@ -181,6 +181,16 @@ RX(pi) 2
                                         (quil::parsed-program-to-logical-matrix processed-program))))))))
 
 
+(deftest test-compiler-hook-preserves-RESETs ()
+  (let* ((pp (quil::parse-quil "
+DECLARE ro BIT
+RESET
+RY(pi/3) 0
+MEASURE 0 ro[0]"))
+         (cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
+    (is (typep (quil::vnth 0 (quil::parsed-program-executable-code cpp))
+               'quil::reset))))
+
 
 (deftest test-compiler-hook-reset-naive-rewiring ()
   ;; Note this numbering depends on the fact that the CZ gates are

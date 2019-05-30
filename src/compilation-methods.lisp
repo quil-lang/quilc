@@ -296,7 +296,10 @@ Returns a value list: (processed-program, of type parsed-program
                        (compress-instructions processed-quil chip-specification
                                               :protoquil t)))
                ;; we're done processing. store the results back into the CFG block.
-               (setf (basic-block-code blk) processed-quil)
+               (setf (basic-block-code blk)
+                     (concatenate 'vector
+                                  (list (make-instance 'reset))
+                                  processed-quil))
                (setf (basic-block-in-rewiring blk) initial-l2p)
                (setf (basic-block-out-rewiring blk) final-l2p)
                (incf topological-swaps local-topological-swaps)
