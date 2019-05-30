@@ -183,13 +183,22 @@ RX(pi) 2
 
 (deftest test-compiler-hook-preserves-RESETs ()
   (let* ((pp (quil::parse-quil "
-DECLARE ro BIT
+PRAGMA INITIAL_REWIRING \"PARTIAL\"
 RESET
+DECLARE ro BIT[2]
 RY(pi/3) 0
-MEASURE 0 ro[0]"))
+RY(pi/3) 1
+RY(pi/3) 2
+RY(pi/3) 3
+H 0
+MEASURE 0 ro[1]"))
          (cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
-    (is (typep (quil::vnth 0 (quil::parsed-program-executable-code cpp))
-               'quil::reset))))
+    (loop :for instr :across (quil::parsed-program-executable-code cpp)
+          :count (typep instr 'quil::reset) :into reset-count
+          :count (not (typep instr 'quil::gate-application)) :into non-application-count
+          :finally (progn
+                     (is (= 1 reset-count))
+                     (is (= 4 non-application-count))))))
 
 
 (deftest test-compiler-hook-reset-naive-rewiring ()
