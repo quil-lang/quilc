@@ -48,6 +48,9 @@ NOTE: This function does *not* cause side effects.")
   (:method ((isn instruction) mref-name index)
     (values isn '() index))
 
+  (:method ((isn jump-target) mref-name index)
+    (values isn '() index))
+
   (:method ((isn application) mref-name index)
     (check-type mref-name string)
     (check-type index unsigned-byte)
