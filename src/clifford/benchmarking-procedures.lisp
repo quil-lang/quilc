@@ -112,6 +112,10 @@
   (and (quil::double= (realpart a) (realpart b))
        (quil::double= (imagpart a) (imagpart b))))
 
+(defun complex~ (a b)
+  (and (quil::double~ (realpart a) (realpart b))
+       (quil::double~ (imagpart a) (imagpart b))))
+
 (defun phase-to-string (phase)
   "Returns a string representation of a fourth root of unity, given by PHASE, NIL otherwise."
   (cond ((complex= phase 1) "")

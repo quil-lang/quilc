@@ -248,56 +248,49 @@
                                 (aref results 1)))
                         100))))
 
+(defun blank-wf (n)
+  (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
+
 (deftest test-tableau-wavefunction ()
   "Some simple tests to see if wavefunctions are correctly generated from tableaus."
-  (let ((zero-qvm (qvm::make-qvm 2))
-        (bell-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
-CNOT 0 1")))
-        (x-qvm (qvm::run-program 2 (cl-quil::parse-quil "X 0")))
-        (phased-bell-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
-CNOT 0 1
-S 1")))
-        (phased-bell-2-qvm (qvm::run-program 2 (cl-quil::parse-quil "H 0
-CNOT 0 1
-S 1
-S 1
-S 1")))
+  (let ((zero-wf (blank-wf 2))
+        (bell-wf (blank-wf 2))
+        (x-wf (blank-wf 2))
+        (phased-bell-wf (blank-wf 2))
         (zero-tab (cl-quil.clifford::make-tableau-zero-state 2))
         (bell-tab (cl-quil.clifford::make-tableau-zero-state 2))
         (x-tab (cl-quil.clifford::make-tableau-zero-state 2))
-        (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2))
-        (phased-bell-2-tab (cl-quil.clifford::make-tableau-zero-state 2)))
+        (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2)))
     ;; zero state wavefunction
-    (is (every #'cl-quil.clifford::complex=
-               (qvm::amplitudes zero-qvm)
+    (setf (aref zero-wf 0) #C(1.0d0 0.0d0))
+    (is (every #'cl-quil.clifford::complex~
+               zero-wf
                (cl-quil.clifford::tableau-wf zero-tab)))
     ;; bell state wavefunction
+    (setf (aref bell-wf 0) #C(0.7071d0 0.0d0))
+    (setf (aref bell-wf 3) #C(0.7071d0 0.0d0))
     (cl-quil.clifford::tableau-apply-h bell-tab 0)
     (cl-quil.clifford::tableau-apply-cnot bell-tab 0 1)
-    (is (every #'cl-quil.clifford::complex=
-               (qvm::amplitudes bell-qvm)
+    (is (every #'cl-quil.clifford::complex~
+               bell-wf
                (cl-quil.clifford::tableau-wf bell-tab)))
     ;; simple x gate test
+    (setf (aref x-wf 1) #C(1.0d0 0.0d0))
     (cl-quil.clifford::tableau-apply-h x-tab 0)
     (cl-quil.clifford::tableau-apply-phase x-tab 0)
     (cl-quil.clifford::tableau-apply-phase x-tab 0)
     (cl-quil.clifford::tableau-apply-h x-tab 0)
-    (is (every #'cl-quil.clifford::complex=
-               (qvm::amplitudes x-qvm)
+    (is (every #'cl-quil.clifford::complex~
+               x-wf
                (cl-quil.clifford::tableau-wf x-tab)))
     ;; wavefunction with complex phase
+    (setf (aref phased-bell-wf 0) #C(0.7071d0 0.0d0))
+    (setf (aref phased-bell-wf 3) #C(0.0d0 -0.7071d0))
     (cl-quil.clifford::tableau-apply-h phased-bell-tab 0)
     (cl-quil.clifford::tableau-apply-cnot phased-bell-tab 0 1)
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
-    (is (every #'cl-quil.clifford::complex=
-               (qvm::amplitudes phased-bell-qvm)
-               (cl-quil.clifford::tableau-wf phased-bell-tab)))
-    ;; another phase test
-    (cl-quil.clifford::tableau-apply-h phased-bell-2-tab 0)
-    (cl-quil.clifford::tableau-apply-cnot phased-bell-2-tab 0 1)
-    (cl-quil.clifford::tableau-apply-phase phased-bell-2-tab 1)
-    (cl-quil.clifford::tableau-apply-phase phased-bell-2-tab 1)
-    (cl-quil.clifford::tableau-apply-phase phased-bell-2-tab 1)
-    (is (every #'cl-quil.clifford::complex=
-               (qvm::amplitudes phased-bell-2-qvm)
-               (cl-quil.clifford::tableau-wf phased-bell-2-tab)))))
+    (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
+    (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
+    (is (every #'cl-quil.clifford::complex~
+               phased-bell-wf
+               (cl-quil.clifford::tableau-wf phased-bell-tab)))))
