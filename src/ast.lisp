@@ -256,7 +256,7 @@ as a permutation."
                     :name name
                     :parameters parameters
                     :entries entries)
-      (alexandria:if-let ((perm (permutation-from-gate-entries entries)))
+      (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
                        :permutation perm)
@@ -338,7 +338,7 @@ numbers. It must start with a string.")
                (not (endp words))))
   (assert (stringp (first words))
           ((first words)))
-  (assert (every (alexandria:disjoin #'stringp #'integerp) words)
+  (assert (every (a:disjoin #'stringp #'integerp) words)
           (words))
   (check-type freeform (or null string))
   (specialize-pragma
@@ -446,10 +446,10 @@ Each addressing mode will be a vector of symbols:
     "A map between a class name (symbol) and the vector of types.")
 
   (defun make-typed-name (name types)
-    (alexandria:format-symbol (symbol-package name)
-                              "~A-~{~A~^/~}"
-                              name
-                              types))
+    (a:format-symbol (symbol-package name)
+                     "~A-~{~A~^/~}"
+                     name
+                     types))
 
   (defun valid-type-symbol-p (s)
     (member s '(
@@ -595,7 +595,7 @@ Each addressing mode will be a vector of symbols:
 (defmacro define-classical-instruction (name mnemonic &body body)
   (check-type mnemonic string)
   (multiple-value-bind (types decls docstring)
-      (alexandria:parse-body body :documentation t)
+      (a:parse-body body :documentation t)
     ;; Declarations are not allowed.
     (assert (null decls))
     ;; An empty body, or a body with non-lists aren't allowed.
@@ -966,7 +966,7 @@ N.B. This slot shoould not be accessed directly! Consider using GATE-APPLICATION
   ;; See the actual definition of this in gates.lisp.
   (:documentation "Return a gate-like object represented in the application APP.")
   (:method :around ((app gate-application))
-    (alexandria:if-let ((gate (%get-gate-application-gate app)))
+    (a:if-let ((gate (%get-gate-application-gate app)))
       gate
       (%set-gate-application-gate (call-next-method) app))))
 
@@ -1301,7 +1301,7 @@ For example,
     (flet ((print-one-line (instr)
              (write-string prefix stream)
              (print-instruction instr stream)
-             (alexandria:when-let ((c (comment instr)))
+             (a:when-let ((c (comment instr)))
                (format stream "~40T# ~a" c))
              (terpri stream)))
       (map nil #'print-one-line seq))))
@@ -1316,7 +1316,7 @@ For example,
     (when (memory-descriptor-sharing-parent memory-defn)
       (format s " SHARING ~a"
               (memory-descriptor-sharing-parent memory-defn))
-      (alexandria:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
+      (a:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
         (format s " OFFSET")
         (loop :for (type . count) :in x
               :do (format s " ~a ~a" count (quil-type-string type)))))

@@ -105,7 +105,7 @@
            (coerce #(#\Newline #\#) 'string))))
 
 (defun lookup-isa-descriptor-for-name (isa)
-  (alexandria:switch (isa :test #'string=)
+  (a:switch (isa :test #'string=)
     ("8Q" (quil::build-8Q-chip))
     ("20Q" (quil::build-skew-rectangular-chip 0 4 5))
     ("16QMUX" (quil::build-16QMUX-chip))
@@ -117,7 +117,7 @@
          (error "ISA descriptor does not name a known template or an extant file.")))))
 
 (defun log-level-string-to-symbol (log-level)
-  (alexandria:eswitch (log-level :test #'string=)
+  (a:eswitch (log-level :test #'string=)
     ("debug" :debug)
     ("info" :info)
     ("notice" :notice)

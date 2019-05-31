@@ -7,7 +7,7 @@
 ;;; This file implements an efficient representation of the Pauli
 ;;; group.
 
-(alexandria:define-constant +paulis+
+(a:define-constant +paulis+
     #(I X Z Y)
   :test #'equalp
   :documentation "The Pauli group symbols.")
@@ -137,7 +137,7 @@ If STREAM is T, print to standard output. Otherwise print to STREAM."
           (apply
            #'concatenate
            'string
-           (mapcar (alexandria:compose #'symbol-name #'base4-to-sym)
+           (mapcar (a:compose #'symbol-name #'base4-to-sym)
                    (base4-list p)))))
 
 (defmethod print-object ((p pauli) stream)
@@ -175,7 +175,7 @@ phase factor)."
            (i (string= (elt r 1) "i"))
            (o (elt r 2))
            (p (+ (if i 1 0) (if n 2 0)))
-           (l (mapcar (alexandria:compose
+           (l (mapcar (a:compose
                        #'intern
                        (lambda (x) (coerce (list x) 'string)))
                       (coerce o 'list))))
@@ -184,16 +184,16 @@ phase factor)."
 )                                       ; EVAL-WHEN
 
 
-(alexandria:define-constant +I+ (pauli-from-symbols '(I))
+(a:define-constant +I+ (pauli-from-symbols '(I))
   :test #'pauli=)
 
-(alexandria:define-constant +X+ (pauli-from-symbols '(X))
+(a:define-constant +X+ (pauli-from-symbols '(X))
   :test #'pauli=)
 
-(alexandria:define-constant +Y+ (pauli-from-symbols '(Y))
+(a:define-constant +Y+ (pauli-from-symbols '(Y))
   :test #'pauli=)
 
-(alexandria:define-constant +Z+ (pauli-from-symbols '(Z))
+(a:define-constant +Z+ (pauli-from-symbols '(Z))
   :test #'pauli=)
 
 (defun pauli-identity (n &optional (p 0))

@@ -84,7 +84,7 @@
 (deftest test-ucr-recognition ()
   (dolist (roll-type (list "RY" "RZ"))
     (let* ((qubit-count 4)
-           (argument-list (random-permutation (mapcar #'qubit (alexandria:iota qubit-count))))
+           (argument-list (random-permutation (mapcar #'qubit (a:iota qubit-count))))
            (angle-list (mapcar (lambda (x)
                                  (declare (ignore x))
                                  (constant (random (* 2 pi))))
@@ -96,7 +96,7 @@
            (ucr-matrix (quil::make-matrix-from-quil (list ucr-instruction)))
            (anonymous-instr (make-instance 'quil::gate-application
                                            :operator #.(named-operator "ANONYMOUS-UCR")
-                                           :arguments (mapcar #'qubit (nreverse (alexandria:iota qubit-count)))
+                                           :arguments (mapcar #'qubit (nreverse (a:iota qubit-count)))
                                            :gate ucr-matrix))
            (recognized-instruction (quil::recognize-ucr anonymous-instr))
            (recognized-matrix (quil::make-matrix-from-quil recognized-instruction)))

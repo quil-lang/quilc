@@ -89,7 +89,7 @@
                  (processed-quil (funcall (cl-quil::approximate-2q-compiler-for target-type (build-8Q-chip))
                                           (build-anonymous-gate ref-mat 1 0)))
                  (mat (cl-quil::make-matrix-from-quil processed-quil))
-                 (big-gates (mapcar (alexandria:compose
+                 (big-gates (mapcar (a:compose
                                      #'quil::operator-description-name
                                      #'application-operator)
                                     (remove-if (lambda (i) (= 1 (length (application-arguments i))))
@@ -154,7 +154,7 @@
               :test #'equalp))))
 
 (defun link-nativep (chip-spec)
-  (reduce #'alexandria:disjoin
+  (reduce #'a:disjoin
           (quil::chip-spec-links chip-spec)
           :initial-value (constantly t)
           :key #'quil::hardware-object-native-instructions))

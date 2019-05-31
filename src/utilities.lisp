@@ -110,7 +110,7 @@ Return two values:
                   (push item current-segment))
                  (t
                   (let ((satisfied (funcall predicate item)))
-                    (when (alexandria:xor satisfied current-satisfaction)
+                    (when (a:xor satisfied current-satisfaction)
                       ;; We have differing satisfactions.
                       (finish-segment)
                       (setf current-satisfaction satisfied))
@@ -127,7 +127,7 @@ Return two values:
          (finish-segment)
          (values (nreverse segments)
                  ;; I'm not even gonna comment this.
-                 (alexandria:xor current-satisfaction (evenp num-segments))))))))
+                 (a:xor current-satisfaction (evenp num-segments))))))))
 
 (defun ilog2 (x)
   "Compute integer logarithm of X to the base 2."
@@ -141,10 +141,10 @@ Return two values:
   "Given an INTEGER N, return true if N is a power of 2, greater than 1."
   (and (> n 1) (power-of-two-p n)))
 
-(alexandria:define-constant double-float-positive-infinity
+(a:define-constant double-float-positive-infinity
     #+ccl ccl::double-float-positive-infinity
     #+ecl ext:double-float-positive-infinity
     #+sbcl sb-ext:double-float-positive-infinity
     #-(or ccl ecl sbcl) (error "double-float-positive-infinity not available."))
 
-(alexandria:define-constant pi #.(coerce cl:pi 'double-float))
+(a:define-constant pi #.(coerce cl:pi 'double-float))

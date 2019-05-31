@@ -22,9 +22,9 @@
     (unwind-protect
          (rpcq:with-rpc-client (client "tcp://127.0.0.1:5555")
            (let* ((quil "H 0")
-                  (isa (alexandria:plist-hash-table
+                  (isa (a:plist-hash-table
                         (list
-                         "1Q" (alexandria:plist-hash-table
+                         "1Q" (a:plist-hash-table
                                (list
                                 "0" (make-hash-table)))
                          "2Q" (make-hash-table))))

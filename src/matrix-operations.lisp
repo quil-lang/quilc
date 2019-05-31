@@ -240,7 +240,7 @@ as needed so that they are the same size."
         matrix
         (kq-gate-on-lines matrix
                           n
-                          (alexandria:iota m :start (1- m) :step -1)))))
+                          (a:iota m :start (1- m) :step -1)))))
 
 (defun matrix-trace (m)
   (assert (= (magicl:matrix-rows m) (magicl:matrix-cols m)))

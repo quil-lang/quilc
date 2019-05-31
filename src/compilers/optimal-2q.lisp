@@ -130,7 +130,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
   ;; that compilers should in general get us closer to our target, and
   ;; identity is *not* getting us closer.
   (when (gate-application-trivially-satisfies-2q-target-requirements
-         instr (alexandria:ensure-list target))
+         instr (a:ensure-list target))
     (give-up-compilation :because ':acts-trivially))
 
   ;; first, some utility definitions for 2Q templates that require numerical solvers

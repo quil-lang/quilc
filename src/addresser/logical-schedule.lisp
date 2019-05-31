@@ -440,7 +440,7 @@ use RESOURCE."
        (push new-inst (gethash hi-inst earlier-instrs))
        (push hi-inst (gethash new-inst later-instrs))
        ;; connect before
-       (alexandria:removef first-instrs hi-inst)
+       (a:removef first-instrs hi-inst)
        (push new-inst first-instrs))
       (t
        ;; connect before
@@ -598,7 +598,7 @@ mapping instructions to their tags. "
                               ;; because INSTR will only be within our
                               ;; native gate set, which will never
                               ;; have gate modifiers.
-                              (alexandria:switch ((application-operator-name instr) :test #'string=)
+                              (a:switch ((application-operator-name instr) :test #'string=)
                                 ;; special handling for the 1Q gates
                                 ("RX"
                                  (gethash "f1QRB" specs-hash))
@@ -630,4 +630,4 @@ mapping instructions to their tags. "
             :finally (return (exp (- (sqrt (- (log fidelity))))))))))
 
 (defun lscheduler-all-instructions (lschedule)
-  (alexandria:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))
+  (a:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))

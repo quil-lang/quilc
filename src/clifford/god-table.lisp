@@ -331,7 +331,7 @@ invert C when applied in the correct (reversed) order.
           :for i :from 0
           :do (dotimes (jdx (gethash i sample-idxs 0))
                 (vector-push hash-key results)))
-    (coerce (alexandria:shuffle results) 'list)))
+    (coerce (a:shuffle results) 'list)))
 
 (defun default-gateset (num-qubits &optional (cnot-edges :complete))
   "Generate a list of generators of single qubit Hadamard and Phase

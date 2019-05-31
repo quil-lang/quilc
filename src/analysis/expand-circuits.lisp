@@ -182,7 +182,7 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
                                  (evaluate-delayed-expression p)
                                  p))
                     params)
-          (assert (notany (alexandria:conjoin #'is-param #'delayed-expression-p) params))
+          (assert (notany (a:conjoin #'is-param #'delayed-expression-p) params))
           (assert (notany #'is-formal args))
           (if (not remake)
               instr

@@ -4,6 +4,7 @@
 
 (defpackage #:cl-quil.resource
   (:use #:cl)
+  (:local-nicknames (:a :alexandria))
   (:export
    #:make-resource-collection           ; FUNCTION
    #:make-qubit-resource                ; FUNCTION
@@ -30,8 +31,7 @@
         #:parse-float
         #:abstract-classes
         #:singleton-classes
-        #:cl-quil.resource
-        #:alexandria)
+        #:cl-quil.resource)
   (:local-nicknames (:a :alexandria))
   ;; options.lisp
   (:export
@@ -431,6 +431,7 @@
   (:nicknames #:quil.clifford)
   (:use #:cl
         #:cl-permutation)
+  (:local-nicknames (:a :alexandria))
 
   ;; clifford/ module
   (:export

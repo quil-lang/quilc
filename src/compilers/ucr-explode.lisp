@@ -46,9 +46,9 @@
   (let* ((temp-gate (copy-instance gate)))
     (setf (application-arguments temp-gate)
           (mapcar #'qubit
-                  (alexandria:iota (length (application-arguments gate))
-                                   :start (1- (length (application-arguments gate)))
-                                   :step -1)))
+                  (a:iota (length (application-arguments gate))
+                          :start (1- (length (application-arguments gate)))
+                          :step -1)))
     (make-matrix-from-quil
      (append
       (when (eql ':up (ucr-application-chirality temp-gate))
@@ -59,7 +59,7 @@
       (when (eql ':down (ucr-application-chirality temp-gate))
         (list
          (build-gate "CNOT" () (second (application-arguments temp-gate))
-                               (first (application-arguments temp-gate)))))))))
+                     (first (application-arguments temp-gate)))))))))
 
 
 ;;; now some local utility functions
@@ -183,8 +183,8 @@
                (make-instance 'ucr-application
                               :chirality chirality
                               :roll-type roll
-                              :parameters (alexandria:ensure-list params)
-                              :arguments (alexandria:ensure-list args)))
+                              :parameters (a:ensure-list params)
+                              :arguments (a:ensure-list args)))
              (ucr (roll params args)
                (ucr* nil roll params args))
              (chiroll (chirality params)

@@ -244,8 +244,8 @@
               "DAGGER BELL"))
          (code (quil:parsed-program-executable-code p)))
     (destructuring-bind (instr-cnot instr-h)
-        (mapcar (alexandria:compose #'quil::operator-description-string
-                                    #'quil:application-operator)
+        (mapcar (a:compose #'quil::operator-description-string
+                           #'quil:application-operator)
                 (coerce code 'list))
       (is (string= "DAGGER CNOT" instr-cnot))
       (is (string= "DAGGER H" instr-h)))))
@@ -263,8 +263,8 @@
     ;; Note that here the order of operations is reversed yet again,
     ;; so that the H 0 instruction is back on top.
     (destructuring-bind (instr-h instr-cnot)
-        (mapcar (alexandria:compose #'quil::operator-description-string
-                                    #'quil:application-operator)
+        (mapcar (a:compose #'quil::operator-description-string
+                           #'quil:application-operator)
                 (coerce code 'list))
       (is (string= "H" instr-h))
       (is (string= "CNOT" instr-cnot)))))

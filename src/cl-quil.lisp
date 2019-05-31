@@ -23,5 +23,5 @@
                (uiop:file-exists-p filespec))
           (filespec)
           "FILESPEC must be a path to a file that exists")
-  (parse-quil (alexandria:read-file-into-string filespec)
+  (parse-quil (a:read-file-into-string filespec)
               :originating-file (first (directory filespec))))

@@ -92,7 +92,7 @@
                  (unless (= j (1- (expt 2 qubit-count)))
                    (format s ", ")))
                (format s "~%"))
-             (format s "TEST ~{~d ~}" (alexandria:iota qubit-count))))
+             (format s "TEST ~{~d ~}" (a:iota qubit-count))))
          (parsed-prog (quil::parse-quil-into-raw-program program-string)))
     (setf parsed-prog (quil::transform 'quil::resolve-applications parsed-prog))
     (is (quil::matrix-equality (magicl:make-identity-matrix (expt 2 qubit-count))
@@ -272,7 +272,7 @@
   (signals simple-error (quil::check-permutation '(0 1 2 5 3)))
   ;; Valid permutations. Grows as n!, so don't get too crazy here.
   (dotimes (n 6)
-    (alexandria:map-permutations
+    (a:map-permutations
      (lambda (permutation)
        (not-signals simple-error (quil::check-permutation permutation)))
-     (alexandria:iota n))))
+     (a:iota n))))
