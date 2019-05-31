@@ -187,6 +187,22 @@
                                  "The given matrix does not represent a Clifford element.")
                          (pauli-from-string (concatenate 'string phase conj))))))))
 
+(defun clifford-to-matrix (cliff)
+  "here we go boys"
+  (let* ((n (num-qubits cliff))
+         (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))
+         (scratch-tab (make-tableau-zero-state n))
+         (cliff-on-tab (lambda (tab) (apply (tableau-function cliff) tab (alexandria:iota n)))))
+    (dotimes (curr-state (expt 2 n))
+      (take-tableau-to-basis-state scratch-tab curr-state)
+      ;; (break "before clifford")
+      (funcall cliff-on-tab scratch-tab)
+      ;; (break "before wavefunction")
+      (let ((image (tableau-wavefunction scratch-tab)))
+        (dotimes (row (expt 2 n))
+          (magicl::setf (magicl::ref mat row curr-state) (aref image row)))))
+    mat))
+
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
   (loop :for gate-application :across (quil::parsed-program-executable-code parsed-quil)
@@ -210,4 +226,3 @@
 (defun clifford-from-quil (quil)
   "Given a STRING of quil, produce the associated CLIFFORD element. If QUIL does not represent a Clifford circuit, return NIL. "
   (clifford-circuit-p (quil::safely-parse-quil quil)))
-

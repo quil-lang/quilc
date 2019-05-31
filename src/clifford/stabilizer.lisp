@@ -1,8 +1,9 @@
 ;;;; stabilizer.lisp
 ;;;;
-;;;; Author: Robert Smith
+;;;; Authors: Robert Smith, Andrew Shi
 
 (in-package #:cl-quil.clifford)
+(declaim (optimize (speed 0) safety debug (space 0)))
 
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
@@ -40,24 +41,33 @@
   (declare (type tableau tab))
   (the tableau-index (ash (1- (array-dimension tab 0)) -1)))
 
+(defun ci (tab i j)
+  (let ((n (tableau-qubits tab)))
+    ;; (assert (<= 0 i (1- (* 2 n))))
+    (assert (<= 0 j (1- n)))))
+
 (defun tableau-x (tab i j)
   (declare (type tableau tab)
            (type tableau-index i j))
+  (ci tab i j)
   (aref tab i j))
 (defun (setf tableau-x) (new-bit tab i j)
   (declare (type tableau tab)
            (type tableau-index i j)
            (type bit new-bit))
+  (ci tab i j)
   (setf (aref tab i j) new-bit))
 
 (defun tableau-z (tab i j)
   (declare (type tableau tab)
            (type tableau-index i j))
+  (ci tab i j)
   (aref tab i (+ j (tableau-qubits tab))))
 (defun (setf tableau-z) (new-bit tab i j)
   (declare (type tableau tab)
            (type tableau-index i j)
            (type bit new-bit))
+  (ci tab i j)
   (setf (aref tab i (+ j (tableau-qubits tab))) new-bit))
 
 (defun tableau-r (tab i)
@@ -119,6 +129,14 @@
     (dotimes (i (* 2 n) zero)
       (setf (aref zero i i) 1))))
 
+(defun take-tableau-to-basis-state (tab x)
+  "Bring the tableau to the specific basis state X."
+  (let ((n (tableau-qubits tab)))
+    (zero-out-tableau tab)
+    (dotimes (i n)
+      (when (logbitp i x)
+        (setf (aref tab (+ i n) (* 2 n)) 1)))))
+
 (declaim (inline phase-of-product))
 (defun phase-of-product (x1 z1 x2 z2)
   ;; This function is called "g" in the Aaronson et al. paper.
@@ -162,39 +180,46 @@
 
 (defun incurred-phase-from-row-product (tab h i)
   "Calculate the incurred phase by multiplying row H and row I together."
-  (let ((sum (+ (* 2 (tableau-r tab h))
-                (* 2 (tableau-r tab i))
-                (loop :with sum :of-type fixnum := 0
-                      :for j :below (tableau-qubits tab)
-                      :for ph := (phase-of-product
-                                  (tableau-x tab i j)
-                                  (tableau-z tab i j)
-                                  (tableau-x tab h j)
-                                  (tableau-z tab h j))
-                      :do (incf sum ph)
-                      :finally (return sum)))))
-    (setf sum (mod sum 4))
-    (unless (or (= sum 0) (= sum 2))
-      (error "invalid prod between row ~D and ~D (got ~D):~%~A~%~A~%" h i sum
-             (with-output-to-string (*standard-output*)
-               (display-row tab h))
-             (with-output-to-string (*standard-output*)
-               (display-row tab i))))
-    sum))
+  (mod (+ (* 2 (tableau-r tab h))
+          (* 2 (tableau-r tab i))
+          (loop :with sum :of-type fixnum := 0
+                :for j :below (tableau-qubits tab)
+                :for ph := (phase-of-product
+                            (tableau-x tab i j)
+                            (tableau-z tab i j)
+                            (tableau-x tab h j)
+                            (tableau-z tab h j))
+                :do (incf sum ph)
+                :finally (return sum)))
+       4))
 
 (declaim (inline row-product))
-(defun row-product (tab h i)
+(defun row-product (tab h i &key allow-dirty-phase)
   ;; Set generator h to h + i, where + is the Pauli group operation.
   (let ((sum (incurred-phase-from-row-product tab h i)))
     ;; Step 1
     (cond
       ((= 0 sum) (setf (tableau-r tab h) 0))
       ((= 2 sum) (setf (tableau-r tab h) 1))
-      (t (error "Unreacheable: ~A." sum)))
+      ((not allow-dirty-phase)
+       (error "invalid prod between row ~D and ~D (got ~D):~%~A~%~A~%" h i sum
+              (with-output-to-string (*standard-output*)
+                (display-row tab h))
+              (with-output-to-string (*standard-output*)
+                (display-row tab i)))))
     ;; Step 2
     (dotimes (j (tableau-qubits tab))
       (xorf (tableau-x tab h j) (tableau-x tab i j))
-      (xorf (tableau-z tab h j) (tableau-z tab i j)))))
+      (xorf (tableau-z tab h j) (tableau-z tab i j)))
+    ;; Return the phase
+    sum))
+
+(defun multiply-into-scratch (tab i)
+  (declare (notinline row-product))
+  (let ((n (tableau-qubits tab)))
+    (prog1 (row-product tab (* 2 n) i :allow-dirty-phase t)
+      ;; This function should only be used where phase is tracked separately.
+      (setf (tableau-r tab (* 2 n)) 0))))
 
 ;;; This is intended to be a helper function for
 ;;; COMPILE-TABLEAU-OPERATION. Look at that function to see if it
@@ -333,6 +358,9 @@ but the symbols may be uninterned or named differently.
                       ;; to this...
                       :collect z))))))))
 
+(defun tableau-function (c)
+  (compile nil (compile-tableau-operation c)))
+
 ;;; These functions: TABLEAU-APPLY-{CNOT, H, PHASE} are hard-coded
 ;;; from the Aaronson et al. paper. These can be readily generated
 ;;; from the above procedure.
@@ -430,8 +458,7 @@ but the symbols may be uninterned or named differently.
       ;; measurement would be.
       (t
        ;; Zero out the scratch space.
-       (dotimes (i (* 2 n))
-         (setf (tableau-scratch tab i) 0))
+       (tableau-clear-scratch tab)
        (let ((m (loop :for m :below n
                       :when (= 1 (tableau-x tab m q))
                         :do (return m)
@@ -442,6 +469,10 @@ but the symbols may be uninterned or named differently.
              (row-product tab (* 2 n) (+ i n))))
          (values (tableau-r tab (* 2 n)) t))))))
 
+(defun tableau-clear-scratch (tab)
+  "Clear the scratch row of TAB."
+  (dotimes (i (1+ (* 2 (tableau-qubits tab))))
+    (setf (tableau-scratch tab i) 0)))
 
 (defun tableau-to-ref (tab)
   "Perform Gaussian elimination to put the tableau in row echelon form. Specifically, the modified generators will be put in the form
@@ -504,8 +535,7 @@ Returns the number of purely X/Y generators.
   (let ((n (tableau-qubits tab))
         (log-nonzero (tableau-to-ref tab)))
     ;; Zero out scratch space
-    (dotimes (i (* 2 n))
-      (setf (tableau-scratch tab i) 0))
+    (tableau-clear-scratch tab)
     ;; For each row, starting from the bottom of the Z generators
     (loop :for row :from (1- (* 2 n)) :downto (+ n log-nonzero)
           :do (let ((phase (tableau-r tab row))
@@ -514,11 +544,11 @@ Returns the number of purely X/Y generators.
                 (loop :for j :from (1- n) :downto 0
                       :when (= 1 (tableau-z tab row j))
                         :do (setf first-z j)
-                            (when (= 1 (tableau-x tab (* 2 n) j))
+                            (when (= 1 (tableau-scratch tab j))
                               (xorf phase 1)))
                 ;; Change the corresponding X in the P operator as necessary
                 (when (= phase 1)
-                  (xorf (tableau-x tab (* 2 n) first-z) 1))))))
+                  (xorf (tableau-scratch tab first-z) 1))))))
 
 (defun read-basis-state-from-scratch-row (tab)
   "Given a tableau TAB, read off the operator on the scratch row as a basis state. Returns two values:
@@ -547,12 +577,14 @@ Note: the scratch space is used as an area to write intermediate state values, a
          (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0))))
     (find-nonzero-operator tab)
     (dotimes (i (expt 2 log-nonzero))
-      (let ((x (logxor i (1+ i))))
+      (let ((x (logxor i (1+ i)))
+            (scratch-phase 0))
         (dotimes (j log-nonzero)
           (when (logbitp j x)
-            (row-product tab (* 2 n) (+ n j))))
+            (incf scratch-phase (multiply-into-scratch tab (+ n j)))))
         (multiple-value-bind (state phase) (read-basis-state-from-scratch-row tab)
-          (setf (aref wf state) (/ phase norm)))))
+          (declare (ignore phase))
+          (setf (aref wf state) (/ (expt #C(0.0d0 1.0d0) scratch-phase) norm)))))
     wf))
 
 ;;; The .chp file format is an input to Aaronson's chp program written
