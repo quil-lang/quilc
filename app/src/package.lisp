@@ -5,4 +5,5 @@
 (in-package #:cl-user)
 
 (defpackage #:quilc
-  (:use #:cl))
+  (:use #:cl)
+  (:package-local-nicknames (:alexandria :a)))
