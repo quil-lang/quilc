@@ -30,7 +30,9 @@
         #:parse-float
         #:abstract-classes
         #:singleton-classes
-        #:cl-quil.resource)
+        #:cl-quil.resource
+        #:alexandria)
+  (:local-nicknames (:a :alexandria))
   ;; options.lisp
   (:export
    #:*allow-unresolved-applications*    ; VARIABLE
