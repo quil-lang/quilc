@@ -14,26 +14,26 @@
        (_
         (("CZ" () p q) x)
         (("CZ" () r s) y))
-     
+
      (give-up-compilation-unless
          (< (+ (ash 1 p) (ash 1 q))
             (+ (ash 1 r) (ash 1 s)))
        (list y x)))
-   
+
    (make-rewriting-rule "CPHASEs commute"
        (_
         (("CPHASE" (_) p q) x)
         (("CPHASE" (_) r s) y))
-     
+
      (give-up-compilation-unless
          (< (+ (ash 1 p) (ash 1 q))
             (+ (ash 1 r) (ash 1 s)))
        (list y x)))
-   
+
    (make-rewriting-rule "Eigenvectors take no action"
        (context
         (_ instr))
-     
+
      (unpack-wf instr context (psi qubit-indices)
        (let ((updated-wf (nondestructively-apply-instr-to-wf instr psi qubit-indices)))
          (give-up-compilation-unless
@@ -49,23 +49,23 @@
         (_
          ((,roll-type (theta) q) x)
          ((,roll-type (phi)   q) y))
-      
+
       (list (build-gate ,roll-type (list (param-+ theta phi)) q)))
-    
+
     (make-rewriting-rule ,(format nil "~a(2 pi k) -> " roll-type)
         (_
          ((,roll-type (theta) _) x))
-      
+
       (give-up-compilation-unless
           (and (typep theta 'double-float)
                (double= (/ theta (* 2 pi))
                         (round (/ theta (* 2 pi)))))
         (list)))
-    
+
     (make-rewriting-rule ,(format nil "~a(x + 2 pi k) -> ~:*~a(x)" roll-type)
         (_
          ((,roll-type (theta) q) x))
-      
+
       (give-up-compilation-unless
           (typep theta 'double-float)
         (let ((reduced-theta (- (mod (+ pi theta) (* 2 pi)) pi)))
@@ -73,11 +73,11 @@
               (and (< pi (abs theta))
                    (< (abs reduced-theta) (abs theta)))
             (list (build-gate ,roll-type (list reduced-theta) q))))))
-    
+
     (make-rewriting-rule ,(format nil "~a(-pi) -> ~:*~a(pi)" roll-type)
         (_
          ((,roll-type (#.(- pi)) q) x))
-      
+
       (list (build-gate ,roll-type (list pi) q)))))
 
 (defun rewriting-rules-for-roll-RX ()
@@ -96,26 +96,26 @@
         (_
          ((,rollB (theta) q) x)
          ((,rollA (#.pi)  q) y))
-      
+
       (list (build-gate ,rollA (list pi)                   q)
             (build-gate ,rollB (list (param-* -1d0 theta)) q)))
-    
+
     ;; rollB(pi) rollA(x) --> rollA(-x) rollB(pi)
     (make-rewriting-rule ,(format nil "~a(pi) ~a(x) -> ~:*~a(-x) ~:*~:*~a(pi)" rollB rollA)
         (_
          ((,rollB (#.pi)  q) x)
          ((,rollA (theta) q) y))
-      
+
       (list (build-gate ,rollA (list (param-* -1d0 theta)) q)
             (build-gate ,rollB (list pi)                   q)))
-    
+
     ;; -rollB/2 rollA/2 rollB/2 --> rollA/2 rollB/2 -rollA/2 (with positionally reversed signs)
     (make-rewriting-rule ,(format nil "-~a/2 ~a/2 ~:*~:*~a/2 -> ~a/2 ~:*~:*~a/2 -~a/2, etc" rollB rollA)
         (_
          ((,rollB (theta1) q) x)
          ((,rollA (theta2) q) y)
          ((,rollB (theta3) q) z))
-      
+
       (give-up-compilation-unless
           (and (typep theta1 'double-float)
                (double= (/ pi 2) (abs theta1))
@@ -145,17 +145,17 @@
        (_
         (("ISWAP" () p q) x)
         (("ISWAP" () r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "RZ" (list pi) p)
              (build-gate "RZ" (list pi) q))))
-   
+
    (make-rewriting-rule "(RZ (x) I) ISWAP -> ISWAP (I (x) RZ)"
        (_
         (("RZ"    (theta) q)     x)
         (("ISWAP" ()      q1 q2) y))
-     
+
      (give-up-compilation-unless
          (or (= q q1) (= q q2))
        (list (build-gate "ISWAP" ()           q1 q2)
@@ -169,40 +169,40 @@
        (_
         (("PISWAP" (theta) p q) x)
         (("PISWAP" (phi)   r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ theta phi)) p q))))
-   
+
    (make-rewriting-rule "PISWAP(phi) -> PISWAP(phi mod 4 pi)"
        (_
         (("PISWAP" (theta) p q) x))
-     
+
      (give-up-compilation-unless
          (typep theta 'double-float)
        (let ((reduced-theta (mod theta (* 4 pi))))
          (give-up-compilation-unless
              (not (double= theta reduced-theta))
            (list (build-gate "PISWAP" (list reduced-theta) p q))))))
-   
+
    (make-rewriting-rule "PISWAP(2pi) -> Z (x) Z"
        (_
         (("PISWAP" (#.(* 2 pi)) p q) x))
-     
+
      (list (build-gate "RZ" (list pi) p)
            (build-gate "RZ" (list pi) q)))
-   
+
    (make-rewriting-rule "PISWAP(4pi) -> NOP"
        (_
         (("PISWAP" (#.(* 4 pi)) _ _) x))
-     
+
      (list))
-   
+
    (make-rewriting-rule "(RZ (x) I) PISWAP(pi) -> PISWAP(pi) (I (x) RZ)"
        (_
         (("RZ"     (theta) q)     x)
         (("PISWAP" (phi)   q1 q2) y))
-     
+
      (give-up-compilation-unless
          (and (typep phi 'double-float)
               (double= 0d0 (mod (abs phi) pi))
@@ -217,27 +217,27 @@
    (make-rewriting-rule "PISWAP(odd * pi) -> ISWAP PISWAP(even * pi)"
        (_
         (("PISWAP" (theta) p q) x))
-     
+
      (give-up-compilation-unless
          (and (typep theta 'double-float)
               (double= (* pi (floor theta pi)) theta))
        (list (build-gate "ISWAP"  ()  p)
              (build-gate "PISWAP" (list (- theta pi)) q))))
-   
+
    (make-rewriting-rule "ISWAP PISWAP(theta) -> PISWAP(pi + theta)"
        (_
         (("ISWAP"  ()    p q) x)
         (("PISWAP" (phi) r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ pi phi)) p q))))
-   
+
    (make-rewriting-rule "PISWAP(phi) ISWAP -> PISWAP(phi + pi)"
        (_
         (("PISWAP" (theta) p q) x)
         (("ISWAP"  ()      r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ theta pi)) p q))))))
@@ -249,7 +249,7 @@
    (make-rewriting-rule "ISWAP -> PISWAP"
        (_
         (("ISWAP" () p q) x))
-     
+
      (list (build-gate "PISWAP" (list pi) p q)))))
 
 
@@ -259,24 +259,24 @@
        (_
         (("CNOT" () p q) x)
         (("CNOT" () r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list)))
-   
+
    (make-rewriting-rule "(RZ (x) I) CNOT -> CNOT (RZ (x) I)"
        (_
         (("RZ"   (theta) p)   x)
         (("CNOT" ()      p q) y))
-     
+
      (list (build-gate "CNOT" ()        p q)
            (build-gate "RZ"   `(,theta) p)))
-   
+
    (make-rewriting-rule "(I (x) RX) CNOT -> CNOT (I (x) RX)"
        (_
         (("RX"   (theta) q)   x)
         (("CNOT" ()      p q) y))
-     
+
      (list (build-gate "CNOT" ()        p q)
            (build-gate "RX"   `(,theta) q)))))
 
@@ -288,25 +288,25 @@
        (_
         (("CZ" () p q) x)
         (("CZ" () r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list)))
-   
+
    (make-rewriting-rule "RZ CZ -> CZ RZ"
        (_
         (("RZ" (_) q)    x)
         (("CZ" () q1 q2) y))
-     
+
      (give-up-compilation-unless
          (or (= q q1) (= q q2))
        (list y x)))
-   
+
    (make-rewriting-rule "(X (x) I) CZ -> CZ (X (x) Z)"
        (_
         (("RX" (#.pi) q)     x)
         (("CZ" ()     q1 q2) y))
-     
+
      (give-up-compilation-unless
          (or (= q q1) (= q q2))
        (list (build-gate "CZ" ()        q1 q2)
@@ -315,7 +315,7 @@
    (make-rewriting-rule "Control bit off: no action"
        (context
         (("CZ" () control _) x))
-     
+
      (unpack-wf x context (psi qubit-indices)
        (let* ((control-bit (- (length qubit-indices)
                               1
@@ -327,11 +327,11 @@
          (give-up-compilation-unless
              (double= 0d0 (sqrt control-bit-weight))
            (list)))))
-   
+
    (make-rewriting-rule "Control bit on: apply Z gate"
        (context
         (("CZ" () control target) x))
-     
+
      (unpack-wf x context (psi qubit-indices)
        (let* ((control-bit (- (length qubit-indices)
                               1
@@ -343,11 +343,11 @@
          (give-up-compilation-unless
              (double= 1d0 (sqrt control-bit-weight))
            (list (build-gate "RZ" (list pi) target))))))
-   
+
    (make-rewriting-rule "Partially supported wf on CZ"
        (context
         (("CZ" () control target) x))
-     
+
      (unpack-wf x context (psi qubit-indices)
        (let* ((zero-position (- (length qubit-indices)
                                 1
@@ -391,7 +391,7 @@
                  ;; the control bit is on: 1100
                  ;; all the bits are nonzero, so we can't reduce: 1111
                  (otherwise
-                  (give-up-compilation)))))))))))
+                  (error 'compiler-rewrite-does-not-apply)))))))))))
 
 (defun rewriting-rules-for-link-of-CPHASE-type ()
   "Generates a list of rewriting rules for simplifying expressions involving CPHASE and standard single-qubit operations."
@@ -400,39 +400,39 @@
        (_
         (("CPHASE" (theta) p q) x)
         (("CPHASE" (phi)   r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "CPHASE" (list (param-+ theta phi)) p q))))
-   
+
    (make-rewriting-rule "CPHASE(2 pi k) -> NOP"
        (_
         (("CPHASE" (theta) _ _) x))
-     
+
      (give-up-compilation-unless
          (and (typep theta 'double-float)
               (double= 0d0 (mod theta (* 2 pi))))
        (list)))
-   
+
    (make-rewriting-rule "CPHASE(x) -> CPHASE(x mod 2 pi)"
        (_
         (("CPHASE" (theta) p q) x))
-     
+
      (give-up-compilation-unless
          (and (typep theta 'double-float)
               (not (double= theta (mod theta (* 2 pi)))))
        (list (build-gate "CPHASE" (list (mod theta (* 2 pi))) p q))))
-   
+
    (make-rewriting-rule "RZ CPHASE -> CPHASE RZ"
        (_
         (("RZ"     (_) _)   x)
         (("CPHASE" (_) _ _) y))
-     
+
      (list y x))
    (make-rewriting-rule "Control bit off: no action"
        (context
         (("CPHASE" (_) control _) x))
-     
+
      (unpack-wf x context (psi qubit-indices)
        (let* ((control-bit (- (length qubit-indices)
                               1
@@ -444,11 +444,11 @@
          (give-up-compilation-unless
              (double= 0d0 (sqrt control-bit-weight))
            (list)))))
-   
+
    (make-rewriting-rule "Control bit on: apply RZ gate"
        (context
         (("CPHASE" (theta) control target) x))
-     
+
      (unpack-wf x context (psi qubit-indices)
        (let* ((control-bit (- (length qubit-indices)
                               1
@@ -468,7 +468,7 @@
    (make-rewriting-rule "CZ -> CPHASE"
        (_
         (("CZ" () p q) x))
-     
+
      (list (build-gate "CPHASE" (list pi) p q)))))
 
 (defun rewriting-rules-preferring-CZ-to-CPHASE ()
@@ -478,25 +478,25 @@
        (_
         (("CPHASE" (phi) p q) x)
         (("CZ"     ()    r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "CPHASE" (list (param-+ phi pi)) p q))))
-   
+
    (make-rewriting-rule
        "CZ CPHASE -> CPHASE"
        (_
         (("CZ"     ()    p q) x)
         (("CPHASE" (phi) r s) y))
-     
+
      (give-up-compilation-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "CPHASE" (list (param-+ phi pi)) p q))))
-   
+
    (make-rewriting-rule "CPHASE(pi) -> CZ"
        (_
         (("CPHASE" (theta) p q) x))
-     
+
      (give-up-compilation-unless
          (and (typep theta 'double-float)
               (double= 0d0 (mod (+ pi theta) (* 2 pi))))

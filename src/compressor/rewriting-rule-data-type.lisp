@@ -14,7 +14,7 @@
 READABLE-NAME is a string used to identify the rewriting rule during debugging.
 
 COUNT is an integer that specifies the number of adjacent instructions the rule takes as input.
- 
+
 CONSUMER is a function that consumes a COMPRESSOR-CONTEXT followed by a list of instructions.  Its possible results are:
    * The error condition COMPILER-DOES-NOT-APPLY if the rule is inapplicable.
    * a LIST of instructions if the rule applies.
@@ -23,7 +23,7 @@ CONSUMER is a function that consumes a COMPRESSOR-CONTEXT followed by a list of 
   (count 1 :read-only t :type (and fixnum unsigned-byte))
   (consumer (lambda (context item)
               (declare (ignore context item))
-              (give-up-compilation))
+              (error 'compiler-rewrite-does-not-apply))
    :read-only t))
 
 (defmacro make-rewriting-rule (readable-name (context-var &rest bind-clauses) &body body)
@@ -108,12 +108,12 @@ BODY is a list of forms that, by the end, should construct a list of instruction
 ;;; dumb little macros for cond guards that we were repeating a million times
 
 (defmacro give-up-compilation-unless (test &body body)
-  "If TEST passes, proceed to execute BODY (and return the value of the final expression). If TEST fails, call GIVE-UP-COMPILATION."
+  "If TEST passes, proceed to execute BODY (and return the value of the final expression). If TEST fails, signal compiler-rewrite-does-not-apply."
   `(cond
      (,test
       ,@body)
      (t
-      (give-up-compilation))))
+      (error 'compiler-rewrite-does-not-apply))))
 
 (defmacro unpack-wf (instr context (psi qubits) &body body)
   "Extracts from CONTEXT the wavefunction component related to the instruction INSTR.  Upon success, bind PSI to the wavefunction contents, bind QUBITS to the qubit ordering convention of PSI, execute BODY, and return the result of the final expression.  Upon failure, call GIVE-UP-COMPILATION."

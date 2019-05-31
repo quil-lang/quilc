@@ -38,13 +38,17 @@
   ()
   (:documentation "This is signaled when a compiler is technically applicable, but would act as an identity."))
 
+(define-condition compiler-rewrite-does-not-apply (compiler-does-not-apply)
+  ()
+  (:documentation "This is signaled when a rewriting rule cannot be applied to an instruction sequence."))
 
 
 (defun give-up-compilation (&key (because ':unknown))
   (ecase because
-    (:invalid-domain (error 'compiler-invalid-domain))
-    (:acts-trivially (error 'compiler-acts-trivially))
-    (:unknown        (error 'compiler-does-not-apply))))
+    (:invalid-domain         (error 'compiler-invalid-domain))
+    (:acts-trivially         (error 'compiler-acts-trivially))
+    (:rewrite-does-not-apply (error 'compiler-rewrite-does-not-apply))
+    (:unknown                (error 'compiler-does-not-apply))))
 
 
 ;;; Core routines governing how a chip-specification's compiler list is walked
