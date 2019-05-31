@@ -488,6 +488,10 @@ Return the following values:
       ;; there should not, however, be a label if this is the entry block
       (unless (eq blk (entry-point cfg))
         (add-to-section (make-instance 'jump-target :label (get-label-from-block blk))))
+      
+      ;; if this block is of type RESET-BLOCK, add back the implicit RESET instruction
+      (when (typep blk 'reset-block)
+        (add-to-section (make-instance 'reset)))
 
       ;; Attach the basic code of this block
       (add-to-section (basic-block-code blk))
