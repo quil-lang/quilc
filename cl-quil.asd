@@ -27,6 +27,7 @@
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
                #:trivial-garbage        ; weak hash tables
+               #:cl-heap
                #:cl-permutation
                #:queues.priority-queue
                #+sbcl #:sb-rotate-byte
