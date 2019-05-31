@@ -1525,13 +1525,14 @@ INPUT-STRING that triggered the condition."
     :documentation
     "Functions usable from within Quil, and their associated Lisp function symbols.")
 
+  ;; If you add a new arithmetic operator to +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ or
+  ;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+, you must also add it to *ARITHMETIC-GRAMMAR*, below.
   (alexandria:define-constant +quil<->lisp-prefix-arithmetic-operators+
       '(("-" . cl:-))
     :test #'equal
     :documentation
     "Prefix arithmetic operators usable from within Quil, and their associated Lisp function symbols.")
 
-  ;; If you add a new arithmetic operator here, you must also add it to *ARITHMETIC-GRAMMAR*, below.
   (alexandria:define-constant +quil<->lisp-infix-arithmetic-operators+
       '(("+" . cl:+)
         ("-" . cl:-)
@@ -1542,41 +1543,75 @@ INPUT-STRING that triggered the condition."
     :documentation
     "Infix arithmetic operators usable from within Quil, and their associated Lisp function symbols.")
 
-  (flet ((lisp->quil (lisp-symbol alist)
-           (check-type lisp-symbol symbol)
-           (alexandria:when-let ((found (rassoc lisp-symbol alist :test #'eq)))
-             (car found)))
-         (quil->lisp (quil-string alist)
-           (check-type quil-string string)
-           (alexandria:when-let ((found (assoc quil-string alist :test #'string-equal)))
-             (cdr found))))
+  (defun %lisp->quil (lisp-symbol alist)
+    (check-type lisp-symbol symbol)
+    (alexandria:when-let ((found (rassoc lisp-symbol alist :test #'eq)))
+      (car found)))
 
-    (defun lisp-symbol->quil-prefix-operator (symbol)
-      (lisp->quil symbol +quil<->lisp-prefix-arithmetic-operators+))
+  (defun %quil->lisp (quil-string alist)
+    (check-type quil-string string)
+    (alexandria:when-let ((found (assoc quil-string alist :test #'string-equal)))
+      (cdr found)))
 
-    (defun quil-prefix-operator->lisp-symbol (quil-prefix-operator)
-      (quil->lisp quil-prefix-operator +quil<->lisp-prefix-arithmetic-operators+))
+  ;; The following functions handle conversion between Quil's arithmetic operators/functions and the
+  ;; corresponding lisp symbols (fbound to lisp functions) that are used in CL-QUIL for evaluating
+  ;; Quil's arithmetic expressions. The mapping from lisp->Quil and Quil->lisp is determined by the
+  ;; above tables, namely: +QUIL<->LISP-FUNCTIONS+, +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+, and
+  ;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+.
+  ;;
+  ;; For example, the Quil infix operator "/" in an expression like "pi/8" maps to the Common Lisp
+  ;; symbol CL:/ and vice versa. Likewise for the prefix operator "-" in "-%theta" which maps to
+  ;; CL:-.
+  ;;
+  ;; The purpose of the following functions is to provide a layer of abstraction around the
+  ;; conversion to/from Quil<->lisp and to act as a single source of truth for such conversions.
+  ;;
+  ;; Here is a glossary of the terms used in the following function names:
+  ;;
+  ;; lisp-symbol:
+  ;;     a SYMBOL which is fbound to a lisp function appropriate for evaluating the corresponding
+  ;;     Quil function or arithmetic operator.
+  ;;
+  ;; quil-function:
+  ;;     a STRING that denotes a Quil arithmetic function. For example "SIN", "COS", "EXP", etc. See
+  ;;     the table +QUIL<->LISP-FUNCTIONS+ for the list of valid functions.
+  ;;
+  ;; quil-prefix-operator:
+  ;;     a STRING that denotes a Quil prefix (unary) arithmetic operator. For example, the "-" in
+  ;;     the expression "-pi/2". See the table +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ for the
+  ;;     list of valid prefix operators.
+  ;;
+  ;; quil-infix-operator:
+  ;;     a STRING that denotes a Quil infix (binary) arithmetic operator. For example, the "-" in
+  ;;     the expression "COS(%x) - i * SIN(%x)". See +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+ for
+  ;;     the list of valid infix operators.
 
-    (defun lisp-symbol->quil-infix-operator (symbol)
-      (lisp->quil symbol +quil<->lisp-infix-arithmetic-operators+))
+  (defun lisp-symbol->quil-prefix-operator (symbol)
+    (%lisp->quil symbol +quil<->lisp-prefix-arithmetic-operators+))
 
-    (defun quil-infix-operator->lisp-symbol (quil-infix-operator)
-      (quil->lisp quil-infix-operator +quil<->lisp-infix-arithmetic-operators+))
+  (defun quil-prefix-operator->lisp-symbol (quil-prefix-operator)
+    (%quil->lisp quil-prefix-operator +quil<->lisp-prefix-arithmetic-operators+))
 
-    (defun lisp-symbol->quil-function (symbol)
-      (lisp->quil symbol +quil<->lisp-functions+))
+  (defun lisp-symbol->quil-infix-operator (symbol)
+    (%lisp->quil symbol +quil<->lisp-infix-arithmetic-operators+))
 
-    (defun quil-function->lisp-symbol (quil-function)
-      (quil->lisp quil-function +quil<->lisp-functions+))
+  (defun quil-infix-operator->lisp-symbol (quil-infix-operator)
+    (%quil->lisp quil-infix-operator +quil<->lisp-infix-arithmetic-operators+))
 
-    (defun lisp-symbol->quil-function-or-prefix-operator (symbol)
-      (or (lisp-symbol->quil-function symbol)
-          (lisp-symbol->quil-prefix-operator symbol)))
+  (defun lisp-symbol->quil-function (symbol)
+    (%lisp->quil symbol +quil<->lisp-functions+))
 
-    (defun valid-quil-function-or-operator-p (symbol)
-      (not (null (or (lisp-symbol->quil-function symbol)
-                     (lisp-symbol->quil-prefix-operator symbol)
-                     (lisp-symbol->quil-infix-operator symbol))))))
+  (defun quil-function->lisp-symbol (quil-function)
+    (%quil->lisp quil-function +quil<->lisp-functions+))
+
+  (defun lisp-symbol->quil-function-or-prefix-operator (symbol)
+    (or (lisp-symbol->quil-function symbol)
+        (lisp-symbol->quil-prefix-operator symbol)))
+
+  (defun valid-quil-function-or-operator-p (symbol)
+    (not (null (or (lisp-symbol->quil-function symbol)
+                   (lisp-symbol->quil-prefix-operator symbol)
+                   (lisp-symbol->quil-infix-operator symbol)))))
 
   (defun binary (head)
     (lambda (a i0 b)
@@ -1585,9 +1620,8 @@ INPUT-STRING that triggered the condition."
 
   (defun validate-function (func-name)
     "Return the lisp symbol that corresponds to the Quil function named FUNC-NAME, or signal a QUIL-PARSE-ERROR if FUNC-NAME is invalid."
-    (alexandria:if-let ((lisp-symbol (quil-function->lisp-symbol func-name)))
-      lisp-symbol
-      (quil-parse-error "Invalid function name: ~A" func-name)))
+    (or (quil-function->lisp-symbol func-name)
+        (quil-parse-error "Invalid function name: ~A" func-name)))
 
   (defun find-or-make-parameter-symbol (param)
     (let ((found (assoc (param-name param)

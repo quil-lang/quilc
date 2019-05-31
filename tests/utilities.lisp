@@ -34,28 +34,13 @@
                  :arguments (mapcar #'cl-quil::qubit qubit-indices)
                  :gate matrix))
 
-(macrolet
-    ((def (predicate-name container-type element-test)
-       (check-type predicate-name symbol)
-       (check-type container-type symbol)
-       (check-type element-test symbol)
-       (let ((docstring
-               (format nil "Return true if OBJECT is a ~A and every element satisfies ~A."
-                       container-type element-test)))
-         `(defun ,predicate-name (object)
-            ,docstring
-            (and (typep object ',container-type)
-                 (every #',element-test object))))))
-  (def string-list-p list stringp)
-  (def string-sequence-p sequence stringp))
-
 (defun join-strings (strings &key (delimiter #\Newline) prefix-p suffix-p)
   "Join a sequence of STRINGS on the character or string DELIMITER.
 
 If PREFIX-P is non-nil, prefix the returned string with DELIMITER.
 
 If SUFFIX-P is non-nil, suffix the returned string with DELIMITER."
-  (check-type strings (satisfies string-sequence-p))
+  (check-type strings quil::string-sequence)
   (check-type delimiter (or string character))
   (with-output-to-string (stream)
     (loop :with last := (length strings)

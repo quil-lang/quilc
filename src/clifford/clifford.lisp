@@ -80,7 +80,7 @@ qubits."
 (declaim (ftype (function (t) simple-vector) basis-map))
 (defstruct (clifford (:include qubit-algebra))
   "An element of the Clifford group on NUM-QUBITS qubits."
-  (num-qubits 0 :type unsigned-fixnum)
+  (num-qubits 0 :type quil::unsigned-fixnum)
   (basis-map nil :type simple-vector))
 
 (defmethod num-qubits ((c clifford))
@@ -236,7 +236,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
   (declare (type clifford c))
   (declare (inline pauli-hash))
   (sxhash
-   (loop :with h :of-type unsigned-fixnum := 0
+   (loop :with h :of-type quil::unsigned-fixnum := 0
          :for p :of-type pauli :across (basis-map c)
          :do (setf h (hash-mix h (pauli-hash p)))
          :finally (return h))))

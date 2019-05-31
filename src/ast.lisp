@@ -100,7 +100,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defun make-delayed-expression (params lambda-params expression)
   "Make a DELAYED-EXPRESSION object initially with parameters PARAMS (probably a list of PARAM objects), lambda parameters LAMBDA-PARAMS, and the form EXPRESSION."
-  (assert (every #'symbolp lambda-params))
+  (check-type lambda-params symbol-list)
   (%delayed-expression :params params
                        :lambda-params lambda-params
                        :expression expression))
@@ -122,7 +122,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                (cons
                 (let ((args (mapcar (lambda (e) (evaluate-expr params lambda-params e))
                                     (cdr expression))))
-                  (if (every (lambda (thing) (typep thing 'number)) args)
+                  (if (number-list-p args)
                       (apply (lookup-function (first expression)) args)
                       (cdr expression))))
                (symbol
@@ -154,11 +154,18 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-comment-table ()
+    "Return an empty weak hash table suitable for use as the CL-QUIL::**COMMENTS** table.
+
+This function can be used to re-initialize the **COMMENTS** table.
+
+Keys are tested with EQ."
     (tg:make-weak-hash-table :test 'eq :weakness ':key)))
 
 (global-vars:define-global-var **comments**
     (make-comment-table)
-  "Weak hash table populated with comments associated to different parts of an AST.")
+  "Weak hash table populated with comments associated to different parts of an AST.
+
+The keys are typically INSTRUCTION instances and associated values are STRINGs.")
 
 (defun comment (x)
   (values (gethash x **comments**)))
@@ -254,7 +261,7 @@ as a permutation."
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
-  (assert (every #'symbolp parameters))
+  (check-type parameters symbol-list)
   (if parameters
       (make-instance 'parameterized-gate-definition
                     :name name

@@ -162,7 +162,7 @@
 ;; special-orthogonal, we have to correct this behavior manually.
 (defun find-real-spanning-set (vectors)
   "VECTORS is a list of complex vectors in C^n (which, here, are of type LIST).  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
-  (assert (a:proper-list-p vectors))
+  (check-type vectors a:proper-list)
   (let* ((coeff-matrix (magicl:make-complex-matrix
                         (length (first vectors))
                         (* 2 (length vectors))

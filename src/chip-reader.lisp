@@ -54,15 +54,12 @@
   (:documentation "This condition can be signaled when the chip reader fails to find an ISA layer.")
   (:report "Invalid QPU description file: missing required ISA layer or sub-layer."))
 
-(defun integer-list-p (list)
-  (every #'integerp list))
-
 (defun expand-key-to-integer-list (key)
   "Expands a string of the form \"n1-...-nm\" to the list of integers (list n1 ... nm)."
   (etypecase key
     (string
      (mapcar #'parse-integer (split-sequence:split-sequence #\- key)))
-    ((and list (satisfies integer-list-p))
+    (integer-list
      key)))
 
 (defun dead-qubit-hash-table ()

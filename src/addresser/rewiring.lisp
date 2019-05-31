@@ -8,14 +8,11 @@
 
 (in-package #:cl-quil)
 
-(defun integeropt-vector-p (v)
-  (and (vectorp v) (every (lambda (x) (or (not x) (integerp x))) v)))
-
 (defstruct (rewiring
             (:constructor init-rewiring)
             (:copier nil))
-  (l2p #() :type (satisfies integeropt-vector-p))
-  (p2l #() :type (satisfies integeropt-vector-p)))
+  (l2p #() :type integeropt-vector)
+  (p2l #() :type integeropt-vector))
 
 (defun inverse-matches-forward-p (forward inverse)
   "Checks that each non-NIL mapping in FORWARD has a corresponding inverse mapping in
