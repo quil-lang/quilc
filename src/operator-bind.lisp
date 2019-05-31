@@ -131,15 +131,14 @@
     (build-gate
      (destructuring-bind (head name param-list &rest qubit-list) body
        (declare (ignore head qubit-list))
-       ;; TODO: emit '?s sometimes.
        (let ((table (make-hash-table :test #'equalp)))
          (cond
            ((and (typep param-list 'cons)
                  (eql 'quote (first param-list))
                  (every #'numberp (second param-list)))
-            (setf (gethash name table) (list (second param-list))))
+            (setf (gethash name table) (list (cons (second param-list) 1))))
            (t
-            (setf (gethash name table) '?)))
+            (setf (gethash name table) (list (cons '_ 1)))))
          table)))
     (otherwise
      (let ((param-table (make-hash-table :test #'equalp)))
@@ -148,16 +147,145 @@
            (dohash ((key val) incoming-table)
              (cond
                ((gethash key param-table)
-                (cond
-                  ((or (eql '? (gethash key param-table))
-                       (eql '? val))
-                   (setf (gethash key param-table) '?))
-                  (t
-                   (setf (gethash key param-table)
-                         (remove-duplicates (union (gethash key param-table)
-                                                   (gethash key incoming-table)))))))
+                ;; merge the two alists
+                (loop :for (param-list . count) :in val
+                      :do (cond
+                            ((assoc param-list (gethash key param-table) :test #'equalp)
+                             (let ((cons-cell (assoc param-list (gethash key param-table) :test #'equalp)))
+                               (incf (cdr cons-cell) count)))
+                            (t
+                             (push (cons param-list count)
+                                   (gethash key param-table))))))
                (t
                 (setf (gethash key param-table) val))))))))))
+
+(defun add-single-entry-to-occurrence-table (table gate-name parameters count &optional (scalar 1))
+  (cond
+    ((assoc parameters (gethash gate-name table) :test #'equalp)
+     (let ((target-cons (assoc parameters (gethash gate-name table) :test #'equalp)))
+       (incf (cdr target-cons) (* count scalar))))
+    (t
+     (push (cons parameters (* count scalar))
+           (gethash gate-name table)))))
+
+(defun add-entry-list-to-occurrence-table (table gate-name entry-list &optional (scalar 1))
+  (dolist (entry entry-list)
+    (destructuring-bind (params . count) entry
+      (add-single-entry-to-occurrence-table table gate-name params count scalar))))
+
+(defun copy-occurrence-table (table)
+  (let ((new-table (make-hash-table :test #'equalp)))
+    (dohash ((key val) table)
+      (add-entry-list-to-occurrence-table new-table key val))
+    new-table))
+
+(defun add-occurrence-tables (table1 table2 &optional (scalar2 1))
+  (let ((new-table (copy-occurrence-table table1)))
+    (dohash ((key val) table2)
+      (add-entry-list-to-occurrence-table new-table key val scalar2))
+    new-table))
+
+(defun binding-matches-p (binding gate-name params)
+  ;; case: INSTR
+  (when (typep binding 'symbol)
+    (return-from binding-matches-p t))
+  ;; case: any options present
+  (when (binding-options (rest binding))
+    (return-from binding-matches-p nil))
+  ;; case: (INSTR (BINDING-NAME BINDING-PARAMS &REST BINDING-ARGS))
+  (let* ((binding-name (binding-op binding))
+         (binding-params (binding-parameters binding)))
+    ;; OP matches or subsumes
+    (unless (or (wildcard-pattern-p binding-name)
+                (typep binding-name 'symbol)
+                (and (typep gate-name 'string)
+                     (string= binding-name gate-name)))
+      (return-from binding-matches-p nil))
+    ;; ditto for each parameter
+    (when (wildcard-pattern-p binding-params)
+      (return-from binding-matches-p t))
+    (when (wildcard-pattern-p params)
+      ;; need to check that binding-params is EQUIVALENT to a wildcard.
+      (return-from binding-matches-p
+        (loop :for binding-param :in binding-params
+              :always (or (wildcard-pattern-p binding-param)
+                          (typep binding-param 'symbol)))))
+    (unless (= (length params) (length binding-params))
+      (return-from binding-matches-p nil))
+    (loop :for param :in params
+          :for binding-param :in binding-params
+          :always (or (wildcard-pattern-p binding-param)
+                      (typep binding-param 'symbol) ; what about parameter lists like (alpha, alpha)?
+                      (and (typep binding-param 'double-float)
+                           (typep param 'double-float)
+                           (double= binding-param param))))))
+
+(defun update-occurrence-table (table compiler)
+  (assert (= 1 (length (compiler-bindings compiler))))
+  (let ((binding (first (compiler-bindings compiler)))
+        (replacement (compiler-output-gates compiler))
+        (new-table (make-hash-table :test #'equalp))
+        (binding-applied? nil))
+    ;; for each existing entry in the table...
+    (dohash ((key val) table)
+      ;; ... and for each parameter entry in the list...
+      (dolist (cons-cell val)
+        (destructuring-bind (params . count) cons-cell
+          ;; ... do we match the binding?
+          (cond
+            ;; if so, merge the replacement into the new table
+            ((binding-matches-p binding key params)
+             (setf binding-applied? t)
+             (setf new-table (add-occurrence-tables new-table replacement count)))
+            ;; if not, retain the old entry
+            (t
+             (add-single-entry-to-occurrence-table new-table key params count))))))
+    (values new-table binding-applied?)))
+
+(defun get-1Q-compilers ()
+  (remove-if-not
+   (lambda (compiler)
+     (and (or (= 1 (length (compiler-bindings compiler))) ; specialize to 1 input
+              (keywordp (second (compiler-bindings compiler)))) ; don't count guards as inputs
+          (every (lambda (binding)
+                   (and (not (wildcard-pattern-p binding)) ; specialize to 1Q inputs
+                        (= 1 (length (binding-arguments binding)))))
+                 (compiler-bindings compiler))))
+   **compilers-available**))
+
+(defun occurrence-table-cost (table gate-cost-table &optional (default-value 0.5d0))
+  (let ((ret 1d0))
+    (dohash ((key val) table ret)
+      (dolist (cons-cell val)
+        (destructuring-bind (params . count) cons-cell
+          (let ((true-cost (gethash (cons key params) gate-cost-table)))
+            (setf ret (* ret (expt (if true-cost true-cost default-value) count)))))))))
+
+(defun occurrence-table-in-gateset-p (table gateset)
+  (dohash ((key val) table t)
+    (dolist (cons-cell val)
+      (destructuring-bind (params . count) cons-cell
+        (declare (ignore count))
+        (unless (or (gethash (cons key params) gateset)
+                    (gethash (cons key '_) gateset))
+          (return-from occurrence-table-in-gateset-p nil))))))
+
+(defun find-shortest-compiler-path (compilers target-gateset)
+  ;; target-gateset is an equalp hash (name . params) -> fidelities
+  (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'>)))
+    ;; initial contents: arbitrary gate, no history
+    (loop :for (task . history) := (list (alexandria:plist-hash-table
+                                          (list "_" (list (cons nil 1)))))
+            :then (cl-heap:dequeue queue)
+          :when (occurrence-table-in-gateset-p task target-gateset)
+            :return (cons task history)
+          :do (dolist (compiler compilers)
+                (multiple-value-bind (new-table updated?)
+                    (update-occurrence-table task compiler)
+                  (when updated?
+                    (cl-heap:enqueue queue
+                                     (list* new-table compiler task history)
+                                     (occurrence-table-cost new-table target-gateset))))))))
 
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
@@ -170,13 +298,26 @@
   (first binding))
 
 (defun binding-op (binding)
-  (first (second binding)))
+  (if (and (typep binding 'cons)
+           (typep (second binding) 'cons))
+      (first (second binding))
+      nil))
 
 (defun binding-parameters (binding)
-  (second (second binding)))
+  (if (and (typep binding 'cons)
+           (typep (second binding) 'cons))
+      (second (second binding))
+      nil))
 
 (defun binding-arguments (binding)
-  (rest (rest (second binding))))
+  (if (and (typep binding 'cons)
+           (typep (second binding) 'cons))
+      (loop :for arg :in (rest (rest (second binding)))
+            :when (keywordp arg)
+              :do (return args)
+            :collect arg :into args
+            :finally (return args))
+      nil))
 
 (defun binding-options (binding)
   (cond
