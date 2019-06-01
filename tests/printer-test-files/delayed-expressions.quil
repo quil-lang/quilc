@@ -99,3 +99,19 @@ DEFCIRCUIT TEST(%arg1, %arg2) p:
 
 RX(0.0) 0
 
+# Input
+DECLARE int INTEGER[2]
+
+DEFGATE MREF(%arg):
+    %arg*int,    int[1]/%arg
+    int[0]^%arg, COS(int+%arg)
+
+# Output
+DECLARE int INTEGER[2]
+
+DEFGATE MREF(%arg):
+    (%arg*int[0]), (int[1]/%arg)
+    (int[0]^%arg), COS((int[0]+%arg))
+
+
+
