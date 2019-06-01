@@ -1,4 +1,5 @@
 # Input
+# This is a slightly modified form of Figure 4.9 on p. 182 of Nielsen & Chuang (2010 ed.)
 DEFCIRCUIT CNOT-DT-T-CNOT-T p1 p2 p3:
     CNOT p2 p3
     DAGGER T p3
