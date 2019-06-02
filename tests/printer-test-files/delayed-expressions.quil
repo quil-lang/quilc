@@ -87,6 +87,21 @@ DEFGATE UNARY-MINUS(%arg1):
 
 
 # Input
+DEFGATE R(%theta, %beta):
+    exp(%beta/3*i), 0
+    0, exp(%theta/2*i)
+
+R(pi/2, pi/8) 0
+
+# Output
+DEFGATE R(%theta, %beta):
+    EXP(((%beta/(3.0))*(1.0i))), 0.0
+    0.0, EXP(((%theta/(2.0))*(1.0i)))
+
+
+R(pi/2, pi/8) 0
+
+# Input
 DEFCIRCUIT TEST(%arg1, %arg2) p:
     RX(%arg1-%arg2) p
 

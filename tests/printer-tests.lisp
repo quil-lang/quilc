@@ -60,9 +60,12 @@ admonition against carelessness."
                   ;; Ensure the output of PRINT-PARSED-PROGRAM can be parsed.
                   (not-signals error (quil:parse-quil actual-output))
 
-                  ;; Ensure expected-output is a fixed point of parse -> print.
-                  (is (string= expected-output
-                               (parse-and-print-quil-to-string expected-output)))))))))
+                  ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this
+                  ;; check might fail, so skip it if we find a magic cookie at the start of the
+                  ;; input section indicating that we should do so.
+                  (unless (alexandria:starts-with-subseq "# Disable fixed-point check" input)
+                    (is (string= expected-output
+                                 (parse-and-print-quil-to-string expected-output))))))))))
 
 (deftest test-instruction-fmt ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\"" (format nil "~/cl-quil:instruction-fmt/"
@@ -92,21 +95,22 @@ admonition against carelessness."
                                                     ,(mref "ro" 5)))))))
 
 (deftest test-defgate-printing ()
-  (let ((befores (list "DEFGATE R(%theta, %beta):
-    exp(%beta/3*i), 0
-    0, exp(%theta/2*i)
-
-R(pi/2, pi/8) 0"
-                       "DEFGATE R:
+  ;; The EXP terms in the below DEFGATE evaluate to floating point values with with lots of digits
+  ;; in the printed representation. It seems like a bad idea to have a test depend on the precise
+  ;; default printed representation of such a float, so this test is not included in
+  ;; TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES, above. However, a similar test case inspired by this
+  ;; one is included in printer-test-files/defgates.quil.
+  (let ((before "DEFGATE R:
     exp(2*i), 0
     0, exp(4*i)
 
-R 0")))
-    (dolist (before befores)
-      (let ((after (parse-and-print-quil-to-string before)))
-        (quil::parse-quil after)))))
+R 0"))
+    (let ((after (parse-and-print-quil-to-string before)))
+      (not-signals error (quil::parse-quil after)))))
 
 (deftest test-circuit-and-declare-printing ()
+  ;; This test relies on the fact that PARSE-QUIL-INTO-RAW-PROGRAM doesn't EXPAND-CIRCUITS,
+  ;; otherwise it could be included in TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES, above.
   (let* ((before "DECLARE theta REAL[16]
 DECLARE theta-bits BIT[100] SHARING theta OFFSET 1 REAL
 

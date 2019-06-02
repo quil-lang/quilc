@@ -1,0 +1,41 @@
+# Input
+# Disable fixed-point check
+
+# The expected output for this input is as given in the Output section, below. However, if *that*
+# output is parsed, it will be correctly recognized as a permutation matrix, and then the printed
+# representation will be a "DEFGATE R as PERMUTATION" not a "DEFGATE R", hence we disable the
+# fixed-point check for this input.
+
+DEFGATE R:
+    exp(i*0), 0
+    0, exp(0/i)
+
+R 0
+
+# Output
+DEFGATE R:
+    1.0, 0.0
+    0.0, 1.0
+
+
+R 0
+
+# Input
+
+# If we modify the DEFGATE from the previous Input section slightly so that it's no longer a
+# permutation matrix, then the output passes the fixed-point check.
+
+DEFGATE R:
+    exp(i*0), 0
+    1, exp(0/i)
+
+R 0
+
+# Output
+DEFGATE R:
+    1.0, 0.0
+    1.0, 1.0
+
+
+R 0
+
