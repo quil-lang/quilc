@@ -9,9 +9,11 @@
    ':cl-quil-tests
    "tests/printer-test-files/"))
 
-(defun parse-and-print-quil-to-string (input)
+(defun parse-and-print-quil-to-string (input
+                                       &key (parser #'quil:parse-quil)
+                                            (printer #'quil::print-parsed-program))
   (with-output-to-string (s)
-    (quil::print-parsed-program (quil:parse-quil input) s)))
+    (funcall printer (funcall parser input) s)))
 
 (defun reset-comment-table-hack ()
   "Reset the CL-QUIL::**COMMENTS** hash table.
@@ -52,9 +54,7 @@ admonition against carelessness."
       (multiple-value-bind (golden-inputs golden-outputs) (parse-golden-file file)
         (loop :for input :in golden-inputs
               :for expected-output :in golden-outputs :do
-                (let* ((input-pp (quil:parse-quil input))
-                       (actual-output (with-output-to-string (s)
-                                        (quil::print-parsed-program input-pp s))))
+                (let ((actual-output (parse-and-print-quil-to-string input)))
                   (is (string= expected-output actual-output))
 
                   ;; Ensure the output of PRINT-PARSED-PROGRAM can be parsed.
@@ -103,10 +103,7 @@ R(pi/2, pi/8) 0"
 
 R 0")))
     (dolist (before befores)
-      (let ((after (with-output-to-string (s)
-                     (quil::print-parsed-program
-                      (quil::parse-quil before)
-                      s))))
+      (let ((after (parse-and-print-quil-to-string before)))
         (quil::parse-quil after)))))
 
 (deftest test-circuit-and-declare-printing ()
@@ -120,8 +117,6 @@ DEFCIRCUIT TEST(%a) b c:
 
 TEST(0.5) 0 1
 ")
-         (after (with-output-to-string (s)
-                  (cl-quil::print-parsed-program
-                   (cl-quil::parse-quil-into-raw-program before) s))))
+         (after (parse-and-print-quil-to-string before :parser #'quil::parse-quil-into-raw-program)))
     (is (string= before after))))
 
