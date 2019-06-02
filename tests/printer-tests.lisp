@@ -124,3 +124,14 @@ TEST(0.5) 0 1
          (after (parse-and-print-quil-to-string before :parser #'quil::parse-quil-into-raw-program)))
     (is (string= before after))))
 
+(deftest test-jump-to-integer-label-printing ()
+  "Ensure that JUMP instructions with integer LABELs are printed correctly."
+  (is (string= (quil::print-instruction-to-string
+                (quil::make-instance 'quil::unconditional-jump :label 42))
+               "JUMP {absolute address 42}"))
+  (is (string= (quil::print-instruction-to-string
+                (quil::make-instance 'quil::jump-when :label 0 :address (quil::mref "ro" 0)))
+               "JUMP-WHEN {absolute address 0} ro[0]"))
+  (is (string= (quil::print-instruction-to-string
+                (quil::make-instance 'quil::jump-unless :label 1 :address (quil::mref "ro" 2)))
+               "JUMP-UNLESS {absolute address 1} ro[2]")))
