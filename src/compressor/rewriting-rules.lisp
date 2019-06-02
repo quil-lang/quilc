@@ -391,7 +391,7 @@
                  ;; the control bit is on: 1100
                  ;; all the bits are nonzero, so we can't reduce: 1111
                  (otherwise
-                  (error 'compiler-rewrite-does-not-apply)))))))))))
+                  (give-up-compilation :because ':rewrite-does-not-apply)))))))))))
 
 (defun rewriting-rules-for-link-of-CPHASE-type ()
   "Generates a list of rewriting rules for simplifying expressions involving CPHASE and standard single-qubit operations."

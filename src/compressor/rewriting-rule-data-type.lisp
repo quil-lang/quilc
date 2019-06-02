@@ -23,7 +23,7 @@ CONSUMER is a function that consumes a COMPRESSOR-CONTEXT followed by a list of 
   (count 1 :read-only t :type (and fixnum unsigned-byte))
   (consumer (lambda (context item)
               (declare (ignore context item))
-              (error 'compiler-rewrite-does-not-apply))
+              (give-up-compilation :because ':rewrite-does-not-apply))
    :read-only t))
 
 (defmacro make-rewriting-rule (readable-name (context-var &rest bind-clauses) &body body)
@@ -113,7 +113,7 @@ BODY is a list of forms that, by the end, should construct a list of instruction
      (,test
       ,@body)
      (t
-      (error 'compiler-rewrite-does-not-apply))))
+      (give-up-compilation :because ':rewrite-does-not-apply))))
 
 (defmacro unpack-wf (instr context (psi qubits) &body body)
   "Extracts from CONTEXT the wavefunction component related to the instruction INSTR.  Upon success, bind PSI to the wavefunction contents, bind QUBITS to the qubit ordering convention of PSI, execute BODY, and return the result of the final expression.  Upon failure, call GIVE-UP-COMPILATION."
