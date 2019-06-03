@@ -336,13 +336,15 @@ but that is outside our scope of interest."
 To put the density matrix into the basis state, e.g., |01><11|, we
 would choose BASIS-INDEX = 7. In general, the basis state |a><b| is
 prepared by choosing BASIS-INDEX = (2^N * a + b)."
-  (let ((amps (make-array 64 :element-type 'qvm:cflonum :initial-element (qvm:cflonum 0))))
+  (let ((amps (make-array (expt 2 (* 2 num-qubits))
+                          :element-type 'qvm:cflonum
+                          :initial-element (qvm:cflonum 0))))
     (setf (aref amps basis-index) (qvm:cflonum 1))
     (qvm:make-density-qvm num-qubits :amplitudes amps)))
 
 (deftest test-measure-semantics ()
-  "Test that artifacts of compilation (namely moving MEASUREs) does
-not change the semantics of the program."
+  "Test that artifacts of compilation (namely moving and rewiring
+MEASUREs) does not change the semantics of the program."
   (let* ((p-str "H 0
 CNOT 0 2
 MEASURE 0
