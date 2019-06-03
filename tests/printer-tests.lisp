@@ -50,22 +50,30 @@ admonition against carelessness."
   (let ((golden-files (uiop:directory-files *printer-test-files-directory* #P"*.quil")))
     (is (not (null golden-files)))
     (dolist (file golden-files)
-      (format t "~&    Testing file ~a" (pathname-name file))
-      (multiple-value-bind (golden-inputs golden-outputs) (parse-golden-file file)
-        (loop :for input :in golden-inputs
-              :for expected-output :in golden-outputs :do
-                (let ((actual-output (parse-and-print-quil-to-string input)))
-                  (is (string= expected-output actual-output))
+      (format t "~&    Testing file ~A" (pathname-name file))
+      (loop :for test-case :in (parse-golden-file file)
+            :for input := (golden-test-case-input test-case)
+            :for expected-output := (golden-test-case-output test-case)
+            :for failure-message := (format nil "~&Golden test case at~%~A:~D"
+                                            (golden-test-case-file test-case)
+                                            (golden-test-case-line test-case))
+            :do (let ((*always-show-failed-sexp* t))
+                  (format t "~&        test case at line ~D" (golden-test-case-line test-case))
 
-                  ;; Ensure the output of PRINT-PARSED-PROGRAM can be parsed.
-                  (not-signals error (quil:parse-quil actual-output))
+                  (let (actual-output)
+                    ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
+                    ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
+                    (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
+                    (not-signals error (quil:parse-quil actual-output))
+                    (is (string= expected-output actual-output) failure-message))
 
                   ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this
                   ;; check might fail, so skip it if we find a magic cookie at the start of the
                   ;; input section indicating that we should do so.
                   (unless (alexandria:starts-with-subseq "# Disable fixed-point check" input)
                     (is (string= expected-output
-                                 (parse-and-print-quil-to-string expected-output))))))))))
+                                 (parse-and-print-quil-to-string expected-output))
+                        failure-message)))))))
 
 (deftest test-instruction-fmt ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\"" (format nil "~/cl-quil:instruction-fmt/"
