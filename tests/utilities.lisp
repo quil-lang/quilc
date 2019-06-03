@@ -299,6 +299,32 @@ and OUTPUT slots, respectively."
   (with-open-file (f file-name)
     (parse-golden-file-stream f)))
 
+(defun map-golden-files-and-test-cases (test-case-function golden-files &optional (stream t))
+  "Call TEST-CASE-FUNCTION on every GOLDEN-TEST-CASE found in the specified GOLDEN-FILES.
+
+This is a convenience wrapper for writing golden file tests that handles iterating over the
+GOLDEN-FILES and their GOLDEN-TEST-CASEs as well as reporting status about the current file and test
+case on the optional STREAM argument.
+
+Note that unlike standard MAP* functions, this function performs a nested, double iteration.
+Roughly:
+
+    (dolist (f golden-files)
+      (dolist (t (parse-golden-file f))
+        (funcall test-case-function t)))
+
+TEST-CASE-FUNCTION is function that takes a single GOLDEN-TEST-CASE argument.
+
+GOLDEN-FILES is a LIST of PATHNAMEs indicating golden files to test.
+
+STREAM is an optional OUTPUT-STREAM for writing debug messages indicating the current file and test
+case being processed. STREAM defaults to T."
+  (dolist (file golden-files)
+    (format stream "~&    Testing golden file ~A at line:" (pathname-name file))
+    (dolist (test-case (parse-golden-file file))
+      (format stream " ~D" (golden-test-case-line test-case))
+      (funcall test-case-function test-case))))
+
 (defun update-golden-file-output-sections (file-paths output-callback
                                            &key (if-exists ':supersede) skip-prompt)
   "Update all output sections of the golden files at FILE-PATHS.
