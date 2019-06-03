@@ -6,36 +6,36 @@
 # representation will be a "DEFGATE R as PERMUTATION" not a "DEFGATE R", hence we disable the
 # fixed-point check for this input.
 
-DEFGATE R:
+DEFGATE TEST-NOT-FIXED-POINT:
     exp(i*0), 0
     0, exp(0/i)
 
-R 0
+TEST-NOT-FIXED-POINT 0
 
 # Output
-DEFGATE R:
+DEFGATE TEST-NOT-FIXED-POINT:
     1.0, 0.0
     0.0, 1.0
 
 
-R 0
+TEST-NOT-FIXED-POINT 0
 
 # Input
 
 # If we modify the DEFGATE from the previous Input section slightly so that it's no longer a
 # permutation matrix, then the output passes the fixed-point check.
 
-DEFGATE R:
+DEFGATE TEST-FIXED-POINT:
     exp(i*0), 0
     1, exp(0/i)
 
-R 0
+TEST-FIXED-POINT 0
 
 # Output
-DEFGATE R:
+DEFGATE TEST-FIXED-POINT:
     1.0, 0.0
     1.0, 1.0
 
 
-R 0
+TEST-FIXED-POINT 0
 
