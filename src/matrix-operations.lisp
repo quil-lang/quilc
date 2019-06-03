@@ -123,9 +123,9 @@ as needed so that they are the same size."
                    (let* ((*read-eval* nil)
                           (raw-rewiring (if vector
                                             (make-rewiring-from-l2p vector)
-                                            (make-rewiring-from-l2p
-                                             (read-from-string (subseq (comment instr)
-                                                                       (length "Entering rewiring: "))))))
+                                            (make-rewiring-from-string
+                                             (subseq (comment instr)
+                                                     (length "Entering rewiring: ")))))
                           (trimmed (trim-rewiring raw-rewiring)))
                      (setf mat (reduce #'matrix-rescale-and-multiply
                                        (list (rewiring-to-permutation-matrix-l2p trimmed)
