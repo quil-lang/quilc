@@ -42,6 +42,42 @@
   (is (equal '(a b c d) (quil::reduce-append '((a) (b c) nil (d)))))
   (is (equal '(a b c d e f) (quil::reduce-append '((a) (b c) nil (d) (e f))))))
 
+(deftest test-print-instruction ()
+  (is (string= "PRAGMA gate_time CNOT \"50 ns\""
+               (with-output-to-string (s)
+                 (cl-quil::print-instruction (make-instance 'quil::pragma
+                                                            :words '("gate_time" "CNOT")
+                                                            :freeform-string "50 ns")
+                                             s))))
+  ;; try a operand-free instruction
+  (is (string= "HALT"
+               (with-output-to-string (s)
+                 (cl-quil::print-instruction (make-instance 'halt)
+                                             s))))
+  ;; try a unary instruction
+  (is (string= "NEG ro[3]"
+               (with-output-to-string (s)
+                 (cl-quil::print-instruction (make-instance 'quil::classical-negate
+                                                            :target (mref "ro" 3))
+                                             s))))
+  ;; try a binary instruction
+  (is (string= "MEASURE 1 ro[3]"
+               (with-output-to-string (s)
+                 (cl-quil::print-instruction (make-instance 'quil::measure
+                                                            :address (mref "ro" 3)
+                                                            :qubit (qubit 1))
+                                             s))))
+  ;; try something fancy
+  (is (string= "CPHASE-AND-MEASURE(%alpha) 1 3 ro[5]"
+               (with-output-to-string (s)
+                 (cl-quil::print-instruction (make-instance 'cl-quil::circuit-application
+                                                            :operator #.(named-operator "CPHASE-AND-MEASURE")
+                                                            :parameters `(,(param "alpha"))
+                                                            :arguments `(,(qubit 1)
+                                                                         ,(qubit 3)
+                                                                         ,(mref "ro" 5)))
+                                             s)))))
+
 (deftest test-big-defgate ()
   (let* ((qubit-count 8)
          (program-string
@@ -264,29 +300,6 @@
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
      (a:iota n))))
 
-(deftest test-measure-discard-semantics ()
-  "Test that artifacts of compilation (namely moving MEASUREs) does
-not change the semantics of the program."
-  (let ((ps (list "MEASURE 0
-H 0"
-                  "H 0
-MEASURE 0
-H 0
-"
-                  "H 0
-MEASURE 0")))
-    (dolist (p (mapcar #'quil:parse-quil ps))
-      (let* ((qvm (qvm:make-density-qvm 1))
-             (qvm-comp (qvm:make-density-qvm 1))
-             (p-comp (quil::compiler-hook p (quil::build-nq-fully-connected-chip 1))))
-        (qvm:load-program qvm p :supersede-memory-subsystem t)
-        (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
-        (qvm:run qvm)
-        (qvm:run qvm-comp)
-        (is (every #'quil::double=
-                   (qvm::amplitudes qvm)
-                   (qvm::amplitudes qvm-comp)))))))
-
 (defun %change-qubit-indices (parsed-program qubits)
   "Send all application/measurement arguments to their position in the
 list of qubits QUBITS."
@@ -303,7 +316,7 @@ list of qubits QUBITS."
                                                      qubits)))
                      (quil::application-arguments instr)))))))
 
-(defun extract-trivial-exit-rewiring (pp)
+(defun %extract-trivial-exit-rewiring (pp)
   "Extract the exit rewiring comment from parsed program PP. Trivial
 here means PP is expected to have a single exit rewiring. A more
 complicated CFG could produce multiple exit rewirings in a program,
@@ -316,24 +329,37 @@ but that is outside our scope of interest."
                    (uiop:string-prefix-p "Exiting rewiring: " comment)) :do
                      (return (quil::make-rewiring-from-string
                               (subseq comment (length "Exiting rewiring: "))))))
- 
+
+(defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
+  "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
+
+To put the density matrix into the basis state, e.g., |01><11|, we
+would choose BASIS-INDEX = 7. In general, the basis state |a><b| is
+prepared by choosing BASIS-INDEX = (2^N * a + b)."
+  (let ((amps (make-array 64 :element-type 'qvm:cflonum :initial-element (qvm:cflonum 0))))
+    (setf (aref amps basis-index) (qvm:cflonum 1))
+    (qvm:make-density-qvm num-qubits :amplitudes amps)))
+
 (deftest test-measure-semantics ()
+  "Test that artifacts of compilation (namely moving MEASUREs) does
+not change the semantics of the program."
   (let* ((p-str "H 0
 CNOT 0 2
 MEASURE 0
 MEASURE 1
 MEASURE 2")
-         (p (parse-quil p-str))
-         (p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil t))
-         (rewiring (quil::rewiring-l2p (extract-trivial-exit-rewiring p-comp)))
-         (p-comp-relabeled (%change-qubit-indices p-comp rewiring)))
-    (let* ((qvm (qvm:make-density-qvm 3))
-           (qvm-comp (qvm:make-density-qvm 3)))
-      (qvm:load-program qvm p :supersede-memory-subsystem t)
-      (qvm:load-program qvm-comp p-comp-relabeled :supersede-memory-subsystem t)
-      (qvm:run qvm)
-      (qvm:run qvm-comp)
-      (is (every #'quil::double=
-                 (qvm::amplitudes qvm)
-                 (qvm::amplitudes qvm-comp)))
-      (values p p-comp-relabeled))))
+         (p (parse-quil p-str)))
+    (loop :for i :below (expt 2 6) :do
+      (let* ((p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil t))
+             (rewiring (quil::rewiring-l2p (extract-trivial-exit-rewiring p-comp)))
+             (p-comp-relabeled (%change-qubit-indices p-comp rewiring))
+             (qvm (%make-density-qvm-initialized-in-basis 3 i))
+             (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))
+        (qvm:load-program qvm p :supersede-memory-subsystem t)
+        (qvm:load-program qvm-comp p-comp-relabeled :supersede-memory-subsystem t)
+        (qvm:run qvm)
+        (qvm:run qvm-comp)
+        (is (every #'quil::double=
+                   (qvm::amplitudes qvm)
+                   (qvm::amplitudes qvm-comp)))))
+    (quil::print-parsed-program p)))
