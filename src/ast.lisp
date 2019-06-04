@@ -100,7 +100,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defun make-delayed-expression (params lambda-params expression)
   "Make a DELAYED-EXPRESSION object initially with parameters PARAMS (probably a list of PARAM objects), lambda parameters LAMBDA-PARAMS, and the form EXPRESSION."
-  (assert (every #'symbolp lambda-params))
+  (check-type lambda-params symbol-list)
   (%delayed-expression :params params
                        :lambda-params lambda-params
                        :expression expression))
@@ -108,9 +108,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defun evaluate-delayed-expression (de &optional (memory-model-evaluator #'identity))
   "Evaluate the delayed expression DE to a numerical value (represented in a CONSTANT data structure). MEMORY-MODEL is an association list with keys MEMORY-REF structures and values the value stored at that location."
   (labels ((lookup-function (expr)
-             (case expr
-               ((+ - * / cos sin tan) expr)
-               (otherwise (error "Illegal function in arithmetic expression: ~a." expr))))
+             (if (valid-quil-function-or-operator-p expr)
+                 expr
+                 (error "Illegal function in arithmetic expression: ~a." expr)))
            (evaluate-parameter (param)
              (etypecase param
                (constant (constant-value param))
@@ -122,7 +122,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                (cons
                 (let ((args (mapcar (lambda (e) (evaluate-expr params lambda-params e))
                                     (cdr expression))))
-                  (if (every (lambda (thing) (typep thing 'number)) args)
+                  (if (number-list-p args)
                       (apply (lookup-function (first expression)) args)
                       (cdr expression))))
                (symbol
@@ -152,9 +152,20 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 ;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-comment-table ()
+    "Return an empty weak hash table suitable for use as the CL-QUIL::**COMMENTS** table.
+
+This function can be used to re-initialize the **COMMENTS** table.
+
+Keys are tested with EQ."
+    (tg:make-weak-hash-table :test 'eq :weakness ':key)))
+
 (global-vars:define-global-var **comments**
-    (tg:make-weak-hash-table :test 'eq :weakness ':key)
-  "Weak hash table populated with comments associated to different parts of an AST.")
+    (make-comment-table)
+  "Weak hash table populated with comments associated to different parts of an AST.
+
+The keys are typically INSTRUCTION instances and associated values are STRINGs.")
 
 (defun comment (x)
   (values (gethash x **comments**)))
@@ -250,7 +261,7 @@ as a permutation."
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
-  (assert (every #'symbolp parameters))
+  (check-type parameters symbol-list)
   (if parameters
       (make-instance 'parameterized-gate-definition
                     :name name
@@ -1165,11 +1176,11 @@ For example,
                     ((= (length expr) 3)
                      (format stream "(~a~a~a)"
                              (print-delayed-expression (second expr) nil)
-                             (first expr)
+                             (lisp-symbol->quil-infix-operator (first expr))
                              (print-delayed-expression (third expr) nil)))
                     ((= (length expr) 2)
                      (format stream "~a(~a)"
-                             (first expr)
+                             (lisp-symbol->quil-function-or-prefix-operator (first expr))
                              (print-delayed-expression (second expr) nil)))))
                  (number
                   (format stream "(~/cl-quil:complex-fmt/)" expr))

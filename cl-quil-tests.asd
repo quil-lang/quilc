@@ -25,6 +25,7 @@
                (:file "initial-rewiring-tests")
                (:file "lexer-tests")
                (:file "parser-tests")
+               (:file "printer-tests")
                (:file "classical-memory-tests")
                (:file "resource-tests")
                (:file "misc-tests")

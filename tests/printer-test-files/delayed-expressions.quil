@@ -1,0 +1,132 @@
+# Input
+DEFGATE TEST-BINARY-ARITH(%arg):
+    %arg+%arg, %arg-%arg
+    %arg/%arg, %arg^%arg
+
+# Output
+DEFGATE TEST-BINARY-ARITH(%arg):
+    (%arg+%arg), (%arg-%arg)
+    (%arg/%arg), (%arg^%arg)
+
+
+
+# Input
+DEFGATE TEST-ARITH-ASSOC(%arg):
+    2*%arg+%arg/pi, %arg^2-%arg+2*%arg
+    %arg*2/2*%arg,  %arg^%arg^%arg
+
+# Output
+DEFGATE TEST-ARITH-ASSOC(%arg):
+    (((2.0)*%arg)+(%arg/(pi))), (((%arg^(2.0))-%arg)+((2.0)*%arg))
+    (((%arg*(2.0))/(2.0))*%arg), (%arg^(%arg^%arg))
+
+
+
+# Input
+DEFGATE TEST-FUNCTIONS(%arg):
+    COS(%arg),      SIN(%arg),               CIS(%arg),           SQRT(%arg)
+    EXP(%arg),      SIN(pi/%arg),            COS(pi/2*%arg),      CIS(%arg*i),
+    SIN(2*%arg),    EXP(1+%arg),             SQRT(%arg^2),        SQRT(%arg)^2
+    COS(SIN(%arg)), SIN(%arg)^2+COS(%arg)^2, SIN(%arg)/SIN(%arg), SIN(%arg)/COS(%arg)
+
+# Output
+DEFGATE TEST-FUNCTIONS(%arg):
+    COS(%arg), SIN(%arg), CIS(%arg), SQRT(%arg)
+    EXP(%arg), SIN(((pi)/%arg)), COS((((pi)/(2.0))*%arg)), CIS((%arg*(1.0i)))
+    SIN(((2.0)*%arg)), EXP(((1.0)+%arg)), SQRT((%arg^(2.0))), (SQRT(%arg)^(2.0))
+    COS(SIN(%arg)), ((SIN(%arg)^(2.0))+(COS(%arg)^(2.0))), (SIN(%arg)/SIN(%arg)), (SIN(%arg)/COS(%arg))
+
+
+
+# Input
+DEFGATE TEST-EXPT-ASSOC(%arg):
+    %arg*COS(%arg/2+2^2)^2^4, 0
+    0, 0
+
+# Output
+DEFGATE TEST-EXPT-ASSOC(%arg):
+    (%arg*(COS(((%arg/(2.0))+((2.0)^(2.0))))^((2.0)^(4.0)))), 0.0
+    0.0, 0.0
+
+
+
+# Input
+DEFGATE TEST-INFIX-ASSOC(%arg1, %arg2, %arg3):
+    (%arg1*%arg2+(%arg3/pi)^2)/pi, 0
+    0, 0
+
+# Output
+DEFGATE TEST-INFIX-ASSOC(%arg1, %arg2, %arg3):
+    (((%arg1*%arg2)+((%arg3/(pi))^(2.0)))/(pi)), 0.0
+    0.0, 0.0
+
+
+
+# Input
+DEFGATE TEST-EXPT(%arg1, %arg2):
+    0, 0
+    0, %arg1^%arg2
+
+# Output
+DEFGATE TEST-EXPT(%arg1, %arg2):
+    0.0, 0.0
+    0.0, (%arg1^%arg2)
+
+
+
+# Input
+DEFGATE TEST-UNARY-MINUS(%arg1):
+    0, -1
+    0, -%arg1
+
+# Output
+DEFGATE TEST-UNARY-MINUS(%arg1):
+    0.0, -1.0
+    0.0, -(%arg1)
+
+
+
+# Input
+DEFGATE TEST-R(%theta, %beta):
+    exp(%beta/3*i), 0
+    0, exp(%theta/2*i)
+
+TEST-R(pi/2, pi/8) 0
+
+# Output
+DEFGATE TEST-R(%theta, %beta):
+    EXP(((%beta/(3.0))*(1.0i))), 0.0
+    0.0, EXP(((%theta/(2.0))*(1.0i)))
+
+
+TEST-R(pi/2, pi/8) 0
+
+# Input
+DEFCIRCUIT TEST-CIRCUIT-EXPANSION(%arg1, %arg2) p:
+    RX(%arg1-%arg2) p
+
+TEST-CIRCUIT-EXPANSION(pi, pi*SIN(pi/2)) 0
+
+# Output
+DEFCIRCUIT TEST-CIRCUIT-EXPANSION(%arg1, %arg2) p:
+    RX((%arg1-%arg2)) p
+
+
+RX(0.0) 0
+
+# Input
+DECLARE int INTEGER[2]
+
+DEFGATE TEST-MREF(%arg):
+    %arg*int,    int[1]/%arg
+    int[0]^%arg, COS(int+%arg)
+
+# Output
+DECLARE int INTEGER[2]
+
+DEFGATE TEST-MREF(%arg):
+    (%arg*int[0]), (int[1]/%arg)
+    (int[0]^%arg), COS((int[0]+%arg))
+
+
+

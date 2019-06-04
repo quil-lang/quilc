@@ -27,7 +27,7 @@
     (1- (length (pauli-components p))))
 
   (defun make-components (num-qubits)
-    (declare (type unsigned-fixnum num-qubits))
+    (declare (type quil::unsigned-fixnum num-qubits))
     (make-array (1+ num-qubits) :element-type 'base4
                                 :initial-element 0))
 
@@ -265,7 +265,7 @@ hash-function."
   (declare (optimize speed (safety 0) (debug 0) (space 0))
            (type pauli p))
   (sxhash
-   (loop :with h :of-type unsigned-fixnum := 0
+   (loop :with h :of-type quil::unsigned-fixnum := 0
          :for x :across (pauli-components p)
          :do (setf h (hash-mix h x))
          :finally (return h))))

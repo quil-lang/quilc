@@ -8,9 +8,6 @@
 ;;; algebras", corresponding to algebras that have some correspondence
 ;;; with collections of qubits.
 
-(deftype unsigned-fixnum ()
-  `(and fixnum unsigned-byte))
-
 (defstruct (qubit-algebra (:conc-name nil))
   "A generic algebra involving objects specialized to NUM-QUBITS qubits.")
 

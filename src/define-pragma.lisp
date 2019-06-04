@@ -79,16 +79,6 @@ elements to ELT-TYPE.
     (alexa:lexer-match-error (c)
       (quil-parse-error "Lexer failure: ~A" c))))
 
-(defun integer-sequence-p (object)
-  (and (typep object 'sequence)
-       (every #'integerp object)))
-
-(deftype integer-vector ()
-  `(and vector (satisfies integer-sequence-p)))
-
-(deftype integer-list ()
-  `(and list (satisfies integer-sequence-p)))
-
 
 ;;;;;;;;;;;;;;;;;;;; Macroexpansion-time checking ;;;;;;;;;;;;;;;;;;;;
 

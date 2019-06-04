@@ -1,0 +1,14 @@
+# Input
+DEFGATE TEST-GH-ISSUE-249(%arg):
+    COS(%arg)^2, 0
+    0, SIN(%arg)^2
+
+TEST-GH-ISSUE-249(0.5) 0
+# Output
+DEFGATE TEST-GH-ISSUE-249(%arg):
+    (COS(%arg)^(2.0)), 0.0
+    0.0, (SIN(%arg)^(2.0))
+
+
+TEST-GH-ISSUE-249(0.5) 0
+

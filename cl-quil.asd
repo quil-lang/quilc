@@ -41,6 +41,7 @@
                 :components ((:static-file "stdgates.quil")))
                (:file "package")
                (:file "options")
+               (:file "types")
                (:file "utilities")
                (:file "relabeling")
                (:file "matrix-operations")

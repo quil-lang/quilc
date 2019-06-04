@@ -352,7 +352,7 @@
            (entries (gate-definition-entries gate-def))
            (params (gate-definition-parameters gate-def))
            (dim (isqrt (length entries))))
-      (assert (every #'symbolp params))
+      (check-type params symbol-list)
       (make-instance 'parameterized-gate
                      :name name
                      :dimension dim
