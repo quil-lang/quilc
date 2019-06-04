@@ -148,8 +148,8 @@
     (destructuring-bind (instr-dagger^1
                          instr-dagger^2
                          instr-dagger^3)
-        (mapcar (alexandria:compose #'quil::operator-description-string
-                                    #'quil:application-operator)
+        (mapcar (a:compose #'quil::operator-description-string
+                           #'quil:application-operator)
                 (coerce code 'list))
       (is (string= "DAGGER H" instr-dagger^1))
       (is (string= "H" instr-dagger^2))

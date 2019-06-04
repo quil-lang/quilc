@@ -28,7 +28,7 @@
   (intern (symbol-name slot-name) :keyword))
 
 (defun pdef-accessor-name (slot-name)
-  (alexandria:format-symbol (symbol-package slot-name) "PRAGMA-~A" slot-name))
+  (a:format-symbol (symbol-package slot-name) "PRAGMA-~A" slot-name))
 
 (defun format-complex-list (list)
   (format nil "(~{~A~^ ~})"
@@ -156,7 +156,7 @@ contains no duplicates."
     (flet ((error-form (message)
              `(error ,(format nil "Malformed pragma ~A -- ~A"
                               name message))))
-      (alexandria:with-gensyms (class words freeform-string)
+      (a:with-gensyms (class words freeform-string)
         `(defmethod check-pragma-arguments ((,class (eql ',pragma-class))
                                            ,words ,freeform-string)
            (unless (,operator ,value (length ,words))
@@ -169,7 +169,7 @@ contains no duplicates."
                            ,(error-form "freeform string provided"))))))))
 
 (defun pdef-pragma-specalized-initargs-form (pdef)
-  (alexandria:with-gensyms (class words freeform-string)
+  (a:with-gensyms (class words freeform-string)
     (let ((pragma-class (pdef-class-name pdef))
           (code (pdef-initialization-code pdef))
           (lambda-list (pdef-word-lambda-list pdef))
@@ -207,7 +207,7 @@ contains no duplicates."
   (let ((class-name (pdef-class-name pdef))
         (code (pdef-display-string-code pdef)))
     (when code
-      (alexandria:with-gensyms (pragma)
+      (a:with-gensyms (pragma)
         `(defmethod pragma-display-string ((,pragma ,class-name))
            (let ,(mapcar (lambda (slot)
                            `(,slot (,(pdef-accessor-name slot) ,pragma)))

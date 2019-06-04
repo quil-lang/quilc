@@ -178,7 +178,7 @@ following swaps. Perform translations under ENVIRONS."
                            (topmost-link
                             (chip-spec-adj-links chip-spec topmost-link))
                            (t
-                            (alexandria:iota n-links)))))
+                            (a:iota n-links)))))
                    (dolist (link-index links-to-search)
                      (let ((topmost-link (or topmost-link link-index)))
                        ;; apply this link
@@ -327,7 +327,7 @@ Optional arguments:
          ;; precompute SWAP distances between separated qubits
          (qq-distances (precompute-qubit-qubit-distances chip-spec))
          ;; the connected component where newly-assigned qubits will live
-         (qubit-cc (alexandria:extremum (chip-spec-live-qubit-cc chip-spec) #'> :key #'length))
+         (qubit-cc (a:extremum (chip-spec-live-qubit-cc chip-spec) #'> :key #'length))
          ;; initialize a bunch of empty 1Q queues, INDEXED BY LOGICAL ADDRESS
          (1q-queues (make-array n-qubits :initial-element (list)))
          ;; finally, initialize a scheduler to write into
@@ -731,7 +731,7 @@ Optional arguments:
            "Finds the best location for an unassigned logical under the given future schedule."
            (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
                    "Qubit ~a already assigned" logical)
-           (alexandria:extremum
+           (a:extremum
             (remove-if (lambda (p)
                          (or (apply-rewiring-p2l working-l2p p)
                              (chip-spec-qubit-dead? chip-spec p)))
@@ -793,7 +793,7 @@ Optional arguments:
                  :for candidate-instr :in 2q-instrs-partially-assigned
                  :for ((q0 q1) (pos0 pos1)) := (assign-gate candidate-instr gates-in-waiting)
                  :when (and pos0 pos1)
-                   :do (alexandria:when-let*
+                   :do (a:when-let*
                            ((candidate-link-line
                              (nth-value 1 (lookup-hardware-address-by-qubits chip-spec (list pos0 pos1))))
                             (candidate-horizon

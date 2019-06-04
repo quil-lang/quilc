@@ -210,7 +210,7 @@ for each el in seq."
     (map nil (lambda (el &aux (value (funcall key el)))
                (setf (gethash value hist) (1+ (or (gethash value hist) 0))))
          seq)
-    (sort (alexandria:hash-table-alist hist) #'> :key #'car)))
+    (sort (a:hash-table-alist hist) #'> :key #'car)))
 
 (defun search-rewiring (chip-spec initial-rewiring initial-qubit-times heuristic-fn done-fn
                         &key (max-iterations most-positive-fixnum))

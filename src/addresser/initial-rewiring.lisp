@@ -180,10 +180,10 @@ is found, then it will return *INITIAL-REWIRING-DEFAULT-TYPE*."
   "Rewires physical qubits not in CC to logical qubits that are not in
 NEEDED."
   (loop :for qi-non-cc
-          :in (set-difference (alexandria:iota (chip-spec-n-qubits chip-spec))
+          :in (set-difference (a:iota (chip-spec-n-qubits chip-spec))
                               cc)
         :for qi-non-needed
-          :in (set-difference (alexandria:iota (chip-spec-n-qubits chip-spec))
+          :in (set-difference (a:iota (chip-spec-n-qubits chip-spec))
                               needed) :do
           (setf (aref (rewiring-p2l rewiring) qi-non-cc) qi-non-needed
                 (aref (rewiring-l2p rewiring) qi-non-needed) qi-non-cc))
@@ -195,7 +195,7 @@ appear in the same connected component of the qpu"
   (let* ((n-qubits (chip-spec-n-qubits chip-spec))
          (connected-components (chip-spec-live-qubit-cc chip-spec))
          (indices (containing-indices connected-components))
-         (cc (alexandria:extremum connected-components #'> :key #'length))
+         (cc (a:extremum connected-components #'> :key #'length))
          (needed (prog-used-qubits parsed-prog)))
     (assert (or (endp needed)
                 (<= (apply #'max needed) n-qubits))

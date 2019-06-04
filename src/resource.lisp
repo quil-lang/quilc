@@ -120,7 +120,7 @@ classical memory regions. "
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (alexandria:define-constant +impossibly-full-resource+
+  (a:define-constant +impossibly-full-resource+
       (make-resource-collection
        :qubits +full+
        :memory-regions t)
@@ -378,7 +378,7 @@ DEFAULT-VALUE is used. "
 (defconstant +range-lower-bound+ most-negative-fixnum)
 (defconstant +range-upper-bound+ most-positive-fixnum)
 
-(alexandria:define-constant +full-range+
+(a:define-constant +full-range+
     (list (cons +range-lower-bound+ +range-upper-bound+))
   :test 'equal
   :documentation "The largest possible range.")
@@ -395,7 +395,7 @@ RANGES."
     ((endp ranges)
      nil)
     ((>= (interval-hi range) (first-interval-lo ranges))
-     (alexandria:maxf (interval-hi range) (first-interval-hi ranges)))))
+     (a:maxf (interval-hi range) (first-interval-hi ranges)))))
 
 (defun range-union (r1 r2)
   (nconc

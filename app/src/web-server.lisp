@@ -59,7 +59,7 @@
   (load-time-value
    (with-output-to-string (s)
      (yason:encode
-      (alexandria:plist-hash-table
+      (a:plist-hash-table
        (list "error_type" "quilc_error"
              "status" "invalid endpoint"))
       s))
@@ -68,7 +68,7 @@
 (defmethod tbnl:acceptor-status-message ((acceptor vhost) (http-status-code (eql #.tbnl:+http-internal-server-error+)) &key error &allow-other-keys)
   (with-output-to-string (s)
     (yason:encode
-     (alexandria:plist-hash-table
+     (a:plist-hash-table
       (list "error_type" "quilc_error"
             "status" error))
      s)))
@@ -182,7 +182,7 @@ If ALLOW-EMPTY-PAYLOADS is true, then an empty payload resolves to the same thin
                        api-key user-id)
     (with-timeout
         (with-output-to-string (s)
-          (yason:encode (alexandria:alist-hash-table
+          (yason:encode (a:alist-hash-table
                          `(("quilc"   . ,+QUILC-VERSION+)
                            ("githash" . ,+GIT-HASH+)))
                         s)))))
@@ -231,10 +231,10 @@ and replies with the JSON
                  recalculation-table)
         (with-output-to-string (s)
           (yason:encode
-           (alexandria:plist-hash-table (list "quil" (with-output-to-string (s)
-                                                       (quil::print-parsed-program rewritten-program s))
-                                              "original_memory_descriptors" reformatted-omd
-                                              "recalculation_table" reformatted-rt))
+           (a:plist-hash-table (list "quil" (with-output-to-string (s)
+                                              (quil::print-parsed-program rewritten-program s))
+                                     "original_memory_descriptors" reformatted-omd
+                                     "recalculation_table" reformatted-rt))
            s))))))
 
 (defun rb-post (data json api-key user-id)
@@ -257,8 +257,8 @@ and replies with the JSON
     (when (> n 2)
       (error "Currently no more than two qubit randomized benchmarking is supported."))
     (let* ((cliffords (mapcar #'quil.clifford::clifford-from-quil gateset))
-           (qubits-used (mapcar (alexandria:compose
-                                 (alexandria:curry #'reduce #'union)
+           (qubits-used (mapcar (a:compose
+                                 (a:curry #'reduce #'union)
                                  #'cl-quil.clifford::extract-qubits-used
                                  #'cl-quil:parse-quil)
                                 gateset))
@@ -313,7 +313,7 @@ and replies with the JSON
     (with-output-to-string (s)
       (yason:encode (list (quil.clifford::phase-factor pauli-out)
                           (apply #'concatenate 'string
-                                 (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
+                                 (mapcar (a:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                          (quil.clifford::base4-list pauli-out))))
                     s))))
 

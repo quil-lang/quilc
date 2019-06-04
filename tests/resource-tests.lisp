@@ -75,7 +75,7 @@
 
 
 (deftest test-resource-difference ()
-  (let ((universe (make-qubit-resources (alexandria:iota 30))))
+  (let ((universe (make-qubit-resources (a:iota 30))))
     (loop
       :repeat 20
       :for l := (loop :repeat 20 :collect (random 30))
@@ -114,7 +114,7 @@
     (loop :repeat (1+ (random 10))
           :for size := (random 10)
           :for lo := (random (- 50 size))
-          :collect (quil::make-resource-range (format nil "~d" (alexandria:random-elt range-names)) lo (+ lo size))))))
+          :collect (quil::make-resource-range (format nil "~d" (a:random-elt range-names)) lo (+ lo size))))))
 
 (deftest test-resource-identities ()
   (let* ((names (list "a" "b" "c"))

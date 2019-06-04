@@ -209,7 +209,7 @@
     (let* ((permutation (permutation-gate-permutation target))
            (size (length permutation)))
       (make-instance 'permutation-gate
-                     :permutation (append (alexandria:iota size)
+                     :permutation (append (a:iota size)
                                           (mapcar (lambda (j) (+ j size)) permutation))))))
 
 ;;; Daggered Gates
@@ -249,9 +249,9 @@
     ((named-operator _)
      (lambda (gate) gate))
     ((controlled-operator od)
-     (alexandria:compose #'control-gate (operator-description-gate-lifter od)))
+     (a:compose #'control-gate (operator-description-gate-lifter od)))
     ((dagger-operator od)
-     (alexandria:compose #'dagger-gate (operator-description-gate-lifter od)))))
+     (a:compose #'dagger-gate (operator-description-gate-lifter od)))))
 
 (defmethod gate-application-gate ((app gate-application))
   (funcall (operator-description-gate-lifter (application-operator app))
@@ -265,7 +265,7 @@
     (let ((table (make-hash-table :test 'equal))
           (gate-defs (parsed-program-gate-definitions
                       (parse-quil-into-raw-program
-                       (alexandria:read-file-into-string
+                       (a:read-file-into-string
                         (asdf:system-relative-pathname
                          "cl-quil" "src/quil/stdgates.quil"))))))
       (dolist (gate-def gate-defs table)
@@ -280,7 +280,7 @@
 
 (defun lookup-standard-gate (gate-name)
   "Lookup the gate named by GATE-NAME in the collection of *standard* Quil gates. Return NIL if non-standard."
-  (check-type gate-name alexandria:string-designator)
+  (check-type gate-name a:string-designator)
   (values (gethash (string gate-name) **default-gate-definitions**)))
 
 
@@ -294,7 +294,7 @@
 (defgeneric gate-definition-to-gate (gate-def)
   (:documentation "Convert a parsed Quil gate definition to a usable, executable gate.")
   (:method :around ((gate-def gate-definition))
-    (alexandria:if-let ((gate (%gate-definition-cached-gate gate-def)))
+    (a:if-let ((gate (%gate-definition-cached-gate gate-def)))
       gate
       (setf (%gate-definition-cached-gate gate-def) (call-next-method)))))
 
@@ -335,7 +335,7 @@
   "Constructs the matrix representation associated to an instruction list consisting of gates. Suitable for testing the output of compilation routines."
   (check-type m magicl:matrix)
   (check-type instr application)
-  (alexandria:when-let ((defn (gate-matrix instr)))
+  (a:when-let ((defn (gate-matrix instr)))
     (let* ((mat-size (ilog2 (magicl:matrix-rows m)))
            (size (max mat-size
                       (apply #'max
@@ -348,7 +348,7 @@
            (m (if (< mat-size size)
                   (kq-gate-on-lines m
                                     size
-                                    (alexandria:iota mat-size :start (1- mat-size) :step -1))
+                                    (a:iota mat-size :start (1- mat-size) :step -1))
                   m)))
       (magicl:multiply-complex-matrices mat m))))
 
@@ -435,7 +435,7 @@ as matrices."
         (unless (endp new-qubits)
           (setf u (kq-gate-on-lines u
                                     (+ (length qubits) (length new-qubits))
-                                    (alexandria:iota (length qubits)
+                                    (a:iota (length qubits)
                                                      :start (1- (length qubits))
                                                      :step -1)))
           (setf qubits (append new-qubits qubits)))

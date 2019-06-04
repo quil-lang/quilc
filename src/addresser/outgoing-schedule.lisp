@@ -38,7 +38,7 @@ permutation record duration."
         (permutation-record-duration (vnth 0 (hardware-object-permutation-gates
                                               (chip-spec-nth-link chip-spec link-index)))))))
   (flet ((get-it (chip-spec isn)
-           (alexandria:if-let ((obj (nth-value 2 (lookup-hardware-address chip-spec isn))))
+           (a:if-let ((obj (nth-value 2 (lookup-hardware-address chip-spec isn))))
              (funcall (hardware-object-native-instructions obj) isn)
              nil)))
     (declare (inline get-it))
@@ -93,7 +93,7 @@ BEFORE-INST to make use of RESOURCE."
 
 (defun chip-schedule-resource-end-time (schedule resource)
   "Return the time at which RESOURCE becomes free permanently within SCHEDULE."
-  (alexandria:if-let (inst (chip-schedule-last-meeting schedule resource))
+  (a:if-let (inst (chip-schedule-last-meeting schedule resource))
     (chip-schedule-end-time schedule inst)
     0))
 
@@ -108,7 +108,7 @@ BEFORE-INST to make use of RESOURCE."
   "Find the first time a qubit is available, for each qubit in the schedule."
   (map 'vector
        (lambda (idx) (chip-schedule-resource-end-time schedule (make-qubit-resource idx)))
-       (alexandria:iota (chip-spec-n-qubits (chip-schedule-spec schedule)))))
+       (a:iota (chip-spec-n-qubits (chip-schedule-spec schedule)))))
 
 (defun chip-schedule-duration (chip-sched)
   "Find the total duration of a chip schedule."
@@ -136,4 +136,4 @@ BEFORE-INST to make use of RESOURCE."
           :do (remhash inst needed))
         (assert (zerop (hash-table-count needed)) ()
                 "Qubit ~a did not have a single line in ~a. Missing ~a"
-                qubit chip-sched (alexandria:hash-table-keys needed))))))
+                qubit chip-sched (a:hash-table-keys needed))))))

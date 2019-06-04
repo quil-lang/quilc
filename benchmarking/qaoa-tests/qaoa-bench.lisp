@@ -22,8 +22,8 @@
         nil))))
 
 (defun print-stats (name numbers)
-  (let ((mean (alexandria:mean numbers))
-        (sdev (alexandria:standard-deviation numbers)))
+  (let ((mean (a:mean numbers))
+        (sdev (a:standard-deviation numbers)))
     (format t "~&~A: ~F (~F)~%" name mean sdev)))
 
 (load (asdf:system-relative-pathname

@@ -197,7 +197,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
                           ()
                           "The symbol ~S is not a Pauli basis element" from)
                   ;; Get the max dimension
-                  (alexandria:maxf num-qubits (dimension from-name) (dimension to-name))
+                  (a:maxf num-qubits (dimension from-name) (dimension to-name))
                   ;; Record the map.
                   (push (cons from-name to-name)
                         maps)))

@@ -204,10 +204,10 @@ other's."
   (unless node
     (return-from print-node-list nil))
   (format t "~30a <-- ~30a --> ~30a~%"
-          (alexandria:when-let ((prev (peephole-rewriter-node-prev node)))
+          (a:when-let ((prev (peephole-rewriter-node-prev node)))
             (peephole-rewriter-node-instr prev))
           (peephole-rewriter-node-instr node)
-          (alexandria:when-let ((next (peephole-rewriter-node-next node)))
+          (a:when-let ((next (peephole-rewriter-node-next node)))
             (peephole-rewriter-node-instr next)))
   (print-node-list (peephole-rewriter-node-next node)))
 
@@ -235,7 +235,7 @@ other's."
            ;; make sure we have enough terms, then apply the rule's consumer
            (with-simple-restart (try-next-compiler "Ignore this error and try the next rewrite rule in the list.")
              (handler-case
-                 (alexandria:when-let*
+                 (a:when-let*
                      ((relevant-nodes-for-inspection
                        (and (>= (length nodes-for-inspection) (rewriting-rule-count rule))
                             ;; TODO: consider calculating this subseq only once.
@@ -293,7 +293,7 @@ other's."
                  (let ((obj (nth-value 2 (lookup-hardware-address-by-qubits chip-specification qubit-complex))))
                    ;; if we can, then we want to loop over the object's rewrite rules.
                    ;; if we can't, we fall through and do nothing.
-                   (alexandria:when-let
+                   (a:when-let
                        ((rewrite-rules
                          (cond
                            ;; if we found a new hardware object, then use its rules
@@ -405,7 +405,7 @@ other's."
          ;; produce a sequence of native instructions that have the same effect
          ;; as the matrix representation of INSTRUCTIONS
          (decompile-instructions-into-full-unitary ()
-           (alexandria:when-let ((matrix (make-matrix-from-quil
+           (a:when-let ((matrix (make-matrix-from-quil
                                           instructions
                                           :relabeling (standard-qubit-relabeler qubits-on-obj))))
              (expand-to-native-instructions
@@ -521,7 +521,7 @@ other's."
                    collinear with the target wavefunction.")))
 
          (check-quil-is-near-as-matrices ()
-           (alexandria:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
+           (a:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
              (let* ((n (ilog2 (magicl:matrix-rows stretched-matrix)))
                     (reduced-matrix
                      (kron-matrix-up (make-matrix-from-quil reduced-instructions)
@@ -781,7 +781,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                             global-governor
                             (nth address (nth order governors))))
                       (old-state (governed-queue-state governed-queue)))
-                 (alexandria:eswitch ((list old-state new-state) :test #'equal)
+                 (a:eswitch ((list old-state new-state) :test #'equal)
                    ;;
                    ;; QUEUEING --> PASSING(B)
                    ;;

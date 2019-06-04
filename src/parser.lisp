@@ -244,7 +244,7 @@ INPUT-STRING that triggered the condition."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-condition quil-parse-error (alexandria:simple-parse-error)
+(define-condition quil-parse-error (a:simple-parse-error)
   ()
   (:documentation "Representation of an error parsing Quil."))
 

@@ -41,7 +41,7 @@
            (loop :for generator :in cliffords
                  :collect (let ((inverse (reconstruct (group-inv generator) god-table)))
                             (cons generator inverse))))
-         (min-identity-decomposition (alexandria:extremum identity-decompositions #'< :key #'length)))
+         (min-identity-decomposition (a:extremum identity-decompositions #'< :key #'length)))
     (push inverse seq)
     (loop :for s :in seq
           :collect (if (clifford-identity-p s)
@@ -197,7 +197,7 @@
   "If the parsed circuit PARSED-QUIL a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
   (let* ((cliffords (extract-cliffords parsed-quil))
          (qubit-targets (extract-qubits-used parsed-quil))
-	 (qubits (sort (remove-duplicates (alexandria:flatten qubit-targets)) #'<))
+	 (qubits (sort (remove-duplicates (a:flatten qubit-targets)) #'<))
 	 (num-qubits (length qubits)))
     (reduce #'group-mul (loop :for clifford :in (reverse cliffords)
 			   :for target :in (reverse qubit-targets)

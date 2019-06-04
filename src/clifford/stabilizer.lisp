@@ -217,8 +217,8 @@ but the symbols may be uninterned or named differently.
          (num-variables (* 2 num-qubits))
          (variables (loop :for i :below num-variables
                           :collect (if (evenp i)
-                                       (alexandria:format-symbol nil "X~D" (floor i 2))
-                                       (alexandria:format-symbol nil "Z~D" (floor i 2)))))
+                                       (a:format-symbol nil "X~D" (floor i 2))
+                                       (a:format-symbol nil "Z~D" (floor i 2)))))
          (phase-factor nil)
          (new-variables (make-array num-variables :initial-element nil)))
     ;; We will be mapping over all Paulis operating on a single
@@ -299,7 +299,7 @@ but the symbols may be uninterned or named differently.
          (i      (gensym "I-"))
          (tab    (gensym "TAB-"))
          (qubits (loop :for i :below num-qubits
-                       :collect (alexandria:format-symbol nil "Q~D" i))))
+                       :collect (a:format-symbol nil "Q~D" i))))
     (multiple-value-bind (variables phase-kickback new-variables)
         (clifford-stabilizer-action c)
       ;; Most of this lambda can be understood by understanding the
@@ -444,7 +444,7 @@ but the symbols may be uninterned or named differently.
         :for isn :in code
         :do
            (format t "~D: ~A" i isn)
-           (alexandria:destructuring-ecase isn
+           (a:destructuring-ecase isn
              ((H q)       (tableau-apply-h tab q))
              ((PHASE q)   (tableau-apply-phase tab q))
              ((CNOT p q)  (tableau-apply-cnot tab p q))

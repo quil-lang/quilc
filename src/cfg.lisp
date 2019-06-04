@@ -641,7 +641,7 @@ Return the following values:
 
 (defun output-cfg (quil out-file &key parallel dce simplify)
   (let ((pp (parse-quil-into-raw-program (if (pathnamep quil)
-                                             (alexandria:read-file-into-string quil)
+                                             (a:read-file-into-string quil)
                                              quil))))
     (setf pp (transform 'process-includes pp (if (pathnamep quil) quil nil)))
     (output-cfg-from-program pp out-file :parallel parallel :dce dce :simplify simplify)))

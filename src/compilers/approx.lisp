@@ -56,8 +56,8 @@
 
 (defun optimal-2q-target-meets-requirements (target requirements)
   "Tests whether REQUIREMENTS of type OPTIMAL-2Q-TARGET, thought of as the two-qubit instructions necessary to instantiate a two-qubit decomposition template, is covered by TARGET of type OPTIMAL-2Q-TARGET, thought of as the available two-qubit instructions on the device."
-  (let ((targetl       (alexandria:ensure-list target))
-        (requirementsl (alexandria:ensure-list requirements)))
+  (let ((targetl       (a:ensure-list target))
+        (requirementsl (a:ensure-list requirements)))
     (when (member ':cphase targetl) (push ':cz targetl))
     (when (member ':piswap targetl) (push ':iswap targetl))
     (when (member ':cnot targetl) (push ':cz targetl))
@@ -125,7 +125,7 @@
 ;; REM: according to arXiv:0308033, their only special property is:
 ;;     e e^T = -(sigma_y (x) sigma_y) .
 ;; there are several such matrices; this one is just easy to write down.
-(alexandria:define-constant
+(a:define-constant
     +e-basis+
     (let* ((sqrt2 (/ (sqrt 2) 2))
            (-sqrt2 (- sqrt2))
@@ -139,7 +139,7 @@
   :test #'matrix-equality
   :documentation "This is an element of SU(4) that has two properties: (1) e-basis e-basis^T = - sigma_y^((x) 2) and (2) e-basis^dag SU(2)^((x) 2) e-basis = SO(4).")
 
-(alexandria:define-constant
+(a:define-constant
     +edag-basis+
     (let* ((sqrt2 (/ (sqrt 2) 2))
            (-sqrt2 (- sqrt2))
@@ -162,7 +162,7 @@
 ;; special-orthogonal, we have to correct this behavior manually.
 (defun find-real-spanning-set (vectors)
   "VECTORS is a list of complex vectors in C^n (which, here, are of type LIST).  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
-  (assert (alexandria:proper-list-p vectors))
+  (assert (a:proper-list-p vectors))
   (let* ((coeff-matrix (magicl:make-complex-matrix
                         (length (first vectors))
                         (* 2 (length vectors))
@@ -478,7 +478,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (check-type q0 symbol)
   
   (multiple-value-bind (body-prog decls docstring)
-      (alexandria:parse-body body :documentation t)
+      (a:parse-body body :documentation t)
     `(progn
        (defun ,name (,coord ,q1 ,q0)
          ,@(when docstring (list docstring))
@@ -506,8 +506,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate requirements parameter-count) &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-APPROXIMATE-TEMPLATE, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
   (multiple-value-bind (body-prog decls docstring)
-      (alexandria:parse-body parametric-circuit :documentation t)
-    (alexandria:with-gensyms (a d b in goodness template-values)
+      (a:parse-body parametric-circuit :documentation t)
+    (a:with-gensyms (a d b in goodness template-values)
       `(define-approximate-template ,name (,coord ,q1 ,q0)
            (:requirements ,requirements
             :predicate ,predicate)
@@ -769,7 +769,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
           ((endp candidate-pairs)
            (give-up-compilation))
           (t
-           (destructuring-bind (fidelity . circuit) (alexandria:extremum candidate-pairs #'> :key #'car)
+           (destructuring-bind (fidelity . circuit) (a:extremum candidate-pairs #'> :key #'car)
              (unless (or *enable-approximate-compilation*
                          (double= 1d0 fidelity))
                (give-up-compilation))

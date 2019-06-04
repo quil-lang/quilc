@@ -165,7 +165,7 @@ RX(pi) 2
         (format *debug-io* "      Working on architecture ~a.~%" architecture)
         (let* ((num-qubits 4)
                (v (quil::random-special-unitary (expt 2 num-qubits)))
-               (args (shuffle-list (alexandria:iota num-qubits :start (1- num-qubits) :step -1)))
+               (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
                (parsed-prog (make-instance
                              'quil::parsed-program
                              :executable-code (make-array 1

@@ -4,6 +4,7 @@
 
 (defpackage #:cl-quil.resource
   (:use #:cl)
+  (:local-nicknames (:a :alexandria))
   (:export
    #:make-resource-collection           ; FUNCTION
    #:make-qubit-resource                ; FUNCTION
@@ -31,6 +32,7 @@
         #:abstract-classes
         #:singleton-classes
         #:cl-quil.resource)
+  (:local-nicknames (:a :alexandria))
   ;; options.lisp
   (:export
    #:*allow-unresolved-applications*    ; VARIABLE
@@ -429,6 +431,7 @@
   (:nicknames #:quil.clifford)
   (:use #:cl
         #:cl-permutation)
+  (:local-nicknames (:a :alexandria))
 
   ;; clifford/ module
   (:export

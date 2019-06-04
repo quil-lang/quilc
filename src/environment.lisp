@@ -14,7 +14,7 @@
 
 (defmacro tolerate-unknown-gate (&body body)
   "Evaluate BODY. If a gate wasn't found, just reurn NIL."
-  `(alexandria:ignore-some-conditions (gate-not-found) ,@body))
+  `(a:ignore-some-conditions (gate-not-found) ,@body))
 
 (defgeneric lookup-gate-in-environment (gate environs)
   (:documentation "Looks up a definition of the instruction GATE inside of the environment ENVIRONS. Results in an object compatible with GATE-MATRIX if a definition is found. Signal the error GATE-NOT-FOUND if it wasn't found."))
@@ -35,10 +35,10 @@
       (error 'gate-not-found :name gate)))
 
 (defmethod lookup-gate-in-environment ((gate string) (environs parsed-program))
-  (alexandria:if-let ((gate-defn (find gate
-                                       (parsed-program-gate-definitions environs)
-                                       :test #'string=
-                                       :key #'gate-definition-name)))
+  (a:if-let ((gate-defn (find gate
+                              (parsed-program-gate-definitions environs)
+                              :test #'string=
+                              :key #'gate-definition-name)))
     gate-defn
     (lookup-gate-in-environment gate nil)))
 
