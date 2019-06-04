@@ -3,6 +3,7 @@
 (defpackage #:cl-quil.tweedledum
   (:use #:common-lisp
         #:cffi)
+  (:local-nicknames (:a :alexandria))
   (:export #:synthesis-dbs))
 
 (in-package #:cl-quil.tweedledum)

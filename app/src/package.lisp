@@ -6,4 +6,4 @@
 
 (defpackage #:quilc
   (:use #:cl)
-  (:package-local-nicknames (:alexandria :a)))
+  (:local-nicknames (:a :alexandria)))
