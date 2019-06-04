@@ -67,7 +67,7 @@ admonition against carelessness."
          ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
          ;; might fail, so skip it if we find a magic cookie at the start of the input section
          ;; indicating that we should do so.
-         (unless (alexandria:starts-with-subseq "# Disable fixed-point check" input)
+         (unless (a:starts-with-subseq "# Disable fixed-point check" input)
            (is (string= expected-output
                         (parse-and-print-quil-to-string expected-output))
                message))))

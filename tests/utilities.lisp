@@ -182,7 +182,7 @@ If SUFFIX-P is non-nil, suffix the returned string with DELIMITER."
 ;;; "# Output" is required; otherwise, UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS will fail when attempting
 ;;; to parse the file.
 
-(define-condition golden-file-parse-error (alexandria:simple-parse-error)
+(define-condition golden-file-parse-error (a:simple-parse-error)
   ((line-number
     :initarg :line-number
     :initform 0
@@ -197,9 +197,9 @@ If SUFFIX-P is non-nil, suffix the returned string with DELIMITER."
              (format stream
                      "Error while parsing golden file at line ~D."
                      (golden-file-parse-error-line-number condition))
-             (alexandria:when-let ((bad-text (golden-file-parse-error-bad-text condition)))
+             (a:when-let ((bad-text (golden-file-parse-error-bad-text condition)))
                (format stream "~&Invalid text: ~S" bad-text))
-             (alexandria:when-let ((format-control (simple-condition-format-control condition)))
+             (a:when-let ((format-control (simple-condition-format-control condition)))
                (apply #'format stream
                       (concatenate 'string "~&" format-control)
                       (simple-condition-format-arguments condition)))))
@@ -239,7 +239,7 @@ and OUTPUT slots, respectively."
                   :format-control format-control
                   :format-arguments format-arguments))
          (stream-file-name (stream)
-           (alexandria:if-let ((path (uiop:truename* stream)))
+           (a:if-let ((path (uiop:truename* stream)))
              (enough-namestring path)
              ;; If STREAM is not a FILE-STREAM, it won't have an a TRUENAME. Just format the STREAM.
              (format nil "~A" stream))))
@@ -340,7 +340,7 @@ OUTPUT-CALLBACK is function from STRING -> STRING. It will be called successivel
 golden-file input section, and should return the corresponding output string for the given input.
 
 IF-EXISTS has the standard Common Lisp meaning. See http://l1sp.org/cl/open."
-  (let ((file-paths-list (alexandria:ensure-list file-paths)))
+  (let ((file-paths-list (a:ensure-list file-paths)))
     (when (or skip-prompt
               (y-or-n-p
                "Are you sure you want to clobber all the output sections of the following files?~%~@
@@ -348,7 +348,7 @@ IF-EXISTS has the standard Common Lisp meaning. See http://l1sp.org/cl/open."
                file-paths-list))
       (dolist (file file-paths-list)
         (format t "~&Updating ~A" file)
-        (alexandria:write-string-into-file
+        (a:write-string-into-file
          (join-strings (loop :for test-case :in (parse-golden-file file)
                              :for input := (golden-test-case-input test-case)
                              :for output := (funcall output-callback input)

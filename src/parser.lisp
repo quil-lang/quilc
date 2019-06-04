@@ -1515,7 +1515,7 @@ INPUT-STRING that triggered the condition."
                   (token-payload tok))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (alexandria:define-constant +quil<->lisp-functions+
+  (a:define-constant +quil<->lisp-functions+
       '(("SIN"  . cl:sin)
         ("COS"  . cl:cos)
         ("SQRT" . cl:sqrt)
@@ -1527,13 +1527,13 @@ INPUT-STRING that triggered the condition."
 
   ;;; If you add a new arithmetic operator to +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ or
   ;;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+, you must also add it to *ARITHMETIC-GRAMMAR*, below.
-  (alexandria:define-constant +quil<->lisp-prefix-arithmetic-operators+
+  (a:define-constant +quil<->lisp-prefix-arithmetic-operators+
       '(("-" . cl:-))
     :test #'equal
     :documentation
     "Prefix arithmetic operators usable from within Quil, and their associated Lisp function symbols.")
 
-  (alexandria:define-constant +quil<->lisp-infix-arithmetic-operators+
+  (a:define-constant +quil<->lisp-infix-arithmetic-operators+
       '(("+" . cl:+)
         ("-" . cl:-)
         ("/" . cl:/)
@@ -1545,12 +1545,12 @@ INPUT-STRING that triggered the condition."
 
   (defun %lisp->quil (lisp-symbol alist)
     (check-type lisp-symbol symbol)
-    (alexandria:when-let ((found (rassoc lisp-symbol alist :test #'eq)))
+    (a:when-let ((found (rassoc lisp-symbol alist :test #'eq)))
       (car found)))
 
   (defun %quil->lisp (quil-string alist)
     (check-type quil-string string)
-    (alexandria:when-let ((found (assoc quil-string alist :test #'string-equal)))
+    (a:when-let ((found (assoc quil-string alist :test #'string-equal)))
       (cdr found)))
 
   ;;; The following functions handle conversion between Quil's arithmetic operators/functions and
