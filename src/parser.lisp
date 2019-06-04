@@ -1525,8 +1525,8 @@ INPUT-STRING that triggered the condition."
     :documentation
     "Functions usable from within Quil, and their associated Lisp function symbols.")
 
-  ;; If you add a new arithmetic operator to +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ or
-  ;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+, you must also add it to *ARITHMETIC-GRAMMAR*, below.
+  ;;; If you add a new arithmetic operator to +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ or
+  ;;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+, you must also add it to *ARITHMETIC-GRAMMAR*, below.
   (alexandria:define-constant +quil<->lisp-prefix-arithmetic-operators+
       '(("-" . cl:-))
     :test #'equal
@@ -1553,38 +1553,38 @@ INPUT-STRING that triggered the condition."
     (alexandria:when-let ((found (assoc quil-string alist :test #'string-equal)))
       (cdr found)))
 
-  ;; The following functions handle conversion between Quil's arithmetic operators/functions and the
-  ;; corresponding lisp symbols (fbound to lisp functions) that are used in CL-QUIL for evaluating
-  ;; Quil's arithmetic expressions. The mapping from lisp->Quil and Quil->lisp is determined by the
-  ;; above tables, namely: +QUIL<->LISP-FUNCTIONS+, +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+, and
-  ;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+.
-  ;;
-  ;; For example, the Quil infix operator "/" in an expression like "pi/8" maps to the Common Lisp
-  ;; symbol CL:/ and vice versa. Likewise for the prefix operator "-" in "-%theta" which maps to
-  ;; CL:-.
-  ;;
-  ;; The purpose of the following functions is to provide a layer of abstraction around the
-  ;; conversion to/from Quil<->lisp and to act as a single source of truth for such conversions.
-  ;;
-  ;; Here is a glossary of the terms used in the following function names:
-  ;;
-  ;; lisp-symbol:
-  ;;     a SYMBOL which is fbound to a lisp function appropriate for evaluating the corresponding
-  ;;     Quil function or arithmetic operator.
-  ;;
-  ;; quil-function:
-  ;;     a STRING that denotes a Quil arithmetic function. For example "SIN", "COS", "EXP", etc. See
-  ;;     the table +QUIL<->LISP-FUNCTIONS+ for the list of valid functions.
-  ;;
-  ;; quil-prefix-operator:
-  ;;     a STRING that denotes a Quil prefix (unary) arithmetic operator. For example, the "-" in
-  ;;     the expression "-pi/2". See the table +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ for the
-  ;;     list of valid prefix operators.
-  ;;
-  ;; quil-infix-operator:
-  ;;     a STRING that denotes a Quil infix (binary) arithmetic operator. For example, the "-" in
-  ;;     the expression "COS(%x) - i * SIN(%x)". See +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+ for
-  ;;     the list of valid infix operators.
+  ;;; The following functions handle conversion between Quil's arithmetic operators/functions and
+  ;;; the corresponding lisp symbols (fbound to lisp functions) that are used in CL-QUIL for
+  ;;; evaluating Quil's arithmetic expressions. The mapping from lisp->Quil and Quil->lisp is
+  ;;; determined by the above tables, namely: +QUIL<->LISP-FUNCTIONS+,
+  ;;; +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+, and +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+.
+  ;;;
+  ;;; For example, the Quil infix operator "/" in an expression like "pi/8" maps to the Common Lisp
+  ;;; symbol CL:/ and vice versa. Likewise for the prefix operator "-" in "-%theta" which maps to
+  ;;; CL:-.
+  ;;;
+  ;;; The purpose of the following functions is to provide a layer of abstraction around the
+  ;;; conversion to/from Quil<->lisp and to act as a single source of truth for such conversions.
+  ;;;
+  ;;; Here is a glossary of the terms used in the following function names:
+  ;;;
+  ;;; lisp-symbol:
+  ;;;     a SYMBOL which is fbound to a lisp function appropriate for evaluating the corresponding
+  ;;;     Quil function or arithmetic operator.
+  ;;;
+  ;;; quil-function:
+  ;;;     a STRING that denotes a Quil arithmetic function. For example "SIN", "COS", "EXP", etc.
+  ;;;     See the table +QUIL<->LISP-FUNCTIONS+ for the list of valid functions.
+  ;;;
+  ;;; quil-prefix-operator:
+  ;;;     a STRING that denotes a Quil prefix (unary) arithmetic operator. For example, the "-" in
+  ;;;     the expression "-pi/2". See the table +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ for the
+  ;;;     list of valid prefix operators.
+  ;;;
+  ;;; quil-infix-operator:
+  ;;;     a STRING that denotes a Quil infix (binary) arithmetic operator. For example, the "-" in
+  ;;;     the expression "COS(%x) - i * SIN(%x)". See +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+ for
+  ;;;     the list of valid infix operators.
 
   (defun lisp-symbol->quil-prefix-operator (symbol)
     (%lisp->quil symbol +quil<->lisp-prefix-arithmetic-operators+))
