@@ -15,7 +15,7 @@
         (("CZ" () p q) x)
         (("CZ" () r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (< (+ (ash 1 p) (ash 1 q))
             (+ (ash 1 r) (ash 1 s)))
        (list y x)))
@@ -25,7 +25,7 @@
         (("CPHASE" (_) p q) x)
         (("CPHASE" (_) r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (< (+ (ash 1 p) (ash 1 q))
             (+ (ash 1 r) (ash 1 s)))
        (list y x)))
@@ -36,7 +36,7 @@
 
      (unpack-wf instr context (psi qubit-indices)
        (let ((updated-wf (nondestructively-apply-instr-to-wf instr psi qubit-indices)))
-         (give-up-compilation-unless
+         (give-up-rewriting-unless
              (collinearp psi updated-wf)
            (list)))))))
 
@@ -56,7 +56,7 @@
         (_
          ((,roll-type (theta) _) x))
 
-      (give-up-compilation-unless
+      (give-up-rewriting-unless
           (and (typep theta 'double-float)
                (double= (/ theta (* 2 pi))
                         (round (/ theta (* 2 pi)))))
@@ -66,10 +66,10 @@
         (_
          ((,roll-type (theta) q) x))
 
-      (give-up-compilation-unless
+      (give-up-rewriting-unless
           (typep theta 'double-float)
         (let ((reduced-theta (- (mod (+ pi theta) (* 2 pi)) pi)))
-          (give-up-compilation-unless
+          (give-up-rewriting-unless
               (and (< pi (abs theta))
                    (< (abs reduced-theta) (abs theta)))
             (list (build-gate ,roll-type (list reduced-theta) q))))))
@@ -116,7 +116,7 @@
          ((,rollA (theta2) q) y)
          ((,rollB (theta3) q) z))
 
-      (give-up-compilation-unless
+      (give-up-rewriting-unless
           (and (typep theta1 'double-float)
                (double= (/ pi 2) (abs theta1))
                (typep theta2 'double-float)
@@ -146,7 +146,7 @@
         (("ISWAP" () p q) x)
         (("ISWAP" () r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "RZ" (list pi) p)
              (build-gate "RZ" (list pi) q))))
@@ -156,7 +156,7 @@
         (("RZ"    (theta) q)     x)
         (("ISWAP" ()      q1 q2) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (or (= q q1) (= q q2))
        (list (build-gate "ISWAP" ()           q1 q2)
              (build-gate "RZ"    (list theta) (if (= q q1) q2 q1)))))))
@@ -170,7 +170,7 @@
         (("PISWAP" (theta) p q) x)
         (("PISWAP" (phi)   r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ theta phi)) p q))))
 
@@ -178,10 +178,10 @@
        (_
         (("PISWAP" (theta) p q) x))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (typep theta 'double-float)
        (let ((reduced-theta (mod theta (* 4 pi))))
-         (give-up-compilation-unless
+         (give-up-rewriting-unless
              (not (double= theta reduced-theta))
            (list (build-gate "PISWAP" (list reduced-theta) p q))))))
 
@@ -203,7 +203,7 @@
         (("RZ"     (theta) q)     x)
         (("PISWAP" (phi)   q1 q2) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (and (typep phi 'double-float)
               (double= 0d0 (mod (abs phi) pi))
               (or (= q q1) (= q q2)))
@@ -218,7 +218,7 @@
        (_
         (("PISWAP" (theta) p q) x))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (and (typep theta 'double-float)
               (double= (* pi (floor theta pi)) theta))
        (list (build-gate "ISWAP"  ()  p)
@@ -229,7 +229,7 @@
         (("ISWAP"  ()    p q) x)
         (("PISWAP" (phi) r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ pi phi)) p q))))
 
@@ -238,7 +238,7 @@
         (("PISWAP" (theta) p q) x)
         (("ISWAP"  ()      r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "PISWAP" (list (param-+ theta pi)) p q))))))
 
@@ -260,7 +260,7 @@
         (("CNOT" () p q) x)
         (("CNOT" () r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list)))
 
@@ -289,7 +289,7 @@
         (("CZ" () p q) x)
         (("CZ" () r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list)))
 
@@ -298,7 +298,7 @@
         (("RZ" (_) q)    x)
         (("CZ" () q1 q2) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (or (= q q1) (= q q2))
        (list y x)))
 
@@ -307,7 +307,7 @@
         (("RX" (#.pi) q)     x)
         (("CZ" ()     q1 q2) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (or (= q q1) (= q q2))
        (list (build-gate "CZ" ()        q1 q2)
              (build-gate "RZ" (list pi) (if (= q q1) q2 q1))
@@ -324,7 +324,7 @@
                 (loop :for i :below (array-total-size psi)
                       :when (logbitp control-bit i)
                         :sum (expt (abs (aref psi i)) 2))))
-         (give-up-compilation-unless
+         (give-up-rewriting-unless
              (double= 0d0 (sqrt control-bit-weight))
            (list)))))
 
@@ -340,7 +340,7 @@
                 (loop :for i :below (array-total-size psi)
                       :when (logbitp control-bit i)
                         :sum (expt (abs (aref psi i)) 2))))
-         (give-up-compilation-unless
+         (give-up-rewriting-unless
              (double= 1d0 (sqrt control-bit-weight))
            (list (build-gate "RZ" (list pi) target))))))
 
@@ -362,7 +362,7 @@
            (dotimes (i (array-total-size psi))
              (incf (aref wf-components (position-type i))
                    (expt (abs (aref psi i)) 2)))
-           (give-up-compilation-unless
+           (give-up-rewriting-unless
                (not (double= 0d0 (aref wf-components 3)))
              (let ((wf-signature
                      (+ (if (double= 0d0 (aref wf-components 0))
@@ -391,7 +391,7 @@
                  ;; the control bit is on: 1100
                  ;; all the bits are nonzero, so we can't reduce: 1111
                  (otherwise
-                  (give-up-compilation :because ':rewrite-does-not-apply)))))))))))
+                  (error 'compiler-rewrite-does-not-apply)))))))))))
 
 (defun rewriting-rules-for-link-of-CPHASE-type ()
   "Generates a list of rewriting rules for simplifying expressions involving CPHASE and standard single-qubit operations."
@@ -401,7 +401,7 @@
         (("CPHASE" (theta) p q) x)
         (("CPHASE" (phi)   r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "CPHASE" (list (param-+ theta phi)) p q))))
 
@@ -409,7 +409,7 @@
        (_
         (("CPHASE" (theta) _ _) x))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (and (typep theta 'double-float)
               (double= 0d0 (mod theta (* 2 pi))))
        (list)))
@@ -418,7 +418,7 @@
        (_
         (("CPHASE" (theta) p q) x))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (and (typep theta 'double-float)
               (not (double= theta (mod theta (* 2 pi)))))
        (list (build-gate "CPHASE" (list (mod theta (* 2 pi))) p q))))
@@ -441,7 +441,7 @@
                 (loop :for i :below (array-total-size psi)
                       :when (logbitp control-bit i)
                         :sum (expt (abs (aref psi i)) 2))))
-         (give-up-compilation-unless
+         (give-up-rewriting-unless
              (double= 0d0 (sqrt control-bit-weight))
            (list)))))
 
@@ -457,7 +457,7 @@
                 (loop :for i :below (array-total-size psi)
                       :when (logbitp control-bit i)
                         :sum (expt (abs (aref psi i)) 2))))
-         (give-up-compilation-unless
+         (give-up-rewriting-unless
              (double= 1d0 (sqrt control-bit-weight))
            (list (build-gate "RZ" (list theta) target))))))
    (rewriting-rules-for-link-of-CZ-type)))
@@ -479,7 +479,7 @@
         (("CPHASE" (phi) p q) x)
         (("CZ"     ()    r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "CPHASE" (list (param-+ phi pi)) p q))))
 
@@ -489,7 +489,7 @@
         (("CZ"     ()    p q) x)
         (("CPHASE" (phi) r s) y))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (subsetp (list p q) (list r s))
        (list (build-gate "CPHASE" (list (param-+ phi pi)) p q))))
 
@@ -497,7 +497,7 @@
        (_
         (("CPHASE" (theta) p q) x))
 
-     (give-up-compilation-unless
+     (give-up-rewriting-unless
          (and (typep theta 'double-float)
               (double= 0d0 (mod (+ pi theta) (* 2 pi))))
        (list (build-gate "CZ" () p q))))))

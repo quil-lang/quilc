@@ -47,7 +47,6 @@
   (ecase because
     (:invalid-domain         (error 'compiler-invalid-domain))
     (:acts-trivially         (error 'compiler-acts-trivially))
-    (:rewrite-does-not-apply (error 'compiler-rewrite-does-not-apply))
     (:unknown                (error 'compiler-does-not-apply))))
 
 
