@@ -353,5 +353,4 @@ MEASURE 2")
         (qvm:run qvm-comp)
         (is (every #'quil::double=
                    (qvm::amplitudes qvm)
-                   (qvm::amplitudes qvm-comp)))))
-    (quil::print-parsed-program p)))
+                   (qvm::amplitudes qvm-comp)))))))
