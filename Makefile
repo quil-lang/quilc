@@ -14,6 +14,7 @@ QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 UNAME_S=$(shell uname -s)
 ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 PREFIX ?= /usr/local
+TWEEDLEDUM ?= $(join $(realpath $(shell pwd)), /src/contrib/tweedledum)
 
 all: quilc
 
@@ -140,6 +141,7 @@ test-quilc:
 # You can specify a different c++17-compatible compiler via the CXX
 # variable. For example: make CXX=/usr/bin/clang++ test-tweedledum
 test-tweedledum:
+	LD_LIBRARY_PATH=$(TWEEDLEDUM):$(LD_LIBRARY_PATH) \
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil/tweedledum-tests)" \
 		--eval "(asdf:test-system :cl-quil/tweedledum-tests)"

@@ -116,7 +116,14 @@ $ git submodule init
 $ git submodule update --init
 ```
 
-You can then load the `cl-quil/tweedledum` package
+You must inform the dynamic linker of the path where the shared library,
+libtweedledum, will be placed once it is compiled (see below). For example,
+using the Bash shell,
+```
+export LD_LIBRARY_PATH=/path/to/quilc/src/contrib/tweedledum
+```
+
+Then, run sbcl and load the `cl-quil/tweedledum` package
 ```
 CL-USER> (ql:quickload :cl-quil/tweedledum)
 CL-USER> (cl-quil.tweedledum:synthesis-dbs '(0 1 3 2))

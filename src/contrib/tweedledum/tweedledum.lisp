@@ -9,17 +9,8 @@
 (in-package #:cl-quil.tweedledum)
 
 (cffi:define-foreign-library libtweedledum
-  (:darwin (:or #.(merge-pathnames "libtweedledum.dylib"
-                                   (or *compile-file-truename*
-                                       *load-truename*))
-                "libtweedledum.dylib"
-                "tweedledum.dylib"))
-  (:unix  (:or #.(merge-pathnames "libtweedledum.so"
-                                  (or *compile-file-truename*
-                                      *load-truename*))
-               "libtweedledum.so"
-               "tweedledum.so"))
-
+  (:darwin (:or "libtweedledum.dylib" "tweedledum.dylib"))
+  (:unix (:or "libtweedledum.so" "tweedledum.so"))
   (t (:default "libtweedledum")))
 
 (defvar *tweedledum-libs-loaded* nil
