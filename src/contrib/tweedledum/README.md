@@ -120,7 +120,7 @@ You must inform the dynamic linker of the path where the shared library,
 libtweedledum, will be placed once it is compiled (see below). For example,
 using the Bash shell,
 ```
-export LD_LIBRARY_PATH=/path/to/quilc/src/contrib/tweedledum
+export LD_LIBRARY_PATH=/path/to/quilc/src/contrib/tweedledum:$LD_LIBRARY_PATH
 ```
 
 Then, run sbcl and load the `cl-quil/tweedledum` package
