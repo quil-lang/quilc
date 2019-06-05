@@ -8,12 +8,12 @@
   "A transform which converts a parsed program with potentially complicated arithmetic to one that has simplified arithmetic expressions")
 
 (defstruct affine-representation
-  ""
+  "Data structure that represents a linear expression."
   (constant 0d0 :type double-float)
   (coefficients (make-hash-table :test #'equalp) :type hash-table))
 
 (defun expression->affine-representation (de)
-  ""
+  "Recursively construct an AFFINE-REPRESENTATION from an EXPRESSION (of type CONS)."
   (etypecase de
     (double-float
      (make-affine-representation :constant de))
@@ -77,7 +77,7 @@
             rep)))))))
 
 (defun affine-representation->expression (rep)
-  ""
+  "Build an EXPRESSION (of type CONS) from an AFFINE-REPRESENTATION, by first iterating through the memory references and their coefficients, and then adding the at the end."
   (let ((expr nil))
     (dohash ((ref coefficient) (affine-representation-coefficients rep))
       (unless (double= 0 coefficient)
@@ -113,6 +113,6 @@
               (application-parameters thing))))
 
 (defun simplify-arithmetics (parsed-prog)
-  ""
+  "Simplify the arithmetic in all of the EXPRESSIONs in the APPLICATION-PARAMETERS of the GATE-APPLICATIONs of the EXECUTABLE-CODE of a PARSED-PROGRAM."
   (map nil #'simplify-arithmetic (parsed-program-executable-code parsed-prog))
   parsed-prog)
