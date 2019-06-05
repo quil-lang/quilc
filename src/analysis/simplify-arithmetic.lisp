@@ -4,6 +4,19 @@
 
 (in-package #:cl-quil)
 
+(define-condition expression-not-simplifiable (serious-condition)
+  ()
+  (:documentation "A condition that is signalled any time an expression cannot be simplified. In general, a sub-condition should be preferred over signalling this one."))
+
+(define-condition expression-not-linear (expression-not-simplifiable)
+  ()
+  (:documentation "A condition that is signalled any time an expression cannot be simplified due to being non-linear."))
+
+(defun give-up-simplification (&key (because ':unknown))
+  (ecase because
+    (:not-linear (error 'expression-not-linear))
+    (:unknown    (error 'expression-not-simplifiable))))
+
 (define-transform simplify-arithmetic (simplify-arithmetics)
   "A transform which converts a parsed program with potentially complicated arithmetic to one that has simplified arithmetic expressions")
 
@@ -14,7 +27,7 @@
 
 (defun expression->affine-representation (de)
   "Recursively construct an AFFINE-REPRESENTATION from an EXPRESSION (of type CONS)."
-  (etypecase de
+  (typecase de
     (double-float
      (make-affine-representation :constant de))
     (memory-ref
@@ -53,7 +66,7 @@
           (let ((rep (make-affine-representation)))
             (unless (or (zerop (hash-table-count (affine-representation-coefficients left)))
                         (zerop (hash-table-count (affine-representation-coefficients right))))
-              (error ""))
+              (give-up-simplification) :because :not-linear)
             (setf (affine-representation-constant rep)
                   (* (affine-representation-constant left)
                      (affine-representation-constant right)))
@@ -67,14 +80,15 @@
          (/
           (let ((rep (make-affine-representation)))
             (unless (zerop (hash-table-count (affine-representation-coefficients right)))
-              (error ""))
+              (give-up-simplification :because :not-linear))
             (setf (affine-representation-constant rep)
                   (/ (affine-representation-constant left)
                      (affine-representation-constant right)))
             (dohash ((ref coefficient) (affine-representation-coefficients left))
               (setf (gethash ref (affine-representation-coefficients rep))
                     (/ coefficient (affine-representation-constant right))))
-            rep)))))))
+            rep)))))
+    (otherwise (give-up-simplification))))
 
 (defun affine-representation->expression (rep)
   "Build an EXPRESSION (of type CONS) from an AFFINE-REPRESENTATION, by first iterating through the memory references and their coefficients, and then adding the at the end."
@@ -99,7 +113,7 @@
     (map-into (application-parameters thing)
               (lambda (param)
                 (handler-case
-                    (etypecase param
+                    (typecase param
                       (constant
                        param)
                       (delayed-expression
@@ -107,9 +121,10 @@
                                                 (delayed-expression-lambda-params param)
                                                 (affine-representation->expression
                                                  (expression->affine-representation
-                                                  (delayed-expression-expression param))))))
-                  ;; TODO: use custom error class
-                  (error () param)))
+                                                  (delayed-expression-expression param)))))
+                      (otherwise (give-up-simplification)))
+                  (expression-not-linear () param)
+                  (expression-not-simplifiable () param)))
               (application-parameters thing))))
 
 (defun simplify-arithmetics (parsed-prog)
