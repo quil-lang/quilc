@@ -298,7 +298,6 @@
       (is (eq lisp-symbol (quil::quil-function->lisp-symbol quil-string)))
       (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
-     (a:iota n))))
 
 (defun %extract-trivial-exit-rewiring (pp)
   "Extract the exit rewiring comment from parsed program PP. Trivial
