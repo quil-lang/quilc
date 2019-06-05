@@ -300,22 +300,6 @@
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
      (a:iota n))))
 
-(defun %change-qubit-indices (parsed-program qubits)
-  "Send all application/measurement arguments to their position in the
-list of qubits QUBITS."
-  (check-type parsed-program parsed-program)
-  (dolist (instr (coerce (parsed-program-executable-code parsed-program) 'list) parsed-program)
-    (typecase instr
-      (quil::measurement
-       (setf (quil::measurement-qubit instr)
-             (quil::qubit (position (quil::qubit-index (quil::measurement-qubit instr))
-                                    qubits))))
-      (quil::application
-       (setf (quil::application-arguments instr)
-             (mapcar (lambda (arg) (quil::qubit (position (quil::qubit-index arg)
-                                                     qubits)))
-                     (quil::application-arguments instr)))))))
-
 (defun %extract-trivial-exit-rewiring (pp)
   "Extract the exit rewiring comment from parsed program PP. Trivial
 here means PP is expected to have a single exit rewiring. A more
@@ -327,8 +311,9 @@ but that is outside our scope of interest."
         :for comment := (quil::comment (elt code i))
         :when (and comment
                    (uiop:string-prefix-p "Exiting rewiring: " comment)) :do
-                     (return (quil::make-rewiring-from-string
-                              (subseq comment (length "Exiting rewiring: "))))))
+                     (return (quil::rewiring-l2p
+                              (quil::make-rewiring-from-string
+                               (subseq comment (length "Exiting rewiring: ")))))))
 
 (defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
   "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
@@ -357,12 +342,14 @@ MEASURE 2")
          (p (parse-quil p-str)))
     (loop :for i :below (expt 2 6) :do
       (let* ((p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil t))
-             (rewiring (quil::rewiring-l2p (extract-trivial-exit-rewiring p-comp)))
-             (p-comp-relabeled (%change-qubit-indices p-comp rewiring))
+             (rewiring (quil::qubit-relabeler (%extract-trivial-exit-rewiring p-comp)))
              (qvm (%make-density-qvm-initialized-in-basis 3 i))
              (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))
         (qvm:load-program qvm p :supersede-memory-subsystem t)
-        (qvm:load-program qvm-comp p-comp-relabeled :supersede-memory-subsystem t)
+        ;; relabeling is a side-effect
+        (map nil (a:rcurry #'quil::%relabel-qubits rewiring)
+             (parsed-program-executable-code p-comp))
+        (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
         (qvm:run qvm)
         (qvm:run qvm-comp)
         (is (every #'quil::double=
