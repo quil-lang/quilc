@@ -359,3 +359,33 @@ B(b) 0 1
              '(e 0 1 2)
              '(f 0 1)
              '(g 0))))
+
+;;; Simplify arithmetic tests
+
+(deftest test-simplify-arithmetic-linear ()
+  "Test that a linear expression can simplified"
+  (let ((in-p (quil::parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+3.0*theta[0]-3.0*theta[0]/4.0-2.0) 0
+"))
+        (out-p (quil::parse-quil "
+DECLARE theta REAL[1]
+RX(2.25*theta[0]) 0
+")))
+    (quil::transform 'quil::simplify-arithmetic in-p)
+    (is (equalp (quil::application-parameters (quil::vnth 0 (quil::parsed-program-executable-code in-p)))
+                (quil::application-parameters (quil::vnth 0 (quil::parsed-program-executable-code out-p)))))))
+
+(deftest test-simplify-arithmetic-non-linear ()
+  "Test that a non-linear expression is left alone"
+  (let ((in-p (quil::parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+3.0*cos(theta[0])-3.0*theta[0]-2.0) 0
+"))
+        (out-p (quil::parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+3.0*cos(theta[0])-3.0*theta[0]-2.0) 0
+")))
+    (quil::transform 'quil::simplify-arithmetic in-p)
+    (is (equalp (quil::application-parameters (quil::vnth 0 (quil::parsed-program-executable-code in-p)))
+                (quil::application-parameters (quil::vnth 0 (quil::parsed-program-executable-code out-p)))))))
