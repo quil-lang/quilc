@@ -342,6 +342,10 @@ prepared by choosing BASIS-INDEX = (2^N * a + b)."
     (setf (aref amps basis-index) (qvm:cflonum 1))
     (qvm:make-density-qvm num-qubits :amplitudes amps)))
 
+;; Disclaimer: the below is maybe incomplete. Should we test not just
+;; for measure-discard? If so, then more thought will be required. It
+;; will not always be the case that passing in a non-density matrix to
+;; the qvm will work as it does below.
 (deftest test-measure-semantics ()
   "Test that artifacts of compilation (namely moving and rewiring
 MEASUREs) does not change the semantics of the program."
