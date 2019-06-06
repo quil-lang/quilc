@@ -153,101 +153,92 @@
   :test #'matrix-equality
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
-;; REM: this is a utility routine that supports diagonalizer-in-e-basis.
-;; it seems that when an eigenspace of a complex operator is one-dimensional and
-;; it admits a real generator, MAGICL will pick it automatically. (this is
-;; because forcing any nonzero entry of the vector to be real forces the rest to
-;; be too.) if the eigenspace is pluridimensional, the guarantee goes out the
-;; window :( because we expect/require the matrix of eigenvectors to be
-;; special-orthogonal, we have to correct this behavior manually.
-(defun find-real-spanning-set (vectors)
-  "VECTORS is a list of complex vectors in C^n (which, here, are of type LIST).  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
-  (check-type vectors a:proper-list)
-  (let* ((coeff-matrix (magicl:make-complex-matrix
-                        (length (first vectors))
-                        (* 2 (length vectors))
-                        (nconc
-                         (loop :for v :in vectors :nconc (mapcar #'imagpart v))
-                         (loop :for v :in vectors :nconc (mapcar #'realpart v)))))
-         (reassemble-matrix (magicl:make-complex-matrix
-                             (length vectors)
-                             (* 2 (length vectors))
-                             (nconc
-                              (loop :for i :from 1 :to (length vectors)
-                                    :nconc (loop :for j :from 1 :to (length vectors)
-                                                 :collect (if (= i j) 1d0 0d0)))
-                              (loop :for i :from 1 :to (length vectors)
-                                    :nconc (loop :for j :from 1 :to (length vectors)
-                                                 :collect (if (= i j) #C(0d0 1d0) 0d0))))))
-         (backsolved-matrix (magicl:multiply-complex-matrices
-                             (magicl:multiply-complex-matrices
-                              (magicl:make-complex-matrix
-                               (length (first vectors))
-                               (length vectors)
-                               (reduce-append vectors))
-                              reassemble-matrix)
-                             (kernel coeff-matrix)))
-         (backsolved-vectors
-           (loop :for i :below (magicl:matrix-cols backsolved-matrix)
-                 :collect (loop :for j :below (magicl:matrix-rows backsolved-matrix)
-                                :collect (magicl:ref backsolved-matrix j i)))))
-    (gram-schmidt backsolved-vectors)))
+;; specifically this would replace the guts of both
+;; `diagonalizer-in-e-basis` and `real-spanning-set`. the only thing
+;; you’d keep from `d-i-e-b` is the definition of `m` as a product
+;; involving `+e-basis+` and `+edag-basis+`, and everything after that
+;; would be a reimplementation of gavin’s python cool, i’ll let you
+;; run with it. lmk if it turns out to be hard / to not work / if you
+;; can’t figure out what i’m suggesting / whatever
 
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
 (defun diagonalizer-in-e-basis (m)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
+  (declare (optimize (debug 3)))
   (check-type m magicl:matrix)
   (let* ((u (magicl:multiply-complex-matrices +edag-basis+ (magicl:multiply-complex-matrices m +e-basis+)))
-         (gammag (magicl:multiply-complex-matrices u (magicl:transpose u))))
-    (multiple-value-bind (evals a) (magicl:eig gammag)
-      ;; the matrix "a" is almost what we want to return, but it needs to be
-      ;; spiced up in various ways:
-      ;; + we want its angle values to be sorted descending, so that if we
-      ;;   diagonalize two matrices with the same eigenvalues, we automatically
-      ;;   get a pair of matrices that conjugate one into the other.
-      ;; + we want its 2-dimensional eigenspaces to be spanned by real vectors.
-      ;; + we want it to be in SO(4), not O(4).
-      ;;
-      ;; first, we address the sort issue. the columns of a match the order of
-      ;; the the values in angles, so we sort the two lists in parallel.\
-      (let* ((angles (mapcar (lambda (x) (let ((ret (imagpart (log x))))
-                                           (if (double= ret (- pi)) pi ret)))
-                             evals))
-             (augmented-list
-               (sort
-                (loop :for i :below 4
-                      :collect (let ((col (loop :for j :below 4
-                                                :collect (magicl:ref a j i))))
-                                 (list (nth i angles) col)))
-                #'<
-                :key #'first))
-             ;; if vectors lie in the same eigenspace, make them real and orthonormal
-             (real-data
-               (let ((current-eval (first (first augmented-list)))
-                     (current-evects (list (second (first augmented-list)))))
-                 (reduce-append
-                  (loop
-                    :for pair :in (append (rest augmented-list)
-                                          (list (list most-positive-fixnum nil))) ;; this dummy tail item forces a flush
-                    :nconc
-                    (cond
-                      ;; we're still forming the current eigenspace...
-                      ((double= current-eval (first pair))
-                       (setf current-evects (append (list (second pair))
-                                                    current-evects))
-                       nil)
-                      (t
-                       ;; we're ready for a flush and a new eigenspace.
-                       (prog1 (find-real-spanning-set current-evects)
-                         (setf current-eval (first pair))
-                         (setf current-evects (list (second pair)))))))))))
-        ;; form a matrix out of the results so far.
-        (setf a (magicl:make-complex-matrix 4 4 real-data)))
-      ;; lastly, fix the determinant (if there's anything left to fix)
-      (when (minusp (realpart (magicl:det a)))
-        (setf a (magicl:multiply-complex-matrices a (magicl:diag 4 4 '(-1d0 1d0 1d0 1d0)))))
-      a)))
+         (gammag (magicl:multiply-complex-matrices u (magicl:transpose u)))
+         (max-tries 16))
+
+    (labels ((matrix-map (f m &rest more-m)
+               ;; damn it feels good to be a lisper
+               (magicl:tabulate (magicl:matrix-rows m)
+                                (magicl:matrix-cols m)
+                                (lambda (i j)
+                                  (apply #'funcall f
+                                         (magicl:ref m i j)
+                                         (mapcar (a:rcurry #'magicl:ref i j)
+                                                 more-m)))))
+             ;; these should certainly be in magicl but c(quote est) la vie
+             (matrix-every (predicate m &rest more-m)
+               (magicl:map-indexes (magicl:matrix-rows m)
+                                   (magicl:matrix-cols m)
+                                   (lambda (i j)
+                                     (unless (apply predicate
+                                                    (magicl:ref m i j)
+                                                    (mapcar (a:rcurry #'magicl:ref i j)
+                                                            more-m))
+                                       (return-from matrix-every nil))))
+               t)
+             (matrix-real-part (m)
+               (matrix-map #'realpart m))
+             (matrix-imag-part (m)
+               (matrix-map #'imagpart m))
+             (matrix-gram-schmidt (m)
+               (let* ((columns (loop :for i :below (magicl:matrix-cols m)
+                                     :collect
+                                     (loop :for j :below (magicl:matrix-rows m)
+                                           :collect (magicl:ref m j i))))
+                      (grammy (gram-schmidt columns)))
+                 (magicl:make-complex-matrix (magicl:matrix-cols m) (magicl:matrix-cols m)
+                  (a:flatten grammy)))))
+
+      (loop :repeat max-tries :do
+        (let* ((rand-coeff (random 1.0d0))
+               (matrix (magicl:add-matrix
+                        (magicl:scale rand-coeff (matrix-real-part gammag))
+                        (magicl:scale (- 1 rand-coeff) (matrix-imag-part gammag)))))
+          (multiple-value-bind (_ evecs)
+              (magicl:eig matrix)
+            (declare (ignore _))
+            (let* ((evecs (matrix-gram-schmidt evecs))
+                   (evals (magicl:matrix-diagonal
+                           (reduce #'magicl:multiply-complex-matrices
+                                   (list
+                                    (magicl:transpose evecs)
+                                    gammag
+                                    evecs))))
+                   (v (reduce #'magicl:multiply-complex-matrices
+                              (list
+                               evecs
+                               (magicl:diag (length evals) (length evals) evals)
+                               (magicl:transpose evecs)))))
+              ;; assert np.allclose(np.eye(4), O2.transpose() @ O2) # Sanity check
+              (assert (matrix-every #'double=
+                                    (magicl:make-identity-matrix 4)
+                                    (magicl:multiply-complex-matrices
+                                     (magicl:transpose evecs)
+                                     evecs)))
+              (print gammag)
+              (print matrix)
+              (print evecs)
+              (print evals)
+              (print v)
+              (when (matrix-every #'double= gammag v)
+                (return-from diagonalizer-in-e-basis evecs))))))
+
+      (error "oof"))))
 
 
 (defun orthogonal-decomposition (m)
