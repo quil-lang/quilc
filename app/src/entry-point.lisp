@@ -193,7 +193,7 @@
   (disable-debugger))
 
 (defun entry-point (argv)
-  (cffi:load-foreign-library (read-from-string "CL-QUIL.TWEEDLEDUM::LIBTWEEDLEDUM"))
+  (uiop:symbol-call ':cl-quil.tweedledum '#:load-tweedledum)
   (handler-case
       (%entry-point argv)
     (interactive-interrupt (c)

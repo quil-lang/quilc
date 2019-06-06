@@ -4,13 +4,22 @@
   (:use #:common-lisp
         #:cffi)
   (:local-nicknames (:a :alexandria))
-  (:export #:synthesis-dbs))
+  (:export #:load-tweedledum #:synthesis-dbs))
 
 (in-package #:cl-quil.tweedledum)
 
 (cffi:define-foreign-library libtweedledum
-  (:darwin (:or "libtweedledum.dylib" "tweedledum.dylib"))
-  (:unix (:or "libtweedledum.so" "tweedledum.so"))
+  (:darwin (:or #.(merge-pathnames "libtweedledum.dylib"
+                                   (or *compile-file-truename*
+                                       *load-truename*))
+                "libtweedledum.dylib"
+                "tweedledum.dylib"))
+  (:unix  (:or #.(merge-pathnames "libtweedledum.so"
+                                  (or *compile-file-truename*
+                                      *load-truename*))
+               "libtweedledum.so"
+               "tweedledum.so"))
+
   (t (:default "libtweedledum")))
 
 (defvar *tweedledum-libs-loaded* nil
@@ -59,14 +68,15 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
         (t
          (quil::give-up-compilation))))))
 
-(defun run-tweedledum-tests ()
+(defun load-tweedledum ()
+  (cffi:load-foreign-library 'libtweedledum)
+  ;; TODO Some error handling here
   (unless *tweedledum-libs-loaded*
-    (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum)
+    (push (constantly 'compile-perm-gate-with-tweedledum)
           cl-quil::*global-compilers*))
+  (setf *tweedledum-libs-loaded* t))
+
+(defun run-tweedledum-tests ()
+  (load-tweedledum)
   (uiop:symbol-call ':cl-quil-tests
                     '#:run-cl-quil-tests))
-
-;; TODO Some error handling here
-(unless *tweedledum-libs-loaded*
-  (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
-  (setf *tweedledum-libs-loaded* t))

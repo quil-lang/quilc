@@ -1,10 +1,8 @@
 COMMIT_HASH=$(shell git rev-parse --short HEAD)
 LISP_CACHE ?= $(HOME)/.cache/common-lisp
 RIGETTI_LISP_LIBRARY_HOME=../
-TWEEDLEDUM ?= $(join $(CURDIR), /src/contrib/tweedledum)
-LD_LIBRARY_PATH := $(TWEEDLEDUM):$(LD_LIBRARY_PATH)
 SBCL_BIN=sbcl
-SBCL=LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) $(SBCL_BIN) --noinform --no-userinit --no-sysinit --non-interactive
+SBCL=$(SBCL_BIN) --noinform --no-userinit --no-sysinit --non-interactive
 QUICKLISP_HOME=$(HOME)/quicklisp
 QUICKLISP_SETUP=$(QUICKLISP_HOME)/setup.lisp
 QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
@@ -16,13 +14,6 @@ QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 UNAME_S=$(shell uname -s)
 ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 PREFIX ?= /usr/local
-ifeq ($(UNAME_S),Linux)
-SOEXT := .so
-endif
-ifeq ($(UNAME_S),Darwin)
-SOEXT := .dylib
-endif
-LIBTWEEDLEDUM := $(TWEEDLEDUM)/libtweedledum$(SOEXT)
 
 all: quilc
 
@@ -75,7 +66,7 @@ endif
 ###############################################################################
 
 .PHONY: quilc
-quilc $(LIBTWEEDLEDUM): system-index.txt
+quilc: system-index.txt
 	$(SBCL) $(FOREST_SDK_FEATURE) \
 	        --eval "(setf sb-ext:\*on-package-variance\* '(:warn (:swank :swank-backend :swank-repl) :error t))" \
 		--eval '(push :hunchentoot-no-ssl *features*)' \
@@ -117,12 +108,9 @@ docker-sdk-barebones: docker
 # INSTALL/UNINSTALL
 ###############################################################################
 
-.PHONY: install install-libtweedledum
-install: quilc install-libtweedledum
+.PHONY: install
+install: quilc
 	install quilc $(DESTDIR)$(PREFIX)/bin
-
-install-libtweedledum: $(LIBTWEEDLEDUM)
-	install $< $(DESTDIR)$(PREFIX)/lib
 
 .PHONY: uninstall
 uninstall:
