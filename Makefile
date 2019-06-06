@@ -1,7 +1,7 @@
 COMMIT_HASH=$(shell git rev-parse --short HEAD)
 LISP_CACHE ?= $(HOME)/.cache/common-lisp
 RIGETTI_LISP_LIBRARY_HOME=../
-TWEEDLEDUM ?= $(join $(realpath $(shell pwd)), /src/contrib/tweedledum)
+TWEEDLEDUM ?= $(join $(CURDIR), /src/contrib/tweedledum)
 LD_LIBRARY_PATH := $(TWEEDLEDUM):$(LD_LIBRARY_PATH)
 SBCL_BIN=sbcl
 SBCL=LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) $(SBCL_BIN) --noinform --no-userinit --no-sysinit --non-interactive
