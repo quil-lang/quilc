@@ -300,26 +300,21 @@
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
 
 (defun %extract-trivial-exit-rewiring (pp)
-  "Extract the exit rewiring comment from parsed program PP. Trivial
-here means PP is expected to have a single exit rewiring. A more
-complicated CFG could produce multiple exit rewirings in a program,
-but that is outside our scope of interest."
+  "Extract the exit rewiring comment from parsed program PP. Trivial here means PP is expected to have a single exit rewiring. A more complicated CFG could produce multiple exit rewirings in a program, but that is outside our scope of interest."
   (declare (type parsed-program pp))
   (loop :with code := (parsed-program-executable-code pp)
         :for i :below (length code)
         :for comment := (quil::comment (elt code i))
         :when (and comment
-                   (uiop:string-prefix-p "Exiting rewiring: " comment)) :do
-                     (return (quil::rewiring-l2p
-                              (quil::make-rewiring-from-string
-                               (subseq comment (length "Exiting rewiring: ")))))))
+                   (uiop:string-prefix-p "Exiting rewiring: " comment))
+          :return (quil::rewiring-l2p
+                   (quil::make-rewiring-from-string
+                    (subseq comment (length "Exiting rewiring: "))))))
 
 (defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
   "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
 
-To put the density matrix into the basis state, e.g., |01><11|, we
-would choose BASIS-INDEX = 7. In general, the basis state |a><b| is
-prepared by choosing BASIS-INDEX = (2^N * a + b)."
+To put the density matrix into the basis state, e.g., |01><11|, we would choose BASIS-INDEX = 7. In general, the basis state |a><b| is prepared by choosing BASIS-INDEX = (2^N * a + b)."
   (let ((amps (make-array (expt 2 (* 2 num-qubits))
                           :element-type 'qvm:cflonum
                           :initial-element (qvm:cflonum 0))))
@@ -331,8 +326,7 @@ prepared by choosing BASIS-INDEX = (2^N * a + b)."
 ;; will not always be the case that passing in a non-density matrix to
 ;; the qvm will work as it does below.
 (deftest test-measure-semantics ()
-  "Test that artifacts of compilation (namely moving and rewiring
-MEASUREs) does not change the semantics of the program."
+  "Test that artifacts of compilation (namely moving and rewiring MEASUREs) does not change the semantics of the program."
   (let* ((p-str "H 0
 CNOT 0 2
 MEASURE 0
