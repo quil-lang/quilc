@@ -158,14 +158,6 @@
       (m* m (magicl:diag 4 4 (list -1 1 1 1)))
       m))
 
-;; specifically this would replace the guts of both
-;; `diagonalizer-in-e-basis` and `real-spanning-set`. the only thing
-;; you’d keep from `d-i-e-b` is the definition of `m` as a product
-;; involving `+e-basis+` and `+edag-basis+`, and everything after that
-;; would be a reimplementation of gavin’s python cool, i’ll let you
-;; run with it. lmk if it turns out to be hard / to not work / if you
-;; can’t figure out what i’m suggesting / whatever
-
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
 (defun diagonalizer-in-e-basis (m)
