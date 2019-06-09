@@ -153,6 +153,11 @@
   :test #'matrix-equality
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
+(defun maybe-permute-basis (m)
+  (if (double~ -1d0 (magicl:det m))
+      (m* m (magicl:diag 4 4 (list -1 1 1 1)))
+      m))
+
 ;; specifically this would replace the guts of both
 ;; `diagonalizer-in-e-basis` and `real-spanning-set`. the only thing
 ;; you’d keep from `d-i-e-b` is the definition of `m` as a product
@@ -224,6 +229,14 @@
                                evecs
                                (magicl:diag (length evals) (length evals) evals)
                                (magicl:transpose evecs)))))
+        (multiple-value-bind (_ evecs)
+            (magicl:eig matrix)
+          (declare (ignore _))
+          (let* ((evecs (maybe-permute-basis (orthonormalize-matrix evecs)))
+                 (evals (magicl:matrix-diagonal
+                         (m* (magicl:transpose evecs)
+                             gammag
+                             evecs)))
               ;; assert np.allclose(np.eye(4), O2.transpose() @ O2) # Sanity check
               (assert (matrix-every #'double=
                                     (magicl:make-identity-matrix 4)
