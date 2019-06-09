@@ -172,63 +172,13 @@
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
   (declare (optimize (debug 3)))
   (check-type m magicl:matrix)
-  (let* ((u (magicl:multiply-complex-matrices +edag-basis+ (magicl:multiply-complex-matrices m +e-basis+)))
-         (gammag (magicl:multiply-complex-matrices u (magicl:transpose u)))
+  (let* ((u (m* +edag-basis+ m +e-basis+))
+         (gammag (m* u (magicl:transpose u)))
          (max-tries 16))
-
-    (labels ((matrix-map (f m &rest more-m)
-               ;; damn it feels good to be a lisper
-               (magicl:tabulate (magicl:matrix-rows m)
-                                (magicl:matrix-cols m)
-                                (lambda (i j)
-                                  (apply #'funcall f
-                                         (magicl:ref m i j)
-                                         (mapcar (a:rcurry #'magicl:ref i j)
-                                                 more-m)))))
-             ;; these should certainly be in magicl but c(quote est) la vie
-             (matrix-every (predicate m &rest more-m)
-               (magicl:map-indexes (magicl:matrix-rows m)
-                                   (magicl:matrix-cols m)
-                                   (lambda (i j)
-                                     (unless (apply predicate
-                                                    (magicl:ref m i j)
-                                                    (mapcar (a:rcurry #'magicl:ref i j)
-                                                            more-m))
-                                       (return-from matrix-every nil))))
-               t)
-             (matrix-real-part (m)
-               (matrix-map #'realpart m))
-             (matrix-imag-part (m)
-               (matrix-map #'imagpart m))
-             (matrix-gram-schmidt (m)
-               (let* ((columns (loop :for i :below (magicl:matrix-cols m)
-                                     :collect
-                                     (loop :for j :below (magicl:matrix-rows m)
-                                           :collect (magicl:ref m j i))))
-                      (grammy (gram-schmidt columns)))
-                 (magicl:make-complex-matrix (magicl:matrix-cols m) (magicl:matrix-cols m)
-                  (a:flatten grammy)))))
-
-      (loop :repeat max-tries :do
-        (let* ((rand-coeff (random 1.0d0))
-               (matrix (magicl:add-matrix
-                        (magicl:scale rand-coeff (matrix-real-part gammag))
-                        (magicl:scale (- 1 rand-coeff) (matrix-imag-part gammag)))))
-          (multiple-value-bind (_ evecs)
-              (magicl:eig matrix)
-            (declare (ignore _))
-            (let* ((evecs (matrix-gram-schmidt evecs))
-                   (evals (magicl:matrix-diagonal
-                           (reduce #'magicl:multiply-complex-matrices
-                                   (list
-                                    (magicl:transpose evecs)
-                                    gammag
-                                    evecs))))
-                   (v (reduce #'magicl:multiply-complex-matrices
-                              (list
-                               evecs
-                               (magicl:diag (length evals) (length evals) evals)
-                               (magicl:transpose evecs)))))
+    (loop :repeat max-tries :do
+      (let* ((rand-coeff (random 1.0d0))
+             (matrix (m+ (magicl:scale rand-coeff (matrix-real-part gammag))
+                         (magicl:scale (- 1 rand-coeff) (matrix-imag-part gammag)))))
         (multiple-value-bind (_ evecs)
             (magicl:eig matrix)
           (declare (ignore _))
@@ -237,29 +187,23 @@
                          (m* (magicl:transpose evecs)
                              gammag
                              evecs)))
+                 (v (m* evecs
+                        (magicl:diag (length evals) (length evals) evals)
+                        (magicl:transpose evecs))))
+            (when (matrix-every #'double= gammag v)
               ;; assert np.allclose(np.eye(4), O2.transpose() @ O2) # Sanity check
               (assert (matrix-every #'double=
                                     (magicl:make-identity-matrix 4)
-                                    (magicl:multiply-complex-matrices
-                                     (magicl:transpose evecs)
-                                     evecs)))
-              (print gammag)
-              (print matrix)
-              (print evecs)
-              (print evals)
-              (print v)
-              (when (matrix-every #'double= gammag v)
-                (return-from diagonalizer-in-e-basis evecs))))))
-
-      (error "oof"))))
+                                    (m* (magicl:transpose evecs)
+                                        evecs)))
+              (return-from diagonalizer-in-e-basis evecs))))))))
 
 
 (defun orthogonal-decomposition (m)
   "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
   (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
          (a (diagonalizer-in-e-basis m))
-         (db (reduce #'magicl:multiply-complex-matrices
-                     (list (magicl:transpose a) +edag-basis+ m +e-basis+)))
+         (db (m* (magicl:transpose a) +edag-basis+ m +e-basis+))
          (diag (loop :for j :below 4
                      :collect (let ((mag 0d0)
                                     phase)
@@ -269,30 +213,23 @@
                                     (setf phase (mod (phase (magicl:ref db j i)) pi))))
                                 (cis phase))))
          (d (magicl:diag 4 4 diag))
-         (b (magicl:multiply-complex-matrices
-             (magicl:conjugate-transpose d) db)))
+         (b (m* (magicl:conjugate-transpose d) db)))
     ;; it could be the case that b has negative determinant. if that's the case, we'll
     ;; swap two of its columns that live in the same eigenspace.
     (when (double~ -1d0 (magicl:det b))
-      (setf d (magicl:multiply-complex-matrices
-               d
-               (magicl:diag 4 4 (list -1 1 1 1))))
-      (setf b (magicl:multiply-complex-matrices
-               (magicl:diag 4 4 (list -1 1 1 1))
-               b)))
+      (setf d (m* d (magicl:diag 4 4 (list -1 1 1 1))))
+      (setf b (m* (magicl:diag 4 4 (list -1 1 1 1)) b)))
     (when *compress-carefully*
       (assert (double~ 1d0 (magicl:det m)))
       (assert (double~ 1d0 (magicl:det a)))
       (assert (double~ 1d0 (magicl:det b)))
       (assert (double~ 1d0 (magicl:det d)))
       (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices a (magicl:transpose a))))
+                                  (m* a (magicl:transpose a))))
       (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices b (magicl:transpose b))))
-      (assert (matrix-equals-dwim (reduce #'magicl:multiply-complex-matrices
-                                          (list +edag-basis+ m +e-basis+))
-                                  (reduce #'magicl:multiply-complex-matrices
-                                          (list a d b)))))
+                                  (m* b (magicl:transpose b))))
+      (assert (matrix-equals-dwim (m* +edag-basis+ m +e-basis+)
+                                  (m* a d b))))
     (values a d b)))
 
 (defun make-signed-permutation-matrix (sigma &optional (signs (list 1 1 1 1)))

@@ -317,3 +317,45 @@ as needed so that they are the same size."
            (d (/ (- y1 y0) delta))
            (new-guess (+ guess (/ (- y0) d))))
       (find-root f new-guess (1- depth-bound)))))
+
+(defun matrix-map (f m &rest more-m)
+  "Returns a matrix X_ij = f(M_ij, ...)."
+  (magicl:tabulate (magicl:matrix-rows m)
+                   (magicl:matrix-cols m)
+                   (lambda (i j)
+                     (apply #'funcall f
+                            (magicl:ref m i j)
+                            (mapcar (a:rcurry #'magicl:ref i j)
+                                    more-m)))))
+
+(defun matrix-every (predicate m &rest more-m)
+  "Tests whether predicate is true for all elements in M."
+  (magicl:map-indexes (magicl:matrix-rows m)
+                      (magicl:matrix-cols m)
+                      (lambda (i j)
+                        (unless (apply predicate
+                                       (magicl:ref m i j)
+                                       (mapcar (a:rcurry #'magicl:ref i j)
+                                               more-m))
+                          (return-from matrix-every nil))))
+  t)
+
+(defun matrix-real-part (m)
+  "Returns a matrix X_ij = Re(M_ij)."
+  (matrix-map #'realpart m))
+
+(defun matrix-imag-part (m)
+  "Returns a matrix X_ij = Im(M_ij)."
+  (matrix-map #'imagpart m))
+
+(defun m* (&rest m)
+  (reduce #'magicl:multiply-complex-matrices
+          m))
+
+(defun m+ (&rest m)
+  (reduce #'magicl:add-matrix
+          m))
+
+(defun m- (&rest m)
+  (reduce #'magicl:sub-matrix
+          m))
