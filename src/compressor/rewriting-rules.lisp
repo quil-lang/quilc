@@ -12,14 +12,16 @@
      (y ("CZ" () r s)
         :where (< (+ (ash 1 p) (ash 1 q))
                   (+ (ash 1 r) (ash 1 s)))))
-  (list y x))
+  (list (build-gate "CZ" () r s)
+        (build-gate "CZ" () p q)))
 
 (define-compiler sort-CPHASEs
-    ((x ("CPHASE" (_) p q))
-     (y ("CPHASE" (_) r s)
+    ((x ("CPHASE" (theta) p q))
+     (y ("CPHASE" (phi)   r s)
         :where (< (+ (ash 1 p) (ash 1 q))
                   (+ (ash 1 r) (ash 1 s)))))
-  (list y x))
+  (list (build-gate "CPHASE" `(,phi)   r s)
+        (build-gate "CPHASE" `(,theta) p q)))
 
 (define-compiler elide-applications-on-eigenvectors
     ((instr :acting-on (psi qubit-indices)
@@ -100,14 +102,14 @@
 (define-compiler sort-RX-after-Z
     ((x ("RX" (theta) q))
      (y ("RZ" (#.pi)  q)))
-  (list y
+  (list (build-gate "RZ" '(#.pi)       q)
         (build-gate "RX" `(,(- theta)) q)))
 
 (define-compiler sort-X-after-RZ
     ((x ("RX" (#.pi)  q))
      (y ("RZ" (theta) q)))
   (list (build-gate "RZ" `(,(- theta)) q)
-        x))
+        (build-gate "RX" '(#.pi)       q)))
 
 (define-compiler rewrite-XZX-as-ZXZ
     ((x ("RX" (theta) q)
@@ -140,8 +142,8 @@
     ((x ("RZ"    (theta) q))
      (y ("ISWAP" ()      q1 q2)
         :where (or (= q q1) (= q q2))))
-  (list y
-        (build-gate "RZ" (list theta) (if (= q q1) q2 q1))))
+  (list (build-gate "ISWAP" ()       q1 q2)
+        (build-gate "RZ"   `(,theta) (if (= q q1) q2 q1))))
 
 (defun rewriting-rules-for-link-of-ISWAP-type ()
   "Generates a list of rewriting rules for simplifying expressions involving ISWAP and standard single-qubit operations."
@@ -232,14 +234,16 @@
   (list))
 
 (define-compiler commute-control-RZ-after-CNOT
-    ((x ("RZ"   (_) control))
-     (y ("CNOT" ()  control _)))
-  (list y x))
+    ((x ("RZ"   (theta) control))
+     (y ("CNOT" ()      control target)))
+  (list (build-gate "CNOT" () control target)
+        (build-gate "RZ"  `(,theta) control)))
 
 (define-compiler commute-target-RX-after-CNOT
-    ((x ("RX"   (_) target))
-     (y ("CNOT" ()  _ target)))
-  (list y x))
+    ((x ("RX"   (theta) target))
+     (y ("CNOT" ()      control target)))
+  (list (build-gate "CNOT" ()       control target)
+        (build-gate "RX"  `(,theta) target)))
 
 (defun rewriting-rules-for-link-of-CNOT-type ()
   (list (make-rewriting-rule "CNOT CNOT ->" #'collapse-CNOTs)
@@ -254,10 +258,11 @@
   (list))
 
 (define-compiler commute-RZ-after-CZ
-    ((x ("RZ" (_) q))
-     (y ("CZ" () q1 q2)
+    ((x ("RZ" (theta) q))
+     (y ("CZ" ()      q1 q2)
         :where (or (= q q1) (= q q2))))
-  (list y x))
+  (list (build-gate "CZ"  () q1 q2)
+        (build-gate "RZ" `(,theta) q)))
 
 (define-compiler commute-X-after-CZ
     ((x ("RX" (#.pi) q))
@@ -329,9 +334,10 @@
   (list (build-gate "CPHASE" `(,(mod theta (* 2 pi))) p q)))
 
 (define-compiler commute-RZ-after-CPHASE
-    ((x ("RZ" _ _))
-     (y ("CPHASE" _ _ _)))
-  (list y x))
+    ((x ("RZ"     (theta) q))
+     (y ("CPHASE" (phi)   q1 q2)))
+  (list (build-gate "CPHASE" `(,phi)   q1 q2)
+        (build-gate "RZ"     `(,theta) q)))
 
 (define-compiler CPHASE-on-wf-with-partial-support
     ((x ("CPHASE" (theta) control target)
