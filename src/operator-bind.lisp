@@ -314,7 +314,10 @@
         (dohash ((cost-key cost-val) gate-cost-table)
           (when (binding-subsumes-p (list '_ cost-key) (list '_ key))
             (setf true-cost cost-val)))
-        (setf ret (* ret (expt true-cost val)))))))
+        (setf ret (* ret (expt true-cost (* (if (typep key 'list)
+                                                (expt 3 (length (cddr key)))
+                                                1)
+                                            val))))))))
 
 (defun occurrence-table-in-gateset-p (table gateset)
   (loop :for table-key :being :the :hash-keys :of table
@@ -666,6 +669,27 @@
                      ,body))))))
     (expand-bindings bindings nil)))
 
+(defun parse-compiler-options (options body)
+  (when (endp options)
+    (return-from parse-compiler-options body))
+  (destructuring-bind (key val &rest remaining-options) options
+    (case key
+      (:full-context
+       (parse-compiler-options remaining-options
+                               `(let ((,val context))
+                                  ,body)))
+      (:chip-specification
+       (parse-compiler-options remaining-options
+                               `(progn
+                                  (unless context (give-up-compilation))
+                                  (let ((,val (compilation-context-chip-specification context)))
+                                    (unless ,val (give-up-compilation))
+                                    ,body))))
+      (:gateset-reducer
+       (parse-compiler-options remaining-options body))
+      (otherwise
+       (error "Unknown compiler option: ~a." (first options))))))
+
 (defmacro define-compiler (name (&rest bindings) &body body)
   (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
     (labels ((collect-variable-names (bindings)
@@ -686,7 +710,9 @@
             `(labels ((,name (,@variable-names &key context)
                         (declare (ignorable context))
                         (multiple-value-bind (,ret-val ,ret-bool)
-                            ,(define-compiler-form bindings (append decls body))
+                            ,(parse-compiler-options
+                              options
+                              (define-compiler-form bindings (append decls body)))
                           (if ,ret-bool ,ret-val (give-up-compilation)))))
                (let ((,old-record (find ,(string name) **compilers-available**
                                         :key #'compiler-name))
@@ -709,22 +735,6 @@
                    (t
                     (push ,struct-name **compilers-available**)))
                  ',name))))))))
-
-(defmacro with-compilation-context ((&rest bindings-plist) &body body)
-  (setf body `(progn ,@body))
-  (loop :for (val key) :on (reverse bindings-plist) :by #'cddr
-        :do (setf body
-                  (ecase key
-                    (:full-context
-                     `(let ((,val context))
-                        ,body))
-                    (:chip-specification
-                     `(progn
-                        (unless context (give-up-compilation))
-                        (let ((,val (compilation-context-chip-specification context)))
-                          (unless ,val (give-up-compilation))
-                          ,body)))))
-        :finally (return body)))
 
 (defun operator-match-p (gate pattern)
   "Tests whether a single GATE matches PATTERN, without performing any binding."

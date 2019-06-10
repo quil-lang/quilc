@@ -212,86 +212,92 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
       (declare (ignore distances))
       (path prev))))
 
-(define-compiler SWAP-to-native-SWAPs ((swap-gate ("SWAP" () q0 q1)))
-  (with-compilation-context (:chip-specification chip-spec)
-    (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
-      (unless computed-path
-        (give-up-compilation))
-      (let* ((f-list (mapcar (lambda (q1 q2) (build-gate "SWAP" '() q1 q2))
-                             computed-path (rest computed-path))))
-        (append f-list (rest (reverse f-list)))))))
+(define-compiler SWAP-to-native-SWAPs ((swap-gate ("SWAP" () q0 q1))
+                                       :gateset-reducer nil
+                                       :chip-specification chip-spec)
+  (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
+    (unless computed-path
+      (give-up-compilation))
+    (let* ((f-list (mapcar (lambda (q1 q2) (build-gate "SWAP" '() q1 q2))
+                           computed-path (rest computed-path))))
+      (append f-list (rest (reverse f-list))))))
 
-(define-compiler CNOT-to-native-CNOTs ((cnot-gate ("CNOT" () q1 q0)))
+(define-compiler CNOT-to-native-CNOTs ((cnot-gate ("CNOT" () q1 q0))
+                                       :gateset-reducer nil
+                                       :chip-specification chip-spec)
   ;; find a shortest path between the two qubits in the swap gate
-  (with-compilation-context (:chip-specification chip-spec)
-    (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
-      (labels
-          ((build-CNOT-string (qubit-string)
+  (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
+    (labels
+        ((build-CNOT-string (qubit-string)
+           (cond
+             ;; base case
+             ((= 2 (length qubit-string))
+              (list (apply #'build-gate "CNOT" '() qubit-string)))
+             ;; recursive case
+             (t
+              (let ((inner-string (build-CNOT-string (rest qubit-string)))
+                    ;; one could also make a deep copy instead of running build-CNOT-string again
+                    (inner-string-copy (build-CNOT-string (rest qubit-string)))
+                    (first-two-qubits (list (first qubit-string) (second qubit-string))))
+                (append
+                 (list
+                  (apply #'build-gate "CNOT" '() first-two-qubits))
+                 inner-string
+                 (list
+                  (apply #'build-gate "CNOT" '() first-two-qubits))
+                 inner-string-copy))))))
+      (build-CNOT-string computed-path))))
+
+(define-compiler CZ-to-native-CZs ((cz-gate ("CZ" () q0 q1))
+                                   :full-context context
+                                   :gateset-reducer nil)
+  (nconc
+   (list (build-gate "RY" '(#.(/ pi 2)) q1))
+   (CNOT-to-native-CNOTs (build-gate "CNOT" () q0 q1) :context context)
+   (list (build-gate "RY" '(#.(/ pi -2)) q1))))
+
+(define-compiler ISWAP-to-native-ISWAPs ((iswap-gate ("ISWAP" _ _ _))
+                                         :gateset-reducer nil
+                                         :full-context context)
+  (let* ((cnot-equivalent (iSWAP-to-CNOT iswap-gate))
+         (cnots-on-chip (loop :for instr :in cnot-equivalent
+                              :nconc (if (string= "CNOT" (application-operator-name instr))
+                                         (CNOT-to-native-CNOTs instr :context context)
+                                         (list instr))))
+         (iswaps-on-chip (loop :for instr :in cnots-on-chip
+                               :nconc (if (string= "CNOT" (application-operator-name instr))
+                                          (CNOT-to-iSWAP instr)
+                                          (list instr)))))
+    iswaps-on-chip))
+
+(define-compiler CPHASE-to-native-CPHASEs ((cphase-gate ("CPHASE" _ _ _))
+                                           :gateset-reducer nil
+                                           :full-context context)
+  (let* ((cnot-equivalent (CPHASE-to-CNOT cphase-gate)))
+    (mapcan (lambda (g)
+              (cond
+                ((string= "CNOT" (application-operator-name g))
+                 (CNOT-to-native-CNOTs g :context context))
+                (t
+                 (list g))))
+            cnot-equivalent)))
+
+(define-compiler PISWAP-to-native-PISWAPs ((piswap-gate ("PISWAP" (theta) q0 q1))
+                                           :gateset-reducer nil
+                                           :chip-specification chip-spec)
+  (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
+    (labels
+        ((build-PISWAP-string (index-list)
+           (let* ((oriented-qubits (mapcar #'qubit index-list))
+                  (a (first oriented-qubits))
+                  (b (second oriented-qubits)))
              (cond
                ;; base case
-               ((= 2 (length qubit-string))
-                (list (apply #'build-gate "CNOT" '() qubit-string)))
+               ((= 2 (length index-list))
+                (list (build-gate "PISWAP" `(,theta) a b)))
                ;; recursive case
                (t
-                (let ((inner-string (build-CNOT-string (rest qubit-string)))
-                      ;; one could also make a deep copy instead of running build-CNOT-string again
-                      (inner-string-copy (build-CNOT-string (rest qubit-string)))
-                      (first-two-qubits (list (first qubit-string) (second qubit-string))))
-                  (append
-                   (list
-                    (apply #'build-gate "CNOT" '() first-two-qubits))
-                   inner-string
-                   (list
-                    (apply #'build-gate "CNOT" '() first-two-qubits))
-                   inner-string-copy))))))
-        (build-CNOT-string computed-path)))))
-
-(define-compiler CZ-to-native-CZs ((cz-gate ("CZ" () q0 q1)))
-  (with-compilation-context (:full-context context)
-    (nconc
-     (list (build-gate "RY" '(#.(/ pi 2)) q1))
-     (CNOT-to-native-CNOTs (build-gate "CNOT" () q0 q1) :context context)
-     (list (build-gate "RY" '(#.(/ pi -2)) q1)))))
-
-(define-compiler ISWAP-to-native-ISWAPs ((iswap-gate ("ISWAP" _ _ _)))
-  (with-compilation-context (:full-context context)
-    (let* ((cnot-equivalent (iSWAP-to-CNOT iswap-gate))
-           (cnots-on-chip (loop :for instr :in cnot-equivalent
-                                :nconc (if (string= "CNOT" (application-operator-name instr))
-                                           (CNOT-to-native-CNOTs instr :context context)
-                                           (list instr))))
-           (iswaps-on-chip (loop :for instr :in cnots-on-chip
-                                 :nconc (if (string= "CNOT" (application-operator-name instr))
-                                            (CNOT-to-iSWAP instr)
-                                            (list instr)))))
-      iswaps-on-chip)))
-
-(define-compiler CPHASE-to-native-CPHASEs ((cphase-gate ("CPHASE" _ _ _)))
-  (with-compilation-context (:full-context context)
-    (let* ((cnot-equivalent (CPHASE-to-CNOT cphase-gate)))
-      (mapcan (lambda (g)
-                (cond
-                  ((string= "CNOT" (application-operator-name g))
-                   (CNOT-to-native-CNOTs g :context context))
-                  (t
-                   (list g))))
-              cnot-equivalent))))
-
-(define-compiler PISWAP-to-native-PISWAPs ((piswap-gate ("PISWAP" (theta) q0 q1)))
-  (with-compilation-context (:chip-specification chip-spec)
-    (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
-      (labels
-          ((build-PISWAP-string (index-list)
-             (let* ((oriented-qubits (mapcar #'qubit index-list))
-                    (a (first oriented-qubits))
-                    (b (second oriented-qubits)))
-               (cond
-                 ;; base case
-                 ((= 2 (length index-list))
-                  (list (build-gate "PISWAP" `(,theta) a b)))
-                 ;; recursive case
-                 (t
-                  (let ((temp-string (build-PISWAP-string (rest index-list)))
-                        (gate (list (build-gate "SWAP" () a b))))
-                    (append gate temp-string gate)))))))
-        (build-PISWAP-string computed-path)))))
+                (let ((temp-string (build-PISWAP-string (rest index-list)))
+                      (gate (list (build-gate "SWAP" () a b))))
+                  (append gate temp-string gate)))))))
+      (build-PISWAP-string computed-path))))
