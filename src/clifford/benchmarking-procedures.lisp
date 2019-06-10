@@ -185,29 +185,23 @@
 
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
-  (loop :for gate-application :across (quil:parsed-program-executable-code parsed-quil)
-        ;; Collect cliffords of all applications (and unresolved
-        ;; applications). If any other instruction type is
+  (loop :for instr :across (quil:parsed-program-executable-code parsed-quil)
+        ;; Collect cliffords of all applications (and pragmas,
+        ;; unresolved applications). If any other instruction type is
         ;; encountered, raise error.
-        :unless (or (typep gate-application 'quil:application)
+        :unless (or (typep instr 'quil:application)
+                    (typep instr 'quil:pragma)
                     (and quil::*allow-unresolved-applications*
-                         (typep gate-application 'quil:unresolved-application)))
-                (error "ouf")
-        :collect (matrix-to-clifford (quil:gate-matrix gate-application))))
-
-(defun extract-qubits-used (parsed-quil)
-  "Given PARSED-QUIL return the indices of the qubits used. The result is given as a list of the qubits used per instruction in the PARSED-QUIL."
-  (loop :for parsed-clifford :across (quil:parsed-program-executable-code parsed-quil)
-        :when (or (typep parsed-clifford 'quil:application)
-                  (and quil::*allow-unresolved-applications*
-                       (typep parsed-clifford 'quil:unresolved-application)))
-          :collect (mapcar #'quil:qubit-index (quil:application-arguments parsed-clifford))))
+                         (typep instr 'quil:unresolved-application)))
+                (error "Cannot extract clifford from the instr ~/cl-quil:instruction-fmt/"
+                       instr)
+        :collect (matrix-to-clifford (quil:gate-matrix instr))))
 
 (defun clifford-circuit-p (parsed-quil)
   "If the parsed circuit PARSED-QUIL a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
   (let* ((cliffords (extract-cliffords parsed-quil))
-         (qubit-targets (extract-qubits-used parsed-quil))
-	 (qubits (sort (remove-duplicates (a:flatten qubit-targets)) #'<))
+         (qubit-targets (cl-quil::qubits-used parsed-quil))
+	 (qubits (sort qubit-targets #'<))
 	 (num-qubits (length qubits)))
     (reduce #'group-mul (loop :for clifford :in (reverse cliffords)
 			   :for target :in (reverse qubit-targets)
