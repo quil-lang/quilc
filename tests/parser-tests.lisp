@@ -134,8 +134,7 @@
               "    RESET qq"
               "RESET"))
          (code (parsed-program-executable-code p)))
-    (is (equalp (aref code 0)
-                (make-instance 'reset)))
+    (is (typep (aref code 0) 'reset))
     (is (equalp (reset-qubit-target (aref code 1))
                 (qubit 5)))))
 

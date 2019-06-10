@@ -15,22 +15,11 @@
   (with-output-to-string (s)
     (funcall printer (funcall parser input) s)))
 
-(defun reset-comment-table-hack ()
-  "Reset the CL-QUIL::**COMMENTS** hash table.
-
-  Resetting the **COMMENTS** table might be required for any test that wants to validate the output
-  of PRINT-PARSED-PROGRAM for programs that contain HALT, NOP, RESET, or other instructions that are
-  represented by singleton classes. This is because the **COMMENTS** hash table is keyed on object
-  identity, so if any prior tests have attached rewiring comments to any singleton instructions,
-  they will persist and be printed by PRINT-PARSED-PROGRAM."
-  (setf quil::**comments** (quil::make-comment-table)))
-
 (defun update-print-parsed-program-golden-files (&key skip-prompt)
   "Call UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES on all the files in *PRINTER-TEST-FILES-DIRECTORY*.
 
 See the documentation string for UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES for more info and an
 admonition against carelessness."
-  (reset-comment-table-hack)
   (update-golden-file-output-sections
    (uiop:directory-files *printer-test-files-directory* #P"*.quil")
    #'parse-and-print-quil-to-string
@@ -44,8 +33,6 @@ admonition against carelessness."
   ;; above, to update the output sections of the golden files. If you do so, however, be sure to
   ;; examine the diffs of the old vs new output *carefully* to ensure all the changes are intended
   ;; or expected. Golden files are precious, and their sanctity must be preserved. Thank you.
-
-  (reset-comment-table-hack)
 
   (let ((golden-files (uiop:directory-files *printer-test-files-directory* #P"*.quil")))
     (is (not (null golden-files)))
