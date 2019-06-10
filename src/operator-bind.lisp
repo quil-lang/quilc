@@ -276,10 +276,19 @@
           (t
            t))))))
 
-(defun update-occurrence-table (table compiler)
+(defun filter-by-qubit-count (table qubit-count)
+  (let ((new-table (make-occurrence-table)))
+    (dohash ((key val) table new-table)
+      (when (= qubit-count
+               (length (binding-arguments (list '_ key))))
+        (setf (gethash key new-table) val)))))
+
+(defun update-occurrence-table (table compiler &optional qubit-count)
   (assert (= 1 (length (compiler-bindings compiler))))
   (let ((binding (first (compiler-bindings compiler)))
-        (replacement (compiler-output-gates compiler))
+        (replacement (if qubit-count
+                         (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
+                         (compiler-output-gates compiler)))
         (new-table (make-hash-table :test #'equalp))
         (binding-applied? nil))
     ;; for each existing entry in the table...
@@ -314,10 +323,7 @@
         (dohash ((cost-key cost-val) gate-cost-table)
           (when (binding-subsumes-p (list '_ cost-key) (list '_ key))
             (setf true-cost cost-val)))
-        (setf ret (* ret (expt true-cost (* (if (typep key 'list)
-                                                (expt 3 (length (cddr key)))
-                                                1)
-                                            val))))))))
+        (setf ret (* ret (expt true-cost val)))))))
 
 (defun occurrence-table-in-gateset-p (table gateset)
   (loop :for table-key :being :the :hash-keys :of table
@@ -325,7 +331,12 @@
                         :thereis (binding-subsumes-p (list '_ gateset-key)
                                                      (list '_ table-key)))))
 
-(defun find-shortest-compiler-path (compilers target-gateset source-gateset)
+(defun generate-blank-binding (qubit-count)
+  (list* '_ ()
+         (loop :for i :below qubit-count
+               :collect '_)))
+
+(defun find-shortest-compiler-path (compilers target-gateset source-gateset &optional qubit-count)
   ;; target-gateset is an equalp hash (name . params) -> fidelities
   (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'>)))
     (flet ((collect-bindings (occurrence-table)
@@ -338,9 +349,7 @@
             :unless task
               :do (error "Exhausted task queue without finding a route to the target gateset.")
             :when (occurrence-table-in-gateset-p task target-gateset)
-              :return (progn
-                        (format t "breaking on ~a, ~a.~%" task target-gateset)
-                        (cons task history))
+              :return (cons task history)
             :unless (member (collect-bindings task)
                             visited-nodes :test #'equalp)
               :do (push (sort (collect-bindings task)
@@ -351,7 +360,7 @@
                         visited-nodes)
                   (dolist (compiler compilers)
                     (multiple-value-bind (new-table updated?)
-                        (update-occurrence-table task compiler)
+                        (update-occurrence-table task compiler qubit-count)
                       (when updated?
                         (cl-heap:enqueue queue
                                          (list* new-table compiler task history)
@@ -363,7 +372,7 @@
          (if (or (symbolp binding)
                  (keywordp (second binding)))
              most-positive-fixnum
-             (length (binding-arguments (second binding))))))
+             (length (binding-arguments binding)))))
     (multiple-value-bind (a-bindings a-options)
         (cleave-options a)
       (multiple-value-bind (b-bindings b-options)
@@ -372,15 +381,29 @@
         (assert (= 1 (length b-bindings)))
         (let* ((a-binding (first a-bindings))
                (b-binding (first b-bindings))
-               (op-count-a (qubit-count a-binding))
-               (op-count-b (qubit-count b-binding)))
+               (arg-count-a (qubit-count a-binding))
+               (arg-count-b (qubit-count b-binding)))
           ;; fewer qubits means it comes earlier
           (cond
-            ((< op-count-a op-count-b)
+            ((< arg-count-a arg-count-b)
+             (print (list arg-count-a arg-count-b 1))
              t)
-            ((> op-count-a op-count-b)
+            ((> arg-count-a arg-count-b)
              nil)
-            ;; from here on: (and (= op-count-a op-count b) ...)
+            ;; from here on: (and (= arg-count-a arg-count b) ...)
+            ;; cluster by name
+            ((and (or (wildcard-pattern-p (binding-op a-binding))
+                      (symbolp (binding-op a-binding)))
+                  (stringp (binding-op b-binding)))
+             nil)
+            ((and (stringp (binding-op a-binding))
+                  (or (wildcard-pattern-p (binding-op b-binding))
+                      (symbolp (binding-op b-binding))))
+             t)
+            ((and (stringp (binding-op a-binding))
+                  (stringp (binding-op b-binding))
+                  (string< (binding-op a-binding) (binding-op b-binding)))
+             t)
             ;; option predicates make it come earlier
             ((and (or a-options (binding-options a-binding))
                   (not (or b-options (binding-options b-binding))))
@@ -397,19 +420,19 @@
                   (not (wildcard-pattern-p (binding-parameters b-binding)))
                   (loop :for param-a :in (binding-parameters a-binding)
                         :for param-b :in (binding-parameters b-binding)
-                          :thereis (and (or (wildcard-pattern-p param-a)
-                                            (symbolp param-a))
-                                        (not (or (wildcard-pattern-p param-b)
-                                                 (symbolp param-b))))))
+                          :thereis (and (not (or (wildcard-pattern-p param-a)
+                                                 (symbolp param-a)))
+                                        (or (wildcard-pattern-p param-b)
+                                            (symbolp param-b)))))
              t)
             (t
              nil)))))))
 
 (defun sort-compilers-by-specialization (compilers)
-  (sort (copy-seq compilers)
-        (lambda (a b)
-          (binding-precedes-p (compiler-bindings a)
-                              (compiler-bindings b)))))
+  (stable-sort (copy-seq compilers)
+               (lambda (a b)
+                 (binding-precedes-p (compiler-bindings a)
+                                     (compiler-bindings b)))))
 
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
