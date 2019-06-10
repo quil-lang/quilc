@@ -750,7 +750,7 @@
                                   (let ((,val (compilation-context-chip-specification context)))
                                     (unless ,val (give-up-compilation))
                                     ,body))))
-      (:gateset-reducer
+      ((:gateset-reducer :class)
        (parse-compiler-options remaining-options body))
       (otherwise
        (error "Unknown compiler option: ~a." (first options))))))
