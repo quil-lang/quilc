@@ -192,13 +192,13 @@
         :unless (or (typep instr 'quil:application)
                     (typep instr 'quil:pragma)
                     (and quil::*allow-unresolved-applications*
-                         (typep instr 'quil:unresolved-application)))
-                (error "Cannot extract clifford from the instr ~/cl-quil:instruction-fmt/"
-                       instr)
+                         (typep instr 'quil:unresolved-application))) :do
+                           (error "Cannot extract clifford from the instr ~/cl-quil:qinstruction-fmt/"
+                                  instr)
         :collect (matrix-to-clifford (quil:gate-matrix instr))))
 
 (defun clifford-circuit-p (parsed-quil)
-  "If the parsed circuit PARSED-QUIL a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
+  "If the parsed circuit PARSED-QUIL is a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
   (let* ((cliffords (extract-cliffords parsed-quil))
          (qubit-targets (cl-quil::qubits-used parsed-quil))
 	 (qubits (sort qubit-targets #'<))
