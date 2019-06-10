@@ -183,7 +183,6 @@
                         (magicl:diag (length evals) (length evals) evals)
                         (magicl:transpose evecs))))
             (when (matrix-every #'double= gammag v)
-              ;; assert np.allclose(np.eye(4), O2.transpose() @ O2) # Sanity check
               (assert (matrix-every #'double=
                                     (magicl:make-identity-matrix 4)
                                     (m* (magicl:transpose evecs)
