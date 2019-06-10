@@ -106,6 +106,11 @@
     :initarg :output-gates
     :reader compiler-output-gates
     :documentation "Information automatically extracted about the target gate set.")
+   (gateset-reducer
+    :initarg :gateset-reducer
+    :initform t
+    :reader compiler-gateset-reducer-p
+    :documentation "Is this compiler intended to transition from one gate set to another?")
    (%function
     :initarg :function
     :reader compiler-%function
@@ -135,31 +140,52 @@
 
 (defun get-output-gates-from-raw-code (body)
   (unless (typep body 'cons)
-    (return-from get-output-gates-from-raw-code (make-hash-table)))
+    (return-from get-output-gates-from-raw-code (make-occurrence-table)))
   (case (first body)
     (build-gate
      (destructuring-bind (head name param-list &rest qubit-list) body
        (declare (ignore head))
-       (let ((table (make-hash-table :test #'equalp)))
-         (setf (gethash (list* name
-                               (cond
-                                 ((and (typep param-list 'list)
-                                       (eql 'quote (first param-list)))
-                                  (loop :for item :in (second param-list)
-                                        :unless (typep item 'number)
-                                          :return '_
-                                        :collect item))
-                                 (t
-                                  '_))
-                               (mapcar (lambda (x)
-                                         (typecase x
-                                           (number x)
-                                           (otherwise '_)))
-                                       qubit-list))
-                        table)
-               1)
+       (let ((table (make-hash-table :test #'equalp))
+             (param-list (cond
+                           ((and (typep param-list 'list)
+                                 (eql 'quote (first param-list)))
+                            (loop :for item :in (second param-list)
+                                  :unless (typep item 'number)
+                                    :return '_
+                                  :collect item))
+                           (t
+                            '_)))
+             (qubit-list (mapcar (lambda (x)
+                                   (typecase x
+                                     (number x)
+                                     (otherwise '_)))
+                                 qubit-list)))
+         (setf (gethash (list* name param-list qubit-list) table) 1)
          table)))
-    ;; TODO: anon-gate
+    (anon-gate
+     (destructuring-bind (head name matrix &rest qubit-list) body
+       (declare (ignore head name matrix))
+       (let ((table (make-hash-table :test #'equalp))
+             (qubit-list (mapcar (lambda (x)
+                                   (typecase x
+                                     (number x)
+                                     (otherwise '_)))
+                                 qubit-list)))
+         (setf (gethash (list* '_ '_ qubit-list) table) 1)
+         table)))
+    (apply
+     (destructuring-bind (head fn &rest args) body
+       (declare (ignore head))
+       (case fn
+         (#'build-gate
+          (destructuring-bind (name param-list qubit-list) args
+            (declare (ignore qubit-list))
+            (get-output-gates-from-raw-code
+             `(build-gate ,name ,param-list
+                          ,@(loop :for j :below (gate-definition-qubits-needed (lookup-standard-gate name))
+                                  :collect '_)))))
+         (otherwise
+          (make-occurrence-table)))))
     (otherwise
      (let ((table (make-occurrence-table)))
        (dolist (subbody body table)
@@ -193,115 +219,62 @@
                              (or (wildcard-pattern-p xp)
                                  (typep xp 'symbol)))
                            x)))))
-    (let (
-          (*standard-output* (make-broadcast-stream)))
-      (format t "~&Looking at ~a vs ~a~%" big-binding small-binding)
-      (when (symbolp big-binding)
-        (return-from binding-subsumes-p t))
-      (print 1)
-      (when (symbolp small-binding)
-        (return-from binding-subsumes-p nil))
-      (print 2)
-      ;; both are destructurable
-      (multiple-value-bind (big-binding big-options) (cleave-options big-binding)
-        (multiple-value-bind (small-binding small-options) (cleave-options small-binding)
-          (cond
-            ((and (= 1 (length big-binding))
-                  (or (endp big-options)
-                      (equalp big-options small-options)))
-             (print 3)
-             t)
-            ((and (= 1 (length small-binding))
-                  (endp small-options))
-             (print 4)
-             nil)
-            ((and big-options small-options)
-             (print 5)
-             nil)
-            ;; big-binding and small-binding are now actual bindings
-            ;; check the operators for failing both _ <= _ and "literal" <= "literal"
-            ((or (and (wildcard-pattern-p (binding-op small-binding))
-                      (not (wildcard-pattern-p (binding-op big-binding))))
-                 (and (not (wildcard-pattern-p (binding-op small-binding)))
-                      (not (wildcard-pattern-p (binding-op big-binding)))
-                      (not (string= (binding-op big-binding) (binding-op small-binding)))))
-             (print 6)
-             nil)
-            ;; check the parameters for failing both _ <= _ and literal <= literal
-            ((or (and (wildcard-pattern-p (binding-parameters small-binding))
-                      (not (wildcard-pattern-p (binding-parameters big-binding))))
-                 (and (not (wildcard-pattern-p (binding-parameters small-binding)))
-                      (not (wildcard-pattern-p (binding-parameters big-binding)))
-                      (loop :for big-param :in (binding-parameters big-binding)
-                            :for small-param :in (binding-parameters small-binding)
-                              :thereis (or (and (or (wildcard-pattern-p small-param)
-                                                    (symbolp small-param))
-                                                (not (wildcard-pattern-p big-param))
-                                                (not (symbolp big-param)))
-                                           (and (not (wildcard-pattern-p small-param))
-                                                (not (wildcard-pattern-p big-param))
-                                                (not (double= big-param small-param)))))))
-             (print 7)
-             nil)
-            ;; check the arguments for failing both _ <= _ and literal <= literal
-            ((or (not (= (length (binding-arguments big-binding))
-                         (length (binding-arguments small-binding))))
-                 (loop :for big-arg :in (binding-arguments big-binding)
-                       :for small-arg :in (binding-arguments small-binding)
-                         :thereis (or (and (or (wildcard-pattern-p small-arg)
-                                               (symbolp small-arg))
-                                           (not (wildcard-pattern-p big-arg))
-                                           (not (symbolp big-arg)))
-                                      (and (not (wildcard-pattern-p small-arg))
-                                           (not (wildcard-pattern-p big-arg))
-                                           (not (double= big-arg small-arg))))))
-             (print 8)
-             nil)
-            ;; otherwise, i guess everything checks out
-            (t
-             (print 9)
-             t)))))))
-
-#+ignore
-(defun binding-matches-p (binding gate-name params)
-  (cond
-    ;; case: INSTR
-    ((typep binding 'symbol)
-     t)
-    ;; case: any options present
-    ((binding-options (rest binding))
-     nil)
-    ;; case: (INSTR (BINDING-NAME BINDING-PARAMS &REST BINDING-ARGS))
-    (t
-     (let* ((binding-name (binding-op binding))
-            (binding-params (binding-parameters binding)))
-       (cond
-         ;; OP matches or subsumes
-         ((not (or (wildcard-pattern-p binding-name)
-                   (typep binding-name 'symbol)
-                   (and (typep gate-name 'string)
-                        (string= binding-name gate-name))))
-          nil)
-         ;; ditto for each parameter
-         ((wildcard-pattern-p binding-params)
-          t)
-         ;; need to check that binding-params is _equivalent_ to a wildcard.
-         ((wildcard-pattern-p params)
-          (loop :for binding-param :in binding-params
-                :always (or (wildcard-pattern-p binding-param)
-                            (typep binding-param 'symbol))))
-         ((not (= (length params) (length binding-params)))
-          nil)
-         ;; parameters are specialized and they don't match
-         (t
-          (loop :for param :in params
-                :for binding-param :in binding-params
-                :always (or (wildcard-pattern-p binding-param)
-                            ;; TODO: what about parameter lists like (alpha, alpha)?
-                            (typep binding-param 'symbol)
-                            (and (typep binding-param 'double-float)
-                                 (typep param 'double-float)
-                                 (double= binding-param param))))))))))
+    (when (symbolp big-binding)
+      (return-from binding-subsumes-p t))
+    (when (symbolp small-binding)
+      (return-from binding-subsumes-p nil))
+    ;; both are destructurable
+    (multiple-value-bind (big-binding big-options) (cleave-options big-binding)
+      (multiple-value-bind (small-binding small-options) (cleave-options small-binding)
+        (cond
+          ((and (= 1 (length big-binding))
+                (or (endp big-options)
+                    (equalp big-options small-options)))
+           t)
+          ((and (= 1 (length small-binding))
+                (endp small-options))
+           nil)
+          ((and big-options small-options)
+           nil)
+          ;; big-binding and small-binding are now actual bindings
+          ;; check the operators for failing both _ <= _ and "literal" <= "literal"
+          ((or (and (wildcard-pattern-p (binding-op small-binding))
+                    (not (wildcard-pattern-p (binding-op big-binding))))
+               (and (not (wildcard-pattern-p (binding-op small-binding)))
+                    (not (wildcard-pattern-p (binding-op big-binding)))
+                    (not (string= (binding-op big-binding) (binding-op small-binding)))))
+           nil)
+          ;; check the parameters for failing both _ <= _ and literal <= literal
+          ((or (and (wildcard-pattern-p (binding-parameters small-binding))
+                    (not (wildcard-pattern-p (binding-parameters big-binding))))
+               (and (not (wildcard-pattern-p (binding-parameters small-binding)))
+                    (not (wildcard-pattern-p (binding-parameters big-binding)))
+                    (loop :for big-param :in (binding-parameters big-binding)
+                          :for small-param :in (binding-parameters small-binding)
+                            :thereis (or (and (or (wildcard-pattern-p small-param)
+                                                  (symbolp small-param))
+                                              (not (wildcard-pattern-p big-param))
+                                              (not (symbolp big-param)))
+                                         (and (not (wildcard-pattern-p small-param))
+                                              (not (wildcard-pattern-p big-param))
+                                              (not (double= big-param small-param)))))))
+           nil)
+          ;; check the arguments for failing both _ <= _ and literal <= literal
+          ((or (not (= (length (binding-arguments big-binding))
+                       (length (binding-arguments small-binding))))
+               (loop :for big-arg :in (binding-arguments big-binding)
+                     :for small-arg :in (binding-arguments small-binding)
+                       :thereis (or (and (or (wildcard-pattern-p small-arg)
+                                             (symbolp small-arg))
+                                         (not (wildcard-pattern-p big-arg))
+                                         (not (symbolp big-arg)))
+                                    (and (not (wildcard-pattern-p small-arg))
+                                         (not (wildcard-pattern-p big-arg))
+                                         (not (double= big-arg small-arg))))))
+           nil)
+          ;; otherwise, i guess everything checks out
+          (t
+           t))))))
 
 (defun update-occurrence-table (table compiler)
   (assert (= 1 (length (compiler-bindings compiler))))
@@ -325,8 +298,7 @@
 (defun get-compilers (&optional (qubit-bound 1))
   (remove-if-not
    (lambda (compiler)
-     (and (or (= 1 (length (compiler-bindings compiler))) ; specialize to 1 input
-              (keywordp (second (compiler-bindings compiler)))) ; don't count guards as inputs
+     (and (compiler-gateset-reducer-p compiler)
           (every (lambda (binding)
                    (and (not (or (wildcard-pattern-p binding)
                                  (symbolp binding)))
@@ -353,25 +325,34 @@
 (defun find-shortest-compiler-path (compilers target-gateset source-gateset)
   ;; target-gateset is an equalp hash (name . params) -> fidelities
   (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'>)))
-    ;; initial contents: arbitrary gate, no history
-    (loop :for (task . history) := (list source-gateset)
-            :then (cl-heap:dequeue queue)
-          :unless task
-            :do (error "Exhausted task queue without finding a route to the target gateset.")
-          :when (occurrence-table-in-gateset-p task target-gateset)
-            :return (progn
-                      (format t "breaking on ~a, ~a.~%" task target-gateset)
-                      (cons task history))
-          :do (format t "~&(~a) " (occurrence-table-cost task target-gateset))
-              (dohash ((key val) task)
-                (format t "~a -> ~a~%    " key val))
-              (dolist (compiler compilers)
-                (multiple-value-bind (new-table updated?)
-                    (update-occurrence-table task compiler)
-                  (when updated?
-                    (cl-heap:enqueue queue
-                                     (list* new-table compiler task history)
-                                     (occurrence-table-cost new-table target-gateset))))))))
+    (flet ((collect-bindings (occurrence-table)
+             (loop :for key :being :the :hash-keys :of occurrence-table
+                   :collect key)))
+      ;; initial contents: arbitrary gate, no history
+      (loop :with visited-nodes := ()
+            :for (task . history) := (list source-gateset)
+              :then (cl-heap:dequeue queue)
+            :unless task
+              :do (error "Exhausted task queue without finding a route to the target gateset.")
+            :when (occurrence-table-in-gateset-p task target-gateset)
+              :return (progn
+                        (format t "breaking on ~a, ~a.~%" task target-gateset)
+                        (cons task history))
+            :unless (member (collect-bindings task)
+                            visited-nodes :test #'equalp)
+              :do (push (sort (collect-bindings task)
+                              (lambda (a b)
+                                (binding-precedes-p
+                                 (list (list '_ a))
+                                 (list (list '_ b)))))
+                        visited-nodes)
+                  (dolist (compiler compilers)
+                    (multiple-value-bind (new-table updated?)
+                        (update-occurrence-table task compiler)
+                      (when updated?
+                        (cl-heap:enqueue queue
+                                         (list* new-table compiler task history)
+                                         (occurrence-table-cost new-table target-gateset)))))))))
 
 (defun binding-precedes-p (a b)
   (labels
@@ -381,9 +362,9 @@
              most-positive-fixnum
              (length (binding-arguments (second binding))))))
     (multiple-value-bind (a-bindings a-options)
-        (cleave-options (compiler-bindings a))
+        (cleave-options a)
       (multiple-value-bind (b-bindings b-options)
-          (cleave-options (compiler-bindings b))
+          (cleave-options b)
         (assert (= 1 (length a-bindings)))
         (assert (= 1 (length b-bindings)))
         (let* ((a-binding (first a-bindings))
@@ -422,7 +403,10 @@
              nil)))))))
 
 (defun sort-compilers-by-specialization (compilers)
-  (sort (copy-seq compilers) #'binding-precedes-p))
+  (sort (copy-seq compilers)
+        (lambda (a b)
+          (binding-precedes-p (compiler-bindings a)
+                              (compiler-bindings b)))))
 
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
@@ -713,7 +697,9 @@
                                       :bindings (quote ,bindings)
                                       :body (quote (progn ,@decls ,@body))
                                       :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
-                                      :function #',name)))
+                                      :function #',name
+                                      :gateset-reducer ,(and (= 1 (length bindings))
+                                                             (getf options :gateset-reducer t)))))
                  (setf (fdefinition ',name) ,struct-name)
                  (setf (documentation ',name 'function) ,docstring)
                  (cond
