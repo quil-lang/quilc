@@ -434,6 +434,48 @@
                  (binding-precedes-p (compiler-bindings a)
                                      (compiler-bindings b)))))
 
+(defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
+  (flet ((discard-tables (path)
+           (loop :for item :in path
+                 :when (typep item 'compiler)
+                   :collect item)))
+    (let* ((compilers (get-compilers qubit-count))
+           (unconditional-compilers
+             (remove-if (lambda (x)
+                          (multiple-value-bind (bindings options) (compiler-bindings x)
+                            (or options
+                                (some (lambda (b) (and (not (symbolp b))
+                                                       (binding-options b)))
+                                      bindings))))
+                        compilers))
+           (generic-path (find-shortest-compiler-path unconditional-compilers
+                                                      target-gateset
+                                                      (alexandria:plist-hash-table
+                                                       (list (generate-blank-binding qubit-count) 1)
+                                                       :test #'equalp)
+                                                      qubit-count))
+           (reduced-compilers (discard-tables generic-path)))
+      (let ((candidate-entry-points
+              (remove-if (lambda (x)
+                           (or (/= qubit-count (length (binding-arguments (first (compiler-bindings x)))))
+                               (loop :for b :being :the :hash-keys :of target-gateset
+                                       :thereis (binding-subsumes-p (list '_ b)
+                                                                    (first (compiler-bindings x))))))
+                         compilers)))
+        (dolist (compiler candidate-entry-points)
+          (let ((special-path
+                  (find-shortest-compiler-path
+                   unconditional-compilers target-gateset
+                   (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
+                   qubit-count)))
+            (when (> (occurrence-table-cost (first special-path) target-gateset)
+                     (occurrence-table-cost (first generic-path) target-gateset))
+              (setf reduced-compilers
+                    (append reduced-compilers
+                            (list compiler)
+                            (discard-tables special-path)))))))
+      (sort-compilers-by-specialization (remove-duplicates reduced-compilers)))))
+
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
 ;;; non-specialized instances of the above class COMPILER and installs them into
