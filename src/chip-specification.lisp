@@ -491,10 +491,8 @@ used to specify CHIP-SPEC."
         (constantly #'state-prep-compiler)
         (constantly #'recognize-ucr)
         (lambda (chip-spec arch)
-          (declare (ignore chip-spec))
           (when (typep arch 'optimal-2q-target)
-            (lambda (instr)
-              (optimal-2q-compiler instr :target arch))))
+            (approximate-2q-compiler-for arch chip-spec)))
         (constantly #'qs-compiler))
   "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
 
