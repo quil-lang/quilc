@@ -326,6 +326,11 @@ as a permutation."
 (defclass no-operation (instruction)
   ()
   (:documentation "The \"do-nothing\" instruction.")
+  ;; The singleton-class is disabled rather than removed here (and elsewhere) as a reminder that
+  ;; this is a quick fix. Ideally, we'd like to find a way to preserve the singleton nature of these
+  ;; AST classes, but still work with rewiring comments and the guts of logical-scheduler. See
+  ;; https://github.com/rigetti/quilc/issues/270 for more context.
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction no-operation)) #())
@@ -358,6 +363,7 @@ numbers. It must start with a string.")
 (defclass halt (instruction)
   ()
   (:documentation "An instruction to immediately halt all execution.")
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction halt)) #())
@@ -366,6 +372,7 @@ numbers. It must start with a string.")
 (defclass reset (instruction)
   ()
   (:documentation "An instruction to reset all qubits to the |0>-state.")
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction reset)) #())
@@ -384,6 +391,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defclass wait (instruction)
   ()
   (:documentation "An instruction to wait for some signal from a classical processor.")
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction wait)) #())
