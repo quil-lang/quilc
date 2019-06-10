@@ -153,41 +153,43 @@
   :test #'matrix-equality
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
-(defun maybe-permute-basis (m)
+(defun ensure-positive-determinant (m)
   (if (double~ -1d0 (magicl:det m))
       (m* m (magicl:diag 4 4 (list -1 1 1 1)))
       m))
+
+(a:define-constant
+    +diagonalizer-max-attempts+
+  16
+  :documentation "Maximum number of attempts DIAGONALIZER-IN-E-BASIS should make to diagonalize the input matrix using a random perturbation.")
 
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
 (defun diagonalizer-in-e-basis (m)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
-  (declare (optimize (debug 3)))
   (check-type m magicl:matrix)
   (let* ((u (m* +edag-basis+ m +e-basis+))
-         (gammag (m* u (magicl:transpose u)))
-         (max-tries 16))
-    (loop :repeat max-tries :do
+         (gammag (m* u (magicl:transpose u))))
+    (loop :repeat +diagonalizer-max-attempts+ :do
       (let* ((rand-coeff (random 1.0d0))
              (matrix (m+ (magicl:scale rand-coeff (matrix-real-part gammag))
-                         (magicl:scale (- 1 rand-coeff) (matrix-imag-part gammag)))))
-        (multiple-value-bind (_ evecs)
-            (magicl:eig matrix)
-          (declare (ignore _))
-          (let* ((evecs (maybe-permute-basis (orthonormalize-matrix evecs)))
-                 (evals (magicl:matrix-diagonal
-                         (m* (magicl:transpose evecs)
-                             gammag
-                             evecs)))
-                 (v (m* evecs
-                        (magicl:diag (length evals) (length evals) evals)
-                        (magicl:transpose evecs))))
-            (when (matrix-every #'double= gammag v)
-              (assert (matrix-every #'double=
-                                    (magicl:make-identity-matrix 4)
-                                    (m* (magicl:transpose evecs)
-                                        evecs)))
-              (return-from diagonalizer-in-e-basis evecs))))))))
+                         (magicl:scale (- 1 rand-coeff) (matrix-imag-part gammag))))
+             (evecs (ensure-positive-determinant
+                     (orthonormalize-matrix
+                      (nth-value 1 (magicl:eig matrix)))))
+             (evals (magicl:matrix-diagonal
+                     (m* (magicl:transpose evecs)
+                         gammag
+                         evecs)))
+             (v (m* evecs
+                    (magicl:diag (length evals) (length evals) evals)
+                    (magicl:transpose evecs))))
+        (when (matrix-every #'double= gammag v)
+          (assert (matrix-every #'double=
+                                (magicl:make-identity-matrix 4)
+                                (m* (magicl:transpose evecs)
+                                    evecs)))
+          (return-from diagonalizer-in-e-basis evecs))))))
 
 
 (defun orthogonal-decomposition (m)
