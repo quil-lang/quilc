@@ -249,18 +249,19 @@
   ;; last line, as well as the fidelity as a values triple.
   (multiple-value-bind (aprime dprime bprime)
       (orthogonal-decomposition (magicl:scale (expt (magicl:det mprime) -1/4) mprime))
-    (let (o oT
-            (d-as-list      (loop :for j :below 4 :collect (magicl:ref d j j)))
-            (dprime-as-list (loop :for j :below 4 :collect (magicl:ref dprime j j)))
-            (max-fidelity 0d0))
+    (let (o
+          oT
+          (d-as-list (loop :for j :below 4 :collect (magicl:ref d j j)))
+          (dprime-as-list (loop :for j :below 4 :collect (magicl:ref dprime j j)))
+          (max-fidelity 0d0))
       ;; maximize the trace over signed permutations
       (cl-permutation:doperms (sigma 4)
-        (dolist (signs (list (list  1  1  1  1)
-                             (list -1 -1  1  1)
-                             (list -1  1 -1  1)
-                             (list -1  1  1 -1)))
+        (dolist (signs (list (list 1 1 1 1)
+                             (list -1 -1 1 1)
+                             (list -1 1 -1 1)
+                             (list -1 1 1 -1)))
           (let* ((new-trace
-                  (loop
+                   (loop
                      :for x :in (cl-permutation:permute sigma d-as-list)
                      :for y :in dprime-as-list
                      :for sign :in signs

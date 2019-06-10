@@ -130,7 +130,7 @@
              nil))
          ;; if all the UCR parameters are the same, return an uncontrolled roll
          (when (every (lambda (param) (double= (constant-value (first parameters))
-                                               (constant-value param)))
+                                          (constant-value param)))
                       parameters)
            (return-from ucr-compiler
              (list (build-gate roll-type (list (constant-value (first parameters))) target))))
@@ -142,16 +142,16 @@
                           (/ (length parameters) 2)))
                 (averages
                   (mapcar (lambda (x y) (constant
-                                         (/ (+ (constant-value x)
-                                               (constant-value y))
-                                            2)))
+                                    (/ (+ (constant-value x)
+                                          (constant-value y))
+                                       2)))
                           high-order-params
                           low-order-params))
                 (differences
                   (mapcar (lambda (x y) (constant
-                                         (/ (- (constant-value x)
-                                               (constant-value y))
-                                            2)))
+                                    (/ (- (constant-value x)
+                                          (constant-value y))
+                                       2)))
                           high-order-params
                           low-order-params))
                 (avgroll  (build-gate roll-type averages    target))
