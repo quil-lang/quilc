@@ -186,10 +186,13 @@
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
   (loop :for gate-application :across (quil:parsed-program-executable-code parsed-quil)
+        ;; Collect cliffords of all applications (and unresolved
+        ;; applications). If any other instruction type is
+        ;; encountered, raise error.
         :unless (or (typep gate-application 'quil:application)
                     (and quil::*allow-unresolved-applications*
-                         (typep gate-application 'quil:unresolved-application))) :do
-                           (error "ouf")
+                         (typep gate-application 'quil:unresolved-application)))
+                (error "ouf")
         :collect (matrix-to-clifford (quil:gate-matrix gate-application))))
 
 (defun extract-qubits-used (parsed-quil)
