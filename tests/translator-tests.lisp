@@ -28,15 +28,23 @@
 (deftest test-euler-translations ()
   "Ensures that the different Euler decompositions all work."
   (let ((master-matrix (quil::random-special-unitary 2)))
-    (dolist (type (list :zyz :zxz :yzy :yxy :xyx :xzx))
-      (let* ((compiled-program (cl-quil::euler-compiler (build-anonymous-gate master-matrix 0)
-                                                        :target type))
+    (dolist (compiler (list #'quil::euler-zyz-compiler
+                            #'quil::euler-zxz-compiler
+                            #'quil::euler-yzy-compiler
+                            #'quil::euler-yxy-compiler
+                            #'quil::euler-xyx-compiler
+                            #'quil::euler-xzx-compiler))
+      (let* ((compiled-program (funcall compiler
+                                        (build-anonymous-gate master-matrix 0)
+                                        :target type))
              (compiled-matrix (magicl:diag 2 2 (list 1d0 1d0))))
         (loop :for instr :in compiled-program :do
-           (setf compiled-matrix (quil::apply-gate compiled-matrix instr)))
-        (is (loop :for i :from 0 :to 1 :always
-               (loop :for j :from 0 :to 1 :always
-                  (< (abs (- (magicl:ref compiled-matrix i j) (magicl:ref master-matrix i j))) 0.01)))
+          (setf compiled-matrix (quil::apply-gate compiled-matrix instr)))
+        (is (loop :for i :from 0 :to 1
+                  :always (loop :for j :from 0 :to 1
+                                :always (< (abs (- (magicl:ref compiled-matrix i j)
+                                                   (magicl:ref master-matrix i j)))
+                                           0.01)))
             "Euler translation test failed: ~a~%" type)))))
 
 (defun generate-test-case (bindings)
@@ -182,7 +190,7 @@
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
                (mat (cl-quil::make-matrix-from-quil (funcall expander instr
-                                                             :context (quil::make-compressor-context
+                                                             :context (quil::make-compilation-context
                                                                        :chip-specification chip-spec)))))
           (is (cl-quil::matrix-equality ref-mat
                                         (cl-quil::scale-out-matrix-phases mat ref-mat))))))))

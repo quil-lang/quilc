@@ -18,7 +18,7 @@
 (deftest test-euler-compilation ()
   "Ensures that euler-compile correctly decomposes an element of SU(2)."
   (let* ((m (quil::random-special-unitary 2))
-         (compiled-list (cl-quil::euler-compiler (build-anonymous-gate m 0)))
+         (compiled-list (cl-quil::euler-zyz-compiler (build-anonymous-gate m 0)))
          (u (quil::make-matrix-from-quil compiled-list)))
     (fiasco-assert-matrices-are-equal m u)))
 
