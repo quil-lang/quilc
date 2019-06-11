@@ -30,10 +30,12 @@
 
 (defun global-rewriting-rules ()
   "Rewriting rules that may be useful in manipulating instruction sequences that do not have an underlying notion of 'native hardware'.  In particular, this includes canonicalizing the ordering of commuting instructions."
-  (list (make-rewriting-rule "CZs commute" #'sort-CZs)
-        (make-rewriting-rule "CPHASEs commute" #'sort-CPHASEs)
-        (make-rewriting-rule "Eigenvectors take no action" #'elide-applications-on-eigenvectors)))
+  (list #'sort-CZs
+        #'sort-CPHASEs
+        #'elide-applications-on-eigenvectors))
 
+
+;;; rewriting rules specialized to qubit types
 
 (define-compiler agglutinate-RXs
     ((x ("RX" (theta) q))
@@ -83,21 +85,6 @@
     ((x ("RZ" (#.(- pi)) q)))
   (list (build-gate "RZ" '(#.pi) q)))
 
-;; rewriting rules specialized to qubit types
-(defun rewriting-rules-for-roll-RX ()
-  "Generates a list of rewriting rules for simplifying expressions involving RX."
-  (list (make-rewriting-rule "RX(a) RX(b) -> RX(a+b)" #'agglutinate-RXs)
-        (make-rewriting-rule "RX(2 pi k) -> " #'eliminate-full-RX-rotations)
-        (make-rewriting-rule "RX(x + 2 pi k) -> RX(x)" #'normalize-RX-rotations)
-        (make-rewriting-rule "RX(-pi) -> RX(pi)" #'prefer-RXpi-to-RXnegpi)))
-
-(defun rewriting-rules-for-roll-RZ ()
-  "Generates a list of rewriting rules for simplifying expressions involving RZ."
-  (list (make-rewriting-rule "RZ(a) RZ(b) -> RZ(a+b)" #'agglutinate-RZs)
-        (make-rewriting-rule "RZ(2 pi k) -> " #'eliminate-full-RZ-rotations)
-        (make-rewriting-rule "RZ(x + 2 pi k) -> RZ(x)" #'normalize-RZ-rotations)
-        (make-rewriting-rule "RZ(-pi) -> RZ(pi)" #'prefer-RZpi-to-RZnegpi)))
-
 
 (define-compiler sort-RX-after-Z
     ((x ("RX" (theta) q))
@@ -122,14 +109,9 @@
         (build-gate "RX" `(,phi)   q)
         (build-gate "RZ" `(,theta) q)))
 
-(defun rewriting-rules-preferring-RZ-to-RX ()
-  "Generates a list of rewriting rules for simplifying expressions involving RZ and RX, with RZ preferred."
-  (list (make-rewriting-rule "X RZ(theta) -> RZ(-theta) X" #'sort-RX-after-Z)
-        (make-rewriting-rule "RX(theta) Z -> Z RX(-theta)" #'sort-X-after-RZ)
-        (make-rewriting-rule "-X/2 Z/2 X/2 -> Z/2 X/2 -Z/2, etc" #'rewrite-XZX-as-ZXZ)))
 
-
-;; rewriting rules specialized to link type
+;;; rewriting rules specialized to link type
+;; ISWAPs
 
 (define-compiler collapse-ISWAPs
     ((x ("ISWAP" () p q))
@@ -145,11 +127,7 @@
   (list (build-gate "ISWAP" ()       q1 q2)
         (build-gate "RZ"   `(,theta) (if (= q q1) q2 q1))))
 
-(defun rewriting-rules-for-link-of-ISWAP-type ()
-  "Generates a list of rewriting rules for simplifying expressions involving ISWAP and standard single-qubit operations."
-  (list (make-rewriting-rule "ISWAP ISWAP -> Z (x) Z" #'collapse-ISWAPs)
-        (make-rewriting-rule "(RZ (x) I) ISWAP -> ISWAP (I (x) RZ)" #'commute-RZ-after-ISWAP)))
-
+;; PISWAPs
 
 (define-compiler agglutinate-PISWAPs
     ((x ("PISWAP" (theta) p q))
@@ -184,15 +162,6 @@
   (list (build-gate "PISWAP" (list phi)   q1 q2)
         (build-gate "RZ"     (list theta) (if (= q q1) q2 q1))))
 
-(defun rewriting-rules-for-link-of-PISWAP-type ()
-  "Generates a list of rewriting rules for simplifying expressions involving PISWAP and standard single-qubit operations."
-  (list (make-rewriting-rule "PISWAP(phi) PISWAP(theta) -> PISWAP(phi + theta)" #'agglutinate-PISWAPs)
-        (make-rewriting-rule "PISWAP(phi) -> PISWAP(phi mod 4 pi)" #'normalize-PISWAP)
-        (make-rewriting-rule "PISWAP(2pi) -> Z (x) Z" #'eliminate-half-PISWAP)
-        (make-rewriting-rule "PISWAP(4pi) -> " #'eliminate-full-PISWAP)
-        (make-rewriting-rule "(RZ (x) I) PISWAP(pi) -> PISWAP(pi) (I (x) RZ)" #'commute-RZ-after-quarter-PISWAP)))
-
-
 (define-compiler factor-ISWAP-out-of-PISWAP
     ((x ("PISWAP" (theta) p q)
         :where (and (typep theta 'double-float)
@@ -212,21 +181,11 @@
         :where (subsetp (list p q) (list r s))))
   (list (build-gate "PISWAP" `(,(param-+ theta pi)) p q)))
 
-(defun rewriting-rules-preferring-ISWAP-to-PISWAP ()
-  "Generates a list of rewriting rules that simplify expressions involving ISWAP and PISWAP, with a preference for rewriting into ISWAP over PISWAP."
-  (list (make-rewriting-rule "PISWAP(odd * pi) -> PISWAP(even * pi) ISWAP" #'factor-ISWAP-out-of-PISWAP)
-        (make-rewriting-rule "ISWAP PISWAP(t) -> PISWAP(t + pi)" #'agglutinate-ISWAP-on-left-into-PISWAP)
-        (make-rewriting-rule "PISWAP(t) ISWAP -> PISWAP(t + pi)" #'agglutinate-ISWAP-on-right-into-PISWAP)))
-
-
 (define-compiler ISWAP-to-PISWAP
     ((x ("ISWAP" () p q)))
   (list (build-gate "PISWAP" '(#.pi) p q)))
 
-(defun rewriting-rules-preferring-PISWAP-to-ISWAP ()
-  "Generates a list of rewriting rules that simplify expressions involving ISWAP and PISWAP, with a preference for rewriting into PISWAP over ISWAP."
-  (list (make-rewriting-rule "ISWAP -> PISWAP" #'ISWAP-to-PISWAP)))
-
+;; CNOTs
 
 (define-compiler collapse-CNOTs
     ((x ("CNOT" () p q))
@@ -245,11 +204,7 @@
   (list (build-gate "CNOT" ()       control target)
         (build-gate "RX"  `(,theta) target)))
 
-(defun rewriting-rules-for-link-of-CNOT-type ()
-  (list (make-rewriting-rule "CNOT CNOT ->" #'collapse-CNOTs)
-        (make-rewriting-rule "(RZ (x) I) CNOT -> CNOT (RZ (x) I)" #'commute-control-RZ-after-CNOT)
-        (make-rewriting-rule "(I (x) RX) CNOT -> CNOT (I (x) RX)" #'commute-target-RX-after-CNOT)))
-
+;; CZs
 
 (define-compiler collapse-CZs
     ((x ("CZ" () p q))
@@ -308,12 +263,7 @@
           (otherwise
            (give-up-compilation)))))))
 
-(defun rewriting-rules-for-link-of-CZ-type ()
-  "Generates a list of rewriting rules for simplifying expressions involving CZ and standard single-qubit operations."  (list (make-rewriting-rule "CZ CZ -> " #'collapse-CZs)
-        (make-rewriting-rule "RZ CZ -> CZ RZ" #'commute-RZ-after-CZ)
-        (make-rewriting-rule "(X (x) I) CZ -> CZ (X (x) Z)" #'commute-X-after-CZ)
-        (make-rewriting-rule "CZ with partially supported wf" #'CZ-on-wf-with-partial-support)))
-
+;; CPHASEs
 
 (define-compiler agglutinate-CPHASEs
     ((x ("CPHASE" (theta) p q))
@@ -375,24 +325,9 @@
           (otherwise
            (give-up-compilation)))))))
 
-(defun rewriting-rules-for-link-of-CPHASE-type ()
-  "Generates a list of rewriting rules for simplifying expressions involving CPHASE and standard single-qubit operations."
-  (list* (make-rewriting-rule "CPHASE(theta) CPHASE(phi) -> CPHASE(theta + phi)" #'agglutinate-CPHASEs)
-         (make-rewriting-rule "CPHASE(2 pi k) ->" #'eliminate-full-CPHASE)
-         (make-rewriting-rule "CPHASE(t + 2 pi k) -> CPHASE(t)" #'normalize-CPHASE)
-         (make-rewriting-rule "RZ CPHASE -> CPHASE RZ" #'commute-RZ-after-CPHASE)
-         (make-rewriting-rule "CPHASE on partially supported wf" #'CPHASE-on-wf-with-partial-support)
-         (rewriting-rules-for-link-of-CZ-type)))
-
-
 (define-compiler CZ-to-CPHASE
     ((x ("CZ" () p q)))
   (list (build-gate "CPHASE" '(#.pi) p q)))
-
-(defun rewriting-rules-preferring-CPHASE-to-CZ ()
-  "Generates a list of rewriting rules that simplify expressions involving CZ and CPHASE, with a preference for rewriting into CPHASE over CZ."
-  (list (make-rewriting-rule "CZ -> CPHASE" #'CZ-to-CPHASE)))
-
 
 (define-compiler agglutinate-CZ-on-right-into-CPHASE
     ((x ("CPHASE" (phi) p q))
@@ -409,9 +344,3 @@
 (define-compiler half-CPHASE-to-CZ
     ((x ("CPHASE" (#.pi) p q)))
   (list (build-gate "CZ" () p q)))
-
-(defun rewriting-rules-preferring-CZ-to-CPHASE ()
-  "Generates a list of rewriting rules that simplify expressions involving CZ and CPHASE, with a preference for rewriting into CZ over CPHASE."
-  (list (make-rewriting-rule "CPHASE CZ -> CPHASE" #'agglutinate-CZ-on-right-into-CPHASE)
-        (make-rewriting-rule "CZ CPHASE -> CPHASE" #'agglutinate-CZ-on-left-into-CPHASE)
-        (make-rewriting-rule "CPHASE(pi) -> CZ" #'half-CPHASE-to-CZ)))

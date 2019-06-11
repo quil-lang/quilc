@@ -4,36 +4,19 @@
 
 (in-package #:cl-quil)
 
-;;; We define the REWRITING-RULE data structure which is made use of
-;;; frequently. Actual rewriting rules are defined in
-;;; rewriting-rules.lisp.
+;;; there used to be a REWRITING-RULE data structure.
+;;; these methods patch over the difference between then and now.
+;;; TODO: remove all traces of these accessors.
 
-(defstruct (rewriting-rule (:constructor %make-rewriting-rule))
-  "An individual rewriting rule for use by the compressor.
+(defun rewriting-rule-readable-name (compiler)
+  (compiler-name compiler))
 
-READABLE-NAME is a string used to identify the rewriting rule during debugging.
+(defun rewriting-rule-count (compiler)
+  (multiple-value-bind (bindings options) (cleave-options (compiler-bindings compiler))
+    (length bindings)))
 
-COUNT is an integer that specifies the number of adjacent instructions the rule takes as input.
- 
-CONSUMER is a function that consumes a COMPILATION-CONTEXT followed by a list of instructions.  Its possible results are:
-   * The error condition COMPILER-DOES-NOT-APPLY if the rule is inapplicable.
-   * a LIST of instructions if the rule applies.
-   * Some other error condition if compilation unexpectedly fails."
-  (readable-name "Unnamed Rewriting Rule" :type string :read-only t)
-  (count 1 :read-only t :type (and fixnum unsigned-byte))
-  (consumer (lambda (context item)
-              (declare (ignore context item))
-              (error 'compiler-rewrite-does-not-apply))
-   :read-only t))
-
-(defun make-rewriting-rule (readable-name compiler)
-  "Create a new REWRITING-RULE object."
-  (%make-rewriting-rule
-      :readable-name readable-name
-      :count (compiler-instruction-count compiler)
-      :consumer compiler))
-
-;;; Some helpers for writing REWRITING-RULEs
+(defun rewriting-rule-consumer (compiler)
+  compiler)
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 

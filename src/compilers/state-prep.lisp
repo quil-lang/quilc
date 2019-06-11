@@ -298,6 +298,8 @@
 ;; this decomposition algorithm is based off of Section 4 of /0406176, our old QSC favorite
 (defun state-prep-compiler (instr &key (target ':cz))
   "Compiles a STATE-PREP-APPLICATION instance by intelligently selecting one of the special-case compilation routines above."
+  (declare (ignore target))
+  
   (unless (typep instr 'state-prep-application)
     (give-up-compilation))
   
@@ -305,6 +307,6 @@
     (1
      (state-prep-1Q-compiler instr))
     (2
-     (state-prep-2Q-compiler instr target))
+     (state-prep-2Q-compiler instr))
     (otherwise
-     (state-prep-trampolining-compiler instr :target target))))
+     (state-prep-trampolining-compiler instr))))

@@ -138,6 +138,29 @@
      (cleave-options (rest bindings-and-options)
                      (cons (first bindings-and-options) backlog)))))
 
+(defun get-binding-from-instr (instr)
+  (typecase instr
+    (measure-discard
+     (list "MEASURE" '_))
+    (measurement
+     (list "MEASURE" '_ '_))
+    (application
+     (adt:match operator-description (application-operator instr)
+       ((named-operator s)
+        (list* s
+               (loop :for p :in (application-parameters instr)
+                     :when (typep p 'constant)
+                       :collect (constant-value p)
+                     :when (symbolp p)
+                       :collect '_)
+               (loop :for q :in (application-arguments instr)
+                     :when (typep q 'qubit)
+                       :collect (qubit-index q)
+                     :when (symbolp q)
+                       :collect '_)))
+       (_
+        nil)))))
+
 (defun get-output-gates-from-raw-code (body)
   (unless (typep body 'cons)
     (return-from get-output-gates-from-raw-code (make-occurrence-table)))
@@ -322,14 +345,16 @@
       (let ((true-cost default-value))
         (dohash ((cost-key cost-val) gate-cost-table)
           (when (binding-subsumes-p (list '_ cost-key) (list '_ key))
-            (setf true-cost cost-val)))
+            (setf true-cost (gate-record-fidelity cost-val))))
         (setf ret (* ret (expt true-cost val)))))))
 
 (defun occurrence-table-in-gateset-p (table gateset)
   (loop :for table-key :being :the :hash-keys :of table
         :always (loop :for gateset-key :being :the :hash-keys :of gateset
-                        :thereis (binding-subsumes-p (list '_ gateset-key)
-                                                     (list '_ table-key)))))
+                        :thereis (and (or (gate-record-duration (gethash gateset-key gateset))
+                                          (gate-record-fidelity (gethash gateset-key gateset)))
+                                      (binding-subsumes-p (list '_ gateset-key)
+                                                          (list '_ table-key))))))
 
 (defun generate-blank-binding (qubit-count)
   (list* '_ ()
@@ -337,7 +362,7 @@
                :collect '_)))
 
 (defun find-shortest-compiler-path (compilers target-gateset source-gateset &optional qubit-count)
-  ;; target-gateset is an equalp hash (name . params) -> fidelities
+  ;; target-gateset is an equalp hash binding -> gate-record
   (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'>)))
     (flet ((collect-bindings (occurrence-table)
              (loop :for key :being :the :hash-keys :of occurrence-table
@@ -485,9 +510,10 @@
                        (and (occurrence-table-in-gateset-p (compiler-output-gates c) gateset)
                             (every (lambda (b)
                                      (some (lambda (g)
-                                             (and (binding-subsumes-p g b)
-                                                  (setf in-fidelity
-                                                        (* in-fidelity (gethash (second g) gateset)))))
+                                             (let ((gate-fidelity (gate-record-fidelity
+                                                                   (gethash (second g) gateset))))
+                                               (and (binding-subsumes-p g b)
+                                                    (setf in-fidelity (* in-fidelity gate-fidelity)))))
                                            gateset-bindings))
                                    (compiler-bindings c))
                             (>= out-fidelity in-fidelity))))
