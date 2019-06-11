@@ -184,7 +184,7 @@
                     (magicl:diag (length evals) (length evals) evals)
                     (magicl:transpose evecs))))
         (when (matrix-every #'double= gammag v)
-          (assert (matrix-every #'double=
+          (assert (matrix-every #'double~
                                 (magicl:make-identity-matrix 4)
                                 (m* (magicl:transpose evecs)
                                     evecs))
