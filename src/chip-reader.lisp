@@ -159,10 +159,9 @@
                      (target-parser (hash-value)
                        (mapcar #'individual-target-parser (a:ensure-list hash-value))))
               (let ((link (build-link q0 q1
-                                      (if (gethash "type" link-hash)
-                                          (target-parser (gethash "type" link-hash))
-                                          (list ':CZ))
-                                      chip-spec))
+                                      :type (if (gethash "type" link-hash)
+                                                (target-parser (gethash "type" link-hash))
+                                                (list ':CZ))))
                     (link-index (length (vnth 1 (chip-specification-objects chip-spec)))))
                 ;; notify the qubits that they're attached to this link
                 (dolist (qubit-index (list q0 q1))
@@ -207,7 +206,7 @@
     (a:when-let ((specs-hash (gethash "specs" hash-table)))
       (load-specs-layer chip-spec specs-hash))
     ;; and return the chip-specification that we've built
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
 
 (defun read-chip-spec-file (file)
   "Read a QPU specification from a file."

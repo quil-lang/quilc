@@ -44,6 +44,18 @@ DURATION is the time duration in nanoseconds of this gate application."
   (permutation (list 1 0))
   (duration 600))
 
+(defstruct gate-record
+  "Houses information about a hardware instantiation of a gate.
+
+FIDELITY stores the measured gate fidelity.
+
+DURATION stores the measured gate duration (in nanoseconds).
+
+NEEDS-PERMUTATION signals that this gate is not native, but some permutation of its qubit ordering is."
+  (fidelity 1d0)
+  (duration 1/100)
+  (needs-permutation nil))
+
 
 ;;; The HARDWARE object structure stores a lot of information. It
 ;;; serves many purposes, principally to solve some of the following
@@ -94,7 +106,7 @@ DURATION is the time duration in nanoseconds of this gate application."
 
 ORDER is a non-negative integer that counts the number of qubit subsidiaries of this hardware object. Equals (1- (length (vnth 0 (hardware-object-cxns this)))). (If you drew a schematic of a chip, this is also the dimension of the graphical representation of the hardware object: 0 for qubits, 1 for links, ... .)
 
-NATIVE-INSTRUCTIONS is a function that takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse. A second value is returned, which is T if the instruction would be native were the qubits permuted in some fashion (\"gate native\").
+GATE-INFORMATION is a hash table mapping gate bindings to GATE-RECORD objects.
 
 COMPILATION-METHODS is a vector of functions that this device can employ to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.
 
@@ -106,16 +118,39 @@ CXNS is an array. In its nth position, there is a vector of the order n hardware
 
 MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
   (order 0 :type unsigned-byte :read-only t)
-  (native-instructions (lambda (instr)
-                         (declare (ignore instr))
-                         (values nil nil))
-   :type (function (t) (values t t)))
+  (gate-information (make-hash-table :test #'equalp))
   (compilation-methods (make-adjustable-vector))
   (permutation-gates (make-adjustable-vector))
   (rewriting-rules (make-adjustable-vector))
   (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
                                               (make-adjustable-vector))))
   (misc-data (make-hash-table :test #'equal) :type hash-table))
+
+(defun warm-hardware-objects (chip-specification)
+  (dotimes (order (length (chip-specification-objects chip-specification)))
+    (dotimes (obj-index (length (vnth order (chip-specification-objects chip-specification))))
+      (let ((obj (vnth obj-index (vnth order (chip-specification-objects chip-specification)))))
+        (setf (hardware-object-compilation-methods obj)
+              (coerce (compute-applicable-compilers (hardware-object-gate-information obj)
+                                                    (1+ (hardware-object-order obj)))
+                      'vector))
+        ;; TODO: incorporate child object gatesets too
+        (setf (hardware-object-rewriting-rules obj)
+              (coerce (compute-applicable-reducers (hardware-object-gate-information obj))
+                      'vector)))))
+  chip-specification)
+
+(defun hardware-object-native-instructions (obj)
+  "Takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse. A second value is returned, which is T if the instruction would be native were the qubits permuted in some fashion (\"gate native\").
+
+Used to be a generic associated to HARDWARE-OBJECT; now computed from the GATE-INFORMATION table."
+  (lambda (instr)
+    (let (duration needs-permutation)
+      (dohash ((key val) (hardware-object-gate-information obj))
+        (when (binding-subsumes-p (list '_ key) (list '_ (get-binding-from-instr instr)))
+          (setf duration (gate-record-duration val))
+          (setf needs-permutation (gate-record-needs-permutation val))))
+      (values duration needs-permutation))))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
@@ -217,35 +252,15 @@ used to specify CHIP-SPEC."
 
 ;;; constructors for hardware object building blocks
 
-(defun build-link (qubit0 qubit1 &optional (type (list ':CZ)) chip-spec)
-  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT. The optional argument CHIP-SPEC is used by compilers to make decisions based on characteristics of the chip and its other hardware components."
+(defun build-link (qubit0 qubit1 &key type gate-information)
+  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
   (check-type qubit0 unsigned-byte)
   (check-type qubit1 unsigned-byte)
   (assert (/= qubit0 qubit1))
   (setf type (a:ensure-list type))
-  (let* ((misc-data (make-hash-table :test #'equal))
-         (obj (make-hardware-object
+  (let* ((obj (make-hardware-object
                :order 1
-               :native-instructions
-               (lambda (instr)
-                 (if (not (or (typep instr 'gate-application)
-                              (typep instr 'unresolved-application)))
-                     (values nil nil)
-                     (let* ((duration-alist (gethash "duration-alist" misc-data))
-                            (duration (cdr (assoc instr duration-alist :test #'operator-match-p))))
-                       (values
-                        ;; Is the instruction precisely native? (both gate + qubit indexes)
-                        duration
-                        ;; Is the gate native? (just the gate)
-                        (and (or duration
-                                 (and (plain-operator-p (application-operator instr))
-                                      (assoc (application-operator-name instr)
-                                             duration-alist
-                                             :test (lambda (name pattern)
-                                                     (string= name (first pattern))))))
-                             t)))))
-               :cxns (vector (vector qubit0 qubit1) #())
-               :misc-data misc-data)))
+               :cxns (vector (vector qubit0 qubit1) #()))))
     ;; set up the SWAP record
     (vector-push-extend (make-permutation-record
                          :operator #.(named-operator "SWAP")
@@ -257,187 +272,80 @@ used to specify CHIP-SPEC."
                                      (t
                                       600)))
                         (hardware-object-permutation-gates obj))
-    ;; set up the other records
-    (loop :with lower-precedence := type
-          :with higher-precedence := nil
-          :for current-type :in type
-          :do (setf lower-precedence (rest lower-precedence))
-              ;; set up duration-alist
-          :nconc (case current-type
-                   ;; In usual interactions, these are all capable of
-                   ;; acting bidirectionally.
-                   (:CZ     (list (cons `("CZ"     ()  ,qubit0 ,qubit1) 150)
-                                  (cons `("CZ"     ()  ,qubit1 ,qubit0) 150)))
-                   (:CPHASE (list (cons `("CPHASE" (_) ,qubit0 ,qubit1) 150)
-                                  (cons `("CPHASE" (_) ,qubit1 ,qubit0) 150)))
-                   (:ISWAP  (list (cons `("ISWAP"  ()  ,qubit0 ,qubit1) 150)
-                                  (cons `("ISWAP"  ()  ,qubit1 ,qubit0) 150)))
-                   (:PISWAP (list (cons `("PISWAP" (_) ,qubit0 ,qubit1) 150)
-                                  (cons `("PISWAP" (_) ,qubit1 ,qubit0) 150)))
-                   ;; CNOT typically only acts in one direction
-                   ;; natively. One can swap the direction of CNOT 0 1
-                   ;; by sandwiching it between Hadamard gates. (The
-                   ;; compiler will do this for you elsewhere.)
-                   ;;
-                   ;;     +----------+
-                   ;;     | H 0      |
-                   ;;     | H 1      |    +----------+
-                   ;;     | CNOT 0 1 | == | CNOT 1 0 |
-                   ;;     | H 1      |    +----------+
-                   ;;     | H 0      |
-                   ;;     +----------+
-                   ;;
-                   (:CNOT   (list (cons `("CNOT"   ()  ,qubit0 ,qubit1) 150)))
-                   ;; We need some qubit type to be specified...
-                   (otherwise (error "Unknown qubit type.")))
-            :into duration-alist
-          ;; set up single-type rewriting rules
-          :nconc (case current-type
-                   (:CZ     (rewriting-rules-for-link-of-CZ-type))
-                   (:CNOT   (rewriting-rules-for-link-of-CNOT-type))
-                   (:CPHASE (rewriting-rules-for-link-of-CPHASE-type))
-                   (:ISWAP  (rewriting-rules-for-link-of-ISWAP-type))
-                   (:PISWAP (rewriting-rules-for-link-of-PISWAP-type)))
-            :into rewriting-rules
-          ;; set up double-type rewriting rules
-          :nconc (cond
-                   ((and (eql  ':PISWAP current-type)
-                         (find ':ISWAP  lower-precedence))
-                    (rewriting-rules-preferring-PISWAP-to-ISWAP))
-                   ((and (eql  ':ISWAP  current-type)
-                         (find ':PISWAP lower-precedence))
-                    (rewriting-rules-preferring-ISWAP-to-PISWAP))
-                   ((and (eql  ':CPHASE current-type)
-                         (find ':CZ     lower-precedence))
-                    (rewriting-rules-preferring-CPHASE-to-CZ))
-                   ((and (eql  ':CZ     current-type)
-                         (find ':CPHASE lower-precedence))
-                    (rewriting-rules-preferring-CZ-to-CPHASE)))
-            :into rewriting-rules
-          ;; set up compilation methods
-          :nconc (cond
-                   ((and (eql ':CNOT current-type)
-                         (not (find ':CPHASE higher-precedence))
-                         (not (find ':CZ higher-precedence)))
-                    (list #'CZ-to-CNOT
-                          #'CNOT-to-flipped-CNOT))
-                   ((and (eql ':CZ current-type)
-                         (not (find ':CPHASE higher-precedence))
-                         (not (find ':CZ     higher-precedence)))
-                    (list* #'CNOT-to-CZ
-                           (unless (member ':CPHASE type)
-                             (list #'CPHASE-to-CNOT))))
-                   ((and (eql ':CPHASE current-type)
-                         (not (find ':CPHASE higher-precedence))
-                         (not (find ':CZ     higher-precedence)))
-                    (list #'CNOT-to-CZ #'CZ-to-CPHASE))
-                   ((and (eql ':PISWAP current-type)
-                         (not (find ':ISWAP  higher-precedence)))
-                    (list #'ISWAP-to-PISWAP)))
-            :into compilation-methods
-          :do (push current-type higher-precedence)
-          :finally
-             (setf (gethash "duration-alist" misc-data)
-                   (nconc duration-alist (gethash "duration-alist" misc-data)))
-             (setf (hardware-object-rewriting-rules obj)
-                   (make-array (length rewriting-rules)
-                               :adjustable t
-                               :initial-contents rewriting-rules))
-             (loop :for method :in compilation-methods
-                   :do (vector-push-extend method (hardware-object-compilation-methods obj))))
-    ;; set up the basic optimal 2Q compiler
-    (vector-push-extend (approximate-2q-compiler-for type chip-spec)
-                        (hardware-object-compilation-methods obj))
+    ;; this is the new model for setting up gate data
+    (when gate-information
+      (setf (hardware-object-gate-information obj) gate-information))
+    ;; this is the legacy model for setting up gate data
+    (when (member ':cz type)
+      (setf (gethash '("CZ" () _ _) (hardware-object-gate-information obj))
+            (make-gate-record :duration 150
+                              :fidelity 0.90d0)))
+    (when (member ':iswap type)
+      (setf (gethash '("ISWAP" () _ _) (hardware-object-gate-information obj))
+            (make-gate-record :duration 150
+                              :fidelity 0.90d0)))
+    (when (member ':cphase type)
+      (setf (gethash '("CPHASE" (_) _ _) (hardware-object-gate-information obj))
+            (make-gate-record :duration 150
+                              :fidelity 0.90d0)))
+    (when (member ':piswap type)
+      (setf (gethash '("PISWAP" (_) _ _) (hardware-object-gate-information obj))
+            (make-gate-record :duration 150
+                              :fidelity 0.90d0)))
+    (when (member ':cnot type)
+      (setf (gethash '("CNOT" () qubit0 qubit1) (hardware-object-gate-information obj))
+            (make-gate-record :duration 150
+                              :fidelity 0.90d0))
+      (setf (gethash '("CNOT" () qubit1 qubit0) (hardware-object-gate-information obj))
+            (make-gate-record :duration 150
+                              :fidelity 0.85d0
+                              :needs-permutation t)))
+    
+    ;; TODO: double-check CNOT
+    
+    ;; TODO: perhaps handle approximate 2Q compilation. does anything special need to happen here?
+    
     ;; based on the optimal 2Q compiler, tag this hardware object with the
     ;; longest duration any compiled sequence of instructions could possibly
     ;; take to run on it.
     (when (or (member ':cz type)
               (member ':iswap type))
       ;; TODO: compute this based on duration data
-      (setf (gethash "time-bound" misc-data)
+      (setf (gethash "time-bound" (hardware-object-misc-data obj))
             #.(+ (* 3 150) (* 6 9)))) ; this is the maximum amt of time that a 2Q program might take
-    ;; return the qubit
+    ;; return the link
     obj))
 
 
-(defun build-qubit (&optional (type (list ':RZ ':X/2)))
-  "Constructs a template qubit.  Legal types: (lists of) ':RZ, ':Z/2, ':RX, ':X/2."
-  (let* ((misc-data (make-hash-table :test #'equal))
-         (obj (make-hardware-object :order 0
-                                    :native-instructions (lambda (instr)
-                                                           (cdr (assoc instr
-                                                                       (gethash "duration-alist" misc-data)
-                                                                       :test #'operator-match-p)))
-                                    :misc-data misc-data)))
-    (setf (gethash "duration-alist" misc-data)
-          (list (cons '("MEASURE" _ _) 2000)
-                (cons '("MEASURE" _) 2000)))
-    (loop :with lower-precedence := type
-          :with higher-precedence := nil
-          :for current-type :in type
-          :do (setf lower-precedence (rest lower-precedence))
-              ;; set up duration-alist
-          :nconc (case current-type
-                   ;; NOTE: supposedly RZ's take 0ns, but this causes too much
-                   ;; of a headache in addresser/outgoing-schedule.lisp, so we
-                   ;; instead use a small value.
-                   (:RZ   (list (cons `("RZ" (_)          _) 1/100)))
-                   (:X/2  (list (cons `("RX" (,(/ pi 2))  _) 9)
-                                (cons `("RX" (,(/ pi -2)) _) 9)
-                                (cons `("RX" (,pi)        _) 9)
-                                (cons `("RX" (,(- pi))    _) 9)))
-                   (otherwise (error "Unknown qubit type.")))
-            :into duration-alist
-          ;; set up single-type rewriting rules
-          :nconc (cond
-                   ((and (find current-type '(:RX :X/2))
-                         (not (find ':RX higher-precedence))
-                         (not (find ':X/2 higher-precedence)))
-                    (rewriting-rules-for-roll-RX))
-                   ((and (find current-type '(:RZ :Z/2))
-                         (not (find ':RZ  higher-precedence))
-                         (not (find ':Z/2 higher-precedence)))
-                    (rewriting-rules-for-roll-RZ)))
-            :into rewriting-rules
-          ;; set up double-type rewriting rules
-          :nconc (cond
-                   ((and (find current-type '(:RX :X/2))
-                         (or (find  ':RZ  lower-precedence)
-                             (find  ':Z/2 lower-precedence))
-                         (not (find ':RX  higher-precedence))
-                         (not (find ':X/2 higher-precedence)))
-                    (rewriting-rules-preferring-RX-to-RZ))
-                   ((and (find current-type '(:RZ :Z/2))
-                         (or (find  ':RX  lower-precedence)
-                             (find  ':X/2 lower-precedence))
-                         (not (find ':RZ  higher-precedence))
-                         (not (find ':Z/2 higher-precedence)))
-                    (rewriting-rules-preferring-RZ-to-RX)))
-            :into rewriting-rules
-          ;; set up compilation methods
-          :nconc (cond
-                   ((and (find current-type '(:RZ :Z/2))
-                         (or (find  ':RX  lower-precedence)
-                             (find  ':X/2 lower-precedence))
-                         (not (find ':RZ  higher-precedence))
-                         (not (find ':Z/2 higher-precedence)))
-                    (list #'PHASE-to-RZ
-                          #'RY-to-XZX
-                          #'RX-to-ZXZXZ
-                          #'euler-ZYZ-compiler)))
-            :into compilation-methods
-          :do (push current-type higher-precedence)
-          :finally
-             (setf (gethash "duration-alist" misc-data)
-                   (nconc duration-alist (gethash "duration-alist" misc-data)))
-             (setf (hardware-object-rewriting-rules obj)
-                   (make-array (length rewriting-rules)
-                               :adjustable t
-                               :initial-contents rewriting-rules))
-             (setf (hardware-object-compilation-methods obj)
-                   (make-array (length compilation-methods)
-                               :adjustable t
-                               :initial-contents compilation-methods)))
+(defun build-qubit (&key type gate-information)
+  "Constructs a template qubit.  Legal types: (lists of) ':RZ, ':X/2, ':MEASURE."
+  (let* ((obj (make-hardware-object :order 0)))
+    ;; new style of initialization
+    (when gate-information
+      (setf (hardware-object-gate-information obj) gate-information))
+    ;; old style of initialization
+    (when (member ':MEASURE type)
+      (setf (gethash '("MEASURE" _ _) (hardware-object-gate-information obj))
+            (make-gate-record :duration 2000))
+      (setf (gethash '("MEASURE" _) (hardware-object-gate-information obj))
+            (make-gate-record :duration 2000)))
+    (when (member :RZ type)
+      (setf (gethash '("RZ" (_) _) (hardware-object-gate-information obj))
+            (make-gate-record :fidelity 1d0
+                              :duration 1/100)))
+    (when (member :X/2 type)
+      (setf (gethash `("RX" (,(/ pi 2)) _) (hardware-object-gate-information obj))
+            (make-gate-record :fidelity .98
+                              :duration 9))
+      (setf (gethash `("RX" (,(/ pi -2)) _) (hardware-object-gate-information obj))
+            (make-gate-record :fidelity .98
+                              :duration 9))
+      (setf (gethash `("RX" (,pi) _) (hardware-object-gate-information obj))
+            (make-gate-record :fidelity .98
+                              :duration 9))
+      (setf (gethash `("RX" (,(- pi)) _) (hardware-object-gate-information obj))
+            (make-gate-record :fidelity .98
+                              :duration 9)))
     ;; return the qubit
     obj))
 
@@ -514,7 +422,7 @@ Compilers are listed in descending precedence.")
 
 (defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz)))
   "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link."
-  (let ((link (build-link q0 q1 architecture chip-specification))
+  (let ((link (build-link q0 q1 :type architecture))
         (link-index (chip-spec-n-links chip-specification)))
     (adjoin-hardware-object link chip-specification)
     (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q0))))
@@ -572,11 +480,11 @@ Compilers are listed in descending precedence.")
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'simple-vector))))
     (install-generic-compilers chip-spec architecture)
     (loop :repeat 8 :do
-      (adjoin-hardware-object (build-qubit) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
     (dotimes (i 8)
       (install-link-onto-chip chip-spec i (mod (1+ i) 8)
                               :architecture architecture))
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
 
 ;; here's another example chip with a linear topology:
 ;; 0 --0-- 1 --1-- 2 --2-- ... --(n-2)-- (n-1)
@@ -586,11 +494,11 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec architecture)
     ;; prep the qubits
     (loop :repeat n :do
-      (adjoin-hardware-object (build-qubit) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
     ;; prep the links
     (dotimes (i (1- n))
       (install-link-onto-chip chip-spec i (1+ i) :architecture architecture))
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
 
 (defun build-nQ-fully-connected-chip (n &key (architecture ':cz))
   (let ((chip-spec (make-chip-specification
@@ -598,11 +506,12 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec architecture)
     ;; prep the qubits
     (loop :repeat n :do
-      (adjoin-hardware-object (build-qubit) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
     ;; prep the links
-    (dotimes (i n chip-spec)
+    (dotimes (i n)
       (dotimes (j i)
-        (install-link-onto-chip chip-spec j i :architecture architecture)))))
+        (install-link-onto-chip chip-spec j i :architecture architecture)))
+    (warm-hardware-objects chip-spec)))
 
 (defun build-16QMUX-chip ()
   (qpu-hash-table-to-chip-specification
@@ -689,7 +598,7 @@ Compilers are listed in descending precedence.")
         ;; which is shaded when the two indices share a 2^1-bit. these are
         ;; the locations that need a new qubit to get generated.
         (unless (logbitp 1 (logxor i j))
-          (let* ((fresh-qubit (build-qubit))
+          (let* ((fresh-qubit (build-qubit :type '(:RZ :X/2)))
                  (fresh-qubit-index (chip-spec-n-qubits chip-spec)))
             ;; poke this qubit ID into the hashtable for later lookup
             (setf (gethash (list i j) qubit-ref-hash) fresh-qubit-index)
@@ -711,8 +620,9 @@ Compilers are listed in descending precedence.")
                    (nearby-qubit-indices
                      (remove nil (mapcar (lambda (k) (gethash k qubit-ref-hash)) nearby-qubit-coordinates))))
               (dolist (other-qubit-index nearby-qubit-indices)
-                (install-link-onto-chip chip-spec fresh-qubit-index other-qubit-index :architecture architecture)))))))
-    chip-spec))
+                (install-link-onto-chip chip-spec fresh-qubit-index other-qubit-index
+                                        :architecture architecture)))))))
+    (warm-hardware-objects chip-spec)))
 
 ;; here's another scalable lattice that Rigetti is using for the 20Q chip to
 ;; appear in the Forest v1.2 release (2017-12-14), usually presented as:
@@ -742,7 +652,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec architecture)
     ;; set up the qubits
     (loop :repeat (* height width) :do
-      (adjoin-hardware-object (build-qubit) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
       (dotimes (j width)
@@ -755,7 +665,7 @@ Compilers are listed in descending precedence.")
           (when (and (not (= j (1- width)))
                      (zerop (mod (+ i top) 2)))
             (install-link-onto-chip chip-spec qubit-index slant-qubit-index :architecture architecture)))))
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
 
 ;;; Google Bristlecone
 ;;
@@ -790,7 +700,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec ':cz)
     ;; set up the qubits
     (dotimes (j (* height width))
-      (adjoin-hardware-object (build-qubit) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
       (dotimes (j width)
@@ -801,7 +711,7 @@ Compilers are listed in descending precedence.")
                  (install-link-onto-chip chip-spec qubit-index (1- below-index)))
                 ((and (oddp i) (plusp (mod (1+ qubit-index) width)))
                  (install-link-onto-chip chip-spec qubit-index (1+ below-index)))))))
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
 
 (defun build-bristlecone-chip ()
   "Create a full 72-qubit Bristlecone CHIP-SPECIFICATION."
@@ -826,7 +736,7 @@ Compilers are listed in descending precedence.")
                  (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
     (install-generic-compilers chip-spec ':cnot)
     (loop :repeat nqubits :do
-      (adjoin-hardware-object (build-qubit) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
     (loop :for (control target) :in links :do
       (install-link-onto-chip chip-spec control target :architecture '(:CNOT)))
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
