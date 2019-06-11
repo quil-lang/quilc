@@ -476,6 +476,23 @@
                             (discard-tables special-path)))))))
       (sort-compilers-by-specialization (remove-duplicates reduced-compilers)))))
 
+(defun compute-applicable-reducers (gateset)
+  (let* ((gateset-bindings (loop :for g :being :the :hash-keys :of gateset
+                                 :collect (list '_ g))))
+    (remove-if-not (lambda (c)
+                     (let* ((in-fidelity 1d0)
+                            (out-fidelity (occurrence-table-cost (compiler-output-gates c) gateset)))
+                       (and (occurrence-table-in-gateset-p (compiler-output-gates c) gateset)
+                            (every (lambda (b)
+                                     (some (lambda (g)
+                                             (and (binding-subsumes-p g b)
+                                                  (setf in-fidelity
+                                                        (* in-fidelity (gethash (second g) gateset)))))
+                                           gateset-bindings))
+                                   (compiler-bindings c))
+                            (>= out-fidelity in-fidelity))))
+                   **compilers-available**)))
+
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
 ;;; non-specialized instances of the above class COMPILER and installs them into
