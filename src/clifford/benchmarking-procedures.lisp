@@ -189,28 +189,26 @@
 Note: will raise an error if PARSED-QUIL contains instruction types
 other than APPLICATION, PRAGMA, or UNRESOLVED-APPLICATION."
   (loop :for instr :across (quil:parsed-program-executable-code parsed-quil)
-        ;; Collect cliffords of all applications (and pragmas,
-        ;; unresolved applications). If any other instruction type is
-        ;; encountered, raise error.
+        :for qubits-used := (quil::%qubits-used instr)
         :unless (or (typep instr 'quil:application)
                     (typep instr 'quil:pragma)
                     (and quil::*allow-unresolved-applications*
                          (typep instr 'quil:unresolved-application))) :do
-                           (error "Cannot extract clifford from the instr ~/cl-quil:qinstruction-fmt/"
+                           (error "Cannot extract clifford from the instr ~/cl-quil:instruction-fmt/"
                                   instr)
-        :collect (matrix-to-clifford (quil:gate-matrix instr))))
+        :collect (list (matrix-to-clifford (quil:gate-matrix instr))
+                       qubits-used)))
 
 (defun clifford-circuit-p (parsed-quil)
   "If the parsed circuit PARSED-QUIL is a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
   (let* ((cliffords (extract-cliffords parsed-quil))
-         (qubit-targets (cl-quil::qubits-used parsed-quil))
-	 (qubits (sort qubit-targets #'<))
+	 (qubits (sort (quil::qubits-used parsed-quil) #'<))
 	 (num-qubits (length qubits)))
-    (reduce #'group-mul (loop :for clifford :in (reverse cliffords)
-			   :for target :in (reverse qubit-targets)
-			   :collect (embed clifford num-qubits (loop :for qubit :in target :collect (position qubit qubits)))))))
+    (reduce #'group-mul (loop :for (clifford targets) :in (reverse cliffords)
+                              :collect (embed clifford num-qubits
+                                              (loop :for qubit :in targets
+                                                    :collect (position qubit qubits)))))))
 
 (defun clifford-from-quil (quil)
   "Given a STRING of quil, produce the associated CLIFFORD element. If QUIL does not represent a Clifford circuit, return NIL. "
   (clifford-circuit-p (quil::safely-parse-quil quil)))
-
