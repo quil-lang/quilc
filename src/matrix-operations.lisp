@@ -348,14 +348,17 @@ as needed so that they are the same size."
   "Returns a matrix X_ij = Im(M_ij)."
   (matrix-map #'imagpart m))
 
-(defun m* (&rest m)
+(defun m* (m &rest more-m)
   (reduce #'magicl:multiply-complex-matrices
-          m))
+          more-m
+          :initial-value m))
 
-(defun m+ (&rest m)
+(defun m+ (m &rest more-m)
   (reduce #'magicl:add-matrix
-          m))
+          more-m
+          :initial-value m))
 
-(defun m- (&rest m)
+(defun m- (m &rest more-m)
   (reduce #'magicl:sub-matrix
-          m))
+          more-m
+          :initial-value m))
