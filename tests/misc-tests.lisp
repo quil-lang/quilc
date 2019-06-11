@@ -321,10 +321,31 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
     (setf (aref amps basis-index) (qvm:cflonum 1))
     (qvm:make-density-qvm num-qubits :amplitudes amps)))
 
-;; Disclaimer: the below is maybe incomplete. Should we test not just
-;; for measure-discard? If so, then more thought will be required. It
-;; will not always be the case that passing in a non-density matrix to
-;; the qvm will work as it does below.
+;; Our test below is built on the following idea: rather than directly
+;; calculating the entire superoperator encoding the pre- and post-compilation
+;; programs and comparing the results, we instead merely calculate the behavior
+;; of the superoperator (itself necessarily a linear operator) on a maximal
+;; linearly independent set of inputs and check that they match individually.
+;;
+;; However, we cheat a bit while doing this: we select a maximal linearly
+;; independent set drawn from __all matrices__, without regards to the three
+;; defining characteristics of density operators (Hermitian, unit trace, and
+;; positive semi-definite), and so we are actually feeding invalid inputs to the
+;; QVM. Provided the QVM does not closely inspect its input, this is fine---but
+;; it would matter when simulating, e.g., a measure-and-store.
+;;
+;; Should this test begin to misbehave, it might be resolved by enforcing these
+;; constraints on our generated probe operators.  I believe the constraints to
+;; be of descending order of severity: it is easy to imagine two distinct
+;; extensions to the space of all matrices of the "same" superoperator, in the
+;; sense that they give the same behavior on density operators but differ on the
+;; complement of Hermitian matrices.  I don't believe that this is possible for
+;; the subclasses of unit-trace or positive-definite operators, but it could
+;; still be that (for something other than pure operations and MEASURE-DISCARDs)
+;; the QVM makes a calculation based on these assumptions and gives garbage
+;; output if they're violated.  Caveat programmer.
+;;
+;; - ecp
 (deftest test-measure-semantics ()
   "Test that artifacts of compilation (namely moving and rewiring MEASUREs) does not change the semantics of the program."
   (let* ((p-str "H 0
