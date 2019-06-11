@@ -348,8 +348,12 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
 ;; - ecp
 (deftest test-measure-semantics ()
   "Test that artifacts of compilation (namely moving and rewiring MEASUREs) does not change the semantics of the program."
-  (let* ((p-str "H 0
+  (let* ((p-str "RX(1.0) 0
+RZ(1.0) 0
+H 0
 CNOT 0 2
+RZ(1.2) 1
+RX(0.8) 1
 MEASURE 0
 MEASURE 1
 MEASURE 2")
