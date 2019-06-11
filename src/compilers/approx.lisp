@@ -154,7 +154,7 @@
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
 (defun ensure-positive-determinant (m)
-  (if (double~ -1d0 (magicl:det m))
+  (if (double= -1d0 (magicl:det m))
       (m* m (magicl:diag 4 4 (list -1 1 1 1)))
       m))
 
