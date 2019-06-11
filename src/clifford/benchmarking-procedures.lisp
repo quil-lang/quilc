@@ -184,7 +184,10 @@
                          (pauli-from-string (concatenate 'string phase conj))))))))
 
 (defun extract-cliffords (parsed-quil)
-  "Given PARSED-QUIL generate the CLIFFORD for each gate"
+  "Given PARSED-QUIL generate a list of pairs (CLIFFORD_i QUBITS_i) where CLIFFORD_i is the clifford for the ith instruction in PARSED-QUIL and QUBITS_i is a list of the qubits used in that instruction.
+
+Note: will raise an error if PARSED-QUIL contains instruction types
+other than APPLICATION, PRAGMA, or UNRESOLVED-APPLICATION."
   (loop :for instr :across (quil:parsed-program-executable-code parsed-quil)
         ;; Collect cliffords of all applications (and pragmas,
         ;; unresolved applications). If any other instruction type is
