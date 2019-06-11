@@ -35,7 +35,7 @@
         (make-rewriting-rule "Eigenvectors take no action" #'elide-applications-on-eigenvectors)))
 
 
-(define-compiler agglutinate-RXes
+(define-compiler agglutinate-RXs
     ((x ("RX" (theta) q))
      (y ("RX" (phi)   q)))
   (list (build-gate "RX" `(,(param-+ theta phi)) q)))
@@ -59,7 +59,7 @@
     ((x ("RX" (#.(- pi)) q)))
   (list (build-gate "RX" '(#.pi) q)))
 
-(define-compiler agglutinate-RZes
+(define-compiler agglutinate-RZs
     ((x ("RZ" (theta) q))
      (y ("RZ" (phi)   q)))
   (list (build-gate "RZ" `(,(param-+ theta phi)) q)))
@@ -86,14 +86,14 @@
 ;; rewriting rules specialized to qubit types
 (defun rewriting-rules-for-roll-RX ()
   "Generates a list of rewriting rules for simplifying expressions involving RX."
-  (list (make-rewriting-rule "RX(a) RX(b) -> RX(a+b)" #'agglutinate-RXes)
+  (list (make-rewriting-rule "RX(a) RX(b) -> RX(a+b)" #'agglutinate-RXs)
         (make-rewriting-rule "RX(2 pi k) -> " #'eliminate-full-RX-rotations)
         (make-rewriting-rule "RX(x + 2 pi k) -> RX(x)" #'normalize-RX-rotations)
         (make-rewriting-rule "RX(-pi) -> RX(pi)" #'prefer-RXpi-to-RXnegpi)))
 
 (defun rewriting-rules-for-roll-RZ ()
   "Generates a list of rewriting rules for simplifying expressions involving RZ."
-  (list (make-rewriting-rule "RZ(a) RZ(b) -> RZ(a+b)" #'agglutinate-RZes)
+  (list (make-rewriting-rule "RZ(a) RZ(b) -> RZ(a+b)" #'agglutinate-RZs)
         (make-rewriting-rule "RZ(2 pi k) -> " #'eliminate-full-RZ-rotations)
         (make-rewriting-rule "RZ(x + 2 pi k) -> RZ(x)" #'normalize-RZ-rotations)
         (make-rewriting-rule "RZ(-pi) -> RZ(pi)" #'prefer-RZpi-to-RZnegpi)))
