@@ -341,22 +341,12 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
 ;; output if they're violated.  Caveat programmer.
 ;;
 ;; - ecp
-(deftest test-measure-semantics ()
-  "Test that artifacts of compilation (namely moving and rewiring MEASUREs) does not change the semantics of the program."
-  (let* ((p-str "RX(1.0) 0
-RZ(1.0) 0
-H 0
-CNOT 0 2
-RZ(1.2) 1
-RX(0.8) 1
-MEASURE 0
-MEASURE 1
-MEASURE 2")
-         (p (parse-quil p-str)))
+(defun %test-measure-semantics (p-str)
+  (let* ((p (parse-quil p-str))
+         (p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil nil))
+         (rewiring (quil::qubit-relabeler (%extract-trivial-exit-rewiring p-comp))))
     (loop :for i :below (expt 2 6) :do
-      (let* ((p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil t))
-             (rewiring (quil::qubit-relabeler (%extract-trivial-exit-rewiring p-comp)))
-             (qvm (%make-density-qvm-initialized-in-basis 3 i))
+      (let* ((qvm (%make-density-qvm-initialized-in-basis 3 i))
              (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))
         (qvm:load-program qvm p :supersede-memory-subsystem t)
         ;; relabeling is a side-effect
@@ -368,3 +358,39 @@ MEASURE 2")
         (is (every #'quil::double=
                    (qvm::amplitudes qvm)
                    (qvm::amplitudes qvm-comp)))))))
+
+(defun map-measure-combinations (f p n)
+  "Apply function F to a permutation of program P with N measures inserted."
+  (let* ((len (length (parsed-program-executable-code p)))
+         (spec (perm:vector-to-word-spec
+                (concatenate 'vector
+                             (make-array len :initial-element 0)
+                             (a:iota n :start 1)))))
+    (labels
+        ((word->program (word)
+           (let ((code (make-array (+ len n) :fill-pointer 0))
+                 (orig-code (coerce (parsed-program-executable-code p) 'list))
+                 (new-prog (quil:copy-instance p)))
+             (loop :for char :across word :do
+               (vector-push (if (zerop char)
+                                (pop orig-code)
+                                (make-instance 'quil:measure-discard :qubit (quil:qubit (1- char))))
+                            code))
+             (setf (parsed-program-executable-code new-prog) code)
+             new-prog)))
+      (perm:map-spec (lambda (rank word)
+                       (declare (ignore rank))
+                       (funcall f (word->program word)))
+                     spec))))
+
+(deftest test-measure-semantics ()
+  "Test that artifacts of compilation (namely moving and rewiring MEASUREs) does not change the semantics of the program."
+  (map-measure-combinations (lambda (p)
+                              (%test-measure-semantics
+                               (with-output-to-string (s)
+                                 (quil::print-parsed-program p s))))
+                            (parse-quil "RX(1.0) 0
+RZ(1.0) 0
+CNOT 0 2
+")
+                            3))
