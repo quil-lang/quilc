@@ -418,7 +418,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, and B are matrices; and Q1, Q0 are qubit indices."
   (multiple-value-bind (ua ub fidelity)
       (match-matrix-to-an-e-basis-diagonalization
-       (make-matrix-from-quil center-circuit :relabeling `((,q1 . 1) (,q0 . 0)))
+       (make-matrix-from-quil center-circuit :relabeling (standard-qubit-relabeler `(,q1 ,q0)))
        a d b)
     
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
@@ -698,7 +698,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                                  center-circuit
                                                  (list right1 right2)))
                      (m (make-matrix-from-quil sandwiched-circuit
-                                               :relabeling `((,q1 . 1) (,q0 . 0)))))
+                                               :relabeling (standard-qubit-relabeler `(,q1 ,q0)))))
                 (let ((infidelity (fidelity-coord-distance
                                    (mapcar #'constant-value (application-parameters can))
                                    (get-canonical-coords-from-diagonal

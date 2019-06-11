@@ -110,7 +110,7 @@
                (qubit (cond
                         ((or (null qubit-type)
                              (string= "Xhalves" qubit-type))
-                         (build-qubit))
+                         (build-qubit :type '(:RZ :X/2 :MEASURE)))
                         (t
                          (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
                                 i qubit-type)))))
@@ -132,7 +132,7 @@
           (assert (< q0 q1 qubit-count)
                   nil
                   "ISA contains a 2Q hardware descriptor attached to qubits ~a, but there are only ~a qubit(s) altogether."
-                  (list q0 q1 )qubit-count)
+                  (list q0 q1) qubit-count)
           ;; check that the link isn't dead
           ;; NOTE: By skipping the dead links, we're shifting the internal link
           ;;       indices from what a user (or debugger) might expect.  Beware!
