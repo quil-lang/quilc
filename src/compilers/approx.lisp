@@ -188,7 +188,9 @@
           (assert (matrix-every #'double=
                                 (magicl:make-identity-matrix 4)
                                 (m* (magicl:transpose evecs)
-                                    evecs)))
+                                    evecs))
+                  (evecs)
+                  "Calculated eigenvectors were not found to be orthonormal.")
           (return-from diagonalizer-in-e-basis evecs))))))
 
 
