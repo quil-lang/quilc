@@ -822,11 +822,11 @@
                               options
                               (define-compiler-form bindings (append decls body)))
                           (if ,ret-bool ,ret-val (give-up-compilation)))))
-               (let ((,old-record (find ,(string name) **compilers-available**
+               (let ((,old-record (find ',name **compilers-available**
                                         :key #'compiler-name))
                      (,struct-name
                        (make-instance ',(getf options :class 'compiler)
-                                      :name ,(string name)
+                                      :name ',name
                                       :instruction-count ,(length variable-names)
                                       :bindings (quote ,bindings)
                                       :body (quote (progn ,@decls ,@body))
