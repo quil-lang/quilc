@@ -391,6 +391,5 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
                                  (quil::print-parsed-program p s))))
                             (parse-quil "RX(pi/3) 0
 CNOT 0 2
-RX(7*pi/3) 2
-")
+RX(7*pi/3) 2")
                             3))
