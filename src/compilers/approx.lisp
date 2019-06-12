@@ -163,6 +163,9 @@
 
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
+;;
+;; This implementation is based on the function
+;; _eig_complex_symmetric() in QuantumFlow's decompositions.py.
 (defun diagonalizer-in-e-basis (m)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
   (check-type m magicl:matrix)
