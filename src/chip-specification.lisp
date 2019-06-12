@@ -126,28 +126,6 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                                               (make-adjustable-vector))))
   (misc-data (make-hash-table :test #'equal) :type hash-table))
 
-(defun warm-hardware-objects (chip-specification)
-  (dotimes (order (length (chip-specification-objects chip-specification)))
-    (dotimes (obj-index (length (vnth order (chip-specification-objects chip-specification))))
-      (let ((obj (vnth obj-index (vnth order (chip-specification-objects chip-specification)))))
-        (setf (hardware-object-compilation-methods obj)
-              (coerce (compute-applicable-compilers (hardware-object-gate-information obj)
-                                                    (1+ (hardware-object-order obj)))
-                      'vector))
-        ;; TODO: incorporate child object gatesets too
-        (let ((gate-information (make-hash-table :test #'equalp)))
-          (dohash ((key val) (hardware-object-gate-information obj))
-            (setf (gethash key gate-information) val))
-          (dotimes (order (hardware-object-order obj))
-            (loop :for subobject-address :across (vnth order (hardware-object-cxns obj))
-                  :for subobject := (chip-spec-hw-object chip-specification order subobject-address)
-                  :do (dohash ((key val) (hardware-object-gate-information subobject))
-                        (setf (gethash key gate-information) val))))
-          (setf (hardware-object-rewriting-rules obj)
-                (coerce (compute-applicable-reducers gate-information)
-                        'vector))))))
-  chip-specification)
-
 (defun hardware-object-native-instructions (obj)
   "Takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse. A second value is returned, which is T if the instruction would be native were the qubits permuted in some fashion (\"gate native\").
 
@@ -280,9 +258,11 @@ used to specify CHIP-SPEC."
                                      (t
                                       600)))
                         (hardware-object-permutation-gates obj))
+    
     ;; this is the new model for setting up gate data
     (when gate-information
       (setf (hardware-object-gate-information obj) gate-information))
+    
     ;; this is the legacy model for setting up gate data
     (when (member ':cz type)
       (setf (gethash '("CZ" () _ _) (hardware-object-gate-information obj))
@@ -307,7 +287,9 @@ used to specify CHIP-SPEC."
       (setf (gethash '("CNOT" () qubit1 qubit0) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.85d0
-                              :needs-permutation t)))
+                              :needs-permutation t))
+      (vector-push-extend #'CNOT-to-flipped-CNOT
+                          (hardware-object-compilation-methods obj)))
     
     ;; TODO: double-check CNOT
     
@@ -453,6 +435,30 @@ Compilers are listed in descending precedence.")
               (setf (gethash other-pair hash) (list index l)))
     (setf (chip-specification-lookup-cache chip-spec) hash)
     nil))
+
+(defun warm-hardware-objects (chip-specification)
+  (dotimes (order (length (chip-specification-objects chip-specification)))
+    (dotimes (obj-index (length (vnth order (chip-specification-objects chip-specification))))
+      (let ((obj (vnth obj-index (vnth order (chip-specification-objects chip-specification)))))
+        (setf (hardware-object-compilation-methods obj)
+              (concatenate 'vector
+                           (hardware-object-compilation-methods obj)
+                           (compute-applicable-compilers (hardware-object-gate-information obj)
+                                                    (1+ (hardware-object-order obj)))))
+        ;; TODO: incorporate child object gatesets too
+        (let ((gate-information (make-hash-table :test #'equalp)))
+          (dohash ((key val) (hardware-object-gate-information obj))
+            (setf (gethash key gate-information) val))
+          (dotimes (order (hardware-object-order obj))
+            (loop :for subobject-address :across (vnth order (hardware-object-cxns obj))
+                  :for subobject := (chip-spec-hw-object chip-specification order subobject-address)
+                  :do (dohash ((key val) (hardware-object-gate-information subobject))
+                        (setf (gethash key gate-information) val))))
+          (setf (hardware-object-rewriting-rules obj)
+                (concatenate 'vector
+                             (hardware-object-rewriting-rules obj)
+                             (compute-applicable-reducers gate-information)))))))
+  chip-specification)
 
 
 

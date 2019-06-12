@@ -170,6 +170,8 @@
        (declare (ignore head))
        (let ((table (make-hash-table :test #'equalp))
              (param-list (cond
+                           ((endp param-list)
+                            nil)
                            ((and (typep param-list 'list)
                                  (eql 'quote (first param-list)))
                             (loop :for item :in (second param-list)
@@ -291,9 +293,11 @@
                                              (symbolp small-arg))
                                          (not (wildcard-pattern-p big-arg))
                                          (not (symbolp big-arg)))
-                                    (and (not (wildcard-pattern-p small-arg))
-                                         (not (wildcard-pattern-p big-arg))
-                                         (not (double= big-arg small-arg))))))
+                                    (and (not (or (wildcard-pattern-p small-arg)
+                                                  (symbolp small-arg)))
+                                         (not (or (wildcard-pattern-p big-arg)
+                                                  (symbolp big-arg)))
+                                         (not (= big-arg small-arg))))))
            nil)
           ;; otherwise, i guess everything checks out
           (t
@@ -463,7 +467,15 @@
   (flet ((discard-tables (path)
            (loop :for item :in path
                  :when (typep item 'compiler)
-                   :collect item)))
+                   :collect item))
+         #+ignore
+         (print-path (path)
+           (dolist (item path)
+             (typecase item
+               (compiler (format t "~&is the output from applying ~a, coming from...~%" item))
+               (hash-table
+                (dohash ((key val) item)
+                  (format t "~a -> ~a~%" key val)))))))
     (let* ((compilers (get-compilers qubit-count))
            (unconditional-compilers
              (remove-if (lambda (x)
@@ -479,6 +491,7 @@
                                                        (list (generate-blank-binding qubit-count) 1)
                                                        :test #'equalp)
                                                       qubit-count))
+           (generic-cost (occurrence-table-cost (first generic-path) target-gateset))
            (reduced-compilers (discard-tables generic-path)))
       (let ((candidate-entry-points
               (remove-if (lambda (x)
@@ -488,13 +501,13 @@
                                                                     (first (compiler-bindings x))))))
                          compilers)))
         (dolist (compiler candidate-entry-points)
-          (let ((special-path
-                  (find-shortest-compiler-path
-                   unconditional-compilers target-gateset
-                   (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
-                   qubit-count)))
-            (when (> (occurrence-table-cost (first special-path) target-gateset)
-                     (occurrence-table-cost (first generic-path) target-gateset))
+          (let* ((special-path
+                   (find-shortest-compiler-path
+                    unconditional-compilers target-gateset
+                    (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
+                    qubit-count))
+                 (special-cost (occurrence-table-cost (first special-path) target-gateset)))
+            (when (> special-cost generic-cost)
               (setf reduced-compilers
                     (append reduced-compilers
                             (list compiler)

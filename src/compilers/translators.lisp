@@ -63,7 +63,8 @@
         (build-gate "RY" '(#.(/ pi -2)) q0)
         (build-gate "Z"  ()             q1)))
 
-(define-compiler CNOT-to-flipped-CNOT ((cnot-gate ("CNOT" () control target)))
+(define-compiler CNOT-to-flipped-CNOT ((cnot-gate ("CNOT" () control target))
+                                       :gateset-reducer nil)
   (list (build-gate "H"    () control)
         (build-gate "H"    () target)
         (build-gate "CNOT" () target control) ; !!
