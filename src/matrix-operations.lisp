@@ -340,11 +340,11 @@ as needed so that they are the same size."
                           (return-from matrix-every nil))))
   t)
 
-(defun matrix-real-part (m)
+(defun matrix-realpart (m)
   "Returns a matrix X_ij = Re(M_ij)."
   (matrix-map #'realpart m))
 
-(defun matrix-imag-part (m)
+(defun matrix-imagpart (m)
   "Returns a matrix X_ij = Im(M_ij)."
   (matrix-map #'imagpart m))
 
@@ -365,3 +365,7 @@ as needed so that they are the same size."
   (reduce #'magicl:sub-matrix
           more-m
           :initial-value (if more-m m (magicl:scale -1 m))))
+
+(defun matrix-diagonal-entries (m)
+  "Returns the diagonal elements of the square matrix M."
+  (loop :for j :below (magicl:matrix-rows m) :collect (magicl:ref m j j)))

@@ -182,8 +182,9 @@
          (gammag (m* u (magicl:transpose u))))
     (loop :repeat num-attempts :do
       (let* ((rand-coeff (random 1.0d0))
-             (matrix (matrix-map (lambda (z) (+ (* rand-coeff       (realpart z))
-                                           (* (- 1 rand-coeff) (imagpart z))))
+             (matrix (matrix-map (lambda (z)
+                                   (+ (* rand-coeff       (realpart z))
+                                      (* (- 1 rand-coeff) (imagpart z))))
                                  gammag))
              (evecs (ensure-positive-determinant
                      (orthonormalize-matrix
@@ -210,11 +211,7 @@
 
 Signals DIAGONALIZER-NOT-FOUND if the diagonalizer is not found.
 
-Three self-explanatory restarts are offered:
-
-    - TRY-AGAIN,
-
-    - GIVE-UP-COMPILATION."
+Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION."
   (restart-case (find-diagonalizer-in-e-basis m +diagonalizer-max-attempts+)
     (try-again ()
       :report "Continue searching for the diagonlizer using random perturbations."
@@ -224,7 +221,7 @@ Three self-explanatory restarts are offered:
       (give-up-compilation))))
 
 (defun orthogonal-decomposition (m)
-  "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
+  "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal. Returns the results as the VALUES triple (VALUES A D B)."
   (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
          (a (diagonalizer-in-e-basis m))
          (db (m* (magicl:transpose a) +edag-basis+ m +e-basis+))
@@ -238,8 +235,13 @@ Three self-explanatory restarts are offered:
                                 (cis phase))))
          (d (magicl:diag 4 4 diag))
          (b (m* (magicl:conjugate-transpose d) db)))
-    ;; it could be the case that b has negative determinant. if that's the case, we'll
-    ;; swap two of its columns that live in the same eigenspace.
+    ;; it could be the case that b has negative determinant. if that's
+    ;; the case, we'll swap two of its columns that live in the same
+    ;; eigenspace.  We want to preserve the equation M = ADB and D's
+    ;; diagonal form, so in our scheme to insert an orthogonal matrix
+    ;; O like M = A(DO)(O^T B), we need to pick O so that (1) O^T B
+    ;; has determinant 1 and (2) DO is again diagonal. The second
+    ;; condition excludes permutation matrices. - ecp
     (when (double~ -1d0 (magicl:det b))
       (setf d (m* d (magicl:diag 4 4 (list -1 1 1 1))))
       (setf b (m* (magicl:diag 4 4 (list -1 1 1 1)) b)))
@@ -283,15 +285,15 @@ Three self-explanatory restarts are offered:
       (orthogonal-decomposition (magicl:scale (expt (magicl:det mprime) -1/4) mprime))
     (let (o
           oT
-          (d-as-list (loop :for j :below 4 :collect (magicl:ref d j j)))
-          (dprime-as-list (loop :for j :below 4 :collect (magicl:ref dprime j j)))
+          (d-as-list (matrix-diagonal-entries d))
+          (dprime-as-list (matrix-diagonal-entries dprime))
           (max-fidelity 0d0))
       ;; maximize the trace over signed permutations
       (cl-permutation:doperms (sigma 4)
-        (dolist (signs (list (list 1 1 1 1)
-                             (list -1 -1 1 1)
-                             (list -1 1 -1 1)
-                             (list -1 1 1 -1)))
+        (dolist (signs (list (list  1  1  1  1)
+                             (list -1 -1  1  1)
+                             (list -1  1 -1  1)
+                             (list -1  1  1 -1)))
           (let* ((new-trace
                    (loop
                      :for x :in (cl-permutation:permute sigma d-as-list)
@@ -384,7 +386,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
                  ((member #.(/ pi 2) intermediate-value :test #'double=)
                   (sort (mapcar #'abs intermediate-value) #'>))
                  (t intermediate-value)))))
-    (let* ((angles (mapcar #'phase (loop :for i :below 4 :collect (magicl:ref d i i))))
+    (let* ((angles (mapcar #'phase (matrix-diagonal-entries d)))
            (first  (mod    (+ (third angles) (fourth angles)) pi))
            (second (mod (- (+ (third angles) (first angles))) pi))
            (third  (mod    (+ (third angles) (second angles)) pi))
