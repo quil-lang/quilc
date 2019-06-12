@@ -161,20 +161,30 @@
 (defconstant +diagonalizer-max-attempts+ 16
   "Maximum number of attempts DIAGONALIZER-IN-E-BASIS should make to diagonalize the input matrix using a random perturbation.")
 
+(define-condition diagonalizer-not-found (error)
+  ((matrix :initarg :matrix :reader diagonalizer-not-found-matrix)
+   (attempts :initarg :attempts :reader diagonalizer-not-found-attempts))
+  (:report (lambda (c s)
+             (format s "Could not find diagonalizer for matrix ~%~A~%after ~D attempt~:P."
+                     (diagonalizer-not-found-matrix c)
+                     (diagonalizer-not-found-attempts c))))
+  (:documentation "The diagonalizer for the given matrix was not found after a number of attempts."))
+
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
 ;;
 ;; This implementation is based on the function
 ;; _eig_complex_symmetric() in QuantumFlow's decompositions.py.
-(defun diagonalizer-in-e-basis (m)
-  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
+(defun find-diagonalizer-in-e-basis (m num-attempts)
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T. This function tries NUM-ATTEMPTS to randomly perturb the matrix in an equivalent form."
   (check-type m magicl:matrix)
   (let* ((u (m* +edag-basis+ m +e-basis+))
          (gammag (m* u (magicl:transpose u))))
-    (loop :repeat +diagonalizer-max-attempts+ :do
+    (loop :repeat num-attempts :do
       (let* ((rand-coeff (random 1.0d0))
-             (matrix (m+ (magicl:scale rand-coeff (matrix-real-part gammag))
-                         (magicl:scale (- 1 rand-coeff) (matrix-imag-part gammag))))
+             (matrix (matrix-map (lambda (z) (+ (* rand-coeff       (realpart z))
+                                           (* (- 1 rand-coeff) (imagpart z))))
+                                 gammag))
              (evecs (ensure-positive-determinant
                      (orthonormalize-matrix
                       (nth-value 1 (magicl:eig matrix)))))
@@ -192,9 +202,28 @@
                                     evecs))
                   (evecs)
                   "Calculated eigenvectors were not found to be orthonormal.")
-          (return-from diagonalizer-in-e-basis evecs)))))
-  (error "Could not find diagonalizer for ~%~A~% in ~D attempts."
-         m +diagonalizer-max-attempts+))
+          (return-from find-diagonalizer-in-e-basis evecs)))))
+  (error 'diagonalizer-not-found :matrix m :attempts num-attempts))
+
+(defun diagonalizer-in-e-basis (m)
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T.
+
+Signals DIAGONALIZER-NOT-FOUND if the diagonalizer is not found.
+
+Three self-explanatory restarts are offered:
+
+    - RETURN-NIL,
+
+    - TRY-AGAIN, and
+
+    - GIVE-UP-COMPILATION."
+  (restart-case (find-diagonalizer-in-e-basis m +diagonalizer-max-attempts+)
+    (try-again ()
+      :report "Continue searching for the diagonlizer using random perturbations."
+      (diagonalizer-in-e-basis m))
+    (give-up-compilation ()
+      :report "Give up compilation."
+      (give-up-compilation))))
 
 (defun orthogonal-decomposition (m)
   "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
@@ -689,9 +718,9 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
           (unless (and (first candidate-pairs)
                        (double= 1d0 (car (first candidate-pairs))))
             (format *compiler-noise-stream*
-                    "APPROXIMATE-2Q-COMPILER: Trying ~a on ~a.~%"
+                    "APPROXIMATE-2Q-COMPILER: Trying ~a on ~/cl-quil:instruction-fmt/.~%"
                     circuit-crafter
-                    (with-output-to-string (s) (print-instruction instr s)))
+                    instr)
             (handler-case
                 (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
                                                                             (application-arguments instr))))
@@ -702,7 +731,8 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                       (sandwich-with-local-gates center-circuit a d b q1 q0)
                     (push (cons (* circuit-cost fidelity) sandwiched-circuit)
                           candidate-pairs)))
-              (compiler-does-not-apply () nil))))
+              (compiler-does-not-apply () nil)
+              (diagonalizer-not-found () (give-up-compilation)))))
         ;; now vomit the results
         (cond
           ((endp candidate-pairs)
