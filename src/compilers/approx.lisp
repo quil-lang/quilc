@@ -158,8 +158,7 @@
       (m* m (magicl:diag 4 4 (list -1 1 1 1)))
       m))
 
-(defconstant +diagonalizer-max-attempts+
-  16
+(defconstant +diagonalizer-max-attempts+ 16
   "Maximum number of attempts DIAGONALIZER-IN-E-BASIS should make to diagonalize the input matrix using a random perturbation.")
 
 ;; this is a support routine for optimal-2q-compile (which explains the funny
