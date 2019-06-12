@@ -184,26 +184,31 @@
                          (pauli-from-string (concatenate 'string phase conj))))))))
 
 (defun extract-cliffords (parsed-quil)
-  "Given PARSED-QUIL generate the CLIFFORD for each gate"
-  (loop :for gate-application :across (quil::parsed-program-executable-code parsed-quil)
-        :collect (matrix-to-clifford (quil:gate-matrix gate-application))))
+  "Given PARSED-QUIL generate a list of pairs (CLIFFORD_i QUBITS_i) where CLIFFORD_i is the clifford for the ith instruction in PARSED-QUIL and QUBITS_i is a list of the qubits used in that instruction.
 
-(defun extract-qubits-used (parsed-quil)
-  "Given PARSED-QUIL return the indices of the qubits used. The result is given as a list of the qubits used per instruction in the PARSED-QUIL."
-  (loop :for parsed-clifford :across (quil::parsed-program-executable-code parsed-quil)
-        :collect (mapcar #'quil::qubit-index (quil::application-arguments parsed-clifford))))
+Note: will raise an error if PARSED-QUIL contains instruction types
+other than APPLICATION, PRAGMA, or UNRESOLVED-APPLICATION."
+  (loop :for instr :across (quil:parsed-program-executable-code parsed-quil)
+        :for qubits-used := (quil::%qubits-used instr)
+        :unless (or (typep instr 'quil:application)
+                    (typep instr 'quil:pragma)
+                    (and quil::*allow-unresolved-applications*
+                         (typep instr 'quil:unresolved-application))) :do
+                           (error "Cannot extract clifford from the instr ~/cl-quil:instruction-fmt/"
+                                  instr)
+        :collect (list (matrix-to-clifford (quil:gate-matrix instr))
+                       qubits-used)))
 
 (defun clifford-circuit-p (parsed-quil)
-  "If the parsed circuit PARSED-QUIL a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
+  "If the parsed circuit PARSED-QUIL is a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
   (let* ((cliffords (extract-cliffords parsed-quil))
-         (qubit-targets (extract-qubits-used parsed-quil))
-	 (qubits (sort (remove-duplicates (a:flatten qubit-targets)) #'<))
+	 (qubits (sort (quil::qubits-used parsed-quil) #'<))
 	 (num-qubits (length qubits)))
-    (reduce #'group-mul (loop :for clifford :in (reverse cliffords)
-			   :for target :in (reverse qubit-targets)
-			   :collect (embed clifford num-qubits (loop :for qubit :in target :collect (position qubit qubits)))))))
+    (reduce #'group-mul (loop :for (clifford targets) :in (reverse cliffords)
+                              :collect (embed clifford num-qubits
+                                              (loop :for qubit :in targets
+                                                    :collect (position qubit qubits)))))))
 
 (defun clifford-from-quil (quil)
   "Given a STRING of quil, produce the associated CLIFFORD element. If QUIL does not represent a Clifford circuit, return NIL. "
   (clifford-circuit-p (quil::safely-parse-quil quil)))
-
