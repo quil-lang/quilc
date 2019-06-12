@@ -212,9 +212,7 @@ Signals DIAGONALIZER-NOT-FOUND if the diagonalizer is not found.
 
 Three self-explanatory restarts are offered:
 
-    - RETURN-NIL,
-
-    - TRY-AGAIN, and
+    - TRY-AGAIN,
 
     - GIVE-UP-COMPILATION."
   (restart-case (find-diagonalizer-in-e-basis m +diagonalizer-max-attempts+)
