@@ -42,6 +42,37 @@
   (is (equal '(a b c d) (quil::reduce-append '((a) (b c) nil (d)))))
   (is (equal '(a b c d e f) (quil::reduce-append '((a) (b c) nil (d) (e f))))))
 
+(deftest test-print-instruction ()
+  (is (string= "PRAGMA gate_time CNOT \"50 ns\""
+               (format nil "~/cl-quil:instruction-fmt/"
+                       (make-instance 'quil::pragma
+                                      :words '("gate_time" "CNOT")
+                                      :freeform-string "50 ns"))))
+  ;; try a operand-free instruction
+  (is (string= "HALT"
+               (format nil "~/cl-quil:instruction-fmt/"
+                       (make-instance 'halt))))
+  ;; try a unary instruction
+  (is (string= "NEG ro[3]"
+               (format nil "~/cl-quil:instruction-fmt/"
+                       (make-instance 'quil::classical-negate
+                                      :target (mref "ro" 3)))))
+  ;; try a binary instruction
+  (is (string= "MEASURE 1 ro[3]"
+               (format nil "~/cl-quil:instruction-fmt/"
+                       (make-instance 'quil::measure
+                                      :address (mref "ro" 3)
+                                      :qubit (qubit 1)))))
+  ;; try something fancy
+  (is (string= "CPHASE-AND-MEASURE(%alpha) 1 3 ro[5]"
+               (format nil "~/cl-quil:instruction-fmt/"
+                       (make-instance 'cl-quil::circuit-application
+                                      :operator #.(named-operator "CPHASE-AND-MEASURE")
+                                      :parameters `(,(param "alpha"))
+                                      :arguments `(,(qubit 1)
+                                                   ,(qubit 3)
+                                                   ,(mref "ro" 5)))))))
+
 (deftest test-big-defgate ()
   (let* ((qubit-count 8)
          (program-string
@@ -262,3 +293,103 @@
       (is (eq lisp-symbol (quil::quil-function->lisp-symbol quil-string)))
       (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
+
+(defun %extract-trivial-exit-rewiring (pp)
+  "Extract the exit rewiring comment from parsed program PP. Trivial here means PP is expected to have a single exit rewiring. A more complicated CFG could produce multiple exit rewirings in a program, but that is outside our scope of interest."
+  (declare (type parsed-program pp))
+  (loop :with code := (parsed-program-executable-code pp)
+        :for i :below (length code)
+        :for comment := (quil::comment (elt code i))
+        :when (and comment
+                   (uiop:string-prefix-p "Exiting rewiring: " comment))
+          :return (quil::rewiring-l2p
+                   (quil::make-rewiring-from-string
+                    (subseq comment (length "Exiting rewiring: "))))))
+
+(defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
+  "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
+
+To put the density matrix into the basis state, e.g., |01><11|, we would choose BASIS-INDEX = 7. In general, the basis state |a><b| is prepared by choosing BASIS-INDEX = (2^N * a + b)."
+  (let ((amps (make-array (expt 2 (* 2 num-qubits))
+                          :element-type 'qvm:cflonum
+                          :initial-element (qvm:cflonum 0))))
+    (setf (aref amps basis-index) (qvm:cflonum 1))
+    (qvm:make-density-qvm num-qubits :amplitudes amps)))
+
+;; Our test below is built on the following idea: rather than directly
+;; calculating the entire superoperator encoding the pre- and post-compilation
+;; programs and comparing the results, we instead merely calculate the behavior
+;; of the superoperator (itself necessarily a linear operator) on a maximal
+;; linearly independent set of inputs and check that they match individually.
+;;
+;; However, we cheat a bit while doing this: we select a maximal linearly
+;; independent set drawn from __all matrices__, without regards to the three
+;; defining characteristics of density operators (Hermitian, unit trace, and
+;; positive semi-definite), and so we are actually feeding invalid inputs to the
+;; QVM. Provided the QVM does not closely inspect its input, this is fine---but
+;; it would matter when simulating, e.g., a measure-and-store.
+;;
+;; Should this test begin to misbehave, it might be resolved by enforcing these
+;; constraints on our generated probe operators.  I believe the constraints to
+;; be of descending order of severity: it is easy to imagine two distinct
+;; extensions to the space of all matrices of the "same" superoperator, in the
+;; sense that they give the same behavior on density operators but differ on the
+;; complement of Hermitian matrices.  I don't believe that this is possible for
+;; the subclasses of unit-trace or positive-definite operators, but it could
+;; still be that (for something other than pure operations and MEASURE-DISCARDs)
+;; the QVM makes a calculation based on these assumptions and gives garbage
+;; output if they're violated.  Caveat programmer.
+;;
+;; - ecp
+(defun %test-measure-semantics (p-str)
+  (let* ((p (parse-quil p-str))
+         (p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil nil))
+         (rewiring (quil::qubit-relabeler (%extract-trivial-exit-rewiring p-comp))))
+    (loop :for i :below (expt 2 6) :do
+      (let* ((qvm (%make-density-qvm-initialized-in-basis 3 i))
+             (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))
+        (qvm:load-program qvm p :supersede-memory-subsystem t)
+        ;; relabeling is a side-effect
+        (map nil (a:rcurry #'quil::%relabel-qubits rewiring)
+             (parsed-program-executable-code p-comp))
+        (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
+        (qvm:run qvm)
+        (qvm:run qvm-comp)
+        (is (every #'quil::double=
+                   (qvm::amplitudes qvm)
+                   (qvm::amplitudes qvm-comp)))))))
+
+(defun map-measure-combinations (f p n)
+  "Apply function F to a permutation of program P with N measures inserted."
+  (let* ((len (length (parsed-program-executable-code p)))
+         (spec (perm:vector-to-word-spec
+                (concatenate 'vector
+                             (make-array len :initial-element 0)
+                             (a:iota n :start 1)))))
+    (labels
+        ((word->program (word)
+           (let ((code (make-array (+ len n) :fill-pointer 0))
+                 (orig-code (coerce (parsed-program-executable-code p) 'list))
+                 (new-prog (quil:copy-instance p)))
+             (loop :for char :across word :do
+               (vector-push (if (zerop char)
+                                (pop orig-code)
+                                (make-instance 'quil:measure-discard :qubit (quil:qubit (1- char))))
+                            code))
+             (setf (parsed-program-executable-code new-prog) code)
+             new-prog)))
+      (perm:map-spec (lambda (rank word)
+                       (declare (ignore rank))
+                       (funcall f (word->program word)))
+                     spec))))
+
+(deftest test-measure-semantics ()
+  "Test that artifacts of compilation (namely moving and rewiring MEASUREs) does not change the semantics of the program."
+  (map-measure-combinations (lambda (p)
+                              (%test-measure-semantics
+                               (with-output-to-string (s)
+                                 (quil::print-parsed-program p s))))
+                            (parse-quil "RX(pi/3) 0
+CNOT 0 2
+RX(7*pi/3) 2")
+                            3))
