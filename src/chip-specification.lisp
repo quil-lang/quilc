@@ -108,11 +108,11 @@ ORDER is a non-negative integer that counts the number of qubit subsidiaries of 
 
 GATE-INFORMATION is a hash table mapping gate bindings to GATE-RECORD objects.
 
-COMPILATION-METHODS is a vector of functions that this device can employ to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.
+COMPILATION-METHODS is a vector of compilers that can be employed to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.  This slot is typically populated by WARM-HARDWARE-OBJECTS.
 
 PERMUTATION-GATES is a vector of permutation gates that this device can natively compile, stored as PERMUTATION-RECORD structs. This data is used by the event scheduler.
 
-REWRITING-RULES is a vector of REWRITING-RULE structures that the compressor loop can use to generate shorter gate strings.
+REWRITING-RULES is a vector of compilers that the compressor loop can use to generate shorter gate strings.  This slot is typically populated by WARM-HARDWARE-OBJECTS.
 
 CXNS is an array. In its nth position, there is a vector of the order n hardware objects on the chip that are connected to this one. Among other things, this is used to determine shared resource blocking.
 
@@ -135,9 +135,17 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                                                     (1+ (hardware-object-order obj)))
                       'vector))
         ;; TODO: incorporate child object gatesets too
-        (setf (hardware-object-rewriting-rules obj)
-              (coerce (compute-applicable-reducers (hardware-object-gate-information obj))
-                      'vector)))))
+        (let ((gate-information (make-hash-table :test #'equalp)))
+          (dohash ((key val) (hardware-object-gate-information obj))
+            (setf (gethash key gate-information) val))
+          (dotimes (order (hardware-object-order obj))
+            (loop :for subobject-address :across (vnth order (hardware-object-cxns obj))
+                  :for subobject := (chip-spec-hw-object chip-specification order subobject-address)
+                  :do (dohash ((key val) (hardware-object-gate-information subobject))
+                        (setf (gethash key gate-information) val))))
+          (setf (hardware-object-rewriting-rules obj)
+                (coerce (compute-applicable-reducers gate-information)
+                        'vector))))))
   chip-specification)
 
 (defun hardware-object-native-instructions (obj)
