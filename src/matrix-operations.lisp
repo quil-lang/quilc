@@ -349,16 +349,19 @@ as needed so that they are the same size."
   (matrix-map #'imagpart m))
 
 (defun m* (m &rest more-m)
+  "Matrix multiplication of input matrices."
   (reduce #'magicl:multiply-complex-matrices
           more-m
           :initial-value m))
 
 (defun m+ (m &rest more-m)
+  "Matrix component-wise addition of input matrices."
   (reduce #'magicl:add-matrix
           more-m
           :initial-value m))
 
 (defun m- (m &rest more-m)
+  "Matrix component-wise subtraction of input matrices. Negates input if applied as unary function."
   (reduce #'magicl:sub-matrix
           more-m
-          :initial-value m))
+          :initial-value (if more-m m (magicl:scale -1 m))))
