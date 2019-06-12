@@ -367,5 +367,7 @@ as needed so that they are the same size."
           :initial-value (if more-m m (magicl:scale -1 m))))
 
 (defun matrix-diagonal-entries (m)
-  "Returns the diagonal elements of the square matrix M."
-  (loop :for j :below (magicl:matrix-rows m) :collect (magicl:ref m j j)))
+  "Returns the diagonal elements of the matrix M."
+  (loop :for j :below (min (magicl:matrix-rows m)
+                           (magicl:matrix-cols m))
+        :collect (magicl:ref m j j)))
