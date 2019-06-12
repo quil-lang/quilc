@@ -192,8 +192,9 @@
                                     evecs))
                   (evecs)
                   "Calculated eigenvectors were not found to be orthonormal.")
-          (return-from diagonalizer-in-e-basis evecs))))))
-
+          (return-from diagonalizer-in-e-basis evecs)))))
+  (error "Could not find diagonalizer for ~%~A~% in ~D attempts."
+         m +diagonalizer-max-attempts+))
 
 (defun orthogonal-decomposition (m)
   "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
