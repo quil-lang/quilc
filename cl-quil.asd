@@ -107,8 +107,7 @@
                              (:file "temporal-addresser")))
                (:module "compressor"
                 :serial t
-                :components ((:file "rewriting-rule-data-type")
-                             (:file "compressor-configuration")
+                :components ((:file "compressor-configuration")
                              (:file "compressor")
                              (:file "wavefunctions")
                              (:file "rewriting-rules")))
