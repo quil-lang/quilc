@@ -476,7 +476,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (check-type coord symbol)
   (check-type q1 symbol)
   (check-type q0 symbol)
-  
+
   (multiple-value-bind (body-prog decls docstring)
       (a:parse-body body :documentation t)
     `(progn
@@ -684,7 +684,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 (define-approximate-template nearest-CZ-circuit-of-depth-2 (coord q1 q0)
     (:requirements (:cz)
-     :predicate (double= 0d0 (third coord)))    
+     :predicate (double= 0d0 (third coord)))
   (list (build-gate "CZ" () q1 q0)
         (build-gate "RY" (list (first coord)) q1)
         (build-gate "RY" (list (second coord)) q0)
@@ -716,7 +716,7 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
       (match-matrix-to-an-e-basis-diagonalization
        (make-matrix-from-quil center-circuit :relabeling (standard-qubit-relabeler `(,q1 ,q0)))
        a d b)
-    
+
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
       (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
         (values
@@ -733,14 +733,14 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
 NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMATE-COMPILER* is NIL."
   (check-type instr gate-application)
   (check-type chip-spec (or null chip-specification))
-  
+
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
-  
+
   ;; extract matrix, canonical decomposition
   (let* ((q1 (qubit-index (first (application-arguments instr))))
          (q0 (qubit-index (second (application-arguments instr))))
-         (m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
+         (m (or (gate-matrix instr) (error 'compiler-invalid-domain)))
          (m (magicl:scale (expt (magicl:det m) -1/4) m)))
     (multiple-value-bind (a d b) (orthogonal-decomposition m)
       ;; now we manufacture a bunch of candidate circuits
