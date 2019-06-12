@@ -229,7 +229,11 @@ other's."
                                           context)
   "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      (;; let the context know that we've passed inspection of NODE, so that the
+      (;; utility for calculating how many instructions a rewriting rule requests
+       (rewriting-rule-count (compiler)
+         (length (cleave-options (compiler-bindings compiler))))
+       
+       ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
        (update-context (node)
          (setf (peephole-rewriter-node-context node)
@@ -254,7 +258,7 @@ other's."
                             ;; TODO: consider calculating this subseq only once.
                             (subseq nodes-for-inspection 0 (rewriting-rule-count rule)))))
                    (let ((output
-                           (apply (rewriting-rule-consumer rule)
+                           (apply rule
                                   (append
                                    (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection)
                                    (list :context (peephole-rewriter-node-context
@@ -262,7 +266,7 @@ other's."
                                                     (first relevant-nodes-for-inspection))))))))
                      (format *compiler-noise-stream*
                              "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~a.~%"
-                             (rewriting-rule-readable-name rule))
+                             (compiler-name rule))
                      ;; if the rule was triggered, splice it in and remove
                      ;; all of the instructions that the rule touched.
                      ;;
@@ -283,7 +287,7 @@ other's."
        ;; successfully, we rewind by the peephole window and try again. if it
        ;; fails, we fall through, step through to the next node, and try again.
        (outer-instruction-loop (node)
-         (do (;; for each instruction...
+         (do ( ;; for each instruction...
               (node #1=(peephole-rewriter-node-next node) #1#))
              ((null node))
            (update-context node)
