@@ -482,17 +482,16 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
-  (a:with-gensyms (instr a d b in goodness template-values evaluated-predicate)
+  (a:with-gensyms (instr a d b in goodness template-values)
     (multiple-value-bind (parametric-circuit decls docstring)
         (alexandria:parse-body parametric-circuit :documentation t)
       `(define-canonical-circuit-approximation ,name
-           ((,instr ("CAN" _ ,q1 ,q0)))
+           ((,instr ("CAN" _ ,q1 ,q0)
+                    :where (or *enable-approximate-compilation*
+                               ,predicate)))
          ,@decls
          ,@(when docstring (list docstring))
-         (let* ((,coord (mapcar #'constant-value (application-parameters ,instr)))
-                (,evaluated-predicate ,predicate))
-           (unless (or *enable-approximate-compilation* ,evaluated-predicate)
-             (give-up-compilation))
+         (let* ((,coord (mapcar #'constant-value (application-parameters ,instr))))
            (labels
                ((circuit-template (,parameter-array ,q1 ,q0)
                   ,@parametric-circuit)
@@ -512,7 +511,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                     (cond
                       ;; if we promised an exact solution but haven't found it yet,
                       ;; try again.
-                      ((and ,evaluated-predicate (not (double= 0d0 ,goodness)))
+                      ((and ,predicate (not (double= 0d0 ,goodness)))
                        (run-optimizer))
                       ;; if we are unsure about the existence of an exact solution, we
                       ;; haven't found one yet, but the user is demanding one, give up.
