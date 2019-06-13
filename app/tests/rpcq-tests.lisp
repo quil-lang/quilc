@@ -47,7 +47,7 @@
                (is (quil::matrix-equality mat1 mat2)))))
       (bt:destroy-thread server-thread))))
 
-(deftest test-generate-rb-sequence ()
+(deftest test-generate-rb-sequence-endpoint ()
   (declare (optimize (debug 3)))
   (let* ((server-function (lambda ()
                             (quilc::start-rpc-server)))
