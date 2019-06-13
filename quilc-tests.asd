@@ -9,6 +9,7 @@
   :depends-on (#:quilc
                #:fiasco
                #:uiop
+               #:alexandria
                )
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':quilc-tests
