@@ -553,16 +553,16 @@ Returns the number of purely X/Y generators.
 (defun read-basis-state-from-scratch-row (tab)
   "Given a tableau TAB, read off the operator on the scratch row as a basis state. Returns two values:
     1) the basis state as an integer
-    2) the phase of the state as a complex number."
+    2) the phase of the state as an integer."
   (let* ((n (tableau-qubits tab))
          (state 0)
-         (phase (* 2 (tableau-r tab (* 2 n)))))
+         (phase 0))
     (dotimes (i n)
       (when (= 1 (tableau-x tab (* 2 n) i))
         (incf state (expt 2 i))
         (when (= 1 (tableau-z tab (* 2 n) i))
           (incf phase))))
-    (values state (expt #C(0.0d0 1.0d0) phase))))
+    (values state phase)))
 
 ;; The two nested dotimes in this function are a little mysterious,
 ;; but they are just a way to cleverly loop over all possible
@@ -571,19 +571,25 @@ Returns the number of purely X/Y generators.
   "Given a tableau TAB, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers.
 
 Note: the scratch space is used as an area to write intermediate state values, and starts with the operator returned by find-nonzero-operator."
+  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
+    (loop :for i :below (array-total-size copy)
+          :do (setf (row-major-aref copy i)
+                    (row-major-aref tab i)))
+    (setf tab copy))
   (let* ((n (tableau-qubits tab))
          (log-nonzero (tableau-to-ref tab))
          (norm (sqrt (expt 2 log-nonzero)))
-         (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0))))
+         (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
+         (scratch-phase 0))
     (find-nonzero-operator tab)
     (dotimes (i (expt 2 log-nonzero))
-      (let ((x (logxor i (1+ i)))
-            (scratch-phase 0))
+      (let ((x (logxor i (1+ i))))
         (dotimes (j log-nonzero)
           (when (logbitp j x)
             (incf scratch-phase (multiply-into-scratch tab (+ n j)))))
         (multiple-value-bind (state phase) (read-basis-state-from-scratch-row tab)
-          (declare (ignore phase))
+          ;; (declare (ignore phase))
+          (incf scratch-phase phase)
           (setf (aref wf state) (/ (expt #C(0.0d0 1.0d0) scratch-phase) norm)))))
     wf))
 
@@ -657,3 +663,6 @@ Note: the scratch space is used as an area to write intermediate state values, a
       (read-chp-file file)
     (let ((tab (make-tableau-zero-state num-qubits)))
       (interpret-chp code tab))))
+
+(defun round-trip (matrix)
+  (clifford-to-matrix (print (matrix-to-clifford matrix))))

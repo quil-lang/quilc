@@ -113,8 +113,10 @@
        (quil::double= (imagpart a) (imagpart b))))
 
 (defun complex~ (a b)
+  #+ignore
   (and (quil::double~ (realpart a) (realpart b))
-       (quil::double~ (imagpart a) (imagpart b))))
+       (quil::double~ (imagpart a) (imagpart b)))
+  (quil::double~ (expt (abs a) 2) (expt (abs b) 2)))
 
 (defun phase-to-string (phase)
   "Returns a string representation of a fourth root of unity, given by PHASE, NIL otherwise."
@@ -187,21 +189,24 @@
                                  "The given matrix does not represent a Clifford element.")
                          (pauli-from-string (concatenate 'string phase conj))))))))
 
-(defun clifford-to-matrix (cliff)
+(defun %clifford-to-matrix (cliff)
   "here we go boys"
   (let* ((n (num-qubits cliff))
          (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))
          (scratch-tab (make-tableau-zero-state n))
-         (cliff-on-tab (lambda (tab) (apply (tableau-function cliff) tab (alexandria:iota n)))))
+         (cliff-on-tab (lambda (tab) (apply (tableau-function cliff) tab (reverse (alexandria:iota n))))))
     (dotimes (curr-state (expt 2 n))
       (take-tableau-to-basis-state scratch-tab curr-state)
-      ;; (break "before clifford")
       (funcall cliff-on-tab scratch-tab)
-      ;; (break "before wavefunction")
       (let ((image (tableau-wavefunction scratch-tab)))
         (dotimes (row (expt 2 n))
           (magicl::setf (magicl::ref mat row curr-state) (aref image row)))))
     mat))
+
+(defun clifford-to-matrix (cliff)
+  (let ((m (%clifford-to-matrix cliff)))
+    (assert (let ((magicl::*default-zero-comparison-epsilon* 1d-4)) (magicl::unitaryp m)) () "The matrix ~%~A~% is not unitary: ~%~A~%" m (magicl::multiply-complex-matrices m (magicl::conjugate-transpose m)))
+    m))
 
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
