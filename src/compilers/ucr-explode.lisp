@@ -289,6 +289,7 @@
                                    (- (aref operating-vector j))))
                  (coerce operating-vector 'list))))))
 
+#+pedagogical-purposes-only
 (defun ucr-explode-instr (instr)
   "Turn any UCR pseudo-instruction into an equivalent list of Quil instructions over the gate set RY, RZ, CNOT.  Leave all others alone."
   (unless (typep instr 'UCR-application)
