@@ -103,3 +103,26 @@ H 0")
            (quil:parsed-program-to-logical-matrix
             (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
 
+
+(deftest test-generate-rb-sequence ()
+  (declare (optimize (debug 3)))
+  (let* ((server-function (lambda ()
+                            (quilc::start-rpc-server)))
+         (server-thread (bt:make-thread server-function)))
+    (sleep 1)
+    (unwind-protect
+         (rpcq:with-rpc-client (client "tcp://127.0.0.1:5555")
+           (let* ((quil "PHASE(pi/2) 0
+H 0")
+                  (gateset (list "PHASE(pi/2) 0" "H 0"))
+                  (server-payload (make-instance 'rpcq::|RandomizedBenchmarkingRequest|
+                                                 :|quil| quil
+                                                 :|depth| 2
+                                                 :|seed| 52
+                                                 :|qubits| 1
+                                                 :|gateset| gateset))
+                  (server-response (rpcq:rpc-call client "generate-rb-sequence" server-payload))
+                  (response (rpcq::|RandomizedBenchmarkingResponse-sequence| server-response)))
+             (loop :for a :across response :do
+               (is (equalp a #(0 0 1 0 1))))))
+      (bt:destroy-thread server-thread))))
