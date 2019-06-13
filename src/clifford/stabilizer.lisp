@@ -130,12 +130,12 @@
       (setf (aref zero i i) 1))))
 
 (defun take-tableau-to-basis-state (tab x)
-  "Bring the tableau to the specific basis state X."
+  "Bring the tableau to the specific basis state X. X is written in LSB form, so for example, |01000> = 8."
   (let ((n (tableau-qubits tab)))
     (zero-out-tableau tab)
     (dotimes (i n)
       (when (logbitp i x)
-        (setf (aref tab (+ i n) (* 2 n)) 1)))))
+        (setf (tableau-r tab (+ i n)) 1)))))
 
 (declaim (inline phase-of-product))
 (defun phase-of-product (x1 z1 x2 z2)
@@ -580,17 +580,16 @@ Note: the scratch space is used as an area to write intermediate state values, a
          (log-nonzero (tableau-to-ref tab))
          (norm (sqrt (expt 2 log-nonzero)))
          (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
-         (scratch-phase 0))
+         (running-phase 0))
     (find-nonzero-operator tab)
     (dotimes (i (expt 2 log-nonzero))
       (let ((x (logxor i (1+ i))))
         (dotimes (j log-nonzero)
           (when (logbitp j x)
-            (incf scratch-phase (multiply-into-scratch tab (+ n j)))))
-        (multiple-value-bind (state phase) (read-basis-state-from-scratch-row tab)
-          ;; (declare (ignore phase))
-          (incf scratch-phase phase)
-          (setf (aref wf state) (/ (expt #C(0.0d0 1.0d0) scratch-phase) norm)))))
+            (incf running-phase (multiply-into-scratch tab (+ n j)))))
+        (multiple-value-bind (state read-phase) (read-basis-state-from-scratch-row tab)
+          #+ignore(break "~A~%~A~%~A~%~A~%" state scratch-phase read-phase tab)
+          (setf (aref wf state) (/ (expt #C(0.0d0 1.0d0) (+ read-phase running-phase)) norm)))))
     wf))
 
 ;;; The .chp file format is an input to Aaronson's chp program written

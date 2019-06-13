@@ -194,7 +194,7 @@
   (let* ((n (num-qubits cliff))
          (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))
          (scratch-tab (make-tableau-zero-state n))
-         (cliff-on-tab (lambda (tab) (apply (tableau-function cliff) tab (reverse (alexandria:iota n))))))
+         (cliff-on-tab (lambda (tab) (apply (tableau-function cliff) tab (alexandria:iota n)))))
     (dotimes (curr-state (expt 2 n))
       (take-tableau-to-basis-state scratch-tab curr-state)
       (funcall cliff-on-tab scratch-tab)
@@ -207,6 +207,57 @@
   (let ((m (%clifford-to-matrix cliff)))
     (assert (let ((magicl::*default-zero-comparison-epsilon* 1d-4)) (magicl::unitaryp m)) () "The matrix ~%~A~% is not unitary: ~%~A~%" m (magicl::multiply-complex-matrices m (magicl::conjugate-transpose m)))
     m))
+
+(defun apply-pauli-to-wavefunction (ph index q wf)
+  "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
+  (let* ((a (mod index 2))
+         (b (floor index 2))
+         (phase (expt #C(0.0d0 1.0d0) (logand a b)))
+         (n (1- (integer-length (length wf)))))
+    (flet ((xz (w0 w1)
+             (setf w0 (* ph phase w0))
+             (setf w1 (* ph phase w1 (expt #C(-1.0d0 0.0d0) b)))
+             (if (zerop a)
+                 (values w0 w1)
+                 (values w1 w0))))
+      (declare (inline xz))
+      (dotimes (i (expt 2 (1- n)) wf)
+        (let* ((addr0 (ash i 1))
+               (addr1 (dpb 1 (byte 1 0) addr0)))
+          (setf addr0 (sb-rotate-byte:rotate-byte q (byte n 0) addr0))
+          (setf addr1 (sb-rotate-byte:rotate-byte q (byte n 0) addr1))
+          (multiple-value-bind (w0 w1) (xz (aref wf addr0) (aref wf addr1))
+            (setf (aref wf addr0) w0
+                  (aref wf addr1) w1)))))))
+
+(require :sb-rotate-byte)
+(defun clifford-to-matrix-v2 (cliff)
+  (let* ((n (num-qubits cliff))
+         (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))
+         (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
+         (zero-image-tab (make-tableau-zero-state n))
+         (pauli-map (clifford-basis-map cliff)))
+    ;; Use a tableau-function to find the image of the zero state
+    (apply (tableau-function cliff) zero-image-tab (alexandria:iota n))
+    (setf scratch-wf (tableau-wavefunction zero-image-tab))
+    ;; Write the image to the first column of MAT
+    (dotimes (row (expt 2 n))
+      (magicl::setf (magicl::ref mat row 0) (aref scratch-wf row)))
+    ;; For each subsequent basis state,
+    (dotimes (curr-state (1- (expt 2 n)))
+      ;; Apply the appropriate paulis to find its image under CLIFF
+      (let ((x (logxor curr-state (1+ curr-state))))
+        (dotimes (i n)
+          (when (logbitp i x)
+            ;; Apply the pauli on zeroth qubit, with phase
+            (apply-pauli-to-wavefunction (if (zerop (phase-factor (aref pauli-map (* 2 i)))) 1 -1) (aref (pauli-components (aref pauli-map (* 2 i))) 1) 0 scratch-wf)
+            ;; Apply the paulis on the rest of the qubits
+            (loop :for p :from 2 :to n
+                  :do (apply-pauli-to-wavefunction 1 (aref (pauli-components (aref pauli-map (* 2 i))) p) (1- p) scratch-wf))))
+        ;; Write the basis state's image to the corresponding column of MAT
+        (dotimes (row (expt 2 n))
+          (magicl::setf (magicl::ref mat row (1+ curr-state)) (aref scratch-wf row)))))
+    mat))
 
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate the CLIFFORD for each gate"
