@@ -42,37 +42,6 @@
   (is (equal '(a b c d) (quil::reduce-append '((a) (b c) nil (d)))))
   (is (equal '(a b c d e f) (quil::reduce-append '((a) (b c) nil (d) (e f))))))
 
-(deftest test-print-instruction ()
-  (is (string= "PRAGMA gate_time CNOT \"50 ns\""
-               (format nil "~/cl-quil:instruction-fmt/"
-                       (make-instance 'quil::pragma
-                                      :words '("gate_time" "CNOT")
-                                      :freeform-string "50 ns"))))
-  ;; try a operand-free instruction
-  (is (string= "HALT"
-               (format nil "~/cl-quil:instruction-fmt/"
-                       (make-instance 'halt))))
-  ;; try a unary instruction
-  (is (string= "NEG ro[3]"
-               (format nil "~/cl-quil:instruction-fmt/"
-                       (make-instance 'quil::classical-negate
-                                      :target (mref "ro" 3)))))
-  ;; try a binary instruction
-  (is (string= "MEASURE 1 ro[3]"
-               (format nil "~/cl-quil:instruction-fmt/"
-                       (make-instance 'quil::measure
-                                      :address (mref "ro" 3)
-                                      :qubit (qubit 1)))))
-  ;; try something fancy
-  (is (string= "CPHASE-AND-MEASURE(%alpha) 1 3 ro[5]"
-               (format nil "~/cl-quil:instruction-fmt/"
-                       (make-instance 'cl-quil::circuit-application
-                                      :operator #.(named-operator "CPHASE-AND-MEASURE")
-                                      :parameters `(,(param "alpha"))
-                                      :arguments `(,(qubit 1)
-                                                   ,(qubit 3)
-                                                   ,(mref "ro" 5)))))))
-
 (deftest test-big-defgate ()
   (let* ((qubit-count 8)
          (program-string
