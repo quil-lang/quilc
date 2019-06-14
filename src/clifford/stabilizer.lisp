@@ -599,19 +599,19 @@ Note: the scratch space is used as an area to write intermediate state values, a
 ;;; The .chp file format is an input to Aaronson's chp program written
 ;;; in C. Below is a parser and interpreter for it.
 
-(defun interpret-chp (code tab)
+(defun interpret-chp (code tab &key silent)
   (loop :for i :from 1
         :for isn :in code
         :do
-           (format t "~D: ~A" i isn)
+           (unless silent (format t "~D: ~A" i isn))
            (alexandria:destructuring-ecase isn
              ((H q)       (tableau-apply-h tab q))
-             ((PHASE q)   (tableau-apply-phase tab q))
+             ((S q)       (tableau-apply-phase tab q))
              ((CNOT p q)  (tableau-apply-cnot tab p q))
              ((MEASURE q) (multiple-value-bind (outcome determ?)
                               (tableau-measure tab q)
-                            (format t " => ~D~:[ (random)~;~]" outcome determ?))))
-           (terpri)))
+                            (unless silent (format t " => ~D~:[ (random)~;~]" outcome determ?)))))
+           (unless silent (terpri))))
 
 (defun read-chp-file (file)
   "Parse a .chp file as defined by Aaronson."
@@ -620,7 +620,7 @@ Note: the scratch space is used as an area to write intermediate state values, a
                (cond
                  ((string= gate-name "h") 'H)
                  ((string= gate-name "c") 'CNOT)
-                 ((string= gate-name "p") 'PHASE)
+                 ((string= gate-name "p") 'S)
                  ((string= gate-name "m") 'MEASURE)
                  (t (error "Invalid gate name: ~S" gate-name))))
              (parse-qubits (qubits)
@@ -666,6 +666,26 @@ Note: the scratch space is used as an area to write intermediate state values, a
       (read-chp-file file)
     (let ((tab (make-tableau-zero-state num-qubits)))
       (interpret-chp code tab))))
+
+(defun random-chp-and-quil (q n)
+  "Generates a random CHP circuit on q qubits, of n gates.
+   Outputs two values:
+    1) The parsed CHP format of the random circuit
+    2) The equivalent random circuit in quil.
+   Intended for testing purposes."
+  (let ((quil-str (make-string-output-stream)))
+    (values
+     (loop :repeat n
+           :for q1 := (random q)
+           :for q2 := (mod (+ q1 (1+ (random (1- q)))) q)
+           :for chp-gate := (alexandria:whichever
+                             `(H ,q1)
+                             `(S ,q1)
+                             `(CNOT ,q1 ,q2))
+           :for quil-gate := (string-trim " " (format nil "~{~A ~}" chp-gate))
+           :collect chp-gate
+           :do (write-line quil-gate quil-str))
+     (get-output-stream-string quil-str))))
 
 (defun round-trip (matrix)
   (clifford-to-matrix (print (matrix-to-clifford matrix))))
