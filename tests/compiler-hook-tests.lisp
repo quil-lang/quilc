@@ -146,7 +146,7 @@ RX(pi) 2
     (CL-QUIL::COMPRESS-INSTRUCTIONS-IN-CONTEXT
      (coerce instructions 'list)
      (quil::build-nQ-linear-chip 4 :architecture ':cphase)
-     (quil::set-up-compressor-context :qubit-count 4 :simulate t))))
+     (quil::set-up-compilation-context :qubit-count 4 :simulate t))))
 
 (defun shuffle-list (l &optional (k nil))
         (let* ((elt (nth (random (length l)) l))

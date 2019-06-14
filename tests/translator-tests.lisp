@@ -35,8 +35,7 @@
                             #'quil::euler-xyx-compiler
                             #'quil::euler-xzx-compiler))
       (let* ((compiled-program (funcall compiler
-                                        (build-anonymous-gate master-matrix 0)
-                                        :target type))
+                                        (build-anonymous-gate master-matrix 0)))
              (compiled-matrix (magicl:diag 2 2 (list 1d0 1d0))))
         (loop :for instr :in compiled-program :do
           (setf compiled-matrix (quil::apply-gate compiled-matrix instr)))
@@ -45,7 +44,7 @@
                                 :always (< (abs (- (magicl:ref compiled-matrix i j)
                                                    (magicl:ref master-matrix i j)))
                                            0.01)))
-            "Euler translation test failed: ~a~%" type)))))
+            "Euler translation test failed: ~a~%" compiler)))))
 
 (defun generate-test-case (bindings)
   ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
