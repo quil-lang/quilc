@@ -47,7 +47,7 @@
                (is (quil::matrix-equality mat1 mat2)))))
       (bt:destroy-thread server-thread))))
 
-(deftest test-native-quil-to-binary ()
+(deftest test-native-quil-to-binary-endpoint ()
   (let* ((server-function (lambda ()
                             (quilc::start-rpc-server)))
          (server-thread (bt:make-thread server-function)))
