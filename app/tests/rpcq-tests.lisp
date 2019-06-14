@@ -65,7 +65,6 @@
                                        (rpcq::|PyQuilExecutableResponse-attributes| server-response))))))
       (bt:destroy-thread server-thread))))
 
-
 ;; This test is copied wholesale from pyQuil's test_api.py, random
 ;; seed and all.
 (deftest test-generate-rb-sequence-endpoint ()
@@ -89,3 +88,36 @@ H 0")
              (loop :for a :across response :do
                (is (equalp a #(0 0 1 0 1))))))
       (bt:destroy-thread server-thread))))
+
+(deftest test-conjugate-pauli-by-clifford-endpoint ()
+  (let* ((server-function (lambda ()
+                            (quilc::start-rpc-server)))
+         (server-thread (bt:make-thread server-function)))
+    (sleep 1)
+    (unwind-protect
+         (rpcq:with-rpc-client (client "tcp://127.0.0.1:5555")
+           (let* ((pauli (make-instance 'rpcq::|PauliTerm| :|indices| '(0) :|symbols| '("X")))
+                  (clifford "H 0")
+                  (request (make-instance 'rpcq::|ConjugateByCliffordRequest|
+                                          :|pauli| pauli
+                                          :|clifford| clifford))
+                  (response (rpcq:rpc-call client "conjugate-pauli-by-clifford" request)))
+             (is (zerop (rpcq::|ConjugateByCliffordResponse-phase| response)))
+             (is (string= "Z" (rpcq::|ConjugateByCliffordResponse-pauli| response)))))
+      (bt:destroy-thread server-thread))))
+
+(deftest test-rewrite-arithmetic-endpoint ()
+  (let* ((server-function (lambda ()
+                            (quilc::start-rpc-server)))
+         (server-thread (bt:make-thread server-function)))
+    (sleep 1)
+    (unwind-protect
+         (rpcq:with-rpc-client (client "tcp://127.0.0.1:5555")
+           (let* ((quil "RX((2+1/2)*pi/7) 0")
+                  (request (make-instance 'rpcq::|RewriteArithmeticRequest|
+                                          :|quil| quil))
+                  (response (rpcq:rpc-call client "rewrite-arithmetic" request)))
+             (is (quil::matrix-equality
+                  (quil:parsed-program-to-logical-matrix (quil:parse-quil quil))
+                  (quil:parsed-program-to-logical-matrix (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
+      (bt:destroy-thread server-thread)))
