@@ -603,11 +603,16 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                        (su2-on-line 0 (gate-matrix (gate-definition-to-gate (lookup-standard-gate "RY")) sigma))
                        (gate-matrix (gate-definition-to-gate (lookup-standard-gate "ISWAP")))))))))
     (multiple-value-bind (sigma mprime) (twist-to-real (gate-matrix instr))
-      (list* (build-gate "RY"    (list (- sigma)) q0)
-             (build-gate "ISWAP" '()              q1 q0)
-             (build-gate "Z"     '()              q0)
-             (build-gate "Z"     '()              q1)
-             (canonical-decomposition (anon-gate "CAN-2" mprime q1 q0))))))
+      (multiple-value-bind (a d b) (orthogonal-decomposition mprime)
+        (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
+          (declare (ignore gamma))
+          (list* (build-gate "RY"    (list (- sigma)) q0)
+                 (build-gate "ISWAP" '()              q1 q0)
+                 (build-gate "Z"     '()              q0)
+                 (build-gate "Z"     '()              q1)
+                 (sandwich-with-local-gates
+                  (list (build-gate "CAN" `(,alpha ,beta 0d0) q1 q0))
+                  a d b q1 q0)))))))
 
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
     (:predicate nil ; TODO: replace this with a convexity test
