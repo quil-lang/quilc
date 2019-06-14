@@ -47,6 +47,8 @@
                (is (quil::matrix-equality mat1 mat2)))))
       (bt:destroy-thread server-thread))))
 
+;; This test is copied wholesale from pyQuil's test_api.py, random
+;; seed and all.
 (deftest test-generate-rb-sequence-endpoint ()
   (let* ((server-function (lambda ()
                             (quilc::start-rpc-server)))
