@@ -533,6 +533,16 @@
                  (binding-precedes-p (compiler-bindings a)
                                      (compiler-bindings b)))))
 
+(defun sort-compilers-by-output-friendliness (compilers gateset qubit-count)
+  (sort (copy-seq compilers)
+        (lambda (a b)
+          (occurrence-table-cost (filter-by-qubit-count (compiler-output-gates a)
+                                                        qubit-count)
+                                 gateset)
+          (occurrence-table-cost (filter-by-qubit-count (compiler-output-gates b)
+                                                        qubit-count)
+                                 gateset))))
+
 (defun blank-out-qubits (gateset)
   (let ((new-gateset (make-hash-table :test #'equalp)))
     (dohash ((key val) gateset new-gateset)
@@ -603,7 +613,30 @@
                             (list compiler)
                             (discard-tables special-path)))))))
       (let ((sorted-compilers
-              (sort-compilers-by-specialization (remove-duplicates reduced-compilers))))
+              ;; TODO: figure out a better way to dispatch this highly feature-specific stuff
+              (append (cond
+                        ((= 1 qubit-count)
+                         (list #'state-prep-1q-compiler))
+                        ((= 2 qubit-count)
+                         (list #'state-prep-2q-compiler)))
+                      #+ignore
+                      (cond
+                        ((= 2 qubit-count)
+                         (list
+                          (make-instance 'compiler
+                                         :name 'APPROXIMATE-2Q-COMPILER
+                                         :instruction-count 1
+                                         :bindings '((instr (_ _ _ _)))
+                                         :output-gates (a:plist-hash-table
+                                                        (list '("CAN" (_ _ _) _ _) 1)
+                                                        :test #'equalp)
+                                         :function (a:curry #'approximate-2q-compiler
+                                                            (remove-if-not (lambda (c)
+                                                                             (typep c 'approximate-compiler))
+                                                                           reduced-compilers))))))
+                      (sort-compilers-by-output-friendliness
+                       (remove-duplicates reduced-compilers)
+                       target-gateset qubit-count))))
         (append (remove-if-not (lambda (c)
                                  (occurrence-table-in-gateset-p (filter-by-qubit-count
                                                                  (compiler-output-gates c)
@@ -719,7 +752,7 @@
 (defun lookup (name env)
   (cdr (assoc name env)))
 
-(defun define-compiler-form (bindings body)
+(defun define-compiler-form (bindings body &key permit-binding-mismatches-when)
   (labels ((expand-bindings (bindings env)
              (cond
                ((endp bindings)
@@ -794,12 +827,12 @@
                (cond
                  ((wildcard-pattern-p ele)
                   (expand-each-element (rest seq)
-                                           (rest ele-vars)
-                                           env
-                                           rest
-                                           :ele-accessor ele-accessor
-                                           :ele-type ele-type
-                                           :eq-predicate eq-predicate))
+                                       (rest ele-vars)
+                                       env
+                                       rest
+                                       :ele-accessor ele-accessor
+                                       :ele-type ele-type
+                                       :eq-predicate eq-predicate))
                  ((and (match-symbol-p ele)
                        (not (lookup ele env)))
                   ;; fresh binding
@@ -815,8 +848,9 @@
                                            :eq-predicate eq-predicate)))
                  (t
                   ;; existing binding / data. insert eq-predicate check
-                  `(when (and (typep ,var ',ele-type)
-                              (,eq-predicate ,ele (,ele-accessor ,var)))
+                  `(when (or ,permit-binding-mismatches-when
+                             (and (typep ,var ',ele-type)
+                                  (,eq-predicate ,ele (,ele-accessor ,var))))
                      ,(expand-each-element (rest seq)
                                            (rest ele-vars)
                                            env
@@ -909,7 +943,7 @@
                                   (let ((,val (compilation-context-chip-specification context)))
                                     (unless ,val (give-up-compilation))
                                     ,body))))
-      ((:gateset-reducer :class)
+      ((:gateset-reducer :class :permit-binding-mismatches-when)
        (parse-compiler-options remaining-options body))
       (otherwise
        (error "Unknown compiler option: ~a." (first options))))))
@@ -936,7 +970,8 @@
                         (multiple-value-bind (,ret-val ,ret-bool)
                             ,(parse-compiler-options
                               options
-                              (define-compiler-form bindings (append decls body)))
+                              (define-compiler-form bindings (append decls body)
+                                :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
                           (if ,ret-bool ,ret-val (give-up-compilation)))))
                (let ((,old-record (find ',name **compilers-available**
                                         :key #'compiler-name))

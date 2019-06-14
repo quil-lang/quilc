@@ -467,7 +467,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                             (first (first bindings)))))
         `(progn
            (define-compiler ,name (,@bindings
-                                   :class approximate-compiler)
+                                   :class approximate-compiler
+                                   :permit-binding-mismatches-when *enable-approximate-compilation*)
              ,@decls
              ,docstring
              (let ((,circuit (progn ,@body))
@@ -611,7 +612,10 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                  (build-gate "Z"     '()              q0)
                  (build-gate "Z"     '()              q1)
                  (sandwich-with-local-gates
-                  (list (build-gate "CAN" `(,alpha ,beta 0d0) q1 q0))
+                  (list (build-gate "ISWAP" '()       q1 q0)
+                        (build-gate "RY"    `(,alpha) q1)
+                        (build-gate "RY"    `(,beta)  q0)
+                        (build-gate "ISWAP" '()       q1 q0))
                   a d b q1 q0)))))))
 
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
@@ -669,13 +673,13 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 ;;; here lies the logic underlying the approximate compilation routine.
 
-(defun approximate-2Q-compiler (instr &key (chip-spec nil) (crafters nil))
+(defun approximate-2Q-compiler (crafters instr &key context)
   "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through.
 
 NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMATE-COMPILER* is NIL."
   (check-type instr gate-application)
-  (check-type chip-spec (or null chip-specification))
-
+  (check-type context compilation-context)
+  
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
 
@@ -683,14 +687,15 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
   (destructuring-bind (left1 left2 can right1 right2) (canonical-decomposition instr)
     (let ((q1 (qubit-index (first (application-arguments instr))))
           (q0 (qubit-index (second (application-arguments instr))))
-          (candidate-pairs nil))
+          (candidate-pairs nil)
+          (chip-spec (compilation-context-chip-specification context)))
       
       ;; now we manufacture a bunch of candidate circuits
       (dolist (circuit-crafter crafters)
         (unless (and (first candidate-pairs)
                      (double= 1d0 (car (first candidate-pairs))))
           (format *compiler-noise-stream*
-                  "APPROXIMATE-2Q-COMPILER: Trying ~a on ~a.~%"
+                  "~&APPROXIMATE-2Q-COMPILER: Trying ~a on ~a...~%"
                   circuit-crafter
                   (with-output-to-string (s) (print-instruction instr s)))
           (handler-case
@@ -707,6 +712,8 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                    (mapcar #'constant-value (application-parameters can))
                                    (get-canonical-coords-from-diagonal
                                     (nth-value 1 (orthogonal-decomposition m))))))
+                  (format *compiler-noise-stream*
+                          " for infidelity ~a.~%" infidelity)
                   (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
                         candidate-pairs)))
             (compiler-does-not-apply () nil))))
@@ -719,26 +726,6 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                     (double= 1d0 fidelity))
           (give-up-compilation))
         (values circuit fidelity)))))
-
-(defun approximate-2Q-compiler-for (target chip-spec)
-  "Constructs an approximate 2Q compiler suitable for a TARGET architecture and a CHIP-SPEC with fidelity data.  Returns a function to be installed into the compilers present on CHIP-SPEC."
-  (let ((crafters
-          (reverse
-           (remove-if-not (lambda (record)
-                            (and (typep record 'approximate-compiler)
-                                 (optimal-2q-target-meets-requirements
-                                  target
-                                  (loop :with dict := '(("CZ" . :cz) ("CNOT" . :cz) ("ISWAP" . :iswap)
-                                                        ("CPHASE" . :cphase) ("PISWAP" . :piswap))
-                                        :for k :being :the hash-keys :of (compiler-output-gates record)
-                                        :when (assoc (binding-op (list '_ k)) dict :test #'string=)
-                                          :collect (cdr (assoc (binding-op (list '_ k)) dict :test #'string=))))))
-                          **compilers-available**))))
-    (lambda (instr &key context)
-      (declare (ignore context))
-      (approximate-2Q-compiler instr
-                               :chip-spec chip-spec
-                               :crafters crafters))))
 
 (define-compiler canonical-decomposition
     ((instr (_ _ q1 q0)))
