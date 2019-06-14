@@ -153,109 +153,78 @@
   :test #'matrix-equality
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
-;; REM: this is a utility routine that supports diagonalizer-in-e-basis.
-;; it seems that when an eigenspace of a complex operator is one-dimensional and
-;; it admits a real generator, MAGICL will pick it automatically. (this is
-;; because forcing any nonzero entry of the vector to be real forces the rest to
-;; be too.) if the eigenspace is pluridimensional, the guarantee goes out the
-;; window :( because we expect/require the matrix of eigenvectors to be
-;; special-orthogonal, we have to correct this behavior manually.
-(defun find-real-spanning-set (vectors)
-  "VECTORS is a list of complex vectors in C^n (which, here, are of type LIST).  When possible, computes a set of vectors with real coefficients that span the same complex subspace of C^n as VECTORS."
-  (check-type vectors a:proper-list)
-  (let* ((coeff-matrix (magicl:make-complex-matrix
-                        (length (first vectors))
-                        (* 2 (length vectors))
-                        (nconc
-                         (loop :for v :in vectors :nconc (mapcar #'imagpart v))
-                         (loop :for v :in vectors :nconc (mapcar #'realpart v)))))
-         (reassemble-matrix (magicl:make-complex-matrix
-                             (length vectors)
-                             (* 2 (length vectors))
-                             (nconc
-                              (loop :for i :from 1 :to (length vectors)
-                                    :nconc (loop :for j :from 1 :to (length vectors)
-                                                 :collect (if (= i j) 1d0 0d0)))
-                              (loop :for i :from 1 :to (length vectors)
-                                    :nconc (loop :for j :from 1 :to (length vectors)
-                                                 :collect (if (= i j) #C(0d0 1d0) 0d0))))))
-         (backsolved-matrix (magicl:multiply-complex-matrices
-                             (magicl:multiply-complex-matrices
-                              (magicl:make-complex-matrix
-                               (length (first vectors))
-                               (length vectors)
-                               (reduce-append vectors))
-                              reassemble-matrix)
-                             (kernel coeff-matrix)))
-         (backsolved-vectors
-           (loop :for i :below (magicl:matrix-cols backsolved-matrix)
-                 :collect (loop :for j :below (magicl:matrix-rows backsolved-matrix)
-                                :collect (magicl:ref backsolved-matrix j i)))))
-    (gram-schmidt backsolved-vectors)))
+(defun ensure-positive-determinant (m)
+  (if (double= -1d0 (magicl:det m))
+      (m* m (magicl:diag 4 4 (list -1 1 1 1)))
+      m))
+
+(defconstant +diagonalizer-max-attempts+ 16
+  "Maximum number of attempts DIAGONALIZER-IN-E-BASIS should make to diagonalize the input matrix using a random perturbation.")
+
+(define-condition diagonalizer-not-found (error)
+  ((matrix :initarg :matrix :reader diagonalizer-not-found-matrix)
+   (attempts :initarg :attempts :reader diagonalizer-not-found-attempts))
+  (:report (lambda (c s)
+             (format s "Could not find diagonalizer for matrix ~%~A~%after ~D attempt~:P."
+                     (diagonalizer-not-found-matrix c)
+                     (diagonalizer-not-found-attempts c))))
+  (:documentation "The diagonalizer for the given matrix was not found after a number of attempts."))
 
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
-(defun diagonalizer-in-e-basis (m)
-  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
+;;
+;; This implementation is based on the function
+;; _eig_complex_symmetric() in QuantumFlow's decompositions.py.
+(defun find-diagonalizer-in-e-basis (m num-attempts)
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T. This function tries NUM-ATTEMPTS to randomly perturb the matrix in an equivalent form."
   (check-type m magicl:matrix)
-  (let* ((u (magicl:multiply-complex-matrices +edag-basis+ (magicl:multiply-complex-matrices m +e-basis+)))
-         (gammag (magicl:multiply-complex-matrices u (magicl:transpose u))))
-    (multiple-value-bind (evals a) (magicl:eig gammag)
-      ;; the matrix "a" is almost what we want to return, but it needs to be
-      ;; spiced up in various ways:
-      ;; + we want its angle values to be sorted descending, so that if we
-      ;;   diagonalize two matrices with the same eigenvalues, we automatically
-      ;;   get a pair of matrices that conjugate one into the other.
-      ;; + we want its 2-dimensional eigenspaces to be spanned by real vectors.
-      ;; + we want it to be in SO(4), not O(4).
-      ;;
-      ;; first, we address the sort issue. the columns of a match the order of
-      ;; the the values in angles, so we sort the two lists in parallel.\
-      (let* ((angles (mapcar (lambda (x) (let ((ret (imagpart (log x))))
-                                           (if (double= ret (- pi)) pi ret)))
-                             evals))
-             (augmented-list
-               (sort
-                (loop :for i :below 4
-                      :collect (let ((col (loop :for j :below 4
-                                                :collect (magicl:ref a j i))))
-                                 (list (nth i angles) col)))
-                #'<
-                :key #'first))
-             ;; if vectors lie in the same eigenspace, make them real and orthonormal
-             (real-data
-               (let ((current-eval (first (first augmented-list)))
-                     (current-evects (list (second (first augmented-list)))))
-                 (reduce-append
-                  (loop
-                    :for pair :in (append (rest augmented-list)
-                                          (list (list most-positive-fixnum nil))) ;; this dummy tail item forces a flush
-                    :nconc
-                    (cond
-                      ;; we're still forming the current eigenspace...
-                      ((double= current-eval (first pair))
-                       (setf current-evects (append (list (second pair))
-                                                    current-evects))
-                       nil)
-                      (t
-                       ;; we're ready for a flush and a new eigenspace.
-                       (prog1 (find-real-spanning-set current-evects)
-                         (setf current-eval (first pair))
-                         (setf current-evects (list (second pair)))))))))))
-        ;; form a matrix out of the results so far.
-        (setf a (magicl:make-complex-matrix 4 4 real-data)))
-      ;; lastly, fix the determinant (if there's anything left to fix)
-      (when (minusp (realpart (magicl:det a)))
-        (setf a (magicl:multiply-complex-matrices a (magicl:diag 4 4 '(-1d0 1d0 1d0 1d0)))))
-      a)))
+  (let* ((u (m* +edag-basis+ m +e-basis+))
+         (gammag (m* u (magicl:transpose u))))
+    (loop :repeat num-attempts :do
+      (let* ((rand-coeff (random 1.0d0))
+             (matrix (matrix-map (lambda (z)
+                                   (+ (* rand-coeff       (realpart z))
+                                      (* (- 1 rand-coeff) (imagpart z))))
+                                 gammag))
+             (evecs (ensure-positive-determinant
+                     (orthonormalize-matrix
+                      (nth-value 1 (magicl:eig matrix)))))
+             (evals (magicl:matrix-diagonal
+                     (m* (magicl:transpose evecs)
+                         gammag
+                         evecs)))
+             (v (m* evecs
+                    (magicl:diag (length evals) (length evals) evals)
+                    (magicl:transpose evecs))))
+        (when (matrix-every #'double= gammag v)
+          (assert (matrix-every #'double~
+                                (magicl:make-identity-matrix 4)
+                                (m* (magicl:transpose evecs)
+                                    evecs))
+                  (evecs)
+                  "Calculated eigenvectors were not found to be orthonormal.")
+          (return-from find-diagonalizer-in-e-basis evecs)))))
+  (error 'diagonalizer-not-found :matrix m :attempts num-attempts))
 
+(defun diagonalizer-in-e-basis (m)
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T.
+
+Signals DIAGONALIZER-NOT-FOUND if the diagonalizer is not found.
+
+Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION."
+  (restart-case (find-diagonalizer-in-e-basis m +diagonalizer-max-attempts+)
+    (try-again ()
+      :report "Continue searching for the diagonlizer using random perturbations."
+      (diagonalizer-in-e-basis m))
+    (give-up-compilation ()
+      :report "Give up compilation."
+      (give-up-compilation))))
 
 (defun orthogonal-decomposition (m)
   "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
   (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
          (a (diagonalizer-in-e-basis m))
-         (db (reduce #'magicl:multiply-complex-matrices
-                     (list (magicl:transpose a) +edag-basis+ m +e-basis+)))
+         (db (m* (magicl:transpose a) +edag-basis+ m +e-basis+))
          (diag (loop :for j :below 4
                      :collect (let ((mag 0d0)
                                     phase)
@@ -265,30 +234,28 @@
                                     (setf phase (mod (phase (magicl:ref db j i)) pi))))
                                 (cis phase))))
          (d (magicl:diag 4 4 diag))
-         (b (magicl:multiply-complex-matrices
-             (magicl:conjugate-transpose d) db)))
-    ;; it could be the case that b has negative determinant. if that's the case, we'll
-    ;; swap two of its columns that live in the same eigenspace.
+         (b (m* (magicl:conjugate-transpose d) db)))
+    ;; it could be the case that b has negative determinant. if that's
+    ;; the case, we'll swap two of its columns that live in the same
+    ;; eigenspace.  We want to preserve the equation M = ADB and D's
+    ;; diagonal form, so in our scheme to insert an orthogonal matrix
+    ;; O like M = A(DO)(O^T B), we need to pick O so that (1) O^T B
+    ;; has determinant 1 and (2) DO is again diagonal. The second
+    ;; condition excludes permutation matrices. - ecp
     (when (double~ -1d0 (magicl:det b))
-      (setf d (magicl:multiply-complex-matrices
-               d
-               (magicl:diag 4 4 (list -1 1 1 1))))
-      (setf b (magicl:multiply-complex-matrices
-               (magicl:diag 4 4 (list -1 1 1 1))
-               b)))
+      (setf d (m* d (magicl:diag 4 4 (list -1 1 1 1))))
+      (setf b (m* (magicl:diag 4 4 (list -1 1 1 1)) b)))
     (when *compress-carefully*
       (assert (double~ 1d0 (magicl:det m)))
       (assert (double~ 1d0 (magicl:det a)))
       (assert (double~ 1d0 (magicl:det b)))
       (assert (double~ 1d0 (magicl:det d)))
       (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices a (magicl:transpose a))))
+                                  (m* a (magicl:transpose a))))
       (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (magicl:multiply-complex-matrices b (magicl:transpose b))))
-      (assert (matrix-equals-dwim (reduce #'magicl:multiply-complex-matrices
-                                          (list +edag-basis+ m +e-basis+))
-                                  (reduce #'magicl:multiply-complex-matrices
-                                          (list a d b)))))
+                                  (m* b (magicl:transpose b))))
+      (assert (matrix-equals-dwim (m* +edag-basis+ m +e-basis+)
+                                  (m* a d b))))
     (values a d b)))
 
 (defun make-signed-permutation-matrix (sigma &optional (signs (list 1 1 1 1)))
@@ -316,10 +283,11 @@
   ;; last line, as well as the fidelity as a values triple.
   (multiple-value-bind (aprime dprime bprime)
       (orthogonal-decomposition (magicl:scale (expt (magicl:det mprime) -1/4) mprime))
-    (let (o oT
-            (d-as-list      (loop :for j :below 4 :collect (magicl:ref d j j)))
-            (dprime-as-list (loop :for j :below 4 :collect (magicl:ref dprime j j)))
-            (max-fidelity 0d0))
+    (let (o
+          oT
+          (d-as-list (matrix-diagonal-entries d))
+          (dprime-as-list (matrix-diagonal-entries dprime))
+          (max-fidelity 0d0))
       ;; maximize the trace over signed permutations
       (cl-permutation:doperms (sigma 4)
         (dolist (signs (list (list  1  1  1  1)
@@ -327,7 +295,7 @@
                              (list -1  1 -1  1)
                              (list -1  1  1 -1)))
           (let* ((new-trace
-                  (loop
+                   (loop
                      :for x :in (cl-permutation:permute sigma d-as-list)
                      :for y :in dprime-as-list
                      :for sign :in signs
@@ -418,7 +386,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
                  ((member #.(/ pi 2) intermediate-value :test #'double=)
                   (sort (mapcar #'abs intermediate-value) #'>))
                  (t intermediate-value)))))
-    (let* ((angles (mapcar #'phase (loop :for i :below 4 :collect (magicl:ref d i i))))
+    (let* ((angles (mapcar #'phase (matrix-diagonal-entries d)))
            (first  (mod    (+ (third angles) (fourth angles)) pi))
            (second (mod (- (+ (third angles) (first angles))) pi))
            (third  (mod    (+ (third angles) (second angles)) pi))
@@ -750,9 +718,9 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
           (unless (and (first candidate-pairs)
                        (double= 1d0 (car (first candidate-pairs))))
             (format *compiler-noise-stream*
-                    "APPROXIMATE-2Q-COMPILER: Trying ~a on ~a.~%"
+                    "APPROXIMATE-2Q-COMPILER: Trying ~a on ~/cl-quil:instruction-fmt/.~%"
                     circuit-crafter
-                    (with-output-to-string (s) (print-instruction instr s)))
+                    instr)
             (handler-case
                 (let* ((center-circuit (apply circuit-crafter coord (mapcar #'qubit-index
                                                                             (application-arguments instr))))
