@@ -654,6 +654,8 @@ Optional arguments:
                                   (nth-value 1 (lookup-hardware-address-by-qubits chip-spec (list p0 p1))))))
                        ;; if so, try to find a link that supports it
                        (cond
+                         ;; the rewiring hasn't been filled out on these logical qubits yet.
+                         ;; store this instruction in a bin of to-be-wired possibilities.
                          ((or (not p0) (not p1))
                           (push instr 2q-instrs-partially-assigned))
                          ;; if we found a link, store this info for later.
@@ -816,8 +818,7 @@ Optional arguments:
              (format *compiler-noise-stream*
                      "GREEDY-TEMPORAL-ADDRESSING: Elected to schedule ~a.~%"
                      (print-instruction instr nil))
-             (let ((rewired-instr (copy-instance instr))
-                   (assignment-missing nil))
+             (let ((rewired-instr (copy-instance instr)))
                ;; If a rewiring fails, which it may in e.g. a PARTIAL
                ;; rewiring scheme, then we need to know about it,
                ;; because the gate is native up to remapping, and
@@ -836,97 +837,64 @@ Optional arguments:
                  (handler-case (rewire-l2p-instruction working-l2p rewired-instr)
                    (missing-rewiring-assignment (c)
                      (declare (ignore c))
-                     (setf assignment-missing t)
-                     ;; Toss out possibly inconsistent state
-                     (setf rewired-instr (copy-instance instr)))))
+                     ;; the instruction is only partially wired, but remember
+                     ;; that we already found a putative link. let's do the
+                     ;; rewiring now, so that on the next pass this instruction
+                     ;; will fall into the bucket of instructions that are
+                     ;; ready-2-go.
+                     (format *compiler-noise-stream*
+                             "GREEDY-TEMPORAL-ADDRESSING: Couldn't rewire ~A because assignment is missing"
+                             (print-instruction instr nil))
+                     (loop
+                       :for (logical physical) :in qubit-assignments
+                       :unless (apply-rewiring-l2p working-l2p logical)
+                         :do (format *compiler-noise-stream*
+                                     "GREEDY-TEMPORAL-ADDRESSING: assign logical qubit ~a to physical qubit ~a~%"
+                                     logical physical)
+                             (rewiring-assign working-l2p logical physical))
+                     (return-from dequeue-soonest-2q-from-list t))))
 
-               (multiple-value-bind (instruction-is-native gate-is-native)
-                   (funcall (hardware-object-native-instructions
-                             (chip-spec-nth-link chip-spec link-line))
-                            rewired-instr)
-                 ;; It's a COND, but it's just some logging!
-                 (cond
-                   (assignment-missing
+               (format *compiler-noise-stream*
+                       "GREEDY-TEMPORAL-ADDRESSING: ~A is ~A in the current rewiring~%"
+                       (print-instruction instr nil)
+                       (print-instruction rewired-instr nil))
+
+               ;; Figure out if we need to compile the instruction,
+               ;; or if we can add it to the schedule.
+               (cond
+                 ;; if we found a link and the instruction is native...
+                 ((funcall (hardware-object-native-instructions
+                               (chip-spec-nth-link chip-spec link-line))
+                              rewired-instr)
+                  (let ((*print-pretty* nil))
                     (format *compiler-noise-stream*
-                            "GREEDY-TEMPORAL-ADDRESSING: Couldn't rewire ~A because assignment is missing"
-                            (print-instruction instr nil)))
-                   (t
-                    (format *compiler-noise-stream*
-                            "GREEDY-TEMPORAL-ADDRESSING: ~A is ~A in the current rewiring~%"
+                            "GREEDY-TEMPORAL-ADDRESSING: ~a is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"
                             (print-instruction instr nil)
-                            (print-instruction rewired-instr nil))))
+                            (rewiring-l2p working-l2p)))
 
-                 ;; Figure out if we need to compile the instruction,
-                 ;; or if we can add it to the schedule.
-                 (cond
-                   ;; if we found a link and the instruction is native...
-                   ;;
-                   ;; XXX: Can we delete most of the code in this
-                   ;; branch since we know things are already wired
-                   ;; correctly?
-                   (instruction-is-native
-                    (let ((*print-pretty* nil))
-                      (format *compiler-noise-stream*
-                              "GREEDY-TEMPORAL-ADDRESSING: ~a is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"
-                              (print-instruction instr nil)
-                              (rewiring-l2p working-l2p)))
+                  (destructuring-bind (left-line right-line)
+                      (mapcar #'qubit-index (application-arguments instr))
+                    ;; dequeue the instruction so we can push the
+                    ;; modified instruction onto the schedule.
+                    (lscheduler-dequeue-instruction lschedule instr)
+                    ;; flush the 1Q gates down the line
+                    (flush-1q-instructions-after-wiring left-line)
+                    (flush-1q-instructions-after-wiring right-line)
+                    ;; and stack the 2Q gate on top
+                    (chip-schedule-append chip-sched rewired-instr)))
 
-                    (destructuring-bind (left-line right-line)
-                        (mapcar #'qubit-index (application-arguments instr))
-                      ;; dequeue the instruction so we can push the
-                      ;; modified instruction onto the schedule.
-                      (lscheduler-dequeue-instruction lschedule instr)
-                      ;; flush the 1Q gates down the line
-                      (flush-1q-instructions-after-wiring left-line)
-                      (flush-1q-instructions-after-wiring right-line)
-                      ;; and stack the 2Q gate on top
-                      (chip-schedule-append chip-sched rewired-instr)))
-
-                   ;; we found a link, and the instruction could be
-                   ;; native if we rewire appropriately.
-                   ;;
-                   ;; This logic is mostly the same, except we have to
-                   ;; do additional work to rewire things.
-                   ((and assignment-missing gate-is-native)
-                    (let ((*print-pretty* nil))
-                      (format *compiler-noise-stream*
-                              "GREEDY-TEMPORAL-ADDRESSING: ~a is native if we do proper rewiring assignment, flushing 1Q lines and dequeueing.~%"
-                              (print-instruction instr nil)))
-
-                    ;; assign qubits to their wires
-                    (loop
-                      :for (logical physical) :in qubit-assignments
-                      :unless (apply-rewiring-l2p working-l2p logical)
-                        :do (format *compiler-noise-stream*
-                                    "GREEDY-TEMPORAL-ADDRESSING: assign logical qubit ~a to physical qubit ~a~%"
-                                    logical physical)
-                            (rewiring-assign working-l2p logical physical))
-
-                    (destructuring-bind (left-line right-line)
-                        (mapcar #'qubit-index (application-arguments instr))
-                      ;; dequeue the instruction (so that we can modify it)
-                      (lscheduler-dequeue-instruction lschedule instr)
-                      ;; flush the 1Q gates down the line
-                      (flush-1q-instructions-after-wiring left-line)
-                      (flush-1q-instructions-after-wiring right-line)
-                      ;; and stack the 2Q gate on top
-                      ;;
-                      ;; Now we should be OK to rewire.
-                      (rewire-l2p-instruction working-l2p rewired-instr)
-                      (chip-schedule-append chip-sched rewired-instr)))
-
-                   ;; otherwise, we found a link but the instruction is not native
-                   (t
-                    (format *compiler-noise-stream*
-                            "GREEDY-TEMPORAL-ADDRESSING: ~a is non-native in the current rewiring, compiling.~%"
-                            (print-instruction instr nil))
-                    
-                    ;; release the hounds
-                    (let ((compiled-seq (apply-translation-compilers
-                                          instr
-                                          chip-spec
-                                          (chip-spec-nth-link chip-spec link-line))))
-                      (lscheduler-replace-instruction lschedule instr compiled-seq))))))
+                 ;; otherwise, we found a link but the instruction is not native
+                 (t
+                  (format *compiler-noise-stream*
+                          "GREEDY-TEMPORAL-ADDRESSING: ~a is non-native in the current rewiring, compiling.~%"
+                          (print-instruction instr nil))
+                  
+                  ;; release the hounds
+                  (let ((compiled-seq (apply-translation-compilers
+                                       instr
+                                       chip-spec
+                                       (chip-spec-nth-link chip-spec link-line))))
+                    (lscheduler-replace-instruction lschedule instr compiled-seq)))))
 
              ;; we scheduled something, so return t
              t))

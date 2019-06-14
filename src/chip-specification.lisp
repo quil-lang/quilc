@@ -281,13 +281,9 @@ used to specify CHIP-SPEC."
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
     (when (member ':cnot type)
-      (setf (gethash '("CNOT" () qubit0 qubit1) (hardware-object-gate-information obj))
+      (setf (gethash `("CNOT" () ,qubit0 ,qubit1) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0))
-      (setf (gethash '("CNOT" () qubit1 qubit0) (hardware-object-gate-information obj))
-            (make-gate-record :duration 150
-                              :fidelity 0.85d0
-                              :needs-permutation t))
       (vector-push-extend #'CNOT-to-flipped-CNOT
                           (hardware-object-compilation-methods obj)))
     
@@ -368,10 +364,6 @@ used to specify CHIP-SPEC."
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':piswap)
             #'PISWAP-to-native-PISWAPs))
-        (lambda (chip-spec arch)
-          (declare (ignore chip-spec))
-          (when (find ':cnot (alexandria:ensure-list arch))
-            #'CNOT-to-native-CNOTs))
         ;; We make this unconditional. We could later conditionalize it if
         ;; we happen to have better CCNOT translations for specific target
         ;; gate sets.
@@ -385,10 +377,6 @@ used to specify CHIP-SPEC."
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
             #'ucr-compiler-to-iswap))
-        (lambda (chip-spec arch)
-          (declare (ignore chip-spec))
-          (when (find ':cnot (alexandria:ensure-list arch))
-            (lambda (instr) (ucr-compiler instr :target ':cnot))))
         (constantly #'state-prep-1q-compiler)
         (constantly #'state-prep-2q-compiler)
         (constantly #'state-prep-trampolining-compiler)
@@ -494,7 +482,7 @@ Compilers are listed in descending precedence.")
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'simple-vector))))
     (install-generic-compilers chip-spec architecture)
     (loop :repeat 8 :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (dotimes (i 8)
       (install-link-onto-chip chip-spec i (mod (1+ i) 8)
                               :architecture architecture))
@@ -508,7 +496,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec architecture)
     ;; prep the qubits
     (loop :repeat n :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; prep the links
     (dotimes (i (1- n))
       (install-link-onto-chip chip-spec i (1+ i) :architecture architecture))
@@ -520,7 +508,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec architecture)
     ;; prep the qubits
     (loop :repeat n :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; prep the links
     (dotimes (i n)
       (dotimes (j i)
@@ -612,7 +600,7 @@ Compilers are listed in descending precedence.")
         ;; which is shaded when the two indices share a 2^1-bit. these are
         ;; the locations that need a new qubit to get generated.
         (unless (logbitp 1 (logxor i j))
-          (let* ((fresh-qubit (build-qubit :type '(:RZ :X/2)))
+          (let* ((fresh-qubit (build-qubit :type '(:RZ :X/2 :MEASURE)))
                  (fresh-qubit-index (chip-spec-n-qubits chip-spec)))
             ;; poke this qubit ID into the hashtable for later lookup
             (setf (gethash (list i j) qubit-ref-hash) fresh-qubit-index)
@@ -666,7 +654,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec architecture)
     ;; set up the qubits
     (loop :repeat (* height width) :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
       (dotimes (j width)
@@ -714,7 +702,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec ':cz)
     ;; set up the qubits
     (dotimes (j (* height width))
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
       (dotimes (j width)
@@ -750,7 +738,7 @@ Compilers are listed in descending precedence.")
                  (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
     (install-generic-compilers chip-spec ':cnot)
     (loop :repeat nqubits :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2)) chip-spec))
+      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (loop :for (control target) :in links :do
       (install-link-onto-chip chip-spec control target :architecture '(:CNOT)))
     (warm-hardware-objects chip-spec)))
