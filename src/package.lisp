@@ -381,7 +381,7 @@
    #:rewrite-arithmetic                 ; FUNCTION/TRANSFORMATION
    )
 
-  ;; analysis/compressor.lisp
+  ;; analysis/compress-qubits.lisp
   (:export
    #:compress-qubits
    #:relabel-rewiring
