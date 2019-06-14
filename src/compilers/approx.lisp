@@ -731,8 +731,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                       (sandwich-with-local-gates center-circuit a d b q1 q0)
                     (push (cons (* circuit-cost fidelity) sandwiched-circuit)
                           candidate-pairs)))
-              (compiler-does-not-apply () nil)
-              (diagonalizer-not-found () (give-up-compilation)))))
+              (compiler-does-not-apply () nil))))
         ;; now vomit the results
         (cond
           ((endp candidate-pairs)
