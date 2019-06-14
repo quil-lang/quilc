@@ -237,11 +237,13 @@
                            ((endp param-list)
                             nil)
                            ((and (typep param-list 'list)
-                                 (eql 'quote (first param-list)))
+                                 (= 2 (length param-list))
+                                 (typep (second param-list) 'list))
                             (loop :for item :in (second param-list)
-                                  :unless (typep item 'number)
-                                    :return '_
-                                  :collect item))
+                                  :if (typep item 'number)
+                                    :collect item
+                                  :else
+                                    :collect '_))
                            (t
                             '_)))
              (qubit-list (mapcar (lambda (x)
@@ -443,7 +445,11 @@
               :do (error "Exhausted task queue without finding a route to the target gateset.")
             :when (occurrence-table-in-gateset-p task target-gateset)
               :return (cons task history)
-            :unless (member (collect-bindings task)
+            :unless (member (sort (collect-bindings task)
+                                  (lambda (a b)
+                                    (binding-precedes-p
+                                     (list (list '_ a))
+                                     (list (list '_ b)))))
                             visited-nodes :test #'equalp)
               :do (push (sort (collect-bindings task)
                               (lambda (a b)
@@ -527,12 +533,29 @@
                  (binding-precedes-p (compiler-bindings a)
                                      (compiler-bindings b)))))
 
+(defun blank-out-qubits (gateset)
+  (let ((new-gateset (make-hash-table :test #'equalp)))
+    (dohash ((key val) gateset new-gateset)
+      (setf (gethash (list* (first key)
+                            (second key)
+                            (mapcar (constantly '_) (rest (rest key))))
+                     new-gateset)
+            val))))
+
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   (flet ((discard-tables (path)
            (loop :for item :in path
                  :when (typep item 'compiler)
                    :collect item))
-         #+ignore
+         (path-has-a-loop-p (path start)
+           (and (< 1 (length path))
+                (loop :for (gateset compiler) :on path :by #'cddr
+                      :when (loop :for gate :being :the :hash-keys :of gateset
+                                  :always (loop :for binding :in start
+                                                  :thereis (binding-subsumes-p (first start)
+                                                                               (list '_ gate))))
+                        :do (return-from path-has-a-loop-p t)
+                      :finally (return nil))))
          (print-path (path)
            (dolist (item path)
              (typecase item
@@ -540,7 +563,9 @@
                (hash-table
                 (dohash ((key val) item)
                   (format t "~a -> ~a~%" key val)))))))
+    (declare (ignorable #'print-path))
     (let* ((compilers (get-compilers qubit-count))
+           (target-gateset (blank-out-qubits target-gateset))
            (unconditional-compilers
              (remove-if (lambda (x)
                           (multiple-value-bind (bindings options) (compiler-bindings x)
@@ -571,12 +596,26 @@
                     (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
                     qubit-count))
                  (special-cost (occurrence-table-cost (first special-path) target-gateset)))
-            (when (> special-cost generic-cost)
+            (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
+                       (> special-cost generic-cost))
               (setf reduced-compilers
                     (append reduced-compilers
                             (list compiler)
                             (discard-tables special-path)))))))
-      (sort-compilers-by-specialization (remove-duplicates reduced-compilers)))))
+      (let ((sorted-compilers
+              (sort-compilers-by-specialization (remove-duplicates reduced-compilers))))
+        (append (remove-if-not (lambda (c)
+                                 (occurrence-table-in-gateset-p (filter-by-qubit-count
+                                                                 (compiler-output-gates c)
+                                                                 qubit-count)
+                                                                target-gateset))
+                               sorted-compilers)
+                (remove-if (lambda (c)
+                             (occurrence-table-in-gateset-p (filter-by-qubit-count
+                                                             (compiler-output-gates c)
+                                                             qubit-count)
+                                                            target-gateset))
+                           sorted-compilers))))))
 
 (defun compute-applicable-reducers (gateset)
   (let* ((gateset-bindings (loop :for g :being :the :hash-keys :of gateset
