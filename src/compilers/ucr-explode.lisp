@@ -138,6 +138,12 @@
                                           (constant-value param)))
                  parameters)
           (list (build-gate roll-type (list (constant-value (first parameters))) target)))
+         ((= 1 (length differences))
+          (list
+             (apply #'build-gate op (alexandria:ensure-list averages) (alexandria:ensure-list rest))
+             (build-gate "CNOT" () control      target)
+             (apply #'build-gate op (alexandria:ensure-list differences) (alexandria:ensure-list rest))
+             (build-gate "CNOT" () control      target)))
          (t
           ;; see the comments above this function for an explanation of what's
           ;; going on here and why.
