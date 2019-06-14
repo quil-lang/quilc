@@ -228,6 +228,8 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                                        :chip-specification chip-spec)
   ;; find a shortest path between the two qubits in the swap gate
   (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
+    (when (= 2 (length computed-path))
+      (give-up-compilation))
     (labels
         ((build-CNOT-string (qubit-string)
            (cond
