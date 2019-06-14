@@ -208,6 +208,7 @@
     (assert (let ((magicl::*default-zero-comparison-epsilon* 1d-4)) (magicl::unitaryp m)) () "The matrix ~%~A~% is not unitary: ~%~A~%" m (magicl::multiply-complex-matrices m (magicl::conjugate-transpose m)))
     m))
 
+(require :sb-rotate-byte)
 (defun apply-pauli-to-wavefunction (ph index q wf)
   "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
   (let* ((a (mod index 2))
@@ -230,7 +231,6 @@
             (setf (aref wf addr0) w0
                   (aref wf addr1) w1)))))))
 
-(require :sb-rotate-byte)
 (defun clifford-to-matrix-v2 (cliff)
   (let* ((n (num-qubits cliff))
          (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))

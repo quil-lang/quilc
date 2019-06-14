@@ -7,7 +7,11 @@
 
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
-;;; Gottesman's paper is also helpful https://arxiv.org/pdf/quant-ph/9807006.pdf
+;;; Gottesman's paper is also helpful
+;;; https://arxiv.org/pdf/quant-ph/9807006.pdf ...but BEWARE HIS JANKY
+;;; QUBIT NOTATION!!  Correct qubit ordering is very important. Pay
+;;; attention to which qubits are least/most significant and how they
+;;; are ordered in the code with respect to this!!
 
 (deftype tableau-index ()
   '(integer 0 (#.array-total-size-limit)))
