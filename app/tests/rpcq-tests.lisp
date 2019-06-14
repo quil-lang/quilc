@@ -104,7 +104,7 @@ H 0")
             (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
 
 
-(deftest test-native-quil-to-binary ()
+(deftest test-native-quil-to-binary-endpoint ()
   (let* ((server-function (lambda ()
                             (quilc::start-rpc-server)))
          (server-thread (bt:make-thread server-function)))
