@@ -264,22 +264,22 @@ used to specify CHIP-SPEC."
       (setf (hardware-object-gate-information obj) gate-information))
     
     ;; this is the legacy model for setting up gate data
-    (when (member ':cz type)
+    (when (optimal-2q-target-meets-requirements type ':cz)
       (setf (gethash '("CZ" () _ _) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
-    (when (member ':iswap type)
+    (when (optimal-2q-target-meets-requirements type ':iswap)
       (setf (gethash '("ISWAP" () _ _) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
-    (when (member ':cphase type)
+    (when (optimal-2q-target-meets-requirements type ':cphase)
       (setf (gethash '("CPHASE" (_) _ _) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
-                              :fidelity 0.90d0)))
-    (when (member ':piswap type)
+                              :fidelity 0.85d0)))
+    (when (optimal-2q-target-meets-requirements type ':piswap)
       (setf (gethash '("PISWAP" (_) _ _) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
-                              :fidelity 0.90d0)))
+                              :fidelity 0.85d0)))
     (when (member ':cnot type)
       (setf (gethash `("CNOT" () ,qubit0 ,qubit1) (hardware-object-gate-information obj))
             (make-gate-record :duration 150
@@ -382,7 +382,17 @@ used to specify CHIP-SPEC."
         (constantly #'state-prep-trampolining-compiler)
         (constantly #'recognize-ucr)
         (lambda (chip-spec arch)
-          (approximate-2q-compiler-for arch chip-spec))
+          (declare (ignore chip-spec))
+          (a:curry #'approximate-2q-compiler
+                   (append (list #'nearest-circuit-of-depth-0)
+                           (when (optimal-2q-target-meets-requirements arch ':cz)
+                             (list #'nearest-cz-circuit-of-depth-1
+                                   #'nearest-cz-circuit-of-depth-2
+                                   #'nearest-cz-circuit-of-depth-3))
+                           (when (optimal-2q-target-meets-requirements arch ':iswap)
+                             (list #'nearest-iswap-circuit-of-depth-1
+                                   #'nearest-iswap-circuit-of-depth-2
+                                   #'nearest-iswap-circuit-of-depth-3)))))
         (constantly #'qs-compiler))
   "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
 

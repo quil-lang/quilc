@@ -175,3 +175,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     #-(or ccl ecl sbcl) (error "double-float-positive-infinity not available."))
 
 (a:define-constant pi #.(coerce cl:pi 'double-float))
+
+(defun print-hash (hash &optional (stream *standard-output*))
+  (dohash ((key val) hash)
+    (format stream "~&~a -> ~a~%" key val)))

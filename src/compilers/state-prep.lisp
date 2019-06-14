@@ -39,7 +39,7 @@
 ;; first we do base case work.
 ;; the most basic base case is the case of a 1-qubit operator.
 (define-compiler state-prep-1Q-compiler
-    ((instr (_ _ _)
+    ((instr (_ _ q)
             :where (typep instr 'state-prep-application)))
   "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
   (let* ((source-wf (vector-scale
@@ -59,11 +59,7 @@
                                (- (second source-wf))
                                (conjugate (second source-wf))
                                (first source-wf)))))
-    (euler-compiler
-     (make-instance 'gate-application
-                    :gate (magicl:multiply-complex-matrices matrix-target matrix-source)
-                    :arguments (application-arguments instr)
-                    :operator (named-operator "1Q-STATE-MATRIX")))))
+    (list (anon-gate "STATE-1Q" (magicl:multiply-complex-matrices matrix-target matrix-source) q))))
 
 
 ;; setting up 2Q state preparation requires some helper functions

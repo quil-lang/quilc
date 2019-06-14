@@ -49,7 +49,9 @@
 (defun generate-test-case (bindings)
   ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
   (let ((adjacency-table (make-hash-table))
-        qubit-bound)
+        qubit-bound
+        parameter-names
+        (parameter-assignments (make-hash-table)))
     (labels ((random-with-exceptions (bound exceptions)
                (assert (> bound (length exceptions)))
                (let ((val (random bound)))
@@ -77,7 +79,14 @@
           (declare (ignore variable-name))
           (when options
             (error "I don't know how to make test cases for guarded compilers."))
-          (add-clique (cddr binding))))
+          (add-clique (cddr binding))
+          (when (listp (second binding))
+            (setf parameter-names
+                  (union parameter-names
+                         (loop :for param :in (second binding)
+                               :when (and (typep param 'symbol)
+                                          (not (eql '_ param)))
+                                 :collect param))))))
       ;; color the graph with qubit indices. it'd be :cool: if this were randomized.
       (quil::dohash ((qubit collision-names) adjacency-table)
         (let ((collision-qubits (mapcar (lambda (name) (gethash name adjacency-table))
@@ -92,26 +101,30 @@
                              (loop :for name :being :the :hash-keys :of adjacency-table
                                      :using (hash-value qubit-assignment)
                                    :maximize (1+ qubit-assignment))))
+      (dolist (n parameter-names)
+        (setf (gethash n parameter-assignments)
+              (random (* 2 pi))))
       ;; walk the instructions, doing parameter/argument instantiation
       (loop :for binding :in bindings
             :collect
             (destructuring-bind (variable-name (name params &rest qubits)) binding
               (declare (ignore variable-name))
-              (let* ((params (mapcar (lambda (param)
-                                       (cond
-                                         ((numberp param)
-                                          param)
-                                         ((typep param 'symbol)
-                                          (random (* 2 pi)))
-                                         (t
-                                          (error "I don't know how to generate this parameter."))))
-                                     params))
+              (let* ((params (when (listp params)
+                               (mapcar (lambda (param)
+                                         (cond
+                                           ((numberp param)
+                                            (constant param))
+                                           ((typep param 'symbol)
+                                            (constant (gethash param parameter-assignments)))
+                                           (t
+                                            (error "I don't know how to generate this parameter."))))
+                                       params)))
                      (qubits (mapcar (lambda (qubit)
                                        (cond
                                          ((numberp qubit)
                                           qubit)
-                                         ((eql '_ qubit)
-                                          '_)
+                                         ((eql qubit (intern "_"))
+                                          nil)
                                          ((symbolp qubit)
                                           (gethash qubit adjacency-table))))
                                      qubits))
@@ -122,15 +135,23 @@
                            (cond
                              ((numberp qubit)
                               (push qubit output-qubits))
-                             ((eql '_ qubit)
+                             ((null qubit)
                               (push (random-with-exceptions qubit-bound
                                                             (append output-qubits occupied-qubits))
                                     output-qubits)))))))
-                (apply #'quil::build-gate name params qubits)))))))
+                (cond
+                  ((stringp name)
+                   (apply #'quil::build-gate name params qubits))
+                  (t
+                   (apply #'quil::anon-gate "ANONYMOUS-INPUT"
+                          (quil::random-special-unitary (ash 1 (length qubits)))
+                          qubits)))))))))
 
 (deftest test-translators ()
   (labels
       ((test-a-compiler (compiler)
+         (unless (quil::compiler-gateset-reducer-p compiler)
+           (return-from test-a-compiler nil))
          (let (test-case input-matrix compiled-output output-matrix)
            ;; building the test case can throw an error if the compiler itself is
            ;; too complicated. we don't intend for that to break the tests.
@@ -138,9 +159,7 @@
              (error ()
                (return-from test-a-compiler nil)))
            (setf input-matrix (quil::make-matrix-from-quil test-case))
-           (handler-case (setf compiled-output (apply compiler test-case))
-             (quil::compiler-does-not-apply ()
-               (return-from test-a-compiler nil)))
+           (setf compiled-output (apply compiler test-case))
            (setf output-matrix (quil::make-matrix-from-quil compiled-output))
            (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
            (is (quil::matrix-equals-dwim input-matrix output-matrix)))))
