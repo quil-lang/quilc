@@ -104,6 +104,25 @@ H 0")
             (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
 
 
+(deftest test-native-quil-to-binary ()
+  (let* ((server-function (lambda ()
+                            (quilc::start-rpc-server)))
+         (server-thread (bt:make-thread server-function)))
+    (sleep 1)
+    (unwind-protect
+         (rpcq:with-rpc-client (client "tcp://127.0.0.1:5555")
+           (let* ((quil "H 0")
+                  (num-shots 10)
+                  (server-payload (make-instance 'rpcq::|BinaryExecutableRequest|
+                                                 :|quil| quil
+                                                 :|num_shots| num-shots))
+                  (server-response (rpcq:rpc-call client "native-quil-to-binary" server-payload)))
+             (is (string= quil (rpcq::|PyQuilExecutableResponse-program| server-response))
+                 (= num-shots (gethash "num_shots"
+                                       (rpcq::|PyQuilExecutableResponse-attributes| server-response))))))
+      (bt:destroy-thread server-thread))))
+
+
 ;; This test is copied wholesale from pyQuil's test_api.py, random
 ;; seed and all.
 (deftest test-generate-rb-sequence-endpoint ()
