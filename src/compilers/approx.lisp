@@ -221,7 +221,7 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
       (give-up-compilation))))
 
 (defun orthogonal-decomposition (m)
-  "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal. Returns the results as the VALUES triple (VALUES A D B)."
+  "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
   (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
          (a (diagonalizer-in-e-basis m))
          (db (m* (magicl:transpose a) +edag-basis+ m +e-basis+))
