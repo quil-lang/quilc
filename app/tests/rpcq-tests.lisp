@@ -104,6 +104,8 @@ H 0")
             (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
 
 
+;; This test is copied wholesale from pyQuil's test_api.py, random
+;; seed and all.
 (deftest test-generate-rb-sequence-endpoint ()
   (let* ((server-function (lambda ()
                             (quilc::start-rpc-server)))
