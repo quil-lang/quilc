@@ -154,6 +154,7 @@ test-ccl:
 ###############################################################################
 # CLEAN
 ###############################################################################
+.PHONY: clean clean-quicklisp clean-cache cleanall
 
 clean:
 	rm -f quilc system-index.txt build-output.log
