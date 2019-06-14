@@ -169,6 +169,6 @@ clean-cache:
 	@echo "Deleting $(LISP_CACHE)"
 	rm -rf "$(LISP_CACHE)"
 
-cleanall: clean clean-cache clean-quicklisp
+clean-all: clean clean-cache clean-quicklisp
 	@echo "All cleaned and reindexed."
 
