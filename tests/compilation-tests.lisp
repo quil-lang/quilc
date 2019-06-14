@@ -145,7 +145,7 @@
          (possible-paths '(((1 2) (2 15) (1 2) (2 15))
                            ((1 0) (0 15) (1 0) (0 15))))
          (path (quil::cnot-to-native-cnots cnot-gate
-                                           :context (quil::make-compressor-context
+                                           :context (quil::make-compilation-context
                                                      :chip-specification chip))))
     (is (find (mapcar #'application-argument-indicies path) possible-paths
               :test #'equalp))))
