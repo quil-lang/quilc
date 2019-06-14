@@ -105,7 +105,6 @@ H 0")
 
 
 (deftest test-generate-rb-sequence-endpoint ()
-  (declare (optimize (debug 3)))
   (let* ((server-function (lambda ()
                             (quilc::start-rpc-server)))
          (server-thread (bt:make-thread server-function)))
