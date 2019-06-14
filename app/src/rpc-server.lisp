@@ -5,7 +5,7 @@
 (in-package #:quilc)
 
 
-(defun get-version-info ()
+(defun get-version-info-handler ()
   (a:alist-hash-table
    `(("quilc"   . ,+QUILC-VERSION+)
      ("githash" . ,+GIT-HASH+))))
@@ -33,9 +33,21 @@
               (2 (incf runtime coeff-twoq)))
           :finally (return runtime))))
 
+(defun statistics-to-metadata (statistics)
+  (check-type statistics hash-table)
+  (make-instance 'rpcq::|NativeQuilMetadata|
+                 :|final_rewiring| (gethash "final_rewiring" statistics)
+                 :|gate_depth| (gethash "gate_depth" statistics)
+                 :|gate_volume| (gethash "gate_volume" statistics)
+                 :|multiqubit_gate_depth| (gethash "multiqubit_gate_depth" statistics)
+                 :|program_duration| (ensure-optional-real (gethash "program_duration" statistics))
+                 :|program_fidelity| (ensure-optional-real (gethash "program_fidelity" statistics))
+                 :|topological_swaps| (gethash "topological_swaps" statistics)
+                 :|qpu_runtime_estimation| (gethash "qpu_runtime_estimation" statistics)))
+
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
-(defun quil-to-native-quil (request)
+(defun quil-to-native-quil-handler (request &key protoquil)
   "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA."
   (check-type request rpcq::|NativeQuilRequest|)
   (let* ((quil-program (quil::parse-quil (rpcq::|NativeQuilRequest-quil| request)))
@@ -44,23 +56,22 @@
                                              "specs" (rpcq::|TargetDevice-specs| target-device))
                                        :test #'equal))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
-         (dictionary (process-program quil-program chip-specification))
-         (processed-program (gethash "processed_program" dictionary))
-         (metadata (make-instance 'rpcq::|NativeQuilMetadata|
-                                  :|final_rewiring| (gethash "final_rewiring" dictionary)
-                                  :|gate_depth| (gethash "gate_depth" dictionary)
-                                  :|gate_volume| (gethash "gate_volume" dictionary)
-                                  :|multiqubit_gate_depth| (gethash "multiqubit_gate_depth" dictionary)
-                                  :|program_duration| (ensure-optional-real (gethash "program_duration" dictionary))
-                                  :|program_fidelity| (ensure-optional-real (gethash "program_fidelity" dictionary))
-                                  :|topological_swaps| (gethash "topological_swaps" dictionary)
-                                  :|qpu_runtime_estimation| (runtime-estimation
-                                                             (quil:parse-quil processed-program)))))
-    (make-instance 'rpcq::|NativeQuilResponse|
-                   :|quil| processed-program
-                   :|metadata| metadata)))
+         ;; Allow endpoint to override server's -P
+         (protoquil (ecase protoquil
+                      ((nil) *protoquil*)
+                      (:false nil)
+                      (t t))))
+    (multiple-value-bind (processed-program statistics-dict)
+        (process-program quil-program chip-specification :protoquil protoquil)
+      (when protoquil
+        (setf (gethash "qpu_runtime_estimation" statistics-dict)
+              (runtime-estimation processed-program)))
+      (make-instance 'rpcq::|NativeQuilResponse|
+                     :|quil| (print-program processed-program nil)
+                     :|metadata| (when protoquil
+                                   (statistics-to-metadata statistics-dict))))))
 
-(defun native-quil-to-binary (request)
+(defun native-quil-to-binary-handler (request)
   "Dummy invocation: this QUILC binary returns something QVM-executable, which is just the program again."
   (check-type request rpcq::|BinaryExecutableRequest|)
   (make-instance 'rpcq::|PyQuilExecutableResponse|
@@ -68,7 +79,7 @@
                  :|attributes| (a:plist-hash-table
                                 `("num_shots" ,(rpcq::|BinaryExecutableRequest-num_shots| request)))))
 
-(defun generate-rb-sequence (request)
+(defun generate-rb-sequence-handler (request)
   "Generates a randomized benchmarking sequence according to REQUEST."
   (check-type request rpcq::|RandomizedBenchmarkingRequest|)
   (let ((k (rpcq::|RandomizedBenchmarkingRequest-depth| request))
@@ -123,7 +134,7 @@
       (make-instance 'rpcq::|RandomizedBenchmarkingResponse|
                      :|sequence| gateset-label-sequence))))
 
-(defun conjugate-pauli-by-clifford (request)
+(defun conjugate-pauli-by-clifford-handler (request)
   "Conjugates a Pauli operator by a Clifford operator, as specified by REQUEST."
   (check-type request rpcq::|ConjugateByCliffordRequest|)
   (let* ((pauli (rpcq::|ConjugateByCliffordRequest-pauli| request))
@@ -153,7 +164,7 @@
                                    (mapcar (a:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                            (quil.clifford::base4-list pauli-out))))))
 
-(defun rewrite-arithmetic (request)
+(defun rewrite-arithmetic-handler (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
   (let ((program (quil::parse-quil-into-raw-program (rpcq::|RewriteArithmeticRequest-quil| request))))
@@ -189,15 +200,16 @@
                            (host "*")
                            (port 5555)
                            (logger (make-instance 'cl-syslog:rfc5424-logger
-                                                  :log-writer (cl-syslog:null-log-writer))))
+                                                  :log-writer (cl-syslog:null-log-writer)))
+                           (time-limit 0))
   (let ((dt (rpcq:make-dispatch-table)))
-    (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil)
-    (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary)
-    (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence)
-    (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford)
-    (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
-    (rpcq:dispatch-table-add-handler dt 'get-version-info)
+    (rpcq:dispatch-table-add-handler dt 'quil-to-native-quil-handler :name "quil-to-native-quil")
+    (rpcq:dispatch-table-add-handler dt 'native-quil-to-binary-handler :name "native-quil-to-binary")
+    (rpcq:dispatch-table-add-handler dt 'generate-rb-sequence-handler :name "generate-rb-sequence")
+    (rpcq:dispatch-table-add-handler dt 'conjugate-pauli-by-clifford-handler :name "conjugate-pauli-by-clifford")
+    (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic-handler :name "rewrite-arithmetic")
+    (rpcq:dispatch-table-add-handler dt 'get-version-info-handler :name "get-version-info")
     (rpcq:start-server :dispatch-table dt
                        :listen-addresses (list (format nil "~a://~a~@[:~a~]" protocol host port))
                        :logger logger
-                       :timeout *time-limit*)))
+                       :timeout time-limit)))

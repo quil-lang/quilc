@@ -12,17 +12,13 @@ called an ISA, and produces another Quil program that is executable on
 that architecture. The compiler will also attempt to optimize the
 program by producing fewer gates and shorter gate depths. The compiler
 may either be run as a server which takes requests (as is used with
-PyQuil), or it may be run as a batch program reading from standard
-input.
+PyQuil), or it may be run as a batch program reading from (and writing
+to) standard input.
 
-Server Mode runs the compiler as an HTTP server, taking simple POST
-requests with JSON payloads which are known to the companion library
-PyQuil.
+Server Mode runs the compiler as an RPC server, taking RPCQ requests
+defined by the RPCQ library.
 .SH OPTIONS
-.IP "-S, --server-mode-http"
-(Server Mode) Run the compiler in Server Mode. Start an HTTP server and
-process HTTP API calls. To stop the server, use Ctrl-C.
-.IP "-R, --server-mode-rpc"
+.IP "-R, -S, --server-mode-rpc"
 (Server RPCQ Mode) Run as a RPCQ server.
 .IP "-p <port>, --port <port>"
 (Server Mode) Run quilc in server mode on port <port>.
@@ -38,34 +34,40 @@ either 8Q, 20Q, 16QMUX, bristlecone, ibmqx5, or a path to a QPU
 description file.
 .IP "-P, --protoquil"
 Prescribe that the input and output must be ProtoQuil, which is Quil
-that is comprised of gates and measurements, with no control flow.
+that is, in order, comprised of memory declarations, gates, and measurements, with no control flow.
+.IP "--print-statistics"
+
 .IP "-d, --compute-gate-depth"
-Print a calculated gate depth for the provided circuit as an appended
-Quil comment. Gate depth is defined as the longest subsequence of
-compiled instructions where adjacent instructions share data.
-(Requires -P.)
+(Deprecated. See --print-statistics.) Print a calculated gate depth for
+the provided circuit as an appended Quil comment. Gate depth is
+defined as the longest subsequence of compiled instructions where
+adjacent instructions share data.  (Requires -P.)
 .IP "-2, --compute-2Q-gate-depth"
-Print a calculated multiqubit gate depth for the provided circuit as
-an appended Quil comment. (Requires -P. Ignores the blacklist and
-whitelist.)
+(Deprecated. See --print-statistics.) Print a calculated multiqubit
+gate depth for the provided circuit as an appended Quil
+comment. (Requires -P. Ignores the blacklist and whitelist.)
 .IP "--compute-gate-volume"
-Print a calculated gate volume for the provided circuit as an appended
-Quil comment. Gate volume is defined as the total number of gates in
-the compiled program. (Requires -P.)
+(Deprecated. See --print-statistics.) Print a calculated gate volume
+for the provided circuit as an appended Quil comment. Gate volume is
+defined as the total number of gates in the compiled
+program. (Requires -P.)
 .IP "-r, --compute-runtime"
-Print a calculated estimated runtime for the provided circuit as an
-appended Quil comment. Assumes that chains of instructions that do
-have overlapping resources (qubits) can be run in parallel. Currently,
-should be taken with a hefty helping of salt. (Requires -P.)
+(Deprecated. See --print-statistics.) Print a calculated estimated
+runtime for the provided circuit as an appended Quil comment. Assumes
+that chains of instructions that do have overlapping resources
+(qubits) can be run in parallel. Currently, should be taken with a
+hefty helping of salt. (Requires -P.)
 .IP "-f, --compute-fidelity"
-Print a calculated estimated compiled circuit fidelity for the
-provided circuit as an appended Quil comment. (Requires -P.)
+(Deprecated. See --print-statistics.) Print a calculated estimated
+compiled circuit fidelity for the provided circuit as an appended Quil
+comment. (Requires -P.)
 .IP "-u, --compute-unused-qubits"
-Print a list of unused qubits as an appended Quil comment. (Requires
--P.)
+(Deprecated. See --print-statistics.) Print a list of unused qubits as
+an appended Quil comment. (Requires -P.)
 .IP "-t, --show-topological-overhead"
-Print the number of SWAP gates incurred for topological reasons for
-the provided circuit as an appended Quil comment. (Requires -P.)
+(Deprecated. See --print-statistics.) Print the number of SWAP gates
+incurred for topological reasons for the provided circuit as an
+appended Quil comment. (Requires -P.)
 .IP "--gate-blacklist <gate-list>"
 When calculating statistics, ignore the gates present in the
 comma-separated list of names of <gate-list>.
@@ -115,88 +117,9 @@ Maximum logging level. Any logs with a less sever level will be
 ignored. Available options are "debug" (default), "info", "notice", 
 "warning", "err", "crit", "alert", or "emerg".
 
-.SH HTTP API
-In Server Mode, the QVM accepts a number of POST requests over HTTP to
-accomplish tasks. In this section, we describe each such request.
-
-(The authors are aware that the usage pattern described isn't making
-use of standard REST conventions.)
-
-The payload of the POST request is always a JSON object (i.e.,
-dictionary).
-
-Compile a program \- Endpoint: /
-.RS
-To compile a Quil program, supply a JSON object with the following
-keys:
-
-    - The value of "uncompiled-quil" or "quil-instructions" (in order
-      of precendence) should be a Quil program in a string.
-
-    - The value of "target-device" should be a device specification.
-
-Returned will be a JSON object with the following keys:
-
-    - The value of "compiled-quil" will be the compiled Quil program
-      as a string.
-
-    - The value of "metadata" will be a collection of statistics about
-      the program that was compiled.
-.RE
-
-Generate a randomized benchmarking sequence \- Endpoint: /rb
-.RS
-The compiler is able to generate uniformly random sequences of
-Clifford gates, along with their inversions, for use with randomized
-benchmarking. The request takes up to four keys:
-
-    - The value of "depth" is the length of the sequence to generate
-      (i.e., the circuit depth).
-
-    - The value of "qubits" is the number of qubits to generate a
-      sequence for. (Currently supported is 1 or 2.)
-
-    - The value of "gateset", which is a list of unitary Quil
-      instructions that represent the gate set which acts as a
-      (possibly over-determined) collection of generators of the
-      Clifford group. The behavior of a non-generating set is
-      unspecified.
-
-    - Optionally, the value of "seed" which is a positive integer
-      acting as the random number generator seed.
-
-Returned will be a list of elements of the generating set representing
-the randomized benchmarking sequence.
-.RE
-
-Apply a Clifford element \- Endpoint: /apply-clifford
-.RS
-The compiler is able to efficiently conjugate an element of the Pauli
-group by an arbitrary element of the Clifford group. (Recall that
-Clifford group elements stabilize the Pauli group.) The request takes
-up to ??? keys:
-
-    - The value of "clifford" is a Quil program represented as a
-      string. (The consequences are undefined if the program does not
-      represent an element of the Clifford group.)
-
-    - The value of "pauli" is a list of two elements. Each element is
-      itself a list of equal size, where the first list is a list of
-      qubit indexes, and the second list is a list of Pauli strings
-      (i.e., "I", "X", "Y", and "Z"). For instance, [[1,2],["X","Z"]]
-      represents a Pauli operator with Z acting on qubit 1 and X
-      acting on qubit 2.
-
-Returned will be a list of two elements, the first being the the phase
-factor (i.e., 1, i, -1, -i) and the second being the resulting Pauli
-element.
-.RE
-
-.SH EXAMPLES
-quilc --isa "8Q" < file.quil
-.RS
-Compile a Quil file (printing the result to stdout) for an eight qubit ring.
-.RE
+.SH RPCQ
+RPCQ is an RPC framework and message specification for Rigetti Quantum
+Cloud Services. See https://github.com/rigetti/rpcq for more detail.
 
 .SH SUPPORT
 Contact <support@rigetti.com> or Robert Smith <robert@rigetti.com>.

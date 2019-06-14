@@ -30,12 +30,12 @@
                       (funcall compile)))
   :serial t
   :components ((:file "package")
+               (:file "globals")
                (:file "versions")
                #+sbcl
                (:file "impl/sbcl")
                #+clozure
                (:file "impl/clozure")
-               (:file "web-server")
                (:file "rpc-server")
                (:file "printers")
                (:file "entry-point")))
