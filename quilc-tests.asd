@@ -10,6 +10,7 @@
                #:fiasco
                #:uiop
                #:alexandria
+               #:uuid
                )
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':quilc-tests
