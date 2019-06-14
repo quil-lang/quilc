@@ -8,7 +8,8 @@
 
 (in-package #:cl-quil.tweedledum)
 
-(cffi:define-foreign-library libtweedledum
+(cffi:define-foreign-library
+    (libtweedledum :search-path "/usr/local/lib/rigetti/")
   (:darwin (:or #.(merge-pathnames "libtweedledum.dylib"
                                    (or *compile-file-truename*
                                        *load-truename*))
