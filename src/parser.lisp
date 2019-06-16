@@ -100,7 +100,7 @@
    (return (tok ':DAGGER)))
   ((eager #.(string #-ccl #\HELM_SYMBOL #+ccl #\u+2388))
    (return (tok ':CONTROLLED)))
-  ((eager #.(string #\OCR_FORK))
+  ((eager #.(string #-ccl #\OCR_FORK #+ccl #\u+2442))
    (return (tok ':FORKED)))
   ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION"
    (return (tok (intern $@ :keyword))))
