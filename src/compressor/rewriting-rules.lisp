@@ -92,7 +92,7 @@
   "The rewriting rules for a pair of distinct rolls do not depend on the particular roll types and are instead valid for any single-parameter exponentiated families for rolls about orthogonal axes. To cut down on repeated code, we provide this macro that slots the roll types in to the standard set of rules. Here we require a notion of \"preference\" of ROLLA over ROLLB: some of the rules trade rolls of one type for rolls of another, and so we prefer to rewrite the \"less natural\" ROLLB into the \"more natural\" ROLLA."
   `(list
     ;; rollB(X) rollA(pi) --> rollA(pi) rollB(-x)
-    (make-rewriting-rule ,(format nil "~a(x) ~a(pi) -> ~:*~a(pi) ~:*~:*~a(-x)" rollB rollA)
+    (make-rewriting-rule ,(format nil "~a(x) ~a(pi) -> ~:*~a(pi) ~2:*~a(-x)" rollB rollA)
         (_
          ((,rollB (theta) q) x)
          ((,rollA (#.pi)  q) y))
@@ -101,7 +101,7 @@
             (build-gate ,rollB (list (param-* -1d0 theta)) q)))
 
     ;; rollB(pi) rollA(x) --> rollA(-x) rollB(pi)
-    (make-rewriting-rule ,(format nil "~a(pi) ~a(x) -> ~:*~a(-x) ~:*~:*~a(pi)" rollB rollA)
+    (make-rewriting-rule ,(format nil "~a(pi) ~a(x) -> ~:*~a(-x) ~2:*~a(pi)" rollB rollA)
         (_
          ((,rollB (#.pi)  q) x)
          ((,rollA (theta) q) y))
@@ -110,7 +110,7 @@
             (build-gate ,rollB (list pi)                   q)))
 
     ;; -rollB/2 rollA/2 rollB/2 --> rollA/2 rollB/2 -rollA/2 (with positionally reversed signs)
-    (make-rewriting-rule ,(format nil "-~a/2 ~a/2 ~:*~:*~a/2 -> ~a/2 ~:*~:*~a/2 -~a/2, etc" rollB rollA)
+    (make-rewriting-rule ,(format nil "-~a/2 ~a/2 ~2:*~a/2 -> ~a/2 ~2:*~a/2 -~a/2, etc" rollB rollA)
         (_
          ((,rollB (theta1) q) x)
          ((,rollA (theta2) q) y)
