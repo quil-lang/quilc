@@ -107,6 +107,7 @@ relabeled according to which free assignments remain."
          (application-arguments isn)))
 
   (:method ((isn pragma) relabeler)
+    (declare (ignore relabeler))
     (unless (typep isn 'specialized-pragma)
       (warn "Unhandled pragma in qubit relabeling: ~S" isn)))
 

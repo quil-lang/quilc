@@ -194,6 +194,7 @@ Return the following values:
     (values label-blk blk nil)))
 
 (defmethod process-instruction (cfg blk (instr halt))
+  (declare (ignore cfg))
   (assert (not (null blk)) (blk))
   (link-blocks blk terminating-edge)
   (values nil blk nil))

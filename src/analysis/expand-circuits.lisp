@@ -192,18 +192,23 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
                 copy))))))
 
   (:method ((instr jump-target) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr no-operation) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr halt) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr reset) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr reset-qubit) param-value arg-value)
+    (declare (ignore param-value))
     (let ((q (reset-qubit-target instr)))
       (if (not (is-formal q))
           instr
@@ -214,12 +219,15 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             (make-instance 'reset-qubit :target new-q)))))
 
   (:method ((instr wait) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr pragma) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr unary-classical-instruction) param-value arg-value)
+    (declare (ignore param-value))
     (let ((addr (classical-target instr)))
       (if (not (is-formal addr))
           instr
@@ -232,6 +240,7 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             (make-instance (class-of instr) :target new-addr)))))
 
   (:method ((instr binary-classical-instruction) param-value arg-value)
+    (declare (ignore param-value))
     (flet ((transform-address (addr)
              (if (not (is-formal addr))
                  addr
@@ -250,6 +259,7 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             instr))))
   
   (:method ((instr trinary-classical-instruction) param-value arg-value)
+    (declare (ignore param-value))
     (flet ((transform-address (addr)
              (if (not (is-formal addr))
                  addr
@@ -270,9 +280,11 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             instr))))
 
   (:method ((instr unconditional-jump) param-value arg-value)
+    (declare (ignore param-value arg-value))
     instr)
 
   (:method ((instr conditional-jump) param-value arg-value)
+    (declare (ignore param-value))
     (let ((addr (conditional-jump-address instr)))
       (cond
         ((is-formal addr)
@@ -283,6 +295,7 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
          instr))))
 
   (:method ((instr measure-discard) param-value arg-value)
+    (declare (ignore param-value))
     (let ((q (measurement-qubit instr)))
       (if (not (is-formal q))
           instr
@@ -293,6 +306,7 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             (make-instance 'measure-discard :qubit new-q)))))
 
   (:method ((instr measure) param-value arg-value)
+    (declare (ignore param-value))
     (let ((q (measurement-qubit instr))
           (addr (measure-address instr))
           (remake nil))

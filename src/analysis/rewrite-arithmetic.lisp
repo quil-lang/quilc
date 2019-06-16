@@ -46,9 +46,11 @@ rewrite scheme and will error.
 NOTE: This function does *not* cause side effects.")
 
   (:method ((isn instruction) mref-name index)
+    (declare (ignore mref-name))
     (values isn '() index))
 
   (:method ((isn jump-target) mref-name index)
+    (declare (ignore mref-name))
     (values isn '() index))
 
   (:method ((isn application) mref-name index)
@@ -84,16 +86,19 @@ NOTE: This function does *not* cause side effects.")
       (values new-isn recalcs index)))
 
   (:method ((isn unary-classical-instruction) mref-name index)
+    (declare (ignore isn mref-name index))
     (error "Classical instructions, which modify memory references, ~
             are not supported in conjunction with gate parameter ~
             arithmetic rewriting."))
 
   (:method ((isn binary-classical-instruction) mref-name index)
+    (declare (ignore isn mref-name index))
     (error "Classical instructions, which modify memory references, ~
             are not supported in conjunction with gate parameter ~
             arithmetic rewriting."))
 
   (:method ((isn trinary-classical-instruction) mref-name index)
+    (declare (ignore isn mref-name index))
     (error "Classical instructions, which modify memory references, ~
             are not supported in conjunction with gate parameter ~
             arithmetic rewriting.")))
