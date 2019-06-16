@@ -270,7 +270,7 @@
                  (pseudoinstruction (make-instance 'application-thread-invocation
                                                    :region (first instrs)
                                                    :thread block
-                                                   :operator #.(named-operator "THREAD")
+                                                   :operator (named-operator "THREAD")
                                                    :arguments arguments)))
             (dolist (instr block)
               (setf resources (resource-union resources (instruction-resources instr))))

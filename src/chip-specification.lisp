@@ -248,7 +248,7 @@ used to specify CHIP-SPEC."
                :misc-data misc-data)))
     ;; set up the SWAP record
     (vector-push-extend (make-permutation-record
-                         :operator #.(named-operator "SWAP")
+                         :operator (named-operator "SWAP")
                          :arguments (list 0 1)
                          :permutation (list 1 0)
                          :duration (cond

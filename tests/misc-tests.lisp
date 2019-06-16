@@ -67,7 +67,7 @@
   (is (string= "CPHASE-AND-MEASURE(%alpha) 1 3 ro[5]"
                (format nil "~/cl-quil:instruction-fmt/"
                        (make-instance 'cl-quil::circuit-application
-                                      :operator #.(named-operator "CPHASE-AND-MEASURE")
+                                      :operator (named-operator "CPHASE-AND-MEASURE")
                                       :parameters `(,(param "alpha"))
                                       :arguments `(,(qubit 1)
                                                    ,(qubit 3)
