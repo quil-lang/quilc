@@ -45,33 +45,33 @@
   (declare (type tableau tab))
   (the tableau-index (ash (1- (array-dimension tab 0)) -1)))
 
-(defun ci (tab i j)
-  (let ((n (tableau-qubits tab)))
-    ;; (assert (<= 0 i (1- (* 2 n))))
-    (assert (<= 0 j (1- n)))))
+;; (defun check-index (tab i j)
+;;   (let ((n (tableau-qubits tab)))
+;;     ;; (assert (<= 0 i (1- (* 2 n))))
+;;     (assert (<= 0 j (1- n)))))
 
 (defun tableau-x (tab i j)
   (declare (type tableau tab)
            (type tableau-index i j))
-  (ci tab i j)
+  ;; (check-index tab i j)
   (aref tab i j))
 (defun (setf tableau-x) (new-bit tab i j)
   (declare (type tableau tab)
            (type tableau-index i j)
            (type bit new-bit))
-  (ci tab i j)
+  ;; (check-index tab i j)
   (setf (aref tab i j) new-bit))
 
 (defun tableau-z (tab i j)
   (declare (type tableau tab)
            (type tableau-index i j))
-  (ci tab i j)
+  ;; (check-index tab i j)
   (aref tab i (+ j (tableau-qubits tab))))
 (defun (setf tableau-z) (new-bit tab i j)
   (declare (type tableau tab)
            (type tableau-index i j)
            (type bit new-bit))
-  (ci tab i j)
+  ;; (check-index tab i j)
   (setf (aref tab i (+ j (tableau-qubits tab))) new-bit))
 
 (defun tableau-r (tab i)
@@ -338,6 +338,7 @@ but the symbols may be uninterned or named differently.
          (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
                   (type tableau ,tab)
                   (type tableau-index ,@qubits))
+         (tableau-clear-scratch ,tab)
          (dotimes (,i (* 2 (tableau-qubits ,tab)))
            (declare (type tableau-index ,i))
            ;; First, we construct bindings to these variables
@@ -348,7 +349,8 @@ but the symbols may be uninterned or named differently.
                          :collect `(,z (tableau-z ,tab ,i ,qubit))))
              (declare (type bit ,@variables))
              ;; Calculate the new phase.
-             (xorf (tableau-r ,tab ,i) ,phase-kickback)
+             ;; (xorf (tableau-r ,tab ,i) ,phase-kickback)
+             (xorf (tableau-r ,tab ,i) (clifford-image-phase ,tab ,c ,i ,@qubits))
              ;; Update the tableau with the new values.
              (setf
               ,@(loop :for qubit :in qubits
@@ -361,6 +363,22 @@ but the symbols may be uninterned or named differently.
                       :collect `(tableau-z ,tab ,i ,qubit)
                       ;; to this...
                       :collect z))))))))
+
+(defun clifford-image-phase (tab c row &rest qubits)
+  (let* ((n (tableau-qubits tab))
+         (cn (num-qubits c))
+         (contributing-ops (make-array (* 2 n) :initial-element (pauli-identity cn)))
+         (images (clifford-basis-map c))
+         (y-phase-offset 0))
+    ;; (format t "~%~A~%~A~%~A" n qubits images)
+    (loop :for i :below (length qubits)
+          :for q := (nth i qubits)
+          :do (when (= 1 (tableau-x tab row q)) (setf (aref contributing-ops (* 2 q)) (aref images (* 2 i))))
+              (when (= 1 (tableau-z tab row q)) (setf (aref contributing-ops (1+ (* 2 q))) (aref images (1+ (* 2 i)))))
+              (when (and (= 1 (tableau-x tab row q)) (= 1 (tableau-z tab row q)))
+                (incf y-phase-offset)))
+    ;; (format t "~A~%~A  (~A + ~A)~%" contributing-ops (reduce #'group-mul contributing-ops) (phase-factor (reduce #'group-mul contributing-ops)) y-phase-offset)
+    (floor (mod (+ y-phase-offset (phase-factor (reduce #'group-mul contributing-ops))) 4) 2)))
 
 (defun tableau-function (c)
   (compile nil (compile-tableau-operation c)))
@@ -682,7 +700,7 @@ Note: the scratch space is used as an area to write intermediate state values, a
                              `(H ,q1)
                              `(S ,q1)
                              `(CNOT ,q1 ,q2))
-           :for quil-gate := (string-trim " " (format nil "~{~A ~}" chp-gate))
+           :for quil-gate := (format nil "~{~A~^ ~}" chp-gate)
            :collect chp-gate
            :do (write-line quil-gate quil-str))
      (get-output-stream-string quil-str))))
