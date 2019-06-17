@@ -11,10 +11,9 @@
    (target-wf :initarg :target-wf
               :accessor state-prep-application-target-wf
               :documentation "Target wavefunction."))
-  (:default-initargs :operator (named-operator "STATE-PREP")
+  (:default-initargs :operator #.(named-operator "STATE-PREP")
                      ;; XXX: Hack!
                      :gate nil)
-
   (:documentation "A pseudo-instruction representing any state-preparation circuit that carries SOURCE-WF into TARGET-WF."))
 
 ;;; XXX: Hack!
@@ -235,11 +234,11 @@
         (append prefix-circuit
                 (list (make-instance 'gate-application
                                      :gate c1
-                                     :operator (named-operator "LHS-state-prep-gate")
+                                     :operator #.(named-operator "LHS-state-prep-gate")
                                      :arguments (list (second (application-arguments instr))))
                       (make-instance 'gate-application
                                      :gate c0
-                                     :operator (named-operator "RHS-state-prep-gate")
+                                     :operator #.(named-operator "RHS-state-prep-gate")
                                      :arguments (list (first (application-arguments instr))))))))))
 
 (defun state-prep-trampolining-compiler (instr &key (target ':cz))

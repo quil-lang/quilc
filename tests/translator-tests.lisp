@@ -92,7 +92,7 @@
            (ucr-instruction (apply #'quil::build-UCR roll-type angle-list argument-list))
            (ucr-matrix (quil::make-matrix-from-quil (list ucr-instruction)))
            (anonymous-instr (make-instance 'quil::gate-application
-                                           :operator (named-operator "ANONYMOUS-UCR")
+                                           :operator #.(named-operator "ANONYMOUS-UCR")
                                            :arguments (mapcar #'qubit (nreverse (a:iota qubit-count)))
                                            :gate ucr-matrix))
            (recognized-instruction (quil::recognize-ucr anonymous-instr))

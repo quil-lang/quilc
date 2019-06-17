@@ -407,7 +407,7 @@ other's."
                                           :relabeling (standard-qubit-relabeler qubits-on-obj))))
              (expand-to-native-instructions
               (list (make-instance 'gate-application
-                                   :operator (named-operator "WHOLEPROGRAM")
+                                   :operator #.(named-operator "WHOLEPROGRAM")
                                    :arguments (mapcar #'qubit qubits-on-obj)
                                    :gate matrix))
               chip-specification))))
