@@ -34,19 +34,19 @@
   "Make a chip from a graph"
   (let* ((chip-spec (init-chip :architecture architecture))
          (qubits
-           (loop :for i :to (1- (length graph)) :collect (quil::build-qubit)))
+           (loop :for i :to (1- (length graph)) :collect (quil::build-qubit :type '(:RZ :X/2 :MEASURE))))
          (qubit-array (make-array (length graph) :initial-contents qubits))
          (links
            (loop
              :for (a . b) :in (graph-edges graph)
              :for link-index :from 0
-             :collect (quil::build-link a b architecture chip-spec)
+             :collect (quil::build-link a b :type architecture)
              :do (vector-push-extend link-index (quil::vnth 1 (quil::hardware-object-cxns (aref qubit-array a))))
              :do (vector-push-extend link-index (quil::vnth 1 (quil::hardware-object-cxns (aref qubit-array b)))))))
     (setf (quil::chip-specification-objects chip-spec)
           (make-array 2 :initial-contents (list qubit-array
                                                 (coerce links 'vector))))
-    chip-spec))
+    (quil::warm-hardware-objects chip-spec)))
 
 ;; 0 -- 1
 ;; |    |
