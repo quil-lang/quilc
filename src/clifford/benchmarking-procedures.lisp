@@ -116,6 +116,16 @@
   (and (quil::double~ (realpart a) (realpart b))
        (quil::double~ (imagpart a) (imagpart b))))
 
+(defun global-phase= (wfa wfb)
+  "Tests that two wavefunctions are equal up to a global phase of an eighth root of unity."
+  (let ((phase-factor #C(0.7071067932881648d0 0.7071067932881648d0))
+        (phase-wf (copy-seq wfa)))
+    (loop :for i :below 8
+          :do (map-into phase-wf (lambda (x) (* x phase-factor)) phase-wf)
+          :when (every #'cl-quil.clifford::complex~ phase-wf wfb)
+            :return t
+          :finally (return nil))))
+
 (defun phase-to-string (phase)
   "Returns a string representation of a fourth root of unity, given by PHASE, NIL otherwise."
   (cond ((complex= phase 1) "")
