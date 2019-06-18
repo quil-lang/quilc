@@ -19,10 +19,7 @@
      (declare (ignorable prefix-matrix postfix-matrix))
      (define-compiler ,name ((instr (_ _ q)))
        (let ((m ,(if prefix-quil
-                     `(reduce #'magicl:multiply-complex-matrices
-                              (list postfix-matrix
-                                    (gate-matrix instr)
-                                    prefix-matrix))
+                     `(m* postfix-matrix (gate-matrix instr) prefix-matrix)
                      `(gate-matrix instr))))
          (multiple-value-bind (u0 u1 v0 v1 angles) (magicl:lapack-csd m 1 1)
            (list (build-gate ,outer-gate `(,(* ,outer-prefactor
