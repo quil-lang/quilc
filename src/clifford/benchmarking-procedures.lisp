@@ -122,7 +122,7 @@
         (phase-wf (copy-seq wfa)))
     (loop :for i :below 8
           :do (map-into phase-wf (lambda (x) (* x phase-factor)) phase-wf)
-          :when (every #'cl-quil.clifford::complex~ phase-wf wfb)
+          :when (every #'complex~ phase-wf wfb)
             :return t
           :finally (return nil))))
 
@@ -197,25 +197,6 @@
                                  "The given matrix does not represent a Clifford element.")
                          (pauli-from-string (concatenate 'string phase conj))))))))
 
-(defun %clifford-to-matrix (cliff)
-  "here we go boys"
-  (let* ((n (num-qubits cliff))
-         (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))
-         (scratch-tab (make-tableau-zero-state n))
-         (cliff-on-tab (lambda (tab) (apply (tableau-function cliff) tab (alexandria:iota n)))))
-    (dotimes (curr-state (expt 2 n))
-      (take-tableau-to-basis-state scratch-tab curr-state)
-      (funcall cliff-on-tab scratch-tab)
-      (let ((image (tableau-wavefunction scratch-tab)))
-        (dotimes (row (expt 2 n))
-          (magicl::setf (magicl::ref mat row curr-state) (aref image row)))))
-    mat))
-
-(defun clifford-to-matrix (cliff)
-  (let ((m (%clifford-to-matrix cliff)))
-    (assert (let ((magicl::*default-zero-comparison-epsilon* 1d-4)) (magicl::unitaryp m)) () "The matrix ~%~A~% is not unitary: ~%~A~%" m (magicl::multiply-complex-matrices m (magicl::conjugate-transpose m)))
-    m))
-
 (require :sb-rotate-byte)
 (defun apply-pauli-to-wavefunction (ph index q wf)
   "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
@@ -239,7 +220,7 @@
             (setf (aref wf addr0) w0
                   (aref wf addr1) w1)))))))
 
-(defun clifford-to-matrix-v2 (cliff)
+(defun clifford-to-matrix (cliff)
   (let* ((n (num-qubits cliff))
          (mat (magicl::make-zero-matrix (expt 2 n) (expt 2 n)))
          (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
@@ -250,7 +231,7 @@
     (setf scratch-wf (tableau-wavefunction zero-image-tab))
     ;; Write the image to the first column of MAT
     (dotimes (row (expt 2 n))
-      (magicl::setf (magicl::ref mat row 0) (aref scratch-wf row)))
+      (setf (magicl::ref mat row 0) (aref scratch-wf row)))
     ;; For each subsequent basis state,
     (dotimes (curr-state (1- (expt 2 n)))
       ;; Apply the appropriate paulis to find its image under CLIFF
@@ -264,7 +245,7 @@
                   :do (apply-pauli-to-wavefunction 1 (aref (pauli-components (aref pauli-map (* 2 i))) p) (1- p) scratch-wf))))
         ;; Write the basis state's image to the corresponding column of MAT
         (dotimes (row (expt 2 n))
-          (magicl::setf (magicl::ref mat row (1+ curr-state)) (aref scratch-wf row)))))
+          (setf (magicl::ref mat row (1+ curr-state)) (aref scratch-wf row)))))
     mat))
 
 (defun extract-cliffords (parsed-quil)

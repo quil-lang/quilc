@@ -3,7 +3,6 @@
 ;;;; Authors: Robert Smith, Andrew Shi
 
 (in-package #:cl-quil.clifford)
-(declaim (optimize (speed 0) safety debug (space 0)))
 
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
