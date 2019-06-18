@@ -181,10 +181,6 @@
         :where (subsetp (list p q) (list r s))))
   (list (build-gate "PISWAP" `(,(param-+ theta pi)) p q)))
 
-(define-compiler ISWAP-to-PISWAP
-    ((x ("ISWAP" () p q)))
-  (list (build-gate "PISWAP" '(#.pi) p q)))
-
 ;; CNOTs
 
 (define-compiler collapse-CNOTs
@@ -324,10 +320,6 @@
                  (build-gate "RZ" `(,theta) target)))
           (otherwise
            (give-up-compilation)))))))
-
-(define-compiler CZ-to-CPHASE
-    ((x ("CZ" () p q)))
-  (list (build-gate "CPHASE" '(#.pi) p q)))
 
 (define-compiler agglutinate-CZ-on-right-into-CPHASE
     ((x ("CPHASE" (phi) p q))
