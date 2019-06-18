@@ -579,36 +579,22 @@ mapping instructions to their tags. "
                  (typecase instr
                    (measure
                     (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                           (specs-hash (gethash "specs" (hardware-object-misc-data qubit-obj))))
-                      (unless specs-hash
+                           (specs-obj (gethash '("MEASURE" _ _) (hardware-object-gate-information qubit-obj))))
+                      (unless specs-obj
                         (warn-and-skip instr))
-                      (setf fidelity (gethash "fRO" specs-hash))
+                      (setf fidelity (gate-record-fidelity specs-obj))
                       (unless fidelity
                         (warn-and-skip instr))))
                    (application
-                    (multiple-value-bind (order address obj)
-                        (lookup-hardware-address chip-spec instr)
-                      (declare (ignore order address))
+                    (let ((obj (nth-value 2 (lookup-hardware-address chip-spec instr))))
                       (unless obj
                         (warn-and-skip instr))
-                      (let ((specs-hash (gethash "specs" (hardware-object-misc-data obj))))
+                      (let ((specs-hash (hardware-object-gate-information obj)))
                         (unless specs-hash (warn-and-skip instr))
-                        (setf fidelity
-                              ;; We can extract the name here directly
-                              ;; because INSTR will only be within our
-                              ;; native gate set, which will never
-                              ;; have gate modifiers.
-                              (a:switch ((application-operator-name instr) :test #'string=)
-                                ;; special handling for the 1Q gates
-                                ("RX"
-                                 (gethash "f1QRB" specs-hash))
-                                ("RZ"
-                                 1)
-                                ;; in general, try to look the data up out of the table
-                                (otherwise
-                                 (gethash
-                                  (format nil "f~a" (application-operator-name instr))
-                                  specs-hash))))
+                        (dohash ((key val) specs-hash)
+                          (when (string= (first key)
+                                         (application-operator-name instr))
+                            (setf fidelity (gate-record-fidelity val))))
                         (unless fidelity
                           (warn-and-skip instr)))))
                    (otherwise
