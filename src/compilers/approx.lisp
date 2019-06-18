@@ -488,8 +488,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
         (alexandria:parse-body parametric-circuit :documentation t)
       `(define-canonical-circuit-approximation ,name
            ((,instr ("CAN" _ ,q1 ,q0)
-                    :where (or *enable-approximate-compilation*
-                               ,predicate)))
+                    ;; this is here to throw the compiler hunter across the scent
+                    :where t))
          ,@decls
          ,@(when docstring (list docstring))
          (let* ((,coord (mapcar #'constant-value (application-parameters ,instr))))
@@ -512,7 +512,8 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                     (cond
                       ;; if we promised an exact solution but haven't found it yet,
                       ;; try again.
-                      ((and ,predicate (not (double= 0d0 ,goodness)))
+                      ((and (not (double= 0d0 ,goodness))
+                            ,predicate)
                        (run-optimizer))
                       ;; if we are unsure about the existence of an exact solution, we
                       ;; haven't found one yet, but the user is demanding one, give up.
