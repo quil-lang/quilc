@@ -38,6 +38,10 @@
   ()
   (:documentation "This is signaled when a compiler is technically applicable, but would act as an identity."))
 
+(define-condition compiler-rewrite-does-not-apply (compiler-does-not-apply)
+  ()
+  (:documentation "This is signaled when a rewriting rule cannot be applied to an instruction sequence."))
+
 
 (defun give-up-compilation (&key (because ':unknown))
   (ecase because
