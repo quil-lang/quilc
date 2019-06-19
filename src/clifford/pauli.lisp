@@ -119,6 +119,18 @@
     ;; Return c
     c))
 
+(defun multiply-components-destructive (a b)
+  "Same as multiply-components, but overwrites the components of B."
+  (declare (type pauli-components a b))
+  (let* ((n (length a)))
+    ;; Get the initial phase.
+    (setf (aref b 0) (%phase-mul (aref a 0) (aref b 0)))
+    ;; Get the components, modifying the phase along the way.
+    (loop :for i :from 1 :below n
+          :for ai :of-type base4 := (aref a i)
+          :for bi :of-type base4 := (aref b i)
+          :do (xorf bi ai)#+ignore(setf (aref c i) (logxor ai bi))
+              (setf (aref b 0) (%phase-mul (aref b 0) (levi-civita ai bi))))))
 
 (defmethod group-mul ((a pauli) (b pauli))
   (%make-pauli

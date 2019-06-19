@@ -7,7 +7,7 @@
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
 ;;; Gottesman's paper is also helpful
-;;; https://arxiv.org/pdf/quant-ph/9807006.pdf ...but BEWARE HIS JANKY
+;;; https://arxiv.org/pdf/quant-ph/9807006.pdf ...but BEWARE HIS PIQUANT
 ;;; QUBIT NOTATION!!  Correct qubit ordering is very important. Pay
 ;;; attention to which qubits are least/most significant and how they
 ;;; are ordered in the code with respect to this!!
@@ -44,33 +44,24 @@
   (declare (type tableau tab))
   (the tableau-index (ash (1- (array-dimension tab 0)) -1)))
 
-;; (defun check-index (tab i j)
-;;   (let ((n (tableau-qubits tab)))
-;;     ;; (assert (<= 0 i (1- (* 2 n))))
-;;     (assert (<= 0 j (1- n)))))
-
 (defun tableau-x (tab i j)
   (declare (type tableau tab)
            (type tableau-index i j))
-  ;; (check-index tab i j)
   (aref tab i j))
 (defun (setf tableau-x) (new-bit tab i j)
   (declare (type tableau tab)
            (type tableau-index i j)
            (type bit new-bit))
-  ;; (check-index tab i j)
   (setf (aref tab i j) new-bit))
 
 (defun tableau-z (tab i j)
   (declare (type tableau tab)
            (type tableau-index i j))
-  ;; (check-index tab i j)
   (aref tab i (+ j (tableau-qubits tab))))
 (defun (setf tableau-z) (new-bit tab i j)
   (declare (type tableau tab)
            (type tableau-index i j)
            (type bit new-bit))
-  ;; (check-index tab i j)
   (setf (aref tab i (+ j (tableau-qubits tab))) new-bit))
 
 (defun tableau-r (tab i)
@@ -198,14 +189,19 @@
 
 (declaim (inline row-product))
 (defun row-product (tab h i &key allow-dirty-phase)
-  ;; Set generator h to h + i, where + is the Pauli group operation.
+  ;; Set generator h to h + i, where + is the Pauli group
+  ;; operation. When ALLOW-DIRTY-PHASE is true, phases are allowed to
+  ;; be i or -i. We do this because while we are multiplying rows
+  ;; around to generate the full stabilizer group, even though each
+  ;; stabilizer will eventually have a phase of 1 or -1, the phase may
+  ;; take the value of i or -i in intermediate steps (see below).
   (let ((sum (incurred-phase-from-row-product tab h i)))
     ;; Step 1
     (cond
       ((= 0 sum) (setf (tableau-r tab h) 0))
       ((= 2 sum) (setf (tableau-r tab h) 1))
       ((not allow-dirty-phase)
-       (error "invalid prod between row ~D and ~D (got ~D):~%~A~%~A~%" h i sum
+       (error "invalid prod between row ~D and ~D (got ~D, which is an invalid phase for a generator or antigenerator!):~%~A~%~A~%" h i sum
               (with-output-to-string (*standard-output*)
                 (display-row tab h))
               (with-output-to-string (*standard-output*)
@@ -217,6 +213,13 @@
     ;; Return the phase
     sum))
 
+;; (Explained above in row-product, but re-explained here) While we
+;; are multiplying rows into the scratch row to generate the full
+;; stabilizer group, even though each stabilizer will eventually have
+;; a phase of 1 or -1, the phase may take the value of i or -i in
+;; intermediate steps. This function multiplies a row i into the
+;; scratch row, and returns the phase produced by the multiplication
+;; (can be 1, i, -1, or -i).
 (defun multiply-into-scratch (tab i)
   (declare (notinline row-product))
   (let ((n (tableau-qubits tab)))
@@ -230,7 +233,7 @@
 (defun clifford-stabilizer-action (c)
   "Compute a symbolic representation of the action of the Clifford element C on the stabilizer representation of a state, namely the \"tableau representation\".
 
-Given a Clifford C, calculate three values:
+Given a Clifford C, calculate two values:
 
 1. A list of variable names representing X-Z pairs on qubits 0, 1, .... A typical value will look like
 
@@ -238,60 +241,20 @@ Given a Clifford C, calculate three values:
 
 but the symbols may be uninterned or named differently.
 
-2. A Boolean expression which calculates the additional phase. If this boolean function were evaluated with the variables of (1) bound, then this would produce the action's contribution to the phase.
-
-3. A list of updates to the variables of (1), represented as Boolean expressions. Similarly to (2), these are expressions in 1-1 correspondence with (1) which, if evaluated, would produce the updates to said variables."
+2. A list of updates to the variables of (1), represented as Boolean expressions. Similarly to (2), these are expressions in 1-1 correspondence with (1) which, if evaluated, would produce the updates to said variables."
   (let* ((num-qubits (clifford-num-qubits c))
          (num-variables (* 2 num-qubits))
          (variables (loop :for i :below num-variables
                           :collect (if (evenp i)
                                        (alexandria:format-symbol nil "X~D" (floor i 2))
                                        (alexandria:format-symbol nil "Z~D" (floor i 2)))))
-         (phase-factor nil)
          (new-variables (make-array num-variables :initial-element nil)))
     ;; We will be mapping over all Paulis operating on a single
     ;; qubit. We will compute the action on the Pauli and use this to
     ;; produce part of the action.
     (map-all-paulis num-qubits
                     (lambda (i p)
-                      (let* ((cp (apply-clifford c p))
-                             (cp-phase (phase-factor cp)))
-                        (assert (zerop (mod cp-phase 2)))
-                        ;; We normalize the phase to be as follows:
-                        ;;
-                        ;;     0 - phase of 1
-                        ;;     1 - phase of -1
-                        ;;
-                        ;; Note that this will _always_ be the case; a
-                        ;; Clifford will maintain a real
-                        ;; eigenvalue. So the factors +/-i can be
-                        ;; thrown out.
-                        (setf cp-phase (ash cp-phase -1))
-                        ;; If we did accumulate a phase, we need to
-                        ;; note how this phase gets accumulated.
-                        ;;
-                        ;; Below, BITS starts off as the bitwise
-                        ;; representation of the Pauli P. This loop is
-                        ;; iterating through the bits and variables in
-                        ;; parallel, and we are building up a
-                        ;; corresponding Boolean expression. This is
-                        ;; the age-old trick of building a Boolean
-                        ;; expression corresponding to a truth
-                        ;; table.
-                        ;;
-                        ;; In the end, we want PHASE-FACTOR to have a
-                        ;; conjunctive term which contributes a -1
-                        ;; phase factor when the variables look like
-                        ;; the Pauli P.
-                        (when (= 1 cp-phase)
-                          (loop :with bits := i
-                                :for variable :in variables
-                                :collect (if (zerop (ldb (byte 1 0) bits)) ; Equiv. to EVENP
-                                             `(bnot ,variable)
-                                             variable)
-                                  :into conjunction
-                                :do (setf bits (ash bits -1))
-                                :finally (push `(b* ,@conjunction) phase-factor)))
+                      (let* ((cp (apply-clifford c p)))
                         ;; When the Pauli P is a generator (i.e., X or
                         ;; Z), then we want to record which other
                         ;; variables see an effect from this generator
@@ -316,8 +279,71 @@ but the symbols may be uninterned or named differently.
     ;; Return the values.
     (values
      variables
-     `(b+ ,@phase-factor)
      (coerce new-variables 'list))))
+
+;; Many moons ago, the phase updates produced by a clifford acting on
+;; a tableau via compile-tableau-operation (and
+;; clifford-stabilizer-action) were slightly incorrect. Before, phases
+;; were updated based on values in the un-clifforded tableau, but in
+;; reality, phase updates are dependent on the _updated_ X and Z bits
+;; of the tableau.
+;; 
+;; This function calculates the correct phase update to each
+;; generator and antigenerator of a tableau acted on by a clifford.
+;; It does this (with a minor adjustment or two) by:
+;;
+;;     1) Considering the row (generator/antigenerator) as a sequence
+;;        of single-qubit X and Z paulis.
+;; 
+;;     2) Mapping each of these paulis to their image under the clifford,
+;;        storing these new, more complicated paulis in contributing-ops.
+;;
+;;     3) Multiplying all these mapped paulis together to find the
+;;        image of the entire tableau row under the clifford.
+;;
+;; This tableau row image will now have an associated phase with it
+;; (which is a multiple of i). The minor adjustments refer to this
+;; detail: if the tableau row already has any Y paulis prior to the
+;; clifford action, the final phase value will have to be increased by
+;; 1 for each Y. This is because in the original row, the -i factor
+;; that comes from XZ = -iY is adjusted to 0, so we need to do the
+;; same for the resulting phase. Otherwise, a clifford that maps Y to
+;; Y, for example, would represent Y as X * Z, map them to themselves,
+;; multiply them together, and find that Y maps to -iY.
+(defun clifford-image-phase (tab c row &rest qubits)
+  "Calculate the phase update to a specific row in the tableau TAB, when acted on by a clifford C on specific qubits."
+  (let* ((cn (num-qubits c))
+         (contributing-op (pauli-identity cn))
+         (images (clifford-basis-map c))
+         (y-phase-offset 0))
+    (loop :for i :below (length qubits)
+          :for q :in qubits
+          :for Xq := (tableau-x tab row q)
+          :for Zq := (tableau-z tab row q)
+          :for Yq := (logand Xq Zq)
+          :do (when (= 1 Xq) (setf contributing-op (group-mul contributing-op (aref images (* 2 i)))))
+              (when (= 1 Zq) (setf contributing-op (group-mul contributing-op (aref images (1+ (* 2 i))))))
+              (incf y-phase-offset Yq))
+    (floor (mod (+ y-phase-offset (phase-factor contributing-op)) 4) 2)))
+
+(defun generate-clifford-image-phase (tab-var c row-var qubit-vars)
+  "Calculate the phase update to a specific row in the tableau TAB, when acted on by a clifford C on specific qubits."
+  (let* ((cn (num-qubits c))
+         (images (clifford-basis-map c)))
+    `(let (#+ignore(row-image (pauli-identity ,cn))
+           (row-image (make-components ,cn))
+           (y-phase-offset 0))
+       (declare (type fixnum y-phase-offset))
+       ,@(loop :for i :below (length qubit-vars)
+                     :for q :in qubit-vars
+                     :collect `(let* ((Xq (tableau-x ,tab-var ,row-var ,q))
+                                      (Zq (tableau-z ,tab-var ,row-var ,q))
+                                      (Yq (logand Xq Zq)))
+                                 (declare (type bit Xq Yq Zq))
+                                 (when (= 1 Xq) (multiply-components-destructive ,(pauli-components (aref images (* 2 i))) row-image)#+ignore(setf row-image (group-mul row-image ,(aref images (* 2 i)))))
+                                 (when (= 1 Zq) (multiply-components-destructive ,(pauli-components (aref images (1+ (* 2 i)))) row-image)#+ignore(setf row-image (group-mul row-image ,(aref images (1+ (* 2 i))))))
+                                 (incf y-phase-offset Yq)))
+       (floor (mod (+ y-phase-offset (phase-factor row-image)) 4) 2))))
 
 (defun compile-tableau-operation (c)
   "Compile a Clifford element into a tableau operation. This will be a lambda form whose first argument is the tableau to operate on, and whose remaining arguments are the qubit indexes to operate on. Upon applying this function to a tableau, it will be mutated "
@@ -328,7 +354,7 @@ but the symbols may be uninterned or named differently.
          (tab    (gensym "TAB-"))
          (qubits (loop :for i :below num-qubits
                        :collect (alexandria:format-symbol nil "Q~D" i))))
-    (multiple-value-bind (variables phase-kickback new-variables)
+    (multiple-value-bind (variables new-variables)
         (clifford-stabilizer-action c)
       ;; Most of this lambda can be understood by understanding the
       ;; return values of CLIFFORD-STABILIZER-ACTION. See the
@@ -349,6 +375,7 @@ but the symbols may be uninterned or named differently.
              (declare (type bit ,@variables))
              ;; Calculate the new phase.
              ;; (xorf (tableau-r ,tab ,i) ,phase-kickback)
+             ;; (xorf (tableau-r ,tab ,i) ,(generate-clifford-image-phase tab c i qubits))
              (xorf (tableau-r ,tab ,i) (clifford-image-phase ,tab ,c ,i ,@qubits))
              ;; Update the tableau with the new values.
              (setf
@@ -362,22 +389,6 @@ but the symbols may be uninterned or named differently.
                       :collect `(tableau-z ,tab ,i ,qubit)
                       ;; to this...
                       :collect z))))))))
-
-(defun clifford-image-phase (tab c row &rest qubits)
-  (let* ((n (tableau-qubits tab))
-         (cn (num-qubits c))
-         (contributing-ops (make-array (* 2 n) :initial-element (pauli-identity cn)))
-         (images (clifford-basis-map c))
-         (y-phase-offset 0))
-    ;; (format t "~%~A~%~A~%~A" n qubits images)
-    (loop :for i :below (length qubits)
-          :for q := (nth i qubits)
-          :do (when (= 1 (tableau-x tab row q)) (setf (aref contributing-ops (* 2 q)) (aref images (* 2 i))))
-              (when (= 1 (tableau-z tab row q)) (setf (aref contributing-ops (1+ (* 2 q))) (aref images (1+ (* 2 i)))))
-              (when (and (= 1 (tableau-x tab row q)) (= 1 (tableau-z tab row q)))
-                (incf y-phase-offset)))
-    ;; (format t "~A~%~A  (~A + ~A)~%" contributing-ops (reduce #'group-mul contributing-ops) (phase-factor (reduce #'group-mul contributing-ops)) y-phase-offset)
-    (floor (mod (+ y-phase-offset (phase-factor (reduce #'group-mul contributing-ops))) 4) 2)))
 
 (defun tableau-function (c)
   (compile nil (compile-tableau-operation c)))
