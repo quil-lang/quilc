@@ -310,40 +310,25 @@ but the symbols may be uninterned or named differently.
 ;; same for the resulting phase. Otherwise, a clifford that maps Y to
 ;; Y, for example, would represent Y as X * Z, map them to themselves,
 ;; multiply them together, and find that Y maps to -iY.
-(defun clifford-image-phase (tab c row &rest qubits)
-  "Calculate the phase update to a specific row in the tableau TAB, when acted on by a clifford C on specific qubits."
-  (let* ((cn (num-qubits c))
-         (contributing-op (pauli-identity cn))
-         (images (clifford-basis-map c))
-         (y-phase-offset 0))
-    (loop :for i :below (length qubits)
-          :for q :in qubits
-          :for Xq := (tableau-x tab row q)
-          :for Zq := (tableau-z tab row q)
-          :for Yq := (logand Xq Zq)
-          :do (when (= 1 Xq) (setf contributing-op (group-mul contributing-op (aref images (* 2 i)))))
-              (when (= 1 Zq) (setf contributing-op (group-mul contributing-op (aref images (1+ (* 2 i))))))
-              (incf y-phase-offset Yq))
-    (floor (mod (+ y-phase-offset (phase-factor contributing-op)) 4) 2)))
-
 (defun generate-clifford-image-phase (tab-var c row-var qubit-vars)
   "Calculate the phase update to a specific row in the tableau TAB, when acted on by a clifford C on specific qubits."
   (let* ((cn (num-qubits c))
          (images (clifford-basis-map c)))
-    `(let (#+ignore(row-image (pauli-identity ,cn))
-           (row-image (make-components ,cn))
-           (y-phase-offset 0))
-       (declare (type fixnum y-phase-offset))
-       ,@(loop :for i :below (length qubit-vars)
-               :for q :in (reverse qubit-vars)
-               :collect `(let* ((Xq (tableau-x ,tab-var ,row-var ,q))
-                                (Zq (tableau-z ,tab-var ,row-var ,q))
-                                (Yq (logand Xq Zq)))
-                           (declare (type bit Xq Yq Zq))
-                           (when (= 1 Xq) (multiply-components-destructive row-image ,(pauli-components (aref images (* 2 i)))))
-                           (when (= 1 Zq) (multiply-components-destructive row-image ,(pauli-components (aref images (1+ (* 2 i))))))
-                           (incf y-phase-offset Yq)))
-       (floor (mod (+ y-phase-offset (aref row-image 0)) 4) 2))))
+    (alexandria:with-gensyms (row-image y-phase-offset Xq Zq Yq)
+      `(let ((,row-image (make-components ,cn))
+             (,y-phase-offset 0))
+         (declare (type fixnum ,y-phase-offset)
+                  (type pauli-components ,row-image))
+         ,@(loop :for i :below (length qubit-vars)
+                 :for q :in (reverse qubit-vars)
+                 :collect `(let* ((,Xq (tableau-x ,tab-var ,row-var ,q))
+                                  (,Zq (tableau-z ,tab-var ,row-var ,q))
+                                  (,Yq (logand ,Xq ,Zq)))
+                             (declare (type bit ,Xq ,Yq ,Zq))
+                             (when (= 1 ,Xq) (multiply-components-into ,row-image ,(pauli-components (aref images (* 2 i))) ,row-image))
+                             (when (= 1 ,Zq) (multiply-components-into ,row-image ,(pauli-components (aref images (1+ (* 2 i)))) ,row-image))
+                             (incf ,y-phase-offset ,Yq)))
+         (floor (mod (the fixnum (+ ,y-phase-offset (aref ,row-image 0))) 4) 2)))))
 
 (defun compile-tableau-operation (c)
   "Compile a Clifford element into a tableau operation. This will be a lambda form whose first argument is the tableau to operate on, and whose remaining arguments are the qubit indexes to operate on. Upon applying this function to a tableau, it will be mutated "
@@ -360,8 +345,7 @@ but the symbols may be uninterned or named differently.
       ;; return values of CLIFFORD-STABILIZER-ACTION. See the
       ;; documentation of that function.
       `(lambda (,tab ,@qubits)
-         ;; TURN THIS DECLARATION BACK ON LATER!!!
-         (declare #+ignore(optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
+         (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
                   (type tableau ,tab)
                   (type tableau-index ,@qubits))
          (dotimes (,i (* 2 (tableau-qubits ,tab)))
@@ -374,9 +358,7 @@ but the symbols may be uninterned or named differently.
                          :collect `(,z (tableau-z ,tab ,i ,qubit))))
              (declare (type bit ,@variables))
              ;; Calculate the new phase.
-             ;; (xorf (tableau-r ,tab ,i) ,phase-kickback)
              (xorf (tableau-r ,tab ,i) ,(generate-clifford-image-phase tab c i qubits))
-             ;; (xorf (tableau-r ,tab ,i) (clifford-image-phase ,tab ,c ,i ,@qubits))
              ;; Update the tableau with the new values.
              (setf
               ,@(loop :for qubit :in (reverse qubits)
