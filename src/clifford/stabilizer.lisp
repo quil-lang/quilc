@@ -335,15 +335,15 @@ but the symbols may be uninterned or named differently.
            (y-phase-offset 0))
        (declare (type fixnum y-phase-offset))
        ,@(loop :for i :below (length qubit-vars)
-                     :for q :in qubit-vars
-                     :collect `(let* ((Xq (tableau-x ,tab-var ,row-var ,q))
-                                      (Zq (tableau-z ,tab-var ,row-var ,q))
-                                      (Yq (logand Xq Zq)))
-                                 (declare (type bit Xq Yq Zq))
-                                 (when (= 1 Xq) (multiply-components-destructive ,(pauli-components (aref images (* 2 i))) row-image)#+ignore(setf row-image (group-mul row-image ,(aref images (* 2 i)))))
-                                 (when (= 1 Zq) (multiply-components-destructive ,(pauli-components (aref images (1+ (* 2 i)))) row-image)#+ignore(setf row-image (group-mul row-image ,(aref images (1+ (* 2 i))))))
-                                 (incf y-phase-offset Yq)))
-       (floor (mod (+ y-phase-offset (phase-factor row-image)) 4) 2))))
+               :for q :in (reverse qubit-vars)
+               :collect `(let* ((Xq (tableau-x ,tab-var ,row-var ,q))
+                                (Zq (tableau-z ,tab-var ,row-var ,q))
+                                (Yq (logand Xq Zq)))
+                           (declare (type bit Xq Yq Zq))
+                           (when (= 1 Xq) (multiply-components-destructive row-image ,(pauli-components (aref images (* 2 i)))))
+                           (when (= 1 Zq) (multiply-components-destructive row-image ,(pauli-components (aref images (1+ (* 2 i))))))
+                           (incf y-phase-offset Yq)))
+       (floor (mod (+ y-phase-offset (aref row-image 0)) 4) 2))))
 
 (defun compile-tableau-operation (c)
   "Compile a Clifford element into a tableau operation. This will be a lambda form whose first argument is the tableau to operate on, and whose remaining arguments are the qubit indexes to operate on. Upon applying this function to a tableau, it will be mutated "
@@ -353,33 +353,33 @@ but the symbols may be uninterned or named differently.
          (i      (gensym "I-"))
          (tab    (gensym "TAB-"))
          (qubits (loop :for i :below num-qubits
-                       :collect (alexandria:format-symbol nil "Q~D" i))))
+                       :collect (alexandria:format-symbol nil "Q~D" (- num-qubits 1 i)))))
     (multiple-value-bind (variables new-variables)
         (clifford-stabilizer-action c)
       ;; Most of this lambda can be understood by understanding the
       ;; return values of CLIFFORD-STABILIZER-ACTION. See the
       ;; documentation of that function.
       `(lambda (,tab ,@qubits)
-         (declare (optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
+         ;; TURN THIS DECLARATION BACK ON LATER!!!
+         (declare #+ignore(optimize speed (safety 0) (debug 0) (space 0) (compilation-speed 0))
                   (type tableau ,tab)
                   (type tableau-index ,@qubits))
-         (tableau-clear-scratch ,tab)
          (dotimes (,i (* 2 (tableau-qubits ,tab)))
            (declare (type tableau-index ,i))
            ;; First, we construct bindings to these variables
            ;; according to the qubits we are operating on.
-           (let (,@(loop :for qubit :in qubits
+           (let (,@(loop :for qubit :in (reverse qubits)
                          :for (x z) :on variables :by #'cddr
                          :collect `(,x (tableau-x ,tab ,i ,qubit))
                          :collect `(,z (tableau-z ,tab ,i ,qubit))))
              (declare (type bit ,@variables))
              ;; Calculate the new phase.
              ;; (xorf (tableau-r ,tab ,i) ,phase-kickback)
-             ;; (xorf (tableau-r ,tab ,i) ,(generate-clifford-image-phase tab c i qubits))
-             (xorf (tableau-r ,tab ,i) (clifford-image-phase ,tab ,c ,i ,@qubits))
+             (xorf (tableau-r ,tab ,i) ,(generate-clifford-image-phase tab c i qubits))
+             ;; (xorf (tableau-r ,tab ,i) (clifford-image-phase ,tab ,c ,i ,@qubits))
              ;; Update the tableau with the new values.
              (setf
-              ,@(loop :for qubit :in qubits
+              ,@(loop :for qubit :in (reverse qubits)
                       :for (x z) :on new-variables :by #'cddr
                       ;; Set this...
                       :collect `(tableau-x ,tab ,i ,qubit)

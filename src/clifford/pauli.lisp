@@ -120,23 +120,27 @@
     c))
 
 (defun multiply-components-destructive (a b)
-  "Same as multiply-components, but overwrites the components of B."
+  "Same as multiply-components, but overwrites the components of A."
   (declare (type pauli-components a b))
   (let* ((n (length a)))
     ;; Get the initial phase.
-    (setf (aref b 0) (%phase-mul (aref a 0) (aref b 0)))
+    (setf (aref a 0) (%phase-mul (aref a 0) (aref b 0)))
     ;; Get the components, modifying the phase along the way.
     (loop :for i :from 1 :below n
           :for ai :of-type base4 := (aref a i)
           :for bi :of-type base4 := (aref b i)
-          :do (xorf bi ai)#+ignore(setf (aref c i) (logxor ai bi))
-              (setf (aref b 0) (%phase-mul (aref b 0) (levi-civita ai bi))))))
+          :do (setf (aref a i) (logxor ai bi))
+              (setf (aref a 0) (%phase-mul (aref a 0) (levi-civita ai bi))))))
 
 (defmethod group-mul ((a pauli) (b pauli))
   (%make-pauli
    :components (multiply-components (pauli-components a)
                                     (pauli-components b))))
 
+;; Paulis are now printed in a fashion that is consistent with the
+;; ordering of the computational basis. For example, a pauli operator
+;; represented as '(A B C) is printed as CBA, which applies A on q0, B
+;; on q1, C on q2.
 (defun print-pauli (p &optional (stream nil))
   "If STREAM is NIL (by default), return simple string representation of a Pauli P.
 If STREAM is T, print to standard output. Otherwise print to STREAM."
@@ -149,8 +153,8 @@ If STREAM is T, print to standard output. Otherwise print to STREAM."
           (apply
            #'concatenate
            'string
-           (mapcar (alexandria:compose #'symbol-name #'base4-to-sym)
-                   (base4-list p)))))
+           (reverse (mapcar (alexandria:compose #'symbol-name #'base4-to-sym)
+                            (base4-list p))))))
 
 (defmethod print-object ((p pauli) stream)
   (print-unreadable-object (p stream :type t)

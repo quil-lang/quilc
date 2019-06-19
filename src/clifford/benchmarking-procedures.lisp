@@ -227,7 +227,7 @@
          (zero-image-tab (make-tableau-zero-state n))
          (pauli-map (clifford-basis-map cliff)))
     ;; Use a tableau-function to find the image of the zero state
-    (apply (tableau-function cliff) zero-image-tab (alexandria:iota n))
+    (apply (tableau-function cliff) zero-image-tab (alexandria:iota n :start (1- n) :step -1))
     (setf scratch-wf (tableau-wavefunction zero-image-tab))
     ;; Write the image to the first column of MAT
     (dotimes (row (expt 2 n))
