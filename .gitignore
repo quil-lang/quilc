@@ -4,3 +4,5 @@ quilc
 system-index.txt
 *.so
 *.dylib
+*.fasl
+.DS_Store

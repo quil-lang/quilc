@@ -130,7 +130,7 @@
    :components (multiply-components (pauli-components a)
                                     (pauli-components b))))
 
-;; Paulis are now printed in a fashion that is consistent with the
+;; Paulis are printed in a fashion that is consistent with the
 ;; ordering of the computational basis. For example, a pauli operator
 ;; represented as '(0 A B C) is printed as CBA, which applies A on q0, B
 ;; on q1, C on q2.

@@ -124,7 +124,7 @@
       (setf (aref zero i i) 1))))
 
 (defun take-tableau-to-basis-state (tab x)
-  "Bring the tableau to the specific basis state X. X is written in LSB form, so for example, |01000> = 8."
+  "Bring the tableau to the specific basis state X. X is an integer interpreted as a collection of bits, so for example, |01000> = #b01000 = 8."
   (let ((n (tableau-qubits tab)))
     (zero-out-tableau tab)
     (dotimes (i n)
@@ -189,12 +189,11 @@
 
 (declaim (inline row-product))
 (defun row-product (tab h i &key allow-dirty-phase)
-  ;; Set generator h to h + i, where + is the Pauli group
-  ;; operation. When ALLOW-DIRTY-PHASE is true, phases are allowed to
-  ;; be i or -i. We do this because while we are multiplying rows
-  ;; around to generate the full stabilizer group, even though each
-  ;; stabilizer will eventually have a phase of 1 or -1, the phase may
-  ;; take the value of i or -i in intermediate steps (see below).
+  "Set generator h to h + i, where + is the Pauli group operation. When ALLOW-DIRTY-PHASE is true, phases are allowed to be i or -i."
+  ;; We do this because while we are multiplying rows around to
+  ;; generate the full stabilizer group, even though each stabilizer
+  ;; will eventually have a phase of 1 or -1, the phase may take the
+  ;; value of i or -i in intermediate steps (see below).
   (let ((sum (incurred-phase-from-row-product tab h i)))
     ;; Step 1
     (cond
@@ -221,6 +220,7 @@
 ;; scratch row, and returns the phase produced by the multiplication
 ;; (can be 1, i, -1, or -i).
 (defun multiply-into-scratch (tab i)
+  "Multiplies row I of TAB into the scratch row, and return the phase produced by the multiplication (as 0, 1, 2, 3 for 1, i, -1, -i respectively)."
   (declare (notinline row-product))
   (let ((n (tableau-qubits tab)))
     (prog1 (row-product tab (* 2 n) i :allow-dirty-phase t)
@@ -241,7 +241,9 @@ Given a Clifford C, calculate two values:
 
 but the symbols may be uninterned or named differently.
 
-2. A list of updates to the variables of (1), represented as Boolean expressions. Similarly to (2), these are expressions in 1-1 correspondence with (1) which, if evaluated, would produce the updates to said variables."
+2. A list of updates to the variables of (1), represented as Boolean expressions. Similarly to (2), these are expressions in 1-1 correspondence with (1) which, if evaluated, would produce the updates to said variables.
+
+Note that no expressions calculating the phase update are created. This is because these phase updates are calculated by the function generate-clifford-image-phase instead."
   (let* ((num-qubits (clifford-num-qubits c))
          (num-variables (* 2 num-qubits))
          (variables (loop :for i :below num-variables
@@ -270,9 +272,9 @@ but the symbols may be uninterned or named differently.
                             ;; The var that contributes to X- and Z-FACTORS
                             (loop :with bits := (pauli-index cp)
                                   :for i :below num-variables
-                                  :when (= 1 (ldb (byte 1 0) bits)) ; Equiv. to ODDP
-                                    :do (push var (aref new-variables i))
-                                  :do (setf bits (ash bits -1))))))))
+                                  ;; :when (= 1 (ldb (byte 1 0) bits)) ; Equiv. to ODDP
+                                  ;;   :do (push var (aref new-variables i))
+                                  :do (push (if (= 1 (ldb (byte 1 0) bits)) var 0) (aref new-variables i)) (setf bits (ash bits -1))))))))
     ;; We didn't actually construct the disjunction yet out of the
     ;; running lists, so do that here.
     (map-into new-variables (lambda (sum) `(b+ ,@sum)) new-variables)
@@ -281,7 +283,7 @@ but the symbols may be uninterned or named differently.
      variables
      (coerce new-variables 'list))))
 
-;; Many moons ago, the phase updates produced by a clifford acting on
+;; Many moons ago (04/2019), the phase updates produced by a clifford acting on
 ;; a tableau via compile-tableau-operation (and
 ;; clifford-stabilizer-action) were slightly incorrect. Before, phases
 ;; were updated based on values in the un-clifforded tableau, but in
@@ -373,6 +375,7 @@ but the symbols may be uninterned or named differently.
                       :collect z))))))))
 
 (defun tableau-function (c)
+  "Given a Clifford C, return a function representing its action on a tableau."
   (compile nil (compile-tableau-operation c)))
 
 ;;; These functions: TABLEAU-APPLY-{CNOT, H, PHASE} are hard-coded
@@ -488,7 +491,7 @@ but the symbols may be uninterned or named differently.
   (dotimes (i (1+ (* 2 (tableau-qubits tab))))
     (setf (tableau-scratch tab i) 0)))
 
-(defun tableau-to-ref (tab)
+(defun make-tableau-row-echelon-form (tab)
   "Perform Gaussian elimination to put the tableau in row echelon form. Specifically, the modified generators will be put in the form
 
     |1 * * * * * * * * * * *|
@@ -547,7 +550,7 @@ Returns the number of purely X/Y generators.
 (defun find-nonzero-operator (tab)
   "Given a tableau TAB, find a Pauli operator P such that P|0...0> has nonzero amplitude in the state represented by TAB. Write this operator to the scratch space of TAB. This function also puts TAB into REF (row echelon form), since P is found using the purely Z generators."
   (let ((n (tableau-qubits tab))
-        (log-nonzero (tableau-to-ref tab)))
+        (log-nonzero (make-tableau-row-echelon-form tab)))
     ;; Zero out scratch space
     (tableau-clear-scratch tab)
     ;; For each row, starting from the bottom of the Z generators
@@ -585,13 +588,8 @@ Returns the number of purely X/Y generators.
   "Given a tableau TAB, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers.
 
 Note: the scratch space is used as an area to write intermediate state values, and starts with the operator returned by find-nonzero-operator."
-  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
-    (loop :for i :below (array-total-size copy)
-          :do (setf (row-major-aref copy i)
-                    (row-major-aref tab i)))
-    (setf tab copy))
   (let* ((n (tableau-qubits tab))
-         (log-nonzero (tableau-to-ref tab))
+         (log-nonzero (make-tableau-row-echelon-form tab))
          (norm (sqrt (expt 2 log-nonzero)))
          (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
          (running-phase 0))
@@ -602,26 +600,33 @@ Note: the scratch space is used as an area to write intermediate state values, a
           (when (logbitp j x)
             (incf running-phase (multiply-into-scratch tab (+ n j)))))
         (multiple-value-bind (state read-phase) (read-basis-state-from-scratch-row tab)
-          #+ignore(break "~A~%~A~%~A~%~A~%" state scratch-phase read-phase tab)
           (setf (aref wf state) (/ (expt #C(0.0d0 1.0d0) (+ read-phase running-phase)) norm)))))
     wf))
+
+(defun copy-tableau (tab)
+  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
+    (loop :for i :below (array-total-size copy)
+          :do (setf (row-major-aref copy i)
+                    (row-major-aref tab i)))
+    copy))
 
 ;;; The .chp file format is an input to Aaronson's chp program written
 ;;; in C. Below is a parser and interpreter for it.
 
 (defun interpret-chp (code tab &key silent)
-  (loop :for i :from 1
-        :for isn :in code
-        :do
-           (unless silent (format t "~D: ~A" i isn))
-           (alexandria:destructuring-ecase isn
-             ((H q)       (tableau-apply-h tab q))
-             ((S q)       (tableau-apply-phase tab q))
-             ((CNOT p q)  (tableau-apply-cnot tab p q))
-             ((MEASURE q) (multiple-value-bind (outcome determ?)
-                              (tableau-measure tab q)
-                            (unless silent (format t " => ~D~:[ (random)~;~]" outcome determ?)))))
-           (unless silent (terpri))))
+  (let ((*standard-output* (if silent (make-broadcast-stream) *standard-output*)))
+    (loop :for i :from 1
+          :for isn :in code
+          :do
+             (format t "~D: ~A" i isn)
+             (alexandria:destructuring-ecase isn
+               ((H q)       (tableau-apply-h tab q))
+               ((S q)       (tableau-apply-phase tab q))
+               ((CNOT p q)  (tableau-apply-cnot tab p q))
+               ((MEASURE q) (multiple-value-bind (outcome determ?)
+                                (tableau-measure tab q)
+                              (format t " => ~D~:[ (random)~;~]" outcome determ?))))
+             (terpri))))
 
 (defun read-chp-file (file)
   "Parse a .chp file as defined by Aaronson."
@@ -696,6 +701,3 @@ Note: the scratch space is used as an area to write intermediate state values, a
            :collect chp-gate
            :do (write-line quil-gate quil-str))
      (get-output-stream-string quil-str))))
-
-(defun round-trip (matrix)
-  (clifford-to-matrix (print (matrix-to-clifford matrix))))

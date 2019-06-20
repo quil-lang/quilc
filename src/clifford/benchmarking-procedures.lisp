@@ -108,9 +108,9 @@
   "If A and B are both not NIL, concatenate them and return a STRING."
   (when (and a b) (concatenate 'string a b)))
 
-(defun global-phase= (wfa wfb)
+(defun global-phase~ (wfa wfb)
   "Tests that two wavefunctions are equal up to a global phase of an eighth root of unity."
-  (let ((phase-factor #C(0.7071067932881648d0 0.7071067932881648d0))
+  (let ((phase-factor (cis (/ pi 4)))
         (phase-wf (copy-seq wfa)))
     (loop :for i :below 8
           :do (map-into phase-wf (lambda (x) (* x phase-factor)) phase-wf)
@@ -219,8 +219,31 @@
               (setf (aref wf addr0) w0
                     (aref wf addr1) w1))))))))
 
-;; DOCUMENT
+;; This function converts a clifford of arbitrary arity to its
+;; corresponding matrix representation. How would one do this, you
+;; ask? It is done in these steps:
+;;
+;;     1) Create a blank square matrix of size 2^n.
+;;
+;;     2) Find the wavefunction image of the zero state under this
+;;     clifford, by using (tableau-function cliff) and applying it on
+;;     a tableau in the zero state, then extracting its
+;;     wavefunction. Thus, this wavefunction is the first column of
+;;     our result matrix.
+;;
+;;     3) Next, we calculate the columns of the matrix in succession,
+;;     which each represent the image of a basis state under the
+;;     clifford. We already know C|0...0>; we want to find C|x>. We
+;;     can get to any basis state from |0> by applying some
+;;     combination of single qubit X gates, and we know the images of
+;;     each of these Xs under conjugation by the clifford, so we can
+;;     apply each image to C|0...0> to get (C*X0*C')(C*X1*C')...C|0> =
+;;     C(X0*X1...)|0> = C|x>. Looping over all 2^n - 1 remaining basis
+;;     states and doing that for each one, and setting the appropriate
+;;     column of the matrix for each one, we get our final clifford
+;;     matrix.
 (defun clifford-to-matrix (cliff)
+  "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
   (let* ((n (num-qubits cliff))
          (mat (magicl:make-zero-matrix (expt 2 n) (expt 2 n)))
          (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
@@ -239,7 +262,8 @@
         (dotimes (i n)
           (when (logbitp i x)
             ;; Apply the pauli on zeroth qubit, with phase
-            (apply-pauli-to-wavefunction (if (zerop (phase-factor (aref pauli-map (* 2 i)))) 1 -1) (aref (pauli-components (aref pauli-map (* 2 i))) 1) 0 scratch-wf)
+            (apply-pauli-to-wavefunction (if (zerop (phase-factor (aref pauli-map (* 2 i)))) 1 -1)
+                                         (aref (pauli-components (aref pauli-map (* 2 i))) 1) 0 scratch-wf)
             ;; Apply the paulis on the rest of the qubits
             (loop :for p :from 2 :to n
                   :do (apply-pauli-to-wavefunction 1 (aref (pauli-components (aref pauli-map (* 2 i))) p) (1- p) scratch-wf))))

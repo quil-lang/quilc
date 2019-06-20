@@ -252,7 +252,7 @@
   (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
 
 (deftest test-tableau-wavefunction ()
-  "Some simple tests to see if wavefunctions are correctly generated from tableaus."
+  "Some simple tests to see if wavefunctions are correctly generated from tableaus. There are many, many more tests in qvm/tests/test-stabilizer-qvm.lisp"
   (let ((zero-wf (blank-wf 2))
         (bell-wf (blank-wf 2))
         (x-wf (blank-wf 2))
