@@ -15,6 +15,30 @@
       (coerce x 'double-float)
       nil))
 
+(defun runtime-estimation (parsed-protoquil-program)
+  "Estimated runtime of PARSED-PROTOQUIL-PROGRAM. Likely to be an over-estimate for small depth programs, where runtime is dominated by network latency and compilation, etc. Take these results with a grain of salt."
+  (break)
+  (when (and (typep parsed-protoquil-program 'quil:parsed-program)
+             (quil::check-protoquil-program parsed-protoquil-program))
+    ;; These opaque numbers come from an analysis of the runtimes of a
+    ;; large number of randomly generated programs targeting a 16Q
+    ;; lattice. Those programs were a random mixture of 1- and 2Q
+    ;; gates, followed by MEASUREs on all 16 qubits.
+    (let ((coeff-oneq 1.6291)
+          (coeff-twoq 1.701)
+          (coeff-const 181.89)
+          (num-oneq (count-if (lambda (instr)
+                                (and (typep instr 'quil:gate-application)
+                                     (= 1 (length (quil:application-arguments instr)))))
+                              (quil:parsed-program-executable-code parsed-protoquil-program)))
+          (num-twoq (count-if (lambda (instr)
+                                (and (typep instr 'quil:gate-application)
+                                     (= 2 (length (quil:application-arguments instr)))))
+                              (quil:parsed-program-executable-code parsed-protoquil-program))))
+      (+ (* coeff-oneq num-oneq)
+         (* coeff-twoq num-twoq)
+         coeff-const))))
+
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
 (defun quil-to-native-quil (request)
@@ -27,6 +51,7 @@
                                        :test #'equal))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
          (dictionary (process-program quil-program chip-specification))
+         (processed-program (gethash "processed_program" dictionary))
          (metadata (a:alist-hash-table
                     `(("final_rewiring" . ,(gethash "final_rewiring" dictionary))
                       ("gate_depth" . ,(gethash "gate_depth" dictionary))
@@ -34,9 +59,10 @@
                       ("multiqubit_gate_depth" . ,(gethash "multiqubit_gate_depth" dictionary))
                       ("program_duration" . ,(gethash "program_duration" dictionary))
                       ("program_fidelity" . ,(gethash "program_fidelity" dictionary))
-                      ("topological_swaps" . ,(gethash "topological_swaps" dictionary))))))
+                      ("topological_swaps" . ,(gethash "topological_swaps" dictionary))
+                      ("duration_estimation" . 1)))))
     (make-instance 'rpcq::|NativeQuilResponse|
-                   :|quil| (gethash "processed_program" dictionary)
+                   :|quil| processed-program
                    :|metadata| metadata)))
 
 (defun native-quil-to-binary (request)
