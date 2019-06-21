@@ -120,8 +120,7 @@
 (declaim (ftype (function (pauli-components pauli-components) pauli-components) multiply-components))
 (defun multiply-components (a b)
   (declare (type pauli-components a b))
-  (let* ((n (length a))
-         (c (make-components (1- n))))
+  (let* ((c (make-components (1- (length a)))))
     (multiply-components-into a b c)
     c))
 

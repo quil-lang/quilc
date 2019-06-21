@@ -263,15 +263,15 @@
         (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2)))
     ;; zero state wavefunction
     (setf (aref zero-wf 0) #C(1.0d0 0.0d0))
-    (is (every #'cl-quil.clifford::complex~
-               zero-wf
-               (cl-quil.clifford::tableau-wavefunction zero-tab)))
+    (is (cl-quil.clifford::global-phase~ 
+         zero-wf
+         (cl-quil.clifford::tableau-wavefunction zero-tab)))
     ;; bell state wavefunction
     (setf (aref bell-wf 0) #C(0.7071d0 0.0d0))
     (setf (aref bell-wf 3) #C(0.7071d0 0.0d0))
     (cl-quil.clifford::tableau-apply-h bell-tab 0)
     (cl-quil.clifford::tableau-apply-cnot bell-tab 0 1)
-    (is (every #'cl-quil.clifford::complex~
+    (is (cl-quil.clifford::global-phase~
                bell-wf
                (cl-quil.clifford::tableau-wavefunction bell-tab)))
     ;; simple x gate test
@@ -280,7 +280,7 @@
     (cl-quil.clifford::tableau-apply-phase x-tab 0)
     (cl-quil.clifford::tableau-apply-phase x-tab 0)
     (cl-quil.clifford::tableau-apply-h x-tab 0)
-    (is (every #'cl-quil.clifford::complex~
+    (is (cl-quil.clifford::global-phase~
                x-wf
                (cl-quil.clifford::tableau-wavefunction x-tab)))
     ;; wavefunction with complex phase
@@ -291,6 +291,6 @@
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
-    (is (every #'cl-quil.clifford::complex~
+    (is (cl-quil.clifford::global-phase~
                phased-bell-wf
                (cl-quil.clifford::tableau-wavefunction phased-bell-tab)))))
