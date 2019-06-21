@@ -16,8 +16,7 @@
       nil))
 
 (defun runtime-estimation (parsed-protoquil-program)
-  "Estimated runtime of PARSED-PROTOQUIL-PROGRAM. Likely to be an over-estimate for small depth programs, where runtime is dominated by network latency and compilation, etc. Take these results with a grain of salt."
-  (break)
+  "Estimated QPU runtime of PARSED-PROTOQUIL-PROGRAM. Likely to be an over-estimate for small depth programs, where runtime is dominated by network latency and compilation, etc. Take these results with a grain of salt."
   (when (and (typep parsed-protoquil-program 'quil:parsed-program)
              (quil::check-protoquil-program parsed-protoquil-program))
     ;; These opaque numbers come from an analysis of the runtimes of a
@@ -52,6 +51,9 @@
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
          (dictionary (process-program quil-program chip-specification))
          (processed-program (gethash "processed_program" dictionary))
+         ;; TODO If "qpu_runtime_estimation" can be folded into
+         ;; "program_duration" then we can replace this whole thing
+         ;; with DICTIONARY.
          (metadata (a:alist-hash-table
                     `(("final_rewiring" . ,(gethash "final_rewiring" dictionary))
                       ("gate_depth" . ,(gethash "gate_depth" dictionary))
@@ -60,7 +62,8 @@
                       ("program_duration" . ,(gethash "program_duration" dictionary))
                       ("program_fidelity" . ,(gethash "program_fidelity" dictionary))
                       ("topological_swaps" . ,(gethash "topological_swaps" dictionary))
-                      ("duration_estimation" . 1)))))
+                      ("qpu_runtime_estimation" . ,(runtime-estimation
+                                                    (quil:parse-quil processed-program)))))))
     (make-instance 'rpcq::|NativeQuilResponse|
                    :|quil| processed-program
                    :|metadata| metadata)))
