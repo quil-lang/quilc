@@ -27,9 +27,10 @@
           :with coeff-twoq := 1.701
           :with runtime := 181.89
           :for instr :across (quil:parsed-program-executable-code parsed-protoquil-program)
-          :for nargs := (length (quil:application-arguments instr)) :do
-            (when (= nargs 1) (incf runtime coeff-oneq))
-            (when (= nargs 2) (incf runtime coeff-twoq))
+          :when (typep instr 'quil:application) :do
+            (let ((nargs (length (quil:application-arguments instr))))
+              (when (= nargs 1) (incf runtime coeff-oneq))
+              (when (= nargs 2) (incf runtime coeff-twoq)))
           :finally (return runtime))))
 
 ;; TODO: rework the structure of process-program so that the JSON junk is only
