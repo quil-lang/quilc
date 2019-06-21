@@ -7,7 +7,7 @@
 ;;; This file implements an efficient representation of the Pauli
 ;;; group.
 
-(alexandria:define-constant +paulis+
+(a:define-constant +paulis+
     #(I X Z Y)
   :test #'equalp
   :documentation "The Pauli group symbols.")
@@ -27,7 +27,7 @@
     (1- (length (pauli-components p))))
 
   (defun make-components (num-qubits)
-    (declare (type unsigned-fixnum num-qubits))
+    (declare (type quil::unsigned-fixnum num-qubits))
     (make-array (1+ num-qubits) :element-type 'base4
                                 :initial-element 0))
 
@@ -183,7 +183,7 @@ phase factor)."
            (i (string= (elt r 1) "i"))
            (o (elt r 2))
            (p (+ (if i 1 0) (if n 2 0)))
-           (l (mapcar (alexandria:compose
+           (l (mapcar (a:compose
                        #'intern
                        (lambda (x) (coerce (list x) 'string)))
                       (coerce o 'list))))
@@ -192,16 +192,16 @@ phase factor)."
 )                                       ; EVAL-WHEN
 
 
-(alexandria:define-constant +I+ (pauli-from-symbols '(I))
+(a:define-constant +I+ (pauli-from-symbols '(I))
   :test #'pauli=)
 
-(alexandria:define-constant +X+ (pauli-from-symbols '(X))
+(a:define-constant +X+ (pauli-from-symbols '(X))
   :test #'pauli=)
 
-(alexandria:define-constant +Y+ (pauli-from-symbols '(Y))
+(a:define-constant +Y+ (pauli-from-symbols '(Y))
   :test #'pauli=)
 
-(alexandria:define-constant +Z+ (pauli-from-symbols '(Z))
+(a:define-constant +Z+ (pauli-from-symbols '(Z))
   :test #'pauli=)
 
 (defun pauli-identity (n &optional (p 0))
@@ -273,7 +273,7 @@ hash-function."
   (declare (optimize speed (safety 0) (debug 0) (space 0))
            (type pauli p))
   (sxhash
-   (loop :with h :of-type unsigned-fixnum := 0
+   (loop :with h :of-type quil::unsigned-fixnum := 0
          :for x :across (pauli-components p)
          :do (setf h (hash-mix h x))
          :finally (return h))))

@@ -54,9 +54,6 @@ WARNING: The default will work for instances of \"idiomatic\" classes that aren'
   #-sbcl
   (logxor (sxhash (memory-ref-name m)) (sxhash (memory-ref-position m))))
 
-;; Used to make a memory reference - keyed hashmap in analysis/rewrite-arithmetic.lisp
-(sb-ext:define-hash-table-test memory-ref= memory-ref-hash)
-
 (defmethod print-object ((mref memory-ref) stream)
   (print-unreadable-object (mref stream :type t :identity nil)
     (format stream "~A[~D]~:[~;*~]"
@@ -103,7 +100,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defun make-delayed-expression (params lambda-params expression)
   "Make a DELAYED-EXPRESSION object initially with parameters PARAMS (probably a list of PARAM objects), lambda parameters LAMBDA-PARAMS, and the form EXPRESSION."
-  (assert (every #'symbolp lambda-params))
+  (check-type lambda-params symbol-list)
   (%delayed-expression :params params
                        :lambda-params lambda-params
                        :expression expression))
@@ -111,9 +108,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defun evaluate-delayed-expression (de &optional (memory-model-evaluator #'identity))
   "Evaluate the delayed expression DE to a numerical value (represented in a CONSTANT data structure). MEMORY-MODEL is an association list with keys MEMORY-REF structures and values the value stored at that location."
   (labels ((lookup-function (expr)
-             (case expr
-               ((+ - * / cos sin tan) expr)
-               (otherwise (error "Illegal function in arithmetic expression: ~a." expr))))
+             (if (valid-quil-function-or-operator-p expr)
+                 expr
+                 (error "Illegal function in arithmetic expression: ~a." expr)))
            (evaluate-parameter (param)
              (etypecase param
                (constant (constant-value param))
@@ -125,7 +122,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                (cons
                 (let ((args (mapcar (lambda (e) (evaluate-expr params lambda-params e))
                                     (cdr expression))))
-                  (if (every (lambda (thing) (typep thing 'number)) args)
+                  (if (number-list-p args)
                       (apply (lookup-function (first expression)) args)
                       (cdr expression))))
                (symbol
@@ -155,9 +152,20 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 ;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-comment-table ()
+    "Return an empty weak hash table suitable for use as the CL-QUIL::**COMMENTS** table.
+
+This function can be used to re-initialize the **COMMENTS** table.
+
+Keys are tested with EQ."
+    (tg:make-weak-hash-table :test 'eq :weakness ':key)))
+
 (global-vars:define-global-var **comments**
-    (tg:make-weak-hash-table :test 'eq :weakness ':key)
-  "Weak hash table populated with comments associated to different parts of an AST.")
+    (make-comment-table)
+  "Weak hash table populated with comments associated to different parts of an AST.
+
+The keys are typically INSTRUCTION instances and associated values are STRINGs.")
 
 (defun comment (x)
   (values (gethash x **comments**)))
@@ -253,13 +261,13 @@ as a permutation."
 (defun make-gate-definition (name parameters entries)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
-  (assert (every #'symbolp parameters))
+  (check-type parameters symbol-list)
   (if parameters
       (make-instance 'parameterized-gate-definition
                     :name name
                     :parameters parameters
                     :entries entries)
-      (alexandria:if-let ((perm (permutation-from-gate-entries entries)))
+      (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
                        :permutation perm)
@@ -318,6 +326,11 @@ as a permutation."
 (defclass no-operation (instruction)
   ()
   (:documentation "The \"do-nothing\" instruction.")
+  ;; The singleton-class is disabled rather than removed here (and elsewhere) as a reminder that
+  ;; this is a quick fix. Ideally, we'd like to find a way to preserve the singleton nature of these
+  ;; AST classes, but still work with rewiring comments and the guts of logical-scheduler. See
+  ;; https://github.com/rigetti/quilc/issues/270 for more context.
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction no-operation)) #())
@@ -341,7 +354,7 @@ numbers. It must start with a string.")
                (not (endp words))))
   (assert (stringp (first words))
           ((first words)))
-  (assert (every (alexandria:disjoin #'stringp #'integerp) words)
+  (assert (every (a:disjoin #'stringp #'integerp) words)
           (words))
   (check-type freeform (or null string))
   (specialize-pragma
@@ -350,6 +363,7 @@ numbers. It must start with a string.")
 (defclass halt (instruction)
   ()
   (:documentation "An instruction to immediately halt all execution.")
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction halt)) #())
@@ -358,6 +372,7 @@ numbers. It must start with a string.")
 (defclass reset (instruction)
   ()
   (:documentation "An instruction to reset all qubits to the |0>-state.")
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction reset)) #())
@@ -376,6 +391,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defclass wait (instruction)
   ()
   (:documentation "An instruction to wait for some signal from a classical processor.")
+  #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
 
 (defmethod arguments ((instruction wait)) #())
@@ -449,10 +465,10 @@ Each addressing mode will be a vector of symbols:
     "A map between a class name (symbol) and the vector of types.")
 
   (defun make-typed-name (name types)
-    (alexandria:format-symbol (symbol-package name)
-                              "~A-~{~A~^/~}"
-                              name
-                              types))
+    (a:format-symbol (symbol-package name)
+                     "~A-~{~A~^/~}"
+                     name
+                     types))
 
   (defun valid-type-symbol-p (s)
     (member s '(
@@ -598,7 +614,7 @@ Each addressing mode will be a vector of symbols:
 (defmacro define-classical-instruction (name mnemonic &body body)
   (check-type mnemonic string)
   (multiple-value-bind (types decls docstring)
-      (alexandria:parse-body body :documentation t)
+      (a:parse-body body :documentation t)
     ;; Declarations are not allowed.
     (assert (null decls))
     ;; An empty body, or a body with non-lists aren't allowed.
@@ -836,13 +852,23 @@ Each addressing mode will be a vector of symbols:
 (defmethod mnemonic  ((inst measure-discard)) (values "MEASURE" 'measure-discard))
 
 (adt:defdata operator-description
-  "A description of an operator that Quil takes."
+  "A family of recipes for attaching meaning to a Quil operator, typically either by table look-up or by some prescribed mathematical combination."
   (named-operator      string)
   (controlled-operator operator-description)
   ;; Note that reduction of consecutive dagger operators is not
   ;; performed here. Use the alternative constructor
   ;; INVOLUTIVE-DAGGER-OPERATOR.
-  (dagger-operator     operator-description))
+  (dagger-operator     operator-description)
+  (forked-operator     operator-description))
+
+(setf (documentation 'named-operator 'function)
+      "Describes a gate using a string name, which is later looked up in a table of DEFGATE definitions.  In Quil code, this corresponds to a raw gate name, like ISWAP.")
+(setf (documentation 'controlled-operator 'function)
+      "Describes a gate as the direct sum of the identity gate (i.e., \"do nothing when the control bit is low\") and some other specified gate G (i.e., \"do G when the control bit is high\").  In Quil code, this corresponds to the descriptor CONTROLLED.")
+(setf (documentation 'dagger-operator 'function)
+      "Describes a gate as the inverse to some other gate.  In Quil code, this corresponds to the descriptor DAGGER.")
+(setf (documentation 'forked-operator 'function)
+      "Describes a gate as the direct sum of two instances of some other specified gate G with input parameters either p_low or p_high, conditioned on whether a control bit is low or high.  In Quil code, this corresponds to the descriptor FORKED.")
 
 (defun involutive-dagger-operator (od)
   "Instantiate a dagger operator on the operator description OD and
@@ -863,14 +889,16 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
   (adt:match operator-description od
     ((named-operator name)   name)
     ((controlled-operator o) (operator-description-root-name o))
-    ((dagger-operator o)     (operator-description-root-name o))))
+    ((dagger-operator o)     (operator-description-root-name o))
+    ((forked-operator o)     (operator-description-root-name o))))
 
 (defun operator-description-additional-qubits (od)
   "The number of additional qubits incurred by this operator description (e.g., CONTROLLED adds one qubit)."
   (adt:match operator-description od
     ((named-operator _)   0)
     ((controlled-operator o) (1+ (operator-description-additional-qubits o)))
-    ((dagger-operator o)     (operator-description-additional-qubits o))))
+    ((dagger-operator o)     (operator-description-additional-qubits o))
+    ((forked-operator o)     (1+ (operator-description-additional-qubits o)))))
 
 (defun print-operator-description (od stream)
   (adt:match operator-description od
@@ -878,6 +906,8 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
     ((controlled-operator o) (write-string "CONTROLLED " stream)
                              (print-operator-description o stream))
     ((dagger-operator o) (write-string "DAGGER " stream)
+                         (print-operator-description o stream))
+    ((forked-operator o) (write-string "FORKED " stream)
                          (print-operator-description o stream))))
 
 (defun operator-description-string (od)
@@ -969,7 +999,7 @@ N.B. This slot shoould not be accessed directly! Consider using GATE-APPLICATION
   ;; See the actual definition of this in gates.lisp.
   (:documentation "Return a gate-like object represented in the application APP.")
   (:method :around ((app gate-application))
-    (alexandria:if-let ((gate (%get-gate-application-gate app)))
+    (a:if-let ((gate (%get-gate-application-gate app)))
       gate
       (%set-gate-application-gate (call-next-method) app))))
 
@@ -1154,11 +1184,11 @@ For example,
                     ((= (length expr) 3)
                      (format stream "(~a~a~a)"
                              (print-delayed-expression (second expr) nil)
-                             (first expr)
+                             (lisp-symbol->quil-infix-operator (first expr))
                              (print-delayed-expression (third expr) nil)))
                     ((= (length expr) 2)
                      (format stream "~a(~a)"
-                             (first expr)
+                             (lisp-symbol->quil-function-or-prefix-operator (first expr))
                              (print-delayed-expression (second expr) nil)))))
                  (number
                   (format stream "(~/cl-quil:complex-fmt/)" expr))
@@ -1304,7 +1334,7 @@ For example,
     (flet ((print-one-line (instr)
              (write-string prefix stream)
              (print-instruction instr stream)
-             (alexandria:when-let ((c (comment instr)))
+             (a:when-let ((c (comment instr)))
                (format stream "~40T# ~a" c))
              (terpri stream)))
       (map nil #'print-one-line seq))))
@@ -1319,7 +1349,7 @@ For example,
     (when (memory-descriptor-sharing-parent memory-defn)
       (format s " SHARING ~a"
               (memory-descriptor-sharing-parent memory-defn))
-      (alexandria:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
+      (a:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
         (format s " OFFSET")
         (loop :for (type . count) :in x
               :do (format s " ~a ~a" count (quil-type-string type)))))

@@ -180,7 +180,7 @@ If DESTRUCTIVE-UPDATE is T, we will update AQVM's internal structure to correlat
 
 (defun nondestructively-apply-instrs-to-wf (instrs wf qc)
   "Given a wavefunction WF, represented as an array of complex doubles, together with a list QC of qubit indices describing what the components of the wavefunction represent, applies the sequence of instructions INSTRS and returns the resulting wavefunction (with the same qubit ordering).  Does not modify any of its inputs."
-  (alexandria:when-let ((wf (copy-seq wf)))
+  (a:when-let ((wf (copy-seq wf)))
     (assert (= (length wf) (expt 2 (length qc))))
     (dolist (instr instrs wf)
       (let ((new-wf (nondestructively-apply-instr-to-wf instr wf qc)))

@@ -198,7 +198,7 @@ used to specify CHIP-SPEC."
 (defun lookup-hardware-address-by-qubits (chip-spec args)
   (unless (chip-specification-lookup-cache chip-spec)
     (warm-chip-spec-lookup-cache chip-spec))
-  (alexandria:when-let ((hash-value (gethash args (chip-specification-lookup-cache chip-spec))))
+  (a:when-let ((hash-value (gethash args (chip-specification-lookup-cache chip-spec))))
     (destructuring-bind (index obj) hash-value
       (values (1- (length args)) index obj))))
 
@@ -222,7 +222,7 @@ used to specify CHIP-SPEC."
   (check-type qubit0 unsigned-byte)
   (check-type qubit1 unsigned-byte)
   (assert (/= qubit0 qubit1))
-  (setf type (alexandria:ensure-list type))
+  (setf type (a:ensure-list type))
   (let* ((misc-data (make-hash-table :test #'equal))
          (obj (make-hardware-object
                :order 1
@@ -445,32 +445,32 @@ used to specify CHIP-SPEC."
 (defun architecture-has-ucr-compiler-p (architecture)
   (or (optimal-2q-target-meets-requirements architecture ':cz)
       (optimal-2q-target-meets-requirements architecture ':iswap)
-      (find ':cnot (alexandria:ensure-list architecture))))
+      (find ':cnot (a:ensure-list architecture))))
 
 ;;; routines for populating the fields of a CHIP-SPECIFICATION object (and
 ;;; maintaining the appropriate interrelations).
 (defvar *global-compilers*
   (list (lambda (chip-spec arch)
           (declare (ignore arch))
-          (alexandria:curry #'swap-to-native-swaps chip-spec))
+          (a:curry #'swap-to-native-swaps chip-spec))
         (lambda (chip-spec arch)
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            (alexandria:curry #'cnot-to-native-cnots chip-spec)))
+            (a:curry #'cnot-to-native-cnots chip-spec)))
         (lambda (chip-spec arch)
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            (alexandria:curry #'cz-to-native-czs chip-spec)))
+            (a:curry #'cz-to-native-czs chip-spec)))
         (lambda (chip-spec arch)
           (when (optimal-2q-target-meets-requirements arch ':iswap)
-            (alexandria:curry #'ISWAP-to-native-ISWAPs chip-spec)))
+            (a:curry #'ISWAP-to-native-ISWAPs chip-spec)))
         (lambda (chip-spec arch)
           (when (optimal-2q-target-meets-requirements arch ':cphase)
-            (alexandria:curry #'CPHASE-to-native-CPHASEs chip-spec)))
+            (a:curry #'CPHASE-to-native-CPHASEs chip-spec)))
         (lambda (chip-spec arch)
           (when (optimal-2q-target-meets-requirements arch ':piswap)
-            (alexandria:curry #'PISWAP-to-native-PISWAPs chip-spec)))
+            (a:curry #'PISWAP-to-native-PISWAPs chip-spec)))
         (lambda (chip-spec arch)
-          (when (find ':cnot (alexandria:ensure-list arch))
-            (alexandria:curry #'CNOT-to-native-CNOTs chip-spec)))
+          (when (find ':cnot (a:ensure-list arch))
+            (a:curry #'CNOT-to-native-CNOTs chip-spec)))
         ;; We make this unconditional. We could later conditionalize it if
         ;; we happen to have better CCNOT translations for specific target
         ;; gate sets.
@@ -483,18 +483,16 @@ used to specify CHIP-SPEC."
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
-            (lambda (instr) (ucr-compiler instr :target ':iswap))))
+            (lambda (instr) (ucr-compiler instr :arch ':iswap))))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
-          (when (find ':cnot (alexandria:ensure-list arch))
-            (lambda (instr) (ucr-compiler instr :target ':cnot))))
+          (when (find ':cnot (a:ensure-list arch))
+            (lambda (instr) (ucr-compiler instr :arch ':cnot))))
         (constantly #'state-prep-compiler)
         (constantly #'recognize-ucr)
         (lambda (chip-spec arch)
-          (declare (ignore chip-spec))
           (when (typep arch 'optimal-2q-target)
-            (lambda (instr)
-              (optimal-2q-compiler instr :target arch))))
+            (approximate-2q-compiler-for arch chip-spec)))
         (constantly #'qs-compiler))
   "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
 
@@ -506,7 +504,7 @@ Compilers are listed in descending precedence.")
   (let ((ret (make-adjustable-vector)))
     (setf (chip-specification-generic-compilers chip-spec) ret)
     (dolist (get-compiler *global-compilers*)
-      (alexandria:when-let ((compiler (funcall get-compiler chip-spec architecture)))
+      (a:when-let ((compiler (funcall get-compiler chip-spec architecture)))
         (vector-push-extend compiler ret)))))
 
 
@@ -604,9 +602,9 @@ Compilers are listed in descending precedence.")
 
 (defun build-16QMUX-chip ()
   (qpu-hash-table-to-chip-specification
-   (alexandria:plist-hash-table
-    (list "isa" (alexandria:plist-hash-table
-                 (list "1Q" (alexandria:plist-hash-table
+   (a:plist-hash-table
+    (list "isa" (a:plist-hash-table
+                 (list "1Q" (a:plist-hash-table
                              (list "0" (make-hash-table)
                                    "1" (make-hash-table)
                                    "2" (make-hash-table)
@@ -624,7 +622,7 @@ Compilers are listed in descending precedence.")
                                    "16" (make-hash-table)
                                    "17" (make-hash-table))
                              :test #'equal)
-                       "2Q" (alexandria:plist-hash-table
+                       "2Q" (a:plist-hash-table
                              (list "0-1" (make-hash-table)
                                    "1-2" (make-hash-table)
                                    "2-3" (make-hash-table)

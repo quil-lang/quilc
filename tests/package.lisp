@@ -3,8 +3,10 @@
 ;;;; Author: Robert Smith
 
 (fiasco:define-test-package #:cl-quil-tests
-    (:use #:cl-quil #:cl-quil.clifford)
+  (:local-nicknames (:a :alexandria))
+  (:use #:cl-quil #:cl-quil.clifford)
 
   ;; suite.lisp
   (:export
-   #:run-cl-quil-tests))
+   #:run-cl-quil-tests)
+  (:shadowing-import-from #:cl-quil #:pi))

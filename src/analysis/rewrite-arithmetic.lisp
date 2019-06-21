@@ -48,6 +48,9 @@ NOTE: This function does *not* cause side effects.")
   (:method ((isn instruction) mref-name index)
     (values isn '() index))
 
+  (:method ((isn jump-target) mref-name index)
+    (values isn '() index))
+
   (:method ((isn application) mref-name index)
     (check-type mref-name string)
     (check-type index unsigned-byte)
@@ -119,7 +122,8 @@ expressions, as elements of a single new memory descriptor.
          ;; just a single name (i.e., more than just __P). It adds
          ;; little bit of complexity in favor of a bit of additional
          ;; extensibility.
-         (recalculation-table (make-hash-table :test 'memory-ref=))
+         (recalculation-table (make-hash-table :test 'memory-ref=
+                                               :hash-function 'memory-ref-hash))
          (old-memory-descriptors (parsed-program-memory-definitions parsed-prog))
          (new-memory-descriptors old-memory-descriptors)
          ;; This isn't necessarily guaranteed to be unique, but the

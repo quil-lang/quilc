@@ -191,7 +191,7 @@ This function is non-destructive."
       ;; nodes.
       (map nil #'chase-node (trailers pg))
       ;; Return the nodes.
-      (alexandria:hash-table-keys nodes))))
+      (a:hash-table-keys nodes))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Fusion ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -295,12 +295,12 @@ forcing \"Y\" to be the middle link."
            ;;Mark that we've seen it and don't want to see it again.
            (setf (gethash node seen) t)
            ;; Fuse forward.
-           (alexandria:when-let
+           (a:when-let
                ((new-node (attempt-trivial-fusion #'fuse-node-forward node seen final )))
              (setf node new-node))
 
            ;; Fuse backward.
-           (alexandria:when-let
+           (a:when-let
                ((new-node (attempt-trivial-fusion #'fuse-node-backward node seen final )))
              (setf node new-node))
 
@@ -432,7 +432,7 @@ The list will actually be a list of lists, where each sublist commutes and can b
 
 (defun program-grid-to-gate-sequence (pg)
   "Convert a PROGRAM-GRID PG back into a list of gates."
-  (mapcan (alexandria:curry #'mapcar #'grid-node-tag) (sort-program-grid pg)))
+  (mapcan (a:curry #'mapcar #'grid-node-tag) (sort-program-grid pg)))
 
 (defun fuse-gate-sequence (gate-sequence)
   "Given a list of gates GATE-SEQUENCE containing *only* fuseable gates, perform gate fusion, returning a new list of gates that is purportedly mathematically equivalent."

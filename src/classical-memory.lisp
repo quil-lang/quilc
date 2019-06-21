@@ -4,7 +4,7 @@
 
 (in-package #:cl-quil)
 
-(define-condition quil-memory-model-error (alexandria:simple-parse-error)
+(define-condition quil-memory-model-error (a:simple-parse-error)
   ()
   (:documentation "An error regarding the classical memory declarations."))
 
@@ -21,7 +21,7 @@
 
 (defun string-to-quil-type (name)
   "Convert a Quil string name of a data type to our internal representation."
-  (alexandria:switch (name :test #'string=)
+  (a:switch (name :test #'string=)
     ("BIT"     quil-bit)
     ("OCTET"   quil-octet)
     ("INTEGER" quil-integer)

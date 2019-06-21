@@ -3,6 +3,7 @@
 (defpackage #:cl-quil.tweedledum
   (:use #:common-lisp
         #:cffi)
+  (:local-nicknames (:a :alexandria))
   (:export #:synthesis-dbs))
 
 (in-package #:cl-quil.tweedledum)
@@ -62,7 +63,7 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
                 (relabler (lambda (q)
                             (setf (quil::qubit-index q)
                                   (quil::qubit-index (nth (quil::qubit-index q) qubits))))))
-           (map nil (alexandria:rcurry #'quil::%relabel-qubits relabler) code)
+           (map nil (a:rcurry #'quil::%relabel-qubits relabler) code)
            (coerce code 'list)))
         (t
          (quil::give-up-compilation))))))

@@ -7,15 +7,15 @@
 
 (deftest test-approximate-compilation ()
   (let* ((chip (quil::build-nq-linear-chip 3 :architecture ':cz))
-         (fidelity-hash (alexandria:plist-hash-table (list "fCZ"   0.50d0
-                                                           "f1QRB" 0.99d0)
-                                                     :test #'equalp))
+         (fidelity-hash (a:plist-hash-table (list "fCZ" 0.50d0
+                                                  "f1QRB" 0.99d0)
+                                            :test #'equalp))
          (pp (quil::parse-quil "CPHASE(pi/4) 0 1"))
          (m-in (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code pp) 'list)))
          cpp m-out)
     (loop
-       :for obj :across (quil::vnth 1 (quil::chip-specification-objects chip))
-       :do (setf (gethash "specs" (quil::hardware-object-misc-data obj)) fidelity-hash))
+      :for obj :across (quil::vnth 1 (quil::chip-specification-objects chip))
+      :do (setf (gethash "specs" (quil::hardware-object-misc-data obj)) fidelity-hash))
     (let ((quil::*enable-approximate-compilation* t))
       (setf cpp (quil::compiler-hook pp chip)))
     ;; check: results are approximately correct

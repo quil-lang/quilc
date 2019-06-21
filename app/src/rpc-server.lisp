@@ -6,7 +6,7 @@
 
 
 (defun get-version-info ()
-  (alexandria:alist-hash-table
+  (a:alist-hash-table
    `(("quilc"   . ,+QUILC-VERSION+)
      ("githash" . ,+GIT-HASH+))))
 
@@ -22,9 +22,9 @@
   (check-type request rpcq::|NativeQuilRequest|)
   (let* ((quil-program (quil::parse-quil-into-raw-program (rpcq::|NativeQuilRequest-quil| request)))
          (target-device (rpcq::|NativeQuilRequest-target_device| request))
-         (qpu-hash (alexandria:plist-hash-table (list "isa" (rpcq::|TargetDevice-isa| target-device)
-                                                      "specs" (rpcq::|TargetDevice-specs| target-device))
-                                                :test #'equal))
+         (qpu-hash (a:plist-hash-table (list "isa" (rpcq::|TargetDevice-isa| target-device)
+                                             "specs" (rpcq::|TargetDevice-specs| target-device))
+                                       :test #'equal))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
          (dictionary (process-program quil-program chip-specification))
          (metadata (make-instance 'rpcq::|NativeQuilMetadata|
@@ -44,7 +44,7 @@
   (check-type request rpcq::|BinaryExecutableRequest|)
   (make-instance 'rpcq::|PyQuilExecutableResponse|
                  :|program| (rpcq::|BinaryExecutableRequest-quil| request)
-                 :|attributes| (alexandria:plist-hash-table
+                 :|attributes| (a:plist-hash-table
                                 `("num_shots" ,(rpcq::|BinaryExecutableRequest-num_shots| request)))))
 
 (defun generate-rb-sequence (request)
@@ -63,8 +63,8 @@
     (when (> n 2)
       (error "Currently no more than two qubit randomized benchmarking is supported."))
     (let* ((cliffords (mapcar #'quil.clifford::clifford-from-quil gateset))
-           (qubits-used (mapcar (alexandria:compose
-                                 (alexandria:curry #'reduce #'union)
+           (qubits-used (mapcar (a:compose
+                                 (a:curry #'reduce #'union)
                                  #'cl-quil.clifford::extract-qubits-used
                                  #'cl-quil:parse-quil)
                                 gateset))
@@ -120,7 +120,7 @@
     (make-instance 'rpcq::|ConjugateByCliffordResponse|
                    :|phase| (quil.clifford::phase-factor pauli-out)
                    :|pauli| (apply #'concatenate 'string
-                                   (mapcar (alexandria:compose #'symbol-name #'quil.clifford::base4-to-sym)
+                                   (mapcar (a:compose #'symbol-name #'quil.clifford::base4-to-sym)
                                            (quil.clifford::base4-list pauli-out))))))
 
 (defun rewrite-arithmetic (request)
@@ -142,7 +142,7 @@
                        (with-output-to-string (s)
                          (quil::print-parsed-program rewritten-program s))
                        :|original_memory_descriptors|
-                       (alexandria:alist-hash-table
+                       (a:alist-hash-table
                         (mapcar (lambda (memory-defn)
                                   (cons (quil::memory-descriptor-name memory-defn)
                                         (make-instance 'rpcq::|ParameterSpec|

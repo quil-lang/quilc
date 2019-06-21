@@ -36,10 +36,10 @@
            ;; Verify correct arguments
            (let ((args (application-arguments app)))
              ;; Check that all arguments are qubits
-             (assert-and-print-instruction (every (alexandria:disjoin #'qubit-p
-                                                                      (if *in-circuit-body*
-                                                                          #'is-formal
-                                                                          (constantly nil)))
+             (assert-and-print-instruction (every (a:disjoin #'qubit-p
+                                                             (if *in-circuit-body*
+                                                                 #'is-formal
+                                                                 (constantly nil)))
                                                   args)
                                            ()
                                            "All arguments must be qubits. Check type of args: ~S." args)

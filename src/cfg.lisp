@@ -107,13 +107,15 @@
       (format stream "(~S)" (label-name (labeled obj))))
     (write-char #\Space stream)
     ;; instructions
-    (format stream "len:~D  " (length (basic-block-code obj)))
+    (format stream "len:~D " (length (basic-block-code obj)))
     ;; incoming and outgoing
     (format stream "in:~D out:" (length (incoming obj)))
-    (adt:match outgoing-edge (outgoing obj)
-      (terminating-edge (write-string "term" stream))
-      ((unconditional-edge _) (write-string "uncond" stream))
-      ((conditional-edge _ _ _) (write-string "cond" stream)))))
+    (if (not (slot-boundp obj 'outgoing))
+        (write-string "unbound" stream)
+        (adt:match outgoing-edge (outgoing obj)
+          (terminating-edge (write-string "term" stream))
+          ((unconditional-edge _) (write-string "uncond" stream))
+          ((conditional-edge _ _ _) (write-string "cond" stream))))))
 
 (defun make-block-from-label (label)
   "Make a new block from the label LABEL."
@@ -173,27 +175,23 @@ Return the following values:
   (vector-push-extend instr (basic-block-code blk))
   (values blk nil nil))
 
-(defmethod process-instruction (cfg blk (instr pragma))
-  (cond
-    ((string= "PRESERVE_BLOCK" (first (pragma-words instr)))
-     (if (= 0 (length (basic-block-code blk)))
-         ;; we don't need to make a new empty block. just change the current one
-         ;; to be preserved
-         (progn
-           (change-class blk 'preserved-block)
-           (values blk nil nil))
-         ;; the old block is non-empty, so make a new preserved block
-         (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
-           (change-class label-blk 'preserved-block)
-           (link-blocks blk (unconditional-edge label-blk))
-           (values label-blk blk nil))))
+(defmethod process-instruction (cfg blk (instr pragma-preserve-block))
+  (if (= 0 (length (basic-block-code blk)))
+      ;; we don't need to make a new empty block. just change the current one
+      ;; to be preserved
+      (progn
+        (change-class blk 'preserved-block)
+        (values blk nil nil))
+      ;; the old block is non-empty, so make a new preserved block
+      (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
+        (change-class label-blk 'preserved-block)
+        (link-blocks blk (unconditional-edge label-blk))
+        (values label-blk blk nil))))
 
-    ((string= "END_PRESERVE_BLOCK" (first (pragma-words instr)))
-     (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
-       (link-blocks blk (unconditional-edge label-blk))
-       (values label-blk blk nil)))
-    (t
-     (call-next-method))))
+(defmethod process-instruction (cfg blk (instr pragma-end-preserve-block))
+  (let ((label-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "PRAGMA-"))))))
+    (link-blocks blk (unconditional-edge label-blk))
+    (values label-blk blk nil)))
 
 (defmethod process-instruction (cfg blk (instr halt))
   (assert (not (null blk)) (blk))
@@ -540,41 +538,38 @@ Return the following values:
 (defun program-cfg (pp &key (dce nil) (simplify nil))
   "Compute the control flow graph for the parsed program PP. Dead code in the CFG is eliminated if DCE is true (default: NIL). Measures are appended before HALT instructions if ADD-MEASURES is set to a CHIP-SPECIFICATION."
   (let* ((code (parsed-program-executable-code pp))
-         (entry (make-instance 'basic-block :name (gensym "ENTRY-BLK-")))
+         (entry (make-instance 'basic-block :name (gensym "ENTRY-BLK-") :outgoing terminating-edge))
          (cfg (make-instance 'cfg :entry-point entry
                                   :blocks (list entry))))
-    (loop :with current-block := (entry-point cfg)
-          :with finished-block := nil
-          :with link-successor? := nil
-          :for i :from 0
-          :for instr :across code
-          :do (progn
-                ;; Start a new block if necessary, and link it to its
-                ;; predecessor.
-                (when (null current-block)
-                  (setf current-block (make-instance 'basic-block)))
+    (flet ((next (current-block)
+             (or current-block (make-instance 'basic-block))))
+      (loop :with finished-block := nil
+            :with link-successor? := nil
+            :for instr :across code
+            :for current-block := (entry-point cfg) :then (next current-block)
+            :do (progn
+                  ;; Process the instruction.
+                  (multiple-value-setq (current-block finished-block link-successor?)
+                    (process-instruction cfg current-block instr))
 
-                ;; We processed a block before, and it needs to be
-                ;; linked to the current one.
-                (when link-successor?
-                  (assert (not (null finished-block)))
-                  (let ((edge (funcall link-successor? current-block)))
-                    (link-blocks finished-block edge)))
+                  (when link-successor?
+                    ;; Start a new block, and link it to its predecessor.
+                    (assert (null current-block))
+                    (assert (not (null finished-block)))
+                    (setf current-block (next current-block))
+                    (let ((edge (funcall link-successor? current-block)))
+                      (link-blocks finished-block edge)))
 
-                ;; Process the instruction.
-                (multiple-value-setq (current-block finished-block link-successor?)
-                  (process-instruction cfg current-block instr))
-
-                ;; Add the finished block if necessary.
-                (unless (null finished-block)
-                  (add-block-to-cfg finished-block cfg)))
-          :finally (progn
-                     ;; If we have a CURRENT-BLOCK that evidently
-                     ;; wasn't finished, we ought to add it to the
-                     ;; CFG, remembering to link it to the exit point.
-                     (unless (null current-block)
-                       (link-blocks current-block terminating-edge)
-                       (add-block-to-cfg current-block cfg))))
+                  ;; Add the finished block if necessary.
+                  (unless (null finished-block)
+                    (add-block-to-cfg finished-block cfg)))
+            :finally (progn
+                       ;; If we have a CURRENT-BLOCK that evidently
+                       ;; wasn't finished, we ought to add it to the
+                       ;; CFG, remembering to link it to the exit point.
+                       (unless (null current-block)
+                         (link-blocks current-block terminating-edge)
+                         (add-block-to-cfg current-block cfg)))))
 
     ;; Remove dead code when desired.
     (when dce
@@ -603,11 +598,12 @@ Return the following values:
     (loop :for x :across (basic-block-code blk) :do
       (print-instruction x s)
       (format s "\\l"))
-    (adt:match outgoing-edge (outgoing blk)
-      ((conditional-edge instr _ _)
-       (format s "\\nConditioned on ~a" (print-instruction instr nil))
-       (format s "\\l"))
-      (_ nil))))
+    (when (slot-boundp blk 'outgoing)
+      (adt:match outgoing-edge (outgoing blk)
+        ((conditional-edge instr _ _)
+         (format s "\\nConditioned on ~a" (print-instruction instr nil))
+         (format s "\\l"))
+        (_ nil)))))
 
 
 (defun generate-graphviz (cfg &optional (stream *standard-output*))
@@ -624,19 +620,20 @@ Return the following values:
 
   ;; All links
   (dolist (from-blk (cfg-blocks cfg))
-    (adt:match outgoing-edge (outgoing from-blk)
-      (terminating-edge nil)
-      ((unconditional-edge target)
-       (format stream "~A -> ~A;~%"
-               (underscorize (symbol-name (basic-block-name from-blk)))
-               (underscorize (symbol-name (basic-block-name target)))))
-      ((conditional-edge _ true-target false-target)
-       (format stream "~A -> ~A [label = \"1\", fontname = \"times-italic\"];~%"
-               (underscorize (symbol-name (basic-block-name from-blk)))
-               (underscorize (symbol-name (basic-block-name true-target))))
-       (format stream "~A -> ~A [label = \"0\", fontname = \"times-italic\"];~%"
-               (underscorize (symbol-name (basic-block-name from-blk)))
-               (underscorize (symbol-name (basic-block-name false-target)))))))
+    (when (slot-boundp from-blk 'outgoing)
+      (adt:match outgoing-edge (outgoing from-blk)
+        (terminating-edge nil)
+        ((unconditional-edge target)
+         (format stream "~A -> ~A;~%"
+                 (underscorize (symbol-name (basic-block-name from-blk)))
+                 (underscorize (symbol-name (basic-block-name target)))))
+        ((conditional-edge _ true-target false-target)
+         (format stream "~A -> ~A [label = \"1\", fontname = \"times-italic\"];~%"
+                 (underscorize (symbol-name (basic-block-name from-blk)))
+                 (underscorize (symbol-name (basic-block-name true-target))))
+         (format stream "~A -> ~A [label = \"0\", fontname = \"times-italic\"];~%"
+                 (underscorize (symbol-name (basic-block-name from-blk)))
+                 (underscorize (symbol-name (basic-block-name false-target))))))))
 
   ;; Footer
   (format stream "}~%")
@@ -644,7 +641,7 @@ Return the following values:
 
 (defun output-cfg (quil out-file &key parallel dce simplify)
   (let ((pp (parse-quil-into-raw-program (if (pathnamep quil)
-                                             (alexandria:read-file-into-string quil)
+                                             (a:read-file-into-string quil)
                                              quil))))
     (setf pp (transform 'process-includes pp (if (pathnamep quil) quil nil)))
     (output-cfg-from-program pp out-file :parallel parallel :dce dce :simplify simplify)))

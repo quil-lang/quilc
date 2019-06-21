@@ -193,7 +193,7 @@
             (setf (gethash rep equivalence-classes)
                   (cons key (gethash rep equivalence-classes))))))
     ;;Check that all 2Q classes contain two elements
-    (dolist (class (alexandria:hash-table-values equivalence-classes))
+    (dolist (class (a:hash-table-values equivalence-classes))
       (is (= 2 (length class))))))
 
 (defparameter *chp-test-files-directory*
@@ -218,7 +218,7 @@
         :repeat 500
         :do
            (let ((tab (cl-quil.clifford::make-tableau-zero-state 6))
-                 (qubits (alexandria:iota 6) #+igh(alexandria:shuffle '(0 1 2 3 4 5))))
+                 (qubits (a:iota 6) #+igh(a:shuffle '(0 1 2 3 4 5))))
              (cl-quil.clifford::tableau-apply-h    tab 0)
              (cl-quil.clifford::tableau-apply-cnot tab 0 1)
              (cl-quil.clifford::tableau-apply-cnot tab 1 2)

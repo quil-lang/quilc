@@ -42,6 +42,7 @@
                 :components ((:static-file "stdgates.quil")))
                (:file "package")
                (:file "options")
+               (:file "types")
                (:file "utilities")
                (:file "relabeling")
                (:file "matrix-operations")
@@ -69,14 +70,15 @@
                (:module "compilers"
                 :serial t
                 :components ((:file "ucr-explode")
-                             (:file "cs-compile")
                              (:file "euler-compile")
                              (:file "qs-compile")
                              (:file "ucr-recognize")
                              (:file "approx")
                              (:file "state-prep")
                              (:file "translators")
-                             (:file "optimal-2q")))
+                             (:file "optimal-2q")
+                             ;; attic'd file / pedagogical purposes only
+                             (:static-file "cs-compile")))
                (:module "analysis"
                 :serial t
                 :components ((:file "process-includes")

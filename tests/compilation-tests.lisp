@@ -5,7 +5,7 @@
 (in-package #:cl-quil-tests)
 
 
-(deftest su4-to-su2x2-test ()
+(deftest test-su4-to-su2x2 ()
   "Ensures that Optimal 2Q Compilation decomposes SU(2)xSU(2) matrices correctly."
   (let* ((a1 (quil::random-special-unitary 2))
          (a0 (quil::random-special-unitary 2))
@@ -15,14 +15,14 @@
           (fiasco-assert-matrices-are-equal a1 b1)
           (fiasco-assert-matrices-are-equal a0 b0))))
 
-(deftest euler-compilation-test ()
+(deftest test-euler-compilation ()
   "Ensures that euler-compile correctly decomposes an element of SU(2)."
   (let* ((m (quil::random-special-unitary 2))
          (compiled-list (cl-quil::euler-compiler (build-anonymous-gate m 0)))
          (u (quil::make-matrix-from-quil compiled-list)))
     (fiasco-assert-matrices-are-equal m u)))
 
-(deftest optimal-2q-on-su2x2 ()
+(deftest test-optimal-2q-on-su2x2 ()
   "Tests that optimal 2Q compilation can handle a gate of the form SU(2) x SU(2)."
   (let* ((m (magicl:multiply-complex-matrices
              (cl-quil::su2-on-line 0 (quil::random-special-unitary 2))
@@ -60,7 +60,7 @@
                            ("CPHASE" "PISWAP"))))
       (finish-output *debug-io*)
       (dolist (template template-list)
-        (format *debug-io* "    Trying test template ~19a" template)
+        (format *debug-io* "~&    Trying test template ~19a" template)
         (let ((random-quil (random-local-quil))
               (target-type nil))
           (dolist (operator template)
@@ -89,7 +89,7 @@
                  (processed-quil (funcall (cl-quil::approximate-2q-compiler-for target-type (build-8Q-chip))
                                           (build-anonymous-gate ref-mat 1 0)))
                  (mat (cl-quil::make-matrix-from-quil processed-quil))
-                 (big-gates (mapcar (alexandria:compose
+                 (big-gates (mapcar (a:compose
                                      #'quil::operator-description-name
                                      #'application-operator)
                                     (remove-if (lambda (i) (= 1 (length (application-arguments i))))
@@ -100,19 +100,14 @@
             (when (> (length big-gates) (length template))
               (format *debug-io* "    WARNING: deeper answer than expected~%"))))))))
 
-(deftest QSD-on-4Q ()
+(deftest test-QSD-on-4Q ()
   "Tests Quantum Shannon Compilation on a random 4Q gate."
   (let* ((m (quil::random-special-unitary 16))
-         (compiled-list (quil::qs-compiler (build-anonymous-gate m 3 2 1 0))))
-    (let* ((expanded-string
-             (loop :for instr :in compiled-list
-                   :nconc (if (typep instr 'quil::ucr-application)
-                              (quil::ucr-explode-instr instr)
-                              (list instr))))
-           (u (quil::make-matrix-from-quil expanded-string)))
-      (check-type u magicl:matrix)
-      (quil::scale-out-matrix-phases u m)
-      (fiasco-assert-matrices-are-equal m u))))
+         (compiled-list (quil::qs-compiler (build-anonymous-gate m 3 2 1 0)))
+         (u (quil::make-matrix-from-quil compiled-list)))
+    (check-type u magicl:matrix)
+    (quil::scale-out-matrix-phases u m)
+    (fiasco-assert-matrices-are-equal m u)))
 
 (deftest test-cnot->cnot ()
   (let ((progm (parse-quil "CNOT 1 0"))
@@ -154,7 +149,7 @@
               :test #'equalp))))
 
 (defun link-nativep (chip-spec)
-  (reduce #'alexandria:disjoin
+  (reduce #'a:disjoin
           (quil::chip-spec-links chip-spec)
           :initial-value (constantly t)
           :key #'quil::hardware-object-native-instructions))
@@ -168,7 +163,7 @@
 
 (deftest test-cnot-rewiring-in-cnot-architecture ()
   "Test that all CNOTs on each pair of qubits compile into a single CNOT rewired appropriately."
-  (format t "[Test output: ~%")
+  (format t "~&    [Test output: ~%")
   (finish-output)
   ;; don't let nobody bully you into allocating (2^16)^2 elements
   (let ((fiasco:*print-test-run-progress* nil)
@@ -186,7 +181,7 @@
 
 (deftest test-cz-compilation-and-rewiring-in-cnot-architecture ()
   "Test that all CZs on all qubit combinations compile to a single CNOT that's native."
-  (format t "[Test output: ~%")
+  (format t "~&    [Test output: ~%")
   (finish-output)
   (let ((fiasco:*print-test-run-progress* nil)
         (quil::*compress-carefully* nil))

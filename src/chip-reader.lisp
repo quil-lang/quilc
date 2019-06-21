@@ -54,15 +54,12 @@
   (:documentation "This condition can be signaled when the chip reader fails to find an ISA layer.")
   (:report "Invalid QPU description file: missing required ISA layer or sub-layer."))
 
-(defun integer-list-p (list)
-  (every #'integerp list))
-
 (defun expand-key-to-integer-list (key)
   "Expands a string of the form \"n1-...-nm\" to the list of integers (list n1 ... nm)."
   (etypecase key
     (string
      (mapcar #'parse-integer (split-sequence:split-sequence #\- key)))
-    ((and list (satisfies integer-list-p))
+    (integer-list
      key)))
 
 (defun dead-qubit-hash-table ()
@@ -160,7 +157,7 @@
                          (t (error "Unknown link type in QPU descriptor on link ~a: ~a."
                                    (list q0 q1) string))))
                      (target-parser (hash-value)
-                       (mapcar #'individual-target-parser (alexandria:ensure-list hash-value))))
+                       (mapcar #'individual-target-parser (a:ensure-list hash-value))))
               (let ((link (build-link q0 q1
                                       (if (gethash "type" link-hash)
                                           (target-parser (gethash "type" link-hash))
@@ -184,7 +181,7 @@
     (loop :for i :from 0
           :for qubit :across (vnth 0 (chip-specification-objects chip-spec))
           :do ;; load the qubit specs info
-              (alexandria:when-let ((spec (gethash (list i) (gethash "1Q" specs-hash))))
+              (a:when-let ((spec (gethash (list i) (gethash "1Q" specs-hash))))
                 (setf (gethash "specs" (hardware-object-misc-data qubit))
                       spec))))
   (when (gethash "2Q" specs-hash)
@@ -207,7 +204,7 @@
     (install-generic-compilers chip-spec (list ':cz))
     ;; now load the layers out of the .qpu hash
     (load-isa-layer chip-spec isa-hash)
-    (alexandria:when-let ((specs-hash (gethash "specs" hash-table)))
+    (a:when-let ((specs-hash (gethash "specs" hash-table)))
       (load-specs-layer chip-spec specs-hash))
     ;; and return the chip-specification that we've built
     chip-spec))

@@ -32,9 +32,10 @@
                   (defun ,name ,args ,@body)
                   (declaim (notinline ,name))))))
 
-  (define-inlineable integer-bits-equal (bits1 bits2)
-      (bit-set bit-set -> boolean)
-    (= bits1 bits2))
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (define-inlineable integer-bits-equal (bits1 bits2)
+        (bit-set bit-set -> boolean)
+      (= bits1 bits2)))
   (define-inlineable infinite-integer-set-p (bits)
       (bit-set -> boolean)
     (minusp bits))
@@ -107,6 +108,9 @@ classical memory regions. "
     (qubits +empty+ :type bit-set :read-only t)
     (memory-regions nil :read-only t))  ; Either an alist mapping region names to bit sets, or the sentinel value T
 
+  (defmethod make-load-form ((object resource-collection) &optional env)
+    (make-load-form-saving-slots object :environment env))
+
   (defun resource= (rc1 rc2)
     "Returns true if resource collections RC1 and RC2 contain the same qubit and region resources."
     (and (integer-bits-equal (resource-collection-qubits rc1)
@@ -116,7 +120,7 @@ classical memory regions. "
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (alexandria:define-constant +impossibly-full-resource+
+  (a:define-constant +impossibly-full-resource+
       (make-resource-collection
        :qubits +full+
        :memory-regions t)
@@ -374,7 +378,7 @@ DEFAULT-VALUE is used. "
 (defconstant +range-lower-bound+ most-negative-fixnum)
 (defconstant +range-upper-bound+ most-positive-fixnum)
 
-(alexandria:define-constant +full-range+
+(a:define-constant +full-range+
     (list (cons +range-lower-bound+ +range-upper-bound+))
   :test 'equal
   :documentation "The largest possible range.")
@@ -391,7 +395,7 @@ RANGES."
     ((endp ranges)
      nil)
     ((>= (interval-hi range) (first-interval-lo ranges))
-     (alexandria:maxf (interval-hi range) (first-interval-hi ranges)))))
+     (a:maxf (interval-hi range) (first-interval-hi ranges)))))
 
 (defun range-union (r1 r2)
   (nconc

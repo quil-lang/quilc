@@ -69,7 +69,7 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
                                       &rest rest)
   "Generates a QAOA program which maps perfectly onto the QPU described by CHIP-SPECIFICATION and which occupies QUBIT-COUNT many qubits.  (Should result in a trivial scheduling problem for the NAIVE rewiring method.)  Pass along any keyword arguments to QAOA-PROGRAM-FROM-GRAPH."
   (let* ((live-ccs (chip-spec-live-qubit-cc chip-specification))
-         (biggest-cc (alexandria:extremum live-ccs #'> :key #'length))
+         (biggest-cc (a:extremum live-ccs #'> :key #'length))
          (program-qubits nil)
          (program-links nil))
     
@@ -81,12 +81,12 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
             ()
             "Must request at least one qubit.")
     
-    (push (alexandria:random-elt biggest-cc)
+    (push (a:random-elt biggest-cc)
           program-qubits)
     
     ;; collect qubits to find a connected subgraph of chip-specification of size qubit-count
     (loop :with nearby-qubits := (chip-spec-adj-qubits chip-specification (first program-qubits))
-          :for next-qubit := (alexandria:random-elt nearby-qubits)
+          :for next-qubit := (a:random-elt nearby-qubits)
           :do (push next-qubit program-qubits)
               (setf nearby-qubits
                     (set-difference (union nearby-qubits
@@ -142,6 +142,6 @@ NOTE: SELF-CONNECTIVITY must lie in the region [0, 1). For values very close to 
                  qubit-connections)
            (incf qubit-bound)))))
     (apply 'qaoa-program-from-graph
-           (alexandria:iota qubit-count)
+           (a:iota qubit-count)
            qubit-connections
            rest)))

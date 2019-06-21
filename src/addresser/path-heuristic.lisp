@@ -44,13 +44,13 @@ respectively."
                (decf (aref link-values link-index) weight-off)))))
 
 (defun select-swap-by-values (chip-spec link-values rewirings-tried rewiring)
-  (alexandria:extremum
+  (a:extremum
    (delete-if
     (lambda (link-index)
       (destructuring-bind (q0 q1) (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list)
         (with-update-rewiring rewiring q0 q1
           (member rewiring rewirings-tried :test #'equalp))))
-    (alexandria:iota (length link-values)))
+    (a:iota (length link-values)))
    #'>
    :key (lambda (idx) (aref link-values idx))))
 
@@ -97,9 +97,9 @@ rewiring."
 
                   (unless p1
                     ;; find a position for the other qubit
-                    (setf p1 (alexandria:extremum
+                    (setf p1 (a:extremum
                               (delete-if (lambda (p) (apply-rewiring-p2l rewiring p))
-                                         (alexandria:iota (rewiring-length rewiring)))
+                                         (a:iota (rewiring-length rewiring)))
                               #'<
                               :key (lambda (p) (aref qq-distances p0 p))))
                     (rewiring-assign rewiring q1 p1))

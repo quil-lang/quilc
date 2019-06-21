@@ -279,35 +279,22 @@
         (calculate-state-prep-angles (state-prep-application-source-wf instr))
       (multiple-value-bind (zero-to-target-Y-angles zero-to-target-Z-angles target-wf)
           (calculate-state-prep-angles (state-prep-application-target-wf instr) -1.0d0)
-        (let ((ucr-arguments (list* (first (application-arguments instr))
-                                    (reverse (rest (application-arguments instr))))))
+        (let ((ucr-arguments (reverse (application-arguments instr))))
           ;; build the resulting circuit
           (list
            ;; move from source Z to ground Z
-           (make-instance 'ucr-application
-                          :roll-type "RZ"
-                          :arguments ucr-arguments
-                          :parameters source-to-zero-Z-angles)
+           (apply #'build-UCR "RZ" source-to-zero-Z-angles ucr-arguments)
            ;; move from source Y to ground Y
-           (make-instance 'ucr-application
-                          :roll-type "RY"
-                          :arguments ucr-arguments
-                          :parameters source-to-zero-Y-angles)
+           (apply #'build-UCR "RY" source-to-zero-Y-angles ucr-arguments)
            ;; trampoline
            (make-instance 'state-prep-application
                           :source-wf source-wf
                           :target-wf target-wf
                           :arguments (rest (application-arguments instr)))
            ;; move from ground to target Y
-           (make-instance 'ucr-application
-                          :roll-type "RY"
-                          :arguments ucr-arguments
-                          :parameters zero-to-target-Y-angles)
+           (apply #'build-UCR "RY" zero-to-target-Y-angles ucr-arguments)
            ;; move from ground to target Z
-           (make-instance 'ucr-application
-                          :roll-type "RZ"
-                          :arguments ucr-arguments
-                          :parameters zero-to-target-Z-angles)))))))
+           (apply #'build-UCR "RZ" zero-to-target-Z-angles ucr-arguments)))))))
 
 
 ;; this decomposition algorithm is based off of Section 4 of /0406176, our old QSC favorite

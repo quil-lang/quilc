@@ -7,4 +7,6 @@
   
   ;; suite.lisp
   (:export
-   #:run-quilc-tests))
+   #:run-quilc-tests)
+  (:local-nicknames (:a :alexandria))
+  (:shadowing-import-from #:cl-quil #:pi))

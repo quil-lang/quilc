@@ -6,7 +6,6 @@
 
 (defun build-gate (operator params &rest qubits)
   "Shorthand function for constructing a GATE-APPLICATION object from QUIL-like input. OPERATOR must be a standard gate name."
-  (check-type operator string)
   (check-type params list)
   (check-type qubits list)
   (assert (not (null qubits)))
@@ -26,12 +25,29 @@
               (formal (string-downcase (symbol-name arg))))
              (otherwise
               arg))))
-    (let ((gate-def (lookup-standard-gate operator)))
+    (let* ((operator-adt
+             (etypecase operator
+               (string (named-operator operator))
+               (operator-description operator)))
+           (gate-def
+             (etypecase operator
+               (string (lookup-standard-gate operator))
+               (operator-description
+                (labels ((recurse (o)
+                           (adt:match operator-description o
+                             ((named-operator str)
+                              (lookup-standard-gate str))
+                             ((dagger-operator o)
+                              (recurse o))
+                             ((controlled-operator o)
+                              (recurse o))
+                             ((forked-operator o)
+                              (recurse o)))))
+                  (recurse operator))))))
       (assert (not (null gate-def)) (operator) "BUILD-GATE only takes standard gate names.")
       (make-instance 'gate-application
-                     :operator (named-operator operator)
+                     :operator operator-adt
                      :name-resolution gate-def
-                     :gate (gate-definition-to-gate gate-def)
                      :parameters (mapcar #'capture-param params)
                      :arguments (mapcar #'capture-arg qubits)))))
 

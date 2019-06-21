@@ -100,7 +100,7 @@
                     ;; find a position for the other qubit
                     (setf p1
                           (loop :with min-p    := nil
-                                :with min-dist := sb-ext:double-float-positive-infinity
+                                :with min-dist := double-float-positive-infinity
                                 :for p :below (rewiring-length rewiring)
                                 :unless (apply-rewiring-p2l rewiring p)
                                   :do (let ((new-dist (aref qq-distances p0 p)))

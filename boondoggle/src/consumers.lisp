@@ -47,7 +47,7 @@
             (classical-addresses
               (get-consumer-registers consumer parsed-program))
             (qvm-payload (yason:encode
-                          (alexandria:plist-hash-table
+                          (a:plist-hash-table
                            (list "type" "multishot"
                                  "addresses" classical-addresses
                                  "trials" (consumer-local-qvm-trials consumer)

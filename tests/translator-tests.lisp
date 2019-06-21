@@ -84,19 +84,16 @@
 (deftest test-ucr-recognition ()
   (dolist (roll-type (list "RY" "RZ"))
     (let* ((qubit-count 4)
-           (argument-list (random-permutation (mapcar #'qubit (alexandria:iota qubit-count))))
+           (argument-list (random-permutation (mapcar #'qubit (a:iota qubit-count))))
            (angle-list (mapcar (lambda (x)
                                  (declare (ignore x))
                                  (constant (random (* 2 pi))))
                                (make-list (expt 2 (1- qubit-count)))))
-           (ucr-instruction (make-instance 'quil::ucr-application
-                                           :roll-type roll-type
-                                           :arguments argument-list
-                                           :parameters angle-list))
+           (ucr-instruction (apply #'quil::build-UCR roll-type angle-list argument-list))
            (ucr-matrix (quil::make-matrix-from-quil (list ucr-instruction)))
            (anonymous-instr (make-instance 'quil::gate-application
                                            :operator #.(named-operator "ANONYMOUS-UCR")
-                                           :arguments (mapcar #'qubit (nreverse (alexandria:iota qubit-count)))
+                                           :arguments (mapcar #'qubit (nreverse (a:iota qubit-count)))
                                            :gate ucr-matrix))
            (recognized-instruction (quil::recognize-ucr anonymous-instr))
            (recognized-matrix (quil::make-matrix-from-quil recognized-instruction)))
@@ -115,7 +112,7 @@
                               (list "CPHASE" (list (random 1.0d0)) #'cl-quil::CPHASE-to-native-CPHASEs)
                               (list "PISWAP" (list (random 1.0d0)) #'cl-quil::PISWAP-to-native-PISWAPs)))
       (destructuring-bind (operator params expander) instr-type
-        (format *debug-io* "    Testing global-to-local ~a expansion~%" operator)
+        (format *debug-io* "~&    Testing global-to-local ~a expansion~%" operator)
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
                (mat (cl-quil::make-matrix-from-quil (funcall expander chip-spec instr))))

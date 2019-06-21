@@ -29,7 +29,7 @@
       (setf file (merge-pathnames file originating-dir)))
     (unless (uiop:file-exists-p file)
       (error "Could not include ~S because it does not exist." file))
-    (let ((incl-pp (parse-quil-into-raw-program (alexandria:read-file-into-string file))))
+    (let ((incl-pp (parse-quil-into-raw-program (a:read-file-into-string file))))
       (setf (parsed-program-gate-definitions pp)
             (append (parsed-program-gate-definitions pp)
                     (parsed-program-gate-definitions incl-pp)))

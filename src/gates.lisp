@@ -39,7 +39,7 @@
   (labels ((check-parameters (gate)
              (unless (every #'is-constant (application-parameters gate))
                (error 'unknown-gate-parameter :gate gate)))
-           (recurse (od)
+           (recurse (od parameters)
              (adt:match operator-description od
                ((named-operator _)
                 ;; We've already resolved the gate name.
@@ -48,18 +48,23 @@
                        (gate-definition-to-gate (gate-application-resolution gate))
                        (mapcar #'constant-value (application-parameters gate))))
                ((controlled-operator o)
-                (let ((summand (recurse o)))
+                (let ((summand (recurse o parameters)))
                   (magicl:direct-sum
                    (magicl:make-identity-matrix (gate-dimension summand))
                    summand)))
                ((dagger-operator o)
-                (magicl:dagger (recurse o))))))
+                (magicl:dagger (recurse o parameters)))
+               ((forked-operator o)
+                (let* ((parameter-count (length parameters))
+                       (left-summand (recurse o (subseq parameters 0 (/ parameter-count 2))))
+                       (right-summand (recurse o (subseq parameters (/ parameter-count 2)))))
+                  (magicl:direct-sum left-summand right-summand))))))
     (cond ((slot-boundp gate 'gate)
            (check-parameters gate)
            (apply #'gate-matrix (gate-application-gate gate)
                   (mapcar #'constant-value (application-parameters gate))))
           (t
-           (recurse (application-operator gate))))))
+           (recurse (application-operator gate) (application-parameters gate))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;; Gate Object Definitions ;;;;;;;;;;;;;;;;;;;;;;;
@@ -209,8 +214,31 @@
     (let* ((permutation (permutation-gate-permutation target))
            (size (length permutation)))
       (make-instance 'permutation-gate
-                     :permutation (append (alexandria:iota size)
+                     :permutation (append (a:iota size)
                                           (mapcar (lambda (j) (+ j size)) permutation))))))
+
+;;; Forked Gates
+
+(defclass forked-gate ()
+  ((target :initarg :target
+           :reader target
+           :documentation "The targeted gate of a single qubit \"fork\", where a \"fork\" is a special case of multiplexing where the same gate is used to form both blocks, with different parameters passed to the gate constructor.")))
+
+(defmethod gate-matrix ((gate forked-gate) &rest parameters)
+  (let* ((target (target gate))
+         (length (/ (length parameters) 2))
+         (first-half (subseq parameters 0 length))
+         (second-half (subseq parameters length)))
+    (magicl:direct-sum (apply #'gate-matrix target first-half)
+                       (apply #'gate-matrix target second-half))))
+
+(defmethod gate-dimension ((gate forked-gate))
+  (* 2 (gate-dimension (target gate))))
+
+(defgeneric fork-gate (target)
+  (:documentation "Construct a forked gate out of TARGET.")
+  (:method ((target t))
+    (make-instance 'forked-gate :target target)))
 
 ;;; Daggered Gates
 
@@ -249,9 +277,11 @@
     ((named-operator _)
      (lambda (gate) gate))
     ((controlled-operator od)
-     (alexandria:compose #'control-gate (operator-description-gate-lifter od)))
+     (a:compose #'control-gate (operator-description-gate-lifter od)))
     ((dagger-operator od)
-     (alexandria:compose #'dagger-gate (operator-description-gate-lifter od)))))
+     (a:compose #'dagger-gate (operator-description-gate-lifter od)))
+    ((forked-operator od)
+     (a:compose #'fork-gate (operator-description-gate-lifter od)))))
 
 (defmethod gate-application-gate ((app gate-application))
   (funcall (operator-description-gate-lifter (application-operator app))
@@ -265,7 +295,7 @@
     (let ((table (make-hash-table :test 'equal))
           (gate-defs (parsed-program-gate-definitions
                       (parse-quil-into-raw-program
-                       (alexandria:read-file-into-string
+                       (a:read-file-into-string
                         (asdf:system-relative-pathname
                          "cl-quil" "src/quil/stdgates.quil"))))))
       (dolist (gate-def gate-defs table)
@@ -280,7 +310,7 @@
 
 (defun lookup-standard-gate (gate-name)
   "Lookup the gate named by GATE-NAME in the collection of *standard* Quil gates. Return NIL if non-standard."
-  (check-type gate-name alexandria:string-designator)
+  (check-type gate-name a:string-designator)
   (values (gethash (string gate-name) **default-gate-definitions**)))
 
 
@@ -294,7 +324,7 @@
 (defgeneric gate-definition-to-gate (gate-def)
   (:documentation "Convert a parsed Quil gate definition to a usable, executable gate.")
   (:method :around ((gate-def gate-definition))
-    (alexandria:if-let ((gate (%gate-definition-cached-gate gate-def)))
+    (a:if-let ((gate (%gate-definition-cached-gate gate-def)))
       gate
       (setf (%gate-definition-cached-gate gate-def) (call-next-method)))))
 
@@ -322,7 +352,7 @@
            (entries (gate-definition-entries gate-def))
            (params (gate-definition-parameters gate-def))
            (dim (isqrt (length entries))))
-      (assert (every #'symbolp params))
+      (check-type params symbol-list)
       (make-instance 'parameterized-gate
                      :name name
                      :dimension dim
@@ -335,7 +365,7 @@
   "Constructs the matrix representation associated to an instruction list consisting of gates. Suitable for testing the output of compilation routines."
   (check-type m magicl:matrix)
   (check-type instr application)
-  (alexandria:when-let ((defn (gate-matrix instr)))
+  (a:when-let ((defn (gate-matrix instr)))
     (let* ((mat-size (ilog2 (magicl:matrix-rows m)))
            (size (max mat-size
                       (apply #'max
@@ -348,7 +378,7 @@
            (m (if (< mat-size size)
                   (kq-gate-on-lines m
                                     size
-                                    (alexandria:iota mat-size :start (1- mat-size) :step -1))
+                                    (a:iota mat-size :start (1- mat-size) :step -1))
                   m)))
       (magicl:multiply-complex-matrices mat m))))
 
@@ -435,7 +465,7 @@ as matrices."
         (unless (endp new-qubits)
           (setf u (kq-gate-on-lines u
                                     (+ (length qubits) (length new-qubits))
-                                    (alexandria:iota (length qubits)
+                                    (a:iota (length qubits)
                                                      :start (1- (length qubits))
                                                      :step -1)))
           (setf qubits (append new-qubits qubits)))

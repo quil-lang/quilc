@@ -29,7 +29,7 @@
   (assert (null options) (options)
           "No options are supported at this time.")
   (multiple-value-bind (predecessors decls doc)
-      (alexandria:parse-body (append docs-and-predecessors '(nil)) :documentation t)
+      (a:parse-body (append docs-and-predecessors '(nil)) :documentation t)
     (assert (null decls) (docs-and-predecessors)
             "DEFINE-TRANSFORM can't have any declarations. Found ~S." decls)
     (assert (every #'symbolp predecessors) (docs-and-predecessors)

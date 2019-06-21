@@ -123,9 +123,9 @@ as needed so that they are the same size."
                    (let* ((*read-eval* nil)
                           (raw-rewiring (if vector
                                             (make-rewiring-from-l2p vector)
-                                            (make-rewiring-from-l2p
-                                             (read-from-string (subseq (comment instr)
-                                                                       (length "Entering rewiring: "))))))
+                                            (make-rewiring-from-string
+                                             (subseq (comment instr)
+                                                     (length "Entering rewiring: ")))))
                           (trimmed (trim-rewiring raw-rewiring)))
                      (setf mat (reduce #'matrix-rescale-and-multiply
                                        (list (rewiring-to-permutation-matrix-l2p trimmed)
@@ -240,7 +240,7 @@ as needed so that they are the same size."
         matrix
         (kq-gate-on-lines matrix
                           n
-                          (alexandria:iota m :start (1- m) :step -1)))))
+                          (a:iota m :start (1- m) :step -1)))))
 
 (defun matrix-trace (m)
   (assert (= (magicl:matrix-rows m) (magicl:matrix-cols m)))
@@ -317,3 +317,57 @@ as needed so that they are the same size."
            (d (/ (- y1 y0) delta))
            (new-guess (+ guess (/ (- y0) d))))
       (find-root f new-guess (1- depth-bound)))))
+
+(defun matrix-map (f m &rest more-m)
+  "Returns a matrix X_ij = f(M_ij, ...)."
+  (magicl:tabulate (magicl:matrix-rows m)
+                   (magicl:matrix-cols m)
+                   (lambda (i j)
+                     (apply #'funcall f
+                            (magicl:ref m i j)
+                            (mapcar (a:rcurry #'magicl:ref i j)
+                                    more-m)))))
+
+(defun matrix-every (predicate m &rest more-m)
+  "Tests whether predicate is true for all elements in M."
+  (magicl:map-indexes (magicl:matrix-rows m)
+                      (magicl:matrix-cols m)
+                      (lambda (i j)
+                        (unless (apply predicate
+                                       (magicl:ref m i j)
+                                       (mapcar (a:rcurry #'magicl:ref i j)
+                                               more-m))
+                          (return-from matrix-every nil))))
+  t)
+
+(defun matrix-realpart (m)
+  "Returns a matrix X_ij = Re(M_ij)."
+  (matrix-map #'realpart m))
+
+(defun matrix-imagpart (m)
+  "Returns a matrix X_ij = Im(M_ij)."
+  (matrix-map #'imagpart m))
+
+(defun m* (m &rest more-m)
+  "Matrix multiplication of input matrices."
+  (reduce #'magicl:multiply-complex-matrices
+          more-m
+          :initial-value m))
+
+(defun m+ (m &rest more-m)
+  "Matrix component-wise addition of input matrices."
+  (reduce #'magicl:add-matrix
+          more-m
+          :initial-value m))
+
+(defun m- (m &rest more-m)
+  "Matrix component-wise subtraction of input matrices. Negates input if applied as unary function."
+  (reduce #'magicl:sub-matrix
+          more-m
+          :initial-value (if more-m m (magicl:scale -1 m))))
+
+(defun matrix-diagonal-entries (m)
+  "Returns the diagonal elements of the matrix M."
+  (loop :for j :below (min (magicl:matrix-rows m)
+                           (magicl:matrix-cols m))
+        :collect (magicl:ref m j j)))

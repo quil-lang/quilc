@@ -26,12 +26,12 @@
             "unknown"
             output)))))
 
-(alexandria:define-constant +QUILC-VERSION+
+(a:define-constant +QUILC-VERSION+
     (system-version '#:quilc)
   :test #'string=
   :documentation "The version of the quilc application.")
 
-(alexandria:define-constant +GIT-HASH+
+(a:define-constant +GIT-HASH+
     (git-hash '#:quilc)
   :test #'string=
   :documentation "The git hash of the quilc repo.")

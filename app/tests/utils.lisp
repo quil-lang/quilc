@@ -15,7 +15,7 @@ e.g.
   (testfunc 3 4)) ;; => 12
 "
   (let* ((names (mapcar #'first defs))
-         (gnames (mapcar (alexandria:compose #'gensym #'symbol-name) names)))
+         (gnames (mapcar (a:compose #'gensym #'symbol-name) names)))
     `(let (,@(loop :for name :in names
                    :for gname :in gnames
                    :collect `(,gname (fdefinition ',name))))

@@ -12,7 +12,7 @@
               (sort (copy-seq a) #'<)
               (sort (copy-seq b) #'<))))
 
-(alexandria:define-constant +identity-defgate+ "
+(a:define-constant +identity-defgate+ "
 DEFGATE I:
     1, 0, 0, 0
     0, 1, 0, 0
@@ -302,13 +302,13 @@ B(b) 0 1
           :accessor dummy-node-value)))
 
 (defun dummy-node (x)
-  (make-instance 'dummy-node :value (alexandria:ensure-list x)))
+  (make-instance 'dummy-node :value (a:ensure-list x)))
 
 (defmethod quil::fuse-objects ((a dummy-node) (b dummy-node))
   (make-instance 'dummy-node
                  :value (append
-                         (alexandria:ensure-list (dummy-node-value a))
-                         (alexandria:ensure-list (dummy-node-value b)))))
+                         (a:ensure-list (dummy-node-value a))
+                         (a:ensure-list (dummy-node-value b)))))
 
 (deftest test-fuse-dummy-objects ()
   "Test that FUSE-OBJECTS behaves properly in MERGE-GRID-NODES."
@@ -335,7 +335,7 @@ B(b) 0 1
              (is (= 1 (length (quil::roots output-pg))))
              (let ((root (first (quil::roots output-pg))))
                (is (quil::root-node-p root))
-               (is (every (alexandria:curry #'eq root) (quil::trailers output-pg)))
+               (is (every (a:curry #'eq root) (quil::trailers output-pg)))
                (is (every #'null (quil::grid-node-back root)))
                (is (every #'null (quil::grid-node-forward root)))
                (is (equalp (mapcar #'first proto-nodes)

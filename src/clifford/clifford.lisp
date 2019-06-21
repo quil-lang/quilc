@@ -80,7 +80,7 @@ qubits."
 (declaim (ftype (function (t) simple-vector) basis-map))
 (defstruct (clifford (:include qubit-algebra))
   "An element of the Clifford group on NUM-QUBITS qubits."
-  (num-qubits 0 :type unsigned-fixnum)
+  (num-qubits 0 :type quil::unsigned-fixnum)
   (basis-map nil :type simple-vector))
 
 (defmethod num-qubits ((c clifford))
@@ -197,7 +197,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
                           ()
                           "The symbol ~S is not a Pauli basis element" from)
                   ;; Get the max dimension
-                  (alexandria:maxf num-qubits (dimension from-name) (dimension to-name))
+                  (a:maxf num-qubits (dimension from-name) (dimension to-name))
                   ;; Record the map.
                   (push (cons from-name to-name)
                         maps)))
@@ -236,7 +236,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
   (declare (type clifford c))
   (declare (inline pauli-hash))
   (sxhash
-   (loop :with h :of-type unsigned-fixnum := 0
+   (loop :with h :of-type quil::unsigned-fixnum := 0
          :for p :of-type pauli :across (basis-map c)
          :do (setf h (hash-mix h (pauli-hash p)))
          :finally (return h))))
@@ -250,10 +250,10 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
   (if pre-allocate
       (make-hash-table :test 'clifford=
                        :hash-function 'clifford-hash
-                       #+sbcl :synchronized #+sbcl synchronized
+                       #+(or sbcl ecl) :synchronized #+(or sbcl ecl) synchronized
                        :size (count-clifford pre-allocate))
       (make-hash-table :test 'clifford=
-                       #+sbcl :synchronized #+sbcl synchronized
+                       #+(or sbcl ecl) :synchronized #+(or sbcl ecl) synchronized
                        :hash-function 'clifford-hash)))
 
 (defmethod print-object ((c clifford) stream)

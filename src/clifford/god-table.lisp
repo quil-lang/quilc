@@ -112,8 +112,9 @@ and J-th (target) qubit."
   (make-hash-table :test 'gateset=
                    :hash-function 'gateset-hash
                    ;; We need to synchronize because this table will
-                   ;; be used as a cache from the server.
-                   :synchronized t))
+                   ;; be used as a cache from the server. LW and CCL
+                   ;; support that by default.
+                   #+(or sbcl ecl) :synchronized #+(or sbcl ecl) t))
 
 (defclass god-table ()
   ((mapping :initarg :mapping :reader mapping)
@@ -132,7 +133,7 @@ allows to compute a minimal length sequence of generators to invert it."))
   "Compute the God table for the closure of some specific generators."
   (let* ((q (make-queue))
          (n (num-qubits gateset))
-         (num-cliffords (count-clifford n))
+         #+#:debug(num-cliffords (count-clifford n))
          (generators (cliffords gateset))
          (gt (make-clifford-hash-table :pre-allocate n
                                        :synchronized nil)))
@@ -330,7 +331,7 @@ invert C when applied in the correct (reversed) order.
           :for i :from 0
           :do (dotimes (jdx (gethash i sample-idxs 0))
                 (vector-push hash-key results)))
-    (coerce (alexandria:shuffle results) 'list)))
+    (coerce (a:shuffle results) 'list)))
 
 (defun default-gateset (num-qubits &optional (cnot-edges :complete))
   "Generate a list of generators of single qubit Hadamard and Phase

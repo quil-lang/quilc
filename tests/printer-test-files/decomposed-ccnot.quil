@@ -1,0 +1,56 @@
+# Input
+# This is a slightly modified form of Figure 4.9 on p. 182 of Nielsen & Chuang (2010 ed.)
+DEFCIRCUIT CNOT-DT-T-CNOT-T p1 p2 p3:
+    CNOT p2 p3
+    DAGGER T p3
+    CNOT p1 p3
+    T p3
+
+DEFCIRCUIT DECOMPOSED-CCNOT q1 q2 q3:
+    H q3
+    CNOT-DT-T-CNOT-T q1 q2 q3
+    CNOT-DT-T-CNOT-T q1 q2 q3
+    T q2
+    H q3
+    CNOT q1 q2
+    T q1
+    DAGGER T q2
+    CNOT q1 q2
+
+DECOMPOSED-CCNOT 0 1 2
+
+# Output
+DEFCIRCUIT CNOT-DT-T-CNOT-T p1 p2 p3:
+    CNOT p2 p3
+    DAGGER T p3
+    CNOT p1 p3
+    T p3
+
+DEFCIRCUIT DECOMPOSED-CCNOT q1 q2 q3:
+    H q3
+    CNOT-DT-T-CNOT-T q1 q2 q3
+    CNOT-DT-T-CNOT-T q1 q2 q3
+    T q2
+    H q3
+    CNOT q1 q2
+    T q1
+    DAGGER T q2
+    CNOT q1 q2
+
+
+H 2
+CNOT 1 2
+DAGGER T 2
+CNOT 0 2
+T 2
+CNOT 1 2
+DAGGER T 2
+CNOT 0 2
+T 2
+T 1
+H 2
+CNOT 0 1
+T 0
+DAGGER T 1
+CNOT 0 1
+
