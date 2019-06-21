@@ -79,6 +79,13 @@
                    :gate matrix
                    :arguments (mapcar #'capture-arg qubits))))
 
+(defun build-UCR (roll-name params &rest args)
+  (let ((op (named-operator roll-name)))
+    (dolist (x (rest args))
+      (declare (ignore x))
+      (setf op (forked-operator op)))
+    (apply #'build-gate op params args)))
+
 
 ;;; also some utilities for defining compiler bodies generally
 
