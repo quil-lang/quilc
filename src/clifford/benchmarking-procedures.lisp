@@ -108,6 +108,11 @@
   "If A and B are both not NIL, concatenate them and return a STRING."
   (when (and a b) (concatenate 'string a b)))
 
+;; This function is just for testing purposes. There also exists an
+;; almost identical function collinearp in src/matrix-operations.lisp
+;; that handles arbitrary global phases, but it uses double=, which is
+;; too strict for the contexts where this function is used to test
+;; equality.
 (defun global-phase~ (wfa wfb)
   "Tests that two wavefunctions are equal up to a global phase of an eighth root of unity."
   (let ((phase-factor (cis (/ pi 4)))
@@ -124,7 +129,7 @@
         ((quil::double~ phase -1) "-")
         ((quil::double~ phase #C(0 1)) "i")
         ((quil::double~ phase #C(0 -1)) "-i")
-        (t NIL)))
+        (t (error "Invalid phase number: ~A~%" phase))))
 
 (defun string-to-phase (phase-str)
   "Returns the phase corresponding to a string form of a fourth root of unity, given by PHASE-STR, NIL otherwise."
@@ -132,7 +137,7 @@
         ((string= phase-str "-") -1)
         ((string= phase-str "i") #C(0 1))
         ((string= phase-str "-i") #C(0 -1))
-        (t NIL)))
+        (t (error "Invalid phase string: ~A~%" phase-str))))
 
 (defun pauli-matrix-p (p)
   "Returns two strings. The first is a string representation of the phase of P, assuming P is a Pauli matrix, which will be a fourth root of unity. The second return value is a string representation of P as a tensor product of single qubit Pauli operators. If P is not a Pauli operator, then the second value will be NIL."
@@ -197,7 +202,6 @@
                                  "The given matrix does not represent a Clifford element.")
                          (pauli-from-string (concatenate 'string phase conj))))))))
 
-(require :sb-rotate-byte)
 (defun apply-pauli-to-wavefunction (ph index q wf)
   "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
   (multiple-value-bind (b a) (floor index 2)
@@ -219,29 +223,29 @@
               (setf (aref wf addr0) w0
                     (aref wf addr1) w1))))))))
 
-;; This function converts a clifford of arbitrary arity to its
-;; corresponding matrix representation. How would one do this, you
-;; ask? It is done in these steps:
-;;
-;;     1) Create a blank square matrix of size 2^n.
-;;
-;;     2) Find the wavefunction image of the zero state under this
-;;     clifford, by using (tableau-function cliff) and applying it on
-;;     a tableau in the zero state, then extracting its
-;;     wavefunction. Thus, this wavefunction is the first column of
-;;     our result matrix.
-;;
-;;     3) Next, we calculate the columns of the matrix in succession,
-;;     which each represent the image of a basis state under the
-;;     clifford. We already know C|0...0>; we want to find C|x>. We
-;;     can get to any basis state from |0> by applying some
-;;     combination of single qubit X gates, and we know the images of
-;;     each of these Xs under conjugation by the clifford, so we can
-;;     apply each image to C|0...0> to get (C*X0*C')(C*X1*C')...C|0> =
-;;     C(X0*X1...)|0> = C|x>. Looping over all 2^n - 1 remaining basis
-;;     states and doing that for each one, and setting the appropriate
-;;     column of the matrix for each one, we get our final clifford
-;;     matrix.
+;;; This function converts a clifford of arbitrary arity to its
+;;; corresponding matrix representation. How would one do this, you
+;;; ask? It is done in these steps:
+;;;
+;;;     1) Create a blank square matrix of size 2^n.
+;;;
+;;;     2) Find the wavefunction image of the zero state under this
+;;;     clifford, by using (tableau-function cliff) and applying it on
+;;;     a tableau in the zero state, then extracting its
+;;;     wavefunction. Thus, this wavefunction is the first column of
+;;;     our result matrix.
+;;;
+;;;     3) Next, we calculate the columns of the matrix in succession,
+;;;     which each represent the image of a basis state under the
+;;;     clifford. We already know C|0...0>; we want to find C|x>. We
+;;;     can get to any basis state from |0> by applying some
+;;;     combination of single qubit X gates, and we know the images of
+;;;     each of these Xs under conjugation by the clifford, so we can
+;;;     apply each image to C|0...0> to get (C*X0*C')(C*X1*C')...C|0> =
+;;;     C(X0*X1...)|0> = C|x>. Looping over all 2^n - 1 remaining basis
+;;;     states and doing that for each one, and setting the appropriate
+;;;     column of the matrix for each one, we get our final clifford
+;;;     matrix.
 (defun clifford-to-matrix (cliff)
   "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
   (let* ((n (num-qubits cliff))

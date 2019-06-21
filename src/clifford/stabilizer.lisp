@@ -212,13 +212,13 @@
     ;; Return the phase
     sum))
 
-;; (Explained above in row-product, but re-explained here) While we
-;; are multiplying rows into the scratch row to generate the full
-;; stabilizer group, even though each stabilizer will eventually have
-;; a phase of 1 or -1, the phase may take the value of i or -i in
-;; intermediate steps. This function multiplies a row i into the
-;; scratch row, and returns the phase produced by the multiplication
-;; (can be 1, i, -1, or -i).
+;;; (Explained above in row-product, but re-explained here) While we
+;;; are multiplying rows into the scratch row to generate the full
+;;; stabilizer group, even though each stabilizer will eventually have
+;;; a phase of 1 or -1, the phase may take the value of i or -i in
+;;; intermediate steps. This function multiplies a row i into the
+;;; scratch row, and returns the phase produced by the multiplication
+;;; (can be 1, i, -1, or -i).
 (defun multiply-into-scratch (tab i)
   "Multiplies row I of TAB into the scratch row, and return the phase produced by the multiplication (as 0, 1, 2, 3 for 1, i, -1, -i respectively)."
   (declare (notinline row-product))
@@ -283,35 +283,35 @@ Note that no expressions calculating the phase update are created. This is becau
      variables
      (coerce new-variables 'list))))
 
-;; Many moons ago (04/2019), the phase updates produced by a clifford acting on
-;; a tableau via compile-tableau-operation (and
-;; clifford-stabilizer-action) were slightly incorrect. Before, phases
-;; were updated based on values in the un-clifforded tableau, but in
-;; reality, phase updates are dependent on the _updated_ X and Z bits
-;; of the tableau.
-;; 
-;; This function calculates the correct phase update to each
-;; generator and antigenerator of a tableau acted on by a clifford.
-;; It does this (with a minor adjustment or two) by:
-;;
-;;     1) Considering the row (generator/antigenerator) as a sequence
-;;        of single-qubit X and Z paulis.
-;; 
-;;     2) Mapping each of these paulis to their image under the clifford,
-;;        storing these new, more complicated paulis in contributing-ops.
-;;
-;;     3) Multiplying all these mapped paulis together to find the
-;;        image of the entire tableau row under the clifford.
-;;
-;; This tableau row image will now have an associated phase with it
-;; (which is a multiple of i). The minor adjustments refer to this
-;; detail: if the tableau row already has any Y paulis prior to the
-;; clifford action, the final phase value will have to be increased by
-;; 1 for each Y. This is because in the original row, the -i factor
-;; that comes from XZ = -iY is adjusted to 0, so we need to do the
-;; same for the resulting phase. Otherwise, a clifford that maps Y to
-;; Y, for example, would represent Y as X * Z, map them to themselves,
-;; multiply them together, and find that Y maps to -iY.
+;;; Many moons ago (04/2019), the phase updates produced by a clifford acting on
+;;; a tableau via compile-tableau-operation (and
+;;; clifford-stabilizer-action) were slightly incorrect. Before, phases
+;;; were updated based on values in the un-clifforded tableau, but in
+;;; reality, phase updates are dependent on the _updated_ X and Z bits
+;;; of the tableau.
+;;;
+;;; This function calculates the correct phase update to each
+;;; generator and antigenerator of a tableau acted on by a clifford.
+;;; It does this (with a minor adjustment or two) by:
+;;;
+;;;     1) Considering the row (generator/antigenerator) as a sequence
+;;;        of single-qubit X and Z paulis.
+;;;
+;;;     2) Mapping each of these paulis to their image under the clifford,
+;;;        storing these new, more complicated paulis in contributing-ops.
+;;;
+;;;     3) Multiplying all these mapped paulis together to find the
+;;;        image of the entire tableau row under the clifford.
+;;;
+;;; This tableau row image will now have an associated phase with it
+;;; (which is a multiple of i). The minor adjustments refer to this
+;;; detail: if the tableau row already has any Y paulis prior to the
+;;; clifford action, the final phase value will have to be increased by
+;;; 1 for each Y. This is because in the original row, the -i factor
+;;; that comes from XZ = -iY is adjusted to 0, so we need to do the
+;;; same for the resulting phase. Otherwise, a clifford that maps Y to
+;;; Y, for example, would represent Y as X * Z, map them to themselves,
+;;; multiply them together, and find that Y maps to -iY.
 (defun generate-clifford-image-phase (tab-var c row-var qubit-vars)
   "Calculate the phase update to a specific row in the tableau TAB, when acted on by a clifford C on specific qubits."
   (let* ((cn (num-qubits c))
@@ -538,15 +538,15 @@ Returns the number of purely X/Y generators.
         ;; Eliminate Z's to get lower generators (Z only)
         (elim-generator #'tableau-z)))))
 
-;; The general procedure of extracting the wavefunction from the
-;; tableau is just generating all of the state's stabilizers (and
-;; applying them to some state). However, this state has to be chosen
-;; carefully, since it's possible that the stabilizer operator sum
-;; will cause everything to destructively interfere and return nothing
-;; (not the |0...0> state, literally nothing, as if the state is in
-;; the "nullspace" of the stabilizer sum). This function ensures we
-;; have a good state to operate on that gives us the correct
-;; stabilizer state.
+;;; The general procedure of extracting the wavefunction from the
+;;; tableau is just generating all of the state's stabilizers (and
+;;; applying them to some state). However, this state has to be chosen
+;;; carefully, since it's possible that the stabilizer operator sum
+;;; will cause everything to destructively interfere and return nothing
+;;; (not the |0...0> state, literally nothing, as if the state is in
+;;; the "nullspace" of the stabilizer sum). This function ensures we
+;;; have a good state to operate on that gives us the correct
+;;; stabilizer state.
 (defun find-nonzero-operator (tab)
   "Given a tableau TAB, find a Pauli operator P such that P|0...0> has nonzero amplitude in the state represented by TAB. Write this operator to the scratch space of TAB. This function also puts TAB into REF (row echelon form), since P is found using the purely Z generators."
   (let ((n (tableau-qubits tab))
@@ -581,9 +581,9 @@ Returns the number of purely X/Y generators.
           (incf phase))))
     (values state phase)))
 
-;; The two nested dotimes in this function are a little mysterious,
-;; but they are just a way to cleverly loop over all possible
-;; combinations of generators.
+;;; The two nested dotimes in this function are a little mysterious,
+;;; but they are just a way to cleverly loop over all possible
+;;; combinations of generators.
 (defun tableau-wavefunction (tab)
   "Given a tableau TAB, generate and return the wavefunction representation of the stabilizer state the tableau represents, using the normalized sum of all stabilizers.
 

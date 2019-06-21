@@ -129,10 +129,10 @@
    :components (multiply-components (pauli-components a)
                                     (pauli-components b))))
 
-;; Paulis are printed in a fashion that is consistent with the
-;; ordering of the computational basis. For example, a pauli operator
-;; represented as '(0 A B C) is printed as CBA, which applies A on q0, B
-;; on q1, C on q2.
+;;; Paulis are printed in a fashion that is consistent with the
+;;; ordering of the computational basis. For example, a pauli operator
+;;; represented as '(0 A B C) is printed as CBA, which applies A on q0, B
+;;; on q1, C on q2.
 (defun print-pauli (p &optional (stream nil))
   "If STREAM is NIL (by default), return simple string representation of a Pauli P.
 If STREAM is T, print to standard output. Otherwise print to STREAM."

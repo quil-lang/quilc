@@ -136,3 +136,7 @@ Return two values:
 (defun positive-power-of-two-p (n)
   "Given an INTEGER N, return true if N is a power of 2, greater than 1."
   (and (> n 1) (power-of-two-p n)))
+
+(defun rotate-byte (count bytespec integer)
+  #-sbcl generic-impl
+  #+sbcl (sb-rotate-byte:rotate-byte count bytespec integer))

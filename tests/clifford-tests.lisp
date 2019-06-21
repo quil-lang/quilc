@@ -249,7 +249,7 @@
                         100))))
 
 (defun blank-wf (n)
-  (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
+  (make-array (expt 2 n) :initial-element #C(0.0d0 0.0d0)))
 
 (deftest test-tableau-wavefunction ()
   "Some simple tests to see if wavefunctions are correctly generated from tableaus. There are many, many more tests in qvm/tests/test-stabilizer-qvm.lisp"
@@ -262,35 +262,35 @@
         (x-tab (cl-quil.clifford::make-tableau-zero-state 2))
         (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2)))
     ;; zero state wavefunction
-    (setf (aref zero-wf 0) #C(1.0d0 0.0d0))
+    (setf (aref zero-wf 0) 1)
     (is (cl-quil.clifford::global-phase~ 
          zero-wf
          (cl-quil.clifford::tableau-wavefunction zero-tab)))
     ;; bell state wavefunction
-    (setf (aref bell-wf 0) #C(0.7071d0 0.0d0))
-    (setf (aref bell-wf 3) #C(0.7071d0 0.0d0))
+    (setf (aref bell-wf 0) (/ (sqrt 2)))
+    (setf (aref bell-wf 3) (/ (sqrt 2)))
     (cl-quil.clifford::tableau-apply-h bell-tab 0)
     (cl-quil.clifford::tableau-apply-cnot bell-tab 0 1)
     (is (cl-quil.clifford::global-phase~
-               bell-wf
-               (cl-quil.clifford::tableau-wavefunction bell-tab)))
+         bell-wf
+         (cl-quil.clifford::tableau-wavefunction bell-tab)))
     ;; simple x gate test
-    (setf (aref x-wf 1) #C(1.0d0 0.0d0))
+    (setf (aref x-wf 1) 1)
     (cl-quil.clifford::tableau-apply-h x-tab 0)
     (cl-quil.clifford::tableau-apply-phase x-tab 0)
     (cl-quil.clifford::tableau-apply-phase x-tab 0)
     (cl-quil.clifford::tableau-apply-h x-tab 0)
     (is (cl-quil.clifford::global-phase~
-               x-wf
-               (cl-quil.clifford::tableau-wavefunction x-tab)))
+         x-wf
+         (cl-quil.clifford::tableau-wavefunction x-tab)))
     ;; wavefunction with complex phase
-    (setf (aref phased-bell-wf 0) #C(0.7071d0 0.0d0))
-    (setf (aref phased-bell-wf 3) #C(0.0d0 -0.7071d0))
+    (setf (aref phased-bell-wf 0) (/ (sqrt 2)))
+    (setf (aref phased-bell-wf 3) (/ #C(0 -1) (sqrt 2)))
     (cl-quil.clifford::tableau-apply-h phased-bell-tab 0)
     (cl-quil.clifford::tableau-apply-cnot phased-bell-tab 0 1)
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
     (cl-quil.clifford::tableau-apply-phase phased-bell-tab 1)
     (is (cl-quil.clifford::global-phase~
-               phased-bell-wf
-               (cl-quil.clifford::tableau-wavefunction phased-bell-tab)))))
+         phased-bell-wf
+         (cl-quil.clifford::tableau-wavefunction phased-bell-tab)))))
