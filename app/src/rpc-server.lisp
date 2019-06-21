@@ -23,20 +23,14 @@
     ;; large number of randomly generated programs targeting a 16Q
     ;; lattice. Those programs were a random mixture of 1- and 2Q
     ;; gates, followed by MEASUREs on all 16 qubits.
-    (let ((coeff-oneq 1.6291)
-          (coeff-twoq 1.701)
-          (coeff-const 181.89)
-          (num-oneq (count-if (lambda (instr)
-                                (and (typep instr 'quil:gate-application)
-                                     (= 1 (length (quil:application-arguments instr)))))
-                              (quil:parsed-program-executable-code parsed-protoquil-program)))
-          (num-twoq (count-if (lambda (instr)
-                                (and (typep instr 'quil:gate-application)
-                                     (= 2 (length (quil:application-arguments instr)))))
-                              (quil:parsed-program-executable-code parsed-protoquil-program))))
-      (+ (* coeff-oneq num-oneq)
-         (* coeff-twoq num-twoq)
-         coeff-const))))
+    (loop :with coeff-oneq := 1.6291
+          :with coeff-twoq := 1.701
+          :with runtime := 181.89
+          :for instr :across (quil:parsed-program-executable-code parsed-protoquil-program)
+          :for nargs := (length (quil:application-arguments instr)) :do
+            (when (= nargs 1) (incf runtime coeff-oneq))
+            (when (= nargs 2) (incf runtime coeff-twoq))
+          :finally (return runtime))))
 
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
