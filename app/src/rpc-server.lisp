@@ -45,19 +45,16 @@
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
          (dictionary (process-program quil-program chip-specification))
          (processed-program (gethash "processed_program" dictionary))
-         ;; TODO If "qpu_runtime_estimation" can be folded into
-         ;; "program_duration" then we can replace this whole thing
-         ;; with DICTIONARY.
-         (metadata (a:alist-hash-table
-                    `(("final_rewiring" . ,(gethash "final_rewiring" dictionary))
-                      ("gate_depth" . ,(gethash "gate_depth" dictionary))
-                      ("gate_volume" . ,(gethash "gate_volume" dictionary))
-                      ("multiqubit_gate_depth" . ,(gethash "multiqubit_gate_depth" dictionary))
-                      ("program_duration" . ,(gethash "program_duration" dictionary))
-                      ("program_fidelity" . ,(gethash "program_fidelity" dictionary))
-                      ("topological_swaps" . ,(gethash "topological_swaps" dictionary))
-                      ("qpu_runtime_estimation" . ,(runtime-estimation
-                                                    (quil:parse-quil processed-program)))))))
+         (metadata (make-instance 'rpcq::|NativeQuilMetadata|
+                                  :|final_rewiring| (gethash "final_rewiring" dictionary)
+                                  :|gate_depth| (gethash "gate_depth" dictionary)
+                                  :|gate_volume| (gethash "gate_volume" dictionary)
+                                  :|multiqubit_gate_depth| (gethash "multiqubit_gate_depth" dictionary)
+                                  :|program_duration| (ensure-optional-real (gethash "program_duration" dictionary))
+                                  :|program_fidelity| (ensure-optional-real (gethash "program_fidelity" dictionary))
+                                  :|topological_swaps| (gethash "topological_swaps" dictionary)
+                                  :|qpu_runtime_estimation| (runtime-estimation
+                                                             (quil:parse-quil processed-program)))))
     (make-instance 'rpcq::|NativeQuilResponse|
                    :|quil| processed-program
                    :|metadata| metadata)))
