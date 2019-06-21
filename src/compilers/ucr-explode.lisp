@@ -7,13 +7,6 @@
 
 (in-package #:cl-quil)
 
-;; first, a helpful utility for constructing UCR gates
-(defun build-UCR (roll-name params &rest args)
-  (let ((op (named-operator roll-name)))
-    (dolist (x (rest args))
-      (declare (ignore x))
-      (setf op (forked-operator op)))
-    (apply #'build-gate op params args)))
 
 ;; this routine emits pretty efficient (but perhaps not optimal) decompositions
 ;; of certain FORKED gates. the input ingredients are:
