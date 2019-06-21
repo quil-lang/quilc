@@ -18,7 +18,7 @@
 (defun runtime-estimation (parsed-protoquil-program)
   "Estimated QPU runtime of PARSED-PROTOQUIL-PROGRAM. Likely to be an over-estimate for small depth programs, where runtime is dominated by network latency and compilation, etc. Take these results with a grain of salt."
   (when (and (typep parsed-protoquil-program 'quil:parsed-program)
-             (quil::check-protoquil-program parsed-protoquil-program))
+             (quil:protoquil-program-p parsed-protoquil-program))
     ;; These opaque numbers come from an analysis of the runtimes of a
     ;; large number of randomly generated programs targeting a 16Q
     ;; lattice. Those programs were a random mixture of 1- and 2Q

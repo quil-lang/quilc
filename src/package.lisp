@@ -397,6 +397,11 @@
   ;; compilation-methods.lisp
   (:export
    #:compiler-hook                      ; FUNCTION
+   #:check-protoquil-program            ; FUNCTION
+   #:protoquil-program-p                ; FUNCTION
+   #:not-protoquil                      ; CONDITION
+   #:not-protoquil-program              ; FUNCTION
+   #:not-protoquil-index                ; FUNCTION
    )
 
   ;; chip-specification.lisp

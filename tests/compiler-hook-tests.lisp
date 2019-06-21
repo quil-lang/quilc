@@ -424,10 +424,10 @@ PRAGMA END_PRESERVE_BLOCK
 MEASURE 1
 ")))
     ;; TODO Maybe there should be a (define-condition invalid-protoquil ...) ?
-    (not-signals simple-error (cl-quil::check-protoquil-program valid-pp))
-    (signals simple-error (cl-quil::check-protoquil-program invalid-pp-1in2))
-    (signals simple-error (cl-quil::check-protoquil-program invalid-pp-1in3))
-    (signals simple-error (cl-quil::check-protoquil-program invalid-pp-2in3))))
+    (not-signals quil:not-protoquil (quil:check-protoquil-program valid-pp))
+    (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-1in2))
+    (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-1in3))
+    (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-2in3))))
 
 (deftest test-global-pragma-survives-compilation ()
   "Test that a global pragma survives compilation."
