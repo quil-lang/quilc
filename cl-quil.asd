@@ -56,6 +56,7 @@
                (:file "gates")
                (:file "environment")
                (:file "context")
+               (:file "build-gate")
                (:file "operator-bind")
                (:module "clifford"
                 :serial t
