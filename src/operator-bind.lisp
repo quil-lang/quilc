@@ -37,6 +37,77 @@
 
 (global-vars:define-global-var **compilers-available** nil)
 
+(defstruct compiler-binding
+  "Represents a generic compiler argument binding.
+
+NAME: Symbol to be bound in the compiler definition.
+OPTIONS: plist of options governing applicability of the compiler binding."
+  (name    nil :type symbol)
+  (options nil :type list))
+
+(defstruct (wildcard-binding
+            (:include compiler-binding)))
+
+(defstruct (gate-binding
+            (:include compiler-binding))
+  "Represents a destructuring compiler argument binding.
+
+OPERATOR: Describes the APPLICATION-OPERATOR field of the instruction.
+PARAMETERS: A list of descriptors for the APPLICATION-PARAMETER field of the instruction.
+ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the instruction."
+  (operator   nil)             ; Type of symbol or operator-description.
+  (parameters nil)             ; Type of symbol or list of symbols and numeric literals.
+  (arguments  nil :type list)) ; Type of list of symbols and numeric literals.
+
+(defstruct (measure-binding
+            (:include compiler-binding))
+  "Represents a destructuring compiler argument binding for a MEASURE instruction."
+  (qubit  nil)                     ; Type of symbol or numeric literal
+  (target nil))                    ; Type of symbol or mref
+
+(defun get-binding-from-instr (instr)
+  "Constructs a COMPILER-BINDING object from an INSTRUCTION object, in such a way that if some auxiliary COMPILER-BINDING subsumes the output of this routine, then it will match when applied to the original INSTRUCTION object."
+  (typecase instr
+    (measure-discard
+     (make-measure-binding :qubit '_))
+    (measurement
+     (make-measure-binding :qubit '_ :target '_))
+    (application
+     (let ((parameters (loop :for p :in (application-parameters instr)
+                             :when (typep p 'constant)
+                               :collect (constant-value p)
+                             :when (symbolp p)
+                               :collect '_))
+           (arguments (loop :for q :in (application-arguments instr)
+                            :when (typep q 'qubit)
+                              :collect (qubit-index q)
+                            :when (symbolp q)
+                              :collect '_)))
+       (make-gate-binding :operator (application-operator instr)
+                          :parameters parameters
+                          :arguments arguments)))))
+
+(defun compiler-gateset-reducer-p (compiler)
+  (getf (compiler-options compiler) ':gateset-reducer t))
+
+(defun get-compilers (qubit-bound)
+  "Returns the sublist of **COMPILERS-AVAILABLE** which match on no more than QUBIT-BOUND qubits and which function as gateset reducers."
+  (remove-if-not
+   (lambda (compiler)
+     (and (compiler-gateset-reducer-p compiler)
+          (= 1 (length (compiler-bindings compiler)))
+          (gate-binding-p (first (compiler-bindings compiler)))
+          (>= qubit-bound (length (gate-binding-arguments (first (compiler-bindings compiler)))))
+          (endp (compiler-binding-options (first (compiler-bindings compiler))))))
+   **compilers-available**))
+
+(defun generate-blank-binding (qubit-count)
+  "Constructs a wildcard COMPILER-BINDING of a fixed QUBIT-COUNT."
+  (make-gate-binding :operator '_
+                     :parameters nil
+                     :arguments (loop :for i :below qubit-count
+                                      :collect '_)))
+
 (defclass compiler ()
   ((name
     :initarg :name
@@ -50,6 +121,10 @@
     :initarg :bindings
     :reader compiler-bindings
     :documentation "Raw list of bindings that the compiler matches against.")
+   (options
+    :initarg :options
+    :reader compiler-options
+    :documentation "plist of global options supplied to this compiler definition.")
    (body
     :initarg :body
     :reader compiler-body
@@ -58,11 +133,6 @@
     :initarg :output-gates
     :reader compiler-output-gates
     :documentation "Information automatically extracted about the target gate set.")
-   (gateset-reducer
-    :initarg :gateset-reducer
-    :initform t
-    :reader compiler-gateset-reducer-p
-    :documentation "Is this compiler intended to transition from one gate set to another?")
    (%function
     :initarg :function
     :reader compiler-%function
@@ -77,41 +147,56 @@
     (format stream "~a" (compiler-name obj))))
 
 
+;;; in what follows, we're very interested in two kinds of maps keyed on bindings:
+;;;  + an "occurrence table" is valued in integers, and it counts frequency
+;;;  + a "gate set" is valued in GATE-RECORD objects, and it tracks e.g. fidelity
+
+(defun make-occurrence-table ()
+  "Construct a fresh occurrence table."
+  (make-hash-table :test #'equalp))
+
+(defun add-entry-to-occurrence-table (table binding count &optional (scalar 1))
+  "Destructively increment a binding's value in an occurrence table."
+  (incf (gethash binding table 0) (* count scalar)))
+
+(defun copy-occurrence-table (table)
+  "Create a shallow copy of an occurrence table."
+  (let ((new-table (make-hash-table :test #'equalp)))
+    (dohash ((key val) table)
+      (add-entry-to-occurrence-table new-table key val))
+    new-table))
+
+(defun add-occurrence-tables (table1 table2 &optional (scalar2 1))
+  "Construct a new occurrence table whose values are the sums of the values of the two input tables."
+  (let ((new-table (copy-occurrence-table table1)))
+    (dohash ((key val) table2)
+      (add-entry-to-occurrence-table new-table key val scalar2))
+    new-table))
+
+(defun filter-by-qubit-count (table qubit-count)
+  (let ((new-table (make-occurrence-table)))
+    (dohash ((key val) table new-table)
+      (when (= qubit-count
+               (length (gate-binding-arguments key)))
+        (setf (gethash key new-table) val)))))
+
+
 ;;; a panoply of routines for dissecting compiler bodies and bindings
 
 (defun cleave-options (bindings-and-options &optional backlog)
+  "Separates a list of the form (binding1 binding2 ... bindingn :option1 val1 ... :optionm valm) into the values pair (binding1 ... bindingn) (:option1 ... valm)."
   (cond
     ((or (endp bindings-and-options)
          (keywordp (first bindings-and-options)))
-     (values (reverse backlog) bindings-and-options))
+     (values (nreverse backlog) bindings-and-options))
     (t
      (cleave-options (rest bindings-and-options)
                      (cons (first bindings-and-options) backlog)))))
 
-(defun get-binding-from-instr (instr)
-  (typecase instr
-    (measure-discard
-     (list "MEASURE" '_))
-    (measurement
-     (list "MEASURE" '_ '_))
-    (application
-     (adt:match operator-description (application-operator instr)
-       ((named-operator s)
-        (list* s
-               (loop :for p :in (application-parameters instr)
-                     :when (typep p 'constant)
-                       :collect (constant-value p)
-                     :when (symbolp p)
-                       :collect '_)
-               (loop :for q :in (application-arguments instr)
-                     :when (typep q 'qubit)
-                       :collect (qubit-index q)
-                     :when (symbolp q)
-                       :collect '_)))
-       (_
-        nil)))))
-
 (defun get-output-gates-from-raw-code (body)
+  "Walks the body of a compiler definition and extracts (or, at least attempts to extract) frequency data about the gates emitted by the compiler.  Results in an occurrence table.
+
+N.B.: This routine is somewhat fragile, and highly creative compiler authors will want to supply a manually-constructed frequency table as an option to DEFINE-COMPILER rather than rely on the success of this helper."
   (unless (typep body 'cons)
     (return-from get-output-gates-from-raw-code (make-occurrence-table)))
   (case (first body)
@@ -119,6 +204,9 @@
      (destructuring-bind (head name param-list &rest qubit-list) body
        (declare (ignore head))
        (let ((table (make-hash-table :test #'equalp))
+             (operator (if (stringp name)
+                           (named-operator name)
+                           name))
              (param-list (cond
                            ((endp param-list)
                             nil)
@@ -137,7 +225,11 @@
                                      (number x)
                                      (otherwise '_)))
                                  qubit-list)))
-         (setf (gethash (list* name param-list qubit-list) table) 1)
+         (setf (gethash (make-gate-binding :operator operator
+                                           :parameters param-list
+                                           :arguments qubit-list)
+                        table)
+               1)
          table)))
     (anon-gate
      (destructuring-bind (head name matrix &rest qubit-list) body
@@ -148,7 +240,11 @@
                                      (number x)
                                      (otherwise '_)))
                                  qubit-list)))
-         (setf (gethash (list* '_ '_ qubit-list) table) 1)
+         (setf (gethash (make-gate-binding :operator '_
+                                           :parameters '_ 
+                                           :arguments qubit-list)
+                        table)
+               1)
          table)))
     (apply
      (destructuring-bind (head fn &rest args) body
@@ -169,100 +265,94 @@
          (let ((incoming-table (get-output-gates-from-raw-code subbody)))
            (setf table (add-occurrence-tables table incoming-table))))))))
 
-(defun make-occurrence-table ()
-  (make-hash-table :test #'equalp))
-
-(defun add-entry-to-occurrence-table (table binding count &optional (scalar 1))
-  (incf (gethash binding table 0) (* count scalar)))
-
-(defun copy-occurrence-table (table)
-  (let ((new-table (make-hash-table :test #'equalp)))
-    (dohash ((key val) table)
-      (add-entry-to-occurrence-table new-table key val))
-    new-table))
-
-(defun add-occurrence-tables (table1 table2 &optional (scalar2 1))
-  (let ((new-table (copy-occurrence-table table1)))
-    (dohash ((key val) table2)
-      (add-entry-to-occurrence-table new-table key val scalar2))
-    new-table))
+#+ignore
+(defgeneric binding-subsumes-p (big-binding small-binding)
+  (:method ((big-binding wildcard-binding) (small-binding wildcard-binding))
+    (or (endp (wildcard-binding-options big-binding))
+        (equalp (wildcard-binding-options big-binding)
+                (wildcard-binding-options small-binding))))
+  (:method ((big-binding compiler-binding) (small-binding wildcard-binding))
+    nil)
+  (:method ((big-binding gate-binding) (small-binding measure-binding))
+    nil)
+  (:method ((big-binding measure-binding) (small-binding gate-binding))
+    nil)
+  (:method ((big-binding measure-binding) (small-binding measure-binding))
+    
+    )
+  (:method ((big-binding gate-binding) (small-binding gate-binding))
+    
+    )
+  )
 
 (defun binding-subsumes-p (big-binding small-binding)
-  "If SMALL-BINDING matches, will BIG-BINDING necessarily match?"
+  "If this routine returns T and BIG-BINDING matches on an INSTRUCTION, then SMALL-BINDING will necessarily also match on it."
   (flet ((wildcard-pattern-p (x)
-           (or (wildcard-pattern-p x)
-               (and (typep x 'cons)
-                    (every (lambda (xp)
-                             (or (wildcard-pattern-p xp)
-                                 (typep xp 'symbol)))
-                           x)))))
-    (when (symbolp big-binding)
-      (return-from binding-subsumes-p t))
-    (when (symbolp small-binding)
-      (return-from binding-subsumes-p nil))
-    ;; both are destructurable
-    (multiple-value-bind (big-binding big-options) (cleave-options big-binding)
-      (multiple-value-bind (small-binding small-options) (cleave-options small-binding)
-        (cond
-          ((and (= 1 (length big-binding))
-                (or (endp big-options)
-                    (equalp big-options small-options)))
-           t)
-          ((and (= 1 (length small-binding))
-                (endp small-options))
-           nil)
-          ((and big-options small-options)
-           nil)
-          ;; big-binding and small-binding are now actual bindings
-          ;; check the operators for failing both _ <= _ and "literal" <= "literal"
-          ((or (and (wildcard-pattern-p (binding-op small-binding))
-                    (not (wildcard-pattern-p (binding-op big-binding))))
-               (and (not (wildcard-pattern-p (binding-op small-binding)))
-                    (not (wildcard-pattern-p (binding-op big-binding)))
-                    (not (string= (binding-op big-binding) (binding-op small-binding)))))
-           nil)
-          ;; check the parameters for failing both _ <= _ and literal <= literal
-          ((or (and (wildcard-pattern-p (binding-parameters small-binding))
-                    (not (wildcard-pattern-p (binding-parameters big-binding))))
-               (and (not (wildcard-pattern-p (binding-parameters small-binding)))
-                    (not (wildcard-pattern-p (binding-parameters big-binding)))
-                    (loop :for big-param :in (binding-parameters big-binding)
-                          :for small-param :in (binding-parameters small-binding)
-                            :thereis (or (and (or (wildcard-pattern-p small-param)
-                                                  (symbolp small-param))
-                                              (not (wildcard-pattern-p big-param))
-                                              (not (symbolp big-param)))
-                                         (and (not (wildcard-pattern-p small-param))
-                                              (not (wildcard-pattern-p big-param))
-                                              (not (double= big-param small-param)))))))
-           nil)
-          ;; check the arguments for failing both _ <= _ and literal <= literal
-          ((or (not (= (length (binding-arguments big-binding))
-                       (length (binding-arguments small-binding))))
-               (loop :for big-arg :in (binding-arguments big-binding)
-                     :for small-arg :in (binding-arguments small-binding)
-                       :thereis (or (and (or (wildcard-pattern-p small-arg)
-                                             (symbolp small-arg))
-                                         (not (wildcard-pattern-p big-arg))
-                                         (not (symbolp big-arg)))
-                                    (and (not (or (wildcard-pattern-p small-arg)
-                                                  (symbolp small-arg)))
-                                         (not (or (wildcard-pattern-p big-arg)
-                                                  (symbolp big-arg)))
-                                         (not (= big-arg small-arg))))))
-           nil)
-          ;; otherwise, i guess everything checks out
-          (t
-           t))))))
-
-(defun filter-by-qubit-count (table qubit-count)
-  (let ((new-table (make-occurrence-table)))
-    (dohash ((key val) table new-table)
-      (when (= qubit-count
-               (length (binding-arguments (list '_ key))))
-        (setf (gethash key new-table) val)))))
+           (or (symbolp x)
+               (and (consp x) (every #'symbolp x)))))
+    (cond
+      ((and (wildcard-binding-p big-binding)
+            (or (endp (compiler-binding-options big-binding))
+                (equalp (compiler-binding-options big-binding)
+                        (compiler-binding-options small-binding))))
+       t)
+      ((wildcard-binding-p small-binding)
+       nil)
+      ((and (compiler-binding-options big-binding)
+            (compiler-binding-options small-binding))
+       nil)
+      ;; deal with the case of measure bindings
+      ((or (and (measure-binding-p big-binding)
+                (not (measure-binding-p small-binding)))
+           (and (not (measure-binding-p big-binding))
+                (measure-binding-p small-binding)))
+       nil)
+      ((and (measure-binding-p big-binding)
+            (measure-binding-p small-binding))
+       (or (symbolp (measure-binding-qubit big-binding))
+           (equalp (measure-binding-qubit big-binding)
+                   (measure-binding-qubit small-binding))))
+      ;; big-binding and small-binding cannot either satisfy wildcard-binding-p.
+      ;; check the operators for failing both _ <= _ and "literal" <= "literal"
+      ((or (and (symbolp (gate-binding-operator small-binding))
+                (not (symbolp (gate-binding-operator big-binding))))
+           (and (not (symbolp (gate-binding-operator small-binding)))
+                (not (symbolp (gate-binding-operator big-binding)))
+                (not (equalp (gate-binding-operator big-binding)
+                             (gate-binding-operator small-binding)))))
+       nil)
+      ;; check the parameters for failing both _ <= _ and literal <= literal
+      ((or (and (wildcard-pattern-p (gate-binding-parameters small-binding))
+                (not (wildcard-pattern-p (gate-binding-parameters big-binding))))
+           (and (not (wildcard-pattern-p (gate-binding-parameters small-binding)))
+                (not (wildcard-pattern-p (gate-binding-parameters big-binding)))
+                (loop :for big-param :in (gate-binding-parameters big-binding)
+                      :for small-param :in (gate-binding-parameters small-binding)
+                        :thereis (or (and (symbolp small-param)
+                                          (not (symbolp big-param)))
+                                     (and (not (symbolp small-param))
+                                          (not (symbolp big-param))
+                                          (not (double= big-param small-param)))))))
+       nil)
+      ;; check the arguments for failing both _ <= _ and literal <= literal
+      ((or (not (= (length (gate-binding-arguments big-binding))
+                   (length (gate-binding-arguments small-binding))))
+           (loop :for big-arg :in (gate-binding-arguments big-binding)
+                 :for small-arg :in (gate-binding-arguments small-binding)
+                   :thereis (or (and (symbolp small-arg)
+                                     (not (symbolp big-arg)))
+                                (and (not (symbolp small-arg))
+                                     (not (symbolp big-arg))
+                                     (not (= big-arg small-arg))))))
+       nil)
+      ;; otherwise, i guess everything checks out
+      (t
+       t))))
 
 (defun update-occurrence-table (table compiler &optional qubit-count)
+  "Treats a COMPILER as a replacement rule: each binding in the occurrence table TABLE on which COMPILER matches is replaced by the output occurrence table of COMPILER (appropriately scaled by the frequency of the binding in TABLE).
+
+Optionally constrains the output to include only those bindings of a particular QUBIT-COUNT."
   (assert (= 1 (length (compiler-bindings compiler))))
   (let ((binding (first (compiler-bindings compiler)))
         (replacement (if qubit-count
@@ -275,7 +365,7 @@
       ;; ... do we match the binding?
       (cond
         ;; if so, merge the replacement into the new table
-        ((binding-subsumes-p binding (list '_ key))
+        ((binding-subsumes-p binding key)
          (setf binding-applied? t)
          (setf new-table (add-occurrence-tables new-table replacement val)))
         ;; if not, retain the old entry
@@ -283,65 +373,45 @@
          (add-entry-to-occurrence-table new-table key val))))
     (values new-table binding-applied?)))
 
-(defun get-compilers (&optional (qubit-bound 1))
-  (remove-if-not
-   (lambda (compiler)
-     (and (compiler-gateset-reducer-p compiler)
-          (every (lambda (binding)
-                   (and (not (or (wildcard-pattern-p binding)
-                                 (symbolp binding)))
-                        (>= qubit-bound (length (binding-arguments binding)))
-                        (endp (binding-options binding))))
-                 (compiler-bindings compiler))))
-   **compilers-available**))
-
-(defun occurrence-table-cost (table gate-cost-table &optional (default-value 0.5d0))
+(defun occurrence-table-cost (occurrence-table gateset &optional (default-value 0.5d0))
+  "Given an OCCURRENCE-TABLE (i.e., a map from GATE-BINDINGs to frequencies) and a GATESET (i.e., a map from GATE-BINDINGs to GATE-RECORDs, which include fidelities), estimate the overall fidelity cost of all the gates in OCCURRENCE-TABLE."
   (let ((ret 1d0))
-    (dohash ((key val) table ret)
+    (dohash ((key val) occurrence-table ret)
       (let ((true-cost default-value))
-        (dohash ((cost-key cost-val) gate-cost-table)
-          (when (binding-subsumes-p (list '_ cost-key) (list '_ key))
+        (dohash ((cost-key cost-val) gateset)
+          (when (binding-subsumes-p cost-key key)
             (setf true-cost (gate-record-fidelity cost-val))))
         (setf ret (* ret (expt true-cost val)))))))
 
-(defun occurrence-table-in-gateset-p (table gateset)
-  (loop :for table-key :being :the :hash-keys :of table
+(defun occurrence-table-in-gateset-p (occurrence-table gateset)
+  "Are all of the entires in OCCURRENCE-TABLE subsumed by entries in GATESET?  This is the stopping condition for recognizing that a table consists of 'native gates'."
+  (loop :for table-key :being :the :hash-keys :of occurrence-table
         :always (loop :for gateset-key :being :the :hash-keys :of gateset
                         :thereis (and (or (gate-record-duration (gethash gateset-key gateset))
                                           (gate-record-fidelity (gethash gateset-key gateset)))
-                                      (binding-subsumes-p (list '_ gateset-key)
-                                                          (list '_ table-key))))))
+                                      (binding-subsumes-p gateset-key table-key)))))
 
-(defun generate-blank-binding (qubit-count)
-  (list* '_ ()
-         (loop :for i :below qubit-count
-               :collect '_)))
+(defun find-shortest-compiler-path (compilers target-gateset occurrence-table &optional qubit-count)
+  "Produces a path of compilers, drawn from COMPILERS, which convert all of the entries of OCCURRENCE-TABLE into \"native gates\" according to TARGET-GATESET.  Returns an alternating chain of occurrence tables and compilers: (On C(n-1) O(n-1) ... C1 O1), where O(j+1) is the result of substituting Cj through Oj and where On is subsumed by TARGET-GATESET.
 
-(defun find-shortest-compiler-path (compilers target-gateset source-gateset &optional qubit-count)
-  ;; target-gateset is an equalp hash binding -> gate-record
+Optionally restricts to considering only those gates and compilers which involve QUBIT-COUNT many qubits.
+
+N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means \"of least length\", but in theory this invariant could be violated by pathological compiler output frequency + fidelity pairings that push the least-length path further down the priority queue."
   (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'>)))
     (flet ((collect-bindings (occurrence-table)
              (loop :for key :being :the :hash-keys :of occurrence-table
                    :collect key)))
       ;; initial contents: arbitrary gate, no history
       (loop :with visited-nodes := ()
-            :for (task . history) := (list source-gateset)
+            :for (task . history) := (list occurrence-table)
               :then (cl-heap:dequeue queue)
             :unless task
               :do (error "Exhausted task queue without finding a route to the target gateset.")
             :when (occurrence-table-in-gateset-p task target-gateset)
               :return (cons task history)
-            :unless (member (sort (collect-bindings task)
-                                  (lambda (a b)
-                                    (binding-precedes-p
-                                     (list (list '_ a))
-                                     (list (list '_ b)))))
+            :unless (member (sort (collect-bindings task) #'binding-precedes-p)
                             visited-nodes :test #'equalp)
-              :do (push (sort (collect-bindings task)
-                              (lambda (a b)
-                                (binding-precedes-p
-                                 (list (list '_ a))
-                                 (list (list '_ b)))))
+              :do (push (sort (collect-bindings task) #'binding-precedes-p)
                         visited-nodes)
                   (dolist (compiler compilers)
                     (multiple-value-bind (new-table updated?)
@@ -351,194 +421,189 @@
                                          (list* new-table compiler task history)
                                          (occurrence-table-cost new-table target-gateset)))))))))
 
-(defun binding-precedes-p (a b)
-  (labels
-      ((qubit-count (binding)
-         (if (or (symbolp binding)
-                 (keywordp (second binding)))
-             most-positive-fixnum
-             (length (binding-arguments binding)))))
-    (multiple-value-bind (a-bindings a-options)
-        (cleave-options a)
-      (multiple-value-bind (b-bindings b-options)
-          (cleave-options b)
-        (assert (= 1 (length a-bindings)))
-        (assert (= 1 (length b-bindings)))
-        (let* ((a-binding (first a-bindings))
-               (b-binding (first b-bindings))
-               (arg-count-a (qubit-count a-binding))
-               (arg-count-b (qubit-count b-binding)))
-          ;; fewer qubits means it comes earlier
-          (cond
-            ((< arg-count-a arg-count-b)
-             (print (list arg-count-a arg-count-b 1))
-             t)
-            ((> arg-count-a arg-count-b)
-             nil)
-            ;; from here on: (and (= arg-count-a arg-count b) ...)
-            ;; cluster by name
-            ((and (or (wildcard-pattern-p (binding-op a-binding))
-                      (symbolp (binding-op a-binding)))
-                  (stringp (binding-op b-binding)))
-             nil)
-            ((and (stringp (binding-op a-binding))
-                  (or (wildcard-pattern-p (binding-op b-binding))
-                      (symbolp (binding-op b-binding))))
-             t)
-            ((and (stringp (binding-op a-binding))
-                  (stringp (binding-op b-binding))
-                  (string< (binding-op a-binding) (binding-op b-binding)))
-             t)
-            ;; option predicates make it come earlier
-            ((and (or a-options (binding-options a-binding))
-                  (not (or b-options (binding-options b-binding))))
-             t)
-            ;; restrictive parameter matching makes it come earlier
-            ((and (not (wildcard-pattern-p (binding-parameters a-binding)))
-                  (wildcard-pattern-p (binding-parameters b-binding)))
-             t)
-            ((and (wildcard-pattern-p (binding-parameters a-binding))
-                  (not (wildcard-pattern-p (binding-parameters b-binding))))
-             nil)
-            ;; does A need to specialize before B?
-            ((and (not (wildcard-pattern-p (binding-parameters a-binding)))
-                  (not (wildcard-pattern-p (binding-parameters b-binding)))
-                  (loop :for param-a :in (binding-parameters a-binding)
-                        :for param-b :in (binding-parameters b-binding)
-                          :thereis (and (not (or (wildcard-pattern-p param-a)
-                                                 (symbolp param-a)))
-                                        (or (wildcard-pattern-p param-b)
-                                            (symbolp param-b)))))
-             t)
-            (t
-             nil)))))))
+(defun print-compiler-path (path)
+  "Pretty-prints the output of FIND-SHORTEST-COMPILER-PATH. Useful for debugging."
+  (dolist (item path)
+    (typecase item
+      (compiler (format t "~&is the output from applying ~a, coming from...~%" item))
+      (hash-table
+       (dohash ((key val) item)
+         (format t "~a -> ~a~%" key val))))))
+
+(defun binding-precedes-p (a-binding b-binding &optional a-options b-options)
+  "If BINDING-PRECEDES-P and if A fails to match on an INSTRUCTION, then B fails to match later."
+  (let* ((arg-count-a (if (gate-binding-p a-binding)
+                          (length (gate-binding-arguments a-binding))
+                          most-positive-fixnum))
+         (arg-count-b (if (gate-binding-p b-binding)
+                          (length (gate-binding-arguments b-binding))
+                          most-positive-fixnum)))
+    ;; fewer qubits means it comes earlier
+    (cond
+      ((< arg-count-a arg-count-b)
+       t)
+      ((> arg-count-a arg-count-b)
+       nil)
+      ;; from here on: (and (= arg-count-a arg-count b) ...)
+      ;; cluster by name
+      ((and (wildcard-binding-p a-binding)
+            (not (symbolp (gate-binding-operator b-binding))))
+       nil)
+      ((and (not (symbolp (gate-binding-operator a-binding)))
+            (wildcard-binding-p b-binding))
+       t)
+      ((and (typep (gate-binding-operator a-binding) 'named-operator)
+            (typep (gate-binding-operator b-binding) 'named-operator)
+            (adt:with-data (named-operator a-str) (gate-binding-operator a-binding)
+              (adt:with-data (named-operator b-str) (gate-binding-operator b-binding)
+                (string< a-str b-str))))
+       t)
+      ;; option predicates make it come earlier
+      ((and (or a-options (compiler-binding-options a-binding))
+            (not (or b-options (compiler-binding-options b-binding))))
+       t)
+      ;; restrictive parameter matching makes it come earlier
+      ((and (not (symbolp (gate-binding-parameters a-binding)))
+            (symbolp (gate-binding-parameters b-binding)))
+       t)
+      ((and (symbolp (gate-binding-parameters a-binding))
+            (not (symbolp (gate-binding-parameters b-binding))))
+       nil)
+      ;; does A need to specialize before B?
+      ((and (not (symbolp (gate-binding-parameters a-binding)))
+            (not (symbolp (gate-binding-parameters b-binding)))
+            (loop :for param-a :in (gate-binding-parameters a-binding)
+                  :for param-b :in (gate-binding-parameters b-binding)
+                    :thereis (and (not (symbolp param-a))
+                                  (symbolp param-b))))
+       t)
+      (t
+       nil))))
 
 (defun sort-compilers-by-specialization (compilers)
-  (stable-sort (copy-seq compilers)
-               (lambda (a b)
-                 (binding-precedes-p (compiler-bindings a)
-                                     (compiler-bindings b)))))
+  (sort (copy-seq compilers) #'binding-precedes-p))
 
-(defun sort-compilers-by-output-friendliness (compilers gateset qubit-count)
+(defun sort-compilers-by-output-friendliness (compilers gateset &optional qubit-count)
   (sort (copy-seq compilers)
         (lambda (a b)
-          (occurrence-table-cost (filter-by-qubit-count (compiler-output-gates a)
-                                                        qubit-count)
-                                 gateset)
-          (occurrence-table-cost (filter-by-qubit-count (compiler-output-gates b)
-                                                        qubit-count)
-                                 gateset))))
+          (let ((a (if qubit-count
+                       (filter-by-qubit-count (compiler-output-gates a) qubit-count)
+                       (compiler-output-gates a)))
+                (b (if qubit-count
+                       (filter-by-qubit-count (compiler-output-gates b) qubit-count)
+                       (compiler-output-gates b))))
+            (> (occurrence-table-cost a gateset)
+               (occurrence-table-cost b gateset))))))
 
 (defun blank-out-qubits (gateset)
   (let ((new-gateset (make-hash-table :test #'equalp)))
     (dohash ((key val) gateset new-gateset)
-      (setf (gethash (list* (first key)
-                            (second key)
-                            (mapcar (constantly '_) (rest (rest key))))
-                     new-gateset)
-            val))))
+      (let ((new-key (copy-instance key)))
+        (etypecase new-key
+          (gate-binding
+           (setf (gate-binding-arguments new-key)
+                 (mapcar (constantly '_)
+                         (gate-binding-arguments new-key))))
+          (measure-binding
+           (setf (measure-binding-qubit new-key) '_))
+          (wildcard-binding
+           t))
+        (setf (gethash new-key new-gateset) val)))))
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
-  (flet ((discard-tables (path)
+  (flet ( ;; Strips the occurrence tables from a run of FIND-SHORTEST-COMPILER-PATH.
+         (discard-tables (path)
            (loop :for item :in path
                  :when (typep item 'compiler)
                    :collect item))
+         ;; Checks whether PATH doubles back through the occurrence table START.
          (path-has-a-loop-p (path start)
            (and (< 1 (length path))
                 (loop :for (gateset compiler) :on path :by #'cddr
                       :when (loop :for gate :being :the :hash-keys :of gateset
                                   :always (loop :for binding :in start
-                                                  :thereis (binding-subsumes-p (first start)
-                                                                               (list '_ gate))))
+                                                  :thereis (binding-subsumes-p (first start) gate)))
                         :do (return-from path-has-a-loop-p t)
-                      :finally (return nil))))
-         (print-path (path)
-           (dolist (item path)
-             (typecase item
-               (compiler (format t "~&is the output from applying ~a, coming from...~%" item))
-               (hash-table
-                (dohash ((key val) item)
-                  (format t "~a -> ~a~%" key val)))))))
-    (declare (ignorable #'print-path))
-    (let* ((compilers (get-compilers qubit-count))
-           (target-gateset (blank-out-qubits target-gateset))
+                      :finally (return nil)))))
+    
+    (let* ((target-gateset (blank-out-qubits target-gateset))
+           (compilers (get-compilers qubit-count))
            (unconditional-compilers
              (remove-if (lambda (x)
-                          (multiple-value-bind (bindings options) (compiler-bindings x)
-                            (or options
-                                (some (lambda (b) (and (not (symbolp b))
-                                                       (binding-options b)))
-                                      bindings))))
+                          (some (lambda (b) (and (not (symbolp b))
+                                                 (compiler-binding-options b)))
+                                (compiler-bindings x)))
                         compilers))
-           (generic-path (find-shortest-compiler-path unconditional-compilers
+           (candidate-special-compilers
+             (remove-if (lambda (x)
+                          (or (/= qubit-count (length (gate-binding-arguments (first (compiler-bindings x)))))
+                              (loop :for b :being :the :hash-keys :of target-gateset
+                                      :thereis (binding-subsumes-p b (first (compiler-bindings x))))))
+                        compilers))
+           generic-path
+           generic-cost
+           compilers-to-save)
+      
+      ;; start by computing a fast route from the generic gate to the target gate set
+      (setf generic-path (find-shortest-compiler-path unconditional-compilers
                                                       target-gateset
                                                       (alexandria:plist-hash-table
                                                        (list (generate-blank-binding qubit-count) 1)
                                                        :test #'equalp)
                                                       qubit-count))
-           (generic-cost (occurrence-table-cost (first generic-path) target-gateset))
-           (reduced-compilers (discard-tables generic-path)))
-      (let ((candidate-entry-points
-              (remove-if (lambda (x)
-                           (or (/= qubit-count (length (binding-arguments (first (compiler-bindings x)))))
-                               (loop :for b :being :the :hash-keys :of target-gateset
-                                       :thereis (binding-subsumes-p (list '_ b)
-                                                                    (first (compiler-bindings x))))))
-                         compilers)))
-        (dolist (compiler candidate-entry-points)
-          (let* ((special-path
-                   (find-shortest-compiler-path
-                    unconditional-compilers target-gateset
-                    (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
-                    qubit-count))
-                 (special-cost (occurrence-table-cost (first special-path) target-gateset)))
-            (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
-                       (> special-cost generic-cost))
-              (setf reduced-compilers
-                    (append reduced-compilers
-                            (list compiler)
-                            (discard-tables special-path)))))))
-      (let ((sorted-compilers
-              ;; TODO: figure out a better way to dispatch this highly feature-specific stuff
-              (append (cond
-                        ((= 1 qubit-count)
-                         (list #'state-prep-1q-compiler))
-                        ((= 2 qubit-count)
-                         (list #'state-prep-2q-compiler)))
-                      #+ignore
-                      (cond
-                        ((= 2 qubit-count)
-                         (list
-                          (make-instance 'compiler
-                                         :name 'APPROXIMATE-2Q-COMPILER
-                                         :instruction-count 1
-                                         :bindings '((instr (_ _ _ _)))
-                                         :output-gates (a:plist-hash-table
-                                                        (list '("CAN" (_ _ _) _ _) 1)
-                                                        :test #'equalp)
-                                         :function (a:curry #'approximate-2q-compiler
-                                                            (remove-if-not (lambda (c)
-                                                                             (typep c 'approximate-compiler))
-                                                                           reduced-compilers))))))
-                      (sort-compilers-by-output-friendliness
-                       (remove-duplicates reduced-compilers)
-                       target-gateset qubit-count))))
-        (append (remove-if-not (lambda (c)
-                                 (occurrence-table-in-gateset-p (filter-by-qubit-count
-                                                                 (compiler-output-gates c)
-                                                                 qubit-count)
-                                                                target-gateset))
-                               sorted-compilers)
-                (remove-if (lambda (c)
-                             (occurrence-table-in-gateset-p (filter-by-qubit-count
-                                                             (compiler-output-gates c)
-                                                             qubit-count)
-                                                            target-gateset))
-                           sorted-compilers))))))
+      (setf generic-cost (occurrence-table-cost (first generic-path) target-gateset))
+      (setf compilers-to-save (discard-tables generic-path))
+      
+      ;; it may be that non-generic gates have shorter routes to the target gate set.
+      ;; each possible such route begins with a specialized compiler.
+      ;; so, iterate over specialized compilers and see if they lead anywhere nice.
+      (dolist (compiler candidate-special-compilers)
+        (let* ((special-path
+                 (find-shortest-compiler-path
+                  unconditional-compilers target-gateset
+                  (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
+                  qubit-count))
+               (special-cost (occurrence-table-cost (first special-path) target-gateset)))
+          ;; did we in fact beat out the generic machinery?
+          (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
+                     (> special-cost generic-cost))
+            ;; then store it!
+            (setf compilers-to-save
+                  (append compilers-to-save (list compiler) (discard-tables special-path))))))
+      
+      ;; these are basically all the compilers we care to use; now we need to
+      ;; sort them into preference order.
+      (let* ((sorted-compilers
+               (sort-compilers-by-output-friendliness
+                        (remove-duplicates compilers-to-save)
+                        target-gateset qubit-count))
+             ;; additionally, we install a couple extra compilers as hax to make
+             ;; the whole machine work. each such hak comes with an explanation,
+             ;; and it would be preferable to work to make each hak unnecessary.
+             (compilers-with-features
+               (append
+                ;; STATE-PREP-APPLICATION doesn't have a GATE-MATRIX, which causes
+                ;; some havoc with all this new automation. so, instead, we prefix
+                ;; with a compiler that catches S-P-As early.
+                (cond
+                  ((= 1 qubit-count)
+                   (list #'state-prep-1q-compiler))
+                  ((= 2 qubit-count)
+                   (list #'state-prep-2q-compiler)))
+                sorted-compilers)))
+        (loop :for c :in compilers-with-features
+              :if (occurrence-table-in-gateset-p (filter-by-qubit-count
+                                                  (compiler-output-gates c)
+                                                  qubit-count)
+                                                 target-gateset)
+                :collect c :into compilers-t
+              :else
+                :collect c :into compilers-nil
+              :finally (return (append compilers-t compilers-nil)))))))
 
 (defun compute-applicable-reducers (gateset)
   (let* ((gateset-bindings (loop :for g :being :the :hash-keys :of gateset
-                                 :collect (list '_ g))))
+                                 :collect g)))
     (remove-if-not (lambda (c)
                      (let* ((in-fidelity 1d0)
                             (out-fidelity (occurrence-table-cost (compiler-output-gates c) gateset)))
@@ -546,7 +611,7 @@
                             (every (lambda (b)
                                      (some (lambda (g)
                                              (let ((gate-fidelity (gate-record-fidelity
-                                                                   (gethash (second g) gateset))))
+                                                                   (gethash g gateset))))
                                                (and (binding-subsumes-p g b)
                                                     (setf in-fidelity (* in-fidelity gate-fidelity)))))
                                            gateset-bindings))
@@ -559,41 +624,29 @@
 ;;; non-specialized instances of the above class COMPILER and installs them into
 ;;; the function namespace.
 
-(defun binding-gate-var (binding)
-  (unless (first binding)
-    (error "Binding ~a is missing a source." binding))
-  (first binding))
-
-(defun binding-op (binding)
-  (if (and (typep binding 'cons)
-           (typep (second binding) 'cons))
-      (first (second binding))
-      nil))
-
-(defun binding-parameters (binding)
-  (if (and (typep binding 'cons)
-           (typep (second binding) 'cons))
-      (second (second binding))
-      nil))
-
-(defun binding-arguments (binding)
-  (if (and (typep binding 'cons)
-           (typep (second binding) 'cons))
-      (loop :for arg :in (rest (rest (second binding)))
-            :when (keywordp arg)
-              :do (return args)
-            :collect arg :into args
-            :finally (return args))
-      nil))
-
-(defun binding-options (binding)
-  (cond
-    ((endp (rest binding))
-     nil)
-    ((typep (second binding) 'keyword)
-     (rest binding))
-    (t
-     (rest (rest binding)))))
+(defun make-binding-from-source (source)
+  (when (symbolp source)
+    (return-from make-binding-from-source
+      (make-wildcard-binding :name source)))
+  (assert (listp source))
+  (multiple-value-bind (source options) (cleave-options source)
+    (cond
+      ((endp (cdr source))
+       (make-wildcard-binding :name (first source)
+                              :options options))
+      (t
+       (make-gate-binding :name (first source)
+                          :options options
+                          :operator (let ((op (first (second source))))
+                                      (etypecase op
+                                        (symbol
+                                         op)
+                                        (string
+                                         (named-operator op))
+                                        (operator-description
+                                         op)))
+                          :parameters (second (second source))
+                          :arguments (rest (rest (second source))))))))
 
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users
@@ -608,28 +661,19 @@
 
 (defun binding-environment (binding)
   "Return an alist of (name . t) for each variable element in BINDING."
-  (cond
-    ((typep binding 'symbol)
-     nil)
-    ((and (typep binding 'cons)
-          (> 2 (length binding)))
-     nil)
-    ((and (typep binding 'cons)
-          (not (typep (second binding) 'cons)))
-     nil)
-    (t
-     (nconc
-      (when (match-symbol-p (binding-op binding))
-        (list (cons (binding-op binding) t)))
-      (unless (wildcard-pattern-p (binding-parameters binding))
-        (mapcan (lambda (param)
-                  (when (match-symbol-p param)
-                    (list (cons param t))))
-                (binding-parameters binding)))
-      (mapcan (lambda (arg)
-                (when (match-symbol-p arg)
-                  (list (cons arg t))))
-              (binding-arguments binding))))))
+  (when (wildcard-binding-p binding)
+    (return-from binding-environment nil))
+  (nconc (when (match-symbol-p (gate-binding-operator binding))
+           (list (cons (binding-op binding) t)))
+         (unless (wildcard-pattern-p (gate-binding-parameters binding))
+           (mapcan (lambda (param)
+                     (when (match-symbol-p param)
+                       (list (cons param t))))
+                   (gate-binding-parameters binding)))
+         (mapcan (lambda (arg)
+                   (when (match-symbol-p arg)
+                     (list (cons arg t))))
+                 (gate-binding-arguments binding))))
 
 (defun extend-environment (binding environment)
   (setf environment
@@ -656,29 +700,15 @@
            
            (expand-binding (binding env body)
              (cond
-               ;; raw binding w/ no specializations
-               ((typep binding 'symbol)
-                body)
-               ;; specialized binding w/ a destructuring
-               ((and (typep binding 'cons)
-                     (typep (second binding) 'cons))
-                (assert (and (typep (first binding) 'symbol)
-                             (not (wildcard-pattern-p (first binding))))
-                        ()
-                        "Leftmost term in a compiler form binding must be a symbol, but got ~a"
-                        binding)
+               ((wildcard-binding-p binding)
+                (if (wildcard-binding-options binding)
+                    (expand-options binding env body)
+                    body))
+               ((gate-binding-p binding)
                 (expand-op binding env
                            (expand-parameters binding env
                                               (expand-arguments binding env
                                                                 (expand-options binding env body)))))
-               ;; specialized binding w/o destructuring
-               ((typep binding 'cons)
-                (assert (and (typep (first binding) 'symbol)
-                             (not (wildcard-pattern-p (first binding))))
-                        ()
-                        "Leftmost term in a compiler form binding must be a symbol, but got ~a"
-                        binding)
-                (expand-options binding env body))
                (t
                 (error "Malformed binding in compiler form: ~a" binding))))
            
@@ -746,41 +776,32 @@
                                            :eq-predicate eq-predicate))))))
            
            (expand-parameters (binding env rest)
-             (if (wildcard-pattern-p (binding-parameters binding))
+             (if (wildcard-pattern-p (gate-binding-parameters binding))
                  rest
-                 (expand-sequence (binding-parameters binding)
+                 (expand-sequence (gate-binding-parameters binding)
                                   env
                                   rest
                                   :gensym-name "PARAM"
                                   :seq-accessor 'application-parameters
-                                  :gate-name (binding-gate-var binding)
+                                  :gate-name (compiler-binding-name binding)
                                   :ele-accessor 'constant-value
                                   :ele-type 'constant
                                   :eq-predicate 'double=)))
            
            (expand-arguments (binding env rest)
-             (expand-sequence (binding-arguments binding)
+             (expand-sequence (gate-binding-arguments binding)
                               env
                               rest
                               :gensym-name "ARG"
                               :seq-accessor 'application-arguments
-                              :gate-name (binding-gate-var binding)
+                              :gate-name (compiler-binding-name binding)
                               :ele-accessor 'qubit-index
                               :ele-type 'qubit
                               :eq-predicate '=))
            
-           (fast-forward-to-options (binding)
-             (unless (endp binding)
-               (cond
-                 ((typep (first binding) 'keyword)
-                  binding)
-                 (t
-                  (fast-forward-to-options (rest binding))))))
-           
            (expand-options (binding env rest)
              (declare (ignore env))
-             (let ((option-plist (fast-forward-to-options binding))
-                   (rest rest))
+             (let ((option-plist (compiler-binding-options binding)))
                (loop :for (val key) :on (reverse option-plist) :by #'cddr
                      :do (setf rest
                                (case key
@@ -789,14 +810,14 @@
                                      ,rest))
                                  (:acting-on
                                   (destructuring-bind (wf qc) val
-                                    `(unpack-wf ,(first binding) context (,wf ,qc)
+                                    `(unpack-wf ,(compiler-binding-name binding) context (,wf ,qc)
                                        ,rest)))
                                  (otherwise
                                   (error "Illegal OPERATOR-BIND option: ~a" key)))))
                rest))
            
            (expand-op (binding env body)
-             (let ((op (binding-op binding)))
+             (let ((op (gate-binding-operator binding)))
                (cond
                  ((wildcard-pattern-p op)
                   ;; ignore
@@ -804,107 +825,70 @@
                  ((and (match-symbol-p op)
                        (not (lookup op env)))
                   ;; fresh binding
-                  `(let ((,op (application-operator-name ,(binding-gate-var binding))))
+                  `(let ((,op ,(compiler-binding-name binding)))
                      ,body))
                  (t
                   ;; existing binding / data. insert string check
-                  `(when (string= ,op (operator-description-string
-                                       (application-operator ,(binding-gate-var binding))))
+                  `(when (equalp ,op (application-operator ,(compiler-binding-name binding)))
                      ,body))))))
     (expand-bindings bindings nil)))
 
-(defun parse-compiler-options (options body)
+(defun enact-compiler-options (options body)
   (when (endp options)
-    (return-from parse-compiler-options body))
+    (return-from enact-compiler-options body))
   (destructuring-bind (key val &rest remaining-options) options
     (case key
       (:full-context
-       (parse-compiler-options remaining-options
+       (enact-compiler-options remaining-options
                                `(let ((,val context))
                                   ,body)))
       (:chip-specification
-       (parse-compiler-options remaining-options
+       (enact-compiler-options remaining-options
                                `(progn
                                   (unless context (give-up-compilation))
                                   (let ((,val (compilation-context-chip-specification context)))
                                     (unless ,val (give-up-compilation))
                                     ,body))))
       ((:gateset-reducer :class :permit-binding-mismatches-when)
-       (parse-compiler-options remaining-options body))
+       (enact-compiler-options remaining-options body))
       (otherwise
        (error "Unknown compiler option: ~a." (first options))))))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
   (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
-    (labels ((collect-variable-names (bindings)
-               (when (endp bindings) (return-from collect-variable-names nil))
-               (let ((binding (first bindings)))
-                 (etypecase binding
-                   (symbol (cons binding
-                                 (collect-variable-names (rest bindings))))
-                   (cons   (cons (first binding)
-                                 (collect-variable-names (rest bindings))))))))
-      (multiple-value-bind (bindings options) (cleave-options bindings)
-        (let ((variable-names (collect-variable-names bindings)))
-          (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
-            (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
-                  (1+ pos) (string name)))
-          (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
-            ;; TODO: do the alexandria destructuring to catch the docstring or whatever
-            `(labels ((,name (,@variable-names &key context)
-                        (declare (ignorable context))
-                        (multiple-value-bind (,ret-val ,ret-bool)
-                            ,(parse-compiler-options
-                              options
-                              (define-compiler-form bindings (append decls body)
-                                :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
-                          (if ,ret-bool ,ret-val (give-up-compilation)))))
-               (let ((,old-record (find ',name **compilers-available**
-                                        :key #'compiler-name))
-                     (,struct-name
-                       (make-instance ',(getf options :class 'compiler)
-                                      :name ',name
-                                      :instruction-count ,(length variable-names)
-                                      :bindings (quote ,bindings)
-                                      :body (quote (progn ,@decls ,@body))
-                                      :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
-                                      :function #',name
-                                      :gateset-reducer ,(and (= 1 (length bindings))
-                                                             (getf options :gateset-reducer t)))))
-                 (setf (fdefinition ',name) ,struct-name)
-                 (setf (documentation ',name 'function) ,docstring)
-                 (cond
-                   (,old-record
-                    (setf **compilers-available**
-                          (substitute ,struct-name ,old-record **compilers-available**)))
-                   (t
-                    (push ,struct-name **compilers-available**)))
-                 ',name))))))))
-
-(defun operator-match-p (gate pattern)
-  "Tests whether a single GATE matches PATTERN, without performing any binding."
-  (or (and (typep gate 'application)
-           (or (not (typep (first pattern) 'string))
-               (adt:match operator-description (application-operator gate)
-                 ((named-operator name) (string= name (first pattern)))
-                 (_ nil)))
-           (loop :for param :in (second pattern)
-                 :for g-param :in (application-parameters gate)
-                 :always (or (not (typep param 'double-float))
-                             (and (typep g-param 'constant)
-                                  (double= param (constant-value g-param)))))
-           (loop :for arg :in (nthcdr 2 pattern)
-                 :for g-arg :in (application-arguments gate)
-                 :always (or (not (typep arg '(integer 0)))
-                             (= arg (qubit-index g-arg)))))
-      (and (string= "MEASURE" (first pattern))
-           (typep gate 'measurement)
-           (or (not (typep (second pattern) 'integer))
-               (= (second pattern) (qubit-index (measurement-qubit gate))))
-           (or (and (not (third pattern))
-                    (not (typep gate 'measure)))
-               (and (typep gate 'measure)
-                    (or (wildcard-pattern-p (third pattern))
-                        (equal (measure-address gate) (third pattern))))
-               (assert "operator-match-p on MEASURE patterns can only use _ for the measurement address"
-                       nil)))))
+    (multiple-value-bind (bindings options) (cleave-options bindings)
+      (let* ((parsed-bindings (mapcar #'make-binding-from-source bindings))
+             (variable-names (mapcar #'compiler-binding-name parsed-bindings)))
+        (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
+          (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
+                (1+ pos) (string name)))
+        (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
+          ;; TODO: do the alexandria destructuring to catch the docstring or whatever
+          `(labels ((,name (,@variable-names &key context)
+                      (declare (ignorable context))
+                      (multiple-value-bind (,ret-val ,ret-bool)
+                          ,(enact-compiler-options
+                            options
+                            (define-compiler-form parsed-bindings (append decls body)
+                              :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
+                        (if ,ret-bool ,ret-val (give-up-compilation)))))
+             (let ((,old-record (find ',name **compilers-available**
+                                      :key #'compiler-name))
+                   (,struct-name
+                     (make-instance ',(getf options :class 'compiler)
+                                    :name ',name
+                                    :instruction-count ,(length variable-names)
+                                    :bindings (mapcar #'make-binding-from-source ',bindings)
+                                    :options ',options
+                                    :body (quote (progn ,@decls ,@body))
+                                    :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
+                                    :function #',name)))
+               (setf (fdefinition ',name) ,struct-name)
+               (setf (documentation ',name 'function) ,docstring)
+               (cond
+                 (,old-record
+                  (setf **compilers-available**
+                        (substitute ,struct-name ,old-record **compilers-available**)))
+                 (t
+                  (push ,struct-name **compilers-available**)))
+               ',name)))))))

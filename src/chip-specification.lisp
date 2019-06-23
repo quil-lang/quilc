@@ -133,7 +133,7 @@ Used to be a generic associated to HARDWARE-OBJECT; now computed from the GATE-I
   (lambda (instr)
     (let (duration needs-permutation)
       (dohash ((key val) (hardware-object-gate-information obj))
-        (when (binding-subsumes-p (list '_ key) (list '_ (get-binding-from-instr instr)))
+        (when (binding-subsumes-p key (get-binding-from-instr instr))
           (setf duration (gate-record-duration val))
           (setf needs-permutation (gate-record-needs-permutation val))))
       (values duration needs-permutation))))
@@ -265,23 +265,38 @@ used to specify CHIP-SPEC."
     
     ;; this is the legacy model for setting up gate data
     (when (optimal-2q-target-meets-requirements type ':cz)
-      (setf (gethash '("CZ" () _ _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "CZ")
+                                        :parameters ()
+                                        :arguments '(_ _))
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
     (when (optimal-2q-target-meets-requirements type ':iswap)
-      (setf (gethash '("ISWAP" () _ _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "ISWAP")
+                                        :parameters ()
+                                        :arguments '(_ _))
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
     (when (optimal-2q-target-meets-requirements type ':cphase)
-      (setf (gethash '("CPHASE" (_) _ _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "CPHASE")
+                                        :parameters '(_)
+                                        :arguments '(_ _))
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.85d0)))
     (when (optimal-2q-target-meets-requirements type ':piswap)
-      (setf (gethash '("PISWAP" (_) _ _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "PISWAP")
+                                        :parameters '(_)
+                                        :arguments '(_ _))
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.85d0)))
     (when (member ':cnot type)
-      (setf (gethash `("CNOT" () ,qubit0 ,qubit1) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "CNOT")
+                                        :parameters ()
+                                        :arguments (list qubit0 qubit1))
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0))
       (vector-push-extend #'CNOT-to-flipped-CNOT
@@ -311,25 +326,43 @@ used to specify CHIP-SPEC."
       (setf (hardware-object-gate-information obj) gate-information))
     ;; old style of initialization
     (when (member ':MEASURE type)
-      (setf (gethash '("MEASURE" _ _) (hardware-object-gate-information obj))
+      (setf (gethash (make-measure-binding :qubit '_
+                                           :target '_)
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 2000))
-      (setf (gethash '("MEASURE" _) (hardware-object-gate-information obj))
+      (setf (gethash (make-measure-binding :qubit '_)
+                     (hardware-object-gate-information obj))
             (make-gate-record :duration 2000)))
     (when (member :RZ type)
-      (setf (gethash '("RZ" (_) _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "RZ")
+                                        :parameters '(_)
+                                        :arguments '(_))
+                     (hardware-object-gate-information obj))
             (make-gate-record :fidelity 1d0
                               :duration 1/100)))
     (when (member :X/2 type)
-      (setf (gethash `("RX" (,(/ pi 2)) _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "RX")
+                                        :parameters (list (/ pi 2))
+                                        :arguments '(_))
+                     (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
-      (setf (gethash `("RX" (,(/ pi -2)) _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "RX")
+                                        :parameters (list (/ pi -2))
+                                        :arguments '(_))
+                     (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
-      (setf (gethash `("RX" (,pi) _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "RX")
+                                        :parameters (list pi)
+                                        :arguments '(_))
+                     (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
-      (setf (gethash `("RX" (,(- pi)) _) (hardware-object-gate-information obj))
+      (setf (gethash (make-gate-binding :operator (named-operator "RX")
+                                        :parameters (list (- pi))
+                                        :arguments '(_))
+                     (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9)))
     ;; return the qubit
@@ -464,9 +497,7 @@ Compilers are listed in descending precedence.")
 
 ;; here we provide a function that generates an example chip. in general, chip
 ;; specifications should be generated based on read-in ISA data, and not hard-
-;; wired into the code. (certain aspects, though, like which compilation methods
-;; to use or what it means to be a link "of CZ type" are things that will
-;; probably need to be hard-wired.)
+;; wired into the code.
 ;;
 ;; Example chip topology and naming scheme:
 ;; 0 --0-- 1 --1-- 2

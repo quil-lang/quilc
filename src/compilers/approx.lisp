@@ -730,9 +730,12 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
 
 (define-compiler canonical-decomposition
     ((instr (_ _ q1 q0)))
-  (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
-         (m (magicl:scale (expt (magicl:det m) -1/4) m)))
-    (multiple-value-bind (a d b) (orthogonal-decomposition m)
-      (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
-        (sandwich-with-local-gates (list (build-gate "CAN" `(,alpha ,beta ,gamma) q1 q0))
-                                   a d b q1 q0)))))
+  (handler-case
+      (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
+             (m (magicl:scale (expt (magicl:det m) -1/4) m)))
+        (multiple-value-bind (a d b) (orthogonal-decomposition m)
+          (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
+            (sandwich-with-local-gates (list (build-gate "CAN" `(,alpha ,beta ,gamma) q1 q0))
+                                       a d b q1 q0))))
+    (unknown-gate-parameter ()
+      (give-up-compilation :because ':invalid-domain))))
