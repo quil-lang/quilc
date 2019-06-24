@@ -217,8 +217,8 @@
         (dotimes (i (expt 2 (1- n)) wf)
           (let* ((addr0 (ash i 1))
                  (addr1 (dpb 1 (byte 1 0) addr0)))
-            (setf addr0 (sb-rotate-byte:rotate-byte q (byte n 0) addr0))
-            (setf addr1 (sb-rotate-byte:rotate-byte q (byte n 0) addr1))
+            (setf addr0 (cl-quil::rotate-byte q (byte n 0) addr0))
+            (setf addr1 (cl-quil::rotate-byte q (byte n 0) addr1))
             (multiple-value-bind (w0 w1) (xz (aref wf addr0) (aref wf addr1))
               (setf (aref wf addr0) w0
                     (aref wf addr1) w1))))))))
