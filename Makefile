@@ -154,12 +154,22 @@ test-ccl:
 ###############################################################################
 # CLEAN
 ###############################################################################
+.PHONY: clean clean-quicklisp clean-cache cleanall
 
 clean:
 	rm -f quilc system-index.txt build-output.log
 	rm -f coverage-report/*.html
 	rm -f src/contrib/**/*.so src/contrib/**/*.dylib
 
+clean-quicklisp:
+	@echo "Cleaning up old projects in Quicklisp"
+	$(QUICKLISP) \
+             --eval '(ql-dist:clean (ql-dist:dist "quicklisp"))'
+
 clean-cache:
 	@echo "Deleting $(LISP_CACHE)"
 	rm -rf "$(LISP_CACHE)"
+
+cleanall: clean clean-cache clean-quicklisp
+	@echo "All cleaned and reindexed."
+
