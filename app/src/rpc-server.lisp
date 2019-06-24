@@ -28,7 +28,7 @@
           :with runtime := 181.89
           :for instr :across (quil:parsed-program-executable-code parsed-protoquil-program)
           :when (typep instr 'quil:application) :do
-            (case (nargs (length (quil:application-arguments instr)))
+            (case (length (quil:application-arguments instr))
               (1 (incf runtime coeff-oneq))
               (2 (incf runtime coeff-twoq)))
           :finally (return runtime))))
