@@ -105,7 +105,7 @@
                (print-instruction (aref p j) s)
                (format s "~%  ")
                (cond ((= (length p) (1+ j))
-                      (write-string "END OF PROGRAM"))
+                      (write-string "END OF PROGRAM" s))
                      (t
                       (print-instruction (aref p (1+ j)) s))))))
   (:documentation "Error raised when a program does not validate as protoquil."))
