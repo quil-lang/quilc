@@ -49,12 +49,9 @@ DURATION is the time duration in nanoseconds of this gate application."
 
 FIDELITY stores the measured gate fidelity.
 
-DURATION stores the measured gate duration (in nanoseconds).
-
-NEEDS-PERMUTATION signals that this gate is not native, but some permutation of its qubit ordering is."
+DURATION stores the measured gate duration (in nanoseconds)."
   (fidelity 1d0)
-  (duration 1/100)
-  (needs-permutation nil))
+  (duration 1/100))
 
 
 ;;; The HARDWARE object structure stores a lot of information. It
@@ -131,11 +128,10 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
 
 Used to be a generic associated to HARDWARE-OBJECT; now computed from the GATE-INFORMATION table."
   (lambda (instr)
-    (let (duration needs-permutation)
+    (let (duration)
       (dohash ((key val) (hardware-object-gate-information obj))
         (when (binding-subsumes-p key (get-binding-from-instr instr))
-          (setf duration (gate-record-duration val))
-          (setf needs-permutation (gate-record-needs-permutation val))))
+          (setf duration (gate-record-duration val))))
       (values duration needs-permutation))))
 
 (defmethod print-object ((obj hardware-object) stream)
