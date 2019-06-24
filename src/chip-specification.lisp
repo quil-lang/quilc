@@ -132,7 +132,7 @@ Used to be a generic associated to HARDWARE-OBJECT; now computed from the GATE-I
       (dohash ((key val) (hardware-object-gate-information obj))
         (when (binding-subsumes-p key (get-binding-from-instr instr))
           (setf duration (gate-record-duration val))))
-      (values duration needs-permutation))))
+      (values duration))))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
