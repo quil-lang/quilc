@@ -423,7 +423,6 @@ H 0
 PRAGMA END_PRESERVE_BLOCK
 MEASURE 1
 ")))
-    ;; TODO Maybe there should be a (define-condition invalid-protoquil ...) ?
     (not-signals quil:not-protoquil (quil:check-protoquil-program valid-pp))
     (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-1in2))
     (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-1in3))
