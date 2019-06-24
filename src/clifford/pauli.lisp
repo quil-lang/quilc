@@ -119,6 +119,7 @@
 
 (declaim (ftype (function (pauli-components pauli-components) pauli-components) multiply-components))
 (defun multiply-components (a b)
+  "Multiplies two pauli-component vectors, returning the result as a new pauli-components vector."
   (declare (type pauli-components a b))
   (let* ((c (make-components (1- (length a)))))
     (multiply-components-into a b c)
@@ -131,7 +132,7 @@
 
 ;;; Paulis are printed in a fashion that is consistent with the
 ;;; ordering of the computational basis. For example, a pauli operator
-;;; represented as '(0 A B C) is printed as CBA, which applies A on q0, B
+;;; represented as #(0 A B C) is printed as CBA, which applies A on q0, B
 ;;; on q1, C on q2.
 (defun print-pauli (p &optional (stream nil))
   "If STREAM is NIL (by default), return simple string representation of a Pauli P.
