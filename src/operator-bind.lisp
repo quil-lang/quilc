@@ -664,7 +664,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
   (when (wildcard-binding-p binding)
     (return-from binding-environment nil))
   (nconc (when (match-symbol-p (gate-binding-operator binding))
-           (list (cons (binding-op binding) t)))
+           (list (cons (gate-binding-operator binding) t)))
          (unless (wildcard-pattern-p (gate-binding-parameters binding))
            (mapcan (lambda (param)
                      (when (match-symbol-p param)
