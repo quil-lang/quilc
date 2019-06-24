@@ -102,4 +102,3 @@ H 0")
            (quil:parsed-program-to-logical-matrix (quil:parse-quil quil))
            (quil:parsed-program-to-logical-matrix
             (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
-

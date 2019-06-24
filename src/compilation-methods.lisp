@@ -90,6 +90,26 @@
 
 ;;; Core public-facing routine for a full compilation pass.
 
+(define-condition not-protoquil (simple-error)
+  ((program :reader not-protoquil-program :initarg :program)
+   (index :reader not-protoquil-index :initarg :index))
+  (:report (lambda (c s)
+             (let ((j (not-protoquil-index c))
+                   (p (parsed-program-executable-code (not-protoquil-program c))))
+               (format s "Misplaced or illegal instruction in ProtoQuil program:~%  ")
+               (cond ((zerop j)
+                      (write-string "(BEGINNING OF PROGRAM)" s))
+                     (t
+                      (print-instruction (aref p (1- j)) s)))
+               (format s "~%>>>")
+               (print-instruction (aref p j) s)
+               (format s "~%  ")
+               (cond ((= (length p) (1+ j))
+                      (write-string "(END OF PROGRAM)" s))
+                     (t
+                      (print-instruction (aref p (1+ j)) s))))))
+  (:documentation "Error raised when a program does not validate as protoquil."))
+
 (defun check-protoquil-program (program)
   "Checks that PROGRAM, an application-resolved parsed-program instance, conforms to the present definition of \"protoQuil\". Signals an error on failure."
   ;; a protoquil program carves up into 3 regions, each optional, of the form:
@@ -113,14 +133,14 @@
                 (typep instr 'measurement))
            (setf region-counter 3))
           (t
-           (error "Misplaced or illegal instruction in ProtoQuil program:~%   ~A~%>>>~A~%   ~A"
-                  (if (zerop j)
-                      "(BEGINNING OF PROGRAM)"
-                      (print-instruction (aref (parsed-program-executable-code program) (1- j)) nil))
-                  (print-instruction (aref (parsed-program-executable-code program) j) nil)
-                  (if (= (1+ j) (length (parsed-program-executable-code program)))
-                      "(END OF PROGRAM)"
-                      (print-instruction (aref (parsed-program-executable-code program) (1+ j)) nil)))))))))
+           (error 'not-protoquil :program program :index j)))))))
+
+(defun protoquil-program-p (program)
+  "Returns T if program satisfies the requirements of a protoquil program, NIL otherwise."
+  (check-type program parsed-program)
+  (handler-case (check-protoquil-program program)
+    (not-protoquil () (return-from protoquil-program-p nil)))
+  t)
 
 ;; Forward declaration from compressor.lisp
 (declaim (special *compressor-passes*))

@@ -15,6 +15,24 @@
       (coerce x 'double-float)
       nil))
 
+(defun runtime-estimation (parsed-protoquil-program)
+  "Estimated QPU runtime of PARSED-PROTOQUIL-PROGRAM. Likely to be an over-estimate for small depth programs, where runtime is dominated by network latency and compilation, etc. Take these results with a grain of salt."
+  (when (and (typep parsed-protoquil-program 'quil:parsed-program)
+             (quil:protoquil-program-p parsed-protoquil-program))
+    ;; These opaque numbers come from an analysis of the runtimes of a
+    ;; large number of randomly generated programs targeting a 16Q
+    ;; lattice. Those programs were a random mixture of 1- and 2Q
+    ;; gates, followed by MEASUREs on all 16 qubits.
+    (loop :with coeff-oneq := 1.6291
+          :with coeff-twoq := 1.701
+          :with runtime := 181.89
+          :for instr :across (quil:parsed-program-executable-code parsed-protoquil-program)
+          :when (typep instr 'quil:application) :do
+            (case (length (quil:application-arguments instr))
+              (1 (incf runtime coeff-oneq))
+              (2 (incf runtime coeff-twoq)))
+          :finally (return runtime))))
+
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
 (defun quil-to-native-quil (request)
@@ -27,6 +45,7 @@
                                        :test #'equal))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
          (dictionary (process-program quil-program chip-specification))
+         (processed-program (gethash "processed_program" dictionary))
          (metadata (make-instance 'rpcq::|NativeQuilMetadata|
                                   :|final_rewiring| (gethash "final_rewiring" dictionary)
                                   :|gate_depth| (gethash "gate_depth" dictionary)
@@ -34,9 +53,11 @@
                                   :|multiqubit_gate_depth| (gethash "multiqubit_gate_depth" dictionary)
                                   :|program_duration| (ensure-optional-real (gethash "program_duration" dictionary))
                                   :|program_fidelity| (ensure-optional-real (gethash "program_fidelity" dictionary))
-                                  :|topological_swaps| (gethash "topological_swaps" dictionary))))
+                                  :|topological_swaps| (gethash "topological_swaps" dictionary)
+                                  :|qpu_runtime_estimation| (runtime-estimation
+                                                             (quil:parse-quil processed-program)))))
     (make-instance 'rpcq::|NativeQuilResponse|
-                   :|quil| (gethash "processed_program" dictionary)
+                   :|quil| processed-program
                    :|metadata| metadata)))
 
 (defun native-quil-to-binary (request)
