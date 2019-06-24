@@ -64,15 +64,12 @@
       (error "Currently no more than two qubit randomized benchmarking is supported."))
     (let* ((cliffords (mapcar #'quil.clifford::clifford-from-quil gateset))
            (qubits-used (mapcar (a:compose
-                                 (a:curry #'reduce #'union)
-                                 #'cl-quil.clifford::extract-qubits-used
+                                 #'cl-quil:qubits-used
                                  #'cl-quil:parse-quil)
                                 gateset))
            (qubits-used-by-interleaver
              (when interleaver
-               (reduce #'union
-                       (cl-quil.clifford::extract-qubits-used
-                        (cl-quil:parse-quil interleaver)))))
+               (cl-quil:qubits-used (cl-quil:parse-quil interleaver))))
            (qubits (union qubits-used-by-interleaver (reduce #'union qubits-used)))
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
@@ -105,7 +102,7 @@
          (clifford-program (rpcq::|ConjugateByCliffordRequest-clifford| request))
          (pauli-indices (coerce (rpcq::|PauliTerm-indices| pauli) 'list))
          (pauli-terms (coerce (rpcq::|PauliTerm-symbols| pauli) 'list))
-         (clifford-indices (sort (reduce #'union (cl-quil.clifford::extract-qubits-used (cl-quil:parse-quil clifford-program))) #'<))
+         (clifford-indices (sort (cl-quil:qubits-used (cl-quil:parse-quil clifford-program)) #'<))
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
          (pauli (quil.clifford:pauli-from-string
                  (with-output-to-string (s)
@@ -155,6 +152,7 @@
 
 (declaim (special *program-name*))
 (defun start-rpc-server (&key
+                           (protocol "tcp")
                            (host "*")
                            (port 5555)
                            (logger (make-instance 'cl-syslog:rfc5424-logger
@@ -167,6 +165,6 @@
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic)
     (rpcq:dispatch-table-add-handler dt 'get-version-info)
     (rpcq:start-server :dispatch-table dt
-                       :listen-addresses (list (format nil "tcp://~a:~a" host port))
+                       :listen-addresses (list (format nil "~a://~a~@[:~a~]" protocol host port))
                        :logger logger
                        :timeout *time-limit*)))

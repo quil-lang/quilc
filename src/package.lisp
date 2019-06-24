@@ -381,6 +381,13 @@
    #:rewrite-arithmetic                 ; FUNCTION/TRANSFORMATION
    )
 
+  ;; analysis/compress-qubits.lisp
+  (:export
+   #:compress-qubits
+   #:relabel-rewiring
+   #:qubits-used
+   )
+
   ;; cl-quil.lisp
   (:export
    #:parse-quil                         ; FUNCTION
