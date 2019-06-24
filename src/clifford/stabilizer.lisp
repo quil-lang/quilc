@@ -33,6 +33,14 @@
     (make-array (list size size) :element-type 'bit
                                  :initial-element 0)))
 
+(defun copy-tableau (tab)
+  "Creates a copy of TAB and returns it."
+  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
+    (loop :for i :below (array-total-size copy)
+          :do (setf (row-major-aref copy i)
+                    (row-major-aref tab i)))
+    copy))
+
 (declaim (inline tableau-qubits
                  tableau-x (setf tableau-x)
                  tableau-z (setf tableau-z)
@@ -84,6 +92,11 @@
            (type bit new-bit))
   (setf (aref tab (* 2 (tableau-qubits tab)) i) new-bit))
 
+(defun tableau-clear-scratch (tab)
+  "Clear the scratch row of TAB."
+  (dotimes (i (1+ (* 2 (tableau-qubits tab))))
+    (setf (tableau-scratch tab i) 0)))
+
 (defun display-row (tab i)
   (cond
     ((= 1 (tableau-r tab i))
@@ -98,6 +111,21 @@
         ((and (= 1 x) (= 0 z)) (write-string "X"))
         ((and (= 0 x) (= 1 z)) (write-string "Z"))
         ((and (= 1 x) (= 1 z)) (write-string "Y"))))))
+
+(defun tableau-copy-row (tab i k)
+  "Given a tableau TAB, overwrite row I with row K."
+  (declare (type tableau tab)
+           (type tableau-index i k))
+  ;; set row i to row k
+  (dotimes (j (array-dimension tab 1))
+    (setf (aref tab i j) (aref tab k j))))
+
+(defun tableau-swap-row (tab i k)
+  "Given a tableau TAB, swap row I with row K."
+  (declare (type tableau tab)
+           (type tableau-index i k))
+  (dotimes (j (1+ (* 2 (tableau-qubits tab))))
+    (rotatef (aref tab i j) (aref tab k j))))
 
 (defun display-tableau (tab)
   "Display the tableau TAB a la Aaronson's CHP program."
@@ -125,6 +153,7 @@
 
 (defun take-tableau-to-basis-state (tab x)
   "Bring the tableau to the specific basis state X. X is an integer interpreted as a collection of bits, so for example, |01000> = #b01000 = 8."
+  (assert (>= (tableau-qubits tab) (integer-length x)))
   (let ((n (tableau-qubits tab)))
     (zero-out-tableau tab)
     (dotimes (i n)
@@ -417,21 +446,6 @@ Note that no expressions calculating the phase update are created. This is becau
   (setf (aref tab i b) 1)
   nil)
 
-(defun tableau-copy-row (tab i k)
-  "Given a tableau TAB, overwrite row I with row K."
-  (declare (type tableau tab)
-           (type tableau-index i k))
-  ;; set row i to row k
-  (dotimes (j (array-dimension tab 1))
-    (setf (aref tab i j) (aref tab k j))))
-
-(defun tableau-swap-row (tab i k)
-  "Given a tableau TAB, swap row I with row K."
-  (declare (type tableau tab)
-           (type tableau-index i k))
-  (dotimes (j (1+ (* 2 (tableau-qubits tab))))
-    (rotatef (aref tab i j) (aref tab k j))))
-
 ;;; Robert: For some reason that I'm not sure about, the procedure for
 ;;; non-deterministic measurement from the Aaronson et al. paper
 ;;; didn't work. I had to look at their C code for inspiration, which
@@ -486,12 +500,7 @@ Note that no expressions calculating the phase update are created. This is becau
              (row-product tab (* 2 n) (+ i n))))
          (values (tableau-r tab (* 2 n)) t))))))
 
-(defun tableau-clear-scratch (tab)
-  "Clear the scratch row of TAB."
-  (dotimes (i (1+ (* 2 (tableau-qubits tab))))
-    (setf (tableau-scratch tab i) 0)))
-
-(defun make-tableau-row-echelon-form (tab)
+(defun put-tableau-into-row-echelon-form (tab)
   "Perform Gaussian elimination to put the tableau in row echelon form. Specifically, the modified generators will be put in the form
 
     |1 * * * * * * * * * * *|
@@ -550,7 +559,7 @@ Returns the number of purely X/Y generators.
 (defun find-nonzero-operator (tab)
   "Given a tableau TAB, find a Pauli operator P such that P|0...0> has nonzero amplitude in the state represented by TAB. Write this operator to the scratch space of TAB. This function also puts TAB into REF (row echelon form), since P is found using the purely Z generators."
   (let ((n (tableau-qubits tab))
-        (log-nonzero (make-tableau-row-echelon-form tab)))
+        (log-nonzero (put-tableau-into-row-echelon-form tab)))
     ;; Zero out scratch space
     (tableau-clear-scratch tab)
     ;; For each row, starting from the bottom of the Z generators
@@ -589,7 +598,7 @@ Returns the number of purely X/Y generators.
 
 Note: the scratch space is used as an area to write intermediate state values, and starts with the operator returned by find-nonzero-operator."
   (let* ((n (tableau-qubits tab))
-         (log-nonzero (make-tableau-row-echelon-form tab))
+         (log-nonzero (put-tableau-into-row-echelon-form tab))
          (norm (sqrt (expt 2 log-nonzero)))
          (wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
          (running-phase 0))
@@ -602,13 +611,6 @@ Note: the scratch space is used as an area to write intermediate state values, a
         (multiple-value-bind (state read-phase) (read-basis-state-from-scratch-row tab)
           (setf (aref wf state) (/ (expt #C(0.0d0 1.0d0) (+ read-phase running-phase)) norm)))))
     wf))
-
-(defun copy-tableau (tab)
-  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
-    (loop :for i :below (array-total-size copy)
-          :do (setf (row-major-aref copy i)
-                    (row-major-aref tab i)))
-    copy))
 
 ;;; The .chp file format is an input to Aaronson's chp program written
 ;;; in C. Below is a parser and interpreter for it.
