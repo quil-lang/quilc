@@ -674,6 +674,18 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 ;;; here lies the logic underlying the approximate compilation routine.
 
+(define-compiler canonical-decomposition
+    ((instr (_ _ q1 q0)))
+  (handler-case
+      (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
+             (m (magicl:scale (expt (magicl:det m) -1/4) m)))
+        (multiple-value-bind (a d b) (orthogonal-decomposition m)
+          (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
+            (sandwich-with-local-gates (list (build-gate "CAN" `(,alpha ,beta ,gamma) q1 q0))
+                                       a d b q1 q0))))
+    (unknown-gate-parameter ()
+      (give-up-compilation :because ':invalid-domain))))
+
 (defun approximate-2Q-compiler (crafters instr &key context)
   "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through.
 
@@ -727,15 +739,3 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                     (double= 1d0 fidelity))
           (give-up-compilation))
         (values circuit fidelity)))))
-
-(define-compiler canonical-decomposition
-    ((instr (_ _ q1 q0)))
-  (handler-case
-      (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
-             (m (magicl:scale (expt (magicl:det m) -1/4) m)))
-        (multiple-value-bind (a d b) (orthogonal-decomposition m)
-          (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
-            (sandwich-with-local-gates (list (build-gate "CAN" `(,alpha ,beta ,gamma) q1 q0))
-                                       a d b q1 q0))))
-    (unknown-gate-parameter ()
-      (give-up-compilation :because ':invalid-domain))))
