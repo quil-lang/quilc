@@ -56,8 +56,6 @@
                                   :|topological_swaps| (gethash "topological_swaps" dictionary)
                                   :|qpu_runtime_estimation| (runtime-estimation
                                                              (quil:parse-quil processed-program)))))
-    (print (runtime-estimation (quil:parse-quil processed-program)))
-    (print metadata)
     (make-instance 'rpcq::|NativeQuilResponse|
                    :|quil| processed-program
                    :|metadata| metadata)))
