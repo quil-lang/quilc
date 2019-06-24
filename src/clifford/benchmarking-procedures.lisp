@@ -80,24 +80,24 @@
      nil)))
 
 (define-factorize factor-I "I"
-  (complex= top-left bottom-right)
-  (and (complex= top-right 0)
-       (complex= top-right bottom-left)))
+  (quil::double= top-left bottom-right)
+  (and (quil::double= top-right 0)
+       (quil::double= top-right bottom-left)))
 
 (define-factorize factor-X "X"
-  (and (complex= top-left 0)
-       (complex= top-left bottom-right))
-  (complex= top-right bottom-left))
+  (and (quil::double= top-left 0)
+       (quil::double= top-left bottom-right))
+  (quil::double= top-right bottom-left))
 
 (define-factorize factor-Y "Y"
-  (and (complex= top-left 0)
-       (complex= top-left bottom-right))
-  (complex= top-right (- bottom-left)))
+  (and (quil::double= top-left 0)
+       (quil::double= top-left bottom-right))
+  (quil::double= top-right (- bottom-left)))
 
 (define-factorize factor-Z "Z"
-  (complex= top-left (- bottom-right))
-  (and (complex= top-right 0)
-       (complex= top-right bottom-left)))
+  (quil::double= top-left (- bottom-right))
+  (and (quil::double= top-right 0)
+       (quil::double= top-right bottom-left)))
 
 (defun valid-pauli-dim (m n)
   "T if M and N are valid dimensions of a Pauli matrix, NIL otherwise."
@@ -108,17 +108,36 @@
   "If A and B are both not NIL, concatenate them and return a STRING."
   (when (and a b) (concatenate 'string a b)))
 
-(defun complex= (a b)
-  (and (quil::double= (realpart a) (realpart b))
-       (quil::double= (imagpart a) (imagpart b))))
+;; This function is just for testing purposes. There also exists an
+;; almost identical function collinearp in src/matrix-operations.lisp
+;; that handles arbitrary global phases, but it uses double=, which is
+;; too strict for the contexts where this function is used to test
+;; equality.
+(defun global-phase~ (wfa wfb)
+  "Tests that two wavefunctions are equal up to a global phase of an eighth root of unity."
+  (let ((phase-factor (cis (/ pi 4)))
+        (phase-wf (copy-seq wfa)))
+    (loop :for i :below 8
+          :do (map-into phase-wf (lambda (x) (* x phase-factor)) phase-wf)
+          :when (every #'quil::double~ phase-wf wfb)
+            :return t
+          :finally (return nil))))
 
 (defun phase-to-string (phase)
   "Returns a string representation of a fourth root of unity, given by PHASE, NIL otherwise."
-  (cond ((complex= phase 1) "")
-        ((complex= phase -1) "-")
-        ((complex= phase #C(0 1)) "i")
-        ((complex= phase #C(0 -1)) "-i")
-        (t NIL)))
+  (cond ((quil::double~ phase 1) "")
+        ((quil::double~ phase -1) "-")
+        ((quil::double~ phase #C(0 1)) "i")
+        ((quil::double~ phase #C(0 -1)) "-i")
+        (t (error "Invalid phase number: ~A~%" phase))))
+
+(defun string-to-phase (phase-str)
+  "Returns the phase corresponding to a string form of a fourth root of unity, given by PHASE-STR, NIL otherwise."
+  (cond ((string= phase-str "") 1)
+        ((string= phase-str "-") -1)
+        ((string= phase-str "i") #C(0 1))
+        ((string= phase-str "-i") #C(0 -1))
+        (t (error "Invalid phase string: ~A~%" phase-str))))
 
 (defun pauli-matrix-p (p)
   "Returns two strings. The first is a string representation of the phase of P, assuming P is a Pauli matrix, which will be a fourth root of unity. The second return value is a string representation of P as a tensor product of single qubit Pauli operators. If P is not a Pauli operator, then the second value will be NIL."
@@ -141,13 +160,13 @@
            (values (phase-to-string phase) pauli)
            NIL))
       ((or (factor-I p) (factor-Z p))
-       (multiple-value-bind (coeff second-pauli)
+       (multiple-value-bind (coeff next-pauli)
            (pauli-matrix-p (magicl::slice p 0 (/ m 2) 0 (/ n 2)))
-         (values coeff (concatenate-or-nil pauli second-pauli))))
+         (values coeff (concatenate-or-nil next-pauli pauli))))
       ((or (factor-Y p) (factor-X p))
-       (multiple-value-bind (coeff second-pauli) (pauli-matrix-p
+       (multiple-value-bind (coeff next-pauli) (pauli-matrix-p
                                                   (magicl::slice p (/ m 2) m 0 (/ n 2)))
-         (values coeff (concatenate-or-nil pauli second-pauli))))
+         (values (phase-to-string (* (string-to-phase coeff) (if (factor-Y p) #C(0 -1) 1))) (concatenate-or-nil next-pauli pauli))))
       (t nil))))
 
 (let ((memo-table (make-hash-table :test #'equal)))
@@ -159,7 +178,7 @@
         (setf (gethash n memo-table)
               (let ((X   (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
                     (Z   (magicl:make-complex-matrix 2 2 '(1 0 0 -1))))
-                (loop :for i :from (- n 1) :downto 0
+                (loop :for i :below n
                       :collect (quil::kq-gate-on-lines X n `(,i))
                       :collect (quil::kq-gate-on-lines Z n `(,i))))))))
 
@@ -182,6 +201,80 @@
                          (assert (not (null conj)) ()
                                  "The given matrix does not represent a Clifford element.")
                          (pauli-from-string (concatenate 'string phase conj))))))))
+
+(defun apply-pauli-to-wavefunction (ph index q wf)
+  "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
+  (multiple-value-bind (b a) (floor index 2)
+    (let* ((phase (expt #C(0.0d0 1.0d0) (b* a b)))
+           (n (quil::ilog2 (length wf))))
+      (flet ((xz (w0 w1)
+               (setf w0 (* ph phase w0))
+               (setf w1 (* ph phase w1 (expt #C(-1.0d0 0.0d0) b)))
+               (if (zerop a)
+                   (values w0 w1)
+                   (values w1 w0))))
+        (declare (inline xz))
+        (dotimes (i (expt 2 (1- n)) wf)
+          (let* ((addr0 (ash i 1))
+                 (addr1 (dpb 1 (byte 1 0) addr0)))
+            (setf addr0 (cl-quil::rotate-byte q (byte n 0) addr0))
+            (setf addr1 (cl-quil::rotate-byte q (byte n 0) addr1))
+            (multiple-value-bind (w0 w1) (xz (aref wf addr0) (aref wf addr1))
+              (setf (aref wf addr0) w0
+                    (aref wf addr1) w1))))))))
+
+;;; This function converts a clifford of arbitrary arity to its
+;;; corresponding matrix representation. How would one do this, you
+;;; ask? It is done in these steps:
+;;;
+;;;     1) Create a blank square matrix of size 2^n.
+;;;
+;;;     2) Find the wavefunction image of the zero state under this
+;;;     clifford, by using (tableau-function cliff) and applying it on
+;;;     a tableau in the zero state, then extracting its
+;;;     wavefunction. Thus, this wavefunction is the first column of
+;;;     our result matrix.
+;;;
+;;;     3) Next, we calculate the columns of the matrix in succession,
+;;;     which each represent the image of a basis state under the
+;;;     clifford. We already know C|0...0>; we want to find C|x>. We
+;;;     can get to any basis state from |0> by applying some
+;;;     combination of single qubit X gates, and we know the images of
+;;;     each of these Xs under conjugation by the clifford, so we can
+;;;     apply each image to C|0...0> to get (C*X0*C')(C*X1*C')...C|0> =
+;;;     C(X0*X1...)|0> = C|x>. Looping over all 2^n - 1 remaining basis
+;;;     states and doing that for each one, and setting the appropriate
+;;;     column of the matrix for each one, we get our final clifford
+;;;     matrix.
+(defun clifford-to-matrix (cliff)
+  "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
+  (let* ((n (num-qubits cliff))
+         (mat (magicl:make-zero-matrix (expt 2 n) (expt 2 n)))
+         (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
+         (zero-image-tab (make-tableau-zero-state n))
+         (pauli-map (clifford-basis-map cliff)))
+    ;; Use a tableau-function to find the image of the zero state
+    (apply (tableau-function cliff) zero-image-tab (alexandria:iota n :start (1- n) :step -1))
+    (setf scratch-wf (tableau-wavefunction zero-image-tab))
+    ;; Write the image to the first column of MAT
+    (dotimes (row (expt 2 n))
+      (setf (magicl:ref mat row 0) (aref scratch-wf row)))
+    ;; For each subsequent basis state,
+    (dotimes (curr-state (1- (expt 2 n)))
+      ;; Apply the appropriate paulis to find its image under CLIFF
+      (let ((x (logxor curr-state (1+ curr-state))))
+        (dotimes (i n)
+          (when (logbitp i x)
+            ;; Apply the pauli on zeroth qubit, with phase
+            (apply-pauli-to-wavefunction (if (zerop (phase-factor (aref pauli-map (* 2 i)))) 1 -1)
+                                         (aref (pauli-components (aref pauli-map (* 2 i))) 1) 0 scratch-wf)
+            ;; Apply the paulis on the rest of the qubits
+            (loop :for p :from 2 :to n
+                  :do (apply-pauli-to-wavefunction 1 (aref (pauli-components (aref pauli-map (* 2 i))) p) (1- p) scratch-wf))))
+        ;; Write the basis state's image to the corresponding column of MAT
+        (dotimes (row (expt 2 n))
+          (setf (magicl:ref mat row (1+ curr-state)) (aref scratch-wf row)))))
+    mat))
 
 (defun extract-cliffords (parsed-quil)
   "Given PARSED-QUIL generate a list of pairs (CLIFFORD_i QUBITS_i) where CLIFFORD_i is the clifford for the ith instruction in PARSED-QUIL and QUBITS_i is a list of the qubits used in that instruction.
