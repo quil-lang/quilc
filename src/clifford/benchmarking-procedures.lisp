@@ -157,7 +157,7 @@
       ((not (valid-pauli-dim m n)) NIL)
       ((= m n 2)
        (if (not (null pauli))
-           (values (phase-to-string phase) pauli)
+           (handler-case (values (phase-to-string phase) pauli) (error () nil))
            NIL))
       ((or (factor-I p) (factor-Z p))
        (multiple-value-bind (coeff next-pauli)
