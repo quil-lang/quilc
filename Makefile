@@ -3,6 +3,7 @@ LISP_CACHE ?= $(HOME)/.cache/common-lisp
 RIGETTI_LISP_LIBRARY_HOME=../
 SBCL_BIN=sbcl
 SBCL=$(SBCL_BIN) --noinform --no-userinit --no-sysinit --non-interactive
+TWEEDLEDUM_DIR := src/contrib/tweedledum
 QUICKLISP_HOME=$(HOME)/quicklisp
 QUICKLISP_SETUP=$(QUICKLISP_HOME)/setup.lisp
 QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
@@ -33,6 +34,13 @@ system-index.txt: $(QUICKLISP_SETUP)
 		$(FOREST_SDK_FEATURE) \
 		--eval '(ql:quickload "quilc")' \
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
+
+.PHONY: tweedledum
+tweedledum:
+	mkdir -p $(TWEEDLEDUM_DIR)/build
+	cd $(TWEEDLEDUM_DIR)/build; \
+	cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/$(TWEEDLEDUM_DIR)" ..; \
+        make install
 
 ###############################################################################
 # DEPENDENCIES
@@ -66,7 +74,7 @@ endif
 ###############################################################################
 
 .PHONY: quilc
-quilc: system-index.txt
+quilc: system-index.txt tweedledum
 	$(SBCL) $(FOREST_SDK_FEATURE) \
 	        --eval "(setf sb-ext:\*on-package-variance\* '(:warn (:swank :swank-backend :swank-repl) :error t))" \
 		--eval '(push :hunchentoot-no-ssl *features*)' \
@@ -155,7 +163,7 @@ test-ccl:
 # CLEAN
 ###############################################################################
 
-clean:
+clean: clean-tweedledum
 	rm -f quilc system-index.txt build-output.log
 	rm -f coverage-report/*.html
 	rm -f src/contrib/**/*.so src/contrib/**/*.dylib
@@ -163,3 +171,6 @@ clean:
 clean-cache:
 	@echo "Deleting $(LISP_CACHE)"
 	rm -rf "$(LISP_CACHE)"
+
+clean-tweedledum:
+	rm -rf $(TWEEDLEDUM_DIR)/build $(TWEEDLEDUM_DIR)/libtweedledum.{so,dylib}

@@ -120,19 +120,19 @@
 
 ;; NOTE: The following contrib requires a C++17 compiler, and is untested on
 ;; Windows
-(defclass c->so (asdf:source-file)
+(defclass cpp->so (asdf:source-file)
   ())
 
-(defmethod output-files ((operation compile-op) (component c->so))
+(defmethod output-files ((operation compile-op) (component cpp->so))
   (values (list (make-pathname :name "libtweedledum"
                                :type #-darwin "so" #+darwin "dylib"
                                :defaults (component-pathname component)))
           t))
 
-(defmethod perform ((operation load-op) (component c->so))
+(defmethod perform ((operation load-op) (component cpp->so))
   t)
 
-(defmethod perform ((operation compile-op) (component c->so))
+(defmethod perform ((operation compile-op) (component cpp->so))
   (labels ((nn (x) (uiop:native-namestring x))
            (compile-it (c++17 c++17-args)
              (uiop:run-program
@@ -182,7 +182,7 @@
   :pathname "src/contrib/tweedledum/"
   :serial t
   :components
-  ((c->so "tweedledum.c")
+  ((cpp->so "tweedledum.cpp")
    (:file "tweedledum")))
 
 (asdf:defsystem #:cl-quil/tweedledum-tests
