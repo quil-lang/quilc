@@ -129,7 +129,6 @@
         ((quil::double~ phase -1) "-")
         ((quil::double~ phase #C(0 1)) "i")
         ((quil::double~ phase #C(0 -1)) "-i")
-        ;; This phase is invalid, but don't error so the test suite can continue.
         (t (error "Invalid phase number: ~A~%" phase))))
 
 (defun string-to-phase (phase-str)
@@ -138,7 +137,6 @@
         ((string= phase-str "-") -1)
         ((string= phase-str "i") #C(0 1))
         ((string= phase-str "-i") #C(0 -1))
-        ;; This phase string is invalid, but don't error so the test suite can continue.
         (t (error "Invalid phase string: ~A~%" phase-str))))
 
 (defun pauli-matrix-p (p)
@@ -159,7 +157,7 @@
       ((not (valid-pauli-dim m n)) NIL)
       ((= m n 2)
        (if (not (null pauli))
-           (handler-bind ((error #'(lambda (x) (declare (ignore x)) nil))) (values (phase-to-string phase) pauli))
+           (handler-case (values (phase-to-string phase) pauli) (error () nil))
            NIL))
       ((or (factor-I p) (factor-Z p))
        (multiple-value-bind (coeff next-pauli)
