@@ -151,7 +151,7 @@
         (error "tweedledum library directory missing. Did you run ~
                 `git submodule init && git submodule update --init`?"))
       (let ((c++17 (or (uiop:getenv "CXX")
-                       "clang++-7"))
+                       "g++"))
             (c++17-args (list "-std=c++17"
                               "-shared"
                               "-fPIC"
