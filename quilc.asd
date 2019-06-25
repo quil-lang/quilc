@@ -12,7 +12,7 @@
                #:split-sequence
                #:command-line-arguments
                #:yason
-               (:version #:magicl "0.6.1")
+               (:version #:magicl "0.6.2")
                #:cl-quil
                #:cl-quil-benchmarking
                #:uiop
