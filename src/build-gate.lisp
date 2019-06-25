@@ -12,11 +12,11 @@
 
 ;;; first, some simple utilities for constructing gate objects
 
-(defun build-gate (operator params &rest qubits)
+(defun build-gate (operator params qubit &rest qubits)
   "Shorthand function for constructing a GATE-APPLICATION object from QUIL-like input. OPERATOR must be a standard gate name."
   (check-type params list)
   (check-type qubits list)
-  (assert (not (null qubits)))
+  (push qubit qubits)
   (flet ((capture-param (param)
            (typecase param
              (double-float
@@ -61,11 +61,11 @@
 
 (define-global-counter **anonymous-gate-counter** get-anonymous-gate-counter)
 
-(defun anon-gate (operator matrix &rest qubits)
+(defun anon-gate (operator matrix qubit &rest qubits)
   "Variant of BUILD-GATE for constructing anonymous gate applications."
   (check-type operator string)
   (check-type matrix magicl:matrix)
-  (assert (not (endp qubits)))
+  (push qubit qubits)
   (flet ((capture-arg (arg)
            (typecase arg
              (integer
@@ -79,12 +79,13 @@
                    :gate matrix
                    :arguments (mapcar #'capture-arg qubits))))
 
-(defun build-UCR (roll-name params &rest args)
+(defun build-UCR (roll-name params qubit &rest qubits)
+  (push qubit qubits)
   (let ((op (named-operator roll-name)))
-    (dolist (x (rest args))
+    (dolist (x (rest qubits))
       (declare (ignore x))
       (setf op (forked-operator op)))
-    (apply #'build-gate op params args)))
+    (apply #'build-gate op params qubits)))
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 

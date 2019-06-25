@@ -50,8 +50,8 @@ DURATION is the time duration in nanoseconds of this gate application."
 FIDELITY stores the measured gate fidelity.
 
 DURATION stores the measured gate duration (in nanoseconds)."
-  (fidelity 1d0)
-  (duration 1/100))
+  (fidelity 1d0 :type real)
+  (duration 1/100 :type real))
 
 
 ;;; The HARDWARE object structure stores a lot of information. It
@@ -124,15 +124,15 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
   (misc-data (make-hash-table :test #'equal) :type hash-table))
 
 (defun hardware-object-native-instructions (obj)
-  "Takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse. A second value is returned, which is T if the instruction would be native were the qubits permuted in some fashion (\"gate native\").
+  "Takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse.
 
-Used to be a generic associated to HARDWARE-OBJECT; now computed from the GATE-INFORMATION table."
+Used to be an anonymous function associated to HARDWARE-OBJECT; now computed from its GATE-INFORMATION table."
   (lambda (instr)
     (let (duration)
       (dohash ((key val) (hardware-object-gate-information obj))
         (when (binding-subsumes-p key (get-binding-from-instr instr))
           (setf duration (gate-record-duration val))))
-      (values duration))))
+      duration)))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
@@ -235,9 +235,15 @@ used to specify CHIP-SPEC."
 ;;; constructors for hardware object building blocks
 
 (defun build-link (qubit0 qubit1 &key type gate-information)
-  "Constructs a template link. Legal types: (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT."
+  "Constructs a template link. The native gates for this link can be specified by one of two mutually exclusive means:
+
+ * The TYPE keyword can consist of (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
+
+ * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
   (check-type qubit0 unsigned-byte)
   (check-type qubit1 unsigned-byte)
+  (when gate-information
+    (check-type gate-information hash-table))
   (assert (/= qubit0 qubit1))
   (setf type (a:ensure-list type))
   (let* ((obj (make-hardware-object
@@ -315,7 +321,13 @@ used to specify CHIP-SPEC."
 
 
 (defun build-qubit (&key type gate-information)
-  "Constructs a template qubit.  Legal types: (lists of) ':RZ, ':X/2, ':MEASURE."
+  "Constructs a template qubit. The native gates for this qubit can be specified by one of two mutually exclusive means:
+
+ * The TYPE keyword can consist of (lists of) ':RZ, ':X/2, ':MEASURE.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
+
+ * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
+  (when gate-information
+    (check-type gate-information hash-table))
   (let* ((obj (make-hardware-object :order 0)))
     ;; new style of initialization
     (when gate-information
@@ -464,6 +476,7 @@ Compilers are listed in descending precedence.")
     nil))
 
 (defun warm-hardware-objects (chip-specification)
+  "Initializes the compiler feature sets of HARDWARE-OBJECT instances installed on a CHIP-SPECIFICATION.  Preserves whatever feature sets might be there already; don't call this repeatedly."
   (dotimes (order (length (chip-specification-objects chip-specification)))
     (dotimes (obj-index (length (vnth order (chip-specification-objects chip-specification))))
       (let ((obj (vnth obj-index (vnth order (chip-specification-objects chip-specification)))))
