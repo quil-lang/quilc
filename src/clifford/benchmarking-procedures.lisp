@@ -130,7 +130,7 @@
         ((quil::double~ phase #C(0 1)) "i")
         ((quil::double~ phase #C(0 -1)) "-i")
         ;; This phase is invalid, but don't error so the test suite can continue.
-        (t nil)))
+        (t (error "Invalid phase number: ~A~%" phase))))
 
 (defun string-to-phase (phase-str)
   "Returns the phase corresponding to a string form of a fourth root of unity, given by PHASE-STR, NIL otherwise."
@@ -139,7 +139,7 @@
         ((string= phase-str "i") #C(0 1))
         ((string= phase-str "-i") #C(0 -1))
         ;; This phase string is invalid, but don't error so the test suite can continue.
-        (t nil)))
+        (t (error "Invalid phase string: ~A~%" phase-str))))
 
 (defun pauli-matrix-p (p)
   "Returns two strings. The first is a string representation of the phase of P, assuming P is a Pauli matrix, which will be a fourth root of unity. The second return value is a string representation of P as a tensor product of single qubit Pauli operators. If P is not a Pauli operator, then the second value will be NIL."
@@ -159,7 +159,7 @@
       ((not (valid-pauli-dim m n)) NIL)
       ((= m n 2)
        (if (not (null pauli))
-           (values (phase-to-string phase) pauli)
+           (handler-bind ((error #'(lambda (x) (declare (ignore x)) nil))) (values (phase-to-string phase) pauli))
            NIL))
       ((or (factor-I p) (factor-Z p))
        (multiple-value-bind (coeff next-pauli)
