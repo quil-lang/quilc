@@ -8,6 +8,32 @@
   (check-type slot-name symbol)
   (error "The slot named ~S is required." slot-name))
 
+(defgeneric copy-instance (instance &rest initargs-overwrite)
+  (:documentation
+   "Create a shallow copy of the object INSTANCE.  The contents of INITARGS-OVERWRITE are used to overwrite individual slot contents in the cloned object.
+
+WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.")
+  (:method ((instance t) &rest initargs-overwrite)
+    (let* ((class (class-of instance))
+           (copy (allocate-instance class)))
+      (dolist (slot (closer-mop:class-slots class))
+        (let ((slot-name (closer-mop:slot-definition-name slot)))
+          (cond
+            ((and (typep class 'structure-class)
+                  (getf initargs-overwrite (intern (string slot-name) :keyword)))
+             (setf (slot-value copy slot-name)
+                   (getf initargs-overwrite (intern (string slot-name) :keyword))))
+            ((and (typep class 'standard-class)
+                  (some (lambda (x) (getf initargs-overwrite x))
+                        (closer-mop:slot-definition-initargs slot)))
+             (setf (slot-value copy slot-name)
+                   (some (lambda (x) (getf initargs-overwrite x))
+                         (closer-mop:slot-definition-initargs slot))))
+            ((slot-boundp instance slot-name)
+             (setf (slot-value copy slot-name)
+                   (slot-value instance slot-name))))))
+      copy)))
+
 (defmacro postpend (obj place)
   `(if ,place
        (push ,obj (cdr (last ,place)))
