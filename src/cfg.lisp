@@ -209,8 +209,6 @@ Return the following values:
       (setf blk new-blk)))
   ;; set the block type to a reset-block
   (change-class blk 'reset-block)
-  ;; upcall to push the RESET instruction on
-  (vector-push-extend instr (basic-block-code blk))
   (values blk nil nil))
 
 (defmethod process-instruction (cfg blk (instr include))
@@ -354,14 +352,20 @@ Return the following values:
 
 (defun merge-sequentially (blk1 blk2)
   "Returns a new BASIC-BLOCK representing a merged BLK1 and BLK2, such that its incoming list is a copy of BLK1's incoming list, its outgoing edge is a copy of BLK2's outgoing edge, and its code is the concatentation of BLK1's code and BLK2's code. Any reference to BLK1 or BLK2 within this new block's edge or incoming list is replaced with a reference to itself."
-  (assert (and (typep blk1 (type-of blk2))
-               (typep blk2 (type-of blk1))))
-  (assert (or (not (basic-block-out-rewiring blk1))
-              (not (basic-block-in-rewiring blk2))
-              (equalp (basic-block-out-rewiring blk1)
-                      (basic-block-in-rewiring blk2))))
+  (assert (and (or (and (typep blk1 'preserved-block)
+                        (typep blk2 'preserved-block))
+                   (and (not (typep blk1 'preserved-block))
+                        (not (typep blk2 'preserved-block))))
+               (or (typep blk2 'reset-block)
+                   (not (basic-block-out-rewiring blk1))
+                   (not (basic-block-in-rewiring blk2))
+                   (equalp (basic-block-out-rewiring blk1)
+                           (basic-block-in-rewiring blk2)))))
   (let ((new-blk (make-instance (type-of blk1)
-                                :code (concatenate 'vector (basic-block-code blk1)
+                                :code (concatenate 'vector
+                                                   (basic-block-code blk1)
+                                                   (when (typep blk2 'reset-block)
+                                                     (list (make-instance 'reset)))
                                                    (basic-block-code blk2))
                                 :labeled (labeled blk1))))
     ;; Update incoming of the new block
@@ -396,16 +400,25 @@ Return the following values:
                   (eq parent (first (children blk)))
                   (eq (type-of parent) (type-of blk))
                   (empty-block-p blk)
-                  (or (not (basic-block-out-rewiring parent))
+                  (or (and (typep parent 'preserved-block)
+                           (typep blk 'preserved-block))
+                      (and (not (typep parent 'preserved-block))
+                           (not (typep blk 'preserved-block))))
+                  (or (typep blk 'reset-block)
+                      (not (basic-block-out-rewiring parent))
                       (not (basic-block-in-rewiring blk))
                       (equalp (basic-block-out-rewiring parent)
                               (basic-block-in-rewiring blk)))
-                  (or (not (basic-block-out-rewiring parent))
-                      (not (basic-block-in-rewiring blk))
-                      (equalp (basic-block-out-rewiring parent)
-                              (basic-block-in-rewiring blk))))
+                  (or (typep parent 'reset-block)
+                      (not (basic-block-in-rewiring parent))
+                      (not (basic-block-out-rewiring blk))
+                      (equalp (basic-block-in-rewiring parent)
+                              (basic-block-out-rewiring blk))))
+                 
                  ;; update the rewiring data
-                 (setf (basic-block-in-rewiring parent) (basic-block-out-rewiring parent))
+                 (setf (basic-block-in-rewiring parent) (or (basic-block-in-rewiring parent)
+                                                            (basic-block-out-rewiring parent))
+                       (basic-block-out-rewiring parent) (basic-block-in-rewiring parent))
                  ;; Update the outgoing edge of the parent to point to itself, rather than this block
                  (setf (outgoing parent) (redirect-edge blk
                                                         parent
@@ -419,17 +432,20 @@ Return the following values:
 
                 ;; Condition 2) Paths can be contracted when a block has one parent, that parent has one outgoing edge, and neither are the exit or entry block. There is
                 ;; also the extra condition that and edge cannot be contracted if doing so would cause previously isolated code to be possibly run within a loop.
-                ((and (eq (type-of parent) (type-of blk))
-                      (or (empty-block-p blk)
+                ((and (or (empty-block-p blk)
                           (not (> (length (children parent)) 1)))
                       (or (empty-block-p parent)
                           (not (find blk (incoming blk))))
                       (= 1 (length (children parent)))
-                      (or (not (basic-block-out-rewiring parent))
+                      (or (and (typep parent 'preserved-block)
+                               (typep blk 'preserved-block))
+                          (and (not (typep parent 'preserved-block))
+                               (not (typep blk 'preserved-block))))
+                      (or (typep blk 'reset-block)
+                          (not (basic-block-out-rewiring parent))
                           (not (basic-block-in-rewiring blk))
                           (equalp (basic-block-out-rewiring parent)
                                   (basic-block-in-rewiring blk))))
-
 
                  ;; The conditions are met to sequentially merge these blocks
                  (let ((new-blk (merge-sequentially parent blk)))
@@ -472,6 +488,10 @@ Return the following values:
       ;; there should not, however, be a label if this is the entry block
       (unless (eq blk (entry-point cfg))
         (add-to-section (make-instance 'jump-target :label (get-label-from-block blk))))
+      
+      ;; if this block is of type RESET-BLOCK, add back the implicit RESET instruction
+      (when (typep blk 'reset-block)
+        (add-to-section (make-instance 'reset)))
 
       ;; Attach the basic code of this block
       (add-to-section (basic-block-code blk))

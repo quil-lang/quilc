@@ -178,7 +178,7 @@ Returns a value list: (processed-program, of type parsed-program
   ;; now we walk the CFG associated to the program
   (let* ((initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                   :type rewiring-type))
-         (cfg (program-cfg parsed-program :dce t :simplify t))
+         (cfg (program-cfg parsed-program :dce t))
          ;; this is a list of pairs (block-to-be-traversed registrant)
          (block-stack (list (list (entry-point cfg) nil)))
          (topological-swaps 0)
@@ -280,7 +280,7 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (initial-l2p chip-schedule final-l2p)
                (do-greedy-temporal-addressing
-                   (rest (coerce (basic-block-code blk) 'list))
+                 (coerce (basic-block-code blk) 'list)
                  chip-specification
                  :environs parsed-program
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
@@ -365,12 +365,10 @@ Returns a value list: (processed-program, of type parsed-program
 
       ;; kick off the traversal
       (exhaust-stack)
-      ;; untag all the reset blocks
-      (dolist (blk (cfg-blocks cfg))
-        (when (typep blk 'reset-block)
-          (change-class blk 'basic-block)))
+      
       ;; one more pass of CFG collapse
       (simplify-cfg cfg)
+      
       (let ((processed-program (reconstitute-program cfg)))
         ;; Keep global PRAGMAS in the code, at the top of the file.
         (setf (parsed-program-executable-code processed-program)
