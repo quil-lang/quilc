@@ -55,7 +55,7 @@ else()
   set(LIBTWEEDLEDUM_STATIC_NAME
     "${CMAKE_STATIC_LIBRARY_PREFIX}${TWEEDLEDUM_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
-  file(WRITE empty.cpp "") # This is to placate CMake's need for a source file.
+  file(WRITE empty.cpp "// This is to placate CMake's need for a source file.") 
   add_executable(rigetti-sbcl empty.cpp)
   target_link_options(rigetti-sbcl
     PRIVATE
