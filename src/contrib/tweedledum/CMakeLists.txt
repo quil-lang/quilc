@@ -44,7 +44,7 @@ find_library(LIBSBCL sbcl
 
 if("${LIBSBCL}" STREQUAL "LIBSBCL-NOTFOUND")
   message(WARNING "Cannot build custom SBCL binary.
-    To build a new SBCL binary, run: cmake -DLIBSBCL=/path/to/libsbcl.a.")
+    To build a new SBCL binary, run: \"cmake -DLIBSBCL=/path/to/libsbcl.a .\"")
 else()
   find_package(ZLIB REQUIRED)
   find_package(Threads REQUIRED)

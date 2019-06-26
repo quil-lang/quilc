@@ -16,6 +16,10 @@ UNAME_S=$(shell uname -s)
 ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 PREFIX ?= /usr/local
 
+ifdef LIBSBCL
+CMAKE_LIBSBCL := -DLIBSBCL="$(LIBSBCL)"
+endif
+
 all: quilc
 
 ###############################################################################
@@ -36,11 +40,14 @@ system-index.txt: $(QUICKLISP_SETUP)
 		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
 
 .PHONY: tweedledum
-tweedledum:
+tweedledum: $(TWEEDLEDUM_DIR)/build/Makefile
+	cd $(TWEEDLEDUM_DIR)/build; \
+        make install
+
+$(TWEEDLEDUM_DIR)/build/Makefile: $(TWEEDLEDUM_DIR)/CMakeLists.txt
 	mkdir -p $(TWEEDLEDUM_DIR)/build
 	cd $(TWEEDLEDUM_DIR)/build; \
-	cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/$(TWEEDLEDUM_DIR)" ..; \
-        make install
+	cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/$(TWEEDLEDUM_DIR)" $(CMAKE_LIBSBCL) ..
 
 ###############################################################################
 # DEPENDENCIES
@@ -174,3 +181,4 @@ clean-cache:
 
 clean-tweedledum:
 	rm -rf $(TWEEDLEDUM_DIR)/build $(TWEEDLEDUM_DIR)/libtweedledum.{so,dylib}
+	rm -f $(TWEEDLEDUM_DIR)/rigetti-sbcl

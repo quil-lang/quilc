@@ -75,8 +75,20 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
   (uiop:symbol-call ':cl-quil-tests
                     '#:run-cl-quil-tests))
 
+(defun tweedledum-present-p ()
+  "Determine if tweedledum is callable."
+  ;; On a non-SBCL system it will fall back to the default behavior for dynamic libraries.
+  (let ((present-p t))
+    #+sbcl
+    (handler-case (synthesis-dbs '(0))
+      (sb-kernel::undefined-alien-function-error (condition)
+        (declare (ignore condition))
+        (setf present-p nil)))
+    present-p))
+
 ;; TODO Some error handling here
 (unless *tweedledum-libs-loaded*
-  (cffi:load-foreign-library 'libtweedledum)
+  (unless (tweedledum-present-p)
+    (cffi:load-foreign-library 'libtweedledum))
   (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
   (setf *tweedledum-libs-loaded* t))

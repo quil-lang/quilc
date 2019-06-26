@@ -115,63 +115,6 @@
 
 ;;; Contribs
 
-;; Adapted from magicl's magicl-transcendental adapted from commonqt's
-;; qt.asd.
-
-;; NOTE: The following contrib requires a C++17 compiler, and is untested on
-;; Windows
-(defclass cpp->so (asdf:source-file)
-  ())
-
-(defmethod output-files ((operation compile-op) (component cpp->so))
-  (values (list (make-pathname :name "libtweedledum"
-                               :type #-darwin "so" #+darwin "dylib"
-                               :defaults (component-pathname component)))
-          t))
-
-(defmethod perform ((operation load-op) (component cpp->so))
-  t)
-
-(defmethod perform ((operation compile-op) (component cpp->so))
-  (labels ((nn (x) (uiop:native-namestring x))
-           (compile-it (c++17 c++17-args)
-             (uiop:run-program
-              ;; TODO This needs to be platform agnostic. The difficulty is
-              ;; in picking up a c++17 compiler automatically.
-              (cons c++17 c++17-args)
-              :error-output t)))
-    (let* ((c-file (component-pathname component))
-           (cwd (namestring (make-pathname :directory (pathname-directory c-file))))
-           (tweedlelibdir (merge-pathnames "tweedledum/" cwd))
-           (shared-object (make-pathname :type #+darwin "dylib" #-darwin "so"
-                                         :name "libtweedledum"
-                                         :defaults c-file)))
-      (unless (uiop:directory-exists-p tweedlelibdir)
-        (error "tweedledum library directory missing. Did you run ~
-                `git submodule init && git submodule update --init`?"))
-      (let ((c++17 (or (uiop:getenv "CXX")
-                       "clang++-7"))
-            (c++17-args (list "-std=c++17"
-                              "-shared"
-                              "-fPIC"
-                              "-DFMT_HEADER_ONLY"
-                              (format nil "-I~a" (merge-pathnames "libs/fmt" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "libs/easy" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "libs/glucose" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "libs/kitty" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "include" tweedlelibdir))
-                              "-o" (nn shared-object)
-                              (nn c-file))))
-        (restart-case
-            (compile-it c++17 c++17-args)
-          (restart-with-c++17-path-input (c++17)
-            :report "Enter path to C++17 compiler and restart"
-            :interactive (lambda ()
-                           (format *query-io* "Enter path to C++17 compiler and restart: ")
-                           (force-output *query-io*)
-                           (list (read-line)))
-            (compile-it c++17 c++17-args)))))))
-
 (asdf:defsystem #:cl-quil/tweedledum
   :license "Apache License 2.0 (See LICENSE.txt)"
   :maintainer "Rigetti Computing"
@@ -182,8 +125,7 @@
   :pathname "src/contrib/tweedledum/"
   :serial t
   :components
-  ((cpp->so "tweedledum.cpp")
-   (:file "tweedledum")))
+  ((:file "tweedledum")))
 
 (asdf:defsystem #:cl-quil/tweedledum-tests
   :depends-on (#:cl-quil-tests #:cl-quil/tweedledum)
