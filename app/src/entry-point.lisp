@@ -193,6 +193,8 @@
   (disable-debugger))
 
 (defun entry-point (argv)
+  #-win32
+  (uiop:symbol-call ':cl-quil.tweedledum '#:load-tweedledum)
   (handler-case
       (%entry-point argv)
     (interactive-interrupt (c)

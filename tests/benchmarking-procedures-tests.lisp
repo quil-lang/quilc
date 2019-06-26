@@ -53,7 +53,7 @@
   (let ((cliff-id1 (list (cl-quil.clifford:clifford-identity 1)))
         (cliff-id2 (list (cl-quil.clifford:clifford-identity 2))))
     (is (equalp (serialize-clifford-sequence cliff-id1) (list (list "X" "Z"))))
-    (is (equalp (serialize-clifford-sequence cliff-id2) (list (list "XI" "ZI" "IX" "IZ"))))))
+    (is (equalp (serialize-clifford-sequence cliff-id2) (list (list "IX" "IZ" "XI" "ZI"))))))
 
 (defun matrix-equalp (a b)
   (let ((ma (magicl:matrix-rows a))
@@ -127,7 +127,7 @@
     (is (plusp diff))))
 
 (deftest test-clifford-from-quil ()
-  (let ((clifford-quil (format nil "~{~a~%~}" (list "CNOT 0 1" "H 5" "CNOT 0 5" "X 3" "Y 1"))))
+  (let ((clifford-quil (format nil "~{~a~%~}" (list "CNOT 1 0" "H 5" "CNOT 5 0" "X 3" "Y 1"))))
     (is (not (null (cl-quil.clifford:clifford-from-quil clifford-quil)))))
   ;; Check to make sure the indices are being parsed correctly (big endian)
   (let ((clifford-quil "CZ 0 5"))
@@ -143,17 +143,17 @@
 	(XZ (cl-quil.clifford:pauli-from-string "XZ"))
 	(-YY (cl-quil.clifford:pauli-from-string "-YY"))
 	(XX (cl-quil.clifford:pauli-from-string "XX"))
-	(CNOT01H0-quil (format nil "~{~a~%~}" (list "CNOT 0 1" "H 0")))
-	(CNOT01H0 (cl-quil.clifford:clifford-from-quil CNOT01H0-quil))
-	(H0CNOT01-quil (format nil "~{~a~%~}" (list "H 0" "CNOT 0 1")))
-	(H0CNOT01 (cl-quil.clifford:clifford-from-quil H0CNOT01-quil)))
+	(CN0T10H0-quil (format nil "~{~a~%~}" (list "CNOT 1 0" "H 0")))
+	(CN0T10H0 (cl-quil.clifford:clifford-from-quil CN0T10H0-quil))
+	(H0CNOT10-quil (format nil "~{~a~%~}" (list "H 0" "CNOT 1 0")))
+	(H0CNOT10 (cl-quil.clifford:clifford-from-quil H0CNOT10-quil)))
     (loop
        :for pauli-in :in `(,IZ ,ZI ,ZZ)
        :for pauli-out :in `(,XZ ,XI ,IZ)
-       :do (is (cl-quil.clifford:pauli= pauli-out (cl-quil.clifford:apply-clifford CNOT01H0 pauli-in))))
+       :do (is (cl-quil.clifford:pauli= pauli-out (cl-quil.clifford:apply-clifford CN0T10H0 pauli-in))))
         (loop
        :for pauli-in :in `(,IZ ,ZI ,ZZ)
        :for pauli-out :in `(,ZZ ,XX ,-YY)
-       :do (is (cl-quil.clifford:pauli= pauli-out (cl-quil.clifford:apply-clifford H0CNOT01 pauli-in))))))
+       :do (is (cl-quil.clifford:pauli= pauli-out (cl-quil.clifford:apply-clifford H0CNOT10 pauli-in))))))
     
 

@@ -169,11 +169,17 @@ test-ccl:
 ###############################################################################
 # CLEAN
 ###############################################################################
+.PHONY: clean clean-quicklisp clean-cache cleanall
 
 clean: clean-tweedledum
 	rm -f quilc system-index.txt build-output.log
 	rm -f coverage-report/*.html
 	rm -f src/contrib/**/*.so src/contrib/**/*.dylib
+
+clean-quicklisp:
+	@echo "Cleaning up old projects in Quicklisp"
+	$(QUICKLISP) \
+             --eval '(ql-dist:clean (ql-dist:dist "quicklisp"))'
 
 clean-cache:
 	@echo "Deleting $(LISP_CACHE)"
@@ -182,3 +188,6 @@ clean-cache:
 clean-tweedledum:
 	rm -rf $(TWEEDLEDUM_DIR)/build $(TWEEDLEDUM_DIR)/libtweedledum.{so,dylib}
 	rm -f $(TWEEDLEDUM_DIR)/rigetti-sbcl
+
+cleanall: clean clean-cache clean-quicklisp
+	@echo "All cleaned and reindexed."

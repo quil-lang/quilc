@@ -13,7 +13,7 @@
                #:yacc                   ; Arithmetic parsing
                #:alexandria             ; Utilities
                #:parse-float            ; Float parsing
-               (:version #:magicl "0.6.1")
+               (:version #:magicl "0.6.2")
                                         ; internal linear algebra library
                #:cl-grnm                ; nelder-mead implementation
                #:singleton-classes
@@ -30,6 +30,7 @@
                #:cl-permutation
                #:queues.priority-queue
                #:cl-ppcre               ; CHP file parsing
+               #+sbcl #:sb-rotate-byte
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))
   :around-compile (lambda (compile)

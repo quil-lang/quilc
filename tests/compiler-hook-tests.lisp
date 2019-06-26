@@ -181,6 +181,25 @@ RX(pi) 2
                                         (quil::parsed-program-to-logical-matrix processed-program))))))))
 
 
+(deftest test-compiler-hook-preserves-RESETs ()
+  (let* ((pp (quil::parse-quil "
+PRAGMA INITIAL_REWIRING \"PARTIAL\"
+RESET
+DECLARE ro BIT[2]
+RY(pi/3) 0
+RY(pi/3) 1
+RY(pi/3) 2
+RY(pi/3) 3
+H 0
+MEASURE 0 ro[1]"))
+         (cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
+    (loop :for instr :across (quil::parsed-program-executable-code cpp)
+          :count (typep instr 'quil::reset) :into reset-count
+          :count (not (typep instr 'quil::gate-application)) :into non-application-count
+          :finally (progn
+                     (is (= 1 reset-count))
+                     (is (= 4 non-application-count))))))
+
 
 (deftest test-compiler-hook-reset-naive-rewiring ()
   ;; Note this numbering depends on the fact that the CZ gates are
@@ -423,11 +442,10 @@ H 0
 PRAGMA END_PRESERVE_BLOCK
 MEASURE 1
 ")))
-    ;; TODO Maybe there should be a (define-condition invalid-protoquil ...) ?
-    (not-signals simple-error (cl-quil::check-protoquil-program valid-pp))
-    (signals simple-error (cl-quil::check-protoquil-program invalid-pp-1in2))
-    (signals simple-error (cl-quil::check-protoquil-program invalid-pp-1in3))
-    (signals simple-error (cl-quil::check-protoquil-program invalid-pp-2in3))))
+    (not-signals quil:not-protoquil (quil:check-protoquil-program valid-pp))
+    (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-1in2))
+    (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-1in3))
+    (signals quil:not-protoquil (quil:check-protoquil-program invalid-pp-2in3))))
 
 (deftest test-global-pragma-survives-compilation ()
   "Test that a global pragma survives compilation."

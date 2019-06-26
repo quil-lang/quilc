@@ -103,11 +103,11 @@
   (declare (type base4 a b))
   (mod (+ a b) 4))
 
-(declaim (ftype (function (pauli-components pauli-components) pauli-components) multiply-components))
-(defun multiply-components (a b)
-  (declare (type pauli-components a b))
-  (let* ((n (length a))
-         (c (make-components (1- n))))
+(declaim (inline multiply-components-into))
+(defun multiply-components-into (a b c)
+  "Multiplies two pauli-component vectors and writes the result into a pauli-components vector C."
+  (declare (type pauli-components a b c))
+  (let* ((n (length a)))
     ;; Get the initial phase.
     (setf (aref c 0) (%phase-mul (aref a 0) (aref b 0)))
     ;; Get the components, modifying the phase along the way.
@@ -115,16 +115,25 @@
           :for ai :of-type base4 := (aref a i)
           :for bi :of-type base4 := (aref b i)
           :do (setf (aref c i) (logxor ai bi))
-              (setf (aref c 0) (%phase-mul (aref c 0) (levi-civita ai bi))))
-    ;; Return c
-    c))
+              (setf (aref c 0) (%phase-mul (aref c 0) (levi-civita ai bi))))))
 
+(declaim (ftype (function (pauli-components pauli-components) pauli-components) multiply-components))
+(defun multiply-components (a b)
+  "Multiplies two pauli-component vectors, returning the result as a new pauli-components vector."
+  (declare (type pauli-components a b))
+  (let* ((c (make-components (1- (length a)))))
+    (multiply-components-into a b c)
+    c))
 
 (defmethod group-mul ((a pauli) (b pauli))
   (%make-pauli
    :components (multiply-components (pauli-components a)
                                     (pauli-components b))))
 
+;;; Paulis are printed in a fashion that is consistent with the
+;;; ordering of the computational basis. For example, a pauli operator
+;;; represented as #(0 A B C) is printed as CBA, which applies A on q0, B
+;;; on q1, C on q2.
 (defun print-pauli (p &optional (stream nil))
   "If STREAM is NIL (by default), return simple string representation of a Pauli P.
 If STREAM is T, print to standard output. Otherwise print to STREAM."
@@ -137,8 +146,8 @@ If STREAM is T, print to standard output. Otherwise print to STREAM."
           (apply
            #'concatenate
            'string
-           (mapcar (a:compose #'symbol-name #'base4-to-sym)
-                   (base4-list p)))))
+           (reverse (mapcar (alexandria:compose #'symbol-name #'base4-to-sym)
+                            (base4-list p))))))
 
 (defmethod print-object ((p pauli) stream)
   (print-unreadable-object (p stream :type t)

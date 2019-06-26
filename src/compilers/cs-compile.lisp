@@ -18,6 +18,7 @@
 
 ;; zips up a compatible pair of lists of UCRs into a single such list by
 ;; letting each list act on a block factor
+#+#:pedagogical-purposes-only
 (defun ucr-zipper (string0 string1 control-qubit)
   (mapcar
        (lambda (left right)
@@ -44,6 +45,7 @@
        string0
        string1))
 
+#+#:pedagogical-purposes-only
 (defun cs-compiler (instr)
   "Performs Cosine-Sine Compilation on an instruction, emitting a list of UCR instructions that describe an equivalent circuit."
   (when (zerop (length (application-arguments instr)))

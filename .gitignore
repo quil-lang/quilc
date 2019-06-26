@@ -4,3 +4,9 @@ quilc
 system-index.txt
 *.so
 *.dylib
+*.fasl
+.DS_Store
+doc/*.aux
+doc/*.log
+doc/*.pdf
+doc/*.toc

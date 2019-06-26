@@ -381,6 +381,13 @@
    #:rewrite-arithmetic                 ; FUNCTION/TRANSFORMATION
    )
 
+  ;; analysis/compress-qubits.lisp
+  (:export
+   #:compress-qubits
+   #:relabel-rewiring
+   #:qubits-used
+   )
+
   ;; cl-quil.lisp
   (:export
    #:parse-quil                         ; FUNCTION
@@ -390,6 +397,11 @@
   ;; compilation-methods.lisp
   (:export
    #:compiler-hook                      ; FUNCTION
+   #:check-protoquil-program            ; FUNCTION
+   #:protoquil-program-p                ; FUNCTION
+   #:not-protoquil                      ; CONDITION
+   #:not-protoquil-program              ; FUNCTION
+   #:not-protoquil-index                ; FUNCTION
    )
 
   ;; chip-specification.lisp

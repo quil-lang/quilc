@@ -4,11 +4,12 @@
   (:use #:common-lisp
         #:cffi)
   (:local-nicknames (:a :alexandria))
-  (:export #:synthesis-dbs))
+  (:export #:load-tweedledum #:synthesis-dbs))
 
 (in-package #:cl-quil.tweedledum)
 
-(cffi:define-foreign-library libtweedledum
+(cffi:define-foreign-library
+    (libtweedledum :search-path "/usr/local/lib/rigetti/")
   (:darwin (:or #.(merge-pathnames "libtweedledum.dylib"
                                    (or *compile-file-truename*
                                        *load-truename*))
@@ -68,10 +69,15 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
         (t
          (quil::give-up-compilation))))))
 
-(defun run-tweedledum-tests ()
+(defun load-tweedledum ()
+  (cffi:load-foreign-library 'libtweedledum)
   (unless *tweedledum-libs-loaded*
-    (push (constantly 'cl-quil.tweedledum::compile-perm-gate-with-tweedledum)
+    (push (constantly 'compile-perm-gate-with-tweedledum)
           cl-quil::*global-compilers*))
+  (setf *tweedledum-libs-loaded* t))
+
+(defun run-tweedledum-tests ()
+  (load-tweedledum)
   (uiop:symbol-call ':cl-quil-tests
                     '#:run-cl-quil-tests))
 
@@ -92,3 +98,4 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
     (cffi:load-foreign-library 'libtweedledum))
   (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
   (setf *tweedledum-libs-loaded* t))
+=======
