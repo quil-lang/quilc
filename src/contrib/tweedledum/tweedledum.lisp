@@ -98,4 +98,3 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
     (cffi:load-foreign-library 'libtweedledum))
   (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
   (setf *tweedledum-libs-loaded* t))
-=======
