@@ -626,7 +626,6 @@ other's."
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
           result-instructions))
-    #+ignore
     (error (c)
       (let ((*print-circle* nil)
             (*print-pretty* nil)

@@ -407,10 +407,10 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
   (destructuring-bind (c1 c2 c3) coord
     (magicl:diag 4 4
                  (mapcar (lambda (z) (cis (* 0.5d0 z)))
-                         (list (+       c1 (- c2)   c3)
-                               (+       c1    c2 (- c3))
-                               (- (+    c1    c2    c3))
-                               (+    (- c1)   c2    c3))))))
+                         (list (+    c1  (- c2)    c3)
+                               (+    c1     c2  (- c3))
+                               (+ (- c1) (- c2) (- c3))
+                               (+ (- c1)    c2     c3))))))
 
 (defun sandwich-with-local-gates (center-circuit a d b q1 q0)
   "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
@@ -454,7 +454,8 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
 
 (defclass approximate-compiler (compiler)
   ()
-  (:metaclass closer-mop:funcallable-standard-class))
+  (:metaclass closer-mop:funcallable-standard-class)
+  (:documentation "A breed of COMPILER that has the potential to emit inexact decompositions when the flag *ENABLE-APPROXIMATE-COMPILATION* is set."))
 
 (defmacro define-canonical-circuit-approximation (name (&rest bindings) &body body)
   "This defines an two-qubit circuit template for use by the approximation algorithm. The template is stored both as a raw function under the name NAME as well as in a list of available templates, guarded by the value REQUIREMENTS of type OPTIMAL-2Q-TARGET.  BODY is a routine that returns a list of GATE-APPLICATION objects and is allowed to reference three arguments: the desired canonical coordinate COORD, the first desired qubit Q1, and the zeroth desired qubit Q0.
@@ -476,9 +477,9 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                    (,q1 (qubit-index (first (application-arguments ,instr-name))))
                    (,q0 (qubit-index (second (application-arguments ,instr-name)))))
                (sandwich-with-local-gates ,circuit
-                                          (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
+                                          (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
                                           (build-canonical-gate-in-magic-basis ,coord)
-                                          (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0))
+                                          (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
                                           ,q1 ,q0))))))))
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
