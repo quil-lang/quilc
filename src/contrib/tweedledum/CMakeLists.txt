@@ -55,7 +55,9 @@ else()
   set(LIBTWEEDLEDUM_STATIC_NAME
     "${CMAKE_STATIC_LIBRARY_PREFIX}${TWEEDLEDUM_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
-  file(WRITE empty.cpp "// This is to placate CMake's need for a source file.") 
+  file(WRITE empty.cpp "// This file exists to placate CMake's need \
+for a source file being associated to a target.
+")
   add_executable(rigetti-sbcl empty.cpp)
   target_link_options(rigetti-sbcl
     PRIVATE
@@ -66,6 +68,9 @@ else()
     # LINKER:-twolevel_namespace
     # LINKER:-bind_at_load
     LINKER:-pagezero_size,0x100000
+    # If you omit the pagezero_size option above, the resulting sbcl binary
+    # will jump right into LDB after complaining that the image has been
+    # corrupted.
     LINKER:-force_load,${LIBSBCL}
     LINKER:-force_load,${LIBTWEEDLEDUM_STATIC_NAME})
   target_link_libraries(rigetti-sbcl
