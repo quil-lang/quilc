@@ -14,6 +14,7 @@
                                    (outer-gate "RZ")
                                    (inner-gate "RY")
                                    (prefix-quil nil))
+  "Produces an Euler decomposition of the form OUTER-GATE INNER-GATE OUTER-GATE, where OUTER-GATE and INNER-GATE satisfy OUTER-GATE^OUTER-PREFACTOR = PREFIX-QUIL RZ (PREFIX-QUIL)^-1 and INNER-GATE^INNER-PREFACTOR = PREFIX-QUIL RY (PREFIX-QUIL)^-1 (both in Quil order, not matrix order)."
   `(let* ((prefix-matrix (make-matrix-from-quil ,prefix-quil))
           (postfix-matrix (magicl::conjugate-transpose prefix-matrix)))
      (declare (ignorable prefix-matrix postfix-matrix))
