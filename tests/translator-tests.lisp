@@ -28,12 +28,12 @@
 (deftest test-euler-translations ()
   "Ensures that the different Euler decompositions all work."
   (let ((master-matrix (quil::random-special-unitary 2)))
-    (dolist (compiler (list #'quil::euler-zyz-compiler
-                            #'quil::euler-zxz-compiler
-                            #'quil::euler-yzy-compiler
-                            #'quil::euler-yxy-compiler
-                            #'quil::euler-xyx-compiler
-                            #'quil::euler-xzx-compiler))
+    (dolist (compiler (list 'quil::euler-zyz-compiler
+                            'quil::euler-zxz-compiler
+                            'quil::euler-yzy-compiler
+                            'quil::euler-yxy-compiler
+                            'quil::euler-xyx-compiler
+                            'quil::euler-xzx-compiler))
       (let* ((compiled-program (funcall compiler
                                         (build-anonymous-gate master-matrix 0)))
              (compiled-matrix (magicl:diag 2 2 (list 1d0 1d0))))

@@ -37,41 +37,58 @@
 
 (global-vars:define-global-var **compilers-available** nil)
 
-(defstruct compiler-binding
-  "Represents a generic compiler argument binding.
+(defclass compiler-binding ()
+  ((name    :initarg :name
+            :initform nil
+            :type symbol
+            :reader compiler-binding-name)
+   (options :initarg :options
+            :initform nil
+            :type list
+            :reader compiler-binding-options))
+  (:documentation
+   "Represents a generic compiler argument binding.
 
 NAME: Symbol to be bound in the compiler definition.
-OPTIONS: plist of options governing applicability of the compiler binding."
-  (name    nil :type symbol)
-  (options nil :type list))
+OPTIONS: plist of options governing applicability of the compiler binding.")
+  (:metaclass abstract-class))
 
-(defstruct (wildcard-binding
-            (:include compiler-binding)))
+(defclass wildcard-binding (compiler-binding)
+  ()
+  (:documentation "Represents a binding that matches on any gate application."))
 
-(defstruct (gate-binding
-            (:include compiler-binding))
-  "Represents a destructuring compiler argument binding.
+(defclass gate-binding (compiler-binding)
+  ((operator   :initarg :operator
+               :initform nil
+               :type (or symbol operator-description)
+               :reader gate-binding-operator)
+   (parameters :initarg :parameters
+               :initform nil
+               :reader gate-binding-parameters)
+   (arguments  :initarg :arguments
+               :initform nil
+               :reader gate-binding-arguments))
+  (:documentation "Represents a compiler argument binding that destructures a gate application."))
 
-OPERATOR: Describes the APPLICATION-OPERATOR field of the instruction.
-PARAMETERS: A list of descriptors for the APPLICATION-PARAMETER field of the instruction.
-ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the instruction."
-  (operator   nil)             ; Type of symbol or operator-description.
-  (parameters nil)             ; Type of symbol or list of symbols and numeric literals.
-  (arguments  nil :type list)) ; Type of list of symbols and numeric literals.
+(defclass measure-binding (compiler-binding)
+  ((qubit  :initarg :qubit
+           :initform nil
+           :type (or symbol unsigned-byte)
+           :reader measure-binding-qubit)
+   (target :initarg :target
+           :initform nil
+           :type (or symbol memory-ref)
+           :reader measure-binding-target))
+  (:documentation "Represents a destructuring compiler argument binding for a MEASURE instruction."))
 
-(defstruct (measure-binding
-            (:include compiler-binding))
-  "Represents a destructuring compiler argument binding for a MEASURE instruction."
-  (qubit  nil)                     ; Type of symbol or numeric literal
-  (target nil))                    ; Type of symbol or mref
 
 (defun get-binding-from-instr (instr)
   "Constructs a COMPILER-BINDING object from an INSTRUCTION object, in such a way that if some auxiliary COMPILER-BINDING subsumes the output of this routine, then it will match when applied to the original INSTRUCTION object."
   (typecase instr
     (measure-discard
-     (make-measure-binding :qubit '_))
+     (make-instance 'measure-binding :qubit '_))
     (measurement
-     (make-measure-binding :qubit '_ :target '_))
+     (make-instance 'measure-binding :qubit '_ :target '_))
     (application
      (let ((parameters (loop :for p :in (application-parameters instr)
                              :when (typep p 'constant)
@@ -83,30 +100,30 @@ ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the ins
                               :collect (qubit-index q)
                             :when (symbolp q)
                               :collect '_)))
-       (make-gate-binding :operator (application-operator instr)
-                          :parameters parameters
-                          :arguments arguments)))))
+       (make-instance 'gate-binding :operator (application-operator instr)
+                                    :parameters parameters
+                                    :arguments arguments)))))
 
 (defun compiler-gateset-reducer-p (compiler)
   (getf (compiler-options compiler) ':gateset-reducer t))
 
 (defun get-compilers (qubit-bound)
-  "Returns the sublist of **COMPILERS-AVAILABLE** which match on no more than QUBIT-BOUND qubits and which function as gateset reducers."
+  "Returns a list of the available compilers which match on no more than QUBIT-BOUND qubits and which function as gateset reducers."
   (remove-if-not
    (lambda (compiler)
      (and (compiler-gateset-reducer-p compiler)
           (= 1 (length (compiler-bindings compiler)))
-          (gate-binding-p (first (compiler-bindings compiler)))
+          (typep (first (compiler-bindings compiler)) 'gate-binding)
           (>= qubit-bound (length (gate-binding-arguments (first (compiler-bindings compiler)))))
           (endp (compiler-binding-options (first (compiler-bindings compiler))))))
    **compilers-available**))
 
 (defun generate-blank-binding (qubit-count)
   "Constructs a wildcard COMPILER-BINDING of a fixed QUBIT-COUNT."
-  (make-gate-binding :operator '_
-                     :parameters nil
-                     :arguments (loop :for i :below qubit-count
-                                      :collect '_)))
+  (make-instance 'gate-binding
+                 :operator '_
+                 :parameters nil
+                 :arguments (make-list qubit-count :initial-element '_)))
 
 (defclass compiler ()
   ((name
@@ -124,7 +141,7 @@ ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the ins
    (options
     :initarg :options
     :reader compiler-options
-    :documentation "plist of global options supplied to this compiler definition.")
+    :documentation "plist of global options supplied to this compiler definition (cf. ENACT-COMPILER-OPTIONS).")
    (body
     :initarg :body
     :reader compiler-body
@@ -137,7 +154,8 @@ ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the ins
     :initarg :function
     :reader compiler-%function
     :documentation "A funcallable that does the compilation. Signature (compilation-context &rest instructions) -> instructions."))
-  (:metaclass closer-mop:funcallable-standard-class))
+  (:metaclass closer-mop:funcallable-standard-class)
+  (:documentation "Represents a transformation that carries particular instruction sequences (e.g., CZ p q; CZ p q) into others (e.g., NOP), decorated with information about the transformation (e.g., the input and output gatesets)."))
 
 (defmethod initialize-instance :after ((c compiler) &key)
   (closer-mop:set-funcallable-instance-function c (compiler-%function c)))
@@ -145,6 +163,26 @@ ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the ins
 (defmethod print-object ((obj compiler) stream)
   (print-unreadable-object (obj stream :type t :identity t)
     (format stream "~a" (compiler-name obj))))
+
+(defun binding-fmt (stream obj &optional colon-modifier at-modifier)
+  (declare (ignore colon-modifier at-modifier))
+  (print-operator-description (gate-binding-operator obj) stream)
+  (a:when-let ((params (gate-binding-parameters obj)))
+    (typecase params
+      (symbol
+       (format stream " ~a" params))
+      (list
+       (format stream " (~{~a~^ ~})" params))))
+  (a:when-let ((arguments (gate-binding-arguments obj)))
+    (format stream "~{ ~a~}" arguments)))
+
+(defmethod describe-object ((obj compiler) stream)
+  (call-next-method)
+  (format stream "~%  NAME: ~a~%~%  INPUT:~%~{    ~/cl-quil::binding-fmt/~%~}~%  OUTPUT FREQUENCY:~%"
+          (compiler-name obj)
+          (compiler-bindings obj))
+  (dohash ((binding count) (compiler-output-gates obj))
+    (format stream "    ~/cl-quil::binding-fmt/: ~a~%" binding count)))
 
 
 ;;; in what follows, we're very interested in two kinds of maps keyed on bindings:
@@ -161,7 +199,8 @@ ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the ins
 
 (defun copy-occurrence-table (table)
   "Create a shallow copy of an occurrence table."
-  (let ((new-table (make-hash-table :test #'equalp)))
+  (let ((new-table (make-hash-table :test #'equalp
+                                    :size (hash-table-count table))))
     (dohash ((key val) table)
       (add-entry-to-occurrence-table new-table key val))
     new-table))
@@ -193,12 +232,12 @@ ARGUMENTS: A list of descriptions for the APPLICATION-ARGUMENTS field of the ins
      (cleave-options (rest bindings-and-options)
                      (cons (first bindings-and-options) backlog)))))
 
-(defun get-output-gates-from-raw-code (body)
+(defun estimate-output-gates-from-raw-code (body)
   "Walks the body of a compiler definition and extracts (or, at least attempts to extract) frequency data about the gates emitted by the compiler.  Results in an occurrence table.
 
 N.B.: This routine is somewhat fragile, and highly creative compiler authors will want to supply a manually-constructed frequency table as an option to DEFINE-COMPILER rather than rely on the success of this helper."
   (unless (typep body 'cons)
-    (return-from get-output-gates-from-raw-code (make-occurrence-table)))
+    (return-from estimate-output-gates-from-raw-code (make-occurrence-table)))
   (case (first body)
     (build-gate
      (destructuring-bind (head name param-list &rest qubit-list) body
@@ -225,9 +264,10 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                                      (number x)
                                      (otherwise '_)))
                                  qubit-list)))
-         (setf (gethash (make-gate-binding :operator operator
-                                           :parameters param-list
-                                           :arguments qubit-list)
+         (setf (gethash (make-instance 'gate-binding
+                                       :operator operator
+                                       :parameters param-list
+                                       :arguments qubit-list)
                         table)
                1)
          table)))
@@ -240,9 +280,10 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                                      (number x)
                                      (otherwise '_)))
                                  qubit-list)))
-         (setf (gethash (make-gate-binding :operator '_
-                                           :parameters '_ 
-                                           :arguments qubit-list)
+         (setf (gethash (make-instance 'gate-binding
+                                       :operator '_
+                                       :parameters '_ 
+                                       :arguments qubit-list)
                         table)
                1)
          table)))
@@ -250,10 +291,10 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
      (destructuring-bind (head fn &rest args) body
        (declare (ignore head))
        (case fn
-         (#'build-gate
+         ((build-gate #'build-gate)
           (destructuring-bind (name param-list qubit-list) args
             (declare (ignore qubit-list))
-            (get-output-gates-from-raw-code
+            (estimate-output-gates-from-raw-code
              `(build-gate ,name ,param-list
                           ,@(loop :for j :below (gate-definition-qubits-needed (lookup-standard-gate name))
                                   :collect '_)))))
@@ -262,28 +303,8 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
     (otherwise
      (let ((table (make-occurrence-table)))
        (dolist (subbody body table)
-         (let ((incoming-table (get-output-gates-from-raw-code subbody)))
+         (let ((incoming-table (estimate-output-gates-from-raw-code subbody)))
            (setf table (add-occurrence-tables table incoming-table))))))))
-
-#+ignore
-(defgeneric binding-subsumes-p (big-binding small-binding)
-  (:method ((big-binding wildcard-binding) (small-binding wildcard-binding))
-    (or (endp (wildcard-binding-options big-binding))
-        (equalp (wildcard-binding-options big-binding)
-                (wildcard-binding-options small-binding))))
-  (:method ((big-binding compiler-binding) (small-binding wildcard-binding))
-    nil)
-  (:method ((big-binding gate-binding) (small-binding measure-binding))
-    nil)
-  (:method ((big-binding measure-binding) (small-binding gate-binding))
-    nil)
-  (:method ((big-binding measure-binding) (small-binding measure-binding))
-    
-    )
-  (:method ((big-binding gate-binding) (small-binding gate-binding))
-    
-    )
-  )
 
 (defun binding-subsumes-p (big-binding small-binding)
   "If this routine returns T and BIG-BINDING matches on an INSTRUCTION, then SMALL-BINDING will necessarily also match on it."
@@ -291,24 +312,24 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
            (or (symbolp x)
                (and (consp x) (every #'symbolp x)))))
     (cond
-      ((and (wildcard-binding-p big-binding)
+      ((and (typep big-binding 'wildcard-binding)
             (or (endp (compiler-binding-options big-binding))
                 (equalp (compiler-binding-options big-binding)
                         (compiler-binding-options small-binding))))
        t)
-      ((wildcard-binding-p small-binding)
+      ((typep small-binding 'wildcard-binding)
        nil)
       ((and (compiler-binding-options big-binding)
             (compiler-binding-options small-binding))
        nil)
       ;; deal with the case of measure bindings
-      ((or (and (measure-binding-p big-binding)
-                (not (measure-binding-p small-binding)))
-           (and (not (measure-binding-p big-binding))
-                (measure-binding-p small-binding)))
+      ((or (and (typep big-binding 'measure-binding)
+                (not (typep small-binding 'measure-binding)))
+           (and (not (typep big-binding 'measure-binding))
+                (typep small-binding 'measure-binding)))
        nil)
-      ((and (measure-binding-p big-binding)
-            (measure-binding-p small-binding))
+      ((and (typep big-binding 'measure-binding)
+            (typep small-binding 'measure-binding))
        (or (symbolp (measure-binding-qubit big-binding))
            (equalp (measure-binding-qubit big-binding)
                    (measure-binding-qubit small-binding))))
@@ -391,6 +412,10 @@ Optionally constrains the output to include only those bindings of a particular 
                                           (gate-record-fidelity (gethash gateset-key gateset)))
                                       (binding-subsumes-p gateset-key table-key)))))
 
+(define-condition no-compiler-path (serious-condition)
+  ()
+  (:documentation "We were asked to select a sequence of compilers from a collection which collectively carry one gate set to another, but we failed to find it."))
+
 (defun find-shortest-compiler-path (compilers target-gateset occurrence-table &optional qubit-count)
   "Produces a path of compilers, drawn from COMPILERS, which convert all of the entries of OCCURRENCE-TABLE into \"native gates\" according to TARGET-GATESET.  Returns an alternating chain of occurrence tables and compilers: (On C(n-1) O(n-1) ... C1 O1), where O(j+1) is the result of substituting Cj through Oj and where On is subsumed by TARGET-GATESET.
 
@@ -406,7 +431,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
             :for (task . history) := (list occurrence-table)
               :then (cl-heap:dequeue queue)
             :unless task
-              :do (error "Exhausted task queue without finding a route to the target gateset.")
+              :do (error 'no-compiler-path)
             :when (occurrence-table-in-gateset-p task target-gateset)
               :return (cons task history)
             :unless (member (sort (collect-bindings task) #'binding-precedes-p)
@@ -432,10 +457,10 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 
 (defun binding-precedes-p (a-binding b-binding &optional a-options b-options)
   "If BINDING-PRECEDES-P and if A fails to match on an INSTRUCTION, then B fails to match later."
-  (let* ((arg-count-a (if (gate-binding-p a-binding)
+  (let* ((arg-count-a (if (typep a-binding 'gate-binding)
                           (length (gate-binding-arguments a-binding))
                           most-positive-fixnum))
-         (arg-count-b (if (gate-binding-p b-binding)
+         (arg-count-b (if (typep b-binding 'gate-binding)
                           (length (gate-binding-arguments b-binding))
                           most-positive-fixnum)))
     ;; fewer qubits means it comes earlier
@@ -445,12 +470,12 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
       ((> arg-count-a arg-count-b)
        nil)
       ;; from here on: (and (= arg-count-a arg-count b) ...)
-      ;; cluster by name
-      ((and (wildcard-binding-p a-binding)
+      ;; cluster by operator
+      ((and (typep a-binding 'wildcard-binding)
             (not (symbolp (gate-binding-operator b-binding))))
        nil)
       ((and (not (symbolp (gate-binding-operator a-binding)))
-            (wildcard-binding-p b-binding))
+            (typep b-binding 'wildcard-binding))
        t)
       ((and (typep (gate-binding-operator a-binding) 'named-operator)
             (typep (gate-binding-operator b-binding) 'named-operator)
@@ -458,6 +483,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
               (adt:with-data (named-operator b-str) (gate-binding-operator b-binding)
                 (string< a-str b-str))))
        t)
+      ;; from here on: either both wildcards or equal operators
       ;; option predicates make it come earlier
       ((and (or a-options (compiler-binding-options a-binding))
             (not (or b-options (compiler-binding-options b-binding))))
@@ -469,7 +495,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
       ((and (symbolp (gate-binding-parameters a-binding))
             (not (symbolp (gate-binding-parameters b-binding))))
        nil)
-      ;; does A need to specialize before B?
+      ;; does A need to specialize before B when matching parameters?
       ((and (not (symbolp (gate-binding-parameters a-binding)))
             (not (symbolp (gate-binding-parameters b-binding)))
             (loop :for param-a :in (gate-binding-parameters a-binding)
@@ -498,19 +524,21 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 (defun blank-out-qubits (gateset)
   (let ((new-gateset (make-hash-table :test #'equalp)))
     (dohash ((key val) gateset new-gateset)
-      (let ((new-key (copy-instance key)))
-        (etypecase new-key
+      (let (new-key)
+        (etypecase key
           (gate-binding
-           (setf (gate-binding-arguments new-key)
-                 (mapcar (constantly '_)
-                         (gate-binding-arguments new-key))))
+           (setf new-key
+                 (copy-instance key :arguments (mapcar (constantly '_)
+                                                       (gate-binding-arguments key)))))
           (measure-binding
-           (setf (measure-binding-qubit new-key) '_))
+           (setf new-key
+                 (copy-instance key :qubit '_)))
           (wildcard-binding
-           t))
+           (setf new-key (copy-instance key))))
         (setf (gethash new-key new-gateset) val)))))
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
+  "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
   (flet ( ;; Strips the occurrence tables from a run of FIND-SHORTEST-COMPILER-PATH.
          (discard-tables (path)
            (loop :for item :in path
@@ -530,8 +558,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
            (compilers (get-compilers qubit-count))
            (unconditional-compilers
              (remove-if (lambda (x)
-                          (some (lambda (b) (and (not (symbolp b))
-                                                 (compiler-binding-options b)))
+                          (some (a:conjoin (complement #'symbolp) #'compiler-binding-options)
                                 (compiler-bindings x)))
                         compilers))
            (candidate-special-compilers
@@ -602,6 +629,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
               :finally (return (append compilers-t compilers-nil)))))))
 
 (defun compute-applicable-reducers (gateset)
+  "Returns all those compilers (including those which match on sequences of instructions rather than single instructions) which improve the brevity of a gate sequence without exiting a particular GATESET."
   (let* ((gateset-bindings (loop :for g :being :the :hash-keys :of gateset
                                  :collect g)))
     (remove-if-not (lambda (c)
@@ -627,26 +655,28 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 (defun make-binding-from-source (source)
   (when (symbolp source)
     (return-from make-binding-from-source
-      (make-wildcard-binding :name source)))
+      (make-instance 'wildcard-binding :name source)))
   (assert (listp source))
   (multiple-value-bind (source options) (cleave-options source)
     (cond
       ((endp (cdr source))
-       (make-wildcard-binding :name (first source)
-                              :options options))
+       (make-instance 'wildcard-binding
+                      :name (first source)
+                      :options options))
       (t
-       (make-gate-binding :name (first source)
-                          :options options
-                          :operator (let ((op (first (second source))))
-                                      (etypecase op
-                                        (symbol
-                                         op)
-                                        (string
-                                         (named-operator op))
-                                        (operator-description
-                                         op)))
-                          :parameters (second (second source))
-                          :arguments (rest (rest (second source))))))))
+       (make-instance 'gate-binding
+                      :name (first source)
+                      :options options
+                      :operator (let ((op (first (second source))))
+                                  (etypecase op
+                                    (symbol
+                                     op)
+                                    (string
+                                     (named-operator op))
+                                    (operator-description
+                                     op)))
+                      :parameters (second (second source))
+                      :arguments (rest (rest (second source))))))))
 
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users
@@ -661,7 +691,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 
 (defun binding-environment (binding)
   "Return an alist of (name . t) for each variable element in BINDING."
-  (when (wildcard-binding-p binding)
+  (when (typep binding 'wildcard-binding)
     (return-from binding-environment nil))
   (nconc (when (match-symbol-p (gate-binding-operator binding))
            (list (cons (gate-binding-operator binding) t)))
@@ -700,11 +730,11 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
            
            (expand-binding (binding env body)
              (cond
-               ((wildcard-binding-p binding)
-                (if (wildcard-binding-options binding)
+               ((typep binding 'wildcard-binding)
+                (if (compiler-binding-options binding)
                     (expand-options binding env body)
                     body))
-               ((gate-binding-p binding)
+               ((typep binding 'gate-binding)
                 (expand-op binding env
                            (expand-parameters binding env
                                               (expand-arguments binding env
@@ -712,7 +742,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                (t
                 (error "Malformed binding in compiler form: ~a" binding))))
            
-           (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name ele-accessor ele-type eq-predicate)
+           (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name ele-accessor ele-type test)
              (let* ((target-length (length seq))
                     (seq-var (gensym (format nil "~aS" gensym-name)))
                     (ele-vars (loop :repeat target-length
@@ -733,9 +763,9 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                             rest
                                             :ele-accessor ele-accessor
                                             :ele-type ele-type
-                                            :eq-predicate eq-predicate))))))
+                                            :test test))))))
            
-           (expand-each-element (seq ele-vars env rest &key ele-accessor ele-type eq-predicate)
+           (expand-each-element (seq ele-vars env rest &key ele-accessor ele-type test)
              (when (endp seq)
                (return-from expand-each-element rest))
              (let ((ele (first seq))
@@ -748,7 +778,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                        rest
                                        :ele-accessor ele-accessor
                                        :ele-type ele-type
-                                       :eq-predicate eq-predicate))
+                                       :test test))
                  ((and (match-symbol-p ele)
                        (not (lookup ele env)))
                   ;; fresh binding
@@ -761,19 +791,19 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                            rest
                                            :ele-accessor ele-accessor
                                            :ele-type ele-type
-                                           :eq-predicate eq-predicate)))
+                                           :test test)))
                  (t
-                  ;; existing binding / data. insert eq-predicate check
+                  ;; existing binding / data. insert test check
                   `(when (or ,permit-binding-mismatches-when
                              (and (typep ,var ',ele-type)
-                                  (,eq-predicate ,ele (,ele-accessor ,var))))
+                                  (,test ,ele (,ele-accessor ,var))))
                      ,(expand-each-element (rest seq)
                                            (rest ele-vars)
                                            env
                                            rest
                                            :ele-accessor ele-accessor
                                            :ele-type ele-type
-                                           :eq-predicate eq-predicate))))))
+                                           :test test))))))
            
            (expand-parameters (binding env rest)
              (if (wildcard-pattern-p (gate-binding-parameters binding))
@@ -786,7 +816,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                   :gate-name (compiler-binding-name binding)
                                   :ele-accessor 'constant-value
                                   :ele-type 'constant
-                                  :eq-predicate 'double=)))
+                                  :test 'double=)))
            
            (expand-arguments (binding env rest)
              (expand-sequence (gate-binding-arguments binding)
@@ -797,7 +827,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                               :gate-name (compiler-binding-name binding)
                               :ele-accessor 'qubit-index
                               :ele-type 'qubit
-                              :eq-predicate '=))
+                              :test '=))
            
            (expand-options (binding env rest)
              (declare (ignore env))
@@ -855,11 +885,12 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
        (error "Unknown compiler option: ~a." (first options))))))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
+  "Defines and registers a COMPILER object."
   (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
     (multiple-value-bind (bindings options) (cleave-options bindings)
       (let* ((parsed-bindings (mapcar #'make-binding-from-source bindings))
              (variable-names (mapcar #'compiler-binding-name parsed-bindings)))
-        (alexandria:when-let (pos (position "CONTEXT" variable-names :key #'string :test #'string=))
+        (alexandria:when-let (pos (position "CONTEXT" variable-names :test #'string=))
           (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
                 (1+ pos) (string name)))
         (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
@@ -881,7 +912,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                     :bindings (mapcar #'make-binding-from-source ',bindings)
                                     :options ',options
                                     :body (quote (progn ,@decls ,@body))
-                                    :output-gates (get-output-gates-from-raw-code (quote (progn ,@body)))
+                                    :output-gates (estimate-output-gates-from-raw-code (quote (progn ,@body)))
                                     :function #',name)))
                (setf (fdefinition ',name) ,struct-name)
                (setf (documentation ',name 'function) ,docstring)
