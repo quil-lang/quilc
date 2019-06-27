@@ -10,3 +10,4 @@ doc/*.aux
 doc/*.log
 doc/*.pdf
 doc/*.toc
+src/contrib/tweedledum/empty.cpp
