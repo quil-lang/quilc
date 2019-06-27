@@ -10,4 +10,8 @@ doc/*.aux
 doc/*.log
 doc/*.pdf
 doc/*.toc
+empty.cpp
 src/contrib/tweedledum/empty.cpp
+src/contrib/tweedledum/build
+src/contrib/tweedledum/rigetti-sbcl
+src/contrib/tweedledum/libtweedledum.{so,dylib}
