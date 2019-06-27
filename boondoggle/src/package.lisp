@@ -3,4 +3,5 @@
 ;;;; Author: Eric Peterson
 
 (defpackage #:boondoggle
-  (:use #:cl))
+  (:use #:cl)
+  (:local-nicknames (:a :alexandria)))
