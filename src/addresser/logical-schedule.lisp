@@ -579,13 +579,11 @@ mapping instructions to their tags. "
                  (typecase instr
                    (measure
                     (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                           (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
+                           (specs-obj (gethash (make-instance 'measure-binding :qubit '_ :target '_)
                                                (hardware-object-gate-information qubit-obj))))
                       (unless specs-obj
                         (warn-and-skip instr))
-                      (setf fidelity (gate-record-fidelity specs-obj))
-                      (unless fidelity
-                        (warn-and-skip instr))))
+                      (setf fidelity (gate-record-fidelity specs-obj))))
                    (application
                     (let ((obj (nth-value 2 (lookup-hardware-address chip-spec instr))))
                       (unless obj
@@ -593,7 +591,7 @@ mapping instructions to their tags. "
                       (let ((specs-hash (hardware-object-gate-information obj)))
                         (unless specs-hash (warn-and-skip instr))
                         (dohash ((key val) specs-hash)
-                          (when (and (gate-binding-p key)
+                          (when (and (typep key 'gate-binding)
                                      (equalp (gate-binding-operator key)
                                              (application-operator-name instr)))
                             (setf fidelity (gate-record-fidelity val))))

@@ -12,6 +12,7 @@
      (y ("CZ" () r s)
         :where (< (+ (ash 1 p) (ash 1 q))
                   (+ (ash 1 r) (ash 1 s)))))
+  "Sorted adjacent CZs into a canonical order, with the intention of bringing canceling pairs next to one another."
   (list (build-gate "CZ" () r s)
         (build-gate "CZ" () p q)))
 

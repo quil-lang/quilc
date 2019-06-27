@@ -206,5 +206,6 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 (a:define-constant pi #.(coerce cl:pi 'double-float))
 
 (defun print-hash (hash &optional (stream *standard-output*))
+  (fresh-line stream)
   (dohash ((key val) hash)
-    (format stream "~&~a -> ~a~%" key val)))
+    (format stream "~a -> ~a~%" key val)))

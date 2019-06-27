@@ -267,37 +267,42 @@ used to specify CHIP-SPEC."
     
     ;; this is the legacy model for setting up gate data
     (when (optimal-2q-target-meets-requirements type ':cz)
-      (setf (gethash (make-gate-binding :operator (named-operator "CZ")
-                                        :parameters ()
-                                        :arguments '(_ _))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "CZ")
+                                    :parameters ()
+                                    :arguments '(_ _))
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
     (when (optimal-2q-target-meets-requirements type ':iswap)
-      (setf (gethash (make-gate-binding :operator (named-operator "ISWAP")
-                                        :parameters ()
-                                        :arguments '(_ _))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "ISWAP")
+                                    :parameters ()
+                                    :arguments '(_ _))
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0)))
     (when (optimal-2q-target-meets-requirements type ':cphase)
-      (setf (gethash (make-gate-binding :operator (named-operator "CPHASE")
-                                        :parameters '(_)
-                                        :arguments '(_ _))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "CPHASE")
+                                    :parameters '(_)
+                                    :arguments '(_ _))
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.85d0)))
     (when (optimal-2q-target-meets-requirements type ':piswap)
-      (setf (gethash (make-gate-binding :operator (named-operator "PISWAP")
-                                        :parameters '(_)
-                                        :arguments '(_ _))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "PISWAP")
+                                    :parameters '(_)
+                                    :arguments '(_ _))
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.85d0)))
     (when (member ':cnot type)
-      (setf (gethash (make-gate-binding :operator (named-operator "CNOT")
-                                        :parameters ()
-                                        :arguments (list qubit0 qubit1))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "CNOT")
+                                    :parameters ()
+                                    :arguments (list qubit0 qubit1))
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 150
                               :fidelity 0.90d0))
@@ -334,42 +339,48 @@ used to specify CHIP-SPEC."
       (setf (hardware-object-gate-information obj) gate-information))
     ;; old style of initialization
     (when (member ':MEASURE type)
-      (setf (gethash (make-measure-binding :qubit '_
-                                           :target '_)
+      (setf (gethash (make-instance 'measure-binding
+                                    :qubit '_
+                                    :target '_)
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 2000))
-      (setf (gethash (make-measure-binding :qubit '_)
+      (setf (gethash (make-instance 'measure-binding :qubit '_)
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 2000)))
     (when (member ':RZ type)
-      (setf (gethash (make-gate-binding :operator (named-operator "RZ")
-                                        :parameters '(_)
-                                        :arguments '(_))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "RZ")
+                                    :parameters '(_)
+                                    :arguments '(_))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity 1d0
                               :duration 1/100)))
     (when (member ':X/2 type)
-      (setf (gethash (make-gate-binding :operator (named-operator "RX")
-                                        :parameters (list (/ pi 2))
-                                        :arguments '(_))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "RX")
+                                    :parameters (list (/ pi 2))
+                                    :arguments '(_))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
-      (setf (gethash (make-gate-binding :operator (named-operator "RX")
-                                        :parameters (list (/ pi -2))
-                                        :arguments '(_))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "RX")
+                                    :parameters (list (/ pi -2))
+                                    :arguments '(_))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
-      (setf (gethash (make-gate-binding :operator (named-operator "RX")
-                                        :parameters (list pi)
-                                        :arguments '(_))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "RX")
+                                    :parameters (list pi)
+                                    :arguments '(_))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
-      (setf (gethash (make-gate-binding :operator (named-operator "RX")
-                                        :parameters (list (- pi))
-                                        :arguments '(_))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "RX")
+                                    :parameters (list (- pi))
+                                    :arguments '(_))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9)))
