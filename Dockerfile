@@ -2,6 +2,8 @@ FROM rigetti/rpcq
 
 ARG build_target
 
+ENV CXX="clang++-7"
+
 # install build dependencies
 COPY Makefile /src/quilc/Makefile
 WORKDIR /src/quilc
