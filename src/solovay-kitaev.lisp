@@ -6,7 +6,7 @@
 
 ;;; This file contains an implementation of the Solovay-Kitaev
 ;;; algorithm described in https://arxiv.org/pdf/quant-ph/0505030.pdf,
-;;; used to approximately decompose arbitrary unitaries to a finite
+;;; used to approximately decompose arbitrary unitaries using a finite
 ;;; set of basis gates.
 
 (defparameter +c-approx+ (* 4 (sqrt 2)))
@@ -15,7 +15,7 @@
 (defclass decomposer ()
   ((basis-gates :reader basis-gates
                 :initarg :basis-gates
-                :type (list integer)
+                :type (vector simple-gate *)
                 :initform (error ":BASIS-GATES is a required initarg to DECOMPOSER.")
                 :documentation "Set of basic gates to decompose to.")
    (num-qubits :reader num-qubits
@@ -52,22 +52,31 @@
                  :epsilon0 epsilon0
                  :base-approximations (generate-base-approximations basis-gates num-qubits epsilon0)))
 
-;; Will be somewhat complicated/tedious
+;; Will be somewhat complicated/tedious. The data structure that will
+;; be used for this representation is still TBD.
 (defun generate-base-approximations (basis-gates num-qubits epsilon0))
 
-(defstruct commutator
-  (v :type (or commutator symbol-list))
-  (w :type (or commutator symbol-list)))
+(defun basis-gate-from-index (basis-gates idx)
+  "Given an integer index IDX, return the corresponding basis gate
+from BASIS-GATES. If IDX is negative, return the inverse of the
+corresponding gate, which is the element in BASIS-GATES indexed
+by (absolute value of IDX minus 1)."
+  (aref basis-gates (1- (abs idx))))
 
-(defun multiply-commutator ((comm commutator)))
+(defstruct commutator
+  (v '() :type (or commutator list))
+  (w '() :type (or commutator list)))
+
+(defun multiply-commutator ((comm commutator))
+  )
 
 (defun expand-commutator ((comm commutator))
   (let ((v (commutator-v comm))
         (w (commutator-w comm)))
     (append v w (dagger v) (dagger w))))
 
-(defun dagger (gate-seq)
-  (reverse (mapcar #'inverse gate-seq)))
+(defun dagger (op-seq)
+  (reverse (mapcar #'(lambda (x) (* -1 x)) op-seq)))
 
 (defun matrix-trace (m)
   (loop :for i :below (magicl:matrix-cols m)
@@ -83,31 +92,31 @@
                   (magicl:conjugate-transpose s)
                   u))))
 
-;; May not be needed, if accessing from the decomposer object directly
-(defun base-approx (u)
+;; Will likely involve some kind of search on whatever structure
+;; base-approximations is.
+(defun find-base-approximation (base-approximations u)
   "Base case approximation for a unitary U.")
 
 ;; Don't fully understand this part yet
 (defun gc-decompose (u)
   "Find the balanced group commutators V and W for a unitary U.")
 
-(defun sk-iter (decomposer unitary depth)
-  "An approximation iteration within the Solovay-Kitaev algorithm at a
-given depth."
-  (if (= depth 0)
-      (base-approx unitary)
-      (let* ((comm (gc-decompose unitary))
-             (v )
-             (w ))
-        ;; do something
-        )))
+(defun sk-iter (decomposer u n)
+  "An approximation iteration within the Solovay-Kitaev algorithm at a depth N."
+  (if (zerop n)
+      (find-base-approximation (base-approximations decomposer) u)
+      (let* ((comm (gc-decompose u))
+             (v-next (sk-iter decomposer (commutator-v comm) (1- n)))
+             (w-next (sk-iter decomposer (commutator-w comm) (1- n))))
+        (append v-next w-next (dagger v-next) (dagger w-next) (sk-iter decomposer u (1- n))))))
 
 (defun decompose (decomposer unitary epsilon)
   "Decomposes a unitary into a sequence of gates from a finite set of
 basis gates, such that the resulting decomposition is within EPSILON
 of the original unitary."
   (let* ((eps0 (epsilon0 decomposer))
-         (depth (ceiling (log (/ (log (* epsilon ))
-                                (log)))
-                        (log (/ 3 2)))))
-    (sk-iter decomposer unitary depth)))
+         (depth (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
+                                 (log (* eps0 +c-approx+ +c-approx+))))
+                         (log (/ 3 2))))
+         (basis-gates (basis-gates decomposer)))
+    (mapcar #'(lambda (x) (basis-gate-from-index basis-gates x)) (sk-iter decomposer unitary depth))))
