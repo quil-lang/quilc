@@ -267,16 +267,23 @@ and replies with the JSON
            (qubits (union qubits-used-by-interleaver (reduce #'union qubits-used)))
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
+                                     ;; XXX: the embedding ordering
+                                     ;; has been reversed to comply
+                                     ;; with the computational basis
+                                     ;; convention, hence the reverse
+                                     ;; here. We could use a better
+                                     ;; fix for this.
                                      :collect
                                      (quil.clifford:embed clifford n
-                                                          (loop :for index :in (nth i qubits-used)
-                                                                :collect (position index qubits)))))
+                                                          (reverse (loop :for index :in (nth i qubits-used)
+                                                                         :collect (position index qubits))))))
            (embedded-interleaver
              (when interleaver
                (quil.clifford:embed (quil.clifford::clifford-from-quil interleaver)
                                     n
-                                    (loop :for index :in qubits-used-by-interleaver
-                                          :collect (position index qubits)))))
+                                    ;; Likewise to the above.
+                                    (reverse (loop :for index :in qubits-used-by-interleaver
+                                                   :collect (position index qubits))))))
            (rb-sequence
              (let ((*random-state*
                      #+sbcl (if seed (sb-ext:seed-random-state seed) *random-state*)
@@ -298,14 +305,19 @@ and replies with the JSON
          (clifford-indices (sort (cl-quil:qubits-used (cl-quil:parse-quil clifford-program)) #'<))
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
 	 (pauli (quil.clifford:pauli-from-string
-		 (with-output-to-string (s)
-                   (dolist (i qubits)
-                     (cond ((member i pauli-indices)
-                            (write-string (nth (position i pauli-indices) pauli-terms) s))
-                           (T (write-string "I" s)))))))
+                 ;; XXX: the pauli-from-string and embedding orderings
+                 ;; have been reversed to comply with the
+                 ;; computational basis convention, hence the reverse
+                 ;; here. We could use a better fix for this.
+		 (reverse (with-output-to-string (s)
+                            (dolist (i qubits)
+                              (cond ((member i pauli-indices)
+                                     (write-string (nth (position i pauli-indices) pauli-terms) s))
+                                    (T (write-string "I" s))))))))
          (clifford (cl-quil.clifford::embed (quil.clifford::clifford-from-quil clifford-program)
                                             (length qubits)
-                                            (loop :for index :in clifford-indices :collect (position index qubits))))
+                                            ;; Likewise to the above.
+                                            (reverse (loop :for index :in clifford-indices :collect (position index qubits)))))
          (pauli-out (quil.clifford:apply-clifford clifford pauli)))
     (with-output-to-string (s)
       (yason:encode (list (quil.clifford::phase-factor pauli-out)
