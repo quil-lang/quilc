@@ -59,7 +59,7 @@
                                                      (quil.clifford:pauli-from-symbols '(I Y X)))
                             (quil.clifford:pauli-from-symbols '(I Z Y) 2)))
 
-  (is (quil.clifford:pauli= (quil.clifford:embed (quil.clifford:pauli-from-symbols '(X Y) 2) 4 '(2 1))
+  (is (quil.clifford:pauli= (quil.clifford:embed (quil.clifford:pauli-from-symbols '(X Y) 2) 4 '(1 2))
                             (quil.clifford:pauli-from-symbols '(I Y X I) 2)))
 
   (is (quil.clifford:pauli= (quil.clifford:tensor-mul quil.clifford::+X+ quil.clifford::+Z+)
@@ -86,7 +86,7 @@
         )
     (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:clifford-identity 3) xyz)
                               xyz))
-    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:hadamard 3 2) xyz)
+    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:hadamard 3 0) xyz)
                               xyx))
     (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford::clifford-from-pauli (quil.clifford:pauli-from-symbols '(Z Y Z))) xyz)
                               (quil.clifford:pauli-from-symbols '(X Y Z) 2)))
