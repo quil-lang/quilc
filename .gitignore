@@ -5,8 +5,11 @@ system-index.txt
 *.so
 *.dylib
 *.fasl
-.DS_Store
 doc/*.aux
+doc/*.fdb_latexmk
+doc/*.fls
 doc/*.log
 doc/*.pdf
+doc/*.synctex.gz
 doc/*.toc
+.DS_Store
