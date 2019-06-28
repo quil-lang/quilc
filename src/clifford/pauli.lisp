@@ -168,7 +168,8 @@ If STREAM is T, print to standard output. Otherwise print to STREAM."
 phase factor)."
     (unless (and (every #'pauli-sym-p s) (base4-p p))
       (error "Malformed Pauli-string S or phase-factor P."))
-    (let ((c (make-components (list-length s))))
+    (let ((c (make-components (list-length s)))
+          (s (reverse s)))
       (setf (aref c 0) p)
       (prog1 (%make-pauli :components c)
         (loop :for i :from 1
@@ -220,7 +221,7 @@ phase factor)."
   (let ((result (pauli-identity n (phase-factor a))))
     (loop
       :for i :from 1
-      :for idx :in idxs
+      :for idx :in (reverse idxs)
       :for ai := (aref (pauli-components a) i)
       :do (setf (aref (pauli-components result) (1+ idx)) ai))
     result))
@@ -285,12 +286,12 @@ hash-function."
   (make-hash-table :test 'pauli= :hash-function 'pauli-hash))
 
 (defmethod tensor-mul ((a pauli) (b pauli))
-  (let* ((na (num-qubits a))
-         (n (+ na (num-qubits b)))
+  (let* ((nb (num-qubits b))
+         (n (+ nb (num-qubits a)))
          (c (make-components n)))
     (setf (aref c 0) (%phase-mul (phase-factor a) (phase-factor b)))
-    (replace c (pauli-components a) :start1 1 :start2 1)
-    (replace c (pauli-components b) :start1 (+ 1 na) :start2 1)
+    (replace c (pauli-components b) :start1 1 :start2 1)
+    (replace c (pauli-components a) :start1 (+ 1 nb) :start2 1)
     (%make-pauli :components c)))
 
 (defmethod group-inv ((p pauli))

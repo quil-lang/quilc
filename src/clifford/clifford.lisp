@@ -184,7 +184,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
                       (p-num-qubits (num-qubits p)))
                  (with-output-to-string (s)
                    (print-pauli
-                    (embed p num-qubits (loop :for i :below p-num-qubits :collect i))
+                    (embed p num-qubits (loop :for i :from (1- p-num-qubits) :downto 0 :collect i))
                     s)))))
       ;; Parse out all of the map data, including the number of qubits
       ;; of the entire Clifford element.
