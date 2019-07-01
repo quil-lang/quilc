@@ -45,12 +45,14 @@
 ;;; Will be somewhat complicated/tedious. The data structure that will
 ;;; be used for this representation is still TBD.
 (defun generate-base-approximations (basis-gates num-qubits epsilon0)
-  "Generates and returns a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set.")
+  "Generates and returns a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set."
+  (values basis-gates num-qubits epsilon0))
 
 ;;; Will likely involve some kind of search on whatever structure
 ;;; base-approximations is.
 (defun find-base-approximation (base-approximations u)
-  "Base case approximation for a unitary U.")
+  "Base case approximation for a unitary U."
+  (values base-approximations u))
 
 (defun sk-iter (decomposer u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a list of integer indices in sign-inverse convention."
@@ -91,29 +93,41 @@
 ;;; Bloch vector structure and conversions to/from unitary matrices
 (defstruct (bloch-vector (:constructor make-bloch-vector))
   (theta 0 :type double-float)
-  (axis #() :type vector))
+  (axis #(0 0 0) :type (simple-vector 3)))
 
 (defun unitary-to-bloch-vector (u)
-  nil)
+  "Converts a unitary matrix into its bloch-vector representation."
+  (let* ((x-sin (* -1 (imagpart (magicl:ref u 0 1))))
+         (y-sin (realpart (magicl:ref u 1 0)))
+         (z-sin (imagpart (/ (- (magicl:ref u 1 1) (magicl:ref u 0 0)) 2)))
+         (cos-theta (realpart (/ (+ (magicl:ref u 0 0) (magicl:ref u 1 1)) 2)))
+         (sin-theta (sqrt (+ (expt x-sin 2) (expt y-sin 2) (expt z-sin 2))))
+         (theta (* 2 (if (zerop sin-theta) (acos cos-theta) (atan sin-theta cos-theta))))
+         (axis (make-array 3)))
+    (setf (aref axis 0) (if (zerop sin-theta) 1 (/ x-sin sin-theta)))
+    (setf (aref axis 1) (if (zerop sin-theta) 0 (/ y-sin sin-theta)))
+    (setf (aref axis 2) (if (zerop sin-theta) 0 (/ z-sin sin-theta)))
+    (make-bloch-vector :theta theta :axis axis)))
 
 (defun bloch-vector-to-unitary (bv)
-  nil)
+  bv)
 
 (defun unitary-to-conjugated-x-rotation (u)
   "Given a unitary U, returns unitaries S and Rx such that Rx is a rotation around the X axis by the same angle that U rotates around its axis, and U = SRxS'."
-  nil)
+  u)
 
 (defun find-transformation-matrix (a b)
   "Given unitaries A and B, finds the unitary S such that A = SBS'."
-  nil)
+  (values a b))
 
 (defun gc-decompose-x-rotation (u)
   "Given a unitary U, returns V and W, two unitaries which are balanced commutators of U (i.e. U = [V, W] = VWV'W'). IMPORTANT: U must be a rotation about the X axis; this is not the general function for any U."
-  nil)
+  u)
 
 ;;; Don't fully understand this part yet
 (defun gc-decompose (u)
-  "Find the balanced group commutators V and W for any unitary U.")
+  "Find the balanced group commutators V and W for any unitary U."
+  u)
 
 ;;; --------------Various utility functions/structures----------------
 
@@ -125,10 +139,10 @@
   (v '() :type list)
   (w '() :type list))
 
-(defun multiply-commutator ((comm commutator))
-  )
+(defun multiply-commutator (comm)
+  comm)
 
-(defun expand-commutator ((comm commutator))
+(defun expand-commutator (comm)
   (let ((v (commutator-v comm))
         (w (commutator-w comm)))
     (append v w (dagger v) (dagger w))))
@@ -145,10 +159,7 @@
     (/ (+ (expt (abs (matrix-trace m)) 2) p)
        (+ (expt p 2) p))))
 
-;;; Distance function based on the fidelity measure suggested by
-;;; Charles. Not sure if this is completely equivalent to ||U - S||,
-;;; or if it isn't, whether it is a sufficient measure for the
-;;; purposes of Solovay-Kitaev.
+;;; Charles
 (defun distance (u s)
   (- 1 (fidelity (magicl:multiply-complex-matrices
                   (magicl:conjugate-transpose s)
