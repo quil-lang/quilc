@@ -1,4 +1,4 @@
-;;;; operator-bind.lisp
+;;;; define-compiler.lisp
 ;;;;
 ;;;; Authors: Eric Peterson, Zach Beane
 ;;;;
