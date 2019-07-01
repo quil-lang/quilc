@@ -166,15 +166,21 @@ OPTIONS: plist of options governing applicability of the compiler binding.")
 
 (defun binding-fmt (stream obj &optional colon-modifier at-modifier)
   (declare (ignore colon-modifier at-modifier))
-  (print-operator-description (gate-binding-operator obj) stream)
-  (a:when-let ((params (gate-binding-parameters obj)))
-    (typecase params
-      (symbol
-       (format stream " ~a" params))
-      (list
-       (format stream " (~{~a~^ ~})" params))))
-  (a:when-let ((arguments (gate-binding-arguments obj)))
-    (format stream "~{ ~a~}" arguments)))
+  (typecase obj
+    (measure-binding
+     (format stream "MEASURE ~a" (measure-binding-qubit obj))
+     (when (measure-binding-target obj)
+       (format stream " ~a" (measure-binding-target obj))))
+    (gate-binding
+     (print-operator-description (gate-binding-operator obj) stream)
+     (a:when-let ((params (gate-binding-parameters obj)))
+       (typecase params
+         (symbol
+          (format stream " ~a" params))
+         (list
+          (format stream " (~{~a~^ ~})" params))))
+     (a:when-let ((arguments (gate-binding-arguments obj)))
+       (format stream "~{ ~a~}" arguments)))))
 
 (defmethod describe-object ((obj compiler) stream)
   (call-next-method)
