@@ -296,7 +296,7 @@ end of the name."
 
   (when check-sdk-version
     (multiple-value-bind (available-p version)
-        (sdk-update-available-p +QUILC-VERSION+ :proxy proxy)
+        (qcs:sdk-update-available-p "quilc" +QUILC-VERSION+ :proxy proxy)
       (when available-p
         (format t "An update is available to the SDK. You have version ~A. ~
 Version ~A is available from https://www.rigetti.com/forest~%"
