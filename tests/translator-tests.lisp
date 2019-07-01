@@ -36,14 +36,8 @@
                             'quil::euler-xzx-compiler))
       (let* ((compiled-program (funcall compiler
                                         (build-anonymous-gate master-matrix 0)))
-             (compiled-matrix (magicl:diag 2 2 (list 1d0 1d0))))
-        (loop :for instr :in compiled-program :do
-          (setf compiled-matrix (quil::apply-gate compiled-matrix instr)))
-        (is (loop :for i :from 0 :to 1
-                  :always (loop :for j :from 0 :to 1
-                                :always (< (abs (- (magicl:ref compiled-matrix i j)
-                                                   (magicl:ref master-matrix i j)))
-                                           0.01)))
+             (compiled-matrix (quil::make-matrix-from-quil compiled-program)))
+        (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
             "Euler translation test failed: ~a~%" compiler)))))
 
 (defun generate-test-case (bindings)

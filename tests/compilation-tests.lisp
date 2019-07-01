@@ -15,13 +15,6 @@
           (fiasco-assert-matrices-are-equal a1 b1)
           (fiasco-assert-matrices-are-equal a0 b0))))
 
-(deftest test-euler-compilation ()
-  "Ensures that euler-compile correctly decomposes an element of SU(2)."
-  (let* ((m (quil::random-special-unitary 2))
-         (compiled-list (cl-quil::euler-zyz-compiler (build-anonymous-gate m 0)))
-         (u (quil::make-matrix-from-quil compiled-list)))
-    (fiasco-assert-matrices-are-equal m u)))
-
 (deftest test-optimal-2q-on-su2x2 ()
   "Tests that optimal 2Q compilation can handle a gate of the form SU(2) x SU(2)."
   (let* ((m (quil::make-matrix-from-quil
