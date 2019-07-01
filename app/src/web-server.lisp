@@ -119,9 +119,10 @@ If ALLOW-EMPTY-PAYLOADS is true, then an empty payload resolves to the same thin
         ((and (null data) allow-empty-payloads) (setf data "{}"))
         ((not (stringp data)) (error "Invalid payload in POST request. Was it empty?")))
       ;; Proceed with parsing.
-      (let ((json (yason:parse data))
-            (api-key (tbnl:header-in* ':X-API-KEY request))
-            (user-id (tbnl:header-in* ':X-USER-ID request)))
+      (let* ((*read-default-float-format* 'double-float)
+             (json (yason:parse data))
+             (api-key (tbnl:header-in* ':X-API-KEY request))
+             (user-id (tbnl:header-in* ':X-USER-ID request)))
         (unless (hash-table-p json)
           (error "The JSON payload parsed as something other than a ~
                   JSON object. The payload was: ~S"
