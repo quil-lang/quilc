@@ -57,7 +57,7 @@
                (:file "environment")
                (:file "context")
                (:file "build-gate")
-               (:file "operator-bind")
+               (:file "define-compiler")
                (:module "clifford"
                 :serial t
                 :components ((:file "qubit-algebra")
