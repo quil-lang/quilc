@@ -953,8 +953,7 @@ INPUT-STRING that triggered the condition."
 "
   (labels ((simplify (entry)
              (parse-arithmetic-tokens entry :eval t)))
-    (let ((simple-entries (mapcar #'simplify entries)))
-      simple-entries)))
+    (mapcar #'simplify entries)))
 
 (defun parse-gate-entries (tok-lines)
   ;; Do we have any lines to parse?
