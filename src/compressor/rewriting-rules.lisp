@@ -38,11 +38,6 @@
 
 ;;; rewriting rules specialized to qubit types
 
-(define-compiler agglutinate-RXs
-    ((x ("RX" (theta) q))
-     (y ("RX" (phi)   q)))
-  (list (build-gate "RX" `(,(param-+ theta phi)) q)))
-
 (define-compiler eliminate-full-RX-rotations
     ((x ("RX" (theta) _)
         :where (and (typep theta 'double-float)
@@ -57,6 +52,11 @@
         (and (< pi (abs theta))
              (< (abs reduced-theta) (abs theta)))
       (list (build-gate "RX" (list reduced-theta) q)))))
+
+(define-compiler agglutinate-RXs
+    ((x ("RX" (theta) q))
+     (y ("RX" (phi)   q)))
+  (list (build-gate "RX" `(,(param-mod (param-+ theta phi) (* 2 pi))) q)))
 
 (define-compiler prefer-RXpi-to-RXnegpi
     ((x ("RX" (#.(- pi)) q)))
@@ -99,6 +99,30 @@
   (list (build-gate "RZ" `(,(- theta)) q)
         (build-gate "RX" '(#.pi)       q)))
 
+(defmacro rewrite-GHG-as-HGH (g h)
+  `(progn
+     ,@(a:map-product
+        (lambda (sign1 sign2 sign3)
+          (let ((name (intern (format nil "REWRITE-~a~a~a-AS-~a~a~a-~a"
+                                      g h g h g h
+                                      (+ (if (plusp sign1) 4 0)
+                                         (if (plusp sign2) 2 0)
+                                         (if (plusp sign3) 1 0))))))
+            `(define-compiler ,name
+                 ((x (,g (,(* sign1 pi 1/2)) q))
+                  (y (,h (,(* sign2 pi 1/2)) q))
+                  (z (,g (,(* sign3 pi 1/2)) q)))
+               (list (build-gate ,h '(,(* sign3 pi 1/2)) q)
+                     (build-gate ,g '(,(* sign2 pi 1/2)) q)
+                     (build-gate ,h '(,(* sign1 pi 1/2)) q)))))
+        '(1 -1) '(1 -1) '(1 -1))))
+
+(rewrite-GHG-as-HGH "RX" "RZ")
+
+;; the above macro expands into a bunch of embodiments of this old rule. the
+;; compiler matching stuff isn't smart enough to impose the k pi / 2 constraint
+;; on the middle RZ input, so the macro manually imposes it instead. c'est la vie
+#+ignore
 (define-compiler rewrite-XZX-as-ZXZ
     ((x ("RX" (theta) q)
         :where (double= (/ pi 2) (abs theta)))

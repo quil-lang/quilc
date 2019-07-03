@@ -127,3 +127,10 @@
 
 (defun param-* (arg1 arg2)
   (param-binary-op '* arg1 arg2))
+
+(defun param-mod (arg1 arg2)
+  "Clamps arg1 to (-arg2, arg2] when arg1 is a determined value."
+  (typecase arg1
+    (real
+     (- (mod (+ (/ arg2 2) arg1) arg2) (/ arg2 2)))
+    (otherwise arg1)))

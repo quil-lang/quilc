@@ -24,12 +24,16 @@
 
 (defmacro unpack-wf (instr context (psi qubits) &body body)
   "Extracts from CONTEXT the wavefunction component related to the instruction INSTR.  Upon success, bind PSI to the wavefunction contents, bind QUBITS to the qubit ordering convention of PSI, execute BODY, and return the result of the final expression.  Upon failure, call GIVE-UP-COMPILATION."
-  `(destructuring-bind (,psi ,qubits)
-       (aqvm-extract-state (compilation-context-aqvm ,context)
-                           (mapcar #'qubit-index (application-arguments ,instr)))
-     (give-up-compilation-unless
-         (not (eql ':not-simulated ,psi))
-       ,@body)))
+  `(cond
+     ((null ,context)
+      (give-up-compilation))
+     (t
+      (destructuring-bind (,psi ,qubits)
+          (aqvm-extract-state (compilation-context-aqvm ,context)
+                              (mapcar #'qubit-index (application-arguments ,instr)))
+        (give-up-compilation-unless
+            (not (eql ':not-simulated ,psi))
+          ,@body)))))
 
 
 ;;; this data structure captures a compilation routine, annotated with various
@@ -634,24 +638,164 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                 :collect c :into compilers-nil
               :finally (return (append compilers-t compilers-nil)))))))
 
+(define-condition cannot-concretize-binding (serious-condition) ())
+(define-condition no-binding-match (serious-condition) ())
+
+(defgeneric binding-subsumes-gate-p (binding gate)
+  (:method ((binding gate-binding) gate)
+    nil)
+  (:method ((binding gate-binding) (gate gate-application))
+    (and
+     ;; binding operator is not a wildcard => binding operator equals gate operator
+     (or (symbolp (gate-binding-operator binding))
+         (equalp (gate-binding-operator binding) (application-operator gate)))
+     ;; binding parameter is not a wildcard => each (binding parameter is not a wildcard => binding param = gate param)
+     (or (symbolp (gate-binding-parameters binding))
+         (every (lambda (b g) (or (symbolp b) (equalp b (constant-value g))))
+                (gate-binding-parameters binding)
+                (application-parameters gate)))
+     ;; each (binding argument is not a wildcard => binding arg = gate arg)
+     (every (lambda (b g) (or (symbolp b) (equalp b (qubit-index g))))
+            (gate-binding-arguments binding)
+            (application-arguments gate))))
+  (:method ((binding measure-binding) gate)
+    nil)
+  (:method ((binding measure-binding) (gate measurement))
+    (and
+     ;; binding qubit is not a wildcard => binding qubit equals gate qubit
+     (or (symbolp (measure-binding-qubit binding))
+         (= (measure-binding-qubit binding) (qubit-index (measurement-qubit gate))))
+     ;; this binding isn't a measure-store
+     (null (measure-binding-target binding))))
+  (:method ((binding measure-binding) (gate measure))
+    (and
+     ;; binding qubit is not a wildcard => binding qubit equals gate qubit
+     (or (symbolp (measure-binding-qubit binding))
+         (= (measure-binding-qubit binding) (qubit-index (measurement-qubit gate))))
+     ;; binding target not a wildcard => binding target equals gate target
+     (or (symbolp (measure-binding-target binding))
+         (equalp (measure-binding-target binding) (measure-address gate)))))
+  (:method ((binding wildcard-binding) gate)
+    (typep gate 'gate-application)))
+
+(defun prefer-concrete-items (a b)
+  (cond
+    ((and (symbolp a) (not (symbolp b)))
+     b)
+    ((and (not (symbolp a)) (symbolp b))
+     a)
+    ((and (not (symbolp a)) (not (symbolp b)) (equalp a b))
+     a)
+    (t (error 'cannot-concretize-binding))))
+
+(defun prefer-concrete-lists (a b)
+  (cond
+    ((and (symbolp a) (symbolp b))
+     (error 'cannot-concretize-binding))
+    ((and (symbolp a) (not (symbolp b)))
+     (if (some #'symbolp b)
+         (error 'cannot-concretize-binding)
+         b))
+    ((and (not (symbolp a)) (symbolp b))
+     (if (some #'symbolp a)
+         (error 'cannot-concretize-binding)
+         a))
+    (t
+     (mapcar #'prefer-concrete-items a b))))
+
+(defgeneric binding-meet (a b)
+  (:documentation "Constructs a maximal binding subsumed by both A and B.")
+  (:method (a b)
+    (error 'cannot-concretize-binding))
+  (:method ((a gate-binding) (b gate-binding))
+    
+    (make-instance 'gate-binding
+                   :operator (prefer-concrete-items (gate-binding-operator a) (gate-binding-operator b))
+                   :parameters (prefer-concrete-lists (gate-binding-parameters a)
+                                                      (gate-binding-parameters b))
+                   :arguments (prefer-concrete-lists (gate-binding-arguments a)
+                                                     (gate-binding-arguments b))))
+  (:method ((a gate-binding) (b wildcard-binding))
+    a)
+  (:method ((a wildcard-binding) (b gate-binding))
+    b))
+
+(defgeneric instantiate-binding (binding)
+  (:method (binding)
+    (error 'cannot-concretize-binding))
+  (:method ((binding gate-binding))
+    (when (symbolp (gate-binding-operator binding))
+      (error 'cannot-concretize-binding))
+    (when (some #'symbolp (gate-binding-parameters binding))
+      (error 'cannot-concretize-binding))
+    (when (some #'symbolp (gate-binding-arguments binding))
+      (error 'cannot-concretize-binding))
+    (apply #'build-gate
+           (gate-binding-operator binding)
+           (gate-binding-parameters binding)
+           (gate-binding-arguments binding))))
+
 (defun compute-applicable-reducers (gateset)
   "Returns all those compilers (including those which match on sequences of instructions rather than single instructions) which improve the brevity of a gate sequence without exiting a particular GATESET."
-  (let* ((gateset-bindings (loop :for g :being :the :hash-keys :of gateset
-                                 :collect g)))
-    (remove-if-not (lambda (c)
-                     (let* ((in-fidelity 1d0)
-                            (out-fidelity (occurrence-table-cost (compiler-output-gates c) gateset)))
-                       (and (occurrence-table-in-gateset-p (compiler-output-gates c) gateset)
-                            (every (lambda (b)
-                                     (some (lambda (g)
-                                             (let ((gate-fidelity (gate-record-fidelity
-                                                                   (gethash g gateset))))
-                                               (and (binding-subsumes-p g b)
-                                                    (setf in-fidelity (* in-fidelity gate-fidelity)))))
-                                           gateset-bindings))
-                                   (compiler-bindings c))
-                            (>= out-fidelity in-fidelity))))
-                   **compilers-available**)))
+  (labels
+      ((calculate-fidelity-of-concrete-gates (gates)
+         (loop :with fidelity := 1d0
+               :for gate :in gates
+               :do (loop :for binding :being :the :hash-keys :of gateset
+                         :for gate-info := (gethash binding gateset)
+                         :when (binding-subsumes-gate-p binding gate)
+                           :return (setf fidelity (* fidelity (gate-record-fidelity gate-info)))
+                         ;; only executes if no binding subsumes the gate
+                         :finally (error 'no-binding-match))
+               :finally (return fidelity)))
+       (gates-that-match-binding (binding)
+         (loop :for gate-binding :being :the :hash-keys :of gateset
+               :for gate := (handler-case (instantiate-binding (binding-meet gate-binding binding))
+                              (cannot-concretize-binding () nil)
+                              (no-binding-match () nil))
+               :when gate :collect gate))
+       (consider-input-test-case (compiler &rest gates)
+         (handler-case
+             (let* ((input-fidelity (calculate-fidelity-of-concrete-gates gates))
+                    (output (apply compiler gates))
+                    (output-fidelity (calculate-fidelity-of-concrete-gates output)))
+               (>= output-fidelity input-fidelity))
+           (no-binding-match () nil)
+           (compiler-does-not-apply () nil)
+           (cannot-concretize-binding () nil)))
+       (consider-compiler (compiler)
+         ;; we support two kinds of matches:
+         ;; (1) a "blind" match, where we can tell just by considering bindings
+         ;;     that the compiler will always have reasonable input and output
+         ;; (2) an "exhaustive" match, where we instantiate different test cases
+         ;;     to pump through the compiler, convincing ourselves that in all
+         ;;     applicable situations the compiler gives good output.
+         (or
+          ;; first try the blind match
+          (let* ((gateset (blank-out-qubits gateset))
+                 (in-fidelity 1d0)
+                 (out-fidelity (occurrence-table-cost (compiler-output-gates compiler) gateset)))
+            (and (occurrence-table-in-gateset-p (compiler-output-gates compiler) gateset)
+                 (loop :for b :in (compiler-bindings compiler)
+                       :always (loop :for g :being :the :hash-keys :of gateset
+                                     :for gate-fidelity := (gate-record-fidelity (gethash g gateset))
+                                     ;; TODO: revisit this predicate.
+                                       :thereis (and (or (binding-subsumes-p g b)
+                                                         (when (typep b 'gate-binding)
+                                                           (binding-subsumes-p (copy-instance b :options nil) g)))
+                                                     (setf in-fidelity (* in-fidelity gate-fidelity)))))
+                 (>= out-fidelity in-fidelity)))
+          ;; if that falls through, try the exhaustive match
+          (let ((matches (loop :for binding :in (compiler-bindings compiler)
+                               :collect (gates-that-match-binding binding))))
+            (unless (every #'identity matches)
+              (return-from consider-compiler nil))
+            (every #'identity (apply #'a:map-product (a:curry #'consider-input-test-case compiler) matches))))))
+    
+    (let (applicable-compilers)
+      (dolist (compiler **compilers-available** applicable-compilers)
+        (when (consider-compiler compiler)
+          (push compiler applicable-compilers))))))
 
 
 ;;; these functions assemble into the macro DEFINE-COMPILER, which constructs
@@ -885,7 +1029,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                   (let ((,val (compilation-context-chip-specification context)))
                                     (unless ,val (give-up-compilation))
                                     ,body))))
-      ((:gateset-reducer :class :permit-binding-mismatches-when)
+      ((:gateset-reducer :class :permit-binding-mismatches-when :output-gateset)
        (enact-compiler-options remaining-options body))
       (otherwise
        (error "Unknown compiler option: ~a." (first options))))))
@@ -918,7 +1062,15 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                     :bindings (mapcar #'make-binding-from-source ',bindings)
                                     :options ',options
                                     :body (quote (progn ,@decls ,@body))
-                                    :output-gates (estimate-output-gates-from-raw-code (quote (progn ,@body)))
+                                    :output-gates ,(if (getf options ':output-gateset)
+                                                       `(a:alist-hash-table
+                                                         (mapcar (lambda (x)
+                                                                   (cons (make-binding-from-source
+                                                                          (list '_ (car x)))
+                                                                         (cdr x)))
+                                                                 ',(getf options ':output-gateset))
+                                                         :test #'equalp)
+                                                       `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
                                     :function #',name)))
                (setf (fdefinition ',name) ,struct-name)
                (setf (documentation ',name 'function) ,docstring)
