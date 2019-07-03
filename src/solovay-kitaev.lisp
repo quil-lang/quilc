@@ -69,7 +69,7 @@
         (w (commutator-w comm)))
     (append v w (dagger v) (dagger w))))
 
-(defun dagger (op-seq)
+(defun seq-dagger (op-seq)
   (reverse (mapcar #'(lambda (x) (* -1 x)) op-seq)))
 
 (defun matrix-trace (m)
@@ -149,23 +149,23 @@
          (basis-gates (basis-gates decomposer)))
     (mapcar #'(lambda (x) (basis-gate-from-index basis-gates x)) (sk-iter decomposer unitary depth))))
 
-;;; -------------------------------------------------------------------
-;;; --------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
-;;; -------------------------------------------------------------------
+;;; ------------------------------------------------------------------
+;;; -------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
+;;; ------------------------------------------------------------------
 ;;; Overall procedure taken in https://github.com/cmdawson/sk to find
-;;; balanced group commutators V and W for a unitary U (below, the '
-;;; symbol represents a dagger):
+;;; balanced group commutators V and W for a unitary U (the ' symbol
+;;; represents a dagger):
 ;;;
 ;;;    1) Convert U to its Bloch vector representation, which is a
 ;;;       rotation by some theta around an arbitrary axis.
 ;;;
-;;;    2) Find unitaries S, Rx s.t. Rx is a rotation around the X axis
-;;;       by theta and SRxS' = U.
+;;;    2) Find unitaries S and Rx s.t. Rx is a rotation around the X
+;;;       axis by theta and SRxS' = U.
 ;;;
-;;;    3) Find the group commutators A, B for Rx s.t. Rx = ABA'B'.
+;;;    3) Find the group commutators B, C for Rx s.t. Rx = BCB'C'.
 ;;;
-;;; With A, B, and S, we can set V = SAS' and W = SBS', because then
-;;; VWV'W' = SAS'SBS'SA'S'SB'S' = SABA'B'S' = SRxS' = U.
+;;; With A, B, and S, we can set V = SBS' and W = SCS', because then
+;;; VWV'W' = SBS'SCS'SB'S'SC'S' = SBCB'C'S' = SRxS' = U.
 
 ;;; Bloch vector structure and conversions to/from unitary matrices
 (defstruct (bloch-vector (:constructor make-bloch-vector))
@@ -233,7 +233,10 @@
 
 (defun unitary-to-conjugated-x-rotation (u)
   "Given a unitary U, returns unitaries S and Rx such that Rx is a rotation around the X axis by the same angle that U rotates around its axis, and U = SRxS'."
-  u)
+  (let* ((u-bv (matrix-to-bloch-vector u))
+         (rx-bv (make-bloch-vector :theta (bloch-vector-theta u-bv) :axis #(1 0 0)))
+         (rx (bloch-vector-to-matrix rx-bv)))
+    (values (find-transformation-matrix u rx) rx)))
 
 (defun find-transformation-matrix (a b)
   "Given unitaries A and B, finds the unitary S such that A = SBS'."
@@ -246,18 +249,41 @@
          (result-bv (make-bloch-vector)))
     ;; Only bother finding an axis if the vectors aren't parallel
     (unless (and (zerop (vector-norm cross-prod)) (double~ dot-prod 0))
-      (cond ((zerop (vector-norm cross-prod)) nil)
+      (cond ((zerop (vector-norm cross-prod)) nil) ;; very special anti-parallel case
             (t ;; General case
-             ;; (vector-normalize cross-prod) Shouldn't be needed
+             (vector-normalize cross-prod)
              (setf (bloch-vector-axis result-bv) cross-prod)
              (setf (bloch-vector-theta result-bv) (acos dot-prod)))))
     (bloch-vector-to-matrix result-bv)))
 
+;;; NEEDS FIXING: sometimes returns group commutators which produce a
+;;; rotation of the negative angle (or about the negative axis)
 (defun gc-decompose-x-rotation (u)
-  "Given a unitary U, returns V and W, two unitaries which are balanced commutators of U (i.e. U = [V, W] = VWV'W'). IMPORTANT: U must be a rotation about the X axis; this is not the general function for any U."
-  u)
+  "Given a unitary U, returns B and C, two unitaries which are balanced commutators of U (i.e. U = [B, C] = BCB'C'). IMPORTANT: U must be a rotation about the X axis; this is not the general function for any U."
+  (let* ((u-cos-half-theta (cos (/ (bloch-vector-theta (matrix-to-bloch-vector u)) 2)))
+         (st (expt (/ (- 1 u-cos-half-theta) 2) 1/4))
+         (ct (sqrt (- 1 (expt st 2))))
+         (theta (* 2 (asin st)))
+         (alpha (atan st))
+         (b-axis (make-array 3))
+         (w-axis (make-array 3)))
+    (setf (aref w-axis 0) (* st (cos alpha)))
+    (setf (aref b-axis 0) (* st (cos alpha)))
+    (setf (aref w-axis 1) (* st (sin alpha)))
+    (setf (aref b-axis 1) (* st (sin alpha)))
+    (setf (aref w-axis 2) ct)
+    (setf (aref b-axis 2) (- ct))
+    (let ((b (bloch-vector-to-matrix (make-bloch-vector :theta theta :axis b-axis)))
+          (w (bloch-vector-to-matrix (make-bloch-vector :theta theta :axis w-axis))))
+      (values b (find-transformation-matrix w (magicl:dagger b))))))
 
-;;; Don't fully understand this part yet
 (defun gc-decompose (u)
   "Find the balanced group commutators V and W for any unitary U."
-  u)
+  (let* ((u-theta (bloch-vector-theta (matrix-to-bloch-vector u)))
+         (rx-theta (bloch-vector-to-matrix (make-bloch-vector :theta u-theta :axis #(1 0 0))))
+         (s (find-transformation-matrix u rx-theta)))
+    ;; (format t "~%~A~%~A~%" u
+    ;;         (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices rx-theta (magicl:dagger s))))
+    (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
+      (values (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
+              (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))

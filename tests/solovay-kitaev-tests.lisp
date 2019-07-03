@@ -35,10 +35,25 @@
       (setf (cl-quil::bloch-vector-theta bv1) (cl-quil::bloch-vector-theta bv2))
       (let* ((u1 (cl-quil::bloch-vector-to-matrix bv1))
              (u2 (cl-quil::bloch-vector-to-matrix bv2))
-             (s (cl-quil::find-transformation-matrix u1 u2))
-             (bvs (cl-quil::matrix-to-bloch-vector s)))
-        (format t "~%bv1: ~A~%bv2: ~A~%bvS: ~A~%~%u1: ~A~%u2: ~A~%s: ~A~%"
-                bv1 bv2 bvs u1 u2 s)
+             (s (cl-quil::find-transformation-matrix u1 u2)))
         (is (cl-quil::matrix-equality
              (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices u2 (magicl:dagger s)))
              u1))))))
+
+(deftest test-gc-decompose-x-rotation ()
+  (dotimes (i 100)
+    (let ((x-rot (cl-quil::bloch-vector-to-matrix (cl-quil::make-bloch-vector :theta (- (random (* 2 pi)) pi)
+                                                                              :axis #(1 0 0)))))
+      (multiple-value-bind (b c) (cl-quil::gc-decompose-x-rotation x-rot)
+        ;; (format t "~%X-ROT: ~A~%B: ~A~%C: ~A~%" x-rot b c)
+        (is (cl-quil::matrix-equality
+             (magicl:multiply-complex-matrices b (magicl:multiply-complex-matrices c (magicl:multiply-complex-matrices (magicl:dagger b) (magicl:dagger c))))
+             x-rot))))))
+
+(deftest test-gc-decompose ()
+  (dotimes (i 100)
+    (let ((u (magicl:random-unitary 2)))
+      (multiple-value-bind (v w) (cl-quil::gc-decompose u)
+        (is (cl-quil::matrix-equality
+             (cl-quil::scale-out-matrix-phases (magicl:multiply-complex-matrices v (magicl:multiply-complex-matrices w (magicl:multiply-complex-matrices (magicl:dagger v) (magicl:dagger w)))) u)
+             u))))))
