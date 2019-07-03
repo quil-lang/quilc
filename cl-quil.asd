@@ -29,7 +29,6 @@
                #:trivial-garbage        ; weak hash tables
                #:cl-permutation
                #:queues.priority-queue
-               #:cl-ppcre               ; CHP file parsing
                #+sbcl #:sb-rotate-byte
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))

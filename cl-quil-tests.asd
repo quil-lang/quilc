@@ -15,6 +15,7 @@
                #:yacc                     ; for the conditions
                (:version #:alexa "1.0.1") ; for the conditions
                #:cl-permutation
+               #:cl-ppcre
                )
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':cl-quil-tests
