@@ -137,17 +137,17 @@
                      (push ':duration args))
                    (setf (gethash (parse-binding gate-datum) gate-information)
                          (apply #'make-gate-record args))))
-               (setf qubit (build-qubit :gate-information gate-information))))
+               (setf qubit (build-qubit i :gate-information gate-information))))
             ;; there's no "gates" field, but there is a "type" field, and it's supported
             ((and (string= "Xhalves" (gethash "type" qubit-hash)))
-             (setf qubit (build-qubit :type '(:RZ :X/2 :MEASURE))))
+             (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE))))
             ;; there's no "gates" field, but there is a "type" field, but it isn't supported
             ((gethash "type" qubit-hash)
              (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
                     i (gethash "type" qubit-hash)))
             ;; there's neither a "gates" nor a "type" field. install a default.
             (t
-             (setf qubit (build-qubit :type '(:RZ :X/2 :MEASURE)))))
+             (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE)))))
           ;; store the descriptor in the qubit hardware-object for later reference
           (setf (hardware-object-misc-data qubit) qubit-hash)
           ;; and store the hardware-object into the chip specification

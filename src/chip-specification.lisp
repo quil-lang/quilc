@@ -325,7 +325,7 @@ used to specify CHIP-SPEC."
     obj))
 
 
-(defun build-qubit (&key type gate-information)
+(defun build-qubit (q &key type gate-information)
   "Constructs a template qubit. The native gates for this qubit can be specified by one of two mutually exclusive means:
 
  * The TYPE keyword can consist of (lists of) ':RZ, ':X/2, ':MEASURE.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
@@ -340,7 +340,7 @@ used to specify CHIP-SPEC."
     ;; old style of initialization
     (when (member ':MEASURE type)
       (setf (gethash (make-instance 'measure-binding
-                                    :qubit '_
+                                    :qubit q
                                     :target '_)
                      (hardware-object-gate-information obj))
             (make-gate-record :duration 2000))
@@ -351,7 +351,7 @@ used to specify CHIP-SPEC."
       (setf (gethash (make-instance 'gate-binding
                                     :operator (named-operator "RZ")
                                     :parameters '(_)
-                                    :arguments '(_))
+                                    :arguments (list q))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity 1d0
                               :duration 1/100)))
@@ -359,30 +359,37 @@ used to specify CHIP-SPEC."
       (setf (gethash (make-instance 'gate-binding
                                     :operator (named-operator "RX")
                                     :parameters (list (/ pi 2))
-                                    :arguments '(_))
+                                    :arguments (list q))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
       (setf (gethash (make-instance 'gate-binding
                                     :operator (named-operator "RX")
                                     :parameters (list (/ pi -2))
-                                    :arguments '(_))
+                                    :arguments (list q))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
       (setf (gethash (make-instance 'gate-binding
                                     :operator (named-operator "RX")
                                     :parameters (list pi)
-                                    :arguments '(_))
+                                    :arguments (list q))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
                               :duration 9))
       (setf (gethash (make-instance 'gate-binding
                                     :operator (named-operator "RX")
                                     :parameters (list (- pi))
-                                    :arguments '(_))
+                                    :arguments (list q))
                      (hardware-object-gate-information obj))
             (make-gate-record :fidelity .98
+                              :duration 9))
+      (setf (gethash (make-instance 'gate-binding
+                                    :operator (named-operator "RX")
+                                    :parameters (list 0d0)
+                                    :arguments (list q))
+                     (hardware-object-gate-information obj))
+            (make-gate-record :fidelity .99
                               :duration 9)))
     ;; return the qubit
     obj))
@@ -542,8 +549,8 @@ Compilers are listed in descending precedence.")
   (let ((chip-spec (make-chip-specification
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'simple-vector))))
     (install-generic-compilers chip-spec architecture)
-    (loop :repeat 8 :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (loop :for q :below 8
+          :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (dotimes (i 8)
       (install-link-onto-chip chip-spec i (mod (1+ i) 8)
                               :architecture architecture))
@@ -556,8 +563,8 @@ Compilers are listed in descending precedence.")
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
     (install-generic-compilers chip-spec architecture)
     ;; prep the qubits
-    (loop :repeat n :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (loop :for q :below n
+          :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; prep the links
     (dotimes (i (1- n))
       (install-link-onto-chip chip-spec i (1+ i) :architecture architecture))
@@ -568,8 +575,8 @@ Compilers are listed in descending precedence.")
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
     (install-generic-compilers chip-spec architecture)
     ;; prep the qubits
-    (loop :repeat n :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (loop :for q :below n
+          :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; prep the links
     (dotimes (i n)
       (dotimes (j i)
@@ -661,8 +668,8 @@ Compilers are listed in descending precedence.")
         ;; which is shaded when the two indices share a 2^1-bit. these are
         ;; the locations that need a new qubit to get generated.
         (unless (logbitp 1 (logxor i j))
-          (let* ((fresh-qubit (build-qubit :type '(:RZ :X/2 :MEASURE)))
-                 (fresh-qubit-index (chip-spec-n-qubits chip-spec)))
+          (let* ((fresh-qubit-index (1+ (chip-spec-n-qubits chip-spec)))
+                 (fresh-qubit (build-qubit fresh-qubit-index :type '(:RZ :X/2 :MEASURE))))
             ;; poke this qubit ID into the hashtable for later lookup
             (setf (gethash (list i j) qubit-ref-hash) fresh-qubit-index)
             ;; poke this qubit object into the hardware array
@@ -714,8 +721,8 @@ Compilers are listed in descending precedence.")
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
     (install-generic-compilers chip-spec architecture)
     ;; set up the qubits
-    (loop :repeat (* height width) :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (loop :for j :below (* height width)
+          :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
       (dotimes (j width)
@@ -763,7 +770,7 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec ':cz)
     ;; set up the qubits
     (dotimes (j (* height width))
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
+      (adjoin-hardware-object (build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
       (dotimes (j width)
@@ -798,8 +805,8 @@ Compilers are listed in descending precedence.")
                  (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
                  (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
     (install-generic-compilers chip-spec ':cnot)
-    (loop :repeat nqubits :do
-      (adjoin-hardware-object (build-qubit :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (loop :for q :below nqubits
+          :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (loop :for (control target) :in links :do
       (install-link-onto-chip chip-spec control target :architecture '(:CNOT)))
     (warm-hardware-objects chip-spec)))
