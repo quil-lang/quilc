@@ -52,4 +52,5 @@
                (:file "csd-tests")
                (:file "addresser-tests")
                (:file "linear-reversible-circuit-tests")
-               (:file "permutation-tests")))
+               (:file "permutation-tests")
+               (:file "solovay-kitaev-tests")))
