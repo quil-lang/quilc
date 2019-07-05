@@ -668,7 +668,7 @@ Compilers are listed in descending precedence.")
         ;; which is shaded when the two indices share a 2^1-bit. these are
         ;; the locations that need a new qubit to get generated.
         (unless (logbitp 1 (logxor i j))
-          (let* ((fresh-qubit-index (1+ (chip-spec-n-qubits chip-spec)))
+          (let* ((fresh-qubit-index (chip-spec-n-qubits chip-spec))
                  (fresh-qubit (build-qubit fresh-qubit-index :type '(:RZ :X/2 :MEASURE))))
             ;; poke this qubit ID into the hashtable for later lookup
             (setf (gethash (list i j) qubit-ref-hash) fresh-qubit-index)
@@ -721,7 +721,7 @@ Compilers are listed in descending precedence.")
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
     (install-generic-compilers chip-spec architecture)
     ;; set up the qubits
-    (loop :for j :below (* height width)
+    (loop :for q :below (* height width)
           :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     ;; now add the links, row-by-row
     (dotimes (i (1- height))
