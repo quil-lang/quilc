@@ -1058,6 +1058,13 @@ N.B., The fractions of pi will be printed up to a certain precision!")
        ((double~ r (- pi))
         (format stream "-pi"))
        (t
+        ;; check integer multiples of pi
+        (dolist (n '(2 3 4 5 6 7 8 9 10))
+          (when (double~ (abs r) (* pi n))
+            (format stream "~:[~;-~]~d*pi" (minusp r) n)
+            (return-from format-real)))
+
+        ;; check fractional multiples of pi
         (dolist (denom '(2 3 4 6 8 16))
           (dotimes (numer (* 2 denom))
             (when (and (/= numer denom)
