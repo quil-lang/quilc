@@ -39,7 +39,7 @@ permutation record duration."
                                               (chip-spec-nth-link chip-spec link-index)))))))
   (flet ((get-it (chip-spec isn)
            (a:if-let ((obj (lookup-hardware-object chip-spec isn)))
-             (funcall (hardware-object-native-instructions obj) isn)
+             (hardware-object-native-instruction-p obj isn)
              nil)))
     (declare (inline get-it))
     (etypecase inst

@@ -24,14 +24,32 @@
 ;;;; tracks information about legal operations on the QPU components:
 ;;;; { type: optional string or optional list of strings, in the case of 1Q
 ;;;;         drawn from the set { "X/2" } and in the case of 2Q drawn from
-;;;;         the set { "CZ", "ISWAP", "CPHASE", "ISWAP" }. these indicate which
-;;;;         operations are legal on this component of the QPU. in the case of a
-;;;;         list, the operations are sorted into "preference order": the
-;;;;         compiler will make an effort to prefer instructions earlier in the
-;;;;         sequence to those later in the sequence. for 1Q the default is
-;;;;         [ "RZ", "X/2" ], and for 2Q the default is "CZ".
-;;;;   dead: optional boolean. when set to T, the compiler will treat all
-;;;;         instructions on this component as illegal. }
+;;;;          the set { "CZ", "ISWAP", "CPHASE", "ISWAP" }. these indicate which
+;;;;          operations are legal on this component of the QPU. in the case of a
+;;;;          list, the operations are sorted into "preference order": the
+;;;;          compiler will make an effort to prefer instructions earlier in the
+;;;;          sequence to those later in the sequence. for 1Q the default is
+;;;;          [ "RZ", "X/2" ], and for 2Q the default is "CZ".
+;;;;   gates: a (unordered) list of dictionaries recording the native operations for
+;;;;          this object, each given via one of the two following forms:
+;;;;          { operator: the string "MEASURE".
+;;;;            qubit: an integer indicating the qubit to be MEASUREd
+;;;;                   OR the string "_" to indicate any qubit.
+;;;;            target: an optional field indicating the memory region to be written to
+;;;;                   OR the string "_" to indicate any qubit.
+;;;;            duration: time in ns that it takes to perform a measurement.
+;;;;            fidelity: readout fidelity for this measurement.
+;;;;          } OR {
+;;;;            operator: the name of the gate application as a string.
+;;;;            parameters: list of parameters supplied to this native instruction,
+;;;;                        which can be numeric literals or "_".
+;;;;            arguments: list of qubit arguments supplied to this native instruction,
+;;;;                       which can be numeric literals or "_".
+;;;;            duration: time in ns that it takes to execute this instruction.
+;;;;            fidelity: gate fidelity for this instruction.
+;;;;          }
+;;;;   dead:  optional boolean. when set to T, the compiler will treat all
+;;;;          instructions on this component as illegal. }
 ;;;;
 ;;;; In the case of the layer "specs", this complex data is again a dictionary,
 ;;;; which tracks information about fidelity properties of operations. it is
@@ -87,6 +105,7 @@
               (setf (gethash qkey 1q-layer) (dead-qubit-hash-table)))))))))
 
 (defun parse-binding (gate-datum)
+  "Parses an entry in the \"gates\" field of an ISA object descriptor."
   (flet ((intern-if-string (x)
            (typecase x
              (string (intern x))
@@ -101,6 +120,20 @@
                       :operator (named-operator (gethash "operator" gate-datum))
                       :parameters (mapcar #'intern-if-string (gethash "parameters" gate-datum))
                       :arguments (mapcar #'intern-if-string (gethash "arguments" gate-datum)))))))
+
+(defun parse-gate-information (gate-datum)
+  (let (args)
+    (a:when-let ((fidelity (gethash "fidelity" gate-datum)))
+      (setf args (list* ':fidelity fidelity args)))
+    (a:when-let ((duration (gethash "duration" gate-datum)))
+      (setf args (list* ':duration duration args)))
+    (apply #'make-gate-record args)))
+
+(defun parse-gates-field (gates)
+  (let ((gate-information (make-hash-table :test #'equalp)))
+    (dolist (gate-datum gates gate-information)
+      (setf (gethash (parse-binding gate-datum) gate-information)
+            (parse-gate-information gate-datum)))))
 
 (defun load-isa-layer (chip-spec isa-hash)
   "Loads the \"isa\" layer into a new chip-specification object."
@@ -126,18 +159,7 @@
           (cond
             ;; there's a "gates" field
             ((gethash "gates" qubit-hash)
-             (let ((gate-information (make-hash-table :test #'equalp)))
-               (dolist (gate-datum (gethash "gates" qubit-hash))
-                 (let (args)
-                   (when (gethash "fidelity" gate-datum)
-                     (push (gethash "fidelity" gate-datum) args)
-                     (push ':fidelity args))
-                   (when (gethash "duration" gate-datum)
-                     (push (gethash "duration" gate-datum) args)
-                     (push ':duration args))
-                   (setf (gethash (parse-binding gate-datum) gate-information)
-                         (apply #'make-gate-record args))))
-               (setf qubit (build-qubit i :gate-information gate-information))))
+             (setf qubit (build-qubit i :gate-information (parse-gates-field (gethash "gates" qubit-hash)))))
             ;; there's no "gates" field, but there is a "type" field, and it's supported
             ((and (string= "Xhalves" (gethash "type" qubit-hash)))
              (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE))))
@@ -183,18 +205,7 @@
                t)
               ;; there's a "gates" field
               ((gethash "gates" link-hash)
-               (let ((gate-information (make-hash-table :test #'equalp)))
-                 (dolist (gate-datum (gethash "gates" link-hash))
-                   (let (args)
-                     (when (gethash "fidelity" gate-datum)
-                       (push (gethash "fidelity" gate-datum) args)
-                       (push ':fidelity args))
-                     (when (gethash "duration" gate-datum)
-                       (push (gethash "duration" gate-datum) args)
-                       (push ':duration args))
-                     (setf (gethash (parse-binding gate-datum) gate-information)
-                           (apply #'make-gate-record args))))
-                 (setf link (build-link q0 q1 :gate-information gate-information))))
+               (setf link (build-link q0 q1 :gate-information (parse-gates-field (gethash "gates" link-hash)))))
               ;; there's no "gates" field, but there is a "type" field
               ((gethash "type" link-hash)
                (labels ((individual-target-parser (string)

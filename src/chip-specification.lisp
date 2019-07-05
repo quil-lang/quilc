@@ -92,7 +92,7 @@ DURATION stores the measured gate duration (in nanoseconds)."
 ;;; We NOTINLINE here because a previous file "compilation-methods.lisp" uses this
 ;;; structure, but the dependency is circular, so moving this doesn't make much sense.
 (declaim (notinline hardware-object-order
-                    hardware-object-native-instructions
+                    hardware-object-native-instruction-p
                     hardware-object-compilation-methods
                     hardware-object-permutation-gates
                     hardware-object-rewriting-rules
@@ -123,16 +123,15 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
                                               (make-adjustable-vector))))
   (misc-data (make-hash-table :test #'equal) :type hash-table))
 
-(defun hardware-object-native-instructions (obj)
-  "Takes an APPLICATION as an argument. It emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and it emits NIL if this instruction does not admit direct translation to a physical pulse.
+(defun hardware-object-native-instruction-p (obj instr)
+  "Emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and emits NIL if this instruction does not admit direct translation to a physical pulse.
 
 Used to be an anonymous function associated to HARDWARE-OBJECT; now computed from its GATE-INFORMATION table."
-  (lambda (instr)
-    (let (duration)
-      (dohash ((key val) (hardware-object-gate-information obj))
-        (when (binding-subsumes-p key (get-binding-from-instr instr))
-          (setf duration (gate-record-duration val))))
-      duration)))
+  (let (duration)
+    (dohash ((key val) (hardware-object-gate-information obj))
+      (when (binding-subsumes-p key (get-binding-from-instr instr))
+        (setf duration (gate-record-duration val))))
+    duration))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
@@ -508,7 +507,7 @@ Compilers are listed in descending precedence.")
               (concatenate 'vector
                            (hardware-object-compilation-methods obj)
                            (compute-applicable-compilers (hardware-object-gate-information obj)
-                                                    (1+ (hardware-object-order obj)))))
+                                                         (1+ (hardware-object-order obj)))))
         ;; TODO: incorporate child object gatesets too
         (let ((gate-information (make-hash-table :test #'equalp)))
           (dohash ((key val) (hardware-object-gate-information obj))

@@ -541,9 +541,7 @@ mapping instructions to their tags. "
              (declare (ignore order address))
              (let (duration)
                (when obj
-                 (setf duration
-                       (funcall (hardware-object-native-instructions obj)
-                                instr)))
+                 (setf duration (hardware-object-native-instruction-p obj instr)))
                (if duration
                    (+ duration value)
                    value)))))

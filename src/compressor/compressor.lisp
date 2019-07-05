@@ -368,8 +368,7 @@ other's."
              (translation-results nil))
          (cond
            ;; are we native? then stick this instruction onto the output.
-           ((and obj
-                 (funcall (hardware-object-native-instructions obj) instr))
+           ((and obj (hardware-object-native-instruction-p obj instr))
             (pop instructions)
             (push instr processed))
            ;; apply a translation and use those instructions instead.
