@@ -231,6 +231,12 @@ used to specify CHIP-SPEC."
     (measurement
      (lookup-hardware-address-by-qubits chip-spec (list (qubit-index (measurement-qubit instr)))))))
 
+(defun lookup-hardware-object-by-qubits (chip-spec args)
+  (nth-value 2 (lookup-hardware-address-by-qubits chip-spec args)))
+
+(defun lookup-hardware-object (chip-spec instr)
+  (nth-value 2 (lookup-hardware-address chip-spec instr)))
+
 
 ;;; constructors for hardware object building blocks
 

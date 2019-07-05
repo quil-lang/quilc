@@ -308,7 +308,7 @@ other's."
                  ;; enlarge the complex
                  (setf qubit-complex (union qubit-complex new-complex))
                  ;; try to find an associated hardware object for this complex
-                 (let ((obj (nth-value 2 (lookup-hardware-address-by-qubits chip-specification qubit-complex))))
+                 (let ((obj (lookup-hardware-object-by-qubits chip-specification qubit-complex)))
                    ;; if we can, then we want to loop over the object's rewrite rules.
                    ;; if we can't, we fall through and do nothing.
                    (a:when-let
@@ -364,7 +364,7 @@ other's."
       ;; otherwise, we have a quantum instruction
       (t
        ;; try to locate it on hardware.
-       (let ((obj (nth-value 2 (lookup-hardware-address chip instr)))
+       (let ((obj (lookup-hardware-object chip instr))
              (translation-results nil))
          (cond
            ;; are we native? then stick this instruction onto the output.
