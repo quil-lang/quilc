@@ -34,7 +34,7 @@
   "Make a chip from a graph"
   (let* ((chip-spec (init-chip :architecture architecture))
          (qubits
-           (loop :for i :to (1- (length graph)) :collect (quil::build-qubit :type '(:RZ :X/2 :MEASURE))))
+           (loop :for i :to (1- (length graph)) :collect (quil::build-qubit i :type '(:RZ :X/2 :MEASURE))))
          (qubit-array (make-array (length graph) :initial-contents qubits))
          (links
            (loop
