@@ -12,52 +12,44 @@
 
 ;;; first, some simple utilities for constructing gate objects
 
+(defun %capture-arg (arg)
+  (typecase arg
+    (integer
+     (qubit arg))
+    (symbol
+     (formal (string-downcase (symbol-name arg))))
+    (otherwise
+     arg)))
+
+(defun %capture-param (param)
+  (typecase param
+    (double-float
+     (constant param))
+    (memory-ref
+     (make-delayed-expression nil nil param))
+    (otherwise
+     param)))
+
 (defun build-gate (operator params qubit &rest qubits)
-  "Shorthand function for constructing a GATE-APPLICATION object from QUIL-like input. OPERATOR must be a standard gate name."
+  "Shorthand function for constructing a GATE-APPLICATION object from QUIL-like input. OPERATOR must be a standard gate name, PARAMS is a list of numbers or FORMALs to be used as parameters, and (LIST* QUBIT QUBITS) is a list of units or FORMALs to be used as qubit arguments.
+
+EXAMPLE: The QUIL line \"CPHASE(pi) 2 3\" corresponds to the s-expression (build-gate \"CPHASE\" '(#.pi) 2 3)."
   (check-type params list)
   (check-type qubits list)
+  (check-type operator (or string operator-description))
   (push qubit qubits)
-  (flet ((capture-param (param)
-           (typecase param
-             (double-float
-              (constant param))
-             (memory-ref
-              (make-delayed-expression nil nil param))
-             (otherwise
-              param)))
-         (capture-arg (arg)
-           (typecase arg
-             (integer
-              (qubit arg))
-             (symbol
-              (formal (string-downcase (symbol-name arg))))
-             (otherwise
-              arg))))
-    (let* ((operator-adt
-             (etypecase operator
-               (string (named-operator operator))
-               (operator-description operator)))
-           (gate-def
-             (etypecase operator
-               (string (lookup-standard-gate operator))
-               (operator-description
-                (labels ((recurse (o)
-                           (adt:match operator-description o
-                             ((named-operator str)
-                              (lookup-standard-gate str))
-                             ((dagger-operator o)
-                              (recurse o))
-                             ((controlled-operator o)
-                              (recurse o))
-                             ((forked-operator o)
-                              (recurse o)))))
-                  (recurse operator))))))
-      (assert (not (null gate-def)) (operator) "BUILD-GATE only takes standard gate names.")
-      (make-instance 'gate-application
-                     :operator operator-adt
-                     :name-resolution gate-def
-                     :parameters (mapcar #'capture-param params)
-                     :arguments (mapcar #'capture-arg qubits)))))
+  (let* ((operator-adt
+           (etypecase operator
+             (string (named-operator operator))
+             (operator-description operator)))
+         (gate-def
+           (lookup-standard-gate (operator-description-root-name operator-adt))))
+    (assert (not (null gate-def)) (operator) "BUILD-GATE only takes standard gates.")
+    (make-instance 'gate-application
+                   :operator operator-adt
+                   :name-resolution gate-def
+                   :parameters (mapcar #'%capture-param params)
+                   :arguments (mapcar #'%capture-arg qubits))))
 
 (define-global-counter **anonymous-gate-counter** get-anonymous-gate-counter)
 
@@ -66,26 +58,16 @@
   (check-type operator string)
   (check-type matrix magicl:matrix)
   (push qubit qubits)
-  (flet ((capture-arg (arg)
-           (typecase arg
-             (integer
-              (qubit arg))
-             (symbol
-              (formal (string-downcase (symbol-name arg))))
-             (otherwise
-              arg))))
-    (make-instance 'gate-application
-                   :operator (named-operator (format nil "~a-~a" operator (get-anonymous-gate-counter)))
-                   :gate matrix
-                   :arguments (mapcar #'capture-arg qubits))))
+  (make-instance 'gate-application
+                 :operator (named-operator (format nil "~a-~a" operator (get-anonymous-gate-counter)))
+                 :gate matrix
+                 :arguments (mapcar #'%capture-arg qubits)))
 
 (defun build-UCR (roll-name params qubit &rest qubits)
-  (push qubit qubits)
-  (let ((op (named-operator roll-name)))
-    (dolist (x (rest qubits))
-      (declare (ignore x))
-      (setf op (forked-operator op)))
-    (apply #'build-gate op params qubits)))
+  (loop :with op := (named-operator roll-name)
+        :repeat (length qubits)
+        :do (setf op (forked-operator op))
+        :finally (apply #'build-gate op params qubit qubits)))
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 
@@ -129,7 +111,7 @@
   (param-binary-op '* arg1 arg2))
 
 (defun param-mod (arg1 arg2)
-  "Clamps arg1 to (-arg2, arg2] when arg1 is a determined value."
+  "Wraps arg1 into (-arg2 / 2, arg2 / 2] when arg1 is a determined value."
   (typecase arg1
     (real
      (- (mod (+ (/ arg2 2) arg1) arg2) (/ arg2 2)))

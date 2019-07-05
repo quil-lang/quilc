@@ -361,7 +361,7 @@ Optional arguments:
     ;;
     ;; These chunks are defined as local functions in the following LABELS area.
     (labels
-        (;;
+        ( ;;
          ;; this first batch of functions are just helpers.
          ;;
          
@@ -849,7 +849,7 @@ Optional arguments:
                        :for (logical physical) :in qubit-assignments
                        :unless (apply-rewiring-l2p working-l2p logical)
                          :do (format *compiler-noise-stream*
-                                     "GREEDY-TEMPORAL-ADDRESSING: assign logical qubit ~a to physical qubit ~a~%"
+                                     "GREEDY-TEMPORAL-ADDRESSING: assigning logical qubit ~a to physical qubit ~a~%"
                                      logical physical)
                              (rewiring-assign working-l2p logical physical))
                      (return-from dequeue-soonest-2q-from-list t))))
@@ -863,9 +863,8 @@ Optional arguments:
                ;; or if we can add it to the schedule.
                (cond
                  ;; if we found a link and the instruction is native...
-                 ((funcall (hardware-object-native-instructions
-                               (chip-spec-nth-link chip-spec link-line))
-                              rewired-instr)
+                 ((hardware-object-native-instruction-p (chip-spec-nth-link chip-spec link-line)
+                                                        rewired-instr)
                   (let ((*print-pretty* nil))
                     (format *compiler-noise-stream*
                             "GREEDY-TEMPORAL-ADDRESSING: ~a is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"

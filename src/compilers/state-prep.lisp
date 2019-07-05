@@ -59,7 +59,7 @@
                                (- (second source-wf))
                                (conjugate (second source-wf))
                                (first source-wf)))))
-    (list (anon-gate "STATE-1Q" (magicl:multiply-complex-matrices matrix-target matrix-source) q))))
+    (list (anon-gate "STATE-1Q" (m* matrix-target matrix-source) q))))
 
 
 ;; setting up 2Q state preparation requires some helper functions
@@ -111,7 +111,7 @@
                                                       (- (sin theta)) (cos theta) 0 0
                                                       0 0 1 0
                                                       0 0 0 1))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (imagpart (aref v 2)))
       (let* ((theta (- (atan (imagpart (aref v 2))
@@ -120,7 +120,7 @@
                                                       0 1 0 0
                                                       (- (sin theta)) 0 (cos theta) 0
                                                       0 0 0 1))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (imagpart (aref v 3)))
       (let* ((theta (- (atan (imagpart (aref v 3))
@@ -129,7 +129,7 @@
                                                       0 1 0 0
                                                       0 0 1 0
                                                       (- (sin theta)) 0 0 (cos theta)))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (realpart (aref v 2)))
       (let* ((theta (- (atan (realpart (aref v 2))
@@ -138,7 +138,7 @@
                                                       0 (cos theta) (sin theta) 0
                                                       0 (- (sin theta)) (cos theta) 0
                                                       0 0 0 1))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (realpart (aref v 3)))
       (let* ((theta (- (atan (realpart (aref v 3))
@@ -147,7 +147,7 @@
                                                       0 (cos theta) 0 (sin theta)
                                                       0 0 1 0
                                                       0 (- (sin theta)) 0 (cos theta)))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (list matrix v)))
 
@@ -221,11 +221,10 @@
       ;; write t^dag s as a member of SU(2) x SU(2)
       (multiple-value-bind (c1 c0)
           (convert-su4-to-su2x2
-           (reduce #'magicl:multiply-complex-matrices
-                   (list +e-basis+
-                         (magicl:conjugate-transpose target-matrix)
-                         source-matrix
-                         +edag-basis+)))
+           (m* +e-basis+
+               (magicl:conjugate-transpose target-matrix)
+               source-matrix
+               +edag-basis+))
         ;; write out the instructions
         (append prefix-circuit
                 (list (make-instance 'gate-application
