@@ -585,7 +585,7 @@ mapping instructions to their tags. "
                         (warn-and-skip instr))
                       (setf fidelity (gate-record-fidelity specs-obj))))
                    (application
-                    (let ((obj (nth-value 2 (lookup-hardware-address chip-spec instr))))
+                    (let ((obj (lookup-hardware-object chip-spec instr)))
                       (unless obj
                         (warn-and-skip instr))
                       (let ((specs-hash (hardware-object-gate-information obj)))
