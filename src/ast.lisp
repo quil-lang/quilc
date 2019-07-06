@@ -1056,26 +1056,18 @@ N.B., The fractions of pi will be printed up to a certain precision!")
        ;; check common cases first
        ((double~ (abs r) 0)
         (format stream "~F" r))
-       ((double~ r pi)
-        (format stream "pi"))
-       ((double~ r (- pi))
-        (format stream "-pi"))
        (t
         ;; check integer multiples of pi
-        (dolist (n '(2 3 4 5 6 7 8 9 10))
+        (dolist (n '(1 2 3 4 5 6 7 8 9 10))
           (when (double~ (abs r) (* pi n))
-            (format stream "~:[~;-~]~d*pi" (minusp r) n)
+            (format stream "~:[~;-~]~:[~d*~;~*~]pi" (minusp r) (= 1 n) n)
             (return-from format-real)))
 
         ;; check fractional multiples of pi
         (dolist (denom '(2 3 4 6 8 16))
           (loop :for numer :from 1 :below (* 2 denom)
-                :when (and (/= numer denom)
-                           (double~ (abs r) (/ (* pi numer) denom)))
-                  :do (cond
-                        ((= numer 1)
-                         (format stream "~:[~;-~]pi/~d" (minusp r) denom))
-                        (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
+                :when (and (/= numer denom) (double~ (abs r) (/ (* pi numer) denom)))
+                  :do (format stream "~:[~;-~]~:[~d*~;~*~]pi/~d" (minusp r) (= 1 numer) numer denom)
                       (return-from format-real)))
         ;; If we cannot find a nice fraction of pi, just print the
         ;; real number
