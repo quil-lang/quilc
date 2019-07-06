@@ -1053,6 +1053,9 @@ N.B., The fractions of pi will be printed up to a certain precision!")
   (cond
     (*print-fractional-radians*
      (cond
+       ;; check common cases first
+       ((double~ (abs r) 0)
+        (format stream "~F" r))
        ((double~ r pi)
         (format stream "pi"))
        ((double~ r (- pi))
@@ -1066,14 +1069,12 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 
         ;; check fractional multiples of pi
         (dolist (denom '(2 3 4 6 8 16))
-          (dotimes (numer (* 2 denom))
+          (loop :for numer :from 1 :below (* 2 denom) :do
             (when (and (/= numer denom)
                        (double~ (abs r) (/ (* pi numer) denom)))
               (cond
                 ((= numer 1)
                  (format stream "~:[~;-~]pi/~d" (minusp r) denom))
-                ((zerop numer)
-                 (format stream "~F" r))
                 (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
               (return-from format-real))))
         ;; If we cannot find a nice fraction of pi, just print the
