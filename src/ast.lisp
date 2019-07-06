@@ -1050,13 +1050,9 @@ N.B., The fractions of pi will be printed up to a certain precision!")
   "Print the real number R nicely to the stream STREAM."
   (check-type r real)
   (check-type stream stream)
-  (cond
-    (*print-fractional-radians*
-     (cond
-       ;; check common cases first
-       ((double~ (abs r) 0)
-        (format stream "~F" r))
-       (t
+  (if (or (not *print-fractional-radians*) (double~ (abs r) 0))
+      (format stream "~F" r)
+      (progn
         ;; check integer multiples of pi
         (dolist (n '(1 2 3 4 5 6 7 8 9 10))
           (when (double~ (abs r) (* pi n))
@@ -1072,8 +1068,6 @@ N.B., The fractions of pi will be printed up to a certain precision!")
         ;; If we cannot find a nice fraction of pi, just print the
         ;; real number
         (format stream "~F" r))))
-    (t
-     (format stream "~F" r))))
 
 (defun real-fmt (stream r &optional colon-modifier at-modifier)
   "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
