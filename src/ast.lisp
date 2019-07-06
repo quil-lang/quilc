@@ -1069,14 +1069,14 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 
         ;; check fractional multiples of pi
         (dolist (denom '(2 3 4 6 8 16))
-          (loop :for numer :from 1 :below (* 2 denom) :do
-            (when (and (/= numer denom)
-                       (double~ (abs r) (/ (* pi numer) denom)))
-              (cond
-                ((= numer 1)
-                 (format stream "~:[~;-~]pi/~d" (minusp r) denom))
-                (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
-              (return-from format-real))))
+          (loop :for numer :from 1 :below (* 2 denom)
+                :when (and (/= numer denom)
+                           (double~ (abs r) (/ (* pi numer) denom)))
+                  :do (cond
+                        ((= numer 1)
+                         (format stream "~:[~;-~]pi/~d" (minusp r) denom))
+                        (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
+                      (return-from format-real)))
         ;; If we cannot find a nice fraction of pi, just print the
         ;; real number
         (format stream "~F" r))))
