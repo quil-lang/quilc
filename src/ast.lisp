@@ -1053,17 +1053,13 @@ N.B., The fractions of pi will be printed up to a certain precision!")
   (if (or (not *print-fractional-radians*) (double~ (abs r) 0))
       (format stream "~F" r)
       (progn
-        ;; check integer multiples of pi
-        (dolist (n '(1 2 3 4 5 6 7 8 9 10))
-          (when (double~ (abs r) (* pi n))
-            (format stream "~:[~;-~]~:[~d*~;~*~]pi" (minusp r) (= 1 n) n)
-            (return-from format-real)))
-
-        ;; check fractional multiples of pi
-        (dolist (denom '(2 3 4 6 8 16))
-          (loop :for numer :from 1 :below (* 2 denom)
-                :when (and (/= numer denom) (double~ (abs r) (/ (* pi numer) denom)))
-                  :do (format stream "~:[~;-~]~:[~d*~;~*~]pi/~d" (minusp r) (= 1 numer) numer denom)
+        ;; check integer and fractional multiples of pi
+        (dolist (denom '(1 2 3 4 6 8 16))
+          (loop :for numer :from 1 :below (if (= denom 1) 11 (* 2 denom))
+                :when (and (or (= 1 numer denom) (/= numer denom))
+                           (double~ (abs r) (/ (* pi numer) denom)))
+                  :do (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
+                              (minusp r) (= 1 numer) numer (= 1 denom) denom)
                       (return-from format-real)))
         ;; If we cannot find a nice fraction of pi, just print the
         ;; real number
