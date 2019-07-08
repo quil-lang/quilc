@@ -220,16 +220,23 @@
                        (magicl:scale (* ny axis-factor) +PY+)
                        (magicl:scale (* nz axis-factor) +PZ+))))
 
-;;; A helper function for calculating the global phase adjustment
-;;; needed to put a matrix MAT into the bloch-vector format described
-;;; in the comment above, by multiplying MAT by the phase factor.
 (defun bloch-phase-correction (mat)
-  ;; Both of these quantities should be purely real; if not, return
-  ;; the phase factor that makes it real.
+  "Calculates the global phase adjustment needed to put a matrix MAT into the bloch-vector matrix form described in the comment above. MAT should be multiplied by the returned phase number to produce the desired form."
   (let* ((diag-sum (+ (magicl:ref mat 0 0) (magicl:ref mat 1 1)))
-         (anti-diag-diff (- (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
-         (nonzero-num (if (zerop diag-sum) anti-diag-diff diag-sum)))
-    (/ (abs nonzero-num) nonzero-num)))
+         (off-diag-sum (+ (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
+         (off-diag-diff (- (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
+         (diag-diff (- (magicl:ref mat 0 0) (magicl:ref mat 1 1)))
+         (phase-nums (list diag-sum off-diag-sum off-diag-diff diag-diff)))
+    ;; In a matrix directly obtained from expanding the bloch vector
+    ;; representation, the sum of the diagonal and the difference of
+    ;; the off-diagonal should be purely real. Likewise, the diagonal
+    ;; difference and the off-diagonal sum should be purely
+    ;; imaginary. Thus, we use the first non-zero number in these
+    ;; quantities to find our phase correction.
+    (loop :for i :below 4
+          :for num :in phase-nums
+          :when (not (zerop num))
+            :do (return (* (/ (abs num) num) (if (evenp i) 1 #C(0 -1)))))))
 
 (defun unitary-to-conjugated-x-rotation (u)
   "Given a unitary U, returns unitaries S and Rx such that Rx is a rotation around the X axis by the same angle that U rotates around its axis, and U = SRxS'."
@@ -282,8 +289,6 @@
   (let* ((u-theta (bloch-vector-theta (matrix-to-bloch-vector u)))
          (rx-theta (bloch-vector-to-matrix (make-bloch-vector :theta u-theta :axis #(1 0 0))))
          (s (find-transformation-matrix u rx-theta)))
-    ;; (format t "~%~A~%~A~%" u
-    ;;         (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices rx-theta (magicl:dagger s))))
     (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
       (values (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
               (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
