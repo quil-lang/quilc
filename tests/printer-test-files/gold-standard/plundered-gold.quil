@@ -881,19 +881,6 @@ RESET
 HALT
 
 # Input
-# Disable fixed-point check
-#
-# The fixed-point check is disabled for this test because something in
-# the PARSE-QUIL -> PRINT-PARSED-PROGRAM cycle causes sequences of
-# CONTROLLED DAGGER or DAGGER CONTROLLED to permute, which makes
-# fixed-point check break. For example:
-#
-# CONTROLLED DAGGER Y 0 1
-# -> parse -> print ->
-# DAGGER CONTROLLED Y 0 1
-# -> parse -> print ->
-# CONTROLLED DAGGER Y 0 1
-#
 # Plundered from ../../good-test-files/good-modifiers.quil
 # various mixes of modifiers
 
@@ -928,9 +915,9 @@ CONTROLLED CONTROLLED CONTROLLED Y 0 1 2 3
 DAGGER Y 0
 Y 0
 DAGGER Y 0
-DAGGER CONTROLLED Y 0 1
+CONTROLLED DAGGER Y 0 1
 CONTROLLED DAGGER CONTROLLED Y 0 1 2
-DAGGER CONTROLLED DAGGER CONTROLLED Y 0 1 2
+CONTROLLED DAGGER CONTROLLED DAGGER Y 0 1 2
 CONTROLLED G 0 1
 DAGGER G 0
 
