@@ -1293,7 +1293,7 @@ For example,
                             (etypecase z
                               (number
                                (format-complex z s))
-                              (list
+                              ((or list symbol)
                                (print-instruction (make-delayed-expression nil nil z) s)))))
                         (subseq (gate-definition-entries gate)
                                 (* i gate-size)

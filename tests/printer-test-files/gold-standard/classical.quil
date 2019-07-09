@@ -1,0 +1,26 @@
+# Input
+DECLARE int INTEGER[4]
+DECLARE ro BIT[4]
+DECLARE b BIT
+
+NEG int[0]
+NOT ro[1]
+MOVE int[2] 1
+EXCHANGE int[0] int[1]
+CONVERT ro[0] int[0]
+LOAD b b int[0]
+STORE b int[0] b
+
+# Output
+DECLARE int INTEGER[4]
+DECLARE ro BIT[4]
+DECLARE b BIT
+
+NEG int[0]
+NOT ro[1]
+MOVE int[2] 1
+EXCHANGE int[0] int[1]
+CONVERT ro[0] int[0]
+LOAD b[0] b int[0]
+STORE b int[0] b[0]
+
