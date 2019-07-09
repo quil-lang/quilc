@@ -566,7 +566,7 @@ INPUT-STRING that triggered the condition."
             :finally (progn
                        (setf (application-operator app)
                              (apply-modifiers-to-operator
-                              (reverse processed-modifiers)
+                              processed-modifiers
                               (application-operator app)))
                        (return (values app rest-lines)))))))
 
