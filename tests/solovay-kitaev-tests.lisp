@@ -40,7 +40,7 @@
 
 (deftest test-gc-decompose-x-rotation ()
   (dotimes (i 100)
-    (let ((x-rot (cl-quil::bloch-vector-to-matrix (cl-quil::make-bloch-vector :theta (- (random (* 2 pi)) pi)
+    (let ((x-rot (cl-quil::bloch-vector-to-matrix (cl-quil::make-bloch-vector :theta (random pi)
                                                                               :axis #(1 0 0)))))
       (multiple-value-bind (b c) (cl-quil::gc-decompose-x-rotation x-rot)
         ;; (format t "~%X-ROT: ~A~%B: ~A~%C: ~A~%" x-rot b c)

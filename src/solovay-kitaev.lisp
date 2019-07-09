@@ -9,9 +9,25 @@
 ;;; used to approximately decompose arbitrary unitaries using a finite
 ;;; set of basis gates.
 
-(defparameter eps 1e-7)
-(defparameter +c-approx+ (* 4 (sqrt 2)))
-(defparameter +c-gc+ (/ (sqrt 2)))
+;;; Constant that upper bounds the ratio between d(V, I) [or d(W, I)]
+;;; and sqrt(d(U, I)) if V and W are balanced group commutators of W
+;;; [found on page 8 of the paper]. 0.9 is a value obtained
+;;; numerically through testing gc-decompose on random unitaries.
+(defparameter +c-gc+ 0.9)
+;;; Constant that upper bounds the ratio between d(VWV'W', approximate
+;;; VWV'W') and eps^(3/2), for the balanced group commutators V, W of
+;;; a unitary and the eps-approximation of each commutator [eps = d(V,
+;;; approximate V) = d(W, approximate W)]. It is also assumed that
+;;; d(V, I) = d(W, I) < c-gc * sqrt(eps), which is true for group
+;;; commutator decompositions made inside the SK-algorithm. [found on
+;;; page 9 of the paper]
+
+;;; This should really theoretically be approximately equal to (* 8
+;;; +c-gc+), but as the paper's authors have shown, a c-approx as low
+;;; as 2.67 can work in practice [yielding a base approximation
+;;; distance of 1/c-approx^2 = 0.14]. We'll use that for now.
+(defparameter +c-approx+ 2.67)
+;;; One-qubit identity and pauli spin matrices, may be replaced later
 (defparameter +I+ (magicl:make-complex-matrix 2 2 '(1 0 0 1)))
 (defparameter +PX+ (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
 (defparameter +PY+ (magicl:make-complex-matrix 2 2 '(0 #C(0 1) #C(0 -1) 0)))
@@ -49,7 +65,7 @@
 (defun vector-normalize (v)
   "Normalizes the vector V in-place; returns its norm."
   (let ((norm (vector-norm v)))
-    (assert (> norm eps) nil "ERROR: cannot normalize the zero vector ~A" v)
+    (assert (> norm 0) nil "ERROR: cannot normalize the zero vector ~A" v)
     (loop :for i :below (length v) :do (setf (aref v i) (/ (aref v i) norm)))
     norm))
 
@@ -57,17 +73,17 @@
   "Given an index IDX in sign-inverse convention, return the corresponding basis gate from BASIS-GATES. Specifically, if IDX is negative, return the inverse of the corresponding gate, which is the element in BASIS-GATES indexed by (absolute value of IDX minus 1)."
   (aref basis-gates (1- (abs idx))))
 
-(defstruct commutator
-  (v '() :type list)
-  (w '() :type list))
+;; (defstruct commutator
+;;   (v '() :type list)
+;;   (w '() :type list))
 
-(defun multiply-commutator (comm)
-  comm)
+;; (defun multiply-commutator (comm)
+;;   comm)
 
-(defun expand-commutator (comm)
-  (let ((v (commutator-v comm))
-        (w (commutator-w comm)))
-    (append v w (dagger v) (dagger w))))
+;; (defun expand-commutator (comm)
+;;   (let ((v (commutator-v comm))
+;;         (w (commutator-w comm)))
+;;     (append v w (dagger v) (dagger w))))
 
 (defun seq-dagger (op-seq)
   (reverse (mapcar #'(lambda (x) (* -1 x)) op-seq)))
@@ -82,10 +98,15 @@
        (+ (expt p 2) p))))
 
 ;;; Charles
-(defun distance (u s)
+(defun charles-distance (u s)
   (- 1 (fidelity (magicl:multiply-complex-matrices
                   (magicl:conjugate-transpose s)
                   u))))
+
+(defun distance (u s)
+  "Returns d(u, s) = ||U - S||, the operator norm of U - S."
+  (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix u s)))))
+    (sqrt (reduce #'max (loop :for i :below (magicl:matrix-rows sigma) :collect (magicl:ref sigma i i))))))
 
 ;;; --------------------------THE MEATY PART--------------------------
 
@@ -113,6 +134,7 @@
 
 (defun make-decomposer (basis-gates num-qubits epsilon0)
   "Initializer for a unitary decomposer."
+  (assert (< epsilon0 (/ (expt +c-approx+ 2))) (epsilon0) "ERROR: the provided base approximation epsilon ~A is not less than ~A, which it must be for approximations to improve on each iteration." epsilon0 (/ (expt +c-approx+ 2)))
   (make-instance 'decomposer
                  :basis-gates basis-gates
                  :num-qubits num-qubits
@@ -128,17 +150,17 @@
 ;;; Will likely involve some kind of search on whatever structure
 ;;; BASE-APPROXIMATIONS uses.
 (defun find-base-approximation (base-approximations u)
-  "Base case approximation for a unitary U."
+  "Base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
   (values base-approximations u))
 
 (defun sk-iter (decomposer u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a list of integer indices in sign-inverse convention."
   (if (zerop n)
       (find-base-approximation (base-approximations decomposer) u)
-      (let* ((comm (gc-decompose u))
-             (v-next (sk-iter decomposer (commutator-v comm) (1- n)))
-             (w-next (sk-iter decomposer (commutator-w comm) (1- n))))
-        (append v-next w-next (dagger v-next) (dagger w-next) (sk-iter decomposer u (1- n))))))
+      (multiple-value-bind (v w) (gc-decompose u)
+        (let* ((v-next (sk-iter decomposer v (1- n)))
+               (w-next (sk-iter decomposer w (1- n))))
+          (append v-next w-next (seq-dagger v-next) (seq-dagger w-next) (sk-iter decomposer u (1- n)))))))
 
 (defun decompose (decomposer unitary epsilon)
   "Decomposes a unitary into a sequence of gates from a finite set of basis gates, such that the resulting decomposition is within EPSILON of the original unitary."
@@ -263,8 +285,6 @@
              (setf (bloch-vector-theta result-bv) (acos dot-prod)))))
     (bloch-vector-to-matrix result-bv)))
 
-;;; NEEDS FIXING: sometimes returns group commutators which produce a
-;;; rotation of the negative angle (or about the negative axis)
 (defun gc-decompose-x-rotation (u)
   "Given a unitary U, returns B and C, two unitaries which are balanced commutators of U (i.e. U = [B, C] = BCB'C'). IMPORTANT: U must be a rotation about the X axis; this is not the general function for any U."
   (let* ((u-cos-half-theta (cos (/ (bloch-vector-theta (matrix-to-bloch-vector u)) 2)))
