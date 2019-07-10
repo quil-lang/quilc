@@ -192,7 +192,7 @@ DEFCIRCUIT EULER(%alpha, %beta, %gamma) q:
 
 
 RX(pi) 0
-RY(6.283185307179586) 0
+RY(2*pi) 0
 RZ(3*pi/2) 0
 
 # Input
