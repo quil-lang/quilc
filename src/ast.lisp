@@ -1046,7 +1046,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defvar *print-polar-form* nil
   "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
 
-(global-vars:define-global-parameter **reasonable-rationals**
+(global-vars:define-global-var **reasonable-rationals**
     (nconc (a:iota 10 :start 1)
            (delete-duplicates
             (loop :for denom :in '(2 3 4 6 8 16)
