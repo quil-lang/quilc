@@ -228,13 +228,13 @@ TEST(0.5) 0 1
   ;; Test *PRINT-FRACTIONAL-RADIANS* = NIL.
   (%check-format #'uiop:string-prefix-p
                  "~/quil:real-fmt/"
-                 `((,(- pi) . "-3.1415")
-                   (,pi . "3.1415")
-                   (,(* (- 1) (/ pi 2)) . "-1.5707")
-                   (,(* (- 3) (/ pi 2)) . "-4.7123")
-                   (,(* (- 1) (/ pi 3)) . "-1.0471")
-                   (,(* 1 (/ pi 4)) . "0.7853")
-                   (,(* 5 (/ pi 6)) . "2.6179"))
+                 `((,(- quil::pi) . "-3.1415")
+                   (,quil::pi . "3.1415")
+                   (,(* (- 1) (/ quil::pi 2)) . "-1.5707")
+                   (,(* (- 3) (/ quil::pi 2)) . "-4.7123")
+                   (,(* (- 1) (/ quil::pi 3)) . "-1.0471")
+                   (,(* 1 (/ quil::pi 4)) . "0.7853")
+                   (,(* 5 (/ quil::pi 6)) . "2.6179"))
                  :print-fractional-radians nil)
 
   ;; Test *PRINT-FRACTIONAL-RADIANS* = T.
