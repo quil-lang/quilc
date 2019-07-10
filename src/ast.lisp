@@ -1070,16 +1070,18 @@ When R is a FLOAT, you can think of REASONABLY-RATIONAL as an imprecise version 
   "Print the real number R nicely to the stream STREAM."
   (check-type r real)
   (check-type stream stream)
-  (if (or (not *print-fractional-radians*) (double~ (abs r) 0))
-      (format stream "~F" r)
-      (a:if-let ((rr (reasonably-rational (abs (/ r pi)))))
-        (let ((numer (numerator rr))
-              (denom (denominator rr)))
-          ;; Pretty-print "reasonable" integer and fractional multiples of pi.
-          (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
-                  (minusp r) (= 1 numer) numer (= 1 denom) denom))
-        ;; If we cannot find a nice fraction of pi, just print the real number.
-        (format stream "~F" r))))
+  (cond
+    ((or (double~ (abs r) 0) (not *print-fractional-radians*))
+     (format stream "~F" r))
+    (t
+     (a:if-let ((rr (reasonably-rational (abs (/ r pi)))))
+       (let ((numer (numerator rr))
+             (denom (denominator rr)))
+         ;; Pretty-print "reasonable" integer and fractional multiples of pi.
+         (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
+                 (minusp r) (= 1 numer) numer (= 1 denom) denom))
+       ;; If we cannot find a nice fraction of pi, just print the real number.
+       (format stream "~F" r)))))
 
 (defun real-fmt (stream r &optional colon-modifier at-modifier)
   "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
