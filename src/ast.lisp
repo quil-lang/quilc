@@ -1102,7 +1102,7 @@ For example,
     ((complexp z)
      (cond
        ((zerop (imagpart z))
-        (format-complex (realpart z) stream))
+        (format-real (realpart z) stream))
        (*print-polar-form*
         (format stream "~F∠" (abs z))
         (format-real (mod (phase z) (* 2 pi)) stream))
