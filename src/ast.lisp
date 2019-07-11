@@ -1046,25 +1046,17 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defvar *print-polar-form* nil
   "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
 
+(declaim (type (vector rational) **reasonable-rationals**))
 (global-vars:define-global-var **reasonable-rationals**
-    (nconc (a:iota 10 :start 1)
-           (delete-duplicates
-            (loop :for denom :in '(2 3 4 6 8 16)
-                  :nconc (loop :for numer :from 1 :below (* 2 denom)
-                               :when (/= numer denom)
-                                 :collect (/ numer denom)))
-            :from-end t))
+    (coerce (nconc (a:iota 10 :start 1)
+                   (delete-duplicates
+                    (loop :for denom :in '(2 3 4 6 8 16)
+                          :nconc (loop :for numer :from 1 :below (* 2 denom)
+                                       :when (/= numer denom)
+                                         :collect (/ numer denom)))
+                    :from-end t))
+            'vector)
   "The list of RATIONAL multiples of PI that are checked by FORMAT-REAL when *PRINT-FRACTIONAL-RADIANS* is T.")
-
-(defun reasonably-rational (r &key (test #'double~))
-  "Return the first RATIONAL in **REASONABLE-RATIONALS** that is DOUBLE~ to R.
-
-If no such RATIONAL exists, return NIL.
-
-R can be any NUMBER, but probably REAL.
-
-When R is a FLOAT, you can think of REASONABLY-RATIONAL as an imprecise version of CL:RATIONALIZE that is limited to checking RATIONALs in **REASONABLE-RATIONALS**."
-  (find r **reasonable-rationals** :test test))
 
 (defun format-real (r stream)
   "Print the real number R nicely to the stream STREAM."
@@ -1074,14 +1066,17 @@ When R is a FLOAT, you can think of REASONABLY-RATIONAL as an imprecise version 
     ((or (double~ (abs r) 0) (not *print-fractional-radians*))
      (format stream "~F" r))
     (t
-     (a:if-let ((rr (reasonably-rational (abs (/ r pi)))))
-       (let ((numer (numerator rr))
-             (denom (denominator rr)))
-         ;; Pretty-print "reasonable" integer and fractional multiples of pi.
-         (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
-                 (minusp r) (= 1 numer) numer (= 1 denom) denom))
-       ;; If we cannot find a nice fraction of pi, just print the real number.
-       (format stream "~F" r)))))
+     (loop :with r-abs := (abs r)
+           :for rr :across **reasonable-rationals**
+           :for numer := (numerator rr)
+           :for denom := (denominator rr)
+           :when (double~ r-abs (/ (* pi numer) denom)) :do
+             ;; Pretty-print "reasonable" integer and fractional multiples of pi.
+             (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
+                     (minusp r) (= 1 numer) numer (= 1 denom) denom)
+             (return-from format-real))
+     ;; If we cannot find a nice fraction of pi, just print the real number.
+     (format stream "~F" r))))
 
 (defun real-fmt (stream r &optional colon-modifier at-modifier)
   "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
