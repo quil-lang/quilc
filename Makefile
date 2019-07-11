@@ -61,6 +61,16 @@ else
 	echo "Non-Linux-based platforms unsupported"
 endif
 
+
+ifeq ($(UNAME_S),Darwin)
+LIBTWEEDLEDUM := libtweedledum.dylib
+else
+LIBTWEEDLEDUM := libtweedledum.so
+endif
+.PHONY: install-tweedledum
+install-tweedledum:
+	install src/contrib/tweedledum/$(LIBTWEEDLEDUM) /usr/local/lib
+
 ###############################################################################
 # BUILD
 ###############################################################################
