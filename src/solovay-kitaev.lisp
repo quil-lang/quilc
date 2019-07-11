@@ -9,8 +9,12 @@
 ;;; used to approximately decompose arbitrary unitaries using a finite
 ;;; set of basis gates.
 
+;;; In the rest of this file, d(x, y) refers to the function of
+;;; operator distance defined in the above paper and is equal to ||X -
+;;; Y||, the operator norm of (X - Y).
+
 ;;; Constant that upper bounds the ratio between d(V, I) [or d(W, I)]
-;;; and sqrt(d(U, I)) if V and W are balanced group commutators of W
+;;; and sqrt(d(U, I)) if V and W are balanced group commutators of U
 ;;; [found on page 8 of the paper]. 0.9 is a value obtained
 ;;; numerically through testing gc-decompose on random unitaries.
 (defparameter +c-gc+ 0.9)
@@ -22,10 +26,10 @@
 ;;; commutator decompositions made inside the SK-algorithm. [found on
 ;;; page 9 of the paper]
 
-;;; This should really theoretically be approximately equal to (* 8
-;;; +c-gc+), but as the paper's authors have shown, a c-approx as low
-;;; as 2.67 can work in practice [yielding a base approximation
-;;; distance of 1/c-approx^2 = 0.14]. We'll use that for now.
+;;; This should theoretically be approximately equal to (* 8 +c-gc+),
+;;; but as the paper's authors have shown, a c-approx as low as 2.67
+;;; can work in practice [yielding a base approximation distance of
+;;; 1/c-approx^2 = 0.14]. We'll use that for now.
 (defparameter +c-approx+ 2.67)
 ;;; One-qubit identity and pauli spin matrices, may be replaced later
 (defparameter +I+ (magicl:make-complex-matrix 2 2 '(1 0 0 1)))
@@ -33,15 +37,15 @@
 (defparameter +PY+ (magicl:make-complex-matrix 2 2 '(0 #C(0 1) #C(0 -1) 0)))
 (defparameter +PZ+ (magicl:make-complex-matrix 2 2 '(1 0 0 -1)))
 
+;;; ------------------------------------------------------------------
 ;;; --------------Various utility functions/structures----------------
+;;; ------------------------------------------------------------------
 
 (defun vector-dot-product (a b)
   "Dot product between vectors A and B."
   (assert (= (length a) (length b)))
-  (let ((result 0))
-    (loop :for ai :across a :for bi :across b
-          :do (incf result (* ai bi)))
-    result))
+  (reduce #'+ (loop :for ai :across a :for bi :across b
+                    :collect (* ai bi))))
 
 (defun vector-cross-product (a b)
   "Cross product between vectors A and B."
@@ -58,9 +62,26 @@
     (setf (aref result 2) (- (* ax by) (* ay bx)))
     result))
 
-(defun vector-norm (v)
-  "Norm of the vector V."
-  (sqrt (vector-dot-product v v)))
+(defun vector-norm (a)
+  "Norm of the vector A."
+  (sqrt (vector-dot-product a a)))
+
+(defun vector-distance (a b)
+  "Norm of the vector A - B."
+  (assert (= (length a) (length b)))
+  (sqrt (reduce #'+ (loop :for ai :across a :for bi :across b
+                          :collect (expt (- ai bi) 2)))))
+
+(defun axis-angle-ball-distance (bv1 bv2)
+  "Distance on the axis-angle ball between bloch-vectors BV1 and BV2."
+  (let ((ball1 (make-array 3))
+        (ball2 (make-array 3)))
+    (loop :for i :below 3
+          :for i1 :across (bloch-vector-axis bv1)
+          :for i2 :across (bloch-vector-axis bv2)
+          :do (setf (aref ball1 i) (* i1 (bloch-vector-theta bv1)))
+              (setf (aref ball2 i) (* i2 (bloch-vector-theta bv2))))
+    (vector-distance ball1 ball2)))
 
 (defun vector-normalize (v)
   "Normalizes the vector V in-place; returns its norm."
@@ -88,6 +109,12 @@
 (defun seq-dagger (op-seq)
   (reverse (mapcar #'(lambda (x) (* -1 x)) op-seq)))
 
+(defun random-bloch-vector (max-theta &key (def-theta 0))
+  "Generate a random bloch-vector with a maximum rotation angle of MAX-THETA. However, if DEF-THETA is set to a non-zero value, generate a random bloch-vector with the exact rotation angle DEF-THETA."
+  (let ((bv (matrix-to-bloch-vector (magicl:random-unitary 2))))
+    (setf (bloch-vector-theta bv) (if (zerop def-theta) (random max-theta) def-theta))
+    bv))
+
 (defun matrix-trace (m)
   (loop :for i :below (magicl:matrix-cols m)
         :sum (magicl:ref m i i)))
@@ -103,12 +130,19 @@
                   (magicl:conjugate-transpose s)
                   u))))
 
+;;; Not sure which distance measure to use, this one or trace norm or charles' fidelity
 (defun distance (u s)
-  "Returns d(u, s) = ||U - S||, the operator norm of U - S."
+  "Returns d(u, s) = ||U - S||, the operator norm of U - S defined in the paper."
   (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix u s)))))
     (sqrt (reduce #'max (loop :for i :below (magicl:matrix-rows sigma) :collect (magicl:ref sigma i i))))))
 
-;;; --------------------------THE MEATY PART--------------------------
+(defun find-c-gc (num-trials)
+  "Numerically tests for the value of c-gc, the upper bound on the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U."
+  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (gc-decompose u) :maximize (/ (distance v +I+) (sqrt (distance u +I+)))))
+
+;;; ------------------------------------------------------------------
+;;; -------------------------THE MEATY PART---------------------------
+;;; ------------------------------------------------------------------
 
 (defclass decomposer ()
   ((basis-gates :reader basis-gates
@@ -141,16 +175,40 @@
                  :epsilon0 epsilon0
                  :base-approximations (generate-base-approximations basis-gates num-qubits epsilon0)))
 
-;;; Will be somewhat complicated/tedious. The data structure that will
-;;; be used for this representation is still TBD.
+(defun epsilon0-from-ball-division (num-trials grid-length)
+  "Computes the max value of epsilon0 that a grid of spacing GRID-LENGTH on the angle-axis ball would satisfy."
+  (loop :for i :below num-trials
+        :for bv1 := (random-bloch-vector (/ pi 2))
+        :for bv2 := (random-bloch-vector (/ pi 2))
+        :for bv-dist := (axis-angle-ball-distance bv1 bv2)
+        :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+        ;; Checks if the random unitaries picked have an angle-axis
+        ;; ball distance shorter than the diagonal of a grid cube
+        :when (< bv-dist (sqrt (* 3 (expt grid-length 2))))
+          :maximize mat-dist))
+
+;;; --------------------------------------------------------------
+;;; --------------BASE APPROXIMATION GENERATION-------------------
+;;; --------------------------------------------------------------
+
+;;; The general procedure here is to use what I call the "angle-axis
+;;; ball" mapping of SU(2) (technically PU(2), the group of SU(2)
+;;; modulo global phase). The unitary which is a rotation about an
+;;; axis in 3d space by an angle theta is mapped to a point of radius
+;;; theta in the direction of the rotation axis; thus, the entire
+;;; group is mapped to a ball of radius pi. The Euclidean distance
+;;; between points in the angle-axis ball is not perfectly correlated
+;;; with our desired metric of operator distance, but is related
+;;; closely enough to serve as a surprisingly good heuristic. It is
+;;; also much more convenient to work with than a 3-sphere, which is
+;;; kind of the whole reason why I'm using this.
+
 (defun generate-base-approximations (basis-gates num-qubits epsilon0)
-  "Generates and returns a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set."
+  "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   (values basis-gates num-qubits epsilon0))
 
-;;; Will likely involve some kind of search on whatever structure
-;;; BASE-APPROXIMATIONS uses.
 (defun find-base-approximation (base-approximations u)
-  "Base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
+  "Returns the base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
   (values base-approximations u))
 
 (defun sk-iter (decomposer u n)
@@ -163,7 +221,7 @@
           (append v-next w-next (seq-dagger v-next) (seq-dagger w-next) (sk-iter decomposer u (1- n)))))))
 
 (defun decompose (decomposer unitary epsilon)
-  "Decomposes a unitary into a sequence of gates from a finite set of basis gates, such that the resulting decomposition is within EPSILON of the original unitary."
+  "Decomposes a unitary into a sequence of basis gates defined by DECOMPOSER, such that the resulting decomposition is within EPSILON of the original unitary."
   (let* ((eps0 (epsilon0 decomposer))
          (depth (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
                                  (log (* eps0 +c-approx+ +c-approx+))))
@@ -312,3 +370,84 @@
     (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
       (values (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
               (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
+
+;;; Some functions which explore the ball representation of SU(2)
+(defun ball-op-distances ()
+  (let* ((bv1 (random-bloch-vector pi))
+         (bv2 (random-bloch-vector pi))
+         (u1 (bloch-vector-to-matrix bv1))
+         (u2 (bloch-vector-to-matrix bv2))
+         (ball1 (make-array 3))
+         (ball2 (make-array 3)))
+    (loop :for i :below 3
+          :for i1 :across (bloch-vector-axis bv1)
+          :for i2 :across (bloch-vector-axis bv2)
+          :do (setf (aref ball1 i) (* i1 (bloch-vector-theta bv1)))
+              (setf (aref ball2 i) (* i2 (bloch-vector-theta bv2))))
+    (values (distance u1 u2) (vector-distance ball1 ball2))))
+
+(defun ball-op-distance-ratios (num-trials)
+  (let ((min-ratio MOST-POSITIVE-FIXNUM)
+        (max-ratio MOST-NEGATIVE-FIXNUM))
+    (dotimes (i num-trials)
+      (multiple-value-bind (op-dist ball-dist) (ball-op-distances)
+        (setf min-ratio (min min-ratio (/ op-dist ball-dist)))
+        (setf max-ratio (max max-ratio (/ op-dist ball-dist)))))
+    (format t "~%TESTING RATIO OF OPERATOR DISTANCE TO BALL DISTANCE~%Min: ~A~%Max: ~A~%" min-ratio max-ratio)))
+
+(defun op-dist-range (num-trials max-angle)
+  (let ((min-dist MOST-POSITIVE-FIXNUM)
+        (max-dist MOST-NEGATIVE-FIXNUM))
+    (loop :for i :below num-trials
+          :for bv1 := (random-bloch-vector max-angle)
+          :for bv2 := (random-bloch-vector max-angle)
+          :for u1 := (bloch-vector-to-matrix bv1)
+          :for u2 := (bloch-vector-to-matrix bv2)
+          :for dist := (distance u1 u2)
+          :do (setf min-dist (min min-dist dist))
+              (setf max-dist (max max-dist dist)))
+    (format t "~%[TESTING THE RANGE OF OPERATOR DISTANCES]~%Up to max-angle: ~A~%Min op dist: ~A~%Max op dist: ~A~%" max-angle min-dist max-dist)))
+
+(defun search-op-variations (num-trials target-dist &key (tolerance 0))
+  (let ((min-dist MOST-POSITIVE-FIXNUM)
+        (max-dist MOST-NEGATIVE-FIXNUM)
+        (hits 0))
+    (loop :for i :below num-trials
+          :for bv1 := (random-bloch-vector (/ pi 2))
+          :for bv2 := (random-bloch-vector (/ pi 2))
+          :for bv-dist := (axis-angle-ball-distance bv1 bv2)
+          :for op-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+          :when (if (zerop tolerance) (< bv-dist target-dist) (< (abs (- bv-dist target-dist)) tolerance))
+            :do (setf min-dist (min min-dist op-dist))
+                (setf max-dist (max max-dist op-dist))
+                (incf hits))
+    (format t "~%[TESTING VARIATION OF OPERATOR DISTANCES]~%")
+    (format t "Num trials: ~A~%Target ball dist: ~A~%Max op dist: ~A~%Percent hits: ~A~%"
+            num-trials target-dist max-dist (/ hits num-trials 1.0))
+    (unless (zerop tolerance)
+      (format t "(Additional data)~%Tolerance: ~A~%Min op dist: ~A~%% of entire interval [0, 1.2] taken up: ~A~%"
+              tolerance min-dist (/ (- max-dist min-dist) 1.2)))))
+
+(defun search-ball-variations (num-trials target-dist &key (tolerance 0))
+  (let ((min-dist MOST-POSITIVE-FIXNUM)
+        (max-dist MOST-NEGATIVE-FIXNUM)
+        (hits 0))
+    (loop :for i :below num-trials
+          :for bv1 := (random-bloch-vector (/ pi 2))
+          :for bv2 := (random-bloch-vector (/ pi 2))
+          :for bv-dist := (axis-angle-ball-distance bv1 bv2)
+          :for op-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+          :when (if (zerop tolerance) (< op-dist target-dist) (< (abs (- op-dist target-dist)) tolerance))
+            :do (setf min-dist (min min-dist bv-dist))
+                (setf max-dist (max max-dist bv-dist))
+                (incf hits))
+    (format t "~%[TESTING VARIATION OF BALL DISTANCES]~%")
+    (format t "Num trials: ~A~%Target op dist: ~A~%Max ball dist: ~A~%Percent hits: ~A~%"
+            num-trials target-dist max-dist (/ hits num-trials 1.0))
+    (unless (zerop tolerance)
+      (format t "(Additional data)~%Tolerance: ~A~%Min op dist: ~A~%% of entire interval [0, pi] taken up: ~A~%"
+              tolerance min-dist (/ (- max-dist min-dist) pi)))))
+
+(defun compare-variations (num-trials tolerance-var)
+  (search-ball-variations num-trials tolerance-var)
+  (search-op-variations num-trials (* tolerance-var (/ pi (sqrt 2)))))
