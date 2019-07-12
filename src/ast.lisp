@@ -901,14 +901,20 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
     ((forked-operator o)     (1+ (operator-description-additional-qubits o)))))
 
 (defun print-operator-description (od stream)
-  (adt:match operator-description od
-    ((named-operator name) (write-string name stream))
-    ((controlled-operator o) (write-string "CONTROLLED " stream)
-                             (print-operator-description o stream))
-    ((dagger-operator o) (write-string "DAGGER " stream)
-                         (print-operator-description o stream))
-    ((forked-operator o) (write-string "FORKED " stream)
-                         (print-operator-description o stream))))
+  (labels ((print-reversed-modifiers (od)
+             (adt:match operator-description od
+               ((named-operator _))
+               ((controlled-operator o)
+                (print-reversed-modifiers o)
+                (write-string "CONTROLLED " stream))
+               ((dagger-operator o)
+                (print-reversed-modifiers o)
+                (write-string "DAGGER " stream))
+               ((forked-operator o)
+                (print-reversed-modifiers o)
+                (write-string "FORKED " stream)))))
+    (print-reversed-modifiers od)
+    (write-string (operator-description-root-name od) stream)))
 
 (defun operator-description-string (od)
   (adt:match operator-description od
