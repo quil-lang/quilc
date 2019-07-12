@@ -72,17 +72,6 @@
   (sqrt (reduce #'+ (loop :for ai :across a :for bi :across b
                           :collect (expt (- ai bi) 2)))))
 
-(defun axis-angle-ball-distance (bv1 bv2)
-  "Distance on the axis-angle ball between bloch-vectors BV1 and BV2."
-  (let ((ball1 (make-array 3))
-        (ball2 (make-array 3)))
-    (loop :for i :below 3
-          :for i1 :across (bloch-vector-axis bv1)
-          :for i2 :across (bloch-vector-axis bv2)
-          :do (setf (aref ball1 i) (* i1 (bloch-vector-theta bv1)))
-              (setf (aref ball2 i) (* i2 (bloch-vector-theta bv2))))
-    (vector-distance ball1 ball2)))
-
 (defun vector-normalize (v)
   "Normalizes the vector V in-place; returns its norm."
   (let ((norm (vector-norm v)))
@@ -175,18 +164,6 @@
                  :epsilon0 epsilon0
                  :base-approximations (generate-base-approximations basis-gates num-qubits epsilon0)))
 
-(defun epsilon0-from-ball-division (num-trials grid-length)
-  "Computes the max value of epsilon0 that a grid of spacing GRID-LENGTH on the angle-axis ball would satisfy."
-  (loop :for i :below num-trials
-        :for bv1 := (random-bloch-vector (/ pi 2))
-        :for bv2 := (random-bloch-vector (/ pi 2))
-        :for bv-dist := (axis-angle-ball-distance bv1 bv2)
-        :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
-        ;; Checks if the random unitaries picked have an angle-axis
-        ;; ball distance shorter than the diagonal of a grid cube
-        :when (< bv-dist (sqrt (* 3 (expt grid-length 2))))
-          :maximize mat-dist))
-
 ;;; --------------------------------------------------------------
 ;;; --------------BASE APPROXIMATION GENERATION-------------------
 ;;; --------------------------------------------------------------
@@ -203,6 +180,18 @@
 ;;; also much more convenient to work with than a 3-sphere, which is
 ;;; kind of the whole reason why I'm using this.
 
+(defun bloch-vector-to-ball-coord (bv)
+  "Returns the axis-angle ball coordinate of a bloch-vector BV."
+  (let ((ball-coord (make-array 3)))
+    (loop :for i :below 3
+          :for j :across (bloch-vector-axis bv)
+          :do (setf (aref ball-coord i) (* j (bloch-vector-theta bv))))
+    ball-coord))
+
+(defun aa-ball-distance (bv1 bv2)
+  "Distance on the axis-angle ball between bloch-vectors BV1 and BV2."
+  (vector-distance (bloch-vector-to-ball-coord bv1) (bloch-vector-to-ball-coord bv2)))
+
 (defun generate-base-approximations (basis-gates num-qubits epsilon0)
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   (values basis-gates num-qubits epsilon0))
@@ -210,6 +199,18 @@
 (defun find-base-approximation (base-approximations u)
   "Returns the base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
   (values base-approximations u))
+
+(defun epsilon0-from-ball-division (num-trials grid-length)
+  "Numerically computes the max value of epsilon0 that a grid of spacing GRID-LENGTH on the angle-axis ball would satisfy."
+  (loop :for i :below num-trials
+        :for bv1 := (random-bloch-vector (/ pi 2))
+        :for bv2 := (random-bloch-vector (/ pi 2))
+        :for bv-dist := (aa-ball-distance bv1 bv2)
+        :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+        ;; Checks if the random unitaries picked have an angle-axis
+        ;; ball distance shorter than the diagonal of a grid cube
+        :when (< bv-dist (sqrt (* 3 (expt grid-length 2))))
+          :maximize mat-dist))
 
 (defun sk-iter (decomposer u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a list of integer indices in sign-inverse convention."
@@ -236,7 +237,7 @@
 ;;; balanced group commutators V and W for a unitary U (the ' symbol
 ;;; represents a dagger):
 ;;;
-;;;    1) Convert U to its Bloch vector representation, which is a
+;;;    1) Convert U to its bloch-vector representation, which is a
 ;;;       rotation by some theta around an arbitrary axis.
 ;;;
 ;;;    2) Find unitaries S and Rx s.t. Rx is a rotation around the X
@@ -247,13 +248,13 @@
 ;;; With A, B, and S, we can set V = SBS' and W = SCS', because then
 ;;; VWV'W' = SBS'SCS'SB'S'SC'S' = SBCB'C'S' = SRxS' = U.
 
-;;; Bloch vector structure and conversions to/from unitary matrices
+;;; bloch-vector structure and conversions to/from unitary matrices
 (defstruct (bloch-vector (:constructor make-bloch-vector))
   "A bloch-vector representation of unitaries as a rotation about an axis on the Bloch sphere."
   (theta 0.0d0 :type double-float)
   (axis #(0 0 0) :type (simple-vector 3)))
 
-;;; Conversions between matrix and bloch vector representations of
+;;; Conversions between matrix and bloch-vector representations of
 ;;; unitaries. To understand them, remember/note that for a rotation
 ;;; of an angle theta about the bloch sphere axis <x, y, z> with unit
 ;;; norm, the corresponding matrix representation is U = cos(t/2)*I -
@@ -268,11 +269,11 @@
 ;;;           \                                           /
 ;;;
 ;;; up to a global phase factor. Using the equation, we can convert
-;;; from bloch vector to matrix, and using this matrix, we can extract
-;;; the bloch vector parameters to convert back, which is what the
+;;; from bloch-vector to matrix, and using this matrix, we can extract
+;;; the bloch-vector parameters to convert back, which is what the
 ;;; functions below do.
 (defun matrix-to-bloch-vector (mat)
-  "Converts a unitary matrix into its bloch-vector representation."
+  "Returns the bloch-vector corresponding to the unitary matrix MAT."
   (let* ((phase-correction (bloch-phase-correction mat))
          (mat (magicl:scale phase-correction mat))
          (x-sin (* -1 (imagpart (magicl:ref mat 0 1))))
@@ -288,7 +289,7 @@
     (make-bloch-vector :theta theta :axis axis)))
 
 (defun bloch-vector-to-matrix (bv)
-  "Converts a bloch-vector to the corresponding unitary matrix."
+  "Returns the unitary matrix corresponding to the bloch-vector BV."
   (let* ((half-theta (/ (bloch-vector-theta bv) 2))
          (axis (bloch-vector-axis bv))
          (nx (aref axis 0))
@@ -307,7 +308,7 @@
          (off-diag-diff (- (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
          (diag-diff (- (magicl:ref mat 0 0) (magicl:ref mat 1 1)))
          (phase-nums (list diag-sum off-diag-sum off-diag-diff diag-diff)))
-    ;; In a matrix directly obtained from expanding the bloch vector
+    ;; In a matrix directly obtained from expanding the bloch-vector
     ;; representation, the sum of the diagonal and the difference of
     ;; the off-diagonal should be purely real. Likewise, the diagonal
     ;; difference and the off-diagonal sum should be purely
@@ -415,7 +416,7 @@
     (loop :for i :below num-trials
           :for bv1 := (random-bloch-vector (/ pi 2))
           :for bv2 := (random-bloch-vector (/ pi 2))
-          :for bv-dist := (axis-angle-ball-distance bv1 bv2)
+          :for bv-dist := (aa-ball-distance bv1 bv2)
           :for op-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
           :when (if (zerop tolerance) (< bv-dist target-dist) (< (abs (- bv-dist target-dist)) tolerance))
             :do (setf min-dist (min min-dist op-dist))
@@ -435,7 +436,7 @@
     (loop :for i :below num-trials
           :for bv1 := (random-bloch-vector (/ pi 2))
           :for bv2 := (random-bloch-vector (/ pi 2))
-          :for bv-dist := (axis-angle-ball-distance bv1 bv2)
+          :for bv-dist := (aa-ball-distance bv1 bv2)
           :for op-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
           :when (if (zerop tolerance) (< op-dist target-dist) (< (abs (- op-dist target-dist)) tolerance))
             :do (setf min-dist (min min-dist bv-dist))
