@@ -83,9 +83,9 @@
   "Given an index IDX in sign-inverse convention, return the corresponding basis gate from BASIS-GATES. Specifically, if IDX is negative, return the inverse of the corresponding gate, which is the element in BASIS-GATES indexed by (absolute value of IDX minus 1)."
   (aref basis-gates (1- (abs idx))))
 
-;; (defstruct commutator
-;;   (v '() :type list)
-;;   (w '() :type list))
+(defstruct commutator
+  (v '() :type (or list commutator))
+  (w '() :type (or list commutator)))
 
 ;; (defun multiply-commutator (comm)
 ;;   comm)
@@ -127,7 +127,7 @@
 
 (defun find-c-gc (num-trials)
   "Numerically tests for the value of c-gc, the upper bound on the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U."
-  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (gc-decompose u) :maximize (/ (distance v +I+) (sqrt (distance u +I+)))))
+  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (commutator-v (gc-decompose u)) :maximize (/ (distance v +I+) (sqrt (distance u +I+)))))
 
 ;;; ------------------------------------------------------------------
 ;;; -------------------------THE MEATY PART---------------------------
@@ -170,15 +170,15 @@
 
 ;;; The general procedure here is to use what I call the "angle-axis
 ;;; ball" mapping of SU(2) (technically PU(2), the group of SU(2)
-;;; modulo global phase). The unitary which is a rotation about an
-;;; axis in 3d space by an angle theta is mapped to a point of radius
-;;; theta in the direction of the rotation axis; thus, the entire
-;;; group is mapped to a ball of radius pi. The Euclidean distance
-;;; between points in the angle-axis ball is not perfectly correlated
-;;; with our desired metric of operator distance, but is related
-;;; closely enough to serve as a surprisingly good heuristic. It is
-;;; also much more convenient to work with than a 3-sphere, which is
-;;; kind of the whole reason why I'm using this.
+;;; modulo global phase). A unitary which is a rotation about an axis
+;;; in 3d space by an angle theta is mapped to a point of radius theta
+;;; in the direction of the rotation axis; thus, the entire group is
+;;; mapped to a ball of radius pi. The Euclidean distance between
+;;; points in the angle-axis ball is not perfectly correlated with our
+;;; desired metric of operator distance, but is related closely enough
+;;; to serve as a surprisingly good heuristic. It is also much more
+;;; convenient to work with than a 3-sphere, which is a big reason for
+;;; why I'm using this.
 
 (defun bloch-vector-to-ball-coord (bv)
   "Returns the axis-angle ball coordinate of a bloch-vector BV."
@@ -192,16 +192,8 @@
   "Distance on the axis-angle ball between bloch-vectors BV1 and BV2."
   (vector-distance (bloch-vector-to-ball-coord bv1) (bloch-vector-to-ball-coord bv2)))
 
-(defun generate-base-approximations (basis-gates num-qubits epsilon0)
-  "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
-  (values basis-gates num-qubits epsilon0))
-
-(defun find-base-approximation (base-approximations u)
-  "Returns the base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
-  (values base-approximations u))
-
-(defun epsilon0-from-ball-division (num-trials grid-length)
-  "Numerically computes the max value of epsilon0 that a grid of spacing GRID-LENGTH on the angle-axis ball would satisfy."
+(defun epsilon0-from-ball-division (num-trials subdivision)
+  "Numerically computes the max value of epsilon0 that a grid of spacing SUBDIVISION on the angle-axis ball would satisfy."
   (loop :for i :below num-trials
         :for bv1 := (random-bloch-vector (/ pi 2))
         :for bv2 := (random-bloch-vector (/ pi 2))
@@ -209,26 +201,54 @@
         :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
         ;; Checks if the random unitaries picked have an angle-axis
         ;; ball distance shorter than the diagonal of a grid cube
-        :when (< bv-dist (sqrt (* 3 (expt grid-length 2))))
+        :when (< bv-dist (sqrt (* 3 (expt subdivision 2))))
           :maximize mat-dist))
+
+(defun matrix-to-grid-id (mat subdivision)
+  "Returns the grid ID of MAT when mapped to an axis-angle ball coordinate in a grid of size SUBDIVISION, as an array of 3 decimals."
+  (let ((ball-coord (bloch-vector-to-ball-coord (matrix-to-bloch-vector mat)))
+        (grid-id (make-array 3)))
+    (loop :for i :below 3 :for j :across ball-coord :do (setf (aref grid-id i) (/ j subdivision)))))
+
+;;; Generate a hash table of grid coordinate -> unitary. Populate
+;;; using IDDFS, as we want to minimize approximation lengths.
+(defun generate-base-approximations (basis-gates num-qubits epsilon0) ;; TODO
+  "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
+  (values basis-gates num-qubits epsilon0))
+
+;;; Will just be a hash table lookup
+(defun find-base-approximation (base-approximations u) ;; TODO
+  "Returns the base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
+  (values base-approximations u))
+
+;;; ---------------------------------------------------------------
+;;; ---------------------Algorithm Calling-------------------------
+;;; ---------------------------------------------------------------
 
 (defun sk-iter (decomposer u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a list of integer indices in sign-inverse convention."
   (if (zerop n)
       (find-base-approximation (base-approximations decomposer) u)
-      (multiple-value-bind (v w) (gc-decompose u)
-        (let* ((v-next (sk-iter decomposer v (1- n)))
-               (w-next (sk-iter decomposer w (1- n))))
-          (append v-next w-next (seq-dagger v-next) (seq-dagger w-next) (sk-iter decomposer u (1- n)))))))
+      (let* ((comm (gc-decompose u))
+             (v-next (sk-iter decomposer (commutator-v comm) (1- n)))
+             (w-next (sk-iter decomposer (commutator-w comm) (1- n))))
+        (append (make-commutator :v v-next :w w-next) (sk-iter decomposer u (1- n))))))
 
 (defun decompose (decomposer unitary epsilon)
-  "Decomposes a unitary into a sequence of basis gates defined by DECOMPOSER, such that the resulting decomposition is within EPSILON of the original unitary."
+  "Decomposes a unitary into a commutator sequence, which is a list of commutator objects with a base approximation list as the last element. This decomposition is guaranteed to be within EPSILON of the original unitary."
   (let* ((eps0 (epsilon0 decomposer))
          (depth (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
                                  (log (* eps0 +c-approx+ +c-approx+))))
                          (log (/ 3 2))))
-         (basis-gates (basis-gates decomposer)))
-    (mapcar #'(lambda (x) (basis-gate-from-index basis-gates x)) (sk-iter decomposer unitary depth))))
+         #+ignore(basis-gates (basis-gates decomposer)))
+    (sk-iter decomposer unitary depth)
+    #+ignore(mapcar #'(lambda (x) (basis-gate-from-index basis-gates x)) (sk-iter decomposer unitary depth))))
+
+(defun expand-commutator-seq (decomposer seq) ;; TODO
+  "Recursively expands every commutator in SEQ to obtain a list of unitaries, using the operator indices defined in DECOMPOSER."
+  (let ((basis-gates (basis-gates decomposer)))
+    (mapcar #'(lambda (x) (if (type-p x 'fixnum) (basis-gate-from-index basis-gates x) (expand-commutator x))) seq))
+  seq)
 
 ;;; ------------------------------------------------------------------
 ;;; -------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
@@ -345,7 +365,7 @@
     (bloch-vector-to-matrix result-bv)))
 
 (defun gc-decompose-x-rotation (u)
-  "Given a unitary U, returns B and C, two unitaries which are balanced commutators of U (i.e. U = [B, C] = BCB'C'). IMPORTANT: U must be a rotation about the X axis; this is not the general function for any U."
+  "Given a unitary U, returns two values B and C which are the balanced commutators of U (i.e. U = [B, C] = BCB'C'). IMPORTANT: U must be a rotation about the X axis; this is not the general function for any U."
   (let* ((u-cos-half-theta (cos (/ (bloch-vector-theta (matrix-to-bloch-vector u)) 2)))
          (st (expt (/ (- 1 u-cos-half-theta) 2) 1/4))
          (ct (sqrt (- 1 (expt st 2))))
@@ -364,13 +384,13 @@
       (values b (find-transformation-matrix w (magicl:dagger b))))))
 
 (defun gc-decompose (u)
-  "Find the balanced group commutators V and W for any unitary U."
+  "Finds the balanced group commutators V and W for any unitary U, returning a commutator object."
   (let* ((u-theta (bloch-vector-theta (matrix-to-bloch-vector u)))
          (rx-theta (bloch-vector-to-matrix (make-bloch-vector :theta u-theta :axis #(1 0 0))))
          (s (find-transformation-matrix u rx-theta)))
     (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
-      (values (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
-              (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
+      (make-commutator :v (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
+                       :w (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
 
 ;;; Some functions which explore the ball representation of SU(2)
 (defun ball-op-distances ()
