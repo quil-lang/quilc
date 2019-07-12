@@ -28,6 +28,15 @@ arbitrary Quil code, either provided directly to the binary or to the
 optimized for the configured instruction set architecture (ISA),
 targeting the native gates specified by the ISA.
 
+
+### Cloning the repository
+
+To clone the quilc repository and its bundled submodules, run the following command:
+
+``` shell
+git clone --recurse-submodules https://github.com/rigetti/quilc.git
+```
+
 ### Building the Quil Compiler
 
 Prerequisites to building `quilc` are:
