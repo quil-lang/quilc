@@ -18,6 +18,10 @@
   (merge-pathnames #P"gold-regex/" *printer-test-files-directory*)
   "Path to directory containing golden files whose expected output sections must be compared via regex.")
 
+(defparameter *printer-test-files-gold-sanity-directory*
+  (merge-pathnames #P"gold-sanity/" *printer-test-files-directory*)
+  "Path to directory containing golden files for sanity testing basic compiler operation.")
+
 (defun parse-and-print-quil-to-string (input
                                        &key (parser #'quil:parse-quil)
                                             (printer #'quil::print-parsed-program))
@@ -42,33 +46,29 @@ admonition against carelessness."
    :skip-prompt skip-prompt))
 
 
-(defun %golden-tester (check-output)
+(defun %golden-parse-print-tester (check-output)
   "Return a function that can be passed to MAP-GOLDEN-FILES-AND-TEST-CASES which uses CHECK-OUTPUT
 to compare output sections.
 
-%GOLDEN-TESTER is a helper function for TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES."
+%GOLDEN-PARSE-PRINT-TESTER is a helper function for TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES."
   (check-type check-output function)
-  (lambda (test-case)
-       (let* ((*always-show-failed-sexp* t)
-              (input (golden-test-case-input test-case))
-              (expected-output (golden-test-case-output test-case))
-              (actual-output nil)
-              (skip-fixed-point-check-p (uiop:string-prefix-p "# Disable fixed-point check" input))
-              (message (format nil "~&Golden test case at (file:line): ~A:~D"
-                               (golden-test-case-file test-case)
-                               (golden-test-case-line test-case))))
-         ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
-         ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
-         (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
-         (not-signals error (quil:parse-quil actual-output))
-         (is (funcall check-output expected-output actual-output) message)
+  (lambda (test-case golden-error-message)
+    (let* ((input (golden-test-case-input test-case))
+           (expected-output (golden-test-case-output test-case))
+           (actual-output nil)
+           (skip-fixed-point-check-p (uiop:string-prefix-p "# Disable fixed-point check" input)))
+      ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
+      ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
+      (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
+      (not-signals error (quil:parse-quil actual-output))
+      (is (funcall check-output expected-output actual-output) golden-error-message)
 
-         ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
-         ;; might fail, so skip it if we find a magic cookie at the start of the input section
-         ;; indicating that we should do so.
-         (unless skip-fixed-point-check-p
-           (is (funcall check-output expected-output (parse-and-print-quil-to-string actual-output))
-               message)))))
+      ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
+      ;; might fail, so skip it if we find a magic cookie at the start of the input section
+      ;; indicating that we should do so.
+      (unless skip-fixed-point-check-p
+        (is (funcall check-output expected-output (parse-and-print-quil-to-string actual-output))
+            golden-error-message)))))
 
 (deftest test-print-parsed-program-golden-files ()
   "Ensure that PRINT-PARSED-PROGRAM produces the expected output and that it is parseable by PARSE-QUIL."
@@ -82,12 +82,53 @@ to compare output sections.
   (let ((golden-files (uiop:directory-files *printer-test-files-gold-standard-directory* #P"*.quil")))
     (format t "~&  Gold-standard tests:")
     (is (not (null golden-files)))
-    (map-golden-files-and-test-cases (%golden-tester #'string=) golden-files))
+    (map-golden-files-and-test-cases (%golden-parse-print-tester #'string=) golden-files))
 
   (let ((golden-files (uiop:directory-files *printer-test-files-gold-regex-directory* #P"*.quil")))
     (format t "~&  Gold-regex tests:")
     (is (not (null golden-files)))
-    (map-golden-files-and-test-cases (%golden-tester #'cl-ppcre:scan) golden-files)))
+    (map-golden-files-and-test-cases (%golden-parse-print-tester #'cl-ppcre:scan) golden-files)))
+
+(defun parse-quil-and-print-matrix-to-string (input
+                                              &key (parser #'quil:parse-quil)
+                                                   (matrix-converter #'quil::parsed-program-to-logical-matrix)
+                                                   (printer #'prin1))
+  (with-output-to-string (s)
+    (funcall printer (funcall matrix-converter (funcall parser input)) s)))
+
+(defun update-sanity-check-golden-files (&key skip-prompt)
+  "Call UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES on all the files in the gold-sanity subdirectory
+of *PRINTER-TEST-FILES-DIRECTORY*.
+
+See the documentation string for UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES for more info and an
+admonition against carelessness."
+  (update-golden-file-output-sections
+   (uiop:directory-files *printer-test-files-gold-sanity-directory* #P"*.quil")
+   #'parse-quil-and-print-matrix-to-string
+   :skip-prompt skip-prompt))
+
+(deftest test-sanity-golden-files ()
+  "Ensure that appleby didn't break everything again."
+
+  ;; Why hello. Has this test failed due to innocuous changes to the printed matrix representation
+  ;; of the parsed program? Then you should consider running UPDATE-SANITY-CHECK-GOLDEN-FILES,
+  ;; above, to update the output sections of the golden files. If you do so, however, be sure to
+  ;; examine the diffs of the old vs new output *carefully* to ensure all the changes are intended
+  ;; or expected. Golden files are precious, and their sanctity must be preserved. Thank you.
+
+  (let ((golden-files (uiop:directory-files *printer-test-files-gold-sanity-directory* #P"*.quil")))
+    (format t "~&  Gold-n-sanity tests:")
+    (is (not (null golden-files)))
+    (map-golden-files-and-test-cases
+     (lambda (test-case golden-error-message)
+       (let* ((input (golden-test-case-input test-case))
+              (expected-output (golden-test-case-output test-case))
+              (actual-output nil))
+         ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
+         ;; PARSE-QUIL-AND-PRINT-MATRIX-TO-STRING chokes on INPUT.
+         (not-signals error (setf actual-output (parse-quil-and-print-matrix-to-string input)))
+         (is (string= expected-output actual-output) golden-error-message)))
+     golden-files)))
 
 (deftest test-instruction-fmt ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\"" (format nil "~/cl-quil:instruction-fmt/"

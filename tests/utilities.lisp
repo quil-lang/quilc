@@ -313,7 +313,13 @@ Roughly:
       (dolist (t (parse-golden-file f))
         (funcall test-case-function t)))
 
-TEST-CASE-FUNCTION is function that takes a single GOLDEN-TEST-CASE argument.
+TEST-CASE-FUNCTION is function that takes two arguments:
+
+   1. a GOLDEN-TEST-CASE
+
+   2. a STRING that contains information about the GOLDEN-TEST-CASE-FILE and GOLDEN-TEST-CASE-LINE.
+   This string can be passed as the optional MESSAGE argument to FIASCO assertion macros to include
+   information about where the failing GOLDEN-TEST-CASE is located.
 
 GOLDEN-FILES is a LIST of PATHNAMEs indicating golden files to test.
 
@@ -323,7 +329,10 @@ case being processed. STREAM defaults to T."
     (format stream "~&    Testing golden file ~A at line:" (pathname-name file))
     (dolist (test-case (parse-golden-file file))
       (format stream " ~D" (golden-test-case-line test-case))
-      (funcall test-case-function test-case))))
+      (let ((*always-show-failed-sexp* t))
+        (funcall test-case-function test-case (format nil "~&Golden test case at (file:line): ~A:~D"
+                                                      (golden-test-case-file test-case)
+                                                      (golden-test-case-line test-case)))))))
 
 (defun update-golden-file-output-sections (file-paths output-callback
                                            &key (if-exists ':supersede) skip-prompt)
