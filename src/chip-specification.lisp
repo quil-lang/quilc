@@ -127,11 +127,12 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
   "Emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and emits NIL if this instruction does not admit direct translation to a physical pulse.
 
 Used to be an anonymous function associated to HARDWARE-OBJECT; now computed from its GATE-INFORMATION table."
-  (let (duration)
-    (dohash ((key val) (hardware-object-gate-information obj))
-      (when (binding-subsumes-p key (get-binding-from-instr instr))
-        (setf duration (gate-record-duration val))))
-    duration))
+  (a:when-let ((gate-record
+                (loop :for key :being :the :hash-keys :of (hardware-object-gate-information obj)
+                      :using (hash-value value)
+                      :when (binding-subsumes-p key (get-binding-from-instr instr))
+                        :do (return value))))
+    (gate-record-duration gate-record)))
 
 (defmethod print-object ((obj hardware-object) stream)
   (print-unreadable-object (obj stream :type t :identity t)
@@ -247,8 +248,7 @@ used to specify CHIP-SPEC."
  * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
   (check-type qubit0 unsigned-byte)
   (check-type qubit1 unsigned-byte)
-  (when gate-information
-    (check-type gate-information hash-table))
+  (check-type gate-information (or null hash-table))
   (assert (/= qubit0 qubit1))
   (setf type (a:ensure-list type))
   (let* ((obj (make-hardware-object
@@ -271,52 +271,25 @@ used to specify CHIP-SPEC."
       (setf (hardware-object-gate-information obj) gate-information))
     
     ;; this is the legacy model for setting up gate data
-    (when (optimal-2q-target-meets-requirements type ':cz)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "CZ")
-                                    :parameters ()
-                                    :arguments '(_ _))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 150
-                              :fidelity 0.90d0)))
-    (when (optimal-2q-target-meets-requirements type ':iswap)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "ISWAP")
-                                    :parameters ()
-                                    :arguments '(_ _))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 150
-                              :fidelity 0.90d0)))
-    (when (optimal-2q-target-meets-requirements type ':cphase)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "CPHASE")
-                                    :parameters '(_)
-                                    :arguments '(_ _))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 150
-                              :fidelity 0.85d0)))
-    (when (optimal-2q-target-meets-requirements type ':piswap)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "PISWAP")
-                                    :parameters '(_)
-                                    :arguments '(_ _))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 150
-                              :fidelity 0.85d0)))
+    (flet ((stash-gate-record (atom gate-name parameters arguments fidelity)
+             (when (member atom type) #+ignore (optimal-2q-target-meets-requirements type atom)
+               (setf (gethash (make-instance 'gate-binding
+                                             :operator (named-operator gate-name)
+                                             :parameters parameters
+                                             :arguments arguments)
+                              (hardware-object-gate-information obj))
+                     (make-gate-record :duration 150
+                                       :fidelity fidelity)))))
+      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.89d0)
+                      (:iswap  "ISWAP"  ()  (_ _) 0.91d0)
+                      (:cphase "CPHASE" (_) (_ _) 0.80d0)
+                      (:piswap "PISWAP" (_) (_ _) 0.80d0)
+                      (:cnot   "CNOT"   ()  (,qubit0 ,qubit1) 0.90d0)))
+        (destructuring-bind (atom gate-name parameters arguments fidelity) data
+          (stash-gate-record atom gate-name parameters arguments fidelity))))
     (when (member ':cnot type)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "CNOT")
-                                    :parameters ()
-                                    :arguments (list qubit0 qubit1))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 150
-                              :fidelity 0.90d0))
       (vector-push-extend #'CNOT-to-flipped-CNOT
                           (hardware-object-compilation-methods obj)))
-    
-    ;; TODO: double-check CNOT
-    
-    ;; TODO: perhaps handle approximate 2Q compilation. does anything special need to happen here?
     
     ;; based on the optimal 2Q compiler, tag this hardware object with the
     ;; longest duration any compiled sequence of instructions could possibly
@@ -336,66 +309,37 @@ used to specify CHIP-SPEC."
  * The TYPE keyword can consist of (lists of) ':RZ, ':X/2, ':MEASURE.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
 
  * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
-  (when gate-information
-    (check-type gate-information hash-table))
-  (let* ((obj (make-hardware-object :order 0)))
+  (check-type gate-information (or null hash-table))
+  (let ((obj (make-hardware-object :order 0)))
     ;; new style of initialization
     (when gate-information
       (setf (hardware-object-gate-information obj) gate-information))
     ;; old style of initialization
-    (when (member ':MEASURE type)
-      (setf (gethash (make-instance 'measure-binding
-                                    :qubit q
-                                    :target '_)
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 2000))
-      (setf (gethash (make-instance 'measure-binding :qubit '_)
-                     (hardware-object-gate-information obj))
-            (make-gate-record :duration 2000)))
-    (when (member ':RZ type)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "RZ")
-                                    :parameters '(_)
-                                    :arguments (list q))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :fidelity 1d0
-                              :duration 1/100)))
-    (when (member ':X/2 type)
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "RX")
-                                    :parameters (list (/ pi 2))
-                                    :arguments (list q))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :fidelity .98
-                              :duration 9))
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "RX")
-                                    :parameters (list (/ pi -2))
-                                    :arguments (list q))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :fidelity .98
-                              :duration 9))
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "RX")
-                                    :parameters (list pi)
-                                    :arguments (list q))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :fidelity .98
-                              :duration 9))
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "RX")
-                                    :parameters (list (- pi))
-                                    :arguments (list q))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :fidelity .98
-                              :duration 9))
-      (setf (gethash (make-instance 'gate-binding
-                                    :operator (named-operator "RX")
-                                    :parameters (list 0d0)
-                                    :arguments (list q))
-                     (hardware-object-gate-information obj))
-            (make-gate-record :fidelity .99
-                              :duration 9)))
+    (flet ((stash-gate-record (gate-name parameters arguments duration fidelity)
+             (setf (gethash (make-instance 'gate-binding
+                                           :operator (named-operator gate-name)
+                                           :parameters parameters
+                                           :arguments arguments)
+                            (hardware-object-gate-information obj))
+                   (make-gate-record :duration duration
+                                     :fidelity fidelity))))
+      (when (member ':MEASURE type)
+        (setf (gethash (make-instance 'measure-binding
+                                      :qubit q
+                                      :target '_)
+                       (hardware-object-gate-information obj))
+              (make-gate-record :duration 2000))
+        (setf (gethash (make-instance 'measure-binding :qubit '_)
+                       (hardware-object-gate-information obj))
+              (make-gate-record :duration 2000)))
+      (when (member ':RZ type)
+        (stash-gate-record "RZ" '(_) (list q) 1/100 1d0))
+      (when (member ':X/2 type)
+        (stash-gate-record "RX" '(#.(/ pi 2))  `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.(/ pi -2)) `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.pi)        `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.(- pi))    `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(0d0)         `(,q) 9 1d0)))
     ;; return the qubit
     obj))
 
@@ -500,28 +444,25 @@ Compilers are listed in descending precedence.")
 
 (defun warm-hardware-objects (chip-specification)
   "Initializes the compiler feature sets of HARDWARE-OBJECT instances installed on a CHIP-SPECIFICATION.  Preserves whatever feature sets might be there already; don't call this repeatedly."
-  (dotimes (order (length (chip-specification-objects chip-specification)))
-    (dotimes (obj-index (length (vnth order (chip-specification-objects chip-specification))))
-      (let ((obj (vnth obj-index (vnth order (chip-specification-objects chip-specification)))))
-        (setf (hardware-object-compilation-methods obj)
-              (concatenate 'vector
-                           (hardware-object-compilation-methods obj)
-                           (compute-applicable-compilers (hardware-object-gate-information obj)
-                                                         (1+ (hardware-object-order obj)))))
-        ;; TODO: incorporate child object gatesets too
-        (let ((gate-information (make-hash-table :test #'equalp)))
-          (dohash ((key val) (hardware-object-gate-information obj))
-            (setf (gethash key gate-information) val))
-          (dotimes (order (hardware-object-order obj))
-            (loop :for subobject-address :across (vnth order (hardware-object-cxns obj))
-                  :for subobject := (chip-spec-hw-object chip-specification order subobject-address)
-                  :do (dohash ((key val) (hardware-object-gate-information subobject))
-                        (setf (gethash key gate-information) val))))
-          (setf (hardware-object-rewriting-rules obj)
-                (concatenate 'vector
-                             (hardware-object-rewriting-rules obj)
-                             (compute-applicable-reducers gate-information)))))))
-  chip-specification)
+  (dotimes (order (length (chip-specification-objects chip-specification)) chip-specification)
+    (loop :for obj :across (vnth order (chip-specification-objects chip-specification))
+          :do (setf (hardware-object-compilation-methods obj)
+                    (concatenate 'vector
+                                 (hardware-object-compilation-methods obj)
+                                 (compute-applicable-compilers (hardware-object-gate-information obj)
+                                                               (1+ order))))
+              ;; TODO: incorporate child object gatesets too
+              (let ((gate-information (a:copy-hash-table (hardware-object-gate-information obj)
+                                                         :test #'equalp)))
+                (dotimes (suborder order)
+                  (loop :for subobject-address :across (vnth suborder (hardware-object-cxns obj))
+                        :for subobject := (chip-spec-hw-object chip-specification suborder subobject-address)
+                        :do (dohash ((key val) (hardware-object-gate-information subobject))
+                              (setf (gethash key gate-information) val))))
+                (setf (hardware-object-rewriting-rules obj)
+                      (concatenate 'vector
+                                   (hardware-object-rewriting-rules obj)
+                                   (compute-applicable-reducers gate-information)))))))
 
 
 

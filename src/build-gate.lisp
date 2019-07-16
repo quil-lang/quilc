@@ -64,10 +64,11 @@ EXAMPLE: The QUIL line \"CPHASE(pi) 2 3\" corresponds to the s-expression (build
                  :arguments (mapcar #'%capture-arg qubits)))
 
 (defun build-UCR (roll-name params qubit &rest qubits)
+  (format *compiler-noise-stream* "BUILD-UCR: Called on ~a, ~{~a ~}~%" qubit qubits)
   (loop :with op := (named-operator roll-name)
         :repeat (length qubits)
         :do (setf op (forked-operator op))
-        :finally (apply #'build-gate op params qubit qubits)))
+        :finally (return (apply #'build-gate op params qubit qubits))))
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 

@@ -53,9 +53,20 @@ WARNING: The default will work for instances of \"idiomatic\" classes that aren'
   (setf (aref vector index) val))
 
 (defmacro dohash (((key val) hash &optional ret) &body body)
-  `(progn (maphash (lambda (,key ,val) ,@body)
-                   ,hash)
-          ,ret))
+  `(loop :for ,key :being :the :hash-keys :of ,hash
+           :using (hash-value ,val)
+         :do ,@body
+         ,@(when ret `(:finally (return ,ret)))))
+
+(defun findhash (item hash &rest args &key (key nil key-p) (test nil test-p))
+  (declare (ignore args))
+  (dohash ((hash-key hash-val) hash)
+    (let* ((val  (if key-p (funcall key hash-val) hash-val))
+           (bool (if test-p
+                     (funcall test item val)
+                     (eql val item))))
+      (when bool
+        (return (values hash-key hash-val))))))
 
 (defmacro define-global-counter (counter-name incf-name)
   `(progn
