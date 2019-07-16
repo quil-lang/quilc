@@ -149,7 +149,6 @@ Return two values:
 integer that contains the bits of INTEGER rotated COUNT times
 leftwards within the byte specified by BYTESPEC, and elsewhere
 contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
-  (declare (optimize (speed 3) (safety 0) (space 0) (debug 1)))
   #-sbcl
   (let ((size (byte-size bytespec)))
     (when (= size 0)

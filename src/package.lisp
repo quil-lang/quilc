@@ -430,6 +430,7 @@
   ;; utilities.lisp
   (:export
    #:ilog2                              ; FUNCTION
+   #:rotate-byte                        ; FUNCTION
    )
 
   ;; relabeling.lisp
