@@ -31,11 +31,11 @@
      param)))
 
 (defun build-gate (operator params qubit &rest qubits)
-  "Shorthand function for constructing a GATE-APPLICATION object from QUIL-like input. OPERATOR must be a standard gate name, PARAMS is a list of numbers or FORMALs to be used as parameters, and (LIST* QUBIT QUBITS) is a list of units or FORMALs to be used as qubit arguments.
+  "Shorthand function for constructing a GATE-APPLICATION object from Quil-like input. OPERATOR must be a standard gate name, PARAMS is a list of numbers or FORMALs to be used as parameters, and (LIST* QUBIT QUBITS) is a list of units or FORMALs to be used as qubit arguments.
 
-EXAMPLE: The QUIL line \"CPHASE(pi) 2 3\" corresponds to the s-expression (build-gate \"CPHASE\" '(#.pi) 2 3)."
-  (check-type params list)
-  (check-type qubits list)
+EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build-gate \"CPHASE\" '(#.pi) 2 3)."
+  (check-type params a:proper-list)
+  (check-type qubits a:proper-list)
   (check-type operator (or string operator-description))
   (push qubit qubits)
   (let* ((operator-adt
@@ -73,7 +73,7 @@ EXAMPLE: The QUIL line \"CPHASE(pi) 2 3\" corresponds to the s-expression (build
 ;;; functions for dealing with mixed constant vs delayed-expression types
 
 (defun param-binary-op (op arg1 arg2)
-  "Binary operator that safely applies to possibly mixed arguments of NUMBER / DELAYED-EXPRESSION objects."
+  "Binary operator that safely applies to possibly mixed arguments of NUMBER / DELAYED-EXPRESSION objects. Returns a NUMBER when possible, and a DELAYED-EXPRESSION otherwise."
   (flet ((decompose (arg)
            "Returns a values tuple: PARAMS LAMBDA-PARAMS EXPRESSION DELAYEDP"
            (optima:match arg

@@ -122,7 +122,7 @@
 ;; the above macro expands into a bunch of embodiments of this old rule. the
 ;; compiler matching stuff isn't smart enough to impose the k pi / 2 constraint
 ;; on the middle RZ input, so the macro manually imposes it instead. c'est la vie
-#+ignore
+#+#:ignore
 (define-compiler rewrite-XZX-as-ZXZ
     ((x ("RX" (theta) q)
         :where (double= (/ pi 2) (abs theta)))

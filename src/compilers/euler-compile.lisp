@@ -19,6 +19,7 @@
   (check-type inner-gate string)
   (check-type outer-prefactor real)
   (check-type inner-prefactor real)
+  (check-type prefix-quil a:proper-list)
   (a:with-gensyms (prefix-matrix postfix-matrix u0 u1 v0 v1 angles)
     `(let* ((,prefix-matrix (make-matrix-from-quil ,prefix-quil))
             (,postfix-matrix (magicl::conjugate-transpose ,prefix-matrix)))
