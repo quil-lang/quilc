@@ -588,13 +588,15 @@ mapping instructions to their tags. "
                         (warn-and-skip instr))
                       (let ((specs-hash (hardware-object-gate-information obj)))
                         (unless specs-hash (warn-and-skip instr))
-                        (dohash ((key val) specs-hash)
-                          (when (and (typep key 'gate-binding)
-                                     (equalp (gate-binding-operator key)
-                                             (application-operator-name instr)))
-                            (setf fidelity (gate-record-fidelity val))))
-                        (unless fidelity
-                          (warn-and-skip instr)))))
+                        (let ((gate-record (findhash (application-operator-name instr)
+                                                     specs-hash
+                                                     ;; can't use a :key b/c of mixed hash value types
+                                                     :test (lambda (x y)
+                                                             (and (typep y 'gate-binding)
+                                                                  (equalp x (gate-binding-operator y)))))))
+                          (unless gate-record
+                            (warn-and-skip instr))
+                          (setf fidelity (gate-record-fidelity gate-record))))))
                    (otherwise
                     (warn-and-skip instr)))
                  (* value

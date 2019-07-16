@@ -24,7 +24,7 @@
 ;;;; tracks information about legal operations on the QPU components:
 ;;;; { type: optional string or optional list of strings, in the case of 1Q
 ;;;;         drawn from the set { "X/2" } and in the case of 2Q drawn from
-;;;;          the set { "CZ", "ISWAP", "CPHASE", "ISWAP" }. these indicate which
+;;;;          the set { "CZ", "ISWAP", "CPHASE", "PISWAP" }. these indicate which
 ;;;;          operations are legal on this component of the QPU. in the case of a
 ;;;;          list, the operations are sorted into "preference order": the
 ;;;;          compiler will make an effort to prefer instructions earlier in the
@@ -36,7 +36,7 @@
 ;;;;            qubit: an integer indicating the qubit to be MEASUREd
 ;;;;                   OR the string "_" to indicate any qubit.
 ;;;;            target: an optional field indicating the memory region to be written to
-;;;;                   OR the string "_" to indicate any qubit.
+;;;;                   OR the string "_" to indicate any region.
 ;;;;            duration: time in ns that it takes to perform a measurement.
 ;;;;            fidelity: readout fidelity for this measurement.
 ;;;;          } OR {
@@ -190,7 +190,7 @@
                   "ISA contains a 2Q hardware descriptor attached to qubits ~a, but there are only ~a qubit(s) altogether."
                   (list q0 q1) qubit-count)
           (let (link
-                (link-index (length (vnth 1 (chip-specification-objects chip-spec)))))
+                (link-index (chip-spec-n-links chip-spec)))
             (cond
               ;; NOTE: By skipping the dead links, we're shifting the internal link
               ;;       indices from what a user (or debugger) might expect.  Beware!
@@ -226,78 +226,67 @@
             (when link
               ;; notify the qubits that they're attached.
               (dolist (qubit-index (list q0 q1))
-                (vector-push-extend link-index
-                                    (vnth 1 (hardware-object-cxns
-                                             (vnth qubit-index
-                                                   (vnth 0 (chip-specification-objects chip-spec)))))))
+                (vector-push-extend link-index (chip-spec-links-on-qubit chip-spec qubit-index)))
               ;; store the descriptor in the link hardware-object for later reference
               (setf (hardware-object-misc-data link) link-hash)
               ;; and store the hardware-object into the chip specification
-              (vector-push-extend link (vnth 1 (chip-specification-objects chip-spec))))))))))
+              (vector-push-extend link (chip-spec-links chip-spec)))))))))
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
   (when (gethash "1Q" specs-hash)
     (loop :for i :from 0
-          :for qubit :across (vnth 0 (chip-specification-objects chip-spec))
+          :for qubit :across (chip-spec-qubits chip-spec)
+          :for gate-info := (hardware-object-gate-information qubit)
           :do ;; load the qubit specs info
               (a:when-let ((spec (gethash (list i) (gethash "1Q" specs-hash))))
                 (setf (gethash "specs" (hardware-object-misc-data qubit))
                       spec)
-                (let* ((gate-info (hardware-object-gate-information qubit)))
-                  (a:when-let ((fidelity (gethash "fRO" spec)))
-                    (dolist (binding (list (make-measure-binding :qubit '_)
-                                           (make-measure-binding :qubit '_ :target '_)))
-                      (setf (gethash binding gate-info)
-                            (copy-instance binding gate-info :fidelity fidelity))))
-                  (a:when-let ((fidelity (gethash "f1QRB" spec)))
-                    (dolist (binding (list (make-gate-binding :operator (named-operator "RX")
-                                                              :parameters '(#.(/ pi 2))
-                                                              :arguments '(_))
-                                           (make-gate-binding :operator (named-operator "RX")
-                                                              :parameters '(#.(/ pi -2))
-                                                              :arguments '(_))
-                                           (make-gate-binding :operator (named-operator "RX")
-                                                              :parameters '(#.pi)
-                                                              :arguments '(_))
-                                           (make-gate-binding :operator (named-operator "RX")
-                                                              :parameters '(#.(- pi))
-                                                              :arguments '(_))))
-                      (setf (gethash binding gate-info)
-                            (copy-instance binding gate-info :fidelity fidelity))))))))
+                (a:when-let ((fidelity (gethash "fRO" spec)))
+                  (dolist (binding (list (make-instance 'measure-binding :qubit '_)
+                                         (make-instance 'measure-binding :qubit '_ :target '_)))
+                    (setf (gethash binding gate-info)
+                          (copy-instance binding gate-info :fidelity fidelity))))
+                (a:when-let ((fidelity (gethash "f1QRB" spec)))
+                  (dolist (binding (list (make-instance 'gate-binding
+                                                        :operator (named-operator "RX")
+                                                        :parameters '(#.(/ pi 2))
+                                                        :arguments '(_))
+                                         (make-instance 'gate-binding
+                                                        :operator (named-operator "RX")
+                                                        :parameters '(#.(/ pi -2))
+                                                        :arguments '(_))
+                                         (make-instance 'gate-binding
+                                                        :operator (named-operator "RX")
+                                                        :parameters '(#.pi)
+                                                        :arguments '(_))
+                                         (make-instance 'gate-binding
+                                                        :operator (named-operator "RX")
+                                                        :parameters '(#.(- pi))
+                                                        :arguments '(_))))
+                    (setf (gethash binding gate-info)
+                          (copy-instance binding gate-info :fidelity fidelity)))))))
   (when (gethash "2Q" specs-hash)
-    (loop :for link :across (vnth 1 (chip-specification-objects chip-spec))
+    (loop :for link :across (chip-spec-links chip-spec)
           :for spec := (gethash (sort (coerce (vnth 0 (hardware-object-cxns link)) 'list) #'<)
                                 (gethash "2Q" specs-hash))
-          :do (setf (gethash "specs" (hardware-object-misc-data link))
-                    spec)
-              (let* ((gate-info (hardware-object-gate-information link)))
-                (a:when-let ((fidelity (gethash "fCZ" spec))
-                             (binding (make-gate-binding :operator (named-operator "CZ")
-                                                         :arguments '(_))))
-                  (setf (gethash binding gate-info)
-                        (copy-instance (gethash binding gate-info)
-                                       :fidelity fidelity)))
-                (a:when-let ((fidelity (gethash "fISWAP" spec))
-                             (binding (make-gate-binding :operator (named-operator "ISWAP")
-                                                         :arguments '(_))))
-                  (setf (gethash binding gate-info)
-                        (copy-instance (gethash binding gate-info)
-                                       :fidelity fidelity)))
-                (a:when-let ((fidelity (gethash "fCPHASE" spec))
-                             (binding (make-gate-binding :operator (named-operator "CPHASE")
-                                                         :parameters '(_)
-                                                         :arguments '(_))))
-                  (setf (gethash binding gate-info)
-                        (copy-instance (gethash binding gate-info)
-                                       :fidelity fidelity)))
-                (a:when-let ((fidelity (gethash "fPISWAP" spec))
-                             (binding (make-gate-binding :operator (named-operator "PISWAP")
-                                                         :parameters '(_)
-                                                         :arguments '(_))))
-                  (setf (gethash binding gate-info)
-                        (copy-instance (gethash binding gate-info)
-                                       :fidelity fidelity)))))))
+          :for gate-info := (hardware-object-gate-information link)
+          :do (flet ((stash-fidelity (gate-name arguments)
+                       (a:when-let ((fidelity (gethash (format nil "f~a" gate-name) spec))
+                                    (binding (make-instance 'gate-binding
+                                                            :operator (named-operator gate-name)
+                                                            :arguments arguments)))
+                         (setf (gethash binding gate-info)
+                               (copy-instance (gethash binding gate-info)
+                                              :fidelity fidelity)))))
+                (setf (gethash "specs" (hardware-object-misc-data link))
+                      spec)
+                (dolist (args '(("CZ" ())
+                                ("ISWAP" ())
+                                ("CPHASE" (_))
+                                ("PISWAP" (_))))
+                  (destructuring-bind (name params) args
+                    (stash-fidelity name params)))))))
 
 (defun qpu-hash-table-to-chip-specification (hash-table)
   "Converts a QPU specification HASH-TABLE, to a chip-specification object.  Requires an \"isa\" layer."
@@ -347,8 +336,7 @@
 (defun check-program-skips-dead-qubits (parsed-program chip-specification)
   "Throws an assert when PARSED-PROGRAM's instructions, assumed flat,
 touch any qubits marked as dead in CHIP-SPECIFICATION."
-  (let ((dead-qubits (loop :for qubit-index :below (length
-                                                    (vnth 0 (chip-specification-objects chip-specification)))
+  (let ((dead-qubits (loop :for qubit-index :below (chip-spec-n-qubits chip-specification)
                            :nconc (when (gethash "dead" (hardware-object-misc-data
                                                          (chip-spec-nth-qubit chip-specification qubit-index)))
                                     (list qubit-index)))))

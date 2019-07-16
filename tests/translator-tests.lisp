@@ -212,8 +212,8 @@
   (let ((chip-spec (cl-quil::make-chip-specification
                     :generic-rewriting-rules (coerce (cl-quil::global-rewriting-rules) 'vector))))
     (cl-quil::install-generic-compilers chip-spec ':cz)
-    (loop :repeat 4 :do
-      (cl-quil::adjoin-hardware-object (cl-quil::build-qubit) chip-spec))
+    (loop :for j :below 4 :do
+      (cl-quil::adjoin-hardware-object (cl-quil::build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (cl-quil::install-link-onto-chip chip-spec 0 1)
     (cl-quil::install-link-onto-chip chip-spec 2 3)
     chip-spec))

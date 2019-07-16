@@ -549,12 +549,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
-  (flet ( ;; Strips the occurrence tables from a run of FIND-SHORTEST-COMPILER-PATH.
-         (discard-tables (path)
-           (loop :for item :in path
-                 :when (typep item 'compiler)
-                   :collect item))
-         ;; Checks whether PATH doubles back through the occurrence table START.
+  (flet ( ;; Checks whether PATH doubles back through the occurrence table START.         
          (path-has-a-loop-p (path start)
            (and (< 1 (length path))
                 (loop :for (gateset compiler) :on path :by #'cddr
@@ -577,66 +572,71 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                               (loop :for b :being :the :hash-keys :of target-gateset
                                       :thereis (binding-subsumes-p b (first (compiler-bindings x))))))
                         compilers))
-           generic-path
-           generic-cost
-           compilers-to-save)
-      
-      ;; start by computing a fast route from the generic gate to the target gate set
-      (setf generic-path (find-shortest-compiler-path unconditional-compilers
+           ;; start by computing a fast route from the generic gate to the target gate set
+           (generic-path (find-shortest-compiler-path unconditional-compilers
                                                       target-gateset
                                                       (alexandria:plist-hash-table
                                                        (list (generate-blank-binding qubit-count) 1)
                                                        :test #'equalp)
                                                       qubit-count))
-      (setf generic-cost (occurrence-table-cost (first generic-path) target-gateset))
-      (setf compilers-to-save (discard-tables generic-path))
+           (generic-cost (occurrence-table-cost (first generic-path) target-gateset)))
       
       ;; it may be that non-generic gates have shorter routes to the target gate set.
       ;; each possible such route begins with a specialized compiler.
       ;; so, iterate over specialized compilers and see if they lead anywhere nice.
-      (dolist (compiler candidate-special-compilers)
-        (let* ((special-path
-                 (find-shortest-compiler-path
-                  unconditional-compilers target-gateset
-                  (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
-                  qubit-count))
-               (special-cost (occurrence-table-cost (first special-path) target-gateset)))
-          ;; did we in fact beat out the generic machinery?
-          (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
-                     (> special-cost generic-cost))
-            ;; then store it!
-            (setf compilers-to-save
-                  (append compilers-to-save (list compiler) (discard-tables special-path))))))
-      
-      ;; these are basically all the compilers we care to use; now we need to
-      ;; sort them into preference order.
-      (let* ((sorted-compilers
-               (sort-compilers-by-output-friendliness
-                        (remove-duplicates compilers-to-save)
-                        target-gateset qubit-count))
-             ;; additionally, we install a couple extra compilers as hax to make
-             ;; the whole machine work. each such hak comes with an explanation,
-             ;; and it would be preferable to work to make each hak unnecessary.
-             (compilers-with-features
-               (append
-                ;; STATE-PREP-APPLICATION doesn't have a GATE-MATRIX, which causes
-                ;; some havoc with all this new automation. so, instead, we prefix
-                ;; with a compiler that catches S-P-As early.
-                (cond
-                  ((= 1 qubit-count)
-                   (list #'state-prep-1q-compiler))
-                  ((= 2 qubit-count)
-                   (list #'state-prep-2q-compiler)))
-                sorted-compilers)))
-        (loop :for c :in compilers-with-features
-              :if (occurrence-table-in-gateset-p (filter-by-qubit-count
-                                                  (compiler-output-gates c)
-                                                  qubit-count)
-                                                 target-gateset)
-                :collect c :into compilers-t
-              :else
-                :collect c :into compilers-nil
-              :finally (return (append compilers-t compilers-nil)))))))
+      (let ((compiler-hash (make-hash-table)))
+        (dolist (compiler generic-path)
+          (when (typep compiler 'compiler)
+            (setf (gethash compiler compiler-hash) generic-cost)))
+        (dolist (compiler candidate-special-compilers)
+          (let* ((special-path
+                   (find-shortest-compiler-path
+                    unconditional-compilers target-gateset
+                    (filter-by-qubit-count (compiler-output-gates compiler) qubit-count)
+                    qubit-count))
+                 (special-cost (occurrence-table-cost (first special-path) target-gateset)))
+            ;; did we in fact beat out the generic machinery?
+            (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
+                       (>= special-cost generic-cost))
+              ;; then store it!
+              (setf (gethash compiler compiler-hash) special-cost))))
+        
+        ;; these are basically all the compilers we care to use; now we need to
+        ;; sort them into preference order.
+        (let* ((sorted-compilers
+                 (stable-sort (remove-duplicates
+                               (append (loop :for compiler :being :the :hash-keys :of compiler-hash
+                                             :collect compiler)
+                                       (loop :for compiler :in generic-path
+                                             :when (typep compiler 'compiler)
+                                               :collect compiler)))
+                              #'>
+                              :key (lambda (x) (gethash x compiler-hash))))
+               ;; additionally, we install a couple extra compilers as hax to make
+               ;; the whole machine work. each such hak comes with an explanation,
+               ;; and it would be preferable to work to make each hak unnecessary.
+               (cleaved-compilers
+                 (loop :for c :in sorted-compilers
+                       :if (occurrence-table-in-gateset-p (filter-by-qubit-count
+                                                           (compiler-output-gates c)
+                                                           qubit-count)
+                                                          target-gateset)
+                         :collect c :into compilers-t
+                       :else
+                         :collect c :into compilers-nil
+                       :finally (return (append compilers-t compilers-nil))))
+               (compilers-with-features
+                 (append
+                  ;; STATE-PREP-APPLICATION doesn't have a GATE-MATRIX, which causes
+                  ;; some havoc with all this new automation. so, instead, we prefix
+                  ;; with a compiler that catches S-P-As early.
+                  (cond
+                    ((= 1 qubit-count)
+                     (list #'state-prep-1q-compiler))
+                    ((= 2 qubit-count)
+                     (list #'state-prep-2q-compiler)))
+                  cleaved-compilers)))
+          compilers-with-features)))))
 
 (define-condition cannot-concretize-binding (serious-condition) ())
 (define-condition no-binding-match (serious-condition) ())
