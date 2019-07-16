@@ -36,6 +36,12 @@
 (defparameter +PX+ (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
 (defparameter +PY+ (magicl:make-complex-matrix 2 2 '(0 #C(0 1) #C(0 -1) 0)))
 (defparameter +PZ+ (magicl:make-complex-matrix 2 2 '(1 0 0 -1)))
+;;; Clifford + T
+(defparameter +H+ (magicl:make-complex-matrix 2 2 (let ((a (/ (sqrt 2))))
+                                                    (list a a a (- a)))))
+(defparameter +S+ (magicl:make-complex-matrix 2 2 '(1 0 0 #C(0 1))))
+(defparameter +S-inv+ (magicl:make-complex-matrix 2 2 '(1 0 0 #C(0 -1))))
+(defparameter +T-inv+ (magicl:make-complex-matrix 2 2 `(1 0 0 ,(cis (- (/ pi 4))))))
 
 ;;; ------------------------------------------------------------------
 ;;; --------------Various utility functions/structures----------------
@@ -87,16 +93,13 @@
   (v '() :type (or list commutator))
   (w '() :type (or list commutator)))
 
-;; (defun multiply-commutator (comm)
-;;   comm)
-
-;; (defun expand-commutator (comm)
-;;   (let ((v (commutator-v comm))
-;;         (w (commutator-w comm)))
-;;     (append v w (dagger v) (dagger w))))
-
 (defun seq-dagger (op-seq)
   (reverse (mapcar #'(lambda (x) (* -1 x)) op-seq)))
+
+(defstruct (bloch-vector (:constructor make-bloch-vector))
+  "A bloch-vector representation of unitaries as a rotation about an axis on the Bloch sphere."
+  (theta 0.0d0 :type double-float)
+  (axis #(0 0 0) :type (simple-vector 3)))
 
 (defun random-bloch-vector (max-theta &key (def-theta 0))
   "Generate a random bloch-vector with a maximum rotation angle of MAX-THETA. However, if DEF-THETA is set to a non-zero value, generate a random bloch-vector with the exact rotation angle DEF-THETA."
@@ -137,22 +140,27 @@
   ((basis-gates :reader basis-gates
                 :initarg :basis-gates
                 :type (vector simple-gate *)
-                :initform (error ":BASIS-GATES is a required initarg to DECOMPOSER.")
                 :documentation "Set of basic gates/operators to decompose to.")
    (num-qubits :reader num-qubits
                :initarg :num-qubits
                :type non-negative-fixnum
-               :initform (error ":NUM-QUBITS is a required initarg to DECOMPOSER.")
                :documentation "Number of qubits the operators of this decomposer act on.")
    (epsilon0 :reader epsilon0
              :initarg :epsilon0
              :type double-float
-             :initform (error ":EPSILON0 is a required initarg to DECOMPOSER.")
-             :documentation "Parameter controlling the density of base-approximation unitaries for this decomposer. Specifically, every unitary operator on NUM-QUBITS should be within EPSILON0 of some unitary in BASE-APPROXIMATIONS.")
+             :documentation "Parameter controlling the density of base-approximation unitaries for this decomposer. Specifically, the angle-axis ball for NUM-QUBITS will be divided into segments of SUBDIVISION along each axis.")
+   (subdivision :accessor subdivision
+                :initarg :subdivision
+                :type double-float
+                :documentation "Parameter controlling the density of base-approximation unitaries for this decomposer. Specifically, the angle-axis ball for NUM-QUBITS will be divided into segments of SUBDIVISION along each axis.")
    (base-approximations :accessor base-approximations
                         :initarg :base-approximations
-                        :initform nil
+                        :type hash-table
                         :documentation "A set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set."))
+  (:default-initargs
+   :basis-gates (error ":BASIS-GATES is a required initarg to DECOMPOSER.")
+   :num-qubits (error ":NUM-QUBITS is a required initarg to DECOMPOSER.")
+   :epsilon0 0.1)
   (:documentation "A decomposer which uses the Solovay-Kitaev algorithm to approximately decompose arbitrary unitaries to a finite set of basis gates."))
 
 (defun make-decomposer (basis-gates num-qubits epsilon0)
@@ -162,7 +170,8 @@
                  :basis-gates basis-gates
                  :num-qubits num-qubits
                  :epsilon0 epsilon0
-                 :base-approximations (generate-base-approximations basis-gates num-qubits epsilon0)))
+                 :subdivision 0.01 ;;TODO: REPLACE THIS
+                 :base-approximations (generate-base-approximations basis-gates num-qubits 0.01)))
 
 ;;; --------------------------------------------------------------
 ;;; --------------BASE APPROXIMATION GENERATION-------------------
@@ -182,11 +191,8 @@
 
 (defun bloch-vector-to-ball-coord (bv)
   "Returns the axis-angle ball coordinate of a bloch-vector BV."
-  (let ((ball-coord (make-array 3)))
-    (loop :for i :below 3
-          :for j :across (bloch-vector-axis bv)
-          :do (setf (aref ball-coord i) (* j (bloch-vector-theta bv))))
-    ball-coord))
+  (concatenate 'vector (loop :for x :across (bloch-vector-axis bv)
+                             :collect (* x (bloch-vector-theta bv)))))
 
 (defun aa-ball-distance (bv1 bv2)
   "Distance on the axis-angle ball between bloch-vectors BV1 and BV2."
@@ -204,75 +210,75 @@
         :when (< bv-dist (sqrt (* 3 (expt subdivision 2))))
           :maximize mat-dist))
 
-(defun matrix-to-grid-id (mat subdivision)
-  "Returns the grid ID of MAT when mapped to an axis-angle ball coordinate in a grid of size SUBDIVISION, as an array of 3 decimals."
-  (let ((ball-coord (bloch-vector-to-ball-coord (matrix-to-bloch-vector mat)))
-        (grid-id (make-array 3)))
-    (loop :for i :below 3 :for j :across ball-coord :do (setf (aref grid-id i) (/ j subdivision)))))
+(defun matrix-to-grid-coord (mat subdivision)
+  "Returns the grid coordinate of MAT when mapped to an axis-angle ball coordinate in a grid of size SUBDIVISION, as an array of 3 integers."
+  (loop :for x :across (bloch-vector-to-ball-coord (matrix-to-bloch-vector mat))
+        :collect (floor x subdivision)))
 
 ;;; Generate a hash table of grid coordinate -> unitary. Populate
 ;;; using IDDFS, as we want to minimize approximation lengths.
-(defun generate-base-approximations (basis-gates num-qubits epsilon0) ;; TODO
+(defun generate-base-approximations (basis-gates &key (depth-limit 10)
+                                                      (num-qubits 1)
+                                                      (subdivision 0.1)) ;; TODO
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
-  (values basis-gates num-qubits epsilon0))
+  (let* ((ball-volume (ceiling (* (/ 4 3) pi (expt (/ pi subdivision) 3))))
+         (approx-table (make-hash-table :test 'equalp))
+         (max-depth 0)
+         (prev-count 0))
+    (labels ((helper (depth seq mat)
+               (cond ((= depth max-depth)
+                      #+ignore(format t "~A~%~A~%" seq mat)
+                      (let ((coord (matrix-to-grid-coord mat subdivision)))
+                        (unless (gethash coord approx-table)
+                          (setf (gethash coord approx-table) seq))))
+                     (t (dolist (gate basis-gates)
+                          (helper (1+ depth) (cons gate seq) (m* gate mat)))))))
+      (dotimes (curr-depth depth-limit)
+        (format t "Searching at depth ~D..." curr-depth)
+        (finish-output)
+        (setf max-depth curr-depth)
+        (helper 0 '() +I+)
+        (format t " (~D new item~:P)~%" (- (hash-table-count approx-table) prev-count))
+        (setf prev-count (hash-table-count approx-table))))))
 
 ;;; Will just be a hash table lookup
-(defun find-base-approximation (base-approximations u) ;; TODO
-  "Returns the base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
-  (values base-approximations u))
+;; (defun find-base-approximation (base-approximations u) ;; TODO
+;;   "Returns the base case approximation for a unitary U, represented as a list of indices in sign-inverse convention."
+;;   )
 
 ;;; ---------------------------------------------------------------
 ;;; ---------------------Algorithm Calling-------------------------
 ;;; ---------------------------------------------------------------
 
-(defun sk-iter (decomposer u n)
-  "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a list of integer indices in sign-inverse convention."
+;;; Helper method for iterating through SK
+(defun sk-iter (base-approximations u n)
+  "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a vector of two items, which are each either a commutator or a base approximation."
   (if (zerop n)
-      (find-base-approximation (base-approximations decomposer) u)
+      t #+ignore(gethash (matrix-to-grid-id u 0.01))
       (let* ((comm (gc-decompose u))
-             (v-next (sk-iter decomposer (commutator-v comm) (1- n)))
-             (w-next (sk-iter decomposer (commutator-w comm) (1- n))))
-        (append (make-commutator :v v-next :w w-next) (sk-iter decomposer u (1- n))))))
+             (v-next (sk-iter base-approximations (commutator-v comm) (1- n)))
+             (w-next (sk-iter base-approximations (commutator-w comm) (1- n))))
+        (vector (sk-iter base-approximations u (1- n)) (make-commutator :v v-next :w w-next)))))
 
 (defun decompose (decomposer unitary epsilon)
-  "Decomposes a unitary into a commutator sequence, which is a list of commutator objects with a base approximation list as the last element. This decomposition is guaranteed to be within EPSILON of the original unitary."
+  "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U. When expanded into all its constituent unitaries, this decomposition is guaranteed to be within EPSILON of the original unitary."
   (let* ((eps0 (epsilon0 decomposer))
          (depth (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
                                  (log (* eps0 +c-approx+ +c-approx+))))
-                         (log (/ 3 2))))
-         #+ignore(basis-gates (basis-gates decomposer)))
-    (sk-iter decomposer unitary depth)
-    #+ignore(mapcar #'(lambda (x) (basis-gate-from-index basis-gates x)) (sk-iter decomposer unitary depth))))
+                         (log (/ 3 2)))))
+    (sk-iter (base-approximations decomposer) unitary depth)))
 
-(defun expand-commutator-seq (decomposer seq) ;; TODO
-  "Recursively expands every commutator in SEQ to obtain a list of unitaries, using the operator indices defined in DECOMPOSER."
-  (let ((basis-gates (basis-gates decomposer)))
-    (mapcar #'(lambda (x) (if (type-p x 'fixnum) (basis-gate-from-index basis-gates x) (expand-commutator x))) seq))
-  seq)
-
-;;; ------------------------------------------------------------------
-;;; -------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
-;;; ------------------------------------------------------------------
-;;; Overall procedure taken in https://github.com/cmdawson/sk to find
-;;; balanced group commutators V and W for a unitary U (the ' symbol
-;;; represents a dagger):
-;;;
-;;;    1) Convert U to its bloch-vector representation, which is a
-;;;       rotation by some theta around an arbitrary axis.
-;;;
-;;;    2) Find unitaries S and Rx s.t. Rx is a rotation around the X
-;;;       axis by theta and SRxS' = U.
-;;;
-;;;    3) Find the group commutators B, C for Rx s.t. Rx = BCB'C'.
-;;;
-;;; With A, B, and S, we can set V = SBS' and W = SCS', because then
-;;; VWV'W' = SBS'SCS'SB'S'SC'S' = SBCB'C'S' = SRxS' = U.
-
-;;; bloch-vector structure and conversions to/from unitary matrices
-(defstruct (bloch-vector (:constructor make-bloch-vector))
-  "A bloch-vector representation of unitaries as a rotation about an axis on the Bloch sphere."
-  (theta 0.0d0 :type double-float)
-  (axis #(0 0 0) :type (simple-vector 3)))
+(defun decompress (decomposer item) ;; TODO
+  "Expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate basis gate label for each sign-inverse index inside, returning the decompressed list of basis gates."
+  (if (typep item 'commutator)
+      (concatenate 'vector (decompress decomposer (commutator-v item))
+                   (decompress decomposer (commutator-w item))
+                   (seq-dagger (decompress decomposer (commutator-v item)))
+                   (seq-dagger (decompress decomposer (commutator-w item))))
+      (mapcar #'(lambda (x) (if (typep x 'fixnum)
+                                x #+ignore(basis-gate-from-index (basis-gates decomposer) x)
+                                (decompress decomposer x)))
+              item)))
 
 ;;; Conversions between matrix and bloch-vector representations of
 ;;; unitaries. To understand them, remember/note that for a rotation
@@ -338,6 +344,24 @@
           :for num :in phase-nums
           :when (not (zerop num))
             :do (return (* (/ (abs num) num) (if (evenp i) 1 #C(0 -1)))))))
+
+;;; ------------------------------------------------------------------
+;;; -------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
+;;; ------------------------------------------------------------------
+;;; Overall procedure taken in https://github.com/cmdawson/sk to find
+;;; balanced group commutators V and W for a unitary U (the ' symbol
+;;; represents a dagger):
+;;;
+;;;    1) Convert U to its bloch-vector representation, which is a
+;;;       rotation by some theta around an arbitrary axis.
+;;;
+;;;    2) Find unitaries S and Rx s.t. Rx is a rotation around the X
+;;;       axis by theta and SRxS' = U.
+;;;
+;;;    3) Find the group commutators B, C for Rx s.t. Rx = BCB'C'.
+;;;
+;;; With A, B, and S, we can set V = SBS' and W = SCS', because then
+;;; VWV'W' = SBS'SCS'SB'S'SC'S' = SBCB'C'S' = SRxS' = U.
 
 (defun unitary-to-conjugated-x-rotation (u)
   "Given a unitary U, returns unitaries S and Rx such that Rx is a rotation around the X axis by the same angle that U rotates around its axis, and U = SRxS'."
