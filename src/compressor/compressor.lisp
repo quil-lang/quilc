@@ -216,7 +216,7 @@ other's."
                                           context)
   "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      (;; utility for calculating how many instructions a rewriting rule requests
+      ( ;; utility for calculating how many instructions a rewriting rule requests
        (rewriting-rule-count (compiler)
          (length (cleave-options (compiler-bindings compiler))))
        
@@ -248,9 +248,9 @@ other's."
                            (apply rule
                                   (append
                                    (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection)
-                                   (list :context (peephole-rewriter-node-context
-                                                   (peephole-rewriter-node-prev
-                                                    (first relevant-nodes-for-inspection))))))))
+                                   (list ':context (peephole-rewriter-node-context
+                                                    (peephole-rewriter-node-prev
+                                                     (first relevant-nodes-for-inspection))))))))
                      (format *compiler-noise-stream*
                              "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~a.~%"
                              (compiler-name rule))

@@ -119,7 +119,7 @@ If ALLOW-EMPTY-PAYLOADS is true, then an empty payload resolves to the same thin
         ((and (null data) allow-empty-payloads) (setf data "{}"))
         ((not (stringp data)) (error "Invalid payload in POST request. Was it empty?")))
       ;; Proceed with parsing.
-      (let* ((*read-default-float-format* 'double-float)
+      (let* ((*read-default-float-format* 'double-float) ; yason parses string-representatives of floats into this data type. we use doubles, but this defaults to singles.
              (json (yason:parse data))
              (api-key (tbnl:header-in* ':X-API-KEY request))
              (user-id (tbnl:header-in* ':X-USER-ID request)))

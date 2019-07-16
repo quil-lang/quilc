@@ -28,19 +28,19 @@
 (deftest test-euler-translations ()
   "Ensures that the different Euler decompositions all work."
   (let ((master-matrix (quil::random-special-unitary 2)))
-    (dolist (compiler (list 'quil::euler-zyz-compiler
-                            'quil::euler-zxz-compiler
-                            'quil::euler-yzy-compiler
-                            'quil::euler-yxy-compiler
-                            'quil::euler-xyx-compiler
-                            'quil::euler-xzx-compiler))
+    (dolist (compiler '(quil::euler-zyz-compiler
+                        quil::euler-zxz-compiler
+                        quil::euler-yzy-compiler
+                        quil::euler-yxy-compiler
+                        quil::euler-xyx-compiler
+                        quil::euler-xzx-compiler))
       (let* ((compiled-program (funcall compiler
                                         (build-anonymous-gate master-matrix 0)))
              (compiled-matrix (quil::make-matrix-from-quil compiled-program)))
         (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
             "Euler translation test failed: ~a~%" compiler)))))
 
-(defun generate-test-case (bindings)
+(defun generate-translator-test-case-for-simple-compiler (bindings)
   ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
   (let ((adjacency-table (make-hash-table))
         qubit-bound
@@ -149,7 +149,8 @@
          (let (test-case input-matrix compiled-output output-matrix)
            ;; building the test case can throw an error if the compiler itself is
            ;; too complicated. we don't intend for that to break the tests.
-           (handler-case (setf test-case (generate-test-case (quil::compiler-bindings compiler)))
+           (handler-case (setf test-case (generate-translator-test-case-for-simple-compiler
+                                          (quil::compiler-bindings compiler)))
              (error ()
                (return-from test-a-compiler nil)))
            (setf input-matrix (quil::make-matrix-from-quil test-case))

@@ -108,7 +108,7 @@
   "Parses an entry in the \"gates\" field of an ISA object descriptor."
   (flet ((intern-if-string (x)
            (typecase x
-             (string (intern x))
+             (string '_)
              (otherwise x))))
     (cond
       ((string= "MEASURE" (gethash "operator" gate-datum))
