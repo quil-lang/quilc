@@ -33,7 +33,7 @@
 ;;   # with the above application of G to give either G(theta) or G(phi)
 ;;   CONTROLLED F         control target
 ;;   G((theta - phi) / 2) target
-;;   CONTROLLED F         control target
+;;   CONTROLLED DAGGER F  control target
 ;;
 ;; as a special case of this, we may set G = RY or G = RZ to recover "uniformly
 ;; controlled rolls" (UCRs), which appear in many common decomposition schemes
