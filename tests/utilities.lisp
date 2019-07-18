@@ -15,18 +15,37 @@
                 :else
                   :collect form)))))
 
+(defun matrix-mismatch (m u &key (test #'quil::double~))
+  "Return a LIST of the (ROW COL) indices of the first mismatch between M and U.
+
+If M and U are equal under TEST, return NIL."
+  (check-type m magicl:matrix)
+  (check-type u magicl:matrix)
+  (assert (and (= (magicl:matrix-rows m) (magicl:matrix-rows u))
+               (= (magicl:matrix-cols m) (magicl:matrix-cols u))))
+  (dotimes (r (magicl:matrix-rows m))
+    (dotimes (c (magicl:matrix-cols m))
+      (unless (funcall test (magicl:ref m r c) (magicl:ref u r c))
+        (return-from matrix-mismatch (list r c))))))
+
+(defun %matrix-mismatch-error-message (m u &key (test #'quil::double~))
+  (format nil "Matrix comparison failed. First mismatch at position: ~A~@
+               First matrix:~%~A~@
+               Second matrix:~%~A"
+          (matrix-mismatch m u :test test)
+          m
+          u))
+
 (defun fiasco-assert-matrices-are-equal (m u)
   (is (= (magicl:matrix-rows u) (magicl:matrix-rows m)))
   (is (= (magicl:matrix-cols u) (magicl:matrix-cols m)))
   (setf u (quil::scale-out-matrix-phases u m))
-  (is (loop :for i :below (magicl:matrix-rows m) :always
-         (loop :for j :below (magicl:matrix-cols m) :always
-            (< (abs (- (magicl:ref m i j) (magicl:ref u i j))) 0.01)))
-      (with-output-to-string (s)
-        (format s "Matrix comparison failed.~%Input matrix:")
-        (magicl::pprint-matrix s m)
-        (format s "~%Output matrix:~%")
-        (magicl::pprint-matrix s u))))
+  (flet ((test~ (a b)
+           (< (abs (- a b)) 0.01)))
+    (is (loop :for i :below (magicl:matrix-rows m) :always
+          (loop :for j :below (magicl:matrix-cols m) :always
+            (test~ (magicl:ref m i j) (magicl:ref u i j))))
+        (%matrix-mismatch-error-message m u :test #'test~))))
 
 (defun build-anonymous-gate (matrix &rest qubit-indices)
   (make-instance 'cl-quil::gate-application

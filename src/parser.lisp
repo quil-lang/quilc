@@ -803,26 +803,24 @@ INPUT-STRING that triggered the condition."
 
 (defun validate-gate-matrix-size (gate-name num-entries)
   "For the gate named GATE-NAME, check that NUM-ENTRIES is a valid number of entries for a gate matrix."
-  (flet ((perfect-square-p (n)
-           (= n (expt (isqrt n) 2))))
-    (unless (<= 4 num-entries)
-      (quil-parse-error "There must be at least 4 entries (a one-qubit ~
+  (unless (<= 4 num-entries)
+    (quil-parse-error "There must be at least 4 entries (a one-qubit ~
                          operator) for the gate ~A being defined. Got ~D."
-                        gate-name
-                        num-entries))
-    (unless (perfect-square-p num-entries)
-      (quil-parse-error "The number of entries of the gate ~A being defined ~
+                      gate-name
+                      num-entries))
+  (unless (perfect-square-p num-entries)
+    (quil-parse-error "The number of entries of the gate ~A being defined ~
                          must be a perfect square (i.e., it must be a square ~
                          matrix. I got ~D entries."
-                        gate-name
-                        num-entries))
-    (unless (positive-power-of-two-p (isqrt num-entries))
-      (quil-parse-error "The gate ~A being defined isn't a square 2^n x 2^n ~
+                      gate-name
+                      num-entries))
+  (unless (positive-power-of-two-p (isqrt num-entries))
+    (quil-parse-error "The gate ~A being defined isn't a square 2^n x 2^n ~
                          matrix. In particular, it is a ~D x ~D matrix."
-                        gate-name
-                        (isqrt num-entries)
-                        (isqrt num-entries)))
-    t))
+                      gate-name
+                      (isqrt num-entries)
+                      (isqrt num-entries)))
+  t)
 
 (defun parse-gate-definition (tok-lines)
   "Parse a gate definition from the token lines TOK-LINES."
