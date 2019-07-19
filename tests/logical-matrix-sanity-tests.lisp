@@ -5,13 +5,9 @@
 (in-package #:cl-quil-tests)
 
 ;;; The purpose of these tests are to act as a basic sanity-check on the combination of PARSE-QUIL
-;;; and PARSED-PROGRAM-TO-LOGICAL-MATRIX. These tests are motivated by a change I made to the parser
-;;; in which I reversed the order in which gate application modifiers were parsed, but neglected to
-;;; also reverse the order of the qubit arguments. That change broke the parser and, subsequently,
-;;; caused PARSED-PROGRAM-TO-LOGICAL-MATRIX to produce incorrect output, but did not result in any
-;;; test failures. Making the same parser change will now cause the below tests (specifically ones
-;;; that include both FORKED and CONTROLLED modifiers) to fail. So the purpose of these tests is to
-;;; prevent appleby from foolishly breaking the parser again (at least not in the same way)!
+;;; and PARSED-PROGRAM-TO-LOGICAL-MATRIX. Specifically these test were motivated by a bug in the way
+;;; gate modifiers were parsed, resulting in incorrect logical matrices being generated when the
+;;; FORKED and CONTROLLED modifiers were combined for certain choices of gate and gate parameters.
 
 (deftest test-parser->logical-matrix-sanity ()
   "Test that PARSE-QUIL -> PARSED-PROGRAM-TO-LOGICAL-MATRIX produces the expected matrix for a handful of simple programs."
