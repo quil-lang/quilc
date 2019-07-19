@@ -12,7 +12,9 @@
   (:documentation
    "Create a shallow copy of the object INSTANCE.  The contents of INITARGS-OVERWRITE are used to overwrite individual slot contents in the cloned object.
 
-WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.")
+WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.
+
+WARNING 2: The default will work for structs which have not been subclassed, but struct types that belong to an inheritance tree display weird behavior with the typechecking internal to (setf slot-value).")
   (:method ((instance t) &rest initargs-overwrite)
     (let* ((class (class-of instance))
            (copy (allocate-instance class)))

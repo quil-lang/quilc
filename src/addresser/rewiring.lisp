@@ -14,7 +14,7 @@
   (l2p #() :type integeropt-vector)
   (p2l #() :type integeropt-vector))
 
-(defmethod print-object ((object rewiring) stream)
+(defmethod print-object :around ((object rewiring) stream)
   (let ((*print-pretty* nil))
     (call-next-method)))
 

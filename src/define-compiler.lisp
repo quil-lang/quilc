@@ -41,6 +41,8 @@
 ;;; preconditions a given compiler needs to operator and (2) to destructure such
 ;;; an input so that the compiler definition can work with the instruction internals.
 
+;; NOTE: these could be converted to structs pretty painlessly, but copy-instance
+;;       is broken for structs with inheritance.
 (defclass compiler-binding ()
   ((name    :initarg :name
             :initform nil
@@ -389,6 +391,8 @@ OPTIONS: plist of options governing applicability of the compiler binding.")
   (:documentation "Represents a transformation that carries particular instruction sequences (e.g., CZ p q; CZ p q) into others (e.g., NOP), decorated with information about the transformation (e.g., the input and output gatesets)."))
 
 (defmethod initialize-instance :after ((c compiler) &key)
+  ;; N.B.: To achieve late binding, set this definition instead:
+  ;;       (lambda (&rest args) (apply (compiler-%function x) args))
   (closer-mop:set-funcallable-instance-function c (compiler-%function c)))
 
 (defmethod print-object ((obj compiler) stream)

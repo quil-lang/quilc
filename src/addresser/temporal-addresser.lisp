@@ -458,7 +458,9 @@ Optional arguments:
                 (update-rewiring initial-l2p q0 q1)
                 (update-rewiring working-l2p q0 q1)
                 (format *compiler-noise-stream*
-                        "GREEDY-TEMPORAL-ADDRESSING: This is a free swap. :)~%GREEDY-TEMPORAL-ADDRESSING: New rewiring: ~a~%GREEDY-TEMPORAL-ADDRESSING: New initial rewiring: ~a~%"
+                        "GREEDY-TEMPORAL-ADDRESSING: This is a free swap. :)~%~
+                         GREEDY-TEMPORAL-ADDRESSING: New rewiring: ~a~%~
+                         GREEDY-TEMPORAL-ADDRESSING: New initial rewiring: ~a~%"
                         working-l2p initial-l2p)))))
 
          ;;

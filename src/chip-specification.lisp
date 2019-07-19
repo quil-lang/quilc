@@ -351,57 +351,57 @@ used to specify CHIP-SPEC."
 ;;; routines for populating the fields of a CHIP-SPECIFICATION object (and
 ;;; maintaining the appropriate interrelations).
 (defvar *global-compilers*
-  (list (constantly #'swap-to-native-swaps)
+  (list (constantly 'swap-to-native-swaps)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            #'cnot-to-native-cnots))
+            'cnot-to-native-cnots))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            #'cz-to-native-czs))
+            'cz-to-native-czs))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
-            #'ISWAP-to-native-ISWAPs))
+            'ISWAP-to-native-ISWAPs))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cphase)
-            #'CPHASE-to-native-CPHASEs))
+            'CPHASE-to-native-CPHASEs))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':piswap)
-            #'PISWAP-to-native-PISWAPs))
+            'PISWAP-to-native-PISWAPs))
         ;; We make this unconditional. We could later conditionalize it if
         ;; we happen to have better CCNOT translations for specific target
         ;; gate sets.
-        (constantly #'ccnot-to-cnot)
-        (constantly #'phase-to-rz)
+        (constantly 'ccnot-to-cnot)
+        (constantly 'phase-to-rz)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
-            #'ucr-compiler-to-cz))
+            'ucr-compiler-to-cz))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
-            #'ucr-compiler-to-iswap))
-        (constantly #'state-prep-1q-compiler)
-        (constantly #'state-prep-2q-compiler)
-        (constantly #'state-prep-trampolining-compiler)
-        (constantly #'recognize-ucr)
+            'ucr-compiler-to-iswap))
+        (constantly 'state-prep-1q-compiler)
+        (constantly 'state-prep-2q-compiler)
+        (constantly 'state-prep-trampolining-compiler)
+        (constantly 'recognize-ucr)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
-          (a:curry #'approximate-2q-compiler
+          (a:curry 'approximate-2q-compiler
                    (append (list #'nearest-circuit-of-depth-0)
                            (when (optimal-2q-target-meets-requirements arch ':cz)
-                             (list #'nearest-cz-circuit-of-depth-1
-                                   #'nearest-cz-circuit-of-depth-2
-                                   #'nearest-cz-circuit-of-depth-3))
+                             (list 'nearest-cz-circuit-of-depth-1
+                                   'nearest-cz-circuit-of-depth-2
+                                   'nearest-cz-circuit-of-depth-3))
                            (when (optimal-2q-target-meets-requirements arch ':iswap)
-                             (list #'nearest-iswap-circuit-of-depth-1
-                                   #'nearest-iswap-circuit-of-depth-2
-                                   #'nearest-iswap-circuit-of-depth-3)))))
-        (constantly #'qs-compiler))
+                             (list 'nearest-iswap-circuit-of-depth-1
+                                   'nearest-iswap-circuit-of-depth-2
+                                   'nearest-iswap-circuit-of-depth-3)))))
+        (constantly 'qs-compiler))
   "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
 
 Compilers are listed in descending precedence.")

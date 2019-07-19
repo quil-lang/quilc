@@ -36,10 +36,11 @@
 EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build-gate \"CPHASE\" '(#.pi) 2 3)."
   (check-type params a:proper-list)
   (check-type qubits a:proper-list)
-  (check-type operator (or string operator-description))
+  (check-type operator (or string operator-description symbol))
   (push qubit qubits)
   (let* ((operator-adt
            (etypecase operator
+             (symbol (string operator))
              (string (named-operator operator))
              (operator-description operator)))
          (gate-def
@@ -64,7 +65,6 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
                  :arguments (mapcar #'%capture-arg qubits)))
 
 (defun build-UCR (roll-name params qubit &rest qubits)
-  (format *compiler-noise-stream* "BUILD-UCR: Called on ~a, ~{~a ~}~%" qubit qubits)
   (loop :with op := (named-operator roll-name)
         :repeat (length qubits)
         :do (setf op (forked-operator op))
