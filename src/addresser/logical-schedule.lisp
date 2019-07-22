@@ -596,7 +596,11 @@ mapping instructions to their tags. "
                                                                   (equalp x (gate-binding-operator y)))))))
                           (unless gate-record
                             (warn-and-skip instr))
-                          (setf fidelity (gate-record-fidelity gate-record))))))
+                          (dohash ((key val) specs-hash)
+                           (when (binding-subsumes-p key (get-binding-from-instr instr))
+                             (setf fidelity (gate-record-fidelity val))))))))
+                          (unless fidelity
+                            (warn-and-skip instr))
                    (otherwise
                     (warn-and-skip instr)))
                  (* value
