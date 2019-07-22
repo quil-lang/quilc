@@ -27,9 +27,20 @@
 (defparameter *cost-fn-dist-decay* 0.5
   "Describes the rate of decay of instruction importance vs. number of SWAPs required before this instruction is actionable.")
 
+(defun swap-fidelity (chip-spec link-index)
+  "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
+  (let* ((hardware-object (chip-spec-nth-link chip-spec link-index))
+         (permutation-record (vnth 0 (hardware-object-permutation-gates
+                                      hardware-object)))
+         (swap (apply #'build-gate
+                      (permutation-record-operator permutation-record)
+                      '()
+                      (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list))))
+    (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
+
 ;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
 (defun precompute-qubit-qubit-distances (chip-spec)
-  "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by swap duration."
+  "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by swap fidelity."
   (let* ((vertex-count (length (vnth 0 (chip-specification-objects chip-spec))))
          (dist (make-array (list vertex-count vertex-count)
                            :initial-element most-positive-fixnum)))
@@ -40,9 +51,7 @@
     (dotimes (link-index (length (vnth 1 (chip-specification-objects chip-spec))))
       (let ( ; eventually this should look up "SWAP" in this list, but for now
              ; this is guaranteed to be the only 2Q permutation anyway.
-            (weight (permutation-record-duration
-                     (vnth 0 (hardware-object-permutation-gates
-                              (chip-spec-nth-link chip-spec link-index)))))
+            (weight (- (log (swap-fidelity chip-spec link-index))))
             (left-vertex (vnth 0 (chip-spec-qubits-on-link chip-spec link-index)))
             (right-vertex (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))))
         (setf (aref dist right-vertex left-vertex) weight)
