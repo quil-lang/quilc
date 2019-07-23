@@ -23,7 +23,7 @@
 ;;;; In the case of the layer "isa", this complex data is a dictionary which
 ;;;; tracks information about legal operations on the QPU components:
 ;;;; { type: optional string or optional list of strings, in the case of 1Q
-;;;;         drawn from the set { "RZ", "X/2" } and in the case of 2Q drawn from
+;;;;         drawn from the set { "X/2" } and in the case of 2Q drawn from
 ;;;;         the set { "CZ", "ISWAP", "CPHASE", "ISWAP" }. these indicate which
 ;;;;         operations are legal on this component of the QPU. in the case of a
 ;;;;         list, the operations are sorted into "preference order": the
