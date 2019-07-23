@@ -209,6 +209,26 @@
     ;; and return the chip-specification that we've built
     chip-spec))
 
+(defun chip-specification-to-qpu-hash-table (chip-spec)
+  "Convert a chip-specification CHIP-SPEC to a QPU hash table. Useful when you want to pull an ISA out of a pre-built chip."
+  (check-type chip-spec chip-specification)
+  (let* ((nq (chip-spec-n-qubits chip-spec))
+         (nl (chip-spec-n-links chip-spec))
+         (table (make-hash-table :test 'equalp)))
+    (let* ((isa (setf (gethash "isa" table) (make-hash-table :test #'equalp)))
+           (oneq (setf (gethash "1Q" isa) (make-hash-table :test #'equalp)))
+           (twoq (setf (gethash "2Q" isa) (make-hash-table :test #'equalp))))
+      (loop :for qi :below nq
+            :unless (chip-spec-qubit-dead? chip-spec qi) :do
+              (setf (gethash (format nil "~S" qi) oneq)
+                    (hardware-object-misc-data (chip-spec-nth-qubit chip-spec qi))))
+      (loop :for li :below nl
+            :for qs := (chip-spec-qubits-on-link chip-spec li)
+            :unless (zerop (length qs)) :do
+              (setf (gethash (format nil "~D-~D" (elt qs 0) (elt qs 1)) twoq)
+                    (hardware-object-misc-data (chip-spec-nth-link chip-spec li)))))
+    table))
+
 (defun read-chip-spec-file (file)
   "Read a QPU specification from a file."
   (qpu-hash-table-to-chip-specification
@@ -232,22 +252,3 @@ touch any qubits marked as dead in CHIP-SPECIFICATION."
                           "Program instruction '~A' attempts to use illegal qubits: ~{~A~^, ~}. Illegal qubits on this QPU: ~{~A~^, ~}."
                           (print-instruction instr nil) instr-dead-qubits dead-qubits))))))
 
-(defun chip-specification-to-qpu-hash-table (chip-spec)
-  "Convert a chip-specification CHIP-SPEC to a QPU hash table. Useful when you want to pull an ISA out of a pre-built chip."
-  (check-type chip-spec chip-specification)
-  (let* ((nq (chip-spec-n-qubits chip-spec))
-         (nl (chip-spec-n-links chip-spec))
-         (table (make-hash-table :test 'equalp)))
-    (let* ((isa (setf (gethash "isa" table) (make-hash-table :test #'equalp)))
-           (oneq (setf (gethash "1Q" isa) (make-hash-table :test #'equalp)))
-           (twoq (setf (gethash "2Q" isa) (make-hash-table :test #'equalp))))
-      (loop :for qi :below nq
-            :unless (chip-spec-qubit-dead? chip-spec qi) :do
-              (setf (gethash (format nil "~S" qi) oneq)
-                    (make-hash-table :test #'equalp)))
-      (loop :for li :below nl
-            :for qs := (chip-spec-qubits-on-link chip-spec li)
-            :unless (zerop (length qs)) :do
-              (setf (gethash (format nil "~D-~D" (elt qs 0) (elt qs 1)) twoq)
-                    (make-hash-table))))
-    table))
