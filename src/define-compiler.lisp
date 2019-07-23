@@ -55,7 +55,7 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 (defstruct (gate-binding (:include compiler-binding))
   "Represents a compiler argument binding that destructures a gate application."
   (operator   nil :read-only t :type (or symbol operator-description))
-  (parameters nil :read-only t :type list)
+  (parameters nil :read-only t :type (or symbol list))
   (arguments  nil :read-only t :type list))
 
 (defstruct (measure-binding (:include compiler-binding))
