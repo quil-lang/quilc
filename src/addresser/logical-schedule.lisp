@@ -577,7 +577,7 @@ mapping instructions to their tags. "
                  (typecase instr
                    (measure
                     (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                           (specs-obj (gethash (make-instance 'measure-binding :qubit '_ :target '_)
+                           (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
                                                (hardware-object-gate-information qubit-obj))))
                       (unless specs-obj
                         (warn-and-skip instr))

@@ -41,55 +41,50 @@
 ;;; preconditions a given compiler needs to operator and (2) to destructure such
 ;;; an input so that the compiler definition can work with the instruction internals.
 
-;; NOTE: these could be converted to structs pretty painlessly, but copy-instance
-;;       is broken for structs with inheritance.
-(defclass compiler-binding ()
-  ((name    :initarg :name
-            :initform nil
-            :type symbol
-            :reader compiler-binding-name)
-   (options :initarg :options
-            :initform nil
-            :type list
-            :reader compiler-binding-options))
-  (:documentation
-   "Represents a generic compiler argument binding.
+(defstruct (compiler-binding (:constructor nil))
+  "Represents a generic compiler argument binding.
 
 NAME: Symbol to be bound in the compiler definition.
-OPTIONS: plist of options governing applicability of the compiler binding.")
-  (:metaclass abstract-class))
+OPTIONS: plist of options governing applicability of the compiler binding."
+  (name    nil :read-only t :type symbol)
+  (options nil :read-only t :type list))
 
-(defclass wildcard-binding (compiler-binding)
-  ()
-  (:documentation "Represents a binding that matches on any gate application."))
+(defstruct (wildcard-binding (:include compiler-binding))
+  "Represents a binding that matches on any gate application.")
 
-(defclass gate-binding (compiler-binding)
-  ((operator   :initarg :operator
-               :initform nil
-               :type (or symbol operator-description)
-               :reader gate-binding-operator)
-   (parameters :initarg :parameters
-               :initform nil
-               :reader gate-binding-parameters)
-   (arguments  :initarg :arguments
-               :initform nil
-               :reader gate-binding-arguments))
-  (:documentation "Represents a compiler argument binding that destructures a gate application."))
+(defstruct (gate-binding (:include compiler-binding))
+  "Represents a compiler argument binding that destructures a gate application."
+  (operator   nil :read-only t :type (or symbol operator-description))
+  (parameters nil :read-only t :type list)
+  (arguments  nil :read-only t :type list))
 
-(defclass measure-binding (compiler-binding)
-  ((qubit  :initarg :qubit
-           :initform nil
-           :type (or symbol unsigned-byte)
-           :reader measure-binding-qubit)
-   (target :initarg :target
-           :initform nil
-           :type (or symbol memory-ref)
-           :reader measure-binding-target))
-  (:documentation "Represents a destructuring compiler argument binding for a MEASURE instruction."))
+(defstruct (measure-binding (:include compiler-binding))
+  "Represents a destructuring compiler argument binding for a MEASURE instruction."
+  (qubit  nil :type (or symbol unsigned-byte))
+  (target nil :type (or symbol memory-ref)))
 
 ;;; here are various utility routines related to the pattern-matching bindings:
 ;;; testing whether one binding is more general than other, extracting a binding
 ;;; which minimally matches a given instruction, ... .
+
+(defun copy-binding (binding &rest initargs-override)
+  (check-type binding compiler-binding)
+  (let ((initargs (list ':name (compiler-binding-name binding)
+                        ':options (compiler-binding-options binding))))
+    (etypecase binding
+      (wildcard-binding
+       (apply #'make-wildcard-binding (append initargs-override initargs)))
+      (gate-binding
+       (setf initargs (list* ':operator (gate-binding-operator binding)
+                             ':parameters (gate-binding-parameters binding)
+                             ':arguments (gate-binding-arguments binding)
+                             initargs))
+       (apply #'make-gate-binding (append initargs-override initargs)))
+      (measure-binding
+       (setf initargs (list* ':qubit (measure-binding-qubit binding)
+                             ':target (measure-binding-target binding)
+                             initargs))
+       (apply #'make-measure-binding (append initargs-override initargs))))))
 
 (defun binding-fmt (stream obj &optional colon-modifier at-modifier)
   (declare (ignore colon-modifier at-modifier))
@@ -113,9 +108,9 @@ OPTIONS: plist of options governing applicability of the compiler binding.")
   "Constructs a COMPILER-BINDING object from an INSTRUCTION object, in such a way that if some auxiliary COMPILER-BINDING subsumes the output of this routine, then it will match when applied to the original INSTRUCTION object."
   (typecase instr
     (measure-discard
-     (make-instance 'measure-binding :qubit '_))
+     (make-measure-binding :qubit '_))
     (measurement
-     (make-instance 'measure-binding :qubit '_ :target '_))
+     (make-measure-binding :qubit '_ :target '_))
     (application
      (let ((parameters (loop :for p :in (application-parameters instr)
                              :when (typep p 'constant)
@@ -127,16 +122,15 @@ OPTIONS: plist of options governing applicability of the compiler binding.")
                               :collect (qubit-index q)
                             :when (symbolp q)
                               :collect '_)))
-       (make-instance 'gate-binding :operator (application-operator instr)
-                                    :parameters parameters
-                                    :arguments arguments)))))
+       (make-gate-binding :operator (application-operator instr)
+                          :parameters parameters
+                          :arguments arguments)))))
 
 (defun generate-blank-binding (qubit-count)
   "Constructs a wildcard COMPILER-BINDING of a fixed QUBIT-COUNT."
-  (make-instance 'gate-binding
-                 :operator '_
-                 :parameters nil
-                 :arguments (make-list qubit-count :initial-element '_)))
+  (make-gate-binding :operator '_
+                     :parameters nil
+                     :arguments (make-list qubit-count :initial-element '_)))
 
 (defun binding-subsumes-p (big-binding small-binding)
   "If this routine returns T and BIG-BINDING matches on an INSTRUCTION, then SMALL-BINDING will necessarily also match on it."
@@ -325,12 +319,11 @@ OPTIONS: plist of options governing applicability of the compiler binding.")
     (error 'cannot-concretize-binding))
   (:method ((a gate-binding) (b gate-binding))
     
-    (make-instance 'gate-binding
-                   :operator (prefer-concrete-items (gate-binding-operator a) (gate-binding-operator b))
-                   :parameters (prefer-concrete-lists (gate-binding-parameters a)
-                                                      (gate-binding-parameters b))
-                   :arguments (prefer-concrete-lists (gate-binding-arguments a)
-                                                     (gate-binding-arguments b))))
+    (make-gate-binding :operator (prefer-concrete-items (gate-binding-operator a) (gate-binding-operator b))
+                       :parameters (prefer-concrete-lists (gate-binding-parameters a)
+                                                          (gate-binding-parameters b))
+                       :arguments (prefer-concrete-lists (gate-binding-arguments a)
+                                                         (gate-binding-arguments b))))
   (:method ((a gate-binding) (b wildcard-binding))
     a)
   (:method ((a wildcard-binding) (b gate-binding))
@@ -512,13 +505,13 @@ Optionally constrains the output to include only those bindings of a particular 
         (etypecase key
           (gate-binding
            (setf new-key
-                 (copy-instance key :arguments (mapcar (constantly '_)
-                                                       (gate-binding-arguments key)))))
+                 (copy-binding key :arguments (mapcar (constantly '_)
+                                                      (gate-binding-arguments key)))))
           (measure-binding
            (setf new-key
-                 (copy-instance key :qubit '_)))
+                 (copy-binding key :qubit '_)))
           (wildcard-binding
-           (setf new-key (copy-instance key))))
+           (setf new-key (copy-binding key))))
         (setf (gethash new-key new-gateset) val)))))
 
 
@@ -708,7 +701,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                      ;; TODO: revisit this predicate.
                                        :thereis (and (or (binding-subsumes-p g b)
                                                          (when (typep b 'gate-binding)
-                                                           (binding-subsumes-p (copy-instance b :options nil) g)))
+                                                           (binding-subsumes-p (copy-binding b :options nil) g)))
                                                      (setf in-fidelity (* in-fidelity gate-fidelity)))))
                  (>= out-fidelity in-fidelity)))
           ;; if that falls through, try the exhaustive match
@@ -773,10 +766,9 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                                      (number x)
                                      (otherwise '_)))
                                  qubit-list)))
-         (setf (gethash (make-instance 'gate-binding
-                                       :operator operator
-                                       :parameters param-list
-                                       :arguments qubit-list)
+         (setf (gethash (make-gate-binding :operator operator
+                                           :parameters param-list
+                                           :arguments qubit-list)
                         table)
                1)
          table)))
@@ -789,10 +781,9 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                                      (number x)
                                      (otherwise '_)))
                                  qubit-list)))
-         (setf (gethash (make-instance 'gate-binding
-                                       :operator '_
-                                       :parameters '_ 
-                                       :arguments qubit-list)
+         (setf (gethash (make-gate-binding :operator '_
+                                           :parameters '_ 
+                                           :arguments qubit-list)
                         table)
                1)
          table)))
@@ -818,28 +809,26 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
 (defun make-binding-from-source (source)
   (when (symbolp source)
     (return-from make-binding-from-source
-      (make-instance 'wildcard-binding :name source)))
+      (make-wildcard-binding :name source)))
   (assert (listp source))
   (multiple-value-bind (source options) (cleave-options source)
     (cond
       ((endp (cdr source))
-       (make-instance 'wildcard-binding
-                      :name (first source)
-                      :options options))
+       (make-wildcard-binding :name (first source)
+                              :options options))
       (t
-       (make-instance 'gate-binding
-                      :name (first source)
-                      :options options
-                      :operator (let ((op (first (second source))))
-                                  (etypecase op
-                                    (symbol
-                                     op)
-                                    (string
-                                     (named-operator op))
-                                    (operator-description
-                                     op)))
-                      :parameters (second (second source))
-                      :arguments (rest (rest (second source))))))))
+       (make-gate-binding :name (first source)
+                          :options options
+                          :operator (let ((op (first (second source))))
+                                      (etypecase op
+                                        (symbol
+                                         op)
+                                        (string
+                                         (named-operator op))
+                                        (operator-description
+                                         op)))
+                          :parameters (second (second source))
+                          :arguments (rest (rest (second source))))))))
 
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users

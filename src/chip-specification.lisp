@@ -273,13 +273,12 @@ used to specify CHIP-SPEC."
     ;; this is the legacy model for setting up gate data
     (flet ((stash-gate-record (atom gate-name parameters arguments fidelity)
              (when (member atom type) #+ignore (optimal-2q-target-meets-requirements type atom)
-               (setf (gethash (make-instance 'gate-binding
-                                             :operator (named-operator gate-name)
-                                             :parameters parameters
-                                             :arguments arguments)
-                              (hardware-object-gate-information obj))
-                     (make-gate-record :duration 150
-                                       :fidelity fidelity)))))
+                   (setf (gethash (make-gate-binding :operator (named-operator gate-name)
+                                                     :parameters parameters
+                                                     :arguments arguments)
+                                  (hardware-object-gate-information obj))
+                         (make-gate-record :duration 150
+                                           :fidelity fidelity)))))
       (dolist (data `((:cz     "CZ"     ()  (_ _) 0.89d0)
                       (:iswap  "ISWAP"  ()  (_ _) 0.91d0)
                       (:cphase "CPHASE" (_) (_ _) 0.80d0)
@@ -316,20 +315,18 @@ used to specify CHIP-SPEC."
       (setf (hardware-object-gate-information obj) gate-information))
     ;; old style of initialization
     (flet ((stash-gate-record (gate-name parameters arguments duration fidelity)
-             (setf (gethash (make-instance 'gate-binding
-                                           :operator (named-operator gate-name)
-                                           :parameters parameters
-                                           :arguments arguments)
+             (setf (gethash (make-gate-binding :operator (named-operator gate-name)
+                                               :parameters parameters
+                                               :arguments arguments)
                             (hardware-object-gate-information obj))
                    (make-gate-record :duration duration
                                      :fidelity fidelity))))
       (when (member ':MEASURE type)
-        (setf (gethash (make-instance 'measure-binding
-                                      :qubit q
-                                      :target '_)
+        (setf (gethash (make-measure-binding :qubit q
+                                             :target '_)
                        (hardware-object-gate-information obj))
               (make-gate-record :duration 2000))
-        (setf (gethash (make-instance 'measure-binding :qubit '_)
+        (setf (gethash (make-measure-binding :qubit '_)
                        (hardware-object-gate-information obj))
               (make-gate-record :duration 2000)))
       (when (member ':RZ type)
