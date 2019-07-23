@@ -1,5 +1,4 @@
 #include <iostream>
-#include <tweedledum/gates/gate_set.hpp>
 #include <tweedledum/gates/mcmt_gate.hpp>
 #include <tweedledum/io/write_unicode.hpp>
 #include <tweedledum/io/quil.hpp>

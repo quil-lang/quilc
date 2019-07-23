@@ -160,6 +160,8 @@
                               (format nil "-I~a" (merge-pathnames "libs/easy" tweedlelibdir))
                               (format nil "-I~a" (merge-pathnames "libs/glucose" tweedlelibdir))
                               (format nil "-I~a" (merge-pathnames "libs/kitty" tweedlelibdir))
+                              (format nil "-I~a" (merge-pathnames "libs/tweedledee" tweedlelibdir))
+                              (format nil "-I~a" (merge-pathnames "libs/rang" tweedlelibdir))
                               (format nil "-I~a" (merge-pathnames "include" tweedlelibdir))
                               "-o" (nn shared-object)
                               (nn c-file))))
