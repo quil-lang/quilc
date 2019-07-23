@@ -238,13 +238,13 @@ touch any qubits marked as dead in CHIP-SPECIFICATION."
   (let* ((nq (chip-spec-n-qubits chip-spec))
          (nl (chip-spec-n-links chip-spec))
          (table (make-hash-table :test 'equalp)))
-    (let* ((isa (setf (gethash "isa" table) (make-hash-table :test 'equalp)))
-           (oneq (setf (gethash "1Q" isa) (make-hash-table :test 'equalp)))
-           (twoq (setf (gethash "2Q" isa) (make-hash-table :test 'equalp))))
+    (let* ((isa (setf (gethash "isa" table) (make-hash-table :test #'equalp)))
+           (oneq (setf (gethash "1Q" isa) (make-hash-table :test #'equalp)))
+           (twoq (setf (gethash "2Q" isa) (make-hash-table :test #'equalp))))
       (loop :for qi :below nq
             :unless (chip-spec-qubit-dead? chip-spec qi) :do
               (setf (gethash (format nil "~S" qi) oneq)
-                    (make-hash-table)))
+                    (make-hash-table :test #'equalp)))
       (loop :for li :below nl
             :for qs := (chip-spec-qubits-on-link chip-spec li)
             :unless (zerop (length qs)) :do
