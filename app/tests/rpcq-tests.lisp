@@ -102,3 +102,31 @@ H 0")
            (quil:parsed-program-to-logical-matrix (quil:parse-quil quil))
            (quil:parsed-program-to-logical-matrix
             (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
+(deftest test-quil-to-native-quil-on-nontrivial-features ()
+  "Test that non-trivial language features (such as DEFCIRCUIT) are processed correctly."
+  (with-random-rpc-client (client)
+    (let* ((quil "
+DEFCIRCUIT TEST a b:
+    H a
+    CNOT a b
+
+TEST 0 1
+")
+           (isa (yason:parse "{\"1Q\": {\"0\": {}, \"1\": {}}, \"2Q\": {\"0-1\": {}}}"))
+           (specs (make-hash-table))
+           (target-device (make-instance 'rpcq::|TargetDevice|
+                                         :|isa| isa
+                                         :|specs| specs))
+           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                          :|quil| quil
+                                          :|target_device| target-device))
+           (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload))
+           (pp (quil::parse-quil quil))
+           (cpp (quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
+      (multiple-value-bind (mat1 mat2)
+          (quil::matrix-rescale (quil::make-matrix-from-quil
+                                 (coerce (quil:parsed-program-executable-code pp) 'list))
+                                (quil::make-matrix-from-quil
+                                 (coerce (quil:parsed-program-executable-code cpp) 'list)))
+        (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
+        (is (quil::matrix-equality mat1 mat2))))))
