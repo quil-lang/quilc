@@ -99,9 +99,12 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
     (unless (diagonal-p m)
       (quil::give-up-compilation))
     ;; This synthesis routine works on the unitary
+    ;;
     ;;   U = diag(1, e^{-i t_1}, ..., e^{-i t_{2^n - 1}})
-    ;; and takes as input the angles t_i; hence (rest ...) below.
-    (let ((angles (rest (mapcar #'phase (magicl:matrix-diagonal m)))))
+    ;;
+    ;; and takes as input the angles t_i; hence (rest ...) and #'-
+    ;; below.
+    (let ((angles (mapcar (a:compose #'- #'phase) (rest (magicl:matrix-diagonal m)))))
       (coerce (quil::parsed-program-executable-code
                (quil:parse-quil
                 (synthesis-diagonal angles)))
