@@ -36,7 +36,10 @@ description file.
 Prescribe that the input and output must be ProtoQuil, which is Quil
 that is, in order, comprised of memory declarations, gates, and measurements, with no control flow.
 .IP "--print-statistics"
-
+Calculate the statistics of the input program and print them to
+standard output. The statistics are: gate depth, two qubit gate depth,
+gate volume, runtime, fidelity, unused qubits, and topological
+overhead.
 .IP "-d, --compute-gate-depth"
 (Deprecated. See --print-statistics.) Print a calculated gate depth for
 the provided circuit as an appended Quil comment. Gate depth is
