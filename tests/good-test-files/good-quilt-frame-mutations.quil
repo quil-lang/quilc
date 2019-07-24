@@ -1,0 +1,6 @@
+SET-PHASE 0 "xy" pi/2
+
+SHIFT-PHASE 0 "xy" -pi
+SHIFT-PHASE 0 1 "cz" 1e-2
+
+SET-SCALE 0 "xy" 0.75

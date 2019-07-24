@@ -1,0 +1,3 @@
+DEFCAL MEASURE 0 dest:
+    CAPTURE 0 "out" flat(1e-6, 2+3*i) iq
+    LT dest iq[0] 0.5
