@@ -259,10 +259,11 @@
                                                             :parameters '(#.(- pi))
                                                             :arguments '(_))))
                     (setf (gethash binding gate-info)
-                          (copy-instance binding gate-info :fidelity fidelity)))))))
+                          (copy-binding gate-info :fidelity fidelity)))))))
   (when (gethash "2Q" specs-hash)
     (loop :for link :across (chip-spec-links chip-spec)
-          :for spec := (gethash (sort (coerce (vnth 0 (hardware-object-cxns link)) 'list) #'<)
+          :for spec := (gethash (format nil "~{~a~^-~}"
+                                        (sort (coerce (vnth 0 (hardware-object-cxns link)) 'list) #'<))
                                 (gethash "2Q" specs-hash))
           :for gate-info := (hardware-object-gate-information link)
           :do (flet ((stash-fidelity (gate-name arguments)
