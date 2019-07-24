@@ -1,7 +1,6 @@
 (in-package #:quilc)
 
 (defparameter *program-name* "quilc")
-(defparameter *print-logical-schedule* nil)
 (defparameter *without-pretty-printing* nil)
 (defparameter *verbose* (make-broadcast-stream))
 (defparameter *log-level* ':info)

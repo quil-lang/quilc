@@ -128,12 +128,7 @@
   "Supported and non-deprecated options.")
 
 (defparameter *deprecated-option-spec*
-  '((("print-logical-schedule" #\s)
-     :type boolean
-     :optional t
-     :documentation "include logically parallelized schedule in output.  Requires -P.  This is deprecated and will eventually be removed.")
-
-    (("compute-gate-depth" #\d)
+  '((("compute-gate-depth" #\d)
      :type boolean
      :optional t
      :documentation "prints compiled circuit gate depth (longest subsequece of data-sharing compiled instructions).  Requires -P.  This is deprecated and will eventually be removed. See --print-statistics.")
@@ -170,7 +165,10 @@
   "Supported and deprecated options.")
 
 (defparameter *ignored-option-spec*
-  '()
+  '((("print-logical-schedule" #\s)
+     :type boolean
+     :optional t
+     :documentation "include logically parallelized schedule in output.  Requires -P.  This is inactive and will eventually be removed."))
   "Inactive and deprecated options.")
 
 (defparameter *retired-option-spec*
@@ -337,7 +335,15 @@ end of the name."
   (loop :for kw :in args :by #'cddr
         :for found := (find kw *deprecated-option-spec* :test #'string-equal :key #'caar)
         :when found :do
-          (format *error-output* "The option --~A is deprecated. See --help for more information.~%"
+          (format *error-output* "The option --~A is deprecated and will be removed. See --help for more information.~%"
+                  (caar found))))
+
+(defun warn-ignored-options (args)
+  "Print a warning message if the server is started with deprecated options (see *DEPRECATED-OPTION-SPEC*)."
+  (loop :for kw :in args :by #'cddr
+        :for found := (find kw *ignored-option-spec* :test #'string-equal :key #'caar)
+        :when found :do
+          (format *error-output* "The option --~A is deprecated and disabled, and will be removed. See --help for more information.~%"
                   (caar found))))
 
 (defun process-options (&rest all-args
@@ -379,7 +385,7 @@ end of the name."
                    show-topological-overhead print-logical-schedule))
 
   (warn-deprecated-options all-args)
-  ;; (warn-ignored-options all-args)
+  (warn-ignored-options all-args)
 
   (when help
     (show-help)
