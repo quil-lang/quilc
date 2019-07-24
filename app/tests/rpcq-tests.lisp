@@ -106,7 +106,32 @@
         (is (not (quil:protoquil-program-p (parse-response ':false))))
         ;; :protoquil t means yes protoquil, regardless of what the server says
         (is (quil:protoquil-program-p (parse-response t))))))
-  (setf quilc::*protoquil* nil))
+  (setf quilc::*protoquil* nil)
+
+  ;; Same tests but for *protoquil* = nil
+  (with-random-rpc-client (client)
+    (let* ((quil "H 0")
+           (isa (a:plist-hash-table
+                 (list
+                  "1Q" (a:plist-hash-table
+                        (list
+                         "0" (make-hash-table)))
+                  "2Q" (make-hash-table))))
+           (specs (make-hash-table))
+           (target-device (make-instance 'rpcq::|TargetDevice|
+                                         :|isa| isa
+                                         :|specs| specs))
+           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                          :|quil| quil
+                                          :|target_device| target-device)))
+      (flet ((parse-response (protoquil)
+               (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+        ;; :protoquil nil means defer to server, i.e. this should not produce protoquil
+        (is (not (quil:protoquil-program-p (parse-response nil))))
+        ;; :protoquil ':false means no protoquil, override server's -P
+        (is (not (quil:protoquil-program-p (parse-response ':false))))
+        ;; :protoquil t means yes protoquil, regardless of what the server says
+        (is (quil:protoquil-program-p (parse-response t)))))))
 
 (deftest test-native-quil-to-binary-endpoint ()
   "Test that the \"native-quil-to-binary\" endpoint works."
