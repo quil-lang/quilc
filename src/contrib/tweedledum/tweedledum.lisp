@@ -4,7 +4,7 @@
   (:use #:common-lisp
         #:cffi)
   (:local-nicknames (:a :alexandria))
-  (:export #:load-tweedledum #:synthesis-dbs))
+  (:export #:load-tweedledum #:synthesis-dbs #:synthesis-diagonal))
 
 (in-package #:cl-quil.tweedledum)
 
@@ -69,6 +69,43 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
            (coerce code 'list)))
         (t
          (quil::give-up-compilation))))))
+
+(defcfun (%synthesis-diagonal "tweedledum_synthesis_diagonal")
+    (:string :free-from-foreign t)
+  (angles (:pointer :double))
+  (size :int))
+
+(defun synthesis-diagonal (angles)
+  (with-foreign-object (angles-foreign :double (length angles))
+    (loop :for i :below (length angles)
+          :for p_i :in angles :do
+            (setf (cffi:mem-aref angles-foreign :double i) p_i))
+    (%synthesis-diagonal angles-foreign (length angles))))
+
+(defun diagonal-p (m)
+  (loop :for i :below (magicl:matrix-cols m) :do
+    (loop :for j :below (magicl:matrix-rows m)
+          :when (and (/= i j)
+                     (not (zerop (magicl:ref m i j)))) :do
+                       (return-from diagonal-p nil)))
+  t)
+
+(defun compile-diagonal-gate-with-tweedledum (instr)
+  ;; TODO Probably don't want to be checking for diagonality for every
+  ;; instruction. Like with permutation gates, diagonality should be
+  ;; available as part of the structure definition. Maybe that already
+  ;; exists.
+  (let ((m (quil:gate-matrix instr)))
+    (unless (diagonal-p m)
+      (quil::give-up-compilation))
+    ;; This synthesis routine works on the unitary
+    ;;   U = diag(1, e^{-i t_1}, ..., e^{-i t_{2^n - 1}})
+    ;; and takes as input the angles t_i; hence (rest ...) below.
+    (let ((angles (rest (mapcar #'phase (magicl:matrix-diagonal m)))))
+      (coerce (quil::parsed-program-executable-code
+               (quil:parse-quil
+                (synthesis-diagonal angles)))
+              'list))))
 
 (defun load-tweedledum ()
   (cffi:load-foreign-library 'libtweedledum)
