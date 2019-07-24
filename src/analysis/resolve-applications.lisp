@@ -27,7 +27,16 @@ determining ambiguity. Otherwise, return NIL."
       (circuit-definition (gate-or-circuit-signature (circuit-definition-name instr)
                                                      (circuit-definition-parameters instr)
                                                      (circuit-definition-arguments instr)))
-      (memory-descriptor (cons 'memory-descriptor (memory-descriptor-name instr))))))
+      (waveform-definition (cons 'waveform-definition
+                                 (waveform-definition-name instr)))
+      (calibration-definition (list 'calibration-definition
+                                    (calibration-definition-name instr)
+                                    (if (gate-calibration-definition instr)
+                                        (length (calibration-definition-parameters instr))
+                                        0)
+                                    (calibration-definition-arguments instr)))
+      (memory-descriptor (cons 'memory-descriptor
+                               (memory-descriptor-name instr))))))
 
 (defun ambiguous-definition-condition (instr file conflicts)
   "Signal a condition indicating that the instruction INSTR parsed from FILE has
@@ -36,6 +45,8 @@ a list of conflicts CONFLICTS."
     (etypecase instr
       (gate-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
       (circuit-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
+      (waveform-definition (make-condition 'ambiguous-waveform-definition :conflicts combined))
+      (calibration-definition (make-condition 'ambiguous-calibration-definition :conflicts combined))
       (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
 (defun extract-code-sections (code)
@@ -45,15 +56,21 @@ a list of conflicts CONFLICTS."
 
     2. List of circuit definitions.
 
-    3. List of memory descriptors.
+    3. List of waveform definitions.
 
-    4. List of code to execute.
+    4. List of calibration definitions.
+
+    5. List of memory descriptors.
+
+    6. List of code to execute.
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: this preserves the order of definitions.
   (let ((gate-defs nil)
         (circ-defs nil)
         (memory-defs nil)
+        (wf-defs nil)
+        (calib-defs nil)
         (exec-code nil)
         ;; The following maps definition signatures to a list of (filename . defn) pairs
         (all-seen-defns (make-hash-table :test 'equal)))
@@ -73,11 +90,15 @@ This also signals ambiguous definitions, which may be handled as needed."
              (typecase instr
                (gate-definition (push instr gate-defs))
                (circuit-definition (push instr circ-defs))
+               (waveform-definition (push instr wf-defs))
+               (calibration-definition (push instr calib-defs))
                (memory-descriptor (push instr memory-defs))
                (t (push instr exec-code)))))
       (mapc #'bin code)
       (values (nreverse gate-defs)
               (nreverse circ-defs)
+              (nreverse wf-defs)
+              (nreverse calib-defs)
               (nreverse memory-defs)
               (nreverse exec-code)))))
 
@@ -153,7 +174,7 @@ This also signals ambiguous definitions, which may be handled as needed."
 (defun resolve-applications (raw-quil)
   "Resolve all UNRESOLVED-APPLICATIONs within the list RAW-QUIL, returning a PARSED-PROGRAM."
   (check-type raw-quil list)
-  (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
+  (multiple-value-bind (gate-defs circ-defs wf-defs cal-defs memory-defs exec-code)
       (extract-code-sections raw-quil)
     (flet ((resolve-instruction-sequence (seq)
              (map nil (lambda (thing)
@@ -170,5 +191,7 @@ This also signals ambiguous definitions, which may be handled as needed."
       (make-instance 'parsed-program
                      :gate-definitions gate-defs
                      :circuit-definitions circ-defs
+                     :waveform-definitions wf-defs
+                     :calibration-definitions cal-defs
                      :memory-definitions memory-defs
                      :executable-code (coerce exec-code 'simple-vector)))))

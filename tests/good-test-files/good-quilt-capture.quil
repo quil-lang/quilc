@@ -1,0 +1,3 @@
+# Simple capture of an IQ point
+DECLARE iq REAL[2]
+CAPTURE 0 "out" flat(1e-6, 2+3*i) iq
