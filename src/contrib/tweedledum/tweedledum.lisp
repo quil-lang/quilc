@@ -110,6 +110,23 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
                 (synthesis-diagonal angles)))
               'list))))
 
+(defun native-decompile-diagonal-matrix (matrix qubits chip)
+  (quil::expand-to-native-instructions (list (apply #'quil::anon-gate "DUMMY-NAME" matrix qubits))
+                                       chip))
+
+(defun tweedledum-decompile-diagonal-matrix (matrix)
+  (compile-diagonal-gate-with-tweedledum matrix))
+
+(defun make-diagonal-matrix-from-phases (phases)
+  (let ((m (magicl:make-zero-matrix (length phases) (length phases))))
+    (loop :for i :below (length phases)
+          :for p :in phases :do
+            (setf (magicl:ref m i i) (complex (cos p) (sin p))))
+    m))
+
+;; (make-diagonal-matrix-from-phases (list 0.5 0.5))
+;; (mapcar #'phase (magicl:matrix-diagonal (make-diagonal-matrix-from-phases (list 0.5 0.5))))
+
 (defun load-tweedledum ()
   (cffi:load-foreign-library 'libtweedledum)
   ;; TODO Some error handling here
