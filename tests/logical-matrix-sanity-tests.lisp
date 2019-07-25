@@ -4,10 +4,15 @@
 
 (in-package #:cl-quil-tests)
 
-;;; The purpose of these tests are to act as a basic sanity-check
-;;; PARSED-PROGRAM-TO-LOGICAL-MATRIX. Specifically these test were motivated by a bug in the way
+;;; The purpose of these tests are to act as a basic sanity-check for
+;;; PARSED-PROGRAM-TO-LOGICAL-MATRIX.  Specifically these test were motivated by a bug in the way
 ;;; gate modifiers were parsed, resulting in incorrect logical matrices being generated when the
-;;; FORKED and CONTROLLED modifiers were combined for certain choices of gate and gate parameters.
+;;; FORKED and CONTROLLED modifiers were combined for certain choices of gate and gate
+;;; parameters. In addition, other tests in the test suite will compare the output of P-P-T-L-M for
+;;; both a compiled and uncompiled version of a given PARSED-PROGRAM and check to see if they are
+;;; OPERATOR=, but this assumes that P-P-T-L-M on the uncompiled PARSED-PROGRAM is a valid
+;;; reference. The below tests are therefore meant to provide an early warning in case P-P-T-L-M is
+;;; misbehaving.
 
 (deftest test-logical-matrix-sanity ()
   "Test that PARSED-PROGRAM-TO-LOGICAL-MATRIX produces the expected matrix for a handful of simple programs."
@@ -258,7 +263,7 @@
               (0.0  0.0  0.0  0.0  0.0  0.0  0.0  ,i-))) ; 111
 
             ;; Test matrices with entries from {0, 1} U RY(z) for z in {pi/3,pi/6,pi/8,pi/10}. This
-            ;; combination of RY gate + theta values were chosen because they produce a 2x2 matrix
+            ;; combination of RY gate + theta values was chosen because it produces a 2x2 matrix
             ;; where 3 of the 4 values are distinct, and hence easier to verify they wind up in the
             ;; expected places in the output of PARSED-PROGRAM-TO-LOGICAL-MATRIX.
             ("RY(pi/3) 0"
