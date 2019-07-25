@@ -99,11 +99,15 @@ JUMP @a")))
          (proc-prog
            (quil::compiler-hook (quil::transform 'quil::compress-qubits
                                                  (cl-quil::read-quil-file file))
-                                (quil::build-nQ-linear-chip 5 :architecture architecture))))
+                                (quil::build-nQ-linear-chip 5 :architecture architecture)
+                                :protoquil t)))
     (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                  (quil::parsed-program-to-logical-matrix proc-prog)))))
+                                  (quil::parsed-program-to-logical-matrix proc-prog)))
+    (list
+     (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
+                                                    'list)))))
 
-(deftest test-compiler-hook ()
+(deftest test-compiler-hook (&key print-stats)
   "Test whether the compiler hook preserves semantic equivalence for
 some test programs."
   (finish-output *debug-io*)
@@ -114,7 +118,9 @@ some test programs."
         (format *debug-io* "      Testing file ~a:" (pathname-name file))
         (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
           (format *debug-io* " ~a" architecture)
-          (compare-compiled file architecture))
+          (let ((stats (compare-compiled file architecture)))
+            (when print-stats
+              (format *debug-io* "~a" stats))))
         (terpri *debug-io*)))))
 
 (deftest test-compression-bug-QUILC-152 ()
