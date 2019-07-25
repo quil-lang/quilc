@@ -4,13 +4,13 @@
 
 (in-package #:cl-quil-tests)
 
-;;; The purpose of these tests are to act as a basic sanity-check on the combination of PARSE-QUIL
-;;; and PARSED-PROGRAM-TO-LOGICAL-MATRIX. Specifically these test were motivated by a bug in the way
+;;; The purpose of these tests are to act as a basic sanity-check
+;;; PARSED-PROGRAM-TO-LOGICAL-MATRIX. Specifically these test were motivated by a bug in the way
 ;;; gate modifiers were parsed, resulting in incorrect logical matrices being generated when the
 ;;; FORKED and CONTROLLED modifiers were combined for certain choices of gate and gate parameters.
 
-(deftest test-parser->logical-matrix-sanity ()
-  "Test that PARSE-QUIL -> PARSED-PROGRAM-TO-LOGICAL-MATRIX produces the expected matrix for a handful of simple programs."
+(deftest test-logical-matrix-sanity ()
+  "Test that PARSED-PROGRAM-TO-LOGICAL-MATRIX produces the expected matrix for a handful of simple programs."
   (mapc (lambda (testcase)
           (let* ((input (first testcase))
                  (entries (second testcase))
@@ -20,7 +20,9 @@
                  ;; TRANSPOSE here to allow writing ENTRIES in row-major order, for readability.
                  (expected (magicl:transpose (magicl:make-complex-matrix n n (a:flatten entries))))
                  (compiled (quil::matrix-rescale
-                            (quil::parsed-program-to-logical-matrix (quil:compiler-hook p (quil::build-nq-linear-chip (quil:qubits-needed p))))
+                            (quil::parsed-program-to-logical-matrix
+                             (quil:compiler-hook p (quil::build-nq-linear-chip
+                                                    (quil:qubits-needed p))))
                             expected)))
             ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion
             ;; succeeds.  Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH
