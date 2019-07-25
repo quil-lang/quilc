@@ -28,52 +28,139 @@
 (deftest test-euler-translations ()
   "Ensures that the different Euler decompositions all work."
   (let ((master-matrix (quil::random-special-unitary 2)))
-    (dolist (type (list :zyz :zxz :yzy :yxy :xyx :xzx))
-      (let* ((compiled-program (cl-quil::euler-compiler (build-anonymous-gate master-matrix 0)
-                                                        :target type))
-             (compiled-matrix (magicl:diag 2 2 (list 1d0 1d0))))
-        (loop :for instr :in compiled-program :do
-           (setf compiled-matrix (quil::apply-gate compiled-matrix instr)))
-        (is (loop :for i :from 0 :to 1 :always
-               (loop :for j :from 0 :to 1 :always
-                  (< (abs (- (magicl:ref compiled-matrix i j) (magicl:ref master-matrix i j))) 0.01)))
-            "Euler translation test failed: ~a~%" type)))))
+    (dolist (compiler '(quil::euler-zyz-compiler
+                        quil::euler-zxz-compiler
+                        quil::euler-yzy-compiler
+                        quil::euler-yxy-compiler
+                        quil::euler-xyx-compiler
+                        quil::euler-xzx-compiler))
+      (let* ((compiled-program (funcall compiler
+                                        (build-anonymous-gate master-matrix 0)))
+             (compiled-matrix (quil::make-matrix-from-quil compiled-program)))
+        (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
+            "Euler translation test failed: ~a~%" compiler)))))
 
-(defmacro build-translator-test (translator-fn input-instr)
-  "Designs a test for TRANSLATOR-FN, which swallows the single INPUT-INSTR gate and emits an equivalent list of instructions."
-  `(let* ((input-instr ,input-instr)
-          (old-matrix (quil::apply-gate (magicl:diag 2 2 (list 1d0 1d0)) input-instr))
-          (translator-output (,translator-fn input-instr))
-          (new-matrix (quil::make-matrix-from-quil translator-output)))
-     (setf new-matrix (quil::scale-out-matrix-phases new-matrix old-matrix))
-     (is (loop :for i :below (magicl:matrix-rows new-matrix) :always
-            (loop :for j :below (magicl:matrix-cols new-matrix) :always
-               (< (abs (- (magicl:ref new-matrix i j) (magicl:ref old-matrix i j))) 0.01)))
-         "On pass: ~a~%Goal matrix:~%~a~%Constructed matrix:~%~a~%"
-         (symbol-name ',translator-fn)
-         (with-output-to-string (s)
-           (print-matrix old-matrix s))
-         (with-output-to-string (s)
-           (print-matrix new-matrix s)))))
+(defun generate-translator-test-case-for-simple-compiler (bindings)
+  ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
+  (let ((adjacency-table (make-hash-table))
+        qubit-bound
+        parameter-names
+        (parameter-assignments (make-hash-table)))
+    (labels ((random-with-exceptions (bound exceptions)
+               (assert (> bound (length exceptions)))
+               (let ((val (random bound)))
+                 (if (member val exceptions)
+                     (random-with-exceptions bound exceptions)
+                     val)))
+             (add-clique (qubits)
+               (cond
+                 ((endp qubits)
+                  t)
+                 ((eql '_ (first qubits))
+                  (add-clique (rest qubits)))
+                 (t
+                  (unless (gethash (first qubits) adjacency-table)
+                    (setf (gethash (first qubits) adjacency-table) nil))
+                  (dolist (distant-qubit (rest qubits))
+                    (unless (eq '_ distant-qubit)
+                      (push (first qubits) (gethash distant-qubit adjacency-table))
+                      (push distant-qubit (gethash (first qubits) adjacency-table))))
+                  (add-clique (rest qubits))))))
+      (dolist (binding bindings)
+        (unless (typep binding 'cons)
+          (error "I don't know how to make tests for permissive compilers."))
+        (destructuring-bind (variable-name binding &rest options) binding
+          (declare (ignore variable-name))
+          (when options
+            (error "I don't know how to make test cases for guarded compilers."))
+          (add-clique (cddr binding))
+          (when (listp (second binding))
+            (setf parameter-names
+                  (union parameter-names
+                         (loop :for param :in (second binding)
+                               :when (and (typep param 'symbol)
+                                          (not (eql '_ param)))
+                                 :collect param))))))
+      ;; color the graph with qubit indices. it'd be :cool: if this were randomized.
+      (quil::dohash ((qubit collision-names) adjacency-table)
+        (let ((collision-qubits (mapcar (lambda (name) (gethash name adjacency-table))
+                                        collision-names)))
+          (loop :for j :from 0
+                :unless (member j collision-qubits)
+                  :do (setf (gethash qubit adjacency-table) j)
+                      (return))))
+      ;; save the max of the largest instruction qubit number & the k in the k-coloring
+      (setf qubit-bound (max (loop :for (variable-name binding) :in bindings
+                                   :maximize (1+ (length (cddr binding))))
+                             (loop :for name :being :the :hash-keys :of adjacency-table
+                                     :using (hash-value qubit-assignment)
+                                   :maximize (1+ qubit-assignment))))
+      (dolist (n parameter-names)
+        (setf (gethash n parameter-assignments)
+              (random (* 2 pi))))
+      ;; walk the instructions, doing parameter/argument instantiation
+      (loop :for binding :in bindings
+            :collect
+            (destructuring-bind (variable-name (name params &rest qubits)) binding
+              (declare (ignore variable-name))
+              (let* ((params (when (listp params)
+                               (mapcar (lambda (param)
+                                         (cond
+                                           ((numberp param)
+                                            (constant param))
+                                           ((typep param 'symbol)
+                                            (constant (gethash param parameter-assignments)))
+                                           (t
+                                            (error "I don't know how to generate this parameter."))))
+                                       params)))
+                     (qubits (mapcar (lambda (qubit)
+                                       (cond
+                                         ((numberp qubit)
+                                          qubit)
+                                         ((eql qubit (intern "_"))
+                                          nil)
+                                         ((symbolp qubit)
+                                          (gethash qubit adjacency-table))))
+                                     qubits))
+                     (occupied-qubits (remove-if #'symbolp qubits))
+                     (qubits
+                       (let ((output-qubits nil))
+                         (dolist (qubit qubits (reverse output-qubits))
+                           (cond
+                             ((numberp qubit)
+                              (push qubit output-qubits))
+                             ((null qubit)
+                              (push (random-with-exceptions qubit-bound
+                                                            (append output-qubits occupied-qubits))
+                                    output-qubits)))))))
+                (cond
+                  ((stringp name)
+                   (apply #'quil::build-gate name params qubits))
+                  (t
+                   (apply #'quil::anon-gate "ANONYMOUS-INPUT"
+                          (quil::random-special-unitary (ash 1 (length qubits)))
+                          qubits)))))))))
 
 (deftest test-translators ()
-  "Tests the various hard-coded translators."
-  (build-translator-test quil::H-to-YX        (cl-quil::build-gate "H"      ()             0))
-  (build-translator-test quil::Z-to-XYX       (cl-quil::build-gate "Z"      ()             0))
-  (build-translator-test quil::Yhalf-to-HX    (cl-quil::build-gate "RY"     '(#.(/ pi 2))  0))
-  (build-translator-test quil::RY-to-XZX      (cl-quil::build-gate "RY"     '(#.(/ pi -9)) 0))
-  (build-translator-test quil::CZ-to-CPHASE   (cl-quil::build-gate "CZ"     ()             0 1))
-  (build-translator-test quil::CPHASE-to-CNOT (cl-quil::build-gate "CPHASE" '(#.(/ pi 7))  0 1))
-  (build-translator-test quil::CNOT-to-CZ     (cl-quil::build-gate "CNOT"   ()             0 1))
-  (build-translator-test quil::iSWAP-to-CNOT  (cl-quil::build-gate "ISWAP"  ()             0 1))
-  (build-translator-test quil::CZ-to-CNOT     (cl-quil::build-gate "CZ"     ()             0 1))
-  (build-translator-test quil::iSWAP-to-PSWAP (cl-quil::build-gate "ISWAP"  ()             0 1))
-  (build-translator-test quil::PSWAP-to-CNOT  (cl-quil::build-gate "PSWAP"  '(#.(/ pi 5))  0 1))
-  (build-translator-test quil::CNOT-to-iSWAP  (cl-quil::build-gate "CNOT"   ()             0 1))
-  (build-translator-test quil::SWAP-to-CNOT   (cl-quil::build-gate "SWAP"   ()             0 1))
-  (build-translator-test quil::SWAP-to-CZ     (cl-quil::build-gate "SWAP"   ()             0 1))
-  (build-translator-test quil::SWAP-to-PSWAP  (cl-quil::build-gate "SWAP"   ()             0 1))
-  (build-translator-test quil::SWAP-to-iSWAP  (cl-quil::build-gate "SWAP"   ()             0 1)))
+  (labels
+      ((test-a-compiler (compiler)
+         (unless (quil::compiler-gateset-reducer-p compiler)
+           (return-from test-a-compiler nil))
+         (let (test-case input-matrix compiled-output output-matrix)
+           ;; building the test case can throw an error if the compiler itself is
+           ;; too complicated. we don't intend for that to break the tests.
+           (handler-case (setf test-case (generate-translator-test-case-for-simple-compiler
+                                          (quil::compiler-bindings compiler)))
+             (error ()
+               (return-from test-a-compiler nil)))
+           (setf input-matrix (quil::make-matrix-from-quil test-case))
+           (setf compiled-output (apply compiler test-case))
+           (setf output-matrix (quil::make-matrix-from-quil compiled-output))
+           (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
+           (is (quil::matrix-equals-dwim input-matrix output-matrix)))))
+    (dolist (compiler quil::**compilers-available**)
+      (test-a-compiler compiler))))
+
 
 (defun random-permutation (list)
   (unless (null list)
@@ -115,7 +202,9 @@
         (format *debug-io* "~&    Testing global-to-local ~a expansion~%" operator)
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
-               (mat (cl-quil::make-matrix-from-quil (funcall expander chip-spec instr))))
+               (mat (cl-quil::make-matrix-from-quil (funcall expander instr
+                                                             :context (quil::make-compilation-context
+                                                                       :chip-specification chip-spec)))))
           (is (cl-quil::matrix-equality ref-mat
                                         (cl-quil::scale-out-matrix-phases mat ref-mat))))))))
 
@@ -124,8 +213,8 @@
   (let ((chip-spec (cl-quil::make-chip-specification
                     :generic-rewriting-rules (coerce (cl-quil::global-rewriting-rules) 'vector))))
     (cl-quil::install-generic-compilers chip-spec ':cz)
-    (loop :repeat 4 :do
-      (cl-quil::adjoin-hardware-object (cl-quil::build-qubit) chip-spec))
+    (loop :for j :below 4 :do
+      (cl-quil::adjoin-hardware-object (cl-quil::build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (cl-quil::install-link-onto-chip chip-spec 0 1)
     (cl-quil::install-link-onto-chip chip-spec 2 3)
     chip-spec))

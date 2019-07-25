@@ -152,7 +152,7 @@ RX(pi) 2
     (CL-QUIL::COMPRESS-INSTRUCTIONS-IN-CONTEXT
      (coerce instructions 'list)
      (quil::build-nQ-linear-chip 4 :architecture ':cphase)
-     (quil::set-up-compressor-context :qubit-count 4 :simulate t))))
+     (quil::set-up-compilation-context :qubit-count 4 :simulate t))))
 
 (defun shuffle-list (l &optional (k nil))
         (let* ((elt (nth (random (length l)) l))
@@ -484,12 +484,10 @@ CCNOT 0 1 2")
            (cond
              ((not (typep instr 'gate-application))
               value)
-             (t
-              (quil::operator-match
-                (((("CZ" () _ _) instr))
-                 (1+ value))
-                (_
-                 value))))))
+             ((adt:with-data (named-operator name) (application-operator instr)
+                (string= "CZ" name))
+              (1+ value))
+             (t value))))
       (let ((CZ-depth (quil::lscheduler-walk-graph ls :bump-value #'value-bumper)))
         (is (>= 8 CZ-depth))))))
 
@@ -505,6 +503,5 @@ CCNOT 0 1 2")
     (multiple-value-bind (order index obj)
         (quil::lookup-hardware-address-by-qubits chip (list 1 2))
       (declare (ignore order index))
-      (is (= (funcall (quil::hardware-object-native-instructions obj)
-                      (quil::build-gate "CZ" () 1 2))
+      (is (= (quil::hardware-object-native-instruction-p obj (quil::build-gate "CZ" () 1 2))
              (quil::chip-schedule-resource-carving-point sched (quil::make-qubit-resource 1 2)))))))

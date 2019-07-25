@@ -268,7 +268,6 @@
                           :for inv-i := (position i permutation :test #'=)
                           :collect inv-i)))))
 
-
 ;;; Taking gates and lifting them to CONTROLLED/DAGGER gates
 
 (defun operator-description-gate-lifter (descr)
@@ -312,7 +311,6 @@
   "Lookup the gate named by GATE-NAME in the collection of *standard* Quil gates. Return NIL if non-standard."
   (check-type gate-name a:string-designator)
   (values (gethash (string gate-name) **default-gate-definitions**)))
-
 
 ;;;;;;;;;;;;;; Conversion of GATE-DEFINITIONs to GATEs ;;;;;;;;;;;;;;;
 

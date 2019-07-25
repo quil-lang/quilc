@@ -7,9 +7,7 @@
 
 (in-package #:cl-quil)
 
-(define-global-counter **qsc-counter** generate-qsc-tag)
-
-(defun qs-compiler (instr)
+(define-compiler qs-compiler (instr)
   "Performs Quantum Shannon Compilation, emitting a list of anonymous gates and UCR instructions that describe an equivalent circuit."
   (unless (or (>= (length (application-arguments instr)) 3)
               (adt:match operator-description (application-operator instr)
@@ -88,8 +86,7 @@
                                                     (/ row-count 2)
                                                     evals-v)
                                        (magicl:conjugate-transpose vL)
-                                       v1)))
-                     (tag (generate-qsc-tag)))
+                                       v1))))
                 ;; we now have the equality
                 ;; m = (u0 (+) u1) Z(Lphi) Y(thetas) Z(Rphi) (v0 (+) v1)
                 ;;   = uL Z(evals-u) uR Z(Lphi) Y(thetas) Z(Rphi) vL Z(evals-v) vR
@@ -98,33 +95,21 @@
                 ;; NOTE: the order here is reversed from the matrix decomp.
                 ;; since the composition order of instructions is backwards
                 (list
-                 (make-instance 'gate-application
-                                :operator (named-operator (format nil "QSC-VR-~d" tag))
-                                :arguments (rest (application-arguments instr))
-                                :gate vR)
+                 (apply #'anon-gate "QSC-VR" vR (rest (application-arguments instr)))
                  (apply #'build-UCR "RZ"
                         (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
                         (append (rest (application-arguments instr))
                                 (list (first (application-arguments instr)))))
-                 (make-instance 'gate-application
-                                :operator (named-operator (format nil "QSC-VL-~d" tag))
-                                :arguments (rest (application-arguments instr))
-                                :gate vL)
+                 (apply #'anon-gate "QSC-VL" vL (rest (application-arguments instr)))
                  (build-gate "RZ" (list (* -2 Rphi)) (first (application-arguments instr)))
                  (apply #'build-UCR "RY"
                         (mapcar (lambda (x) (constant (* 2 x))) thetas)
                         (append (rest (application-arguments instr))
                                 (list (first (application-arguments instr)))))
                  (build-gate "RZ" (list (* -2 Lphi)) (first (application-arguments instr)))
-                 (make-instance 'gate-application
-                                :operator (named-operator (format nil "QSC-UR-~d" tag))
-                                :arguments (rest (application-arguments instr))
-                                :gate uR)
+                 (apply #'anon-gate "QSC-UR" uR (rest (application-arguments instr)))
                  (apply #'build-UCR "RZ"
                         (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
                         (append (rest (application-arguments instr))
                                 (list (first (application-arguments instr)))))
-                 (make-instance 'gate-application
-                                :operator (named-operator (format nil "QSC-UL-~d" tag))
-                                :arguments (rest (application-arguments instr))
-                                :gate uL))))))))))
+                 (apply #'anon-gate "QSC-UL" uL (rest (application-arguments instr))))))))))))

@@ -4,22 +4,6 @@
 
 (in-package #:cl-quil)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defgeneric copy-instance (instance)
-  (:documentation
-   "Create a shallow copy of the object INSTANCE.
-
-WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.")
-  (:method ((instance t))
-    (let* ((class (class-of instance))
-           (copy (allocate-instance class)))
-      (dolist (slot (mapcar #'closer-mop:slot-definition-name (closer-mop:class-slots class)))
-        (when (slot-boundp instance slot)
-          (setf (slot-value copy slot)
-                (slot-value instance slot))))
-      copy)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;; Atomic Elements ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defstruct (qubit (:constructor qubit (index)))

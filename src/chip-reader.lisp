@@ -24,14 +24,32 @@
 ;;;; tracks information about legal operations on the QPU components:
 ;;;; { type: optional string or optional list of strings, in the case of 1Q
 ;;;;         drawn from the set { "X/2" } and in the case of 2Q drawn from
-;;;;         the set { "CZ", "ISWAP", "CPHASE", "ISWAP" }. these indicate which
-;;;;         operations are legal on this component of the QPU. in the case of a
-;;;;         list, the operations are sorted into "preference order": the
-;;;;         compiler will make an effort to prefer instructions earlier in the
-;;;;         sequence to those later in the sequence. for 1Q the default is
-;;;;         [ "RZ", "X/2" ], and for 2Q the default is "CZ".
-;;;;   dead: optional boolean. when set to T, the compiler will treat all
-;;;;         instructions on this component as illegal. }
+;;;;          the set { "CZ", "ISWAP", "CPHASE", "PISWAP" }. these indicate which
+;;;;          operations are legal on this component of the QPU. in the case of a
+;;;;          list, the operations are sorted into "preference order": the
+;;;;          compiler will make an effort to prefer instructions earlier in the
+;;;;          sequence to those later in the sequence. for 1Q the default is
+;;;;          [ "RZ", "X/2" ], and for 2Q the default is "CZ".
+;;;;   gates: a (unordered) list of dictionaries recording the native operations for
+;;;;          this object, each given via one of the two following forms:
+;;;;          { operator: the string "MEASURE".
+;;;;            qubit: an integer indicating the qubit to be MEASUREd
+;;;;                   OR the string "_" to indicate any qubit.
+;;;;            target: an optional field indicating the memory region to be written to
+;;;;                   OR the string "_" to indicate any region.
+;;;;            duration: time in ns that it takes to perform a measurement.
+;;;;            fidelity: readout fidelity for this measurement.
+;;;;          } OR {
+;;;;            operator: the name of the gate application as a string.
+;;;;            parameters: list of parameters supplied to this native instruction,
+;;;;                        which can be numeric literals or "_".
+;;;;            arguments: list of qubit arguments supplied to this native instruction,
+;;;;                       which can be numeric literals or "_".
+;;;;            duration: time in ns that it takes to execute this instruction.
+;;;;            fidelity: gate fidelity for this instruction.
+;;;;          }
+;;;;   dead:  optional boolean. when set to T, the compiler will treat all
+;;;;          instructions on this component as illegal. }
 ;;;;
 ;;;; In the case of the layer "specs", this complex data is again a dictionary,
 ;;;; which tracks information about fidelity properties of operations. it is
@@ -86,6 +104,35 @@
             (unless exists?
               (setf (gethash qkey 1q-layer) (dead-qubit-hash-table)))))))))
 
+(defun parse-binding (gate-datum)
+  "Parses an entry in the \"gates\" field of an ISA object descriptor."
+  (flet ((intern-if-string (x)
+           (typecase x
+             (string '_)
+             (otherwise x))))
+    (cond
+      ((string= "MEASURE" (gethash "operator" gate-datum))
+       (make-measure-binding :target (intern-if-string (gethash "target" gate-datum))
+                             :qubit (intern-if-string (gethash "qubit" gate-datum))))
+      (t
+       (make-gate-binding :operator (named-operator (gethash "operator" gate-datum))
+                          :parameters (mapcar #'intern-if-string (gethash "parameters" gate-datum))
+                          :arguments (mapcar #'intern-if-string (gethash "arguments" gate-datum)))))))
+
+(defun parse-gate-information (gate-datum)
+  (let (args)
+    (a:when-let ((fidelity (gethash "fidelity" gate-datum)))
+      (setf args (list* ':fidelity fidelity args)))
+    (a:when-let ((duration (gethash "duration" gate-datum)))
+      (setf args (list* ':duration duration args)))
+    (apply #'make-gate-record args)))
+
+(defun parse-gates-field (gates)
+  (let ((gate-information (make-hash-table :test #'equalp)))
+    (dolist (gate-datum gates gate-information)
+      (setf (gethash (parse-binding gate-datum) gate-information)
+            (parse-gate-information gate-datum)))))
+
 (defun load-isa-layer (chip-spec isa-hash)
   "Loads the \"isa\" layer into a new chip-specification object."
   (unless (and isa-hash
@@ -106,14 +153,21 @@
                 "ISA contains a 1Q descriptor of index ~a, but there are only ~a qubit(s) altogether."
                 i (1- qubit-count))
         ;; form a qubit
-        (let* ((qubit-type (gethash "type" qubit-hash))
-               (qubit (cond
-                        ((or (null qubit-type)
-                             (string= "Xhalves" qubit-type))
-                         (build-qubit))
-                        (t
-                         (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
-                                i qubit-type)))))
+        (let (qubit)
+          (cond
+            ;; there's a "gates" field
+            ((gethash "gates" qubit-hash)
+             (setf qubit (build-qubit i :gate-information (parse-gates-field (gethash "gates" qubit-hash)))))
+            ;; there's no "gates" field, but there is a "type" field, and it's supported
+            ((and (string= "Xhalves" (gethash "type" qubit-hash)))
+             (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE))))
+            ;; there's no "gates" field, but there is a "type" field, but it isn't supported
+            ((gethash "type" qubit-hash)
+             (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
+                    i (gethash "type" qubit-hash)))
+            ;; there's neither a "gates" nor a "type" field. install a default.
+            (t
+             (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE)))))
           ;; store the descriptor in the qubit hardware-object for later reference
           (setf (hardware-object-misc-data qubit) qubit-hash)
           ;; and store the hardware-object into the chip specification
@@ -132,64 +186,101 @@
           (assert (< q0 q1 qubit-count)
                   nil
                   "ISA contains a 2Q hardware descriptor attached to qubits ~a, but there are only ~a qubit(s) altogether."
-                  (list q0 q1 )qubit-count)
-          ;; check that the link isn't dead
-          ;; NOTE: By skipping the dead links, we're shifting the internal link
-          ;;       indices from what a user (or debugger) might expect.  Beware!
-          (when (and
-                 ;; the link itself is alive
-                 (null (gethash "dead" link-hash))
-                 ;; the link is not attached to dead qubits
-                 (null (gethash "dead" (hardware-object-misc-data
-                                        (chip-spec-nth-qubit chip-spec
-                                                             q0))))
-                 (null (gethash "dead" (hardware-object-misc-data
-                                        (chip-spec-nth-qubit chip-spec
-                                                             q1)))))
-            ;; form a link attached to the two qubit indices
-            (labels ((individual-target-parser (string)
-                       (cond
-                         ((null string) nil)
-                         ((string= "CZ" string) ':cz)
-                         ((string= "ISWAP" string) ':iswap)
-                         ((string= "CPHASE" string) ':cphase)
-                         ((string= "PISWAP" string) ':piswap)
-                         (t (error "Unknown link type in QPU descriptor on link ~a: ~a."
-                                   (list q0 q1) string))))
-                     (target-parser (hash-value)
-                       (mapcar #'individual-target-parser (a:ensure-list hash-value))))
-              (let ((link (build-link q0 q1
-                                      (if (gethash "type" link-hash)
-                                          (target-parser (gethash "type" link-hash))
-                                          (list ':CZ))
-                                      chip-spec))
-                    (link-index (length (vnth 1 (chip-specification-objects chip-spec)))))
-                ;; notify the qubits that they're attached to this link
-                (dolist (qubit-index (list q0 q1))
-                  (vector-push-extend link-index
-                                      (vnth 1 (hardware-object-cxns
-                                               (vnth qubit-index
-                                                     (vnth 0 (chip-specification-objects chip-spec)))))))
-                ;; store the descriptor in the link hardware-object for later reference
-                (setf (hardware-object-misc-data link) link-hash)
-                ;; and store the hardware-object into the chip specification
-                (vector-push-extend link (vnth 1 (chip-specification-objects chip-spec)))))))))))
+                  (list q0 q1) qubit-count)
+          (let (link
+                (link-index (chip-spec-n-links chip-spec)))
+            (cond
+              ;; NOTE: By skipping the dead links, we're shifting the internal link
+              ;;       indices from what a user (or debugger) might expect.  Beware!
+              ((or (gethash "dead" link-hash)
+                   (gethash "dead" (hardware-object-misc-data
+                                    (chip-spec-nth-qubit chip-spec
+                                                         q0)))
+                   (gethash "dead" (hardware-object-misc-data
+                                    (chip-spec-nth-qubit chip-spec
+                                                         q1))))
+               
+               t)
+              ;; there's a "gates" field
+              ((gethash "gates" link-hash)
+               (setf link (build-link q0 q1 :gate-information (parse-gates-field (gethash "gates" link-hash)))))
+              ;; there's no "gates" field, but there is a "type" field
+              ((gethash "type" link-hash)
+               (labels ((individual-target-parser (string)
+                          (cond
+                            ((null string) nil)
+                            ((string= "CZ" string) ':cz)
+                            ((string= "ISWAP" string) ':iswap)
+                            ((string= "CPHASE" string) ':cphase)
+                            ((string= "PISWAP" string) ':piswap)
+                            (t (error "Unknown link type in QPU descriptor on link ~a: ~a."
+                                      (list q0 q1) string)))))
+                 (setf link (build-link q0 q1
+                                        :type (mapcar #'individual-target-parser
+                                                      (a:ensure-list (gethash "type" link-hash)))))))
+              ;; there's no "gates" or "type" field, so install a default
+              (t
+               (setf link (build-link q0 q1 :type '(:CZ)))))
+            (when link
+              ;; notify the qubits that they're attached.
+              (dolist (qubit-index (list q0 q1))
+                (vector-push-extend link-index (chip-spec-links-on-qubit chip-spec qubit-index)))
+              ;; store the descriptor in the link hardware-object for later reference
+              (setf (hardware-object-misc-data link) link-hash)
+              ;; and store the hardware-object into the chip specification
+              (vector-push-extend link (chip-spec-links chip-spec)))))))))
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
   (when (gethash "1Q" specs-hash)
     (loop :for i :from 0
-          :for qubit :across (vnth 0 (chip-specification-objects chip-spec))
+          :for qubit :across (chip-spec-qubits chip-spec)
+          :for gate-info := (hardware-object-gate-information qubit)
           :do ;; load the qubit specs info
               (a:when-let ((spec (gethash (list i) (gethash "1Q" specs-hash))))
                 (setf (gethash "specs" (hardware-object-misc-data qubit))
-                      spec))))
+                      spec)
+                (a:when-let ((fidelity (gethash "fRO" spec)))
+                  (dolist (binding (list (make-measure-binding :qubit '_)
+                                         (make-measure-binding :qubit '_ :target '_)))
+                    (setf (gethash binding gate-info)
+                          (copy-binding gate-info :fidelity fidelity))))
+                (a:when-let ((fidelity (gethash "f1QRB" spec)))
+                  (dolist (binding (list (make-gate-binding :operator (named-operator "RX")
+                                                            :parameters '(#.(/ pi 2))
+                                                            :arguments '(_))
+                                         (make-gate-binding :operator (named-operator "RX")
+                                                            :parameters '(#.(/ pi -2))
+                                                            :arguments '(_))
+                                         (make-gate-binding :operator (named-operator "RX")
+                                                            :parameters '(#.pi)
+                                                            :arguments '(_))
+                                         (make-gate-binding :operator (named-operator "RX")
+                                                            :parameters '(#.(- pi))
+                                                            :arguments '(_))))
+                    (setf (gethash binding gate-info)
+                          (copy-binding gate-info :fidelity fidelity)))))))
   (when (gethash "2Q" specs-hash)
-    (loop :for link :across (vnth 1 (chip-specification-objects chip-spec))
-          :for spec := (gethash (sort (coerce (vnth 0 (hardware-object-cxns link)) 'list) #'<)
+    (loop :for link :across (chip-spec-links chip-spec)
+          :for spec := (gethash (format nil "~{~a~^-~}"
+                                        (sort (coerce (vnth 0 (hardware-object-cxns link)) 'list) #'<))
                                 (gethash "2Q" specs-hash))
-          :do (setf (gethash "specs" (hardware-object-misc-data link))
-                    spec))))
+          :for gate-info := (hardware-object-gate-information link)
+          :do (flet ((stash-fidelity (gate-name arguments)
+                       (a:when-let ((fidelity (gethash (format nil "f~a" gate-name) spec))
+                                    (binding (make-gate-binding :operator (named-operator gate-name)
+                                                                :arguments arguments)))
+                         (setf (gethash binding gate-info)
+                               (copy-binding (gethash binding gate-info)
+                                             :fidelity fidelity)))))
+                (setf (gethash "specs" (hardware-object-misc-data link))
+                      spec)
+                (dolist (args '(("CZ" ())
+                                ("ISWAP" ())
+                                ("CPHASE" (_))
+                                ("PISWAP" (_))))
+                  (destructuring-bind (name params) args
+                    (stash-fidelity name params)))))))
 
 (defun qpu-hash-table-to-chip-specification (hash-table)
   "Converts a QPU specification HASH-TABLE, to a chip-specification object.  Requires an \"isa\" layer."
@@ -207,7 +298,7 @@
     (a:when-let ((specs-hash (gethash "specs" hash-table)))
       (load-specs-layer chip-spec specs-hash))
     ;; and return the chip-specification that we've built
-    chip-spec))
+    (warm-hardware-objects chip-spec)))
 
 (defun chip-specification-to-qpu-hash-table (chip-spec)
   "Convert a chip-specification CHIP-SPEC to a QPU hash table. Useful when you want to pull an ISA out of a pre-built chip."
@@ -233,13 +324,13 @@
   "Read a QPU specification from a file."
   (qpu-hash-table-to-chip-specification
    (with-open-file (s file)
-     (yason:parse s))))
+     (let ((*read-default-float-format* 'double-float))
+       (yason:parse s)))))
 
 (defun check-program-skips-dead-qubits (parsed-program chip-specification)
   "Throws an assert when PARSED-PROGRAM's instructions, assumed flat,
 touch any qubits marked as dead in CHIP-SPECIFICATION."
-  (let ((dead-qubits (loop :for qubit-index :below (length
-                                                    (vnth 0 (chip-specification-objects chip-specification)))
+  (let ((dead-qubits (loop :for qubit-index :below (chip-spec-n-qubits chip-specification)
                            :nconc (when (gethash "dead" (hardware-object-misc-data
                                                          (chip-spec-nth-qubit chip-specification qubit-index)))
                                     (list qubit-index)))))

@@ -14,6 +14,10 @@
   (l2p #() :type integeropt-vector)
   (p2l #() :type integeropt-vector))
 
+(defmethod print-object :around ((object rewiring) stream)
+  (let ((*print-pretty* nil))
+    (call-next-method)))
+
 (defun inverse-matches-forward-p (forward inverse)
   "Checks that each non-NIL mapping in FORWARD has a corresponding inverse mapping in
 INVERSE."

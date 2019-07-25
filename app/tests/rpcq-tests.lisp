@@ -28,31 +28,39 @@
 
 (deftest test-quil-to-native-quil-endpoint ()
   "Test that the \"quil-to-native-quil\" endpoint compiles to a program whose matrix representation is equivalent to the input program." 
-  (with-random-rpc-client (client)
-    (let* ((quil "H 0")
-           (isa (a:plist-hash-table
-                 (list
-                  "1Q" (a:plist-hash-table
-                        (list
-                         "0" (make-hash-table)))
-                  "2Q" (make-hash-table))))
-           (specs (make-hash-table))
-           (target-device (make-instance 'rpcq::|TargetDevice|
-                                         :|isa| isa
-                                         :|specs| specs))
-           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
-                                          :|quil| quil
-                                          :|target_device| target-device))
-           (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload))
-           (pp (quil::parse-quil quil))
-           (cpp (quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
-      (multiple-value-bind (mat1 mat2)
-          (quil::matrix-rescale (quil::make-matrix-from-quil
-                                 (coerce (quil:parsed-program-executable-code pp) 'list))
-                                (quil::make-matrix-from-quil
-                                 (coerce (quil:parsed-program-executable-code cpp) 'list)))
-        (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
-        (is (quil::matrix-equality mat1 mat2))))))
+  (flet ((plist-isa-subtable (&rest p) (a:plist-hash-table p :test #'equalp)))
+    (with-random-rpc-client (client)
+      (let* ((quil "H 0")
+             (isa (plist-isa-subtable
+                   "1Q" (plist-isa-subtable
+                         "0" (make-hash-table)
+                         "1" (make-hash-table))
+                   "2Q" (plist-isa-subtable
+                         "0-1" (make-hash-table))))
+             (specs (plist-isa-subtable
+                     "1Q" (plist-isa-subtable
+                           "0" (plist-isa-subtable "f1QRB" 0.98)
+                           "1" (plist-isa-subtable "f1QRB" 0.98))
+                     "2Q" (plist-isa-subtable
+                           "0-1" (make-hash-table))))
+             (target-device (make-instance 'rpcq::|TargetDevice|
+                                           :|isa| isa
+                                           :|specs| specs))
+             (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                            :|quil| quil
+                                            :|target_device| target-device))
+             (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil t))
+             (pp (quil::parse-quil quil))
+             (cpp (quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
+        (multiple-value-bind (mat1 mat2)
+            (quil::matrix-rescale (quil::make-matrix-from-quil
+                                   (coerce (quil:parsed-program-executable-code pp) 'list))
+                                  (quil::make-matrix-from-quil
+                                   (coerce (quil:parsed-program-executable-code cpp) 'list)))
+          (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
+          (is (> 1d0 (rpcq::|NativeQuilMetadata-program_fidelity|
+                            (rpcq::|NativeQuilResponse-metadata| server-response))))
+          (is (quil::matrix-equality mat1 mat2)))))))
 
 (deftest test-quil-to-native-quil-protoquil-endpoint ()
   "Test that the \"quil-to-native-quil\" endpoint will compile protoquil when given :PROTOQUIL T."

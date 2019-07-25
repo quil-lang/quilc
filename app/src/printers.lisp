@@ -24,7 +24,9 @@
           (with-output-to-string (s)
             (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
               (quil::print-parsed-program processed-program s)))))
-    (write-string program-as-string stream)))
+    (if stream
+        (write-string program-as-string stream)
+        program-as-string)))
 
 ;; custom encoder for rewiring objects
 (defmethod yason:encode ((object quil::rewiring) &optional (stream *standard-output*))

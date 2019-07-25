@@ -27,6 +27,7 @@
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
                #:trivial-garbage        ; weak hash tables
+               #:cl-heap
                #:cl-permutation
                #:queues.priority-queue
                #+sbcl #:sb-rotate-byte
@@ -54,7 +55,9 @@
                (:file "parser")
                (:file "gates")
                (:file "environment")
-               (:file "operator-bind")
+               (:file "context")
+               (:file "build-gate")
+               (:file "define-compiler")
                (:module "clifford"
                 :serial t
                 :components ((:file "qubit-algebra")
@@ -105,9 +108,7 @@
                              (:file "temporal-addresser")))
                (:module "compressor"
                 :serial t
-                :components ((:file "rewriting-rule-data-type")
-                             (:file "compressor-configuration")
-                             (:file "context")
+                :components ((:file "compressor-configuration")
                              (:file "compressor")
                              (:file "wavefunctions")
                              (:file "rewriting-rules")))

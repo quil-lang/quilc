@@ -54,38 +54,40 @@
 
 (defun apply-translation-compilers (instruction chip-spec hardware-object)
   "Wrapper function that calls the compilers associated to HARDWARE-OBJECT and the generic compilers associated to CHIP-SPEC in precedence order, returning the first found expansion of INSTRUCTION as a sequence."
-  (labels ((try-compiler (compilation-method)
-             "Applies COMPILATION-METHOD to INSTRUCTION. If it succeeds, end
+  (let ((context (make-compilation-context :chip-specification chip-spec)))
+    (labels ((try-compiler (compilation-method)
+               "Applies COMPILATION-METHOD to INSTRUCTION. If it succeeds, end
               the whole procedure and return the resulting instruction sequence.
               If it fails, cede control by returning NIL."
-             (restart-case
-                 (handler-case
-                     (let ((result (funcall compilation-method instruction)))
-                       (let ((*print-pretty* nil))
-                         (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Applying compiler ~a to ~a.~%"
-                                 compilation-method
-                                 (print-instruction instruction nil)))
-                       (dolist (instr result)
-                         (write-string "    " *compiler-noise-stream*)
-                         (print-instruction instr *compiler-noise-stream*)
-                         (terpri *compiler-noise-stream*))
-                       (return-from apply-translation-compilers result))
-                   (compiler-does-not-apply () nil))
-               (try-next-compiler ()
-                 :report "Ignore this error and try the next compiler in the list."))))
-    ;; if this is a thread invocation, call its expander
-    (when (typep instruction 'application-thread-invocation)
-      (return-from apply-translation-compilers
-        (application-thread-invocation-thread instruction)))
-    ;; then try the compilers attached to the hardware object
-    (when hardware-object
-      (map nil #'try-compiler (hardware-object-compilation-methods hardware-object)))
-    ;; if those fail, try the global compilers
-    (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
-    ;; if those failed too, there's really nothing more to do.
-    (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~a.~%"
-            (print-instruction instruction nil))
-    (give-up-compilation)))
+               (restart-case
+                   (handler-case
+                       (let ((result (funcall compilation-method instruction :context context)))
+                         (let ((*print-pretty* nil))
+                           (format *compiler-noise-stream*
+                                   "APPLY-TRANSLATION-COMPILERS: Applying ~a to ~/quil:instruction-fmt/.~%"
+                                   compilation-method instruction))
+                         (dolist (instr result)
+                           (write-string "    " *compiler-noise-stream*)
+                           (print-instruction instr *compiler-noise-stream*)
+                           (terpri *compiler-noise-stream*))
+                         (return-from apply-translation-compilers result))
+                     (compiler-does-not-apply () nil))
+                 (try-next-compiler ()
+                   :report "Ignore this error and try the next compiler in the list."))))
+      ;; if this is a thread invocation, call its expander
+      (when (typep instruction 'application-thread-invocation)
+        (return-from apply-translation-compilers
+          (application-thread-invocation-thread instruction)))
+      ;; then try the compilers attached to the hardware object
+      (when hardware-object
+        (map nil #'try-compiler (hardware-object-compilation-methods hardware-object)))
+      ;; if those fail, try the global compilers
+      (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
+      ;; if those failed too, there's really nothing more to do.
+      (format *compiler-noise-stream*
+              "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/.~%"
+              instruction)
+      (give-up-compilation))))
 
 
 ;;; Core public-facing routine for a full compilation pass.

@@ -1,6 +1,9 @@
 ;;;; state-prep.lisp
 ;;;;
 ;;;; Author: Eric Peterson
+;;;;
+;;;; The trampolining decomposition algorithm is based off of Section 4 of
+;;;; arXiv:0406176, our old QSC favorite.
 
 (in-package #:cl-quil)
 
@@ -35,11 +38,10 @@
 
 ;; first we do base case work.
 ;; the most basic base case is the case of a 1-qubit operator.
-(defun state-prep-1Q-compiler (instr)
+(define-compiler state-prep-1Q-compiler
+    ((instr (_ _ q)
+            :where (typep instr 'state-prep-application)))
   "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
-  (unless (and (typep instr 'state-prep-application)
-               (= 1 (length (application-arguments instr))))
-    (give-up-compilation))
   (let* ((source-wf (vector-scale
                      (/ (norm (coerce (state-prep-application-source-wf instr) 'list)))
                      (coerce (state-prep-application-source-wf instr) 'list)))
@@ -57,11 +59,7 @@
                                (- (second source-wf))
                                (conjugate (second source-wf))
                                (first source-wf)))))
-    (euler-compiler
-     (make-instance 'gate-application
-                    :gate (magicl:multiply-complex-matrices matrix-target matrix-source)
-                    :arguments (application-arguments instr)
-                    :operator (named-operator "1Q-STATE-MATRIX")))))
+    (list (anon-gate "STATE-1Q" (m* matrix-target matrix-source) q))))
 
 
 ;; setting up 2Q state preparation requires some helper functions
@@ -113,7 +111,7 @@
                                                       (- (sin theta)) (cos theta) 0 0
                                                       0 0 1 0
                                                       0 0 0 1))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (imagpart (aref v 2)))
       (let* ((theta (- (atan (imagpart (aref v 2))
@@ -122,7 +120,7 @@
                                                       0 1 0 0
                                                       (- (sin theta)) 0 (cos theta) 0
                                                       0 0 0 1))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (imagpart (aref v 3)))
       (let* ((theta (- (atan (imagpart (aref v 3))
@@ -131,7 +129,7 @@
                                                       0 1 0 0
                                                       0 0 1 0
                                                       (- (sin theta)) 0 0 (cos theta)))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (realpart (aref v 2)))
       (let* ((theta (- (atan (realpart (aref v 2))
@@ -140,7 +138,7 @@
                                                       0 (cos theta) (sin theta) 0
                                                       0 (- (sin theta)) (cos theta) 0
                                                       0 0 0 1))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (unless (double= 0d0 (realpart (aref v 3)))
       (let* ((theta (- (atan (realpart (aref v 3))
@@ -149,19 +147,17 @@
                                                       0 (cos theta) 0 (sin theta)
                                                       0 0 1 0
                                                       0 (- (sin theta)) 0 (cos theta)))))
-        (setf matrix (magicl:multiply-complex-matrices m matrix))
+        (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
     (list matrix v)))
 
 
 ;; TODO: this should be made architecture-sensitive, with separate templates
 ;;       for ISWAP-based chips
-(defun state-prep-2Q-compiler (instr &optional (target ':cz)) 
+(define-compiler state-prep-2Q-compiler
+    ((instr (_ _ _ _)
+            :where (typep instr 'state-prep-application))) 
   "Compiler for STATE-PREP-APPLICATION instances that target a pair of qubits."
-  (declare (ignore target))     ; for now, everything compiles to CNOT
-  (unless (and (typep instr 'state-prep-application)
-               (= 2 (length (application-arguments instr))))
-    (give-up-compilation))
   (let ((qubit-complex (reverse (mapcar #'qubit-index (application-arguments instr))))
         prefix-circuit
         (source-wf (state-prep-application-source-wf instr))
@@ -225,11 +221,10 @@
       ;; write t^dag s as a member of SU(2) x SU(2)
       (multiple-value-bind (c1 c0)
           (convert-su4-to-su2x2
-           (reduce #'magicl:multiply-complex-matrices
-                   (list +e-basis+
-                         (magicl:conjugate-transpose target-matrix)
-                         source-matrix
-                         +edag-basis+)))
+           (m* +e-basis+
+               (magicl:conjugate-transpose target-matrix)
+               source-matrix
+               +edag-basis+))
         ;; write out the instructions
         (append prefix-circuit
                 (list (make-instance 'gate-application
@@ -241,11 +236,9 @@
                                      :operator #.(named-operator "RHS-state-prep-gate")
                                      :arguments (list (first (application-arguments instr))))))))))
 
-(defun state-prep-trampolining-compiler (instr &key (target ':cz))
+(define-compiler state-prep-trampolining-compiler
+    ((instr :where (typep instr 'state-prep-application)))
   "Recursive compiler for STATE-PREP-APPLICATION instances. It's probably wise to use this only if the state preparation instruction targets at least two qubits."
-  (declare (ignore target))
-  (unless (typep instr 'state-prep-application)
-    (give-up-compilation))
   (flet ((calculate-state-prep-angles (wf &optional (prefactor 1.0d0))
            ;; computes UCR angles for a circuit satisfying
            ;; UCRY(phi) UCRZ(theta) |wf> = |wf'> (x) |0>.
@@ -300,6 +293,8 @@
 ;; this decomposition algorithm is based off of Section 4 of /0406176, our old QSC favorite
 (defun state-prep-compiler (instr &key (target ':cz))
   "Compiles a STATE-PREP-APPLICATION instance by intelligently selecting one of the special-case compilation routines above."
+  (declare (ignore target))
+  
   (unless (typep instr 'state-prep-application)
     (give-up-compilation))
   
@@ -307,6 +302,6 @@
     (1
      (state-prep-1Q-compiler instr))
     (2
-     (state-prep-2Q-compiler instr target))
+     (state-prep-2Q-compiler instr))
     (otherwise
-     (state-prep-trampolining-compiler instr :target target))))
+     (state-prep-trampolining-compiler instr))))

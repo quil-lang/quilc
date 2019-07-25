@@ -3,10 +3,10 @@
 ;;;; Author: Eric Peterson
 ;;;; Algorithm based off of _Quantum Gate Decomposition Algorithms_ by Alexander Slepoy
 ;;;;
-;;;; This file contains attic routines of how we used to do compilation of generic
-;;;; unitaries.  This logic has been completely subsumed by
-;;;; src/compilers/qs-compile.lisp , and the non-historian user is advised to look
-;;;; there instead for how we do this in the modern age.
+;;;; This file contains attic routines of how we used to do generic compilation
+;;;; of multi-qubit programs. This routine is completely outperformed by "quantum
+;;;; Shannon decomposition", src/compilers/qs-compile.lisp, and the non-historian
+;;;; user is advised to look there instead for how we do this in the modern age.
 
 (in-package #:cl-quil)
 
