@@ -148,6 +148,17 @@
   (:documentation "An instruction representing the mutation of a frame attribute.")
   (:metaclass abstract-class))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun expand-frame-mutation-definition (name mnemonic docstring)
+    (check-type name symbol)
+    (check-type mnemonic string)
+    `(progn
+       (defclass ,name (frame-mutation)
+         ()
+         (:documentation ,docstring))
+
+       (defmethod mnemonic ((inst ,name)) (values ',mnemonic ',name)))))
+
 (defmethod arguments ((instr frame-mutation))
   (with-slots (qubits frame value)
       instr
@@ -158,16 +169,6 @@
   (check-type body list)
   (assert (= 1 (length body)))
   (expand-frame-mutation-definition name mnemonic (first body)))
-
-(defun expand-frame-mutation-definition (name mnemonic docstring)
-  (check-type name symbol)
-  (check-type mnemonic string)
-  `(progn
-     (defclass ,name (frame-mutation)
-       ()
-       (:documentation ,docstring))
-
-     (defmethod mnemonic ((inst ,name)) (values ',mnemonic ',name))))
 
 (defmethod print-instruction-generic ((instr frame-mutation) (stream stream))
   (format stream "~A~{ ~A~}"
