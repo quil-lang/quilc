@@ -182,6 +182,7 @@
                  :subdivision 0.01 ;; TODO
                  :base-approximations (generate-base-approximations basis-gates)))
 
+;;; NOTE: REQUIRES 1e-6 TOLERANCE ON MAGICL:IDENTITYP
 (defun find-order (mat)
   "Determines the order of MAT, i.e. how many times it has to be multiplied with itself to reach the identity matrix."
   (let ((curr-mat mat))
@@ -228,102 +229,122 @@
         :when (< bv-dist (sqrt (* 3 (expt subdivision 2))))
           :maximize mat-dist))
 
-(defun matrix-to-grid-coord (mat subdivision &key (exact nil))
-  "Returns the grid coordinate of MAT when mapped to an axis-angle ball coordinate in a grid of size SUBDIVISION, as an array of 3 integers."
+(defun epsilon0-vs-ball-dist (num-trials dist)
+  "Numerically computes the max value of epsilon0 that DIST on the angle-axis ball would satisfy."
+  (loop :for i :below num-trials
+        :for bv1 := (random-bloch-vector (/ pi 2))
+        :for bv2 := (random-bloch-vector (/ pi 2))
+        :for bv-dist := (aa-ball-distance bv1 bv2)
+        :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+        ;; Checks if the random unitaries picked have an angle-axis
+        ;; ball distance shorter than the diagonal of a grid cube
+        :when (< bv-dist dist)
+          :maximize mat-dist))
+
+(defun matrix-to-grid-coord (mat subdivision)
+  "Returns the grid coordinate of MAT when mapped to an axis-angle ball coordinate in a grid of size SUBDIVISION. The result is an array of 3 decimals corresponding to MAT's spatial coordinate in the grid."
   (concatenate 'vector (loop :for x :across (bloch-vector-to-ball-coord (matrix-to-bloch-vector mat))
-                             :collect (if exact (/ x subdivision) (floor x subdivision)))))
+                             :collect (/ x subdivision))))
 
 ;; (defun num-reachable-areas (subdivision)
 ;;   "Returns the total number of grid cubes of length SUBDIVISION that are reachable within the angle-axis ball, i.e. the number of cubes which intersect the ball."
-;;   (let ((diameter (1+ (floor) (/ (* 2 pi) subdivision)))
+;;   (let ((diameter (1+ (floor (/ (* 2 pi) subdivision))))
 ;;         (offset (ceiling (/ pi subdivision))))
 ;;     (dotimes (i (expt diameter 3))
 ;;       (let ((x (- (mod i diameter) offset))
 ;;             (y (- (mod (floor i diameter) diameter) offset))
-;;             (z (- (floor i (expt diameter 2)) offset)))
-;;         (format t "~A~%" (list x y z))))))
+;;             (z (- (floor i (expt diameter 2)) offset)))))))
 
-(defun generate-base-approximations-ballies (basis-gates &key (depth-limit 10) (debug nil)) ;; TODO
+(defun generate-base-approximations-ballies (basis-gates &key (ballie-r 0.01) (depth-limit 10) (debug nil)) ;; TODO
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   ;; Gates of odd index [2n + 1] correspond to the inverse of gate [2n]
   (let* ((gates (loop :for gate :in basis-gates
                       :collect gate #+ignore(simple-gate-matrix gate)
                       :collect (magicl:dagger gate #+ignore(simple-gate-matrix gate)))) ;; TODO
          (gate-orders (loop :for gate :in basis-gates :collect (find-order gate)))
-         (subdivision 0.01) ;; TODO: REPLACE
-         #+ignore(ball-volume (ceiling (* (/ 4 3) pi (expt (/ pi subdivision) 3))))
          (approx-table (make-hash-table :test 'equalp))
          (max-depth 0)
          (prev-count 0)
-         (overcounted 0))
-    (loop :for gate :in gates :for i :below (length gates) :do (format t "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
+         (overcounted 0)
+         (neglected 0)
+         (oeis-magic-num 12345678))
+    (loop :for gate :in gates
+          :for i :from 0
+          :do (format debug "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
     (labels ((helper (depth seq mat last-idx rep-count)
                (cond ((= depth max-depth)
-                      (let* ((coord (matrix-to-grid-coord mat subdivision :exact t))
-                             (grid-coord (matrix-to-grid-coord mat subdivision))
-                             (empty-ballies (remove-if #'(lambda (x) (nth-value 1 (gethash x approx-table)))
-                                                       (loop :for i :below 8 :collect (concatenate 'vector
-                                                                                                   (list (+ (aref grid-coord 0) (mod i 2))
-                                                                                                         (+ (aref grid-coord 1) (mod (floor i 2) 2))
-                                                                                                         (+ (aref grid-coord 2) (floor i 4))))))))
-                        ;; Find the closest ball out of neighboring, empty ballies
-                        ;; (format t "New sequence found: ~A -> ~A~%" grid-coord seq)
-                        (when empty-ballies
-                          (setf (gethash (reduce #'(lambda (x y) (min (vector-distance x coord) (vector-distance y coord)))
-                                                 (cdr empty-ballies) :initial-value (car empty-ballies))
-                                         approx-table)
-                                seq))
-                        (when (and (not empty-ballies) debug)
-                          (format t "~A too densely populated...skipping...~%" coord))))
+                      (let* ((exact-grid-coord (matrix-to-grid-coord mat ballie-r))
+                             (valid-ballies (remove-if (lambda (x) (or (> (vector-norm x) (/ pi ballie-r))
+                                                                       (nth-value 1 (gethash x approx-table))
+                                                                       (> (vector-distance x exact-grid-coord) 1)))
+                                                       (loop :for i :below 8 :collect (vector
+                                                                                       (+ (floor (aref exact-grid-coord 0)) (mod i 2))
+                                                                                       (+ (floor (aref exact-grid-coord 1)) (mod (floor i 2) 2))
+                                                                                       (+ (floor (aref exact-grid-coord 2)) (floor i 4)))))))
+                        ;; Find the closest ball out of neighboring, empty ballies (within the aa-ball)
+                        (dolist (ballie valid-ballies)
+                          (setf (gethash ballie approx-table) seq))
+                        (when (not valid-ballies)
+                          (format debug "~D overcounted~%" seq)
+                          (incf overcounted))))
                      (t (loop :for gate :in gates
-                              :for i :below (length gates)
+                              :for i :from 0
                               :for order := (elt gate-orders (floor i 2))
-                              ;; Prevent half-order from being
-                              ;; exceeded if a) we're using the same
-                              ;; gate or b) we're using the previous
-                              ;; gate's inverse
-                              :if (or (and (= i last-idx)
-                                           (or (zerop order) (< rep-count (if debug (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)) (ceiling order 2)))))
-                                      (and (not (= i last-idx))
-                                           (not (= (floor i 2) (floor last-idx 2)))))
+                              ;; Don't use a gate if a) it has an odd
+                              ;; index and its inverse is already in
+                              ;; the gate set, b) we're repeating the
+                              ;; previous gate and its half-order is
+                              ;; exceeded, or c) we're using the
+                              ;; previous gate's inverse
+                              :if (and (not (and (= order 2) (oddp i)))
+                                       (or (and (= i last-idx)
+                                                (or (zerop order) (< rep-count
+                                                                     (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
+                                           (and (not (= i last-idx))
+                                                (not (= (floor i 2) (floor last-idx 2))))))
                                 :do (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))
                               :else ;; Look at which sequences are being pruned
-                              :if (and (> max-depth 0) debug)
-                                :do (format t "Nonono! Not using gate ~A on sequence ~A~%" i seq)
-                              )))))
-      (dotimes (curr-depth depth-limit)
-        (format t "Searching at depth ~D..." curr-depth)
+                              :do (format debug "Nonono! Not using gate ~A on sequence ~A~%" i seq)
+                                  (incf neglected))))))
+      (format t "Division: ~D~%" ballie-r)
+      (loop :for curr-depth :from 0 :to depth-limit :do
+        #+ignore(dotimes (curr-depth (1+ depth-limit)))
+        (format t "Depth ~D search:" curr-depth)
         (finish-output)
         (setf max-depth curr-depth)
+        (setf overcounted 0)
+        (setf neglected 0)
         (helper 0 '() +I+ -1 0)
-        (format t " (~D new item~:P) (~D item~:P overcounted)~%" (- (hash-table-count approx-table) prev-count) overcounted)
+        (format t " (~D new, ~D overcounted, ~D neglected)" (- (hash-table-count approx-table) prev-count) overcounted neglected)
+        (format t " (~$% filled so far, ~D to go)~%" (* 100 (/ (hash-table-count approx-table) oeis-magic-num))
+                (- oeis-magic-num (hash-table-count approx-table)))
         (setf prev-count (hash-table-count approx-table)))
       approx-table)))
 
 ;;; Generate a hash table of grid coordinate -> unitary. Populate
 ;;; using IDDFS, as we want to minimize approximation lengths.
-(defun generate-base-approximations (basis-gates &key (depth-limit 10) (debug nil)) ;; TODO
+(defun generate-base-approximations (basis-gates &key (subdivision 0.01) (depth-limit 10) (debug nil)) ;; TODO
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   ;; Gates of odd index [2n + 1] correspond to the inverse of gate [2n]
   (let* ((gates (loop :for gate :in basis-gates
                       :collect gate #+ignore(simple-gate-matrix gate)
                       :collect (magicl:dagger gate #+ignore(simple-gate-matrix gate)))) ;; TODO
          (gate-orders (loop :for gate :in basis-gates :collect (find-order gate)))
-         (subdivision 0.01) ;; TODO: REPLACE
          #+ignore(ball-volume (ceiling (* (/ 4 3) pi (expt (/ pi subdivision) 3))))
          (approx-table (make-hash-table :test 'equalp))
          (max-depth 0)
          (prev-count 0)
-         (overcounted 0))
-    (loop :for gate :in gates :for i :below (length gates) :do (format t "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
+         (overcounted 0)
+         (neglected 0))
+    (loop :for gate :in gates :for i :below (length gates) :do (format debug "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
     (labels ((helper (depth seq mat last-idx rep-count)
                (cond ((= depth max-depth)
-                      (let ((grid-coord (matrix-to-grid-coord mat subdivision)))
+                      (let ((grid-coord (map 'vector #'floor (matrix-to-grid-coord mat subdivision))))
                         (when (nth-value 1 (gethash grid-coord approx-table))
-                          ;; (format t "~D overlaps with existing ~D~%" seq (gethash grid-coord approx-table))
+                          (format debug "~D overlaps with existing ~D~%" seq (gethash grid-coord approx-table))
                           (incf overcounted))
                         (unless (nth-value 1 (gethash grid-coord approx-table))
-                          ;; (format t "New sequence found: ~A -> ~A~%" grid-coord seq)
+                          (format debug "New sequence found: ~A~%" seq)
                           (setf (gethash grid-coord approx-table) seq))))
                      (t (loop :for gate :in gates
                               :for i :below (length gates)
@@ -332,21 +353,24 @@
                               ;; exceeded if a) we're using the same
                               ;; gate or b) we're using the previous
                               ;; gate's inverse
-                              :if (or (and (= i last-idx)
-                                           (or (zerop order) (< rep-count (if debug (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)) (ceiling order 2)))))
-                                      (and (not (= i last-idx))
-                                           (not (= (floor i 2) (floor last-idx 2)))))
+                              :if (and (not (and (= order 2) (oddp i)))
+                                       (or (and (= i last-idx)
+                                                (or (zerop order) (< rep-count (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
+                                           (and (not (= i last-idx))
+                                                (not (= (floor i 2) (floor last-idx 2))))))
                                 :do (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))
-                              ;; :else ;; Look at which sequences are being pruned
-                              ;;   :if (> max-depth 0)
-                              ;;     :do (format t "Nonono! Not using gate ~A on sequence ~A~%" i seq)
-                              )))))
-      (dotimes (curr-depth depth-limit)
+                              :else ;; Look at which sequences are being pruned
+                              :do
+                                 (format debug "Neglecting ~D on ~D~%" i seq)
+                                 (incf neglected))))))
+      (dotimes (curr-depth (1+ depth-limit))
         (format t "Searching at depth ~D..." curr-depth)
         (finish-output)
         (setf max-depth curr-depth)
+        (setf overcounted 0)
+        (setf neglected 0)
         (helper 0 '() +I+ -1 0)
-        (format t " (~D new item~:P) (~D item~:P overcounted)~%" (- (hash-table-count approx-table) prev-count) overcounted)
+        (format t " (~D new, ~D overcounted, ~D neglected)~%" (- (hash-table-count approx-table) prev-count) overcounted neglected)
         (setf prev-count (hash-table-count approx-table)))
       approx-table)))
 
@@ -363,7 +387,7 @@
 (defun sk-iter (base-approximations u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a vector of two items, which are each either a commutator or a base approximation."
   (if (zerop n)
-      t #+ignore(gethash (matrix-to-grid-coord u 0.01))
+      (gethash (map 'vector #'floor (matrix-to-grid-coord u 0.01)) base-approximations)
       (let* ((comm (gc-decompose u))
              (v-next (sk-iter base-approximations (commutator-v comm) (1- n)))
              (w-next (sk-iter base-approximations (commutator-w comm) (1- n))))
