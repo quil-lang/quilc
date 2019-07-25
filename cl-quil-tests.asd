@@ -25,6 +25,7 @@
   :components ((:file "package")
                (:file "suite")
                (:file "utilities")
+               (:file "logical-matrix-sanity-tests")
                (:file "initial-rewiring-tests")
                (:file "lexer-tests")
                (:file "parser-tests")

@@ -42,33 +42,29 @@ admonition against carelessness."
    :skip-prompt skip-prompt))
 
 
-(defun %golden-tester (check-output)
+(defun %golden-parse-print-tester (check-output)
   "Return a function that can be passed to MAP-GOLDEN-FILES-AND-TEST-CASES which uses CHECK-OUTPUT
 to compare output sections.
 
-%GOLDEN-TESTER is a helper function for TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES."
+%GOLDEN-PARSE-PRINT-TESTER is a helper function for TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES."
   (check-type check-output function)
-  (lambda (test-case)
-       (let* ((*always-show-failed-sexp* t)
-              (input (golden-test-case-input test-case))
-              (expected-output (golden-test-case-output test-case))
-              (actual-output nil)
-              (skip-fixed-point-check-p (uiop:string-prefix-p "# Disable fixed-point check" input))
-              (message (format nil "~&Golden test case at (file:line): ~A:~D"
-                               (golden-test-case-file test-case)
-                               (golden-test-case-line test-case))))
-         ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
-         ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
-         (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
-         (not-signals error (quil:parse-quil actual-output))
-         (is (funcall check-output expected-output actual-output) message)
+  (lambda (test-case golden-error-message)
+    (let* ((input (golden-test-case-input test-case))
+           (expected-output (golden-test-case-output test-case))
+           (actual-output nil)
+           (skip-fixed-point-check-p (uiop:string-prefix-p "# Disable fixed-point check" input)))
+      ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
+      ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
+      (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
+      (not-signals error (quil:parse-quil actual-output))
+      (is (funcall check-output expected-output actual-output) golden-error-message)
 
-         ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
-         ;; might fail, so skip it if we find a magic cookie at the start of the input section
-         ;; indicating that we should do so.
-         (unless skip-fixed-point-check-p
-           (is (funcall check-output expected-output (parse-and-print-quil-to-string actual-output))
-               message)))))
+      ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
+      ;; might fail, so skip it if we find a magic cookie at the start of the input section
+      ;; indicating that we should do so.
+      (unless skip-fixed-point-check-p
+        (is (funcall check-output expected-output (parse-and-print-quil-to-string actual-output))
+            golden-error-message)))))
 
 (deftest test-print-parsed-program-golden-files ()
   "Ensure that PRINT-PARSED-PROGRAM produces the expected output and that it is parseable by PARSE-QUIL."
@@ -82,12 +78,12 @@ to compare output sections.
   (let ((golden-files (uiop:directory-files *printer-test-files-gold-standard-directory* #P"*.quil")))
     (format t "~&  Gold-standard tests:")
     (is (not (null golden-files)))
-    (map-golden-files-and-test-cases (%golden-tester #'string=) golden-files))
+    (map-golden-files-and-test-cases (%golden-parse-print-tester #'string=) golden-files))
 
   (let ((golden-files (uiop:directory-files *printer-test-files-gold-regex-directory* #P"*.quil")))
     (format t "~&  Gold-regex tests:")
     (is (not (null golden-files)))
-    (map-golden-files-and-test-cases (%golden-tester #'cl-ppcre:scan) golden-files)))
+    (map-golden-files-and-test-cases (%golden-parse-print-tester #'cl-ppcre:scan) golden-files)))
 
 (deftest test-instruction-fmt ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\"" (format nil "~/cl-quil:instruction-fmt/"
@@ -173,7 +169,7 @@ TEST(0.5) 0 1
                           :print-polar-form print-polar-form)))
 
 (defun %pprint-rational-as-pi-multiple (r)
-  "Approximation the pretty printing parts of CL-QUIL::FORMAT-REAL.
+  "Approximate the pretty printing parts of CL-QUIL::FORMAT-REAL.
 
 Used as a helper function in TEST-REAL-FMT."
   (check-type r (rational 0))

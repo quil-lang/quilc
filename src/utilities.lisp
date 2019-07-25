@@ -141,6 +141,10 @@ Return two values:
   "Given an INTEGER N, return true if N is a power of 2, greater than 1."
   (and (> n 1) (power-of-two-p n)))
 
+(defun perfect-square-p (n)
+  "Given a non-negative INTEGER N, return true if N is a perfect square."
+  (= n (expt (isqrt n) 2)))
+
 ;;; Rotate-byte function courtesy of cl-utilities, from
 ;;; https://github.com/Publitechs/cl-utilities/blob/master/rotate-byte.lisp
 #+sbcl (declaim (inline rotate-byte))
