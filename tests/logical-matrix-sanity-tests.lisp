@@ -18,11 +18,21 @@
                  (p (if (stringp input) (quil:parse-quil input) input))
                  (actual (quil::parsed-program-to-logical-matrix p))
                  ;; TRANSPOSE here to allow writing ENTRIES in row-major order, for readability.
-                 (expected (magicl:transpose (magicl:make-complex-matrix n n (a:flatten entries)))))
+                 (expected (magicl:transpose (magicl:make-complex-matrix n n (a:flatten entries))))
+                 (compiled (quil::matrix-rescale
+                            (quil::parsed-program-to-logical-matrix (quil:compiler-hook p (quil::build-nq-linear-chip (quil:qubits-needed p))))
+                            expected)))
+            ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion
+            ;; succeeds.  Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH
+            ;; when/if the associated test assertion actually fails.
             (is (quil::matrix-equality actual expected)
-                (format nil "Checking input: ~S~%~A"
-                        input
-                        (%matrix-mismatch-error-message actual expected)))))
+                "Checking input: ~S~%~/cl-quil-tests::matrix-mismatch-fmt/"
+                input
+                (list actual expected))
+            (is (quil::operator= compiled expected)
+                "Checking compiled input: ~S~%~/cl-quil-tests::matrix-mismatch-fmt/"
+                input
+                (list compiled expected))))
         ;; Bind some values that show up as matrix entries in the testscases below, to make pattern
         ;; matching on them easier. Scroll down to the RY-gate tests to see where a,..,h are used.
         (let* ((i+ #C(0.0 1.0))

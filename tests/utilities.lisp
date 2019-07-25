@@ -28,13 +28,35 @@ If M and U are equal under TEST, return NIL."
       (unless (funcall test (magicl:ref m r c) (magicl:ref u r c))
         (return-from matrix-mismatch (list r c))))))
 
-(defun %matrix-mismatch-error-message (m u &key (test #'quil::double~))
-  (format nil "Matrix comparison failed. First mismatch at position: ~A~@
-               First matrix:~%~A~@
-               Second matrix:~%~A"
-          (matrix-mismatch m u :test test)
-          m
-          u))
+(defun %print-matrix-mismatch (m u &key (test #'quil::double~)
+                                        stream)
+  (a:if-let (mismatch-position (matrix-mismatch m u :test test))
+    (format stream
+            "First mismatch at position: ~A~@
+             First matrix:~%~A~@
+             Second matrix:~%~A"
+            mismatch-position
+            m u)
+    (format stream "No matrix mismatch found.")))
+
+(defun matrix-mismatch-fmt (stream arguments &optional colon-modifier at-modifier)
+  "Like the function %PRINT-MATRIX-MISMATCH, but is compatible with format strings using the ~/.../ directive.
+
+This function is intended to be used in FIASCO assertion error messages. FIASCO evaluates format
+args regardless of whether a test passes or fails, but FORMAT is only called to print the error
+message on failure. Thus, using MATRIX-MISMATCH-FMT in your FIASCO format control string allows you
+to only compute the MATRIX-MISMATCH for failing tests, which is usually what you want.
+
+For example,
+
+    (format t \"~/cl-quil-tests::matrix-mismatch-fmt/\" (list matrix-a matrix-b))
+    (format t \"~/cl-quil-tests::matrix-mismatch-fmt/\" (list matrix-a matrix-b #'test-function))
+"
+  (declare (ignore colon-modifier at-modifier))
+  (destructuring-bind (m u &optional test) arguments
+    (if (null test)
+        (%print-matrix-mismatch m u :stream stream)
+        (%print-matrix-mismatch m u :stream stream :test test))))
 
 (defun fiasco-assert-matrices-are-equal (m u)
   (is (= (magicl:matrix-rows u) (magicl:matrix-rows m)))
@@ -45,7 +67,11 @@ If M and U are equal under TEST, return NIL."
     (is (loop :for i :below (magicl:matrix-rows m) :always
           (loop :for j :below (magicl:matrix-cols m) :always
             (test~ (magicl:ref m i j) (magicl:ref u i j))))
-        (%matrix-mismatch-error-message m u :test #'test~))))
+        ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion succeeds.
+        ;; Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH when/if the
+        ;; above assertion actually fails.
+        "Matrix comparison failed. ~/cl-quil-tests::matrix-mismatch-fmt/"
+        (list m u #'test~))))
 
 (defun build-anonymous-gate (matrix &rest qubit-indices)
   (make-instance 'cl-quil::gate-application
