@@ -326,6 +326,8 @@
    #:instruction-fmt                    ; FUNCTION (format directive)
    #:real-fmt                           ; FUNCTION (format directive)
    #:complex-fmt                        ; FUNCTION (format directive)
+
+   #:comment                            ; FUNCTION
    )
 
   ;; gates.lisp

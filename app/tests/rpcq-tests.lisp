@@ -5,13 +5,14 @@
 (in-package #:quilc-tests)
 
 (defmacro with-random-rpc-client ((client) &body body)
+  "Bind CLIENT to an RPCQ client object for the duration of BODY."
   (let* ((protocol "inproc")
          (host (format nil "~a" (uuid:make-v4-uuid)))
          (endpoint (concatenate 'string protocol "://" host)))
     `(let* ((server-function (lambda ()
-                              (quilc::start-rpc-server :protocol ,protocol
-                                                       :host ,host
-                                                       :port nil)))
+                               (quilc::start-rpc-server :protocol ,protocol
+                                                        :host ,host
+                                                        :port nil)))
             (server-thread (bt:make-thread server-function)))
        (sleep 1)
        (unwind-protect
@@ -20,11 +21,13 @@
          (bt:destroy-thread server-thread)))))
 
 (deftest test-easy-version-call ()
+  "Test that the \"get-version-info\" endpoint works."
   (with-random-rpc-client (client)
     (let ((hash (rpcq:rpc-call client "get-version-info")))
       (is (typep hash 'hash-table)))))
 
-(deftest test-quil-roundtrip ()
+(deftest test-quil-to-native-quil-endpoint ()
+  "Test that the \"quil-to-native-quil\" endpoint compiles to a program whose matrix representation is equivalent to the input program." 
   (with-random-rpc-client (client)
     (let* ((quil "H 0")
            (isa (a:plist-hash-table
@@ -51,7 +54,87 @@
         (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
         (is (quil::matrix-equality mat1 mat2))))))
 
+(deftest test-quil-to-native-quil-protoquil-endpoint ()
+  "Test that the \"quil-to-native-quil\" endpoint will compile protoquil when given :PROTOQUIL T."
+  (with-random-rpc-client (client)
+    (let* ((quil "H 0")
+           (isa (a:plist-hash-table
+                 (list
+                  "1Q" (a:plist-hash-table
+                        (list
+                         "0" (make-hash-table)))
+                  "2Q" (make-hash-table))))
+           (specs (make-hash-table))
+           (target-device (make-instance 'rpcq::|TargetDevice|
+                                         :|isa| isa
+                                         :|specs| specs))
+           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                          :|quil| quil
+                                          :|target_device| target-device))
+           (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil nil))
+           (server-response-protoquil (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil t))
+           (cpp (quil:parse-quil (rpcq::|NativeQuilResponse-quil| server-response)))
+           (cpp-protoquil (quil:parse-quil (rpcq::|NativeQuilResponse-quil| server-response-protoquil))))
+      (is (not (quil:protoquil-program-p cpp)))
+      (is (quil:protoquil-program-p cpp-protoquil)))))
+
+(deftest test-quil-to-native-quil-endpoint-overrides-server ()
+  "Test that the \"quil-to-native-quil\" endpoint can override a server that has been started with -P."
+  ;; TODO This is a bit of a hack, but I can't get
+  ;; bt:*default-special-bindings* to work here.
+  (setf quilc::*protoquil* t)
+  (with-random-rpc-client (client)
+    (let* ((quil "H 0")
+           (isa (a:plist-hash-table
+                 (list
+                  "1Q" (a:plist-hash-table
+                        (list
+                         "0" (make-hash-table)))
+                  "2Q" (make-hash-table))))
+           (specs (make-hash-table))
+           (target-device (make-instance 'rpcq::|TargetDevice|
+                                         :|isa| isa
+                                         :|specs| specs))
+           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                          :|quil| quil
+                                          :|target_device| target-device)))
+      (flet ((parse-response (protoquil)
+               (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+        ;; :protoquil nil means defer to server, i.e. this should produce protoquil
+        (is (quil:protoquil-program-p (parse-response nil)))
+        ;; :protoquil ':false means no protoquil, override server's -P
+        (is (not (quil:protoquil-program-p (parse-response ':false))))
+        ;; :protoquil t means yes protoquil, regardless of what the server says
+        (is (quil:protoquil-program-p (parse-response t))))))
+  (setf quilc::*protoquil* nil)
+
+  ;; Same tests but for *protoquil* = nil
+  (with-random-rpc-client (client)
+    (let* ((quil "H 0")
+           (isa (a:plist-hash-table
+                 (list
+                  "1Q" (a:plist-hash-table
+                        (list
+                         "0" (make-hash-table)))
+                  "2Q" (make-hash-table))))
+           (specs (make-hash-table))
+           (target-device (make-instance 'rpcq::|TargetDevice|
+                                         :|isa| isa
+                                         :|specs| specs))
+           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                          :|quil| quil
+                                          :|target_device| target-device)))
+      (flet ((parse-response (protoquil)
+               (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+        ;; :protoquil nil means defer to server, i.e. this should not produce protoquil
+        (is (not (quil:protoquil-program-p (parse-response nil))))
+        ;; :protoquil ':false means no protoquil, override server's -P
+        (is (not (quil:protoquil-program-p (parse-response ':false))))
+        ;; :protoquil t means yes protoquil, regardless of what the server says
+        (is (quil:protoquil-program-p (parse-response t)))))))
+
 (deftest test-native-quil-to-binary-endpoint ()
+  "Test that the \"native-quil-to-binary\" endpoint works."
   (with-random-rpc-client (client)
     (let* ((quil "H 0")
            (num-shots 10)
@@ -66,6 +149,7 @@
 ;; This test is copied wholesale from pyQuil's test_api.py, random
 ;; seed and all.
 (deftest test-generate-rb-sequence-endpoint ()
+  "Test that the \"generate-rb-sequence\" endpoint works."
   (with-random-rpc-client (client)
     (let* ((quil "PHASE(pi/2) 0
 H 0")
@@ -82,6 +166,7 @@ H 0")
         (is (equalp a #(0 0 1 0 1)))))))
 
 (deftest test-conjugate-pauli-by-clifford-endpoint ()
+  "Test that the \"conjugate-pauli-by-clifford\" endpoint works."
   (with-random-rpc-client (client)
     (let* ((pauli (make-instance 'rpcq::|PauliTerm| :|indices| '(0) :|symbols| '("X")))
            (clifford "H 0")
@@ -93,6 +178,7 @@ H 0")
       (is (string= "Z" (rpcq::|ConjugateByCliffordResponse-pauli| response))))))
 
 (deftest test-rewrite-arithmetic-endpoint ()
+  "Test that the \"rewrite-arithmetic\" endpoint works."
   (with-random-rpc-client (client)
     (let* ((quil "RX((2+1/2)*pi/7) 0")
            (request (make-instance 'rpcq::|RewriteArithmeticRequest|
