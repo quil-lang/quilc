@@ -66,6 +66,19 @@
 ;;; helper functions for algebraically-reduce-instructions, including the doubly-linked
 ;;; list structure peephole-rewriter-node which is used for rewinding the peephole rewriter
 
+(defun calculate-instructions-2q-depth (instructions)
+  (let ((lschedule (make-lscheduler)))
+    (append-instructions-to-lschedule lschedule instructions)
+    (or (lscheduler-walk-graph lschedule
+                               :base-value 0
+                               :bump-value (lambda (instr value)
+                                             (if (and (typep instr 'gate-application)
+                                                      (< 1 (length (application-arguments instr))))
+                                                 (1+ value)
+                                                 value))
+                               :test-values #'max)
+        0)))
+
 (defun calculate-instructions-duration (instructions chip-specification)
   "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
   (let ((lschedule (make-lscheduler)))
