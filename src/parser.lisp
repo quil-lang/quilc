@@ -13,7 +13,9 @@
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
     :DECLARE :SHARING :OFFSET :PRAGMA
-    :AS :MATRIX :PERMUTATION))
+    :AS :MATRIX :PERMUTATION
+    :PULSE :CAPTURE :DELAY :FENCE
+    :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE))
 
 (deftype token-type ()
   '(or
@@ -110,7 +112,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|DELAY|FENCE|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -399,6 +401,10 @@ the immediately preceding line."
       ((:LOAD :STORE :EQ :GT :GE :LT :LE)
        (parse-trinary-classical tok-type tok-lines))
 
+      ;; Frame Mutation
+      ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
+       (parse-frame-mutation tok-type tok-lines))
+
       (otherwise
        (quil-parse-error "Got an unexpected token of type ~S ~
                           when trying to parse a program." tok-type)))))
@@ -652,6 +658,37 @@ result of BODY, and the (possibly null) list of remaining lines.
                               (application-operator app)))
                        (return (values app rest-lines)))))))
 
+(defun parse-application-parameter (toks)
+  (let ((*arithmetic-parameters* nil)
+        (*segment-encountered* nil))
+    (let ((result (parse-arithmetic-tokens toks :eval t)))
+      (cond
+        ((and (null *arithmetic-parameters*)
+              (null *segment-encountered*))
+         (cond
+           ((numberp result)
+            (constant result))
+           ((typep result 'memory-ref)
+            result)
+           (t
+            (quil-parse-error "A number was expected from arithmetic evaluation. Got something of type ~S."
+                              (type-of result)))))
+
+        ((or *formal-arguments-allowed*
+             (and *segment-encountered*
+                  (null *arithmetic-parameters*)))
+         (if (and (= 1 (length toks))
+                  (eql ':PARAMETER (token-type (first toks)))
+                  (= 1 (length *arithmetic-parameters*)))
+             (token-payload (first toks))
+             (make-delayed-expression
+              (mapcar #'first *arithmetic-parameters*)
+              (mapcar #'second *arithmetic-parameters*)
+              result)))
+
+        (t
+         (quil-parse-error "Formal parameters found in a place they're not allowed."))))))
+
 (defun parse-application (tok-lines)
   "Parse a gate or circuit application out of the lines of tokens TOK-LINES, returning an UNRESOLVED-APPLICATION."
   (let ((line (pop tok-lines))
@@ -700,37 +737,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                                         (lambda (tok)
                                           (eq ':comma (token-type tok)))
                                         found-params)))
-                         (mapcar (lambda (toks)
-                                   (let ((*arithmetic-parameters* nil)
-                                         (*segment-encountered* nil))
-                                     (let ((result (parse-arithmetic-tokens toks :eval t)))
-                                       (cond
-                                         ((and (null *arithmetic-parameters*)
-                                               (null *segment-encountered*))
-                                          (cond
-                                            ((numberp result)
-                                             (constant result))
-                                            ((typep result 'memory-ref)
-                                             result)
-                                            (t
-                                             (quil-parse-error "A number was expected from arithmetic evaluation. Got something of type ~S."
-                                                               (type-of result)))))
-
-                                         ((or *formal-arguments-allowed*
-                                              (and *segment-encountered*
-                                                   (null *arithmetic-parameters*)))
-                                          (if (and (= 1 (length toks))
-                                                   (eql ':PARAMETER (token-type (first toks)))
-                                                   (= 1 (length *arithmetic-parameters*)))
-                                              (token-payload (first toks))
-                                              (make-delayed-expression
-                                               (mapcar #'first *arithmetic-parameters*)
-                                               (mapcar #'second *arithmetic-parameters*)
-                                               result)))
-
-                                         (t
-                                          (quil-parse-error "Formal parameters found in a place they're not allowed."))))))
-                                 entries)))))
+                         (mapcar #'parse-application-parameter entries)))))
 
       ;; Parse out the rest of the arguments and return.
       (return-from parse-application
@@ -1423,6 +1430,36 @@ result of BODY, and the (possibly null) list of remaining lines.
              (parse-program-lines tok-lines)
            (push parsed parsed-body)
            (setf tok-lines rest-lines)))))))
+
+(defun parse-frame-mutation (tok-type tok-lines)
+  (match-line ((op tok-type) (qubit :INTEGER) &rest rest-toks) tok-lines
+      (multiple-value-bind (qubit-toks rest-toks)
+          ;; Consume tokens until we reach the frame's name (a string)
+          (take-until (lambda (tok) (eql ':STRING (token-type tok)))
+                      (cons qubit rest-toks))
+        (when (endp rest-toks)
+          (quil-parse-error "Expected a frame in ~A, but none were found (did you forget quotes?)"
+                            tok-type))
+        (dolist (q qubit-toks)
+          (unless (eql ':INTEGER (token-type q))
+            (quil-parse-error "Expected a qubit index, but instead got ~A in instruction ~A"
+                              (token-type q)
+                              tok-type)))
+        (let ((frame-name (first rest-toks))
+              (value-toks (rest rest-toks)))
+          ;; We've already checked the frame name.
+          ;; TODO This allows for memory references. Do we want that?
+          (let ((result (parse-application-parameter value-toks)))
+            (make-instance
+             (ecase tok-type
+               ((:SET-FREQUENCY) 'set-frequency)
+               ((:SET-PHASE)     'set-phase)
+               ((:SHIFT-PHASE)   'shift-phase)
+               ((:SET-SCALE)     'shift-scale))
+             :qubits (mapcar (lambda (tok) (qubit (token-payload tok)))
+                             qubit-toks)
+             :frame (frame (token-payload frame-name))
+             :value result))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
