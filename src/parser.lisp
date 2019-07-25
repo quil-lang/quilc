@@ -659,6 +659,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                        (return (values app rest-lines)))))))
 
 (defun parse-application-parameter (toks)
+  "Parse a single parameter. Consumes all tokens given."
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
     (let ((result (parse-arithmetic-tokens toks :eval t)))
@@ -689,10 +690,44 @@ result of BODY, and the (possibly null) list of remaining lines.
         (t
          (quil-parse-error "Formal parameters found in a place they're not allowed."))))))
 
+(defun parse-application-parameters (arg-tokens &key name)
+  "Parse the parameters from an application. Returns the parsed
+parameters and the remaining tokens."
+  ;; Check for parenthesis in first position to indicate
+  ;; parameters.
+  (unless (eql ':LEFT-PAREN (token-type (first arg-tokens)))
+    (values nil arg-tokens))
+   ;; Remove :LEFT-PAREN
+    (pop arg-tokens)
+    ;; Time to parse out everything in between the parentheses...
+    (multiple-value-bind (found-params rest-line)
+        ;; ... but first we have to find the right paren.
+        (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
+                             arg-tokens)
+
+      ;; But if we didn't find it, then we have an unmatched
+      ;; parenthesis.
+      (when (endp rest-line)
+        (quil-parse-error "No matching right parenthesis in the ~
+                           application~@[ ~S~]."
+                          name))
+
+      ;; If we did find it, pop it off from where the arguments
+      ;; will lie.
+      (pop rest-line)
+      ;; Parse the params. Separate them by comma, evaluate them
+      ;; if necessary.
+      (let* ((entries
+               (split-sequence:split-sequence-if
+                (lambda (tok)
+                  (eq ':comma (token-type tok)))
+                found-params))
+             (params (mapcar #'parse-application-parameter entries)))
+        (values params rest-line))))
+
 (defun parse-application (tok-lines)
   "Parse a gate or circuit application out of the lines of tokens TOK-LINES, returning an UNRESOLVED-APPLICATION."
-  (let ((line (pop tok-lines))
-        params)
+  (let ((line (pop tok-lines)))
     (destructuring-bind (op . args) line
       ;; Check that we are starting out with a :NAME, representing the
       ;; name of the gate or circuit.
@@ -708,45 +743,17 @@ result of BODY, and the (possibly null) list of remaining lines.
                                  :operator (named-operator (token-payload op)))
                   tok-lines)))
 
-      ;; Check for parenthesis in first position to indicate
-      ;; parameters.
-      (when (eql ':LEFT-PAREN (token-type (first args)))
-        ;; Remove :LEFT-PAREN
-        (pop args)
-        ;; Time to parse out everything in between the parentheses...
-        (multiple-value-bind (found-params rest-line)
-            ;; ... but first we have to find the right paren.
-            (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
-                                 args)
+      (multiple-value-bind (params args)
+          (parse-application-parameters args :name (token-payload op))
 
-          ;; But if we didn't find it, then we have an unmatched
-          ;; parenthesis.
-          (when (endp rest-line)
-            (quil-parse-error "No matching right parenthesis in the ~
-                               application ~S."
-                              (token-payload op)))
-
-          ;; If we did find it, pop it off from where the arguments
-          ;; will lie.
-          (pop rest-line)
-          (setf args rest-line)
-
-          ;; Parse the params. Separate them by comma, evaluate them
-          ;; if necessary.
-          (setf params (let ((entries (split-sequence:split-sequence-if
-                                        (lambda (tok)
-                                          (eq ':comma (token-type tok)))
-                                        found-params)))
-                         (mapcar #'parse-application-parameter entries)))))
-
-      ;; Parse out the rest of the arguments and return.
-      (return-from parse-application
-        (values
-         (make-instance 'unresolved-application
-                        :operator (named-operator (token-payload op))
-                        :parameters params
-                        :arguments (mapcar #'parse-argument args))
-         tok-lines)))))
+        ;; Parse out the rest of the arguments and return.
+        (return-from parse-application
+          (values
+           (make-instance 'unresolved-application
+                          :operator (named-operator (token-payload op))
+                          :parameters params
+                          :arguments (mapcar #'parse-argument args))
+           tok-lines))))))
 
 (defun parse-measurement (tok-lines)
   "Parse a measurement out of the lines of tokens TOK-LINES."
@@ -1461,6 +1468,23 @@ result of BODY, and the (possibly null) list of remaining lines.
              :frame (frame (token-payload frame-name))
              :value result))))))
 
+;;; TODO
+;;; - *formal-arguments-allowed* t ?
+;;; - can we be more consistent re: taking a slice of a line, a single line, or a list of lines?
+
+(defun parse-waveform (toks)
+  (match-line ((name ':NAME) &rest rest-toks) toks
+    (if (endp rest-toks)
+        (waveform-ref (token-payload name))
+        (let ((*arithmetic-parameters* nil)
+              (*segment-encountered* nil))
+          (multiple-value-bind (params rest)
+              (parse-application-parameters rest-toks)
+            (when (null params)
+              (quil-parse-error "Invalid waveform parameters."))  ; TODO better message?
+            (unless (endp rest)
+              (quil-parse-error "Unexpected tokens when parsing waveform."))
+            (%waveform-ref (token-payload name) params)))))) ;TODO call these params or args?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
