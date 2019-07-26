@@ -116,8 +116,8 @@
                              :qubit (intern-if-string (gethash "qubit" gate-datum))))
       (t
        (make-gate-binding :operator (named-operator (gethash "operator" gate-datum))
-                          :parameters (mapcar #'intern-if-string (gethash "parameters" gate-datum))
-                          :arguments (mapcar #'intern-if-string (gethash "arguments" gate-datum)))))))
+                          :parameters (map 'list #'intern-if-string (gethash "parameters" gate-datum))
+                          :arguments (map 'list #'intern-if-string (gethash "arguments" gate-datum)))))))
 
 (defun parse-gate-information (gate-datum)
   (let (args)
@@ -129,9 +129,11 @@
 
 (defun parse-gates-field (gates)
   (let ((gate-information (make-hash-table :test #'equalp)))
-    (dolist (gate-datum gates gate-information)
-      (setf (gethash (parse-binding gate-datum) gate-information)
-            (parse-gate-information gate-datum)))))
+    (map nil (lambda (gate-datum)
+               (setf (gethash (parse-binding gate-datum) gate-information)
+                     (parse-gate-information gate-datum)))
+         gates)
+    gate-information))
 
 (defun load-isa-layer (chip-spec isa-hash)
   "Loads the \"isa\" layer into a new chip-specification object."
