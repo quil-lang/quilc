@@ -200,8 +200,8 @@
 ;;; Pulse
 
 (defclass pulse (instruction)
-  ((gates :initarg :gates
-          :accessor pulse-gates)
+  ((qubits :initarg :qubits
+          :accessor pulse-qubits)
    (frame :initarg :frame
           :accessor pulse-frame)
    (waveform :initarg :waveform
@@ -210,7 +210,7 @@
 
 (defmethod print-instruction-generic ((instr pulse) (stream stream))
   (format stream "PULSE ~{~A ~} ~A ~A"
-          (pulse-gates instr)
+          (pulse-qubits instr)
           (print-instruction-generic (pulse-frame instr) nil)
           (print-instruction-generic (pulse-waveform instr) nil)))
 

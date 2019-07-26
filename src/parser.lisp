@@ -401,9 +401,24 @@ the immediately preceding line."
       ((:LOAD :STORE :EQ :GT :GE :LT :LE)
        (parse-trinary-classical tok-type tok-lines))
 
-      ;; Frame Mutation
+      ;; QuilT Frame Mutation
       ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
        (parse-frame-mutation tok-type tok-lines))
+
+      ;; QuilT pulse
+      ((:PULSE)
+       (parse-pulse tok-lines))
+
+      ((:DELAY)
+       (parse-delay tok-lines))
+
+      ;; QuilT fence
+      ((:FENCE)
+       (parse-fence tok-lines))
+
+      ;; QuilT capture
+      ((:CAPTURE)
+       (parse-capture tok-lines))
 
       (otherwise
        (quil-parse-error "Got an unexpected token of type ~S ~
@@ -658,6 +673,8 @@ result of BODY, and the (possibly null) list of remaining lines.
                               (application-operator app)))
                        (return (values app rest-lines)))))))
 
+;;; TODO can we call this something like: parse an "expression"?
+;;; perhaps the more general TODO is to write down an honest grammar for Quil.
 (defun parse-application-parameter (toks)
   "Parse a single parameter. Consumes all tokens given."
   (let ((*arithmetic-parameters* nil)
@@ -1438,6 +1455,95 @@ parameters and the remaining tokens."
            (push parsed parsed-body)
            (setf tok-lines rest-lines)))))))
 
+(declaim (optimize (speed 0) (space 0) (debug 3)))
+
+(defun parse-pulse (tok-lines)
+  (match-line ((op :PULSE) (qubit :INTEGER) &rest rest-toks) tok-lines
+      (multiple-value-bind (qubit-toks rest-toks)
+          ;; Consume tokens until we reach the frame's name (a string)
+          (take-until (lambda (tok) (eql ':STRING (token-type tok)))
+                      (cons qubit rest-toks))
+        (when (endp rest-toks)
+          (quil-parse-error "Expected a frame in PULSE, but none were found (did you forget quotes?)"))
+        ;; First up, qubit indices.
+        (let* ((qubits (mapcar (lambda (q)
+                                 (if (eql ':INTEGER (token-type q))
+                                     (qubit (token-payload q))
+                                     (quil-parse-error "Expected a qubit index in PULSE, but instead got ~A."
+                                                       (token-type q))))
+                               qubit-toks))
+               ;; Next token is the name of the frame.
+               (frame-name (frame
+                            (token-payload
+                             (first rest-toks)))))
+          ;; Finally, we should have a waveform reference.
+          (multiple-value-bind (waveform-ref rest) (parse-waveform-ref (rest rest-toks))
+            (unless (endp rest)
+              (quil-parse-error "Unexpected token ~A at end of PULSE instruction." (first rest)))
+            (make-instance 'pulse
+                           :qubits qubits
+                           :frame frame-name
+                           :waveform waveform-ref))))))
+
+(defun parse-delay (tok-lines)
+  (match-line ((op :DELAY) (qubit :INTEGER) &rest duration-toks) tok-lines
+    (when (endp duration-toks)
+      (quil-parse-error "Expected a duration in DELAY instruction."))
+    ;; TODO formal arguments?
+    (make-instance 'delay
+                   :qubit (qubit (token-payload qubit))
+                   :duration (parse-application-parameter duration-toks))))
+
+(defun parse-fence (tok-lines)
+  (match-line ((op :FENCE) (qubit :INTEGER) &rest other-qubit-toks) tok-lines
+    (dolist (q other-qubit-toks)
+      (unless (eql ':INTEGER (token-type q))
+        (quil-parse-error "Expected qubit indices in FENCE instruction, but observed ~A."
+                          (token-type q))))
+    (make-instance 'fence
+                   :qubits (mapcar (lambda (tok) (qubit (token-payload tok)))
+                                   (cons qubit other-qubit-toks)))))
+
+;;; TODO should we be able to capture-discard?
+(defun parse-capture (tok-lines)
+  (match-line ((op :CAPTURE) (qubit :INTEGER) (frame-name :STRING) &rest rest-toks) tok-lines
+    (when (endp rest-toks)
+      (quil-parse-error "CAPTURE instruction is missing waveform reference."))
+    (multiple-value-bind (waveform-ref rest-toks)
+        (parse-waveform-ref rest-toks)
+      (when (endp rest-toks)
+        (quil-parse-error "CAPTURE instruction is missing memory reference."))
+      (unless (endp (rest rest-toks))
+        (quil-parse-error "Unexpected token ~A in CAPTURE" (rest rest-toks)))
+      (let* ((address (first rest-toks))
+               (address-obj
+                (cond
+                  ;; Actual address to measure into.
+                  ((eql ':AREF (token-type address))
+                   (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
+                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
+                   (mref (car (token-payload address))
+                         (cdr (token-payload address))))
+
+                  ;; Implicit address to measure into.
+                  ((and (eql ':NAME (token-type address))
+                        (find (token-payload address) *memory-region-names* :test #'string=))
+                   (mref (token-payload address) 0))
+
+                  ;; Formal argument.
+                  ((eql ':NAME (token-type address))
+                   (unless *formal-arguments-allowed*
+                     (quil-parse-error "Found formal argument where it's not allowed."))
+                   (formal (token-payload address)))
+
+                  (t
+                   (quil-parse-error "Expected address after MEASURE")))))
+          (make-instance 'capture 
+                         :qubit (qubit (token-payload qubit))
+                         :frame (frame (token-payload frame-name))
+                         :waveform waveform-ref
+                         :memory-ref address-obj)))))
+
 (defun parse-frame-mutation (tok-type tok-lines)
   (match-line ((op tok-type) (qubit :INTEGER) &rest rest-toks) tok-lines
       (multiple-value-bind (qubit-toks rest-toks)
@@ -1472,19 +1578,24 @@ parameters and the remaining tokens."
 ;;; - *formal-arguments-allowed* t ?
 ;;; - can we be more consistent re: taking a slice of a line, a single line, or a list of lines?
 
-(defun parse-waveform (toks)
-  (match-line ((name ':NAME) &rest rest-toks) toks
+(defun parse-waveform-ref (toks)
+  (check-type toks list)
+  (when (endp toks)
+    (quil-parse-error "Expected a waveform reference."))
+  (let ((name-tok (first toks))
+        (rest-toks (rest toks)))
+    (unless (eql :NAME (token-type name-tok))
+      (quil-parse-error "Expected a NAME when parsing waveform reference."))
     (if (endp rest-toks)
-        (waveform-ref (token-payload name))
+        (waveform-ref (token-payload name-tok))
         (let ((*arithmetic-parameters* nil)
               (*segment-encountered* nil))
           (multiple-value-bind (params rest)
               (parse-application-parameters rest-toks)
             (when (null params)
               (quil-parse-error "Invalid waveform parameters."))  ; TODO better message?
-            (unless (endp rest)
-              (quil-parse-error "Unexpected tokens when parsing waveform."))
-            (%waveform-ref (token-payload name) params)))))) ;TODO call these params or args?
+            (values (%waveform-ref (token-payload name-tok) params)
+                    rest)))))) ;TODO call these params or args?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
