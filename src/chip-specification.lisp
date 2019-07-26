@@ -53,6 +53,10 @@ DURATION stores the measured gate duration (in nanoseconds)."
   (fidelity 1d0 :type real)
   (duration 1/100 :type real))
 
+(defun copy-gate-record (record &key fidelity duration)
+  (make-gate-record :fidelity (or fidelity (gate-record-fidelity record))
+                    :duration (or duration (gate-record-duration record))))
+
 
 ;;; The HARDWARE object structure stores a lot of information. It
 ;;; serves many purposes, principally to solve some of the following
