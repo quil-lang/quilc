@@ -351,6 +351,7 @@
    #:parameterized-gate-function        ; READER
 
    #:controlled-gate                    ; CLASS
+   #:forked-gate                        ; CLASS
    #:dagger-gate                        ; CLASS
    #:target                             ; READER
 
