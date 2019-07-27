@@ -136,9 +136,9 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                (unless random-gate-flag
                  (mapcar #'random (gate-set-record-parameter-bounds gate-record))))
              (gate-invocation (make-instance 'quil::gate-application
-                                             :operator (quil::named-operator gate-name)
-                                             :arguments (map 'list #'quil::qubit qubit-indices)
-                                             :parameters (map 'list #'quil::constant gate-parameters))))
+                                             :operator (quil:named-operator gate-name)
+                                             :arguments (map 'list #'quil:qubit qubit-indices)
+                                             :parameters (map 'list #'quil:constant gate-parameters))))
         (push gate-invocation instruction-list)
         ;; check to see if we need to bail because of depth
         (when (and
