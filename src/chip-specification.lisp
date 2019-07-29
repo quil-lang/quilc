@@ -44,7 +44,7 @@ DURATION is the time duration in nanoseconds of this gate application."
   (permutation (list 1 0))
   (duration 600))
 
-(defstruct gate-record
+(defstruct (gate-record (:copier nil))
   "Houses information about a hardware instantiation of a gate.
 
 FIDELITY stores the measured gate fidelity.
