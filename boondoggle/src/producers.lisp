@@ -113,7 +113,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                                      "This gate spec expects higher order hardware objects to exist.")
                              (elt (quil::chip-specification-objects chip-specification) gate-order)))
                          (device-index (random (length available-devices))))
-                    (first (quil::hardware-object-cxns (nth device-index available-devices)))))
+                    (quil::vnth 0 (quil::hardware-object-cxns (quil::vnth device-index available-devices)))))
                  (t
                   (assert (< gate-order qubits-on-device)
                           nil
@@ -136,9 +136,9 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                (unless random-gate-flag
                  (mapcar #'random (gate-set-record-parameter-bounds gate-record))))
              (gate-invocation (make-instance 'quil::gate-application
-                                             :operator gate-name
-                                             :arguments (mapcar #'quil::qubit qubit-indices)
-                                             :parameters (mapcar #'quil::constant gate-parameters))))
+                                             :operator (quil:named-operator gate-name)
+                                             :arguments (map 'list #'quil:qubit qubit-indices)
+                                             :parameters (map 'list #'quil:constant gate-parameters))))
         (push gate-invocation instruction-list)
         ;; check to see if we need to bail because of depth
         (when (and

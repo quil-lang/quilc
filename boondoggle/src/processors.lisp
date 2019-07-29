@@ -46,6 +46,12 @@
 
 (defmethod apply-process ((processor processor-measures) &rest data)
   (let ((data (quil::copy-instance (first data))))
+    (setf (quil::parsed-program-memory-definitions data)
+      (append (list (quil::make-memory-descriptor
+		     :name "ro"
+		     :type quil::quil-bit
+		     :length (quil::chip-spec-n-qubits (processor-measures-chip-specification processor))))
+              (quil::parsed-program-memory-definitions data)))
     (setf (quil::parsed-program-executable-code data)
           (concatenate 'vector
                        (quil::parsed-program-executable-code data)

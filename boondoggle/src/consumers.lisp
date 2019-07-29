@@ -33,7 +33,7 @@
     (remove-duplicates
     (loop :for instr :across (quil::parsed-program-executable-code parsed-program)
           :when (typep instr 'quil::measure)
-            :collect (quil::address-value
+            :collect (quil::memory-ref-position
                       (quil::measure-address
                        instr))))))
 
@@ -45,7 +45,8 @@
               (with-output-to-string (s)
                 (quil::print-parsed-program parsed-program s)))
             (classical-addresses
-              (get-consumer-registers consumer parsed-program))
+              (a:plist-hash-table
+                (list "ro" (get-consumer-registers consumer parsed-program))))
             (qvm-payload (yason:encode
                           (a:plist-hash-table
                            (list "type" "multishot"
@@ -59,9 +60,10 @@
                                    :content (with-output-to-string (s)
                                               (yason:encode qvm-payload s))
                                    :content-type "application/json; charset=utf-8"))
+            (parsed-response (yason:parse qvm-response))
             (counts
-              (loop :with ret := (make-list (expt 2 (length classical-addresses)) :initial-element 0)
-                    :for result :in (yason:parse qvm-response)
+              (loop :with ret := (make-list (expt 2 (length (gethash "ro" classical-addresses))) :initial-element 0)
+                    :for result :in (gethash "ro" parsed-response)
                     :do (incf (nth
                                (let ((n 0))
                                  (dolist (x result)
