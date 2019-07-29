@@ -1,4 +1,9 @@
-FROM rigetti/rpcq
+# now we can independently pull versions quicklisp and rpcq
+FROM rigetti/rpcq:2.7.2 as rpcq
+FROM rigetti/lisp:2019-07-11
+
+# copy over rpcq source from the first build stage
+COPY --from=rpcq /src/rpcq /src/rpcq
 
 ARG build_target
 
