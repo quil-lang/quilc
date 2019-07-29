@@ -15,6 +15,7 @@
     :DECLARE :SHARING :OFFSET :PRAGMA
     :AS :MATRIX :PERMUTATION
     :PULSE :CAPTURE :DELAY :FENCE
+    :DEFWAVEFORM
     :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE))
 
 (deftype token-type ()
@@ -112,7 +113,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|DELAY|FENCE|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|DELAY|FENCE|DEFWAVEFORM|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -420,6 +421,14 @@ the immediately preceding line."
       ((:CAPTURE)
        (parse-capture tok-lines))
 
+      ((:DEFWAVEFORM)
+       (unless *definitions-allowed*
+         (quil-parse-error "Found DEFWAVEFORM where it's not allowed."))
+
+       (let ((*definitions-allowed* nil)
+             (*formal-arguments-allowed* t))
+         (parse-waveform-definition tok-lines)))
+
       (otherwise
        (quil-parse-error "Got an unexpected token of type ~S ~
                           when trying to parse a program." tok-type)))))
@@ -713,13 +722,13 @@ parameters and the remaining tokens."
   ;; Check for parenthesis in first position to indicate
   ;; parameters.
   (unless (eql ':LEFT-PAREN (token-type (first arg-tokens)))
-    (values nil arg-tokens))
+    (return-from parse-application-parameters (values nil arg-tokens)))
    ;; Remove :LEFT-PAREN
-    (pop arg-tokens)
-    ;; Time to parse out everything in between the parentheses...
-    (multiple-value-bind (found-params rest-line)
-        ;; ... but first we have to find the right paren.
-        (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
+  (pop arg-tokens)
+  ;; Time to parse out everything in between the parentheses...
+  (multiple-value-bind (found-params rest-line)
+      ;; ... but first we have to find the right paren.
+      (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
                              arg-tokens)
 
       ;; But if we didn't find it, then we have an unmatched
@@ -868,7 +877,6 @@ parameters and the remaining tokens."
 
   ;; Get the parameter and body lines
   (let (name
-        params
         (gate-type ':MATRIX))
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       (destructuring-bind (op . params-args) parameter-line
@@ -888,54 +896,23 @@ parameters and the remaining tokens."
         ;; We have a name. Stash it away.
         (setf name (token-payload (pop params-args)))
 
-        ;; Check for parenthesis in first position to indicate
-        ;; parameters.
-        (when (eql ':LEFT-PAREN (token-type (first params-args)))
-          ;; Remove :LEFT-PAREN
-          (pop params-args)
+        (let ((*definition-context* :DEFGATE))
+          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+            (when (eql ':AS (token-type (first rest-line)))
+              (pop rest-line)
+              (let* ((parsed-gate-tok (first rest-line))
+                     (parsed-gate-type (token-type parsed-gate-tok)))
+                (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
+                  (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
+                (setf gate-type parsed-gate-type)))
 
-          ;; Parse out until the right paren.
-          (multiple-value-bind (found-params rest-line)
-              (take-until (lambda (x)
-                            (pop params-args)
-                            (eql ':RIGHT-PAREN (token-type x)))
-                          params-args)
-            ;; ... or error if it doesn't exist.
-            (when (null rest-line)
-              (quil-parse-error "No matching right paren in DEFGATE params"))
-
-            ;; Remove right paren.
-            (pop rest-line)
-
-            ;; Some sanity checks for the parameter list. Must be of odd length,
-            ;; and every other token should be a :COMMA
-            (unless (and (oddp (length found-params))
-                         (loop :for c :in (rest found-params) :by #'cddr
-                               :always (eql ':COMMA (token-type c))))
-              ;; TODO Some printer for tokens?
-              (quil-parse-error "Malformed parameter list in DEFGATE: ~A" found-params))
-            ;; Go through the supposed parameters, checking that they
-            ;; are, and parsing them out.
-            (setf params (loop :for p :in (remove ':comma found-params :key #'token-type)
-                               :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list. ~A" p)
-                               :collect (parse-parameter p)))))
-
-        (when (eql ':AS (token-type (first params-args)))
-          (pop params-args)
-          (let* ((parsed-gate-tok (first params-args))
-                 (parsed-gate-type (token-type parsed-gate-tok)))
-            (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
-              (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
-            (setf gate-type parsed-gate-type)))
-
-        (ecase gate-type
-          (:MATRIX
-           (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
-          (:PERMUTATION
-           (when params
-             (quil-parse-error "Permutation gate definitions do not support parameters."))
-           (parse-gate-entries-as-permutation body-lines name :lexical-context op)))))))
+            (ecase gate-type
+              (:MATRIX
+               (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
+              (:PERMUTATION
+               (when params
+                 (quil-parse-error "Permutation gate definitions do not support parameters."))
+               (parse-gate-entries-as-permutation body-lines name :lexical-context op)))))))))
 
 (defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)
   (multiple-value-bind (parsed-entries rest-lines)
@@ -956,7 +933,7 @@ parameters and the remaining tokens."
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
     (multiple-value-bind (parsed-entries rest-lines)
-        (parse-gate-entries body-lines)
+        (parse-gate-or-waveform-entries body-lines)
       ;; Check that we only refered to parameters in our param list.
       (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
             :unless (find (param-name body-p) params :key #'param-name
@@ -992,19 +969,19 @@ parameters and the remaining tokens."
              (parse-arithmetic-tokens entry :eval t)))
     (mapcar #'simplify entries)))
 
-(defun parse-gate-entries (tok-lines)
+(defun parse-gate-or-waveform-entries (tok-lines)
   ;; Do we have any lines to parse?
   (when (null tok-lines)
-    (warn "End of program each when indented gate entries was expected.")
-    (return-from parse-gate-entries (values nil nil)))
+    (warn "End of program each when indented gate or waveform entries was expected.")
+    (return-from parse-gate-or-waveform-entries (values nil nil)))
 
   ;; Check for indentation.
   (multiple-value-bind (indented? modified-line)
       (indented-line (first tok-lines))
     ;; Is the first line indented?
     (unless indented?
-      (warn "Expected indented gate entries but alas, they weren't found.")
-      (return-from parse-gate-entries
+      (warn "Expected indented gate or waveform entries but alas, they weren't found.")
+      (return-from parse-gate-or-waveform-entries
         (values nil tok-lines)))
     ;; Remove the indentation from the top line.
     (setf tok-lines (cons modified-line (rest tok-lines))))
@@ -1017,7 +994,7 @@ parameters and the remaining tokens."
   (loop :with gate-entries := nil :do
     ;; Reached EOF
     (when (null tok-lines)
-      (return-from parse-gate-entries
+      (return-from parse-gate-or-waveform-entries
         (values (parse-arithmetic-entries gate-entries)
                 tok-lines)))
 
@@ -1029,7 +1006,7 @@ parameters and the remaining tokens."
         (dedented?
          (let ((new-lines (cons modified-line
                                 (rest tok-lines))))
-           (return-from parse-gate-entries
+           (return-from parse-gate-or-waveform-entries
              (values (parse-arithmetic-entries gate-entries)
                      new-lines))))
         ;; DEDENT not found, continue parsing entries.
@@ -1101,7 +1078,7 @@ parameters and the remaining tokens."
   (when (null tok-lines)
     (quil-parse-error "EOF reached when circuit definition expected"))
 
-  (let (name params args)
+  (let (name args)
     ;; Split off the header line from the body lines.
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       ;; Check that we have a well-formed header line.
@@ -1122,61 +1099,31 @@ parameters and the remaining tokens."
         ;; Stash it away.
         (setf name (token-payload (pop params-args)))
 
-        ;; Check for parenthesis in first position to indicate
-        ;; parameters.
-        (when (eql ':LEFT-PAREN (token-type (first params-args)))
-          ;; Remove :LEFT-PAREN
-          (pop params-args)
+        (let ((*definition-context* :DEFCIRCUIT))
+          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+            ;; Check for colon and incise it.
+            (let ((maybe-colon (last rest-line)))
+              (when (or (null maybe-colon)
+                        (not (eql ':COLON (token-type (first maybe-colon)))))
+                (quil-parse-error "Expected a colon in DEFCIRCUIT"))
+              (setf rest-line (butlast rest-line)))
 
-          ;; Parse out the parameters enclosed.
-          (multiple-value-bind (found-params rest-line)
-              (take-until (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
-                          params-args)
+            ;; Collect arguments and stash them away.
+            (loop :for arg :in rest-line
+                  :when (not (eql ':NAME (token-type arg)))
+                    :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
+                  :collect (parse-argument arg) :into formal-args
+                  :finally (setf args formal-args))
 
-            ;; Error if we didn't find a right parenthesis.
-            (when (null rest-line)
-              (quil-parse-error "No matching right paren in DEFCIRCUIT params"))
-
-            ;; Remove right paren and stash away params.
-            (pop rest-line)
-
-            ;; Some sanity checks for the parameter list. Must be of odd length,
-            ;; and every other token should be a :COMMA
-            (unless (and (oddp (length found-params))
-                         (loop :for c :in (rest found-params) :by #'cddr
-                               :always (eql ':COMMA (token-type c))))
-              ;; TODO Some printer for tokens?
-              (quil-parse-error "Malformed parameter list in DEFCIRCUIT: ~A" found-params))
-            ;; Parse out the parameters.
-            (setf params (loop :for p :in (remove ':COMMA found-params :key #'token-type)
-                               :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFCIRCUIT parameter list: ~A" p)
-                               :collect (parse-parameter p))
-                  params-args rest-line)))
-
-        ;; Check for colon and incise it.
-        (let ((maybe-colon (last params-args)))
-          (when (or (null maybe-colon)
-                    (not (eql ':COLON (token-type (first maybe-colon)))))
-            (quil-parse-error "Expected a colon in DEFCIRCUIT"))
-          (setf params-args (butlast params-args)))
-
-        ;; Collect arguments and stash them away.
-        (loop :for arg :in params-args
-              :when (not (eql ':NAME (token-type arg)))
-                :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
-              :collect (parse-argument arg) :into formal-args
-              :finally (setf args formal-args))
-
-        (multiple-value-bind (parsed-body rest-lines)
-            (parse-indented-body body-lines)
-          (values (make-circuit-definition
-                   name              ; Circuit name
-                   params            ; formal parameters
-                   args              ; formal arguments
-                   parsed-body
-                   :context op)
-                  rest-lines))))))
+            (multiple-value-bind (parsed-body rest-lines)
+                (parse-indented-body body-lines)
+              (values (make-circuit-definition
+                       name              ; Circuit name
+                       params            ; formal parameters
+                       args              ; formal arguments
+                       parsed-body
+                       :context op)
+                      rest-lines))))))))
 
 (defun parse-quil-type (string)
   (check-type string string)
@@ -1573,6 +1520,194 @@ parameters and the remaining tokens."
                              qubit-toks)
              :frame (frame (token-payload frame-name))
              :value result))))))
+
+;;; TODO
+;;;  - this allows the waveform entries to be spread across multiple lines. is that ok?
+;;;  - this uses a lot of code from the gate definition parsing. refactor?
+;;;  - also, if the idea is that quilt should be "human readable", isn't it a bit terrible
+;;;    to have waveform definitions in the source? presumably they are much bigger than gate definitions...
+;;;    (since people are ok with small gates, which can be applied to various qubits)
+(defun parse-waveform-definition (tok-lines)
+  "Parse a waveform definition from the token lines TOK-LINES."
+  ;; Check that we have tokens left
+  (when (null tok-lines)
+    (quil-parse-error "EOF reached when waveform definition expected"))
+
+  ;; Get the parameter and body lines
+  (let (name
+        params)
+    (destructuring-bind (parameter-line &rest body-lines) tok-lines
+      (destructuring-bind (op . params-args) parameter-line
+        ;; Check that we are dealing with a DEFWAVEFORM.
+        (unless (eql ':DEFWAVEFORM (token-type op))
+          (quil-parse-error "DEFWAVEFORM expected. Got ~S"
+                            (token-type op)))
+
+        ;; Check that something is following the DEFWAVEFORM.
+        (when (null params-args)
+          (quil-parse-error "Expected more after DEFWAVEFORM token"))
+
+        ;; Check for a name.
+        (unless (eql ':NAME (token-type (first params-args)))
+          (quil-parse-error "Expected a name for the DEFWAVEFORM"))
+
+        ;; We have a name. Stash it away.
+        (setf name (token-payload (pop params-args)))
+
+        ;; Check for parenthesis in first position to indicate
+        ;; parameters.
+        (when (eql ':LEFT-PAREN (token-type (first params-args)))
+          ;; Remove :LEFT-PAREN
+          (pop params-args)
+
+          ;; Parse out until the right paren.
+          (multiple-value-bind (found-params rest-line)
+              (take-until (lambda (x)
+                            (pop params-args)
+                            (eql ':RIGHT-PAREN (token-type x)))
+                          params-args)
+            ;; ... or error if it doesn't exist.
+            (when (null rest-line)
+              (quil-parse-error "No matching right paren in DEFWAVEFORM params"))
+
+            ;; Remove right paren.
+            (pop rest-line)
+
+            ;; Some sanity checks for the parameter list. Must be of odd length,
+            ;; and every other token should be a :COMMA
+            (unless (and (oddp (length found-params))
+                         (loop :for c :in (rest found-params) :by #'cddr
+                               :always (eql ':COMMA (token-type c))))
+              ;; TODO Some printer for tokens?
+              (quil-parse-error "Malformed parameter list in DEFWAVEFORM: ~A" found-params))
+            ;; Go through the supposed parameters, checking that they
+            ;; are, and parsing them out.
+            (setf params (loop :for p :in (remove ':comma found-params :key #'token-type)
+                               :when (not (eql ':PARAMETER (token-type p)))
+                                 :do (quil-parse-error "Found something other than a parameter in a DEFWAVEFORM parameter list. ~A" p)
+                               :collect (parse-parameter p))))));TODO PARSE-PARAMETER vs PARSE-APPLICATION-PARAMETER
+      (let ((*arithmetic-parameters* nil)
+            (*segment-encountered* nil))
+        (multiple-value-bind (parsed-entries rest-lines)
+            (parse-gate-or-waveform-entries body-lines)
+          ;; Check that we only refered to parameters in our param list.
+          (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
+                :unless (find (param-name body-p) params :key #'param-name
+                                                         :test #'string=)
+                  :do (quil-parse-error
+                       "The parameter ~A was found in the body of the waveform definition of ~
+                        ~A but wasn't in the declared parameter list."
+                       (param-name body-p)
+                       name))
+          (let ((param-symbols
+                  ;; Make sure we have symbols for everything. Collect
+                  ;; a list of them in the same order as PARAMS.
+                  (loop :for p :in params
+                        :for found-p := (assoc (param-name p) *arithmetic-parameters*
+                                               :key #'param-name
+                                               :test #'string=)
+                        :if (null found-p)
+                          :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
+                        :else
+                          :collect (second found-p))))
+            (values (make-waveform-definition name param-symbols parsed-entries)
+                    rest-lines)))))))
+
+(defparameter *definition-context* nil
+  "A Quil keyword (e.g. :DEFGATE) indicating the context in which a
+portion of a definition is being parsed.")
+
+;;; Parameters in a definition differ from parameters in an application.
+(defun parse-definition-parameters (params-args)
+  "Parse the parameters from a definition. Returns the parsed parameters
+and the reamining tokens."
+  (unless (eql ':LEFT-PAREN (token-type (first params-args)))
+    (return-from parse-definition-parameters (values nil params-args)))
+
+  ;; Remove :LEFT-PAREN
+  (pop params-args)
+
+  ;; Parse out the parameters enclosed.
+  (multiple-value-bind (found-params rest-line)
+      (take-until (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
+                  params-args)
+
+    ;; Error if we didn't find a right parenthesis.
+    (when (endp rest-line)
+      (quil-parse-error "No matching right paren in~@[ ~A~] params" *definition-context*))
+
+    ;; Remove right paren and stash away params.
+    (pop rest-line)
+
+    ;; Some sanity checks for the parameter list. Must be of odd length,
+    ;; and every other token should be a :COMMA
+    (unless (and (oddp (length found-params))
+                 (loop :for c :in (rest found-params) :by #'cddr
+                       :always (eql ':COMMA (token-type c))))
+      ;; TODO Some printer for tokens?
+      (quil-parse-error "Malformed parameter list~@[ in ~A~]: ~A" *definition-context* found-params))
+    ;; Parse out the parameters.
+    (values
+     (loop :for p :in (remove ':COMMA found-params :key #'token-type)
+           :when (not (eql ':PARAMETER (token-type p)))
+             :do (quil-parse-error "Found something other than a parameter in a~@[ ~A~] parameter list: ~A"
+                                   *definition-context*
+                                   p)
+           :collect (parse-parameter p))
+     rest-line)))
+
+(defun parse-calibration-definition (tok-lines)
+  "Parse out a calibration definition from the lines of tokens TOK-LINES."
+
+  ;; Check that we have tokens left to parse.
+  (when (null tok-lines)
+    (quil-parse-error "EOF reached when calibration definition expected"))
+
+  (let (name args)
+    ;; Split off the header line from the body lines.
+    (destructuring-bind (parameter-line &rest body-lines) tok-lines
+      ;; Check that we have a well-formed header line.
+      (destructuring-bind (op . params-args) parameter-line
+        ;; We must be working with a DEFCIRCUIT.
+        (unless (eql ':DEFCAL (token-type op))
+          (quil-parse-error "DEFCAL expected. Got ~S"
+                            (token-type op)))
+
+        ;; Check that there are tokens following DEFCAL.
+        (when (null params-args)
+          (quil-parse-error "Expected more after DEFCAL token"))
+
+        ;; Check for name.
+        (unless (eql ':NAME (token-type (first params-args)))
+          (quil-parse-error "Expected a name for the DEFCAL"))
+
+        ;; Stash it away.
+        (setf name (token-payload (pop params-args)))
+
+        (let ((*definition-context* :DEFGATE))
+          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+            ;; Check for colon and incise it.
+            (let ((maybe-colon (last rest-line)))
+              (when (or (null maybe-colon)
+                        (not (eql ':COLON (token-type (first maybe-colon)))))
+                (quil-parse-error "Expected a colon in DEFCAL"))
+              (setf rest-line (butlast rest-line)))
+
+            ;; Collect arguments and stash them away.
+            (loop :for arg :in rest-line
+                  :when (not (eql ':NAME (token-type arg)))
+                    :do (quil-parse-error "Invalid formal argument in DEFCAL line.")
+                  :collect (parse-argument arg) :into formal-args
+                  :finally (setf args formal-args))
+
+            (multiple-value-bind (parsed-body rest-lines)
+                (parse-indented-body body-lines)
+              (values (make-circuit-definition
+                       name              ; Circuit name
+                       params            ; formal parameters
+                       args              ; formal arguments
+                       parsed-body)
+                      rest-lines))))))))
 
 ;;; TODO
 ;;; - *formal-arguments-allowed* t ?
