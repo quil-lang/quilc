@@ -46,7 +46,7 @@
                 (quil::print-parsed-program parsed-program s)))
             (classical-addresses
               (a:plist-hash-table
-	       (list "ro" (get-consumer-registers consumer parsed-program))))
+                (list "ro" (get-consumer-registers consumer parsed-program))))
             (qvm-payload (yason:encode
                           (a:plist-hash-table
                            (list "type" "multishot"
@@ -60,7 +60,7 @@
                                    :content (with-output-to-string (s)
                                               (yason:encode qvm-payload s))
                                    :content-type "application/json; charset=utf-8"))
-	    (parsed-response (yason:parse qvm-response))
+            (parsed-response (yason:parse qvm-response))
             (counts
               (loop :with ret := (make-list (expt 2 (length (gethash "ro" classical-addresses))) :initial-element 0)
                     :for result :in (gethash "ro" parsed-response)

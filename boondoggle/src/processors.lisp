@@ -50,7 +50,7 @@
       (append (list (quil::make-memory-descriptor
 		     :name "ro"
 		     :type quil::quil-bit
-		     :length (length (elt (quil::chip-specification-objects (processor-measures-chip-specification processor)) 0))))
+		     :length (quil::chip-spec-n-qubits (processor-measures-chip-specification processor))))
               (quil::parsed-program-memory-definitions data)))
     (setf (quil::parsed-program-executable-code data)
           (concatenate 'vector
