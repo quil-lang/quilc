@@ -24,7 +24,8 @@
 (defmethod print-instruction-generic ((thing waveform-ref) (stream stream))
   (format stream "~A~@[(~{~A~^, ~})~]"
           (waveform-ref-name thing)
-          (waveform-ref-args thing)))
+          (mapcar (lambda (arg) (print-instruction-generic arg nil))
+                  (waveform-ref-args thing))))
 
 ;;; Definitions
 
