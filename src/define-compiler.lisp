@@ -1047,39 +1047,42 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                 (1+ pos) (string name)))
         (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
           ;; TODO: do the alexandria destructuring to catch the docstring or whatever
-          `(labels ((,name (,@variable-names &key context)
-                      (declare (ignorable context))
-                      (multiple-value-bind (,ret-val ,ret-bool)
-                          ,(enact-compiler-options
-                            options
-                            (define-compiler-form parsed-bindings (append decls body)
-                              :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
-                        (if ,ret-bool ,ret-val (give-up-compilation)))))
-             (let ((,old-record (find ',name **compilers-available**
-                                      :key #'compiler-name))
-                   (,struct-name
-                     (make-instance ',(getf options ':class 'compiler)
-                                    :name ',name
-                                    :instruction-count ,(length variable-names)
-                                    :bindings (mapcar #'make-binding-from-source ',bindings)
-                                    :options ',options
-                                    :body '(locally ,@decls ,@body)
-                                    :output-gates ,(if (getf options ':output-gateset)
-                                                       `(a:alist-hash-table
-                                                         (mapcar (lambda (x)
-                                                                   (cons (make-binding-from-source
-                                                                          (list '_ (car x)))
-                                                                         (cdr x)))
-                                                                 ',(getf options ':output-gateset))
-                                                         :test #'equalp)
-                                                       `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
-                                    :function #',name)))
-               (setf (fdefinition ',name) ,struct-name)
-               (setf (documentation ',name 'function) ,docstring)
-               (cond
-                 (,old-record
-                  (setf **compilers-available**
-                        (substitute ,struct-name ,old-record **compilers-available**)))
-                 (t
-                  (push ,struct-name **compilers-available**)))
-               ',name)))))))
+          `(progn
+             ;; Let the world know about the existence of this function.
+             (declaim (ftype function ,name))
+             (labels ((,name (,@variable-names &key context)
+                        (declare (ignorable context))
+                        (multiple-value-bind (,ret-val ,ret-bool)
+                            ,(enact-compiler-options
+                              options
+                              (define-compiler-form parsed-bindings (append decls body)
+                                :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
+                          (if ,ret-bool ,ret-val (give-up-compilation)))))
+               (let ((,old-record (find ',name **compilers-available**
+                                        :key #'compiler-name))
+                     (,struct-name
+                       (make-instance ',(getf options ':class 'compiler)
+                                      :name ',name
+                                      :instruction-count ,(length variable-names)
+                                      :bindings (mapcar #'make-binding-from-source ',bindings)
+                                      :options ',options
+                                      :body '(locally ,@decls ,@body)
+                                      :output-gates ,(if (getf options ':output-gateset)
+                                                         `(a:alist-hash-table
+                                                           (mapcar (lambda (x)
+                                                                     (cons (make-binding-from-source
+                                                                            (list '_ (car x)))
+                                                                           (cdr x)))
+                                                                   ',(getf options ':output-gateset))
+                                                           :test #'equalp)
+                                                         `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
+                                      :function #',name)))
+                 (setf (fdefinition ',name) ,struct-name)
+                 (setf (documentation ',name 'function) ,docstring)
+                 (cond
+                   (,old-record
+                    (setf **compilers-available**
+                          (substitute ,struct-name ,old-record **compilers-available**)))
+                   (t
+                    (push ,struct-name **compilers-available**)))
+                 ',name))))))))

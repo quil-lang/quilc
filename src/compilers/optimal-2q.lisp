@@ -13,6 +13,15 @@
 ;;;;           PERUSE AT YOUR OWN RISK.
 ;;;;           PROBABLY DON'T MODIFY.
 
+;;;; WARNING: THIS CODE IS TO ENSURE THIS FILE CAN CONTINUE TO BE COMPILED.
+
+(defun euler-compiler (&rest args)
+  "This is a bogus function."
+  (declare (ignore args))
+  (error "This is a bogus function."))
+
+
+;;; Now the main file...
 
 (define-global-counter **optimal-2q-twist-counter** generate-optimal-2q-twist-tag)
 
