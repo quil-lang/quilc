@@ -258,7 +258,7 @@ OPTIONS: plist of options governing applicability of the compiler binding."
          (equalp (gate-binding-operator binding) (application-operator gate)))
      ;; binding parameter is not a wildcard => each (binding parameter is not a wildcard => binding param = gate param)
      (or (symbolp (gate-binding-parameters binding))
-         (every (lambda (b g) (or (symbolp b) (equalp b (constant-value g))))
+         (every (lambda (b g) (or (symbolp b) (double= b (constant-value g))))
                 (gate-binding-parameters binding)
                 (application-parameters gate)))
      ;; each (binding argument is not a wildcard => binding arg = gate arg)
@@ -284,6 +284,14 @@ OPTIONS: plist of options governing applicability of the compiler binding."
          (equalp (measure-binding-target binding) (measure-address gate)))))
   (:method ((binding wildcard-binding) gate)
     (typep gate 'gate-application)))
+
+(defun unguarded-binding-p (b)
+  "Will the binding B match on any ol' gate?"
+  (or (and (wildcard-binding-p b)
+           (endp (wildcard-binding-options b)))
+      (and (gate-binding-p b)
+           (symbolp (gate-binding-operator b))
+           (endp (gate-binding-options b)))))
 
 (define-condition cannot-concretize-binding (serious-condition) ())
 (define-condition no-binding-match (serious-condition) ())
@@ -695,33 +703,40 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
            (compiler-does-not-apply () nil)
            (cannot-concretize-binding () nil)))
        (consider-compiler (compiler)
-         ;; we support two kinds of matches:
-         ;; (1) a "blind" match, where we can tell just by considering bindings
-         ;;     that the compiler will always have reasonable input and output
-         ;; (2) an "exhaustive" match, where we instantiate different test cases
-         ;;     to pump through the compiler, convincing ourselves that in all
-         ;;     applicable situations the compiler gives good output.
-         (or
-          ;; first try the blind match
-          (let* ((gateset (blank-out-qubits gateset))
-                 (in-fidelity 1d0)
-                 (out-fidelity (occurrence-table-cost (compiler-output-gates compiler) gateset)))
-            (and (occurrence-table-in-gateset-p (compiler-output-gates compiler) gateset)
-                 (loop :for b :in (compiler-bindings compiler)
-                       :always (loop :for g :being :the :hash-keys :of gateset
-                                     :for gate-fidelity := (gate-record-fidelity (gethash g gateset))
-                                     ;; TODO: revisit this predicate.
-                                       :thereis (and (or (binding-subsumes-p g b)
-                                                         (when (typep b 'gate-binding)
-                                                           (binding-subsumes-p (copy-binding b :options nil) g)))
-                                                     (setf in-fidelity (* in-fidelity gate-fidelity)))))
-                 (>= out-fidelity in-fidelity)))
-          ;; if that falls through, try the exhaustive match
-          (let ((matches (loop :for binding :in (compiler-bindings compiler)
-                               :collect (gates-that-match-binding binding))))
-            (unless (every #'identity matches)
-              (return-from consider-compiler nil))
-            (every #'identity (apply #'a:map-product (a:curry #'consider-input-test-case compiler) matches))))))
+         ;; certain things we will never tolerate:
+         ;; (1) unguarded matches will always result in infinite loops.
+         (and
+          (notany #'unguarded-binding-p (compiler-bindings compiler))
+          ;; have cleared these checks, we support two kinds of matches:
+          ;; (1) a "blind" match, where we can tell just by considering bindings
+          ;;     that the compiler will always have reasonable input and output
+          ;; (2) an "exhaustive" match, where we instantiate different test cases
+          ;;     to pump through the compiler, convincing ourselves that in all
+          ;;     applicable situations the compiler gives good output.
+          (or
+           ;; first try the blind match
+           (let* ((gateset (blank-out-qubits gateset))
+                  (in-fidelity 1d0)
+                  (out-fidelity (occurrence-table-cost (compiler-output-gates compiler) gateset)))
+             (and (occurrence-table-in-gateset-p (compiler-output-gates compiler) gateset)
+                  (loop :for b :in (compiler-bindings compiler)
+                        :always (loop :for g :being :the :hash-keys :of gateset
+                                      :for gate-fidelity := (gate-record-fidelity (gethash g gateset))
+                                      ;; TODO: revisit this predicate.
+                                        :thereis (and (or (binding-subsumes-p g b)
+                                                          (when (typep b 'gate-binding)
+                                                            (binding-subsumes-p (copy-binding b :options nil) g)))
+                                                      (setf in-fidelity (* in-fidelity gate-fidelity)))))
+                  (>= out-fidelity in-fidelity)))
+           ;; if that falls through, try the exhaustive match
+           (let ((matches (loop :for binding :in (compiler-bindings compiler)
+                                :for match := (gates-that-match-binding binding)
+                                :when (null match)
+                                  :do (return-from consider-compiler nil)
+                                :collect match)))
+             ;; TODO: this MAP-PRODUCT could be better: unknown argument list size,
+             ;;       generates a whole big list and then does EVERY afterward, ...
+             (every #'identity (apply #'a:map-product (a:curry #'consider-input-test-case compiler) matches)))))))
     
     (let (applicable-compilers)
       (dolist (compiler **compilers-available** applicable-compilers)
