@@ -414,6 +414,18 @@ OPTIONS: plist of options governing applicability of the compiler binding."
   (dohash ((binding count) (compiler-output-gates obj))
     (format stream "    ~/cl-quil::binding-fmt/: ~a~%" binding count)))
 
+(defun record-compiler (name)
+  "Record (possibly overwriting) the existence of the compiler named by NAME."
+  (check-type name symbol)
+  (let* ((c (fdefinition name)))
+    (assert (typep c 'compiler) (name) "The name ~S doesn't name a known compiler." name)
+    (let ((prev (find name **compilers-available** :key #'compiler-name)))
+      (cond
+        ((null prev)
+         (push c **compilers-available**))
+        (t
+         (substitute c prev **compilers-available**)))))
+  (values))
 
 ;;; in what follows, we're very interested in two kinds of maps keyed on bindings:
 ;;;  + an "occurrence table" is valued in integers, and it counts frequency.
@@ -1045,44 +1057,35 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
         (alexandria:when-let (pos (position "CONTEXT" variable-names :test #'string=))
           (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
                 (1+ pos) (string name)))
-        (alexandria:with-gensyms (ret-val ret-bool struct-name old-record)
+        (alexandria:with-gensyms (ret-val ret-bool)
           ;; TODO: do the alexandria destructuring to catch the docstring or whatever
           `(progn
              ;; Let the world know about the existence of this function.
              (declaim (ftype function ,name))
-             (labels ((,name (,@variable-names &key context)
-                        (declare (ignorable context))
-                        (multiple-value-bind (,ret-val ,ret-bool)
-                            ,(enact-compiler-options
-                              options
-                              (define-compiler-form parsed-bindings (append decls body)
-                                :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
-                          (if ,ret-bool ,ret-val (give-up-compilation)))))
-               (let ((,old-record (find ',name **compilers-available**
-                                        :key #'compiler-name))
-                     (,struct-name
-                       (make-instance ',(getf options ':class 'compiler)
-                                      :name ',name
-                                      :instruction-count ,(length variable-names)
-                                      :bindings (mapcar #'make-binding-from-source ',bindings)
-                                      :options ',options
-                                      :body '(locally ,@decls ,@body)
-                                      :output-gates ,(if (getf options ':output-gateset)
-                                                         `(a:alist-hash-table
-                                                           (mapcar (lambda (x)
-                                                                     (cons (make-binding-from-source
-                                                                            (list '_ (car x)))
-                                                                           (cdr x)))
-                                                                   ',(getf options ':output-gateset))
-                                                           :test #'equalp)
-                                                         `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
-                                      :function #',name)))
-                 (setf (fdefinition ',name) ,struct-name)
-                 (setf (documentation ',name 'function) ,docstring)
-                 (cond
-                   (,old-record
-                    (setf **compilers-available**
-                          (substitute ,struct-name ,old-record **compilers-available**)))
-                   (t
-                    (push ,struct-name **compilers-available**)))
-                 ',name))))))))
+             (setf (fdefinition ',name)
+                   (make-instance ',(getf options ':class 'compiler)
+                                  :name ',name
+                                  :instruction-count ,(length variable-names)
+                                  :bindings (mapcar #'make-binding-from-source ',bindings)
+                                  :options ',options
+                                  :body '(locally ,@decls ,@body)
+                                  :output-gates ,(if (getf options ':output-gateset)
+                                                     `(a:alist-hash-table
+                                                       (mapcar (lambda (x)
+                                                                 (cons (make-binding-from-source
+                                                                        (list '_ (car x)))
+                                                                       (cdr x)))
+                                                               ',(getf options ':output-gateset))
+                                                       :test #'equalp)
+                                                     `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
+                                  :function (a:named-lambda ,name (,@variable-names &key context)
+                                              (declare (ignorable context))
+                                              (multiple-value-bind (,ret-val ,ret-bool)
+                                                  ,(enact-compiler-options
+                                                    options
+                                                    (define-compiler-form parsed-bindings (append decls body)
+                                                      :permit-binding-mismatches-when (getf options ':permit-binding-mismatches-when)))
+                                                (if ,ret-bool ,ret-val (give-up-compilation))))))
+             (setf (documentation ',name 'function) ,docstring)
+             (record-compiler ',name)
+             ',name))))))
