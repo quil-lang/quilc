@@ -131,20 +131,21 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
               instr))
      t)))
 
-(defun lookup-substitute-if (test lookup things)
-  "Returns a copy of the list THINGS, with each element <e> satisfying
-(TEST <e>) replaced by the value of (LOOKUP <e>)."
-  (mapcar (lambda (elt)
-            (if (funcall test elt)
-                (funcall lookup elt)
-                elt))
-          things))
+(defun transform-if (test transform)
+  "Given a unary function TRANSFORM, return a new function which either applies TRANSFORM or does not,
+depending on whether TEST passes."
+  (lambda (obj)
+    (if (funcall test obj)
+        (funcall transform obj)
+        obj)))
 
 (defgeneric instantiate-instruction (instr param-value arg-value)
   (:documentation "Given an instruction INSTR possibly with formal parameters/variables, instantiate it with the proper parameter/argument values provided by the unary functions PARAM-VALUE and ARG-VALUE, which take PARAM and FORMAL objects respectively as arguments. Return the instruction or a list of instructions as a result.")
   (:method ((instr circuit-application) param-value arg-value)
-    (let ((params (lookup-substitute-if (constantly t) (substitute-parameter param-value) (application-parameters instr)))
-          (args (lookup-substitute-if #'is-formal arg-value (application-arguments instr))))
+    (let ((params (mapcar (transform-if (constantly t) (substitute-parameter param-value))
+                          (application-parameters instr)))
+          (args (mapcar (transform-if #'is-formal arg-value)
+                        (application-arguments instr))))
       (cond
         ((simple-dagger-operator-p (application-operator instr))
          (let ((instrs (instantiate-circuit (circuit-application-definition instr)
@@ -169,13 +170,13 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
 
   (:method ((instr application) param-value arg-value)
     (let ((remake nil))
-      (let ((params (lookup-substitute-if (constantly t) (substitute-parameter param-value) (application-parameters instr)))
-            (args (lookup-substitute-if #'is-formal arg-value (application-arguments instr))))
+      (let ((params (mapcar (transform-if (constantly t) (substitute-parameter param-value))
+                            (application-parameters instr)))
+            (args (mapcar (transform-if #'is-formal arg-value)
+                          (application-arguments instr))))
         (setf remake t)
-        (map-into params (lambda (p)
-                           (if (delayed-expression-p p)
-                               (evaluate-delayed-expression p)
-                               p))
+        (map-into params
+                  (transform-if #'delayed-expression-p #'evaluate-delayed-expression)
                   params)
         (assert (notany (a:conjoin #'is-param #'delayed-expression-p) params))
         (assert (notany #'is-formal args))
@@ -243,7 +244,7 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             (make-instance (class-of instr) :left (transform-address left)
                                             :right (transform-address right))
             instr))))
-  
+
   (:method ((instr trinary-classical-instruction) param-value arg-value)
     (flet ((transform-address (addr)
              (if (not (is-formal addr))

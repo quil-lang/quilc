@@ -189,6 +189,17 @@
           (mnemonic instr)
           (map 'list #'print-instruction-to-string (arguments instr))))
 
+(defmethod instantiate-instruction ((instr frame-mutation) param-value arg-value)
+  (let ((qubits (mapcar (transform-if #'is-formal arg-value)
+                        (target-qubits instr)))
+        (value (funcall (transform-if #'is-formal arg-value)
+                        (mutation-value instr))))
+    (make-instance (class-of instr)
+                   :qubits qubits
+                   :frame (target-frame instr)
+                   :value value)))
+
+
 (define-frame-mutation set-frequency "SET-FREQUENCY"
   "An instruction setting the frequency of a frame.")
 
@@ -229,6 +240,14 @@
           (print-instruction-generic (pulse-frame instr) nil)
           (print-instruction-generic (pulse-waveform instr) nil)))
 
+;;; TODO can waveform arguments be formal parameters?
+(defmethod instantiate-instruction ((instr pulse) param-value arg-value)
+  (let ((qubits (lookup-substitute-if #'is-formal arg-value (pulse-qubits instr))))
+    (make-instance 'pulse
+                   :qubits qubits
+                   :frame (pulse-frame instr)
+                   :waveform (pulse-waveform instr))))
+
 ;;; Capture
 ;;; TODO: do we need RAW-CAPTURE? couldn't we just have a raw(duration) waveform?
 ;;; the only tricky business here is that the duration needs to be a rational number
@@ -251,8 +270,19 @@
           (print-instruction-generic (capture-waveform instr) nil)
           (print-instruction-generic (capture-memory-ref instr) nil)))
 
+(defmethod instantiate-instruction ((instr capture) param-value arg-value)
+  (let ((qubit (funcall (transform-if #'is-formal arg-value)
+                        (capture-qubit instr)))
+        (memory-ref (funcall (transform-if #'is-formal arg-value)
+                             (capture-memory-ref instr))))
+    (check-mref memory-ref)
+    (make-instance 'capture
+                   :qubit qubit
+                   :frame (capture-frame instr)
+                   :waveform (capture-waveform instr)
+                   :memory-ref memory-ref)))
+
 ;;; Timing control
-;;; TODO Why delay only one qubit?
 (defclass delay (instruction)
   ((qubit :initarg :qubit
           :accessor delay-qubit)
@@ -263,6 +293,15 @@
 (defmethod print-instruction-generic ((instr delay) (stream stream))
   (format stream "DELAY ~A ~A" (delay-qubit instr) (delay-duration instr)))
 
+(defmethod instantiate-instruction ((instr delay) param-value arg-value)
+  (let ((qubit (funcall (transform-if #'is-formal arg-value)
+                        (delay-qubit instr)))
+        (duration (funcall (transform-if #'is-formal arg-value))
+                  (delay-duration instr)))
+    (make-instance 'delay
+                   :qubit qubit
+                   :duration duration)))
+
 (defclass fence (instruction)
   ((qubits :initarg :qubits
            :accessor fence-qubits))
@@ -271,3 +310,8 @@
 
 (defmethod print-instruction-generic ((instr fence) (stream stream))
   (format stream "FENCE ~{~A ~}" (fence-qubits instr)))
+
+(defmethod instantiate-instruction ((instr fence) param-value arg-value)
+  (let ((qubits (mapcar (transform-if #'is-formal arg-value)
+                        (fence-qubits instr))))
+    (make-instance 'fence :qubits qubits)))
