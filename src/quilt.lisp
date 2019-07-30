@@ -222,8 +222,9 @@
   (:documentation "A pulse instruction."))
 
 (defmethod print-instruction-generic ((instr pulse) (stream stream))
-  (format stream "PULSE ~{~A ~} ~A ~A"
-          (pulse-qubits instr)
+  (format stream "PULSE ~{~A ~}~A ~A"
+          (mapcar (lambda (q) (print-instruction-generic q nil))
+                  (pulse-qubits instr))
           (print-instruction-generic (pulse-frame instr) nil)
           (print-instruction-generic (pulse-waveform instr) nil)))
 
