@@ -362,6 +362,7 @@ end of the name."
                           (compute-2Q-gate-depth nil)
                           (compute-unused-qubits nil)
                           (show-topological-overhead nil)
+                          (json-serialize nil)
                           (gate-blacklist nil)
                           (gate-whitelist nil)
                           (without-pretty-printing nil)
@@ -387,7 +388,7 @@ end of the name."
   ;; Deprecated options.
   (declare (ignore compute-gate-depth compute-gate-volume compute-runtime
                    compute-fidelity compute-2Q-gate-depth compute-unused-qubits
-                   show-topological-overhead print-logical-schedule))
+                   show-topological-overhead print-logical-schedule json-serialize))
 
   (warn-deprecated-options all-args)
   (warn-ignored-options all-args)
