@@ -1,5 +1,5 @@
-;;; This might not be permanent, but it's convenient
-;;; to keep all of these in one place at the moment.
+;;; TODO deprecate these parsing tests
+;;; (they are subsumed by the .quil example files)
 
 (in-package #:cl-quil-tests)
 
