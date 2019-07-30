@@ -73,10 +73,10 @@
   (:report "Invalid QPU description file: missing required ISA layer or sub-layer."))
 
 (defun expand-key-to-integer-list (key)
-  "Expands a string of the form \"n1-...-nm\" to the list of integers (list n1 ... nm)."
+  "Expands a string of the form \"n1-...-nm\" to the list of integers (list nj1 ... njm), sorted ascending."
   (etypecase key
     (string
-     (mapcar #'parse-integer (split-sequence:split-sequence #\- key)))
+     (sort (mapcar #'parse-integer (split-sequence:split-sequence #\- key)) #'<))
     (integer-list
      key)))
 
@@ -201,7 +201,6 @@
                    (gethash "dead" (hardware-object-misc-data
                                     (chip-spec-nth-qubit chip-spec
                                                          q1))))
-               
                t)
               ;; there's a "gates" field
               ((gethash "gates" link-hash)
@@ -234,6 +233,7 @@
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
+  (declare (optimize (debug 3)))
   (when (gethash "1Q" specs-hash)
     (loop :for i :from 0
           :for qubit :across (chip-spec-qubits chip-spec)
@@ -264,27 +264,28 @@
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity))))))))
   (when (gethash "2Q" specs-hash)
-    (loop :for link :across (chip-spec-links chip-spec)
-          :for spec := (gethash (format nil "~{~a~^-~}"
-                                        (sort (coerce (vnth 0 (hardware-object-cxns link)) 'list) #'<))
-                                (gethash "2Q" specs-hash))
-          :for gate-info := (hardware-object-gate-information link)
-          :do (flet ((stash-fidelity (gate-name parameters)
-                       (a:when-let* ((fidelity (gethash (format nil "f~a" gate-name) spec))
-                                     (binding (make-gate-binding :operator (named-operator gate-name)
-                                                                 :parameters parameters
-                                                                 :arguments '(_ _)))
-                                     (record (gethash binding gate-info)))
-                         (setf (gethash binding gate-info)
-                               (copy-gate-record record :fidelity fidelity)))))
-                (setf (gethash "specs" (hardware-object-misc-data link))
-                      spec)
-                (dolist (args '(("CZ" ())
-                                ("ISWAP" ())
-                                ("CPHASE" (_))
-                                ("PISWAP" (_))))
-                  (destructuring-bind (name params) args
-                    (stash-fidelity name params)))))))
+    (loop :for key :being :the :hash-keys :of (gethash "2Q" specs-hash)
+            :using (hash-value spec)
+          :for (q0 q1) := (expand-key-to-integer-list key)
+          :for link := (lookup-hardware-object-by-qubits chip-spec (list q0 q1))
+          :for gate-info := (and link (hardware-object-gate-information link))
+          :when gate-info
+            :do (flet ((stash-fidelity (gate-name parameters)
+                         (a:when-let* ((fidelity (gethash (format nil "f~a" gate-name) spec))
+                                       (binding (make-gate-binding :operator (named-operator gate-name)
+                                                                   :parameters parameters
+                                                                   :arguments '(_ _)))
+                                       (record (gethash binding gate-info)))
+                           (setf (gethash binding gate-info)
+                                 (copy-gate-record record :fidelity fidelity)))))
+                  (setf (gethash "specs" (hardware-object-misc-data link))
+                        spec)
+                  (dolist (args '(("CZ" ())
+                                  ("ISWAP" ())
+                                  ("CPHASE" (_))
+                                  ("PISWAP" (_))))
+                    (destructuring-bind (name params) args
+                      (stash-fidelity name params)))))))
 
 (defun qpu-hash-table-to-chip-specification (hash-table)
   "Converts a QPU specification HASH-TABLE, to a chip-specification object.  Requires an \"isa\" layer."
