@@ -1058,12 +1058,12 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
              (let ((,old-record (find ',name **compilers-available**
                                       :key #'compiler-name))
                    (,struct-name
-                     (make-instance ',(getf options :class 'compiler)
+                     (make-instance ',(getf options ':class 'compiler)
                                     :name ',name
                                     :instruction-count ,(length variable-names)
                                     :bindings (mapcar #'make-binding-from-source ',bindings)
                                     :options ',options
-                                    :body (quote (progn ,@decls ,@body))
+                                    :body '(locally ,@decls ,@body)
                                     :output-gates ,(if (getf options ':output-gateset)
                                                        `(a:alist-hash-table
                                                          (mapcar (lambda (x)
