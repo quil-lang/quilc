@@ -7,6 +7,11 @@
 
 ;;; rewriting rules in general
 
+(define-compiler eliminate-identities
+    ((x ("I" () _)))
+  "Eliminate I gates."
+  (list))
+
 (define-compiler sort-CZs
     ((x ("CZ" () p q))
      (y ("CZ" () r s)
@@ -31,7 +36,8 @@
 
 (defun global-rewriting-rules ()
   "Rewriting rules that may be useful in manipulating instruction sequences that do not have an underlying notion of 'native hardware'.  In particular, this includes canonicalizing the ordering of commuting instructions."
-  (list #'sort-CZs
+  (list #'eliminate-identities
+        #'sort-CZs
         #'sort-CPHASEs
         #'elide-applications-on-eigenvectors))
 
