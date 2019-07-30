@@ -8,6 +8,9 @@
 ;;;
 ;;; Use MAKE-ADJUSTABLE-VECTOR and VNTH for these objects.
 
+(defconstant +near-perfect-fidelity+ 0.99999d0
+  "Even perfect operations are typically limited in their physical realization by, say, the granularity of control electronics. (For instance, waveform IQ values might be stored as complex fixnums of some specified depth.) This constant is a mnemonic for \"supposedly perfect\" and captures some of the loss incurred by these imperfections.")
+
 (defstruct chip-specification
   "Houses information about hardware components on a QPU.
 
@@ -50,7 +53,7 @@ DURATION is the time duration in nanoseconds of this gate application."
 FIDELITY stores the measured gate fidelity.
 
 DURATION stores the measured gate duration (in nanoseconds)."
-  (fidelity 1d0 :type real)
+  (fidelity +near-perfect-fidelity+ :type real)
   (duration 1/100 :type real))
 
 (defun copy-gate-record (record &key fidelity duration)
@@ -334,13 +337,13 @@ used to specify CHIP-SPEC."
                        (hardware-object-gate-information obj))
               (make-gate-record :duration 2000)))
       (when (member ':RZ type)
-        (stash-gate-record "RZ" '(_) (list q) 1/100 1d0))
+        (stash-gate-record "RZ" '(_) (list q) 1/100 +near-perfect-fidelity+))
       (when (member ':X/2 type)
         (stash-gate-record "RX" '(#.(/ pi 2))  `(,q) 9 0.98d0)
         (stash-gate-record "RX" '(#.(/ pi -2)) `(,q) 9 0.98d0)
         (stash-gate-record "RX" '(#.pi)        `(,q) 9 0.98d0)
         (stash-gate-record "RX" '(#.(- pi))    `(,q) 9 0.98d0)
-        (stash-gate-record "RX" '(0d0)         `(,q) 9 1d0)))
+        (stash-gate-record "RX" '(0d0)         `(,q) 9 +near-perfect-fidelity+)))
     ;; return the qubit
     obj))
 
