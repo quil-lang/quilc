@@ -23,6 +23,7 @@
                #:drakma
                #:trivial-features     ; for portable *features*
                #:alexandria
+               #:swank
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:quilc-tests)))
   :around-compile (lambda (compile)

@@ -124,7 +124,12 @@
      :type string
      :optional t
      :initial-value nil
-     :documentation "Proxy to use when checking for an SDK update."))
+     :documentation "Proxy to use when checking for an SDK update.")
+
+    (("swank-port")
+     :type integer
+     :optional t
+     :documentation "port to start a Swank server on"))
   "Supported and non-deprecated options.")
 
 (defparameter *deprecated-option-spec*
@@ -378,6 +383,7 @@ end of the name."
                           (server-mode-rpc nil)
                           (host nil)
                           (port nil)
+                          swank-port
                           time-limit
                           (help nil)
                           (log-level nil)
@@ -469,6 +475,12 @@ Version ~A is available from https://www.rigetti.com/forest~%"
         (server-mode-rpc
          (unless quiet
            (show-banner))
+
+         (when swank-port
+           (enable-debugger)
+           (setf swank:*use-dedicated-output-stream* nil)
+           (swank:create-server :port swank-port
+                                :dont-close t))
 
          (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
            (:msgid "LOG0001"))
