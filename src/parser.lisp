@@ -1921,6 +1921,7 @@ and the reamining tokens."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Entry Point ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 (define-condition ambiguous-definition ()
   ((conflicts :initarg :conflicts :reader ambiguous-definition-conflicts
               :documentation "A list of (filename . definition) pairs which conflict."))
@@ -1933,6 +1934,14 @@ and the reamining tokens."
 (define-condition ambiguous-gate-or-circuit-definition (ambiguous-definition)
   ()
   (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE or DEFCIRCUIT forms."))
+
+(define-condition ambiguous-waveform-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFWAVEFORM forms."))
+
+(define-condition ambiguous-calibration-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFCAL forms."))
 
 (defun parse-quil-into-raw-program (string)
   "Parse a string STRING into a list of raw Quil syntax objects."

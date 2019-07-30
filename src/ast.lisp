@@ -1443,6 +1443,10 @@ For example,
                      :accessor parsed-program-gate-definitions)
    (circuit-definitions :initarg :circuit-definitions
                         :accessor parsed-program-circuit-definitions)
+   (waveform-definitions :initarg :waveform-definitions
+                         :accessor parsed-program-waveform-definitions)
+   (calibration-definitions :initarg :calibration-definitions
+                            :accessor parsed-program-calibration-definitions)
    (memory-definitions :initarg :memory-definitions
                        :accessor parsed-program-memory-definitions)
    (executable-program :initarg :executable-code
@@ -1450,6 +1454,8 @@ For example,
   (:default-initargs
    :gate-definitions nil
    :circuit-definitions nil
+   :waveform-definitions nil
+   :calibration-definitions nil
    :memory-definitions nil
    :executable-code #()))
 
@@ -1527,7 +1533,8 @@ Examples:
 
   (unless (endp (parsed-program-gate-definitions parsed-program))
     (format s "~%"))
-  ;; write out circuits
+
+  ;; write out circuits  ;; TODO why are we not using PRINT-INSTRUCTION?
   (dolist (circuit-defn (parsed-program-circuit-definitions parsed-program))
     (format s "DEFCIRCUIT ~a"
             (circuit-definition-name circuit-defn))
@@ -1544,6 +1551,15 @@ Examples:
     (terpri s))
   (unless (endp (parsed-program-circuit-definitions parsed-program))
     (terpri s))
+
+  ;; write out waveform definitions
+  (dolist (waveform-defn (parsed-program-waveform-definitions parsed-program))
+    (print-instruction waveform-defn s))
+
+  ;; write out calibration definitions
+  (dolist (calibration-defn (parsed-program-calibration-definitions parsed-program))
+    (print-instruction calibration-defn s))
+
   ;; write out main block
   (print-instruction-sequence (parsed-program-executable-code parsed-program)
                               :stream s))
