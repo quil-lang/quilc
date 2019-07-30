@@ -581,10 +581,23 @@ other's."
           (t
            (check-quil-agrees-as-matrices)))))))
 
-
 (defun compress-instructions-in-context (instructions chip-specification context)
   "Dispatch routine for doing rewriting, algebraic and linear-algebraic, on a sequence of INSTRUCTIONS."
-  (handler-case
+  (handler-bind ((error (lambda (c)
+                          (declare (ignore c))
+                          (let ((*print-circle* nil)
+                                (*print-pretty* nil)
+                                (*print-fractional-radians* nil))
+                            (write-line "A violent error occurred when compressing a subsequence." *error-output*)
+                            (write-line "The offending subsequence is:" *error-output*)
+                            (print-code-list instructions *error-output*)
+                            (write-line "The current compression context is:" *error-output*)
+                            (princ context *error-output*)
+                            (finish-output *error-output*)
+                            ;; We explicitly do *NOT* handle the error
+                            ;; here. We just want to indicate to the
+                            ;; user that an error happened down here.
+                            ))))
       ;; start by making a decision about how we're going to do linear algebraic compression
       (let ((decompiled-instructions (decompile-instructions-in-context instructions
                                                                         chip-specification
@@ -624,18 +637,7 @@ other's."
           (format-quil-sequence *compiler-noise-stream*
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
-          result-instructions))
-    (error (c)
-      (let ((*print-circle* nil)
-            (*print-pretty* nil)
-            (*print-fractional-radians* nil))
-        (write-line "A violent error occurred when compressing a subsequence." *error-output*)
-        (write-line "The offending subsequence is:" *error-output*)
-        (print-code-list instructions *error-output*)
-        (write-line "The current compression context is:" *error-output*)
-        (princ context *error-output*)
-        (finish-output *error-output*))
-      (error c))))
+          result-instructions))))
 
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
