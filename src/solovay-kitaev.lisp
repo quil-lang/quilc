@@ -43,6 +43,8 @@
 (defparameter +S-inv+ (magicl:make-complex-matrix 2 2 '(1 0 0 #C(0 -1))))
 (defparameter +T+ (magicl:make-complex-matrix 2 2 `(1 0 0 ,(cis (/ pi 4)))))
 (defparameter +T-inv+ (magicl:make-complex-matrix 2 2 `(1 0 0 ,(cis (- (/ pi 4))))))
+;;; Temporary constant
+(defparameter +ballie-radius+ 0.2)
 
 ;;; ------------------------------------------------------------------
 ;;; --------------Various utility functions/structures----------------
@@ -86,16 +88,16 @@
     (loop :for i :below (length v) :do (setf (aref v i) (/ (aref v i) norm)))
     norm))
 
-(defun basis-gate-from-index (basis-gates idx)
-  "Given an index IDX in parity-inverse convention, return the corresponding basis gate from BASIS-GATES, which is the basis gate indexed by (floor idx 2) and inverted if idx is odd (just the original gate if idx is even)."
-  (aref basis-gates (1- (abs idx))))
+;; (defun gate-from-index (gates idx)
+;;   "Given an index IDX in parity-inverse convention, return the corresponding basis gate from BASIS-GATES, which is the basis gate indexed by (floor idx 2) and inverted if idx is odd (just the original gate if idx is even)."
+;;   (aref gates (floor idx)))
 
 (defstruct commutator
   (v '() :type (or list commutator))
   (w '() :type (or list commutator)))
 
 (defun seq-dagger (op-seq)
-  (reverse (mapcar #'(lambda (x) (* -1 x)) op-seq)))
+  (reverse (mapcar (lambda (x) (+ (* 2 (floor x 2)) (- 1 (mod x 2)))) op-seq)))
 
 (defstruct (bloch-vector (:constructor make-bloch-vector))
   "A bloch-vector representation of unitaries as a rotation about an axis on the Bloch sphere."
@@ -131,7 +133,7 @@
 
 (defun find-c-gc (num-trials)
   "Numerically tests for the value of c-gc, the upper bound on the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U."
-  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (commutator-v (gc-decompose u)) :maximize (/ (distance v +I+) (sqrt (distance u +I+)))))
+  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (gc-decompose u) :maximize (/ (distance v +I+) (sqrt (distance u +I+)))))
 
 ;;; ------------------------------------------------------------------
 ;;; -------------------------THE MEATY PART---------------------------
@@ -141,11 +143,11 @@
   ((gates :reader gates
                 :initarg :gates
                 :type (or cons (vector simple-gate *))
-                :documentation "Set of basic gates/operators to decompose to, including inverses.")
+                :documentation "Set of basis gates/operators to decompose to, including inverses.")
    (gate-orders :reader gate-orders
                 :initarg :gate-orders
                 :type (or cons (vector fixnum *))
-                :documentation "Numbers which describe the orders of each basic gate.")
+                :documentation "Numbers which describe the orders of each basis gate/inverse pair.")
    (num-qubits :reader num-qubits
                :initarg :num-qubits
                :type non-negative-fixnum
@@ -166,21 +168,21 @@
    :gates (error ":GATES is a required initarg to DECOMPOSER.")
    :gate-orders '()
    :num-qubits (error ":NUM-QUBITS is a required initarg to DECOMPOSER.")
-   :epsilon0 0.1)
+   :epsilon0 1)
   (:documentation "A decomposer which uses the Solovay-Kitaev algorithm to approximately decompose arbitrary unitaries to a finite set of basis gates."))
 
 (defun make-decomposer (basis-gates num-qubits epsilon0)
   "Initializer for a unitary decomposer."
-  (assert (< epsilon0 (/ (expt +c-approx+ 2))) (epsilon0) "ERROR: the provided base approximation epsilon ~A is not less than ~A, which it must be for approximations to improve on each iteration." epsilon0 (/ (expt +c-approx+ 2)))
+  ;; (assert (< epsilon0 (/ (expt +c-approx+ 2))) (epsilon0) "ERROR: the provided base approximation epsilon ~A is not less than ~A, which it must be for approximations to improve on each iteration." epsilon0 (/ (expt +c-approx+ 2)))
   (make-instance 'decomposer
                  :gates (loop :for gate :in basis-gates
                               :collect gate #+ignore(simple-gate-matrix gate)
                               :collect (magicl:dagger gate #+ignore(simple-gate-matrix gate)))
-                 :gate-orders (gate-orders (loop :for gate :in basis-gates :collect (find-order gate)))
+                 :gate-orders (loop :for gate :in basis-gates :collect (find-order gate))
                  :num-qubits num-qubits
                  :epsilon0 epsilon0
-                 :subdivision 0.01 ;; TODO
-                 :base-approximations (generate-base-approximations basis-gates)))
+                 :subdivision +ballie-radius+ ;; TODO
+                 :base-approximations (generate-base-approximations-ballies basis-gates :depth-limit 23 :verbose t)))
 
 ;;; NOTE: REQUIRES 1e-6 TOLERANCE ON MAGICL:IDENTITYP
 (defun find-order (mat)
@@ -255,7 +257,9 @@
 ;;             (y (- (mod (floor i diameter) diameter) offset))
 ;;             (z (- (floor i (expt diameter 2)) offset)))))))
 
-(defun generate-base-approximations-ballies (basis-gates &key (ballie-r 0.01) (depth-limit 10) (debug nil)) ;; TODO
+;;; Generate a hash table of grid coordinate -> unitary. Populate
+;;; using IDDFS, as we want to minimize approximation lengths.
+(defun generate-base-approximations-ballies (basis-gates &key (ballie-r +ballie-radius+) (depth-limit 10) (verbose nil) (debug nil)) ;; TODO
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   ;; Gates of odd index [2n + 1] correspond to the inverse of gate [2n]
   (let* ((gates (loop :for gate :in basis-gates
@@ -270,7 +274,7 @@
          (oeis-magic-num 12345678))
     (loop :for gate :in gates
           :for i :from 0
-          :do (format debug "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
+          :do (format verbose "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
     (labels ((helper (depth seq mat last-idx rep-count)
                (cond ((= depth max-depth)
                       (let* ((exact-grid-coord (matrix-to-grid-coord mat ballie-r))
@@ -306,78 +310,34 @@
                               :else ;; Look at which sequences are being pruned
                               :do (format debug "Nonono! Not using gate ~A on sequence ~A~%" i seq)
                                   (incf neglected))))))
-      (format t "Division: ~D~%" ballie-r)
+      (format verbose "Division: ~D~%" ballie-r)
+      (format (not verbose) "Generating base approximations...")
       (loop :for curr-depth :from 0 :to depth-limit :do
         #+ignore(dotimes (curr-depth (1+ depth-limit)))
-        (format t "Depth ~D search:" curr-depth)
+        (format verbose "Depth ~D search:" curr-depth)
         (finish-output)
         (setf max-depth curr-depth)
         (setf overcounted 0)
         (setf neglected 0)
         (helper 0 '() +I+ -1 0)
-        (format t " (~D new, ~D overcounted, ~D neglected)" (- (hash-table-count approx-table) prev-count) overcounted neglected)
-        (format t " (~$% filled so far, ~D to go)~%" (* 100 (/ (hash-table-count approx-table) oeis-magic-num))
+        (format verbose " (~D new, ~D overcounted, ~D neglected)" (- (hash-table-count approx-table) prev-count) overcounted neglected)
+        (format verbose" (~$% filled so far, ~D to go)~%" (* 100 (/ (hash-table-count approx-table) oeis-magic-num))
                 (- oeis-magic-num (hash-table-count approx-table)))
-        (setf prev-count (hash-table-count approx-table)))
-      approx-table)))
-
-;;; Generate a hash table of grid coordinate -> unitary. Populate
-;;; using IDDFS, as we want to minimize approximation lengths.
-(defun generate-base-approximations (basis-gates &key (subdivision 0.01) (depth-limit 10) (debug nil)) ;; TODO
-  "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
-  ;; Gates of odd index [2n + 1] correspond to the inverse of gate [2n]
-  (let* ((gates (loop :for gate :in basis-gates
-                      :collect gate #+ignore(simple-gate-matrix gate)
-                      :collect (magicl:dagger gate #+ignore(simple-gate-matrix gate)))) ;; TODO
-         (gate-orders (loop :for gate :in basis-gates :collect (find-order gate)))
-         #+ignore(ball-volume (ceiling (* (/ 4 3) pi (expt (/ pi subdivision) 3))))
-         (approx-table (make-hash-table :test 'equalp))
-         (max-depth 0)
-         (prev-count 0)
-         (overcounted 0)
-         (neglected 0))
-    (loop :for gate :in gates :for i :below (length gates) :do (format debug "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
-    (labels ((helper (depth seq mat last-idx rep-count)
-               (cond ((= depth max-depth)
-                      (let ((grid-coord (map 'vector #'floor (matrix-to-grid-coord mat subdivision))))
-                        (when (nth-value 1 (gethash grid-coord approx-table))
-                          (format debug "~D overlaps with existing ~D~%" seq (gethash grid-coord approx-table))
-                          (incf overcounted))
-                        (unless (nth-value 1 (gethash grid-coord approx-table))
-                          (format debug "New sequence found: ~A~%" seq)
-                          (setf (gethash grid-coord approx-table) seq))))
-                     (t (loop :for gate :in gates
-                              :for i :below (length gates)
-                              :for order := (elt gate-orders (floor i 2))
-                              ;; Prevent half-order from being
-                              ;; exceeded if a) we're using the same
-                              ;; gate or b) we're using the previous
-                              ;; gate's inverse
-                              :if (and (not (and (= order 2) (oddp i)))
-                                       (or (and (= i last-idx)
-                                                (or (zerop order) (< rep-count (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
-                                           (and (not (= i last-idx))
-                                                (not (= (floor i 2) (floor last-idx 2))))))
-                                :do (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))
-                              :else ;; Look at which sequences are being pruned
-                              :do
-                                 (format debug "Neglecting ~D on ~D~%" i seq)
-                                 (incf neglected))))))
-      (dotimes (curr-depth (1+ depth-limit))
-        (format t "Searching at depth ~D..." curr-depth)
-        (finish-output)
-        (setf max-depth curr-depth)
-        (setf overcounted 0)
-        (setf neglected 0)
-        (helper 0 '() +I+ -1 0)
-        (format t " (~D new, ~D overcounted, ~D neglected)~%" (- (hash-table-count approx-table) prev-count) overcounted neglected)
+        (format (not verbose) ".")
         (setf prev-count (hash-table-count approx-table)))
       approx-table)))
 
 ;;; Will just be a hash table lookup
-;; (defun find-base-approximation (base-approximations u) ;; TODO
-;;   "Returns the base case approximation for a unitary U, represented as a list of indices in parity-inverse convention."
-;;   )
+(defun fetch-base-approximation (base-approximations u) ;; TODO
+  "Returns the base case approximation for a unitary U, represented as a list of indices in parity-inverse convention."
+  (let* ((exact-grid-coord (matrix-to-grid-coord u +ballie-radius+))
+         (nearby-ballies (loop :for i :below 8 :collect (vector
+                                                         (+ (floor (aref exact-grid-coord 0)) (mod i 2))
+                                                         (+ (floor (aref exact-grid-coord 1)) (mod (floor i 2) 2))
+                                                         (+ (floor (aref exact-grid-coord 2)) (floor i 4))))))
+    (gethash (reduce (lambda (x y) (min (vector-distance x exact-grid-coord) (vector-distance y exact-grid-coord)))
+                     (cdr nearby-ballies) :initial-value (car nearby-ballies))
+             base-approximations)))
 
 ;;; ---------------------------------------------------------------
 ;;; ---------------------Algorithm Calling-------------------------
@@ -387,31 +347,31 @@
 (defun sk-iter (base-approximations u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a vector of two items, which are each either a commutator or a base approximation."
   (if (zerop n)
-      (gethash (map 'vector #'floor (matrix-to-grid-coord u 0.01)) base-approximations)
-      (let* ((comm (gc-decompose u))
-             (v-next (sk-iter base-approximations (commutator-v comm) (1- n)))
-             (w-next (sk-iter base-approximations (commutator-w comm) (1- n))))
-        (vector (sk-iter base-approximations u (1- n)) (make-commutator :v v-next :w w-next)))))
+      (gethash (map 'vector #'floor (matrix-to-grid-coord u +ballie-radius+)) base-approximations)
+      (multiple-value-bind (v w) (gc-decompose u)
+        (let* ((v-next (sk-iter base-approximations v (1- n)))
+               (w-next (sk-iter base-approximations w (1- n))))
+          (cons (sk-iter base-approximations u (1- n)) (list (make-commutator :v v-next :w w-next)))))))
 
 (defun decompose (decomposer unitary epsilon)
   "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U. When expanded into all its constituent unitaries, this decomposition is guaranteed to be within EPSILON of the original unitary."
   (let* ((eps0 (epsilon0 decomposer))
-         (depth (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
+         (depth 3 #+ignore(ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
                                  (log (* eps0 +c-approx+ +c-approx+))))
                          (log (/ 3 2)))))
     (sk-iter (base-approximations decomposer) unitary depth)))
 
 (defun decompress (decomposer item) ;; TODO
-  "Expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate basis gate label for each parity-inverse index inside, returning the decompressed list of basis gates."
+  "Expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate gate for each parity-inverse index inside, returning the decompressed list of gates."
+  ;; TODO: still need to convert indices -> gates
   (if (typep item 'commutator)
-      (concatenate 'vector (decompress decomposer (commutator-v item))
-                   (decompress decomposer (commutator-w item))
-                   (seq-dagger (decompress decomposer (commutator-v item)))
-                   (seq-dagger (decompress decomposer (commutator-w item))))
-      (mapcar #'(lambda (x) (if (typep x 'fixnum)
-                                x #+ignore(basis-gate-from-index (gates decomposer) x)
-                                (decompress decomposer x)))
-              item)))
+      (append (decompress decomposer (commutator-v item))
+              (decompress decomposer (commutator-w item))
+              (seq-dagger (decompress decomposer (commutator-v item)))
+              (seq-dagger (decompress decomposer (commutator-w item))))
+      (if (typep (car item) 'list)
+          (append (decompress decomposer (car item)) (decompress decomposer (cadr item)))
+          item)))
 
 ;;; Conversions between matrix and bloch-vector representations of
 ;;; unitaries. To understand them, remember/note that for a rotation
@@ -546,8 +506,8 @@
          (rx-theta (bloch-vector-to-matrix (make-bloch-vector :theta u-theta :axis #(1 0 0))))
          (s (find-transformation-matrix u rx-theta)))
     (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
-      (make-commutator :v (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
-                       :w (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
+      (values (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
+              (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
 
 ;;; Some functions which explore the ball representation of SU(2)
 (defun ball-op-distances ()
