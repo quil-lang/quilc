@@ -131,63 +131,60 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
               instr))
      t)))
 
+(defun lookup-substitute-if (test lookup things)
+  "Returns a copy of the list THINGS, with each element <e> satisfying
+(TEST <e>) replaced by the value of (LOOKUP <e>)."
+  (mapcar (lambda (elt)
+            (if (funcall test elt)
+                (funcall lookup elt)
+                elt))
+          things))
+
 (defgeneric instantiate-instruction (instr param-value arg-value)
   (:documentation "Given an instruction INSTR possibly with formal parameters/variables, instantiate it with the proper parameter/argument values provided by the unary functions PARAM-VALUE and ARG-VALUE, which take PARAM and FORMAL objects respectively as arguments. Return the instruction or a list of instructions as a result.")
   (:method ((instr circuit-application) param-value arg-value)
-    (labels ((sub (test lookup things)
-               (loop :for thing :in things
-                     :if (funcall test thing)
-                       :collect (funcall lookup thing)
-                     :else
-                       :collect thing)))
-      (let ((params (sub (constantly t) (substitute-parameter param-value) (application-parameters instr)))
-            (args   (sub #'is-formal arg-value (application-arguments instr))))
-        (cond
-          ((simple-dagger-operator-p (application-operator instr))
-           (let ((instrs (instantiate-circuit (circuit-application-definition instr)
-                                              params
-                                              args)))
-             (dolist (instr instrs)
-               (unless (unitary-instruction-p instr)
-                 (error "DAGGER cannot be applied to the impure instruction ~/quil:instruction-fmt/"
-                        instr))
-               (setf (application-operator instr)
-                     (involutive-dagger-operator (application-operator instr))))
-             ;; The Hermitian transpose reverses the order of operator
-             ;; applications
-             (setf instrs (reverse instrs))))
-          ((plain-operator-p (application-operator instr))
-           (instantiate-circuit (circuit-application-definition instr)
-                                params
-                                args))
-          (t
-           (error "Unable to instantiate the modifiers in the complex instruction ~/quil:instruction-fmt/."
-                  instr))))))
+    (let ((params (lookup-substitute-if (constantly t) (substitute-parameter param-value) (application-parameters instr)))
+          (args (lookup-substitute-if #'is-formal arg-value (application-arguments instr))))
+      (cond
+        ((simple-dagger-operator-p (application-operator instr))
+         (let ((instrs (instantiate-circuit (circuit-application-definition instr)
+                                            params
+                                            args)))
+           (dolist (instr instrs)
+             (unless (unitary-instruction-p instr)
+               (error "DAGGER cannot be applied to the impure instruction ~/quil:instruction-fmt/"
+                      instr))
+             (setf (application-operator instr)
+                   (involutive-dagger-operator (application-operator instr))))
+           ;; The Hermitian transpose reverses the order of operator
+           ;; applications
+           (setf instrs (reverse instrs))))
+        ((plain-operator-p (application-operator instr))
+         (instantiate-circuit (circuit-application-definition instr)
+                              params
+                              args))
+        (t
+         (error "Unable to instantiate the modifiers in the complex instruction ~/quil:instruction-fmt/."
+                instr)))))
 
   (:method ((instr application) param-value arg-value)
     (let ((remake nil))
-      (flet ((sub (test lookup things)
-               (loop :for thing :in things
-                     :if (funcall test thing)
-                       :collect (progn (setf remake t) (funcall lookup thing))
-                     :else
-                       :collect thing)))
-        (let ((params (sub (constantly t) (substitute-parameter param-value) (application-parameters instr)))
-              (args (sub #'is-formal arg-value (application-arguments instr))))
-          (setf remake t)
-          (map-into params (lambda (p)
-                             (if (delayed-expression-p p)
-                                 (evaluate-delayed-expression p)
-                                 p))
-                    params)
-          (assert (notany (a:conjoin #'is-param #'delayed-expression-p) params))
-          (assert (notany #'is-formal args))
-          (if (not remake)
-              instr
-              (let ((copy (copy-instance instr)))
-                (setf (application-parameters copy) params)
-                (setf (application-arguments copy) args)
-                copy))))))
+      (let ((params (lookup-substitute-if (constantly t) (substitute-parameter param-value) (application-parameters instr)))
+            (args (lookup-substitute-if #'is-formal arg-value (application-arguments instr))))
+        (setf remake t)
+        (map-into params (lambda (p)
+                           (if (delayed-expression-p p)
+                               (evaluate-delayed-expression p)
+                               p))
+                  params)
+        (assert (notany (a:conjoin #'is-param #'delayed-expression-p) params))
+        (assert (notany #'is-formal args))
+        (if (not remake)
+            instr
+            (let ((copy (copy-instance instr)))
+              (setf (application-parameters copy) params)
+              (setf (application-arguments copy) args)
+              copy)))))
 
   (:method ((instr jump-target) param-value arg-value)
     instr)
