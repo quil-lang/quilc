@@ -168,7 +168,12 @@
   '((("print-logical-schedule" #\s)
      :type boolean
      :optional t
-     :documentation "include logically parallelized schedule in output.  Requires -P.  This is inactive and will eventually be removed."))
+     :documentation "include logically parallelized schedule in output.  Requires -P.  This is inactive and will eventually be removed.")
+    
+    (("json-serialize" #\j)
+     :type boolean
+     :optional t
+     :documentation "serialize output as a JSON object"))
   "Inactive and deprecated options.")
 
 (defparameter *retired-option-spec*
