@@ -15,7 +15,7 @@
     :DECLARE :SHARING :OFFSET :PRAGMA
     :AS :MATRIX :PERMUTATION
     :PULSE :CAPTURE :DELAY :FENCE
-    :DEFWAVEFORM
+    :DEFWAVEFORM :DEFCAL
     :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE))
 
 (deftype token-type ()
@@ -113,7 +113,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|DELAY|FENCE|DEFWAVEFORM|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -428,6 +428,14 @@ the immediately preceding line."
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
          (parse-waveform-definition tok-lines)))
+
+      ((:DEFCAL)
+       (unless *definitions-allowed*
+         (quil-parse-error "Found DEFCAL where it's not allowed."))
+
+       (let ((*definitions-allowed* nil)
+             (*formal-arguments-allowed* t))
+         (parse-calibration-definition tok-lines)))
 
       (otherwise
        (quil-parse-error "Got an unexpected token of type ~S ~
@@ -1492,32 +1500,32 @@ parameters and the remaining tokens."
                          :memory-ref address-obj)))))
 
 (defun parse-frame-mutation (tok-type tok-lines)
-  (match-line ((op tok-type) (qubit :INTEGER) &rest rest-toks) tok-lines
+  (match-line ((op tok-type) &rest rest-toks) tok-lines
       (multiple-value-bind (qubit-toks rest-toks)
           ;; Consume tokens until we reach the frame's name (a string)
           (take-until (lambda (tok) (eql ':STRING (token-type tok)))
-                      (cons qubit rest-toks))
+                      rest-toks)
         (when (endp rest-toks)
           (quil-parse-error "Expected a frame in ~A, but none were found (did you forget quotes?)"
                             tok-type))
         (dolist (q qubit-toks)
-          (unless (eql ':INTEGER (token-type q))
-            (quil-parse-error "Expected a qubit index, but instead got ~A in instruction ~A"
+          (unless (or (eql ':INTEGER (token-type q))
+                      (eql ':NAME (token-type q)))
+            (quil-parse-error "Expected a qubit index or a formal parameter, but instead got ~A in instruction ~A"
                               (token-type q)
                               tok-type)))
         (let ((frame-name (first rest-toks))
               (value-toks (rest rest-toks)))
           ;; We've already checked the frame name.
-          ;; TODO This allows for memory references. Do we want that?
+          ;; TODO This allows for memory references in the value. Do we want that?
           (let ((result (parse-application-parameter value-toks)))
             (make-instance
              (ecase tok-type
                ((:SET-FREQUENCY) 'set-frequency)
                ((:SET-PHASE)     'set-phase)
                ((:SHIFT-PHASE)   'shift-phase)
-               ((:SET-SCALE)     'shift-scale))
-             :qubits (mapcar (lambda (tok) (qubit (token-payload tok)))
-                             qubit-toks)
+               ((:SET-SCALE)     'set-scale))
+             :qubits (mapcar #'parse-argument qubit-toks) ; TODO we don't want a memory reference here...
              :frame (frame (token-payload frame-name))
              :value result))))))
 
@@ -1534,8 +1542,7 @@ parameters and the remaining tokens."
     (quil-parse-error "EOF reached when waveform definition expected"))
 
   ;; Get the parameter and body lines
-  (let (name
-        params)
+  (let (name)
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFWAVEFORM.
@@ -1554,64 +1561,40 @@ parameters and the remaining tokens."
         ;; We have a name. Stash it away.
         (setf name (token-payload (pop params-args)))
 
-        ;; Check for parenthesis in first position to indicate
-        ;; parameters.
-        (when (eql ':LEFT-PAREN (token-type (first params-args)))
-          ;; Remove :LEFT-PAREN
-          (pop params-args)
+        (let ((*definition-context* :DEFWAVEFORM))
+          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+            ;; Check for colon and incise it.
+            (let ((maybe-colon (last rest-line)))
+              (when (or (null maybe-colon)
+                        (not (eql ':COLON (token-type (first maybe-colon)))))
+                (quil-parse-error "Expected a colon in DEFWAVEFORM")))
 
-          ;; Parse out until the right paren.
-          (multiple-value-bind (found-params rest-line)
-              (take-until (lambda (x)
-                            (pop params-args)
-                            (eql ':RIGHT-PAREN (token-type x)))
-                          params-args)
-            ;; ... or error if it doesn't exist.
-            (when (null rest-line)
-              (quil-parse-error "No matching right paren in DEFWAVEFORM params"))
-
-            ;; Remove right paren.
-            (pop rest-line)
-
-            ;; Some sanity checks for the parameter list. Must be of odd length,
-            ;; and every other token should be a :COMMA
-            (unless (and (oddp (length found-params))
-                         (loop :for c :in (rest found-params) :by #'cddr
-                               :always (eql ':COMMA (token-type c))))
-              ;; TODO Some printer for tokens?
-              (quil-parse-error "Malformed parameter list in DEFWAVEFORM: ~A" found-params))
-            ;; Go through the supposed parameters, checking that they
-            ;; are, and parsing them out.
-            (setf params (loop :for p :in (remove ':comma found-params :key #'token-type)
-                               :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFWAVEFORM parameter list. ~A" p)
-                               :collect (parse-parameter p))))));TODO PARSE-PARAMETER vs PARSE-APPLICATION-PARAMETER
-      (let ((*arithmetic-parameters* nil)
-            (*segment-encountered* nil))
-        (multiple-value-bind (parsed-entries rest-lines)
-            (parse-gate-or-waveform-entries body-lines)
-          ;; Check that we only refered to parameters in our param list.
-          (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
-                :unless (find (param-name body-p) params :key #'param-name
-                                                         :test #'string=)
-                  :do (quil-parse-error
-                       "The parameter ~A was found in the body of the waveform definition of ~
-                        ~A but wasn't in the declared parameter list."
-                       (param-name body-p)
-                       name))
-          (let ((param-symbols
-                  ;; Make sure we have symbols for everything. Collect
-                  ;; a list of them in the same order as PARAMS.
-                  (loop :for p :in params
-                        :for found-p := (assoc (param-name p) *arithmetic-parameters*
-                                               :key #'param-name
-                                               :test #'string=)
-                        :if (null found-p)
-                          :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
-                        :else
-                          :collect (second found-p))))
-            (values (make-waveform-definition name param-symbols parsed-entries)
-                    rest-lines)))))))
+            (let ((*arithmetic-parameters* nil)
+                  (*segment-encountered* nil))
+              (multiple-value-bind (parsed-entries rest-lines)
+                  (parse-gate-or-waveform-entries body-lines)
+                ;; Check that we only refered to parameters in our param list.
+                (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
+                      :unless (find (param-name body-p) params :key #'param-name
+                                                               :test #'string=)
+                        :do (quil-parse-error
+                             "The parameter ~A was found in the body of the waveform definition of ~
+                              ~A but wasn't in the declared parameter list."
+                             (param-name body-p)
+                             name))
+                (let ((param-symbols
+                        ;; Make sure we have symbols for everything. Collect
+                        ;; a list of them in the same order as PARAMS.
+                        (loop :for p :in params
+                              :for found-p := (assoc (param-name p) *arithmetic-parameters*
+                                                     :key #'param-name
+                                                     :test #'string=)
+                              :if (null found-p)
+                                :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
+                              :else
+                                :collect (second found-p))))
+                  (values (make-waveform-definition name param-symbols parsed-entries)
+                          rest-lines))))))))))
 
 (defparameter *definition-context* nil
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a
@@ -1678,7 +1661,8 @@ and the reamining tokens."
           (quil-parse-error "Expected more after DEFCAL token"))
 
         ;; Check for name.
-        (unless (eql ':NAME (token-type (first params-args)))
+        (unless (or (eql ':NAME (token-type (first params-args)))
+                    (eql ':MEASURE (token-type (first params-args))))
           (quil-parse-error "Expected a name for the DEFCAL"))
 
         ;; Stash it away.
@@ -1686,6 +1670,10 @@ and the reamining tokens."
 
         (let ((*definition-context* :DEFGATE))
           (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+            (when (and (eql ':MEASURE name)
+                       (not (null params)))
+              (quil-parse-error "MEASURE calibrations do not support formal parameters."))
+
             ;; Check for colon and incise it.
             (let ((maybe-colon (last rest-line)))
               (when (or (null maybe-colon)
@@ -1695,19 +1683,25 @@ and the reamining tokens."
 
             ;; Collect arguments and stash them away.
             (loop :for arg :in rest-line
-                  :when (not (eql ':NAME (token-type arg)))
-                    :do (quil-parse-error "Invalid formal argument in DEFCAL line.")
+                  :when (not (or (eql ':NAME (token-type arg))
+                                 (eql ':INTEGER (token-type arg))))
+                    :do (quil-parse-error "Invalid argument in DEFCAL line.")
                   :collect (parse-argument arg) :into formal-args
                   :finally (setf args formal-args))
 
             (multiple-value-bind (parsed-body rest-lines)
                 (parse-indented-body body-lines)
-              (values (make-circuit-definition
-                       name              ; Circuit name
-                       params            ; formal parameters
-                       args              ; formal arguments
-                       parsed-body)
-                      rest-lines))))))))
+              (values
+               (if (eql ':MEASURE name)
+                   (make-instance 'measure-calibration-definition
+                                  :arguments args
+                                  :body parsed-body)
+                   (make-instance 'gate-calibration-definition
+                                  :name name
+                                  :parameters params
+                                  :arguments args
+                                  :body parsed-body))
+               rest-lines))))))))
 
 ;;; TODO
 ;;; - *formal-arguments-allowed* t ?

@@ -53,7 +53,7 @@
   (if parameters
       (make-instance 'parameterized-waveform-definition
                      :name name
-                     :parameter parameters
+                     :parameters parameters
                      :entries entries)
       (make-instance 'static-waveform-definition
                      :name name
@@ -80,11 +80,7 @@
 
 
 (defclass calibration-definition ()
-  ((name :initarg :name
-         :reader calibration-definition-name)
-   (parameters :initarg :parameters
-               :reader calibration-definition-parameters)
-   (arguments :initarg :arguments
+  ((arguments :initarg :arguments
               :reader calibration-definition-arguments)
    (body :initarg :body
          :reader calibration-definition-body))
@@ -92,7 +88,10 @@
   (:documentation "A representation of a user-specified calibration."))
 
 (defclass gate-calibration-definition (calibration-definition)
-  ()
+  ((name :initarg :name
+         :reader calibration-definition-name)
+   (parameters :initarg :parameters
+               :reader calibration-definition-parameters))
   (:documentation "A representation of a user-specified gate calibration."))
 
 (defclass measure-calibration-definition (calibration-definition)
@@ -131,6 +130,20 @@
                                 :prefix "    ")
     (terpri stream)))
 
+(defun make-calibration-definition (name params args body)
+  (check-type name string)
+  (assert (every #'is-param params))
+  (assert (every (lambda (arg)
+                   (or (is-formal arg)
+                       (qubit-p arg)))
+                 args))
+  (make-instance (if (string-equal "MEASURE" name)
+                     'measure-calibration-definition
+                     'gate-calibration-definition)
+                 :name name
+                 :parameters params
+                 :arguments args
+                 :body body))
 
 ;;; Frame Mutations
 ;;; frame is <list of qubits> followed by <frame name>
