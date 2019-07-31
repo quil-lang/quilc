@@ -67,20 +67,22 @@
                       (push distant-qubit (gethash (first qubits) adjacency-table))))
                   (add-clique (rest qubits))))))
       (dolist (binding bindings)
-        (unless (typep binding 'cons)
-          (error "I don't know how to make tests for permissive compilers."))
-        (destructuring-bind (variable-name binding &rest options) binding
-          (declare (ignore variable-name))
-          (when options
-            (error "I don't know how to make test cases for guarded compilers."))
-          (add-clique (cddr binding))
-          (when (listp (second binding))
-            (setf parameter-names
-                  (union parameter-names
-                         (loop :for param :in (second binding)
-                               :when (and (typep param 'symbol)
-                                          (not (eql '_ param)))
-                                 :collect param))))))
+        (etypecase binding
+          (quil::wildcard-binding
+           (error "I don't know how to make tests for permissive compilers."))
+          (quil::measure-binding
+           (error "I don't know how to make tests for MEASURE compilers."))
+          (quil::gate-binding
+           (when (quil::gate-binding-options binding)
+             (error "I don't know how to make test cases for guarded compilers."))
+           (add-clique (quil::gate-binding-arguments binding))
+           (when (listp (quil::gate-binding-parameters binding))
+             (setf parameter-names
+                   (union parameter-names
+                          (loop :for param :in (quil::gate-binding-parameters binding)
+                                :when (and (typep param 'symbol)
+                                           (not (eql '_ param)))
+                                  :collect param)))))))
       ;; color the graph with qubit indices. it'd be :cool: if this were randomized.
       (quil::dohash ((qubit collision-names) adjacency-table)
         (let ((collision-qubits (mapcar (lambda (name) (gethash name adjacency-table))
@@ -90,8 +92,8 @@
                   :do (setf (gethash qubit adjacency-table) j)
                       (return))))
       ;; save the max of the largest instruction qubit number & the k in the k-coloring
-      (setf qubit-bound (max (loop :for (variable-name binding) :in bindings
-                                   :maximize (1+ (length (cddr binding))))
+      (setf qubit-bound (max (loop :for binding :in bindings
+                                   :maximize (1+ (length (quil::gate-binding-arguments binding))))
                              (loop :for name :being :the :hash-keys :of adjacency-table
                                      :using (hash-value qubit-assignment)
                                    :maximize (1+ qubit-assignment))))
@@ -101,45 +103,43 @@
       ;; walk the instructions, doing parameter/argument instantiation
       (loop :for binding :in bindings
             :collect
-            (destructuring-bind (variable-name (name params &rest qubits)) binding
-              (declare (ignore variable-name))
-              (let* ((params (when (listp params)
-                               (mapcar (lambda (param)
-                                         (cond
-                                           ((numberp param)
-                                            (constant param))
-                                           ((typep param 'symbol)
-                                            (constant (gethash param parameter-assignments)))
-                                           (t
-                                            (error "I don't know how to generate this parameter."))))
-                                       params)))
-                     (qubits (mapcar (lambda (qubit)
+            (let* ((params (when (listp (quil::gate-binding-parameters binding))
+                             (mapcar (lambda (param)
                                        (cond
-                                         ((numberp qubit)
-                                          qubit)
-                                         ((eql qubit (intern "_"))
-                                          nil)
-                                         ((symbolp qubit)
-                                          (gethash qubit adjacency-table))))
-                                     qubits))
-                     (occupied-qubits (remove-if #'symbolp qubits))
-                     (qubits
-                       (let ((output-qubits nil))
-                         (dolist (qubit qubits (reverse output-qubits))
-                           (cond
-                             ((numberp qubit)
-                              (push qubit output-qubits))
-                             ((null qubit)
-                              (push (random-with-exceptions qubit-bound
-                                                            (append output-qubits occupied-qubits))
-                                    output-qubits)))))))
-                (cond
-                  ((stringp name)
-                   (apply #'quil::build-gate name params qubits))
-                  (t
-                   (apply #'quil::anon-gate "ANONYMOUS-INPUT"
-                          (quil::random-special-unitary (ash 1 (length qubits)))
-                          qubits)))))))))
+                                         ((numberp param)
+                                          (constant param))
+                                         ((typep param 'symbol)
+                                          (constant (gethash param parameter-assignments)))
+                                         (t
+                                          (error "I don't know how to generate this parameter."))))
+                                     (quil::gate-binding-parameters binding))))
+                   (qubits (mapcar (lambda (qubit)
+                                     (cond
+                                       ((numberp qubit)
+                                        qubit)
+                                       ((eql qubit (intern "_"))
+                                        nil)
+                                       ((symbolp qubit)
+                                        (gethash qubit adjacency-table))))
+                                   (quil::gate-binding-arguments binding)))
+                   (occupied-qubits (remove-if #'symbolp qubits))
+                   (qubits
+                     (let ((output-qubits nil))
+                       (dolist (qubit qubits (reverse output-qubits))
+                         (cond
+                           ((numberp qubit)
+                            (push qubit output-qubits))
+                           ((null qubit)
+                            (push (random-with-exceptions qubit-bound
+                                                          (append output-qubits occupied-qubits))
+                                  output-qubits)))))))
+              (cond
+                ((symbolp (quil::gate-binding-operator binding))
+                 (apply #'quil::anon-gate "ANONYMOUS-INPUT"
+                        (quil::random-special-unitary (ash 1 (length qubits)))
+                        qubits))
+                (t
+                 (apply #'quil::build-gate (quil::gate-binding-operator binding) params qubits))))))))
 
 (deftest test-translators ()
   (labels
