@@ -1,9 +1,18 @@
-# now we can independently pull versions quicklisp and rpcq
-FROM rigetti/rpcq:2.7.2 as rpcq
-FROM rigetti/lisp:2019-07-11
+# specify the dependency versions (can be overriden with --build_arg)
+ARG rpcq_version=2.7.2
+ARG qvm_version=1.10.0
+ARG quicklisp_version=2019-07-11
+
+# use multi-stage builds to independently pull dependency versions
+FROM rigetti/rpcq:$rpcq_version as rpcq
+FROM rigetti/qvm:$qvm_version as qvm
+FROM rigetti/lisp:$quicklisp_version
 
 # copy over rpcq source from the first build stage
 COPY --from=rpcq /src/rpcq /src/rpcq
+
+# copy over qvm source from the second build stage (needed for unit tests)
+COPY --from=qvm /src/qvm /src/qvm
 
 ARG build_target
 
