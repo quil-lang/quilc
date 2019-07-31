@@ -40,6 +40,12 @@
         (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
             "Euler translation test failed: ~a~%" compiler)))))
 
+(define-condition test-case-too-complicated (error)
+  ((reason :initarg :reason :reader test-case-too-complicated-reason))
+  (:documentation "Signaled when a test case generator is applied to a scenario that is too complicated for it to generate.")
+  (:report (lambda (c s)
+             (princ (test-case-too-complicated-reason c) s))))
+
 (defun generate-translator-test-case-for-simple-compiler (bindings)
   ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
   (let ((adjacency-table (make-hash-table))
@@ -69,12 +75,15 @@
       (dolist (binding bindings)
         (etypecase binding
           (quil::wildcard-binding
-           (error "I don't know how to make tests for permissive compilers."))
+           (error 'test-case-too-complicated
+                  :reason "I don't know how to make tests for permissive compilers."))
           (quil::measure-binding
-           (error "I don't know how to make tests for MEASURE compilers."))
+           (error 'test-case-too-complicated
+                  :reason "I don't know how to make tests for MEASURE compilers."))
           (quil::gate-binding
            (when (quil::gate-binding-options binding)
-             (error "I don't know how to make test cases for guarded compilers."))
+             (error 'test-case-too-complicated
+                    :reason "I don't know how to make test cases for guarded compilers."))
            (add-clique (quil::gate-binding-arguments binding))
            (when (listp (quil::gate-binding-parameters binding))
              (setf parameter-names
@@ -111,7 +120,8 @@
                                          ((typep param 'symbol)
                                           (constant (gethash param parameter-assignments)))
                                          (t
-                                          (error "I don't know how to generate this parameter."))))
+                                          (error 'test-case-too-complicated
+                                                 :reason "I don't know how to generate this parameter."))))
                                      (quil::gate-binding-parameters binding))))
                    (qubits (mapcar (lambda (qubit)
                                      (cond
@@ -151,7 +161,7 @@
            ;; too complicated. we don't intend for that to break the tests.
            (handler-case (setf test-case (generate-translator-test-case-for-simple-compiler
                                           (quil::compiler-bindings compiler)))
-             (error ()
+             (test-case-too-complicated ()
                (return-from test-a-compiler nil)))
            (setf input-matrix (quil::make-matrix-from-quil test-case))
            (setf compiled-output (apply compiler test-case))
