@@ -90,6 +90,7 @@
                              (:file "resolve-applications")
                              (:file "qubits-needed")
                              (:file "compress-qubits")
+                             (:file "expansion")
                              (:file "expand-circuits")
                              (:file "rewrite-arithmetic")
                              (:file "fusion")
