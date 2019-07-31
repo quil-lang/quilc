@@ -76,7 +76,13 @@
   "Expands a string of the form \"n1-...-nm\" to the list of integers (list nj1 ... njm), sorted ascending."
   (etypecase key
     (string
-     (sort (mapcar #'parse-integer (split-sequence:split-sequence #\- key)) #'<))
+     (let ((unsorted-list (mapcar #'parse-integer (split-sequence:split-sequence #\- key))))
+       (cond
+         ((every #'<= unsorted-list (rest unsorted-list))
+          unsorted-list)
+         (t
+          (warn "Encountered an unsorted ISA key: ~a" unsorted-list)
+          (sort unsorted-list #'<)))))
     (integer-list
      key)))
 
