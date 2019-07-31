@@ -10,22 +10,25 @@ test-cl-quil:
   stage: test
   tags:
     - github
+    - dockerd
   only:
     - branches
-  image: rigetti/rpcq
+  image: docker:stable
   script:
-    - make dump-version-info
-    - make install-test-deps
-    - make test-cl-quil RIGETTI_LISP_LIBRARY_HOME=/src
+    - docker build -t rigetti/quilc:${CI_COMMIT_SHORT_SHA} .
+    - docker run --rm --entrypoint=make rigetti/quilc:${CI_COMMIT_SHORT_SHA} test-cl-quil
+    - docker rmi rigetti/quilc:${CI_COMMIT_SHORT_SHA}
+
 
 test-quilc:
   stage: test
   tags:
     - github
+    - dockerd
   only:
     - branches
-  image: rigetti/rpcq
+  image: docker:stable
   script:
-    - make dump-version-info
-    - make install-test-deps
-    - make test-quilc RIGETTI_LISP_LIBRARY_HOME=/src
+    - docker build -t rigetti/quilc:${CI_COMMIT_SHORT_SHA} .
+    - docker run --rm --entrypoint=make rigetti/quilc:${CI_COMMIT_SHORT_SHA} test-quilc
+    - docker rmi rigetti/quilc:${CI_COMMIT_SHORT_SHA}
