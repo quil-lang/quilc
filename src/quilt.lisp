@@ -81,9 +81,7 @@
 
 
 (defclass calibration-definition ()
-  ((arguments :initarg :arguments
-              :reader calibration-definition-arguments)
-   (body :initarg :body
+  ((body :initarg :body
          :reader calibration-definition-body))
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified calibration."))
@@ -92,12 +90,25 @@
   ((name :initarg :name
          :reader calibration-definition-name)
    (parameters :initarg :parameters
-               :reader calibration-definition-parameters))
+               :reader calibration-definition-parameters)
+   (arguments :initarg :arguments
+              :reader calibration-definition-arguments))
   (:documentation "A representation of a user-specified gate calibration."))
 
-(defclass measure-calibration-definition (calibration-definition)
+(defclass measurement-calibration-definition (calibration-definition)
+  ((qubit :initarg :qubit
+          :reader measurement-calibration-qubit))
+  (:metaclass abstract-class)
+  (:documentation "Superclass to measurement calibration definitions."))
+
+(defclass measure-calibration-definition (measurement-calibration-definition)
+  ((address :initarg :address
+             :reader measure-calibration-address))
+  (:documentation "A representation of a user-specified MEASURE calibration."))
+
+(defclass measure-discard-calibration-definition (measurement-calibration-definition)
   ()
-  (:documentation "A representation of a user-specified measurement calibration."))
+  (:documentation "A representation of a user-specifieed MEASURE (discard) calibration."))
 
 (defmethod print-instruction-generic ((defn gate-calibration-definition) (stream stream))
   (format stream "DEFCAL ~a" (calibration-definition-name defn))
@@ -242,7 +253,8 @@
 
 ;;; TODO can waveform arguments be formal parameters?
 (defmethod instantiate-instruction ((instr pulse) param-value arg-value)
-  (let ((qubits (lookup-substitute-if #'is-formal arg-value (pulse-qubits instr))))
+  (let ((qubits (mapcar (transform-if #'is-formal arg-value)
+                        (pulse-qubits instr))))
     (make-instance 'pulse
                    :qubits qubits
                    :frame (pulse-frame instr)

@@ -326,6 +326,8 @@
    #:parsed-program                     ; CLASS
    #:parsed-program-gate-definitions    ; READER
    #:parsed-program-circuit-definitions ; READER
+   #:parsed-program-waveform-definitions     ; READER
+   #:parsed-program-calibration-definitions  ; READER
    #:parsed-program-memory-definitions  ; READER
    #:parsed-program-executable-code     ; READER
    #:print-parsed-program               ; FUNCTION
