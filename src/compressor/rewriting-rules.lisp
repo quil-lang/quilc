@@ -97,12 +97,12 @@
     ((x ("RX" (theta) q))
      (y ("RZ" (#.pi)  q)))
   (list (build-gate "RZ" '(#.pi)       q)
-        (build-gate "RX" `(,(- theta)) q)))
+        (build-gate "RX" `(,(param-* -1d0 theta)) q)))
 
 (define-compiler sort-X-after-RZ
     ((x ("RX" (#.pi)  q))
      (y ("RZ" (theta) q)))
-  (list (build-gate "RZ" `(,(- theta)) q)
+  (list (build-gate "RZ" `(,(param-* -1d0 theta)) q)
         (build-gate "RX" '(#.pi)       q)))
 
 (defmacro rewrite-GHG-as-HGH (g h)
@@ -197,7 +197,7 @@
     ((x ("PISWAP" (theta) p q)
         :where (and (typep theta 'double-float)
                     (double= theta (* pi (floor theta pi))))))
-  (list (build-gate "PISWAP" `(,(- theta pi)) p q)
+  (list (build-gate "PISWAP" `(,(param-+ theta pi)) p q)
         (build-gate "ISWAP"   ()              p q)))
 
 (define-compiler agglutinate-ISWAP-on-left-into-PISWAP
