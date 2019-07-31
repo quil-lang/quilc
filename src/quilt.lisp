@@ -291,13 +291,15 @@
   (:documentation "A delay of a specific time on a specific qubit."))
 
 (defmethod print-instruction-generic ((instr delay) (stream stream))
-  (format stream "DELAY ~A ~A" (delay-qubit instr) (delay-duration instr)))
+  (format stream "DELAY ~A ~A"
+          (print-instruction-generic (delay-qubit instr) nil)
+          (print-instruction-generic (delay-duration instr) nil)))
 
 (defmethod instantiate-instruction ((instr delay) param-value arg-value)
   (let ((qubit (funcall (transform-if #'is-formal arg-value)
                         (delay-qubit instr)))
-        (duration (funcall (transform-if #'is-formal arg-value))
-                  (delay-duration instr)))
+        (duration (funcall (transform-if #'is-formal arg-value)
+                           (delay-duration instr))))
     (make-instance 'delay
                    :qubit qubit
                    :duration duration)))
@@ -309,7 +311,9 @@
   preceding and succeeding instructions."))
 
 (defmethod print-instruction-generic ((instr fence) (stream stream))
-  (format stream "FENCE ~{~A ~}" (fence-qubits instr)))
+  (format stream "FENCE ~{~A ~}" (mapcar (lambda (q)
+                                           (print-instruction-generic q nil))
+                                         (fence-qubits instr))))
 
 (defmethod instantiate-instruction ((instr fence) param-value arg-value)
   (let ((qubits (mapcar (transform-if #'is-formal arg-value)
