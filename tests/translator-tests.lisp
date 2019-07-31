@@ -40,6 +40,12 @@
         (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
             "Euler translation test failed: ~a~%" compiler)))))
 
+(define-condition test-case-too-complicated (error)
+  ((reason :initarg :reason :reader test-case-too-complicated-reason))
+  (:documentation "Signaled when a test case generator is applied to a scenario that is too complicated for it to generate.")
+  (:report (lambda (c s)
+             (princ (test-case-too-complicated-reason c) s))))
+
 (defun generate-translator-test-case-for-simple-compiler (bindings)
   ;; build an adjacency graph of bound qubit variables that aren't allowed to collide
   (let ((adjacency-table (make-hash-table))
@@ -67,20 +73,25 @@
                       (push distant-qubit (gethash (first qubits) adjacency-table))))
                   (add-clique (rest qubits))))))
       (dolist (binding bindings)
-        (unless (typep binding 'cons)
-          (error "I don't know how to make tests for permissive compilers."))
-        (destructuring-bind (variable-name binding &rest options) binding
-          (declare (ignore variable-name))
-          (when options
-            (error "I don't know how to make test cases for guarded compilers."))
-          (add-clique (cddr binding))
-          (when (listp (second binding))
-            (setf parameter-names
-                  (union parameter-names
-                         (loop :for param :in (second binding)
-                               :when (and (typep param 'symbol)
-                                          (not (eql '_ param)))
-                                 :collect param))))))
+        (etypecase binding
+          (quil::wildcard-binding
+           (error 'test-case-too-complicated
+                  :reason "I don't know how to make tests for permissive compilers."))
+          (quil::measure-binding
+           (error 'test-case-too-complicated
+                  :reason "I don't know how to make tests for MEASURE compilers."))
+          (quil::gate-binding
+           (when (quil::gate-binding-options binding)
+             (error 'test-case-too-complicated
+                    :reason "I don't know how to make test cases for guarded compilers."))
+           (add-clique (quil::gate-binding-arguments binding))
+           (when (listp (quil::gate-binding-parameters binding))
+             (setf parameter-names
+                   (union parameter-names
+                          (loop :for param :in (quil::gate-binding-parameters binding)
+                                :when (and (typep param 'symbol)
+                                           (not (eql '_ param)))
+                                  :collect param)))))))
       ;; color the graph with qubit indices. it'd be :cool: if this were randomized.
       (quil::dohash ((qubit collision-names) adjacency-table)
         (let ((collision-qubits (mapcar (lambda (name) (gethash name adjacency-table))
@@ -90,76 +101,125 @@
                   :do (setf (gethash qubit adjacency-table) j)
                       (return))))
       ;; save the max of the largest instruction qubit number & the k in the k-coloring
-      (setf qubit-bound (max (loop :for (variable-name binding) :in bindings
-                                   :maximize (1+ (length (cddr binding))))
+      (setf qubit-bound (max (loop :for binding :in bindings
+                                   :maximize (1+ (length (quil::gate-binding-arguments binding))))
                              (loop :for name :being :the :hash-keys :of adjacency-table
                                      :using (hash-value qubit-assignment)
                                    :maximize (1+ qubit-assignment))))
       (dolist (n parameter-names)
         (setf (gethash n parameter-assignments)
-              (random (* 2 pi))))
+              ;; If a named parameter exists, let's use a memory
+              ;; reference for it.
+              (mref (symbol-name n) 0)))
       ;; walk the instructions, doing parameter/argument instantiation
-      (loop :for binding :in bindings
-            :collect
-            (destructuring-bind (variable-name (name params &rest qubits)) binding
-              (declare (ignore variable-name))
-              (let* ((params (when (listp params)
-                               (mapcar (lambda (param)
-                                         (cond
-                                           ((numberp param)
-                                            (constant param))
-                                           ((typep param 'symbol)
-                                            (constant (gethash param parameter-assignments)))
-                                           (t
-                                            (error "I don't know how to generate this parameter."))))
-                                       params)))
-                     (qubits (mapcar (lambda (qubit)
-                                       (cond
-                                         ((numberp qubit)
-                                          qubit)
-                                         ((eql qubit (intern "_"))
-                                          nil)
-                                         ((symbolp qubit)
-                                          (gethash qubit adjacency-table))))
-                                     qubits))
-                     (occupied-qubits (remove-if #'symbolp qubits))
-                     (qubits
-                       (let ((output-qubits nil))
-                         (dolist (qubit qubits (reverse output-qubits))
-                           (cond
-                             ((numberp qubit)
-                              (push qubit output-qubits))
-                             ((null qubit)
-                              (push (random-with-exceptions qubit-bound
-                                                            (append output-qubits occupied-qubits))
-                                    output-qubits)))))))
-                (cond
-                  ((stringp name)
-                   (apply #'quil::build-gate name params qubits))
-                  (t
-                   (apply #'quil::anon-gate "ANONYMOUS-INPUT"
-                          (quil::random-special-unitary (ash 1 (length qubits)))
-                          qubits)))))))))
+      (values (loop :for binding :in bindings
+                    :collect
+                    (let* ((params (when (listp (quil::gate-binding-parameters binding))
+                                     (mapcar (lambda (param)
+                                               (cond
+                                                 ((numberp param)
+                                                  (constant param))
+                                                 ((typep param 'symbol)
+                                                  (gethash param parameter-assignments))
+                                                 (t
+                                                  (error 'test-case-too-complicated
+                                                         :reason "I don't know how to generate this parameter."))))
+                                             (quil::gate-binding-parameters binding))))
+                           (qubits (mapcar (lambda (qubit)
+                                             (cond
+                                               ((numberp qubit)
+                                                qubit)
+                                               ((eql qubit (intern "_"))
+                                                nil)
+                                               ((symbolp qubit)
+                                                (gethash qubit adjacency-table))))
+                                           (quil::gate-binding-arguments binding)))
+                           (occupied-qubits (remove-if #'symbolp qubits))
+                           (qubits
+                             (let ((output-qubits nil))
+                               (dolist (qubit qubits (reverse output-qubits))
+                                 (cond
+                                   ((numberp qubit)
+                                    (push qubit output-qubits))
+                                   ((null qubit)
+                                    (push (random-with-exceptions qubit-bound
+                                                                  (append output-qubits occupied-qubits))
+                                          output-qubits)))))))
+                      (cond
+                        ((symbolp (quil::gate-binding-operator binding))
+                         (apply #'quil::anon-gate "ANONYMOUS-INPUT"
+                                (quil::random-special-unitary (ash 1 (length qubits)))
+                                qubits))
+                        (t
+                         (apply #'quil::build-gate (quil::gate-binding-operator binding) params qubits)))))
+              parameter-assignments))))
+
+(defun %patch-mref-values (instr table)
+  (unless (quil::application-parameters instr)
+    (return-from %patch-mref-values instr))
+  (let ((instr-new (quil::copy-instance instr)))
+    (setf (quil::application-parameters instr-new)
+          (mapcar #'quil::copy-instance
+                  (quil::application-parameters instr-new)))
+    (labels ((treesplore (expression)
+               (cond ((listp expression)
+                      (mapcar #'treesplore expression))
+                     ((quil::delayed-expression-p expression)
+                      (quil::make-delayed-expression
+                       nil nil (treesplore (quil::delayed-expression-expression expression))))
+                     ((typep expression 'quil::memory-ref)
+                      (let* ((name (quil::memory-ref-name expression)))
+                        (gethash name table)))
+                     (t
+                      expression))))
+      (map-into (quil::application-parameters instr-new)
+                (lambda (param)
+                  (if (quil::delayed-expression-p param)
+                      (let ((res (treesplore param)))
+                        (quil::evaluate-delayed-expression res))
+                      param))
+                (quil::application-parameters instr-new))
+      instr-new)))
+
+(defun %make-de-value-table (quil)
+  (loop :with table := (make-hash-table :test 'equalp)
+        :for instr :in quil
+        :for params := (application-parameters instr) :do
+          (loop :for param :in params
+                :when (typep param 'quil::delayed-expression) :do
+                  (let ((name (quil::memory-ref-name (quil::delayed-expression-expression param))))
+                    (setf (gethash name table) (random (* 2 pi)))))
+        :finally
+           (return table)))
 
 (deftest test-translators ()
-  (labels
-      ((test-a-compiler (compiler)
-         (unless (quil::compiler-gateset-reducer-p compiler)
-           (return-from test-a-compiler nil))
-         (let (test-case input-matrix compiled-output output-matrix)
-           ;; building the test case can throw an error if the compiler itself is
-           ;; too complicated. we don't intend for that to break the tests.
-           (handler-case (setf test-case (generate-translator-test-case-for-simple-compiler
-                                          (quil::compiler-bindings compiler)))
-             (error ()
-               (return-from test-a-compiler nil)))
-           (setf input-matrix (quil::make-matrix-from-quil test-case))
-           (setf compiled-output (apply compiler test-case))
-           (setf output-matrix (quil::make-matrix-from-quil compiled-output))
-           (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
-           (is (quil::matrix-equals-dwim input-matrix output-matrix)))))
-    (dolist (compiler quil::**compilers-available**)
-      (test-a-compiler compiler))))
+  (labels ((do-compilation (compiler)
+             (unless (quil::compiler-gateset-reducer-p compiler)
+               (return-from do-compilation nil))
+             (let (test-case test-case-patched input-matrix compiled-output output-matrix table)
+               ;; building the test case can throw an error if the compiler itself is
+               ;; too complicated. we don't intend for that to break the tests.
+               (handler-case (setf test-case (generate-translator-test-case-for-simple-compiler
+                                              (quil::compiler-bindings compiler)))
+                 (test-case-too-complicated (c)
+                   (format t "~&Compiler ~A not tested because ~A" compiler (test-case-too-complicated-reason c))
+                   (return-from do-compilation nil)))
+               (setf table (%make-de-value-table test-case))
+               (setf test-case-patched (mapcar (a:rcurry #'%patch-mref-values table) test-case))
+               (setf input-matrix (quil::make-matrix-from-quil test-case-patched))
+               (setf compiled-output (mapcar (a:rcurry #'%patch-mref-values table)
+                                             (apply compiler test-case)))
+               (setf output-matrix (quil::make-matrix-from-quil compiled-output))
+               (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
+               (is (quil::matrix-equals-dwim input-matrix output-matrix))
+               t)))
+    (loop :for compiler :in (remove-if (a:rcurry #'typep 'quil::approximate-compiler)
+                                       quil::**compilers-available**)
+          :count t :into compiler-count
+          :count (do-compilation compiler) :into hit-count
+          :finally (let ((hit-rate (/ hit-count compiler-count)))
+                     (format t "~&  Tested ~2,2f% of all compilers." (* 100 hit-rate))
+                     (is (< 1/10 hit-rate))))))
 
 
 (defun random-permutation (list)
