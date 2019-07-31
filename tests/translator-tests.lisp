@@ -167,9 +167,14 @@
            (setf compiled-output (apply compiler test-case))
            (setf output-matrix (quil::make-matrix-from-quil compiled-output))
            (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
-           (is (quil::matrix-equals-dwim input-matrix output-matrix)))))
-    (dolist (compiler quil::**compilers-available**)
-      (test-a-compiler compiler))))
+           (is (quil::matrix-equals-dwim input-matrix output-matrix))
+           t)))
+    (loop :for compiler :in quil::**compilers-available**
+          :count t :into compiler-count
+          :count (test-a-compiler compiler) :into hit-count
+          :finally (let ((hit-rate (/ hit-count compiler-count)))
+                     (format t "~&  Tested ~2,2f% of all compilers." (* 100 hit-rate))
+                     (is (< 1/10 hit-rate))))))
 
 
 (defun random-permutation (list)
