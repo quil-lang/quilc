@@ -82,3 +82,70 @@ HALT
         {\"1Q\": {\"1\": {}, \"3\": {}},
          \"2Q\": {\"1-2\": {}, \"2-3\": {}}}}"))))
     (signals error (compiler-hook progm chip))))
+
+(defparameter *qpu-test-file-directory*
+  (asdf:system-relative-pathname
+   ':cl-quil-tests
+   "tests/qpu-test-files/"))
+
+(defun %read-test-chipspec (file-name)
+  (quil::read-chip-spec-file (merge-pathnames file-name *qpu-test-file-directory*)))
+
+(deftest test-sohaib-gh-361 ()
+  "Regression test for github issue #361."
+  ;; https://github.com/rigetti/quilc/issues/361
+  (let ((progm (with-output-to-quil
+                 "CNOT 0 2"
+                 "CNOT 0 7"
+                 "RZ(-0.4693665293556365) 7"
+                 "CNOT 0 7"
+                 "CNOT 0 10"
+                 "RZ(-0.439060348695375) 10"
+                 "CNOT 0 10"
+                 "CNOT 0 15"
+                 "RZ(-0.1774648984274036) 15"
+                 "CNOT 0 15"
+                 "CNOT 0 16"
+                 "RZ(-0.5283738721906502) 16"
+                 "CNOT 0 16"
+                 "CNOT 0 17"
+                 "RZ(-0.5127678603188986) 17"
+                 "CNOT 0 17"
+                 "CNOT 1 2"
+                 "RZ(-0.38636880263183865) 2"
+                 "CNOT 1 2"
+                 "CNOT 1 7"
+                 "RZ(-0.23607918922895188) 7"
+                 "CNOT 1 7"
+                 "CNOT 1 14"))
+        (chip (%read-test-chipspec "Aspen-4-10Q-A.qpu")))
+    (not-signals error (compiler-hook progm chip))
+    (not-signals error (compiler-hook progm chip :rewiring-type ':partial))
+    (not-signals error (compiler-hook progm chip :rewiring-type ':greedy))))
+
+(deftest test-prog-initial-rewiring-heuristic ()
+  ;; Any PRAGMA INITIAL_REWIRING is respected.
+  (dolist (init-rewiring '("NAIVE" "PARTIAL" "GREEDY" "RANDOM"))
+    (is (eq (a:make-keyword init-rewiring)
+            (quil::prog-initial-rewiring-heuristic
+             (with-output-to-quil
+               (format t "PRAGMA INITIAL_REWIRING ~S~%" init-rewiring)
+               "X 0"
+               "CZ 0 2"
+               "CNOT 2 3")
+             (quil::build-nq-linear-chip 4)))))
+
+  (let ((pp-a (with-output-to-quil "X 0" "CZ 0 2" "CNOT 2 3"))
+        (pp-b (with-output-to-quil "X 0" "CZ 1 2" "CNOT 2 3")))
+    (dolist (quil::*initial-rewiring-default-type* '(:naive :partial :greedy :random))
+      ;; Contains CZ on non-adjancent qubits: *INITIAL-REWIRING-DEFAULT-TYPE*
+      (is (eq quil::*initial-rewiring-default-type*
+              (quil::prog-initial-rewiring-heuristic pp-a (quil::build-nq-linear-chip 4))))
+
+      ;; Always :NAIVE for a fully-connected chip
+      (is (eq ':naive
+              (quil::prog-initial-rewiring-heuristic pp-a (quil::build-nq-fully-connected-chip 4))))
+
+      ;; Always :NAIVE for PP-B on linear chip
+      (is (eq ':naive
+              (quil::prog-initial-rewiring-heuristic pp-b (quil::build-nq-linear-chip 4)))))))
