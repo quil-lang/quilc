@@ -332,10 +332,10 @@ used to specify CHIP-SPEC."
         (setf (gethash (make-measure-binding :qubit q
                                              :target '_)
                        (hardware-object-gate-information obj))
-              (make-gate-record :duration 2000))
+              (make-gate-record :duration 2000 :fidelity 0.90d0))
         (setf (gethash (make-measure-binding :qubit '_)
                        (hardware-object-gate-information obj))
-              (make-gate-record :duration 2000)))
+              (make-gate-record :duration 2000 :fidelity 0.90d0)))
       (when (member ':RZ type)
         (stash-gate-record "RZ" '(_) (list q) 1/100 +near-perfect-fidelity+))
       (when (member ':X/2 type)
