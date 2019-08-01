@@ -107,8 +107,7 @@ before erroring. Intended to avoid infinite loops.")
                    x
                    (list x)))))
         (mapcan #'instantiate
-                (ralabel-block-labels-uniquely
-                 (circuit-definition-body circdef)))))))
+                (relabel-block-labels-uniquely defn-body))))))
 
 (defun substitute-parameter (param-value)
   "Given a function PARAM-VALUE to compute the value of a PARAM object, return a function which takes either a PARAM, DELAYED-EXPRESSION, or CONSTANT and computes it's numerical value. Should always"
@@ -154,7 +153,7 @@ depending on whether TEST passes."
 (defgeneric instantiate-instruction (instr param-value arg-value)
   (:documentation "Given an instruction INSTR possibly with formal parameters/variables, instantiate it with the proper parameter/argument values provided by the unary functions PARAM-VALUE and ARG-VALUE, which take PARAM and FORMAL objects respectively as arguments. Return the instruction or a list of instructions as a result.")
   (:method ((instr circuit-application) param-value arg-value)
-    (let ((params (mapcar (transform-if (constantly t) (substitute-parameter param-value))
+    (let ((params (mapcar (transform-if (constantly t) (substitute-parameter param-value)) ; TODO this can be simplified...
                           (application-parameters instr)))
           (args (mapcar (transform-if #'is-formal arg-value)
                         (application-arguments instr))))
@@ -173,9 +172,9 @@ depending on whether TEST passes."
            ;; applications
            (setf instrs (reverse instrs))))
         ((plain-operator-p (application-operator instr))
-         (instantiate-circuit (circuit-application-definition instr)
-                              params
-                              args))
+         (instantiate-definition (circuit-application-definition instr)
+                                 params
+                                 args))
         (t
          (error "Unable to instantiate the modifiers in the complex instruction ~/quil:instruction-fmt/."
                 instr)))))
@@ -233,7 +232,7 @@ depending on whether TEST passes."
           instr
           (let ((new-addr (funcall arg-value addr)))
             (assert (or (is-mref addr) (is-formal addr)))
-            (unless (< 1 *circuit-expansion-depth*)
+            (unless (< 1 *expansion-depth*)
               (assert (is-mref new-addr) ()
                       "The formal argument ~A must be substituted with an address."
                       (formal-name addr)))
@@ -245,7 +244,7 @@ depending on whether TEST passes."
                  addr
                  (let ((new-addr (funcall arg-value addr)))
                    (assert (or (is-mref addr) (is-formal addr)))
-                   (unless (< 1 *circuit-expansion-depth*)
+                   (unless (< 1 *expansion-depth*)
                      (assert (is-mref new-addr) ()
                              "The formal argument ~A must be substituted with an address."
                              (formal-name addr)))
@@ -263,7 +262,7 @@ depending on whether TEST passes."
                  addr
                  (let ((new-addr (funcall arg-value addr)))
                    (assert (or (is-mref addr) (is-formal addr)))
-                   (unless (< 1 *circuit-expansion-depth*)
+                   (unless (< 1 *expansion-depth*)
                      (assert (is-mref new-addr) ()
                              "The formal argument ~A must be substituted with an address."
                              (formal-name addr)))

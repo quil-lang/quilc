@@ -1651,7 +1651,7 @@ and the reamining tokens."
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       ;; Check that we have a well-formed header line.
       (destructuring-bind (op . params-args) parameter-line
-        ;; We must be working with a DEFCIRCUIT.
+        ;; We must be working with a DEFCAL
         (unless (eql ':DEFCAL (token-type op))
           (quil-parse-error "DEFCAL expected. Got ~S"
                             (token-type op)))
@@ -1660,48 +1660,67 @@ and the reamining tokens."
         (when (null params-args)
           (quil-parse-error "Expected more after DEFCAL token"))
 
-        ;; Check for name.
-        (unless (or (eql ':NAME (token-type (first params-args)))
-                    (eql ':MEASURE (token-type (first params-args))))
-          (quil-parse-error "Expected a name for the DEFCAL"))
+        (let ((is-measure-calibration (eql ':MEASURE (token-type (first params-args)))))
+          ;; Check for name.
+          (unless (or is-measure-calibration
+                      (eql ':NAME (token-type (first params-args))))
+            (quil-parse-error "Expected a name for the DEFCAL"))
 
-        ;; Stash it away.
-        (setf name (token-payload (pop params-args)))
+          ;; Stash it away.
+          (setf name (token-payload (pop params-args)))
 
-        (let ((*definition-context* :DEFGATE))
-          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
-            (when (and (eql ':MEASURE name)
-                       (not (null params)))
-              (quil-parse-error "MEASURE calibrations do not support formal parameters."))
+          ;; TODO Do we really want to recycle application parameter parsing code?
+          (let ((*definition-context* :DEFCAL)
+                (*formal-arguments-allowed* t))
+            (multiple-value-bind (params rest-line) (parse-application-parameters params-args)
+              (when (and is-measure-calibration
+                         (not (null params)))
+                (quil-parse-error "MEASURE calibrations do not support parameters."))
 
-            ;; Check for colon and incise it.
-            (let ((maybe-colon (last rest-line)))
-              (when (or (null maybe-colon)
-                        (not (eql ':COLON (token-type (first maybe-colon)))))
-                (quil-parse-error "Expected a colon in DEFCAL"))
-              (setf rest-line (butlast rest-line)))
+              (dolist (param params)
+                (unless (or (is-constant param)
+                            (is-param param))
+                  (quil-parse-error "Unexpected parameter type in DEFCAL.")))
 
-            ;; Collect arguments and stash them away.
-            (loop :for arg :in rest-line
-                  :when (not (or (eql ':NAME (token-type arg))
-                                 (eql ':INTEGER (token-type arg))))
-                    :do (quil-parse-error "Invalid argument in DEFCAL line.")
-                  :collect (parse-argument arg) :into formal-args
-                  :finally (setf args formal-args))
+              ;; Check for colon and incise it.
+              (let ((maybe-colon (last rest-line)))
+                (when (or (null maybe-colon)
+                          (not (eql ':COLON (token-type (first maybe-colon)))))
+                  (quil-parse-error "Expected a colon in DEFCAL"))
+                (setf rest-line (butlast rest-line)))
 
-            (multiple-value-bind (parsed-body rest-lines)
-                (parse-indented-body body-lines)
-              (values
-               (if (eql ':MEASURE name)
-                   (make-instance 'measure-calibration-definition
-                                  :arguments args
-                                  :body parsed-body)
-                   (make-instance 'gate-calibration-definition
-                                  :name name
-                                  :parameters params
-                                  :arguments args
-                                  :body parsed-body))
-               rest-lines))))))))
+              ;; Collect arguments and stash them away.
+              (loop :for arg :in rest-line
+                    :when (not (or (eql ':NAME (token-type arg))
+                                   (eql ':INTEGER (token-type arg))))
+                      :do (quil-parse-error "Invalid argument in DEFCAL line.")
+                    :collect (parse-argument arg) :into formal-args
+                    :finally (setf args formal-args))
+
+              (when (and is-measure-calibration
+                         (> (length args) 2))
+                (quil-parse-error "Too many arguments for DEFCAL MEASURE."))
+
+              (multiple-value-bind (parsed-body rest-lines)
+                  (parse-indented-body body-lines)
+                (values
+                 (cond ((and is-measure-calibration
+                             (null (second args)))
+                        (make-instance 'measure-discard-calibration-definition
+                                       :qubit (first args)
+                                       :body parsed-body))
+                       (is-measure-calibration
+                        (make-instance 'measure-calibration-definition
+                                       :qubit (first args)
+                                       :address (second args)
+                                       :body parsed-body))
+                       (t
+                        (make-instance 'gate-calibration-definition
+                                       :name name
+                                       :parameters params
+                                       :arguments args
+                                       :body parsed-body)))
+                 rest-lines)))))))))
 
 ;;; TODO
 ;;; - *formal-arguments-allowed* t ?

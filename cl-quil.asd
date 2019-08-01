@@ -92,6 +92,7 @@
                              (:file "compress-qubits")
                              (:file "expansion")
                              (:file "expand-circuits")
+                             (:file "expand-calibrations")
                              (:file "rewrite-arithmetic")
                              (:file "fusion")
                              (:file "simplify-arithmetic")))
