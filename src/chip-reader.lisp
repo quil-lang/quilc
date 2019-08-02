@@ -127,8 +127,8 @@
 (defun parse-gate-information (gate-datum)
   (let (args)
     (a:when-let ((fidelity (gethash "fidelity" gate-datum)))
-      (when (double= -1d0 fidelity)
-        (setf fidelity +near-perfect-fidelity+))
+      (when (double= fidelity +forest-error-sentinel+)
+        (setf fidelity +totally-awful-fidelity+))
       (setf args (list* ':fidelity fidelity args)))
     (a:when-let ((duration (gethash "duration" gate-datum)))
       (setf args (list* ':duration duration args)))
@@ -254,10 +254,8 @@
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity)))))
                 (a:when-let ((fidelity (gethash "f1QRB" spec)))
-                  ;; NOTE: Forest thinks that "-1" is a special fidelity value
-                  ;;       that indicates a particular error in measurement.
-                  (when (double= -1d0 fidelity)
-                    (setf fidelity +near-perfect-fidelity+))
+                  (when (double= fidelity +forest-error-sentinel+)
+                    (setf fidelity +totally-awful-fidelity+))
                   (dohash ((binding record) gate-info)
                     (when (and (gate-binding-p binding)
                                (equalp (named-operator "RX") (gate-binding-operator binding))
