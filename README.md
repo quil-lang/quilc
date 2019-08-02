@@ -191,12 +191,28 @@ A few good entry points to exploring the library are:
 * The function `cl-quil:compiler-hook` which constructs a control-flow
   graph (CFG) and then performs various optimizations on the CFG.
 
-## Automated Packaging with Docker
+## Automated Build, Test, and Release with Docker
 
 The CI pipeline for `quilc` produces a Docker image, available at
 [`rigetti/quilc`](https://hub.docker.com/r/rigetti/quilc).
-
 To get the latest stable version of `quilc`, run `docker pull rigetti/quilc`.
+To instead pull a specific version of quilc, run `docker pull rigetti/quilc:VERSION`,
+where `VERSION` is something like `1.10.4`.
+
+The Dockerfile for quilc builds from three parent Docker images:
+
+1. [`rigetti/lisp`](https://hub.docker.com/r/rigetti/lisp): Contains SBCL, Quicklisp, and
+   third-party libraries.
+2. [`rigetti/rpcq`](https://hub.docker.com/r/rigetti/rpcq): Contains the message spec and
+   RPC framework used by quilc.
+3. [`rigetti/qvm`](https://hub.docker.com/r/rigetti/qvm): Contains the Quantum Virtual Machine,
+   used in the quilc tests.
+
+The Dockerfile for quilc intentionally pins the versions of these three images,
+which means that the version numbers must be actively incremented as necessary.
+If the build for quilc is failing, this is probably the place to look, because
+the unit tests are run inside of a freshly-built quilc Docker image as part of
+the GitLab CI pipeline.
 
 ## Running the Quil Compiler with Docker
 
@@ -236,12 +252,25 @@ assigned host ports. You can then inspect the mapping using `docker port CONTAIN
 
 ## Release Process
 
-1. Update `VERSION.txt` and dependency versions (if applicable) and push the commit to `master`.
+1. Update `VERSION.txt` and push the commit to `master`.
 2. Push a git tag `vX.Y.Z` that contains the same version number as in `VERSION.txt`.
 3. Verify that the resulting build (triggered by pushing the tag) completes successfully.
 4. Publish a [release](https://github.com/rigetti/quilc/releases) using the tag as the name.
 5. Close the [milestone](https://github.com/rigetti/quilc/milestones) associated with this release,
    and migrate incomplete issues to the next one.
+6. Update the quilc version of downstream dependencies (if applicable, see next section).
+
+## Downstream Dependencies
+
+Currently, there are a couple different components of the Forest SDK that depend on quilc:
+
+1. [qvm](https://github.com/rigetti/qvm)
+2. [pyquil](https://github.com/rigetti/pyquil)
+3. [forest-benchmarking](https://github.com/rigetti/forest-benchmarking)
+
+It is the responsibility of the releaser to verify that the latest quilc release does not
+break the test suites of these downstream dependencies. All of these repositories pull the
+latest released version of quilc as part of their CI pipelines.
 
 # Get involved!
 
