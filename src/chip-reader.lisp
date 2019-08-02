@@ -97,18 +97,17 @@
     ;; Get the maximally indexed qubit, so we can bound the indexes of
     ;; the qubits we need to add.
     (let ((max-qubit-index
-            (loop :for k :being :the :hash-keys :of 1q-layer
-                  :maximize (parse-integer k :radix 10 :junk-allowed nil))))
+            (loop :for (k) :being :the :hash-keys :of 1q-layer
+                  :maximize k)))
       ;; Now, go through the hash table, filling in anything
       ;; missing. We can go :BELOW and not :TO with DOTIMES since we
       ;; know the last index exists.
       (dotimes (q max-qubit-index isa-hash)
-        (let ((qkey (prin1-to-string q)))
-          (multiple-value-bind (qubit-hash exists?)
-              (gethash qkey 1q-layer)
-            (declare (ignore qubit-hash))
-            (unless exists?
-              (setf (gethash qkey 1q-layer) (dead-qubit-hash-table)))))))))
+        (multiple-value-bind (qubit-hash exists?)
+            (gethash (list q) 1q-layer)
+          (declare (ignore qubit-hash))
+          (unless exists?
+            (setf (gethash (list q) 1q-layer) (dead-qubit-hash-table))))))))
 
 (defun parse-binding (gate-datum)
   "Parses an entry in the \"gates\" field of an ISA object descriptor."
@@ -128,6 +127,8 @@
 (defun parse-gate-information (gate-datum)
   (let (args)
     (a:when-let ((fidelity (gethash "fidelity" gate-datum)))
+      (when (double= fidelity +forest-error-sentinel+)
+        (setf fidelity +totally-awful-fidelity+))
       (setf args (list* ':fidelity fidelity args)))
     (a:when-let ((duration (gethash "duration" gate-datum)))
       (setf args (list* ':duration duration args)))
@@ -155,7 +156,7 @@
           (make-array qubit-count :initial-element nil))
     ;; for each logical qubit descriptor...
     (dohash ((key qubit-hash) (gethash "1Q" isa-hash))
-      (destructuring-bind (i) (expand-key-to-integer-list key)
+      (destructuring-bind (i) key
         (assert (< i qubit-count)
                 nil
                 "ISA contains a 1Q descriptor of index ~a, but there are only ~a qubit(s) altogether."
@@ -184,7 +185,7 @@
     ;; for each logical link descriptor...
     (when (gethash "2Q" isa-hash)
       (dohash ((key link-hash) (gethash "2Q" isa-hash))
-        (destructuring-bind (q0 q1) (expand-key-to-integer-list key)
+        (destructuring-bind (q0 q1) key
           ;; check that the link is ordered
           (assert (< q0 q1)
                   nil
@@ -239,7 +240,6 @@
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
-  (declare (optimize (debug 3)))
   (when (gethash "1Q" specs-hash)
     (loop :for i :from 0
           :for qubit :across (chip-spec-qubits chip-spec)
@@ -254,25 +254,20 @@
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity)))))
                 (a:when-let ((fidelity (gethash "f1QRB" spec)))
-                  (dolist (binding (list (make-gate-binding :operator (named-operator "RX")
-                                                            :parameters '(#.(/ pi 2))
-                                                            :arguments '(_))
-                                         (make-gate-binding :operator (named-operator "RX")
-                                                            :parameters '(#.(/ pi -2))
-                                                            :arguments '(_))
-                                         (make-gate-binding :operator (named-operator "RX")
-                                                            :parameters '(#.pi)
-                                                            :arguments '(_))
-                                         (make-gate-binding :operator (named-operator "RX")
-                                                            :parameters '(#.(- pi))
-                                                            :arguments '(_))))
-                    (a:when-let ((record (gethash binding gate-info)))
+                  (when (double= fidelity +forest-error-sentinel+)
+                    (setf fidelity +totally-awful-fidelity+))
+                  (dohash ((binding record) gate-info)
+                    (when (and (gate-binding-p binding)
+                               (equalp (named-operator "RX") (gate-binding-operator binding))
+                               (not (double= 0d0 (first (gate-binding-parameters binding)))))
+                      (unless (double= 0d0 (mod (first (gate-binding-parameters binding)) (/ pi 2)))
+                        (warn "Qubit ~a: applying f1QRB spec to unusual native gate RX(~a)" i (first (gate-binding-parameters binding))))
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity))))))))
   (when (gethash "2Q" specs-hash)
     (loop :for key :being :the :hash-keys :of (gethash "2Q" specs-hash)
             :using (hash-value spec)
-          :for (q0 q1) := (expand-key-to-integer-list key)
+          :for (q0 q1) := key
           :for link := (lookup-hardware-object-by-qubits chip-spec (list q0 q1))
           :for gate-info := (and link (hardware-object-gate-information link))
           :when gate-info
@@ -293,21 +288,74 @@
                     (destructuring-bind (name params) args
                       (stash-fidelity name params)))))))
 
+;; NOTE: This function (and its call sites) are an unfortunate anachronism of
+;; CL-QUIL / quilc development. QPU specifications were originally sent over
+;; the wire (or read in from disk) as JSON dictionaries, which have the
+;; restriction that they can only be keyed on strings. Internally, it would have
+;; been more convenient to have them keyed on lists of numbers, and so we decided
+;; on the convention that the string "n1" (with n1 a number) deserialize to the
+;; list (n1), the string "n1-n2" deserialize to the list (n1 n2), and so on. we
+;; managed this right at the deserialization layer by providing an :object-key-fn
+;; key to yason:parse.
+;;
+;; later, we migrated to RPCQ, which does support sending dictionaries keyed on
+;; non-strings over the wire, but we didn't initially make use of it: the client
+;; still serialized the QPU specification through JSON, then sent the JSON string
+;; along to be deserialized by the above means. later, someone half-assed the
+;; RPCQ message |TargetDevice|, which broke the "isa" and "specs" top-level keys
+;; from a QPU specification into RPCQ slots, but then marked their contents as
+;; :any -> :any dictionaries and stored the non-JSON-serialized dictionaries
+;; there, which were keyed on single-qubit unwrapped integers and qubit-qubit
+;; pairs of integers (breaking consistently with the deser layer above).
+;;
+;; this type mismatch caused bugs, which we awkwardly patched over for a while,
+;; until we ultimately found ourselves in a position without a backwards
+;; compatible solution. the situation is improving: quilc's HTTP endpoint is
+;; sunsetting, and with it the JSON payloads are likely to disappear too (though
+;; one must still consider their CLI usage), and so we need only consider the
+;; client's awkward behavior with the RPCQ payloads. for now, we are going to
+;; isolate this awkward behavior into this single function, which converts all
+;; of the possible options above into integer lists, and adhere rigidly to the
+;; use of integer vectors within the CL-QUIL codebase.
+;;
+;;        -ecp
+(defun sanitize-qpu-hash-layer (layer)
+  (flet ((walk-sublayer (sublayer)
+           (let ((new-sublayer (make-hash-table :test #'equalp)))
+             (dohash ((key val) sublayer new-sublayer)
+               (etypecase key
+                 (string
+                  (setf key (sort (expand-key-to-integer-list key) #'<)))
+                 (integer
+                  (setf key (list key)))
+                 (integer-vector
+                  (setf key (sort (coerce key 'list) #'<)))
+                 (integer-list
+                  (setf key (sort (copy-list key) #'<))))
+               (setf (gethash key new-sublayer) val)))))
+    (let ((new-layer (make-hash-table :test #'equalp)))
+      (a:when-let ((sublayer (gethash "1Q" layer)))
+        (setf (gethash "1Q" new-layer) (walk-sublayer sublayer)))
+      (a:when-let ((sublayer (gethash "2Q" layer)))
+        (setf (gethash "2Q" new-layer) (walk-sublayer sublayer)))
+      new-layer)))
+
 (defun qpu-hash-table-to-chip-specification (hash-table)
   "Converts a QPU specification HASH-TABLE, to a chip-specification object.  Requires an \"isa\" layer."
   (check-type hash-table hash-table)
-  (let ((isa-hash (or (gethash "isa" hash-table)
-                      (error 'missing-isa-layer-error)))
-        (chip-spec (make-chip-specification
-                    :objects (make-array 2 :initial-contents (list (make-adjustable-vector)
-                                                                   (make-adjustable-vector)))
-                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
+  (let* ((isa-hash (sanitize-qpu-hash-layer
+                    (or (gethash "isa" hash-table)
+                        (error 'missing-isa-layer-error))))
+         (chip-spec (make-chip-specification
+                     :objects (make-array 2 :initial-contents (list (make-adjustable-vector)
+                                                                    (make-adjustable-vector)))
+                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
     ;; set up the self-referential compilers
     (install-generic-compilers chip-spec (list ':cz))
     ;; now load the layers out of the .qpu hash
     (load-isa-layer chip-spec isa-hash)
     (a:when-let ((specs-hash (gethash "specs" hash-table)))
-      (load-specs-layer chip-spec specs-hash))
+      (load-specs-layer chip-spec (sanitize-qpu-hash-layer specs-hash)))
     ;; and return the chip-specification that we've built
     (warm-hardware-objects chip-spec)))
 

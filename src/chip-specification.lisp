@@ -11,6 +11,13 @@
 (defconstant +near-perfect-fidelity+ 0.99999d0
   "Even perfect operations are typically limited in their physical realization by, say, the granularity of control electronics. (For instance, waveform IQ values might be stored as complex fixnums of some specified depth.) This constant is a mnemonic for \"supposedly perfect\" and captures some of the loss incurred by these imperfections.")
 
+;; TODO: actually put a small value here.
+(defconstant +totally-awful-fidelity+ 0.99997d0
+  "In the event that the Forest database indicates that a gate is too error-prone even to accurately estimate the error, we use this value as a generic lowball for how awful the gate must be.")
+
+(defconstant +forest-error-sentinel+ -1
+  "The Forest database sometimes stores a fidelity of -1 to indicate that the fidelity estimation routine failed.")
+
 (defstruct chip-specification
   "Houses information about hardware components on a QPU.
 
@@ -332,10 +339,10 @@ used to specify CHIP-SPEC."
         (setf (gethash (make-measure-binding :qubit q
                                              :target '_)
                        (hardware-object-gate-information obj))
-              (make-gate-record :duration 2000))
+              (make-gate-record :duration 2000 :fidelity 0.90d0))
         (setf (gethash (make-measure-binding :qubit '_)
                        (hardware-object-gate-information obj))
-              (make-gate-record :duration 2000)))
+              (make-gate-record :duration 2000 :fidelity 0.90d0)))
       (when (member ':RZ type)
         (stash-gate-record "RZ" '(_) (list q) 1/100 +near-perfect-fidelity+))
       (when (member ':X/2 type)
