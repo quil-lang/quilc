@@ -522,9 +522,49 @@ result of BODY, and the (possibly null) list of remaining lines.
                (values (progn ,@body)
                        (rest ,all-lines))))))))))
 
+(defun parse-qubit (qubit-tok)
+  (case (token-type qubit-tok)
+    ((:NAME)
+     (unless *formal-arguments-allowed*
+       ;; TODO print context
+       (quil-parse-error "Found the formal parameter ~A where not allowed." (token-payload qubit-tok)))
+     (formal (token-payload qubit-tok)))
+    ((:INTEGER) (qubit (token-payload qubit-tok)))
+    (otherwise
+     (quil-parse-error "Unable to parse qubit. Expected a name~@[ or formal parameter], but got ~A"
+                       *formal-arguments-allowed*
+                       (token-type qubit-tok)))))
+
+(defun parse-memory-or-formal-token (tok &key ensure-valid)
+  (cond
+    ;; Actual address to measure into.
+    ((eql ':AREF (token-type tok))
+     (when (and ensure-valid
+                (not (find (car (token-payload tok)) *memory-region-names* :test #'string=)))
+       ;; TODO context
+       (quil-parse-error "Bad memory region name ~a in instruction" (car (token-payload tok))))
+     (mref (car (token-payload tok))
+           (cdr (token-payload tok))))
+
+    ;; Implicit address to measure into.
+    ((and (eql ':NAME (token-type tok))
+          (find (token-payload tok) *memory-region-names* :test #'string=))
+     (mref (token-payload tok) 0))
+
+    ;; Formal argument.
+    ((eql ':NAME (token-type tok))
+     (unless *formal-arguments-allowed*
+       (quil-parse-error "Found formal argument where it's not allowed."))
+     (formal (token-payload tok)))
+
+    (t
+     (quil-parse-error "Expected an address~:[~; or formal argument~], got ~S"
+                       *formal-arguments-allowed*
+                       (token-type tok)))))
+
 (defun parse-simple-instruction (type tok-lines)
   (match-line ((op type)) tok-lines
-    (ecase (token-type op)
+    (ecase type
       ((:HALT)  (make-instance 'halt))
       ((:RESET) (make-instance 'reset))
       ((:NOP)   (make-instance 'no-operation))
@@ -535,17 +575,9 @@ result of BODY, and the (possibly null) list of remaining lines.
   (match-line ((op :RESET) &optional q) tok-lines
     (if (null q)
         ;; global RESET
-        (make-instance 'reset) 
+        (make-instance 'reset)
         ;; targeted RESET
-        (make-instance
-         'reset-qubit
-         ;; target can be explicit qubit index or name (if inside DEFCIRCUIT)
-         :target (ecase (token-type q)
-                   ((:NAME)
-                    (unless *formal-arguments-allowed*
-                      (quil-parse-error "Found formal parameter in RESET where not allowed."))
-                    (formal (token-payload q)))
-                   ((:INTEGER) (qubit (token-payload q))))))))
+        (make-instance 'reset-qubit :target (parse-qubit q)))))
 
 (defun take-until (f list)
   "Take elements of LIST until the boolean function F is satisfied. More specifically, split LIST into two lists A and B (as two values) such that
@@ -573,56 +605,56 @@ result of BODY, and the (possibly null) list of remaining lines.
         (values (subseq list 0 p)
                 (subseq list p)))))
 
-(defun parse-parameter (arg-tok)
-  "Parse a token/number/parameter ARG-TOK intended to be a parameter."
-  (typecase arg-tok
-    (number (constant arg-tok))
+(defun parse-parameter (tok)
+  "Parse a token/number/parameter TOK intended to be a parameter."
+  (typecase tok
+    (number (constant tok))
     (param
      (unless *formal-arguments-allowed*
        (quil-parse-error "Found formal parameter where not allowed: ~S"
-                         arg-tok))
-     arg-tok)
+                         tok))
+     tok)
     (token
-     (let ((type (token-type arg-tok)))
+     (let ((type (token-type tok)))
        (case type
          ((:PARAMETER)
           (unless *formal-arguments-allowed*
             (quil-parse-error "Found formal parameter where not allowed: ~S"
-                              (token-payload arg-tok)))
-          (token-payload arg-tok))
+                              (token-payload tok)))
+          (token-payload tok))
          ((:COMPLEX)
-          (token-payload arg-tok))
+          (token-payload tok))
          ((:INTEGER)
-          (constant (coerce (token-payload arg-tok) 'double-float)))
+          (constant (coerce (token-payload tok) 'double-float)))
          (otherwise
-          (quil-parse-error "Token doesn't represent a parameter where expected: ~S" arg-tok)))))
+          (quil-parse-error "Token doesn't represent a parameter where expected: ~S" tok)))))
     (t (quil-parse-error "Unexpected token type ~S: ~S"
-                         (type-of arg-tok)
-                         arg-tok))))
+                         (type-of tok)
+                         tok))))
 
-(defun parse-argument (arg-tok)
-  "Parse a token ARG-TOK intended to be an argument."
+(defun parse-argument (tok)
+  "Parse a token TOK intended to be an argument."
   (declare (special *memory-region-names*)) ; Forward declaration
-  (case (token-type arg-tok)
+  (case (token-type tok)
     ((:NAME)
-     (let ((names-memory-region-p (find (token-payload arg-tok) *memory-region-names*
+     (let ((names-memory-region-p (find (token-payload tok) *memory-region-names*
                                         :test #'string=)))
        (unless (or names-memory-region-p
                    *formal-arguments-allowed*)
          (quil-parse-error "Found formal argument where not allowed: ~S"
-                           (token-payload arg-tok)))
+                           (token-payload tok)))
        (if names-memory-region-p
-           (mref (token-payload arg-tok) 0)
-           (formal (token-payload arg-tok)))))
+           (mref (token-payload tok) 0)
+           (formal (token-payload tok)))))
     ((:INTEGER)
-     (qubit (token-payload arg-tok)))
+     (qubit (token-payload tok)))
     ((:COMPLEX)
-     (token-payload arg-tok))
+     (token-payload tok))
     ((:AREF)
-     (mref (car (token-payload arg-tok))
-           (cdr (token-payload arg-tok))))
+     (mref (car (token-payload tok))
+           (cdr (token-payload tok))))
     (otherwise
-     (quil-parse-error "Token doesn't represent an argument where expected: ~S" arg-tok))))
+     (quil-parse-error "Token doesn't represent an argument where expected: ~S" tok))))
 
 ;; Dear reader:
 ;;
@@ -768,74 +800,28 @@ parameters and the remaining tokens."
 
 (defun parse-application (tok-lines)
   "Parse a gate or circuit application out of the lines of tokens TOK-LINES, returning an UNRESOLVED-APPLICATION."
-  (let ((line (pop tok-lines)))
-    (destructuring-bind (op . args) line
-      ;; Check that we are starting out with a :NAME, representing the
-      ;; name of the gate or circuit.
-      (unless (eql ':NAME (token-type op))
-        (quil-parse-error "Gate/circuit application needs a name. Got ~S"
-                          (token-type op)))
+  (match-line ((op :NAME) &rest rest-toks) tok-lines
+      (if (endp rest-toks)
+          (make-instance 'unresolved-application
+                         :operator (named-operator (token-payload op)))
+          (multiple-value-bind (params args)
+              (parse-application-parameters rest-toks :name (token-payload op))
 
-      ;; Check for anything following the name.
-      (when (endp args)
-        ;; This is almost surely a circuit application.
-        (return-from parse-application
-          (values (make-instance 'unresolved-application
-                                 :operator (named-operator (token-payload op)))
-                  tok-lines)))
-
-      (multiple-value-bind (params args)
-          (parse-application-parameters args :name (token-payload op))
-
-        ;; Parse out the rest of the arguments and return.
-        (return-from parse-application
-          (values
-           (make-instance 'unresolved-application
-                          :operator (named-operator (token-payload op))
-                          :parameters params
-                          :arguments (mapcar #'parse-argument args))
-           tok-lines))))))
+            ;; Parse out the rest of the arguments and return.
+            (make-instance 'unresolved-application
+                           :operator (named-operator (token-payload op))
+                           :parameters params
+                           :arguments (mapcar #'parse-argument args))))))
 
 (defun parse-measurement (tok-lines)
   "Parse a measurement out of the lines of tokens TOK-LINES."
-  (match-line ((op :MEASURE) qubit &optional address) tok-lines
-    ;; Convert token to either a formal or a QUBIT object.
-    (case (token-type qubit)
-      ((:INTEGER)
-       (setf qubit (qubit (token-payload qubit))))
-      ((:NAME)
-       (unless *formal-arguments-allowed*
-         (quil-parse-error "Found a formal argument where it's not allowed."))
-       (setf qubit (formal (token-payload qubit))))
-      (t
-       (quil-parse-error "Expected qubit after MEASURE.")))
-    (if (null address)
-        (make-instance 'measure-discard :qubit qubit)
-        (let ((address-obj
-                (cond
-                  ;; Actual address to measure into.
-                  ((eql ':AREF (token-type address))
-                   (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
-                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
-                   (mref (car (token-payload address))
-                         (cdr (token-payload address))))
-
-                  ;; Implicit address to measure into.
-                  ((and (eql ':NAME (token-type address))
-                        (find (token-payload address) *memory-region-names* :test #'string=))
-                   (mref (token-payload address) 0))
-
-                  ;; Formal argument.
-                  ((eql ':NAME (token-type address))
-                   (unless *formal-arguments-allowed*
-                     (quil-parse-error "Found formal argument where it's not allowed."))
-                   (formal (token-payload address)))
-
-                  (t
-                   (quil-parse-error "Expected address after MEASURE")))))
+  (match-line ((op :MEASURE) qubit-tok &optional address-tok) tok-lines
+    (let ((qubit (parse-qubit qubit-tok)))
+      (if (null address-tok)
+          (make-instance 'measure-discard :qubit qubit)
           (make-instance 'measure
                          :qubit qubit
-                         :address address-obj)))))
+                         :address (parse-memory-or-formal-token address-tok :ensure-valid t))))))
 
 (defun parse-pragma (tok-lines)
   "Parse a PRAGMA out of the lines of tokens TOK-LINES."
@@ -1231,22 +1217,6 @@ parameters and the remaining tokens."
   (match-line ((op :JUMP) (label :LABEL-NAME)) tok-lines
     (make-instance 'unconditional-jump :label (token-payload label))))
 
-(defun parse-memory-or-formal-token (tok)
-  (cond
-    ((eql ':AREF (token-type tok))
-     (mref (car (token-payload tok))
-           (cdr (token-payload tok))))
-    ((and (eql ':NAME (token-type tok))
-          (find (token-payload tok) *memory-region-names* :test #'string=))
-     (mref (token-payload tok) 0))
-    ((and (eql ':NAME (token-type tok))
-          *formal-arguments-allowed*)
-     (formal (token-payload tok)))
-    (t
-     (quil-parse-error "Expected an address~:[~; or formal argument~], got ~S"
-                       *formal-arguments-allowed*
-                       (token-type tok)))))
-
 (defun parse-classical-argument (toks)
   "Given a list of tokens that represent an argument to a classical instruction, parse it into something valid, including evaluating arithmetic tokens to produce a number."
   (if (= 1 (length toks))
@@ -1417,8 +1387,6 @@ parameters and the remaining tokens."
            (push parsed parsed-body)
            (setf tok-lines rest-lines)))))))
 
-(declaim (optimize (speed 0) (space 0) (debug 3)))
-
 (defun parse-pulse (tok-lines)
   (match-line ((op :PULSE) &rest rest-toks) tok-lines
     (multiple-value-bind (qubits frame-name rest-toks)
@@ -1433,26 +1401,18 @@ parameters and the remaining tokens."
                        :waveform waveform-ref)))))
 
 (defun parse-delay (tok-lines)
-  (match-line ((op :DELAY) (qubit :INTEGER) &rest duration-toks) tok-lines
+  (match-line ((op :DELAY) qubit &rest duration-toks) tok-lines
     (when (endp duration-toks)
       (quil-parse-error "Expected a duration in DELAY instruction."))
-    ;; TODO formal arguments?
     (make-instance 'delay
-                   :qubit (qubit (token-payload qubit))
+                   :qubit (parse-qubit qubit)
                    :duration (parse-application-parameter duration-toks))))
 
 (defun parse-fence (tok-lines)
-  (match-line ((op :FENCE) (qubit :INTEGER) &rest other-qubit-toks) tok-lines
-    (dolist (q other-qubit-toks)
-      (unless (eql ':INTEGER (token-type q))
-        (quil-parse-error "Expected qubit indices in FENCE instruction, but observed ~A."
-                          (token-type q))))
+  (match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines
     (make-instance 'fence
-                   :qubits (mapcar (lambda (tok) (qubit (token-payload tok)))
-                                   (cons qubit other-qubit-toks)))))
+                   :qubits (mapcar #'parse-qubit (cons qubit other-qubit-toks)))))
 
-;;; TODO should we be able to capture-discard?
-;;; TODO qubit should be integer or formal. this macro isn't that helpful
 (defun parse-capture (tok-lines)
   (match-line ((op :CAPTURE) &rest rest-toks) tok-lines
     (multiple-value-bind (qubits frame-name rest-toks)
@@ -1462,39 +1422,18 @@ parameters and the remaining tokens."
       (when (endp rest-toks)
         (quil-parse-error "CAPTURE instruction is missing waveform reference."))
       (multiple-value-bind (waveform-ref rest-toks)
-        (parse-waveform-ref rest-toks)
-      (when (endp rest-toks)
-        (quil-parse-error "CAPTURE instruction is missing memory reference."))
-      (unless (endp (rest rest-toks))
-        (quil-parse-error "Unexpected token ~A in CAPTURE" (rest rest-toks)))
-      (let* ((address (first rest-toks))
-             (address-obj
-               (cond
-                 ;; Actual address to measure into.
-                 ((eql ':AREF (token-type address))
-                  (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
-                    (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
-                  (mref (car (token-payload address))
-                        (cdr (token-payload address))))
-
-                 ;; Implicit address to measure into.
-                 ((and (eql ':NAME (token-type address))
-                       (find (token-payload address) *memory-region-names* :test #'string=))
-                  (mref (token-payload address) 0))
-
-                 ;; Formal argument.
-                 ((eql ':NAME (token-type address))
-                  (unless *formal-arguments-allowed*
-                    (quil-parse-error "Found formal argument where it's not allowed."))
-                  (formal (token-payload address)))
-
-                 (t
-                  (quil-parse-error "Expected address after MEASURE")))))
-        (make-instance 'capture
-                       :qubit (first qubits)
-                       :frame frame-name
-                       :waveform waveform-ref
-                       :memory-ref address-obj))))))
+          (parse-waveform-ref rest-toks)
+        (when (endp rest-toks)
+          (quil-parse-error "CAPTURE instruction is missing memory reference."))
+        (unless (endp (rest rest-toks))
+          (quil-parse-error "Unexpected token ~A in CAPTURE" (rest rest-toks)))
+        (let ((address-obj (parse-memory-or-formal-token (first rest-toks)
+                                                         :ensure-valid t)))
+          (make-instance 'capture
+                         :qubit (first qubits)
+                         :frame frame-name
+                         :waveform waveform-ref
+                         :memory-ref address-obj))))))
 
 ;;; TODO should RAW-CAPTURE allow for arithmetic expressions in the duration
 ;;; TODO do we enforce rational durations?
@@ -1507,14 +1446,11 @@ parameters and the remaining tokens."
       (unless (= 2 (length rest-toks))
         (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
       (let ((duration (parse-argument (first rest-toks)))
-            (addr (parse-argument (second rest-toks))))
+            (addr (parse-memory-or-formal-token (second rest-toks) :ensure-valid t)))
         (unless (or (and (is-constant duration)
                          (realp (constant-value duration)))
                     (is-formal duration))
           (quil-parse-error "Expected RAW-CAPTURE duration to be a rational number or formal argument."))
-        (unless (is-mref addr)
-          (quil-parse-error "Expected a memory reference in RAW-CAPTURE, but observed ~A"
-                            (token-type (second rest-toks))))
         (make-instance 'raw-capture
                        :qubit (first qubits)
                        :frame frame-name
@@ -1558,22 +1494,14 @@ Returns the frame qubits, the frame name, and the remaining tokens."
   (multiple-value-bind (qubit-toks rest-toks)
       (take-until (lambda (tok) (eql ':STRING (token-type tok)))
                   toks)
-    (dolist (q qubit-toks)
-      (unless (or (eql ':INTEGER (token-type q))
-                  (eql ':NAME (token-type q)))
-        (quil-parse-error "Expected a qubit index or a formal parameter, but instead got ~A in instruction ~A"
-                          (token-type q)
-                          error-context)))
-
-    (when (endp rest-toks)
-      (quil-parse-error "Expected a frame name in ~A, but none were found (did you forget quotes?)"
-                        error-context))
-
-    ;; TODO should we really be using parse-argument here? can we exclude memory refs?
-    (values
-     (mapcar #'parse-argument qubit-toks)      ; qubits
-     (frame (token-payload (first rest-toks))) ; frame name
-     (rest rest-toks))))                       ; remaining tokens
+    (let ((qubits (mapcar #'parse-qubit qubit-toks)))
+      (when (endp rest-toks)
+        (quil-parse-error "Expected a frame name in ~A, but none were found (did you forget quotes?)"
+                          error-context))
+      (values
+       qubits
+       (frame (token-payload (first rest-toks))) ; frame name
+       (rest rest-toks)))))
 
 ;;; TODO
 ;;;  - this allows the waveform entries to be spread across multiple lines. is that ok?
@@ -1771,7 +1699,6 @@ and the reamining tokens."
 ;;; TODO
 ;;; - *formal-arguments-allowed* t ?
 ;;; - can we be more consistent re: taking a slice of a line, a single line, or a list of lines?
-
 (defun parse-waveform-ref (toks)
   (check-type toks list)
   (when (endp toks)
