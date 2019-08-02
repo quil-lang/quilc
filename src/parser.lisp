@@ -16,7 +16,7 @@
     :AS :MATRIX :PERMUTATION
     :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
     :DEFWAVEFORM :DEFCAL
-    :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE))
+    :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
 
 (deftype token-type ()
   '(or
@@ -113,7 +113,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW-CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -405,6 +405,10 @@ the immediately preceding line."
       ;; QuilT Frame Mutation
       ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
        (parse-simple-frame-mutation tok-type tok-lines))
+
+      ;; QuilT phase swap
+      ((:SWAP-PHASE)
+       (parse-swap-phase tok-lines))
 
       ;; QuilT pulse
       ((:PULSE)
@@ -1526,33 +1530,57 @@ parameters and the remaining tokens."
 
 (defun parse-simple-frame-mutation (tok-type tok-lines)
   (match-line ((op tok-type) &rest rest-toks) tok-lines
-      (multiple-value-bind (qubit-toks rest-toks)
-          ;; Consume tokens until we reach the frame's name (a string)
-          (take-until (lambda (tok) (eql ':STRING (token-type tok)))
-                      rest-toks)
-        (when (endp rest-toks)
-          (quil-parse-error "Expected a frame in ~A, but none were found (did you forget quotes?)"
-                            tok-type))
-        (dolist (q qubit-toks)
-          (unless (or (eql ':INTEGER (token-type q))
-                      (eql ':NAME (token-type q)))
-            (quil-parse-error "Expected a qubit index or a formal parameter, but instead got ~A in instruction ~A"
-                              (token-type q)
-                              tok-type)))
-        (let ((frame-name (first rest-toks))
-              (value-toks (rest rest-toks)))
-          ;; We've already checked the frame name.
-          ;; TODO This allows for memory references in the value. Do we want that?
-          (let ((result (parse-application-parameter value-toks)))
-            (make-instance
-             (ecase tok-type
-               ((:SET-FREQUENCY) 'set-frequency)
-               ((:SET-PHASE)     'set-phase)
-               ((:SHIFT-PHASE)   'shift-phase)
-               ((:SET-SCALE)     'set-scale))
-             :qubits (mapcar #'parse-argument qubit-toks) ; TODO we don't want a memory reference here...
-             :frame (frame (token-payload frame-name))
-             :value result))))))
+    (multiple-value-bind (qubits frame-name value-toks)
+        (parse-frame rest-toks tok-type)
+      ;; TODO This allows for memory references in the value. Do we want that?
+      (let ((result (parse-application-parameter value-toks)))
+        (make-instance
+         (ecase tok-type
+           ((:SET-FREQUENCY) 'set-frequency)
+           ((:SET-PHASE)     'set-phase)
+           ((:SHIFT-PHASE)   'shift-phase)
+           ((:SET-SCALE)     'set-scale))
+         :qubits qubits
+         :frame frame-name
+         :value result)))))
+
+(defun parse-swap-phase (tok-lines)
+  (match-line ((op :SWAP-PHASE) &rest rest-toks) tok-lines
+      (multiple-value-bind (left-qubits left-frame-name rest-toks)
+          (parse-frame rest-toks :SWAP-PHASE)
+        (multiple-value-bind (right-qubits right-frame-name rest-toks)
+            (parse-frame rest-toks :SWAP-PHASE)
+          (unless (endp rest-toks)
+            (quil-parse-error "Unexpected token ~A in SWAP-PHASE"
+                              (token-type (first rest-toks))))
+          (make-instance 'swap-phase
+                         :left-qubits left-qubits
+                         :left-frame left-frame-name
+                         :right-qubits right-qubits
+                         :right-frame right-frame-name)))))
+
+(defun parse-frame (toks error-context)
+  "Parse a frame from the list of tokens TOKS.
+Returns the frame qubits, the frame name, and the remaining tokens."
+  (multiple-value-bind (qubit-toks rest-toks)
+      (take-until (lambda (tok) (eql ':STRING (token-type tok)))
+                  toks)
+    (dolist (q qubit-toks)
+      (unless (or (eql ':INTEGER (token-type q))
+                  (eql ':NAME (token-type q)))
+        (quil-parse-error "Expected a qubit index or a formal parameter, but instead got ~A in instruction ~A"
+                          (token-type q)
+                          error-context)))
+
+    (when (endp rest-toks)
+      (quil-parse-error "Expected a frame name in ~A, but none were found (did you forget quotes?)"
+                        error-context))
+
+    ;; TODO should we really be using parse-argument here? can we exclude memory refs?
+    (values
+     (mapcar #'parse-argument qubit-toks)      ; qubits
+     (frame (token-payload (first rest-toks))) ; frame name
+     (rest rest-toks))))                       ; remaining tokens
 
 ;;; TODO
 ;;;  - this allows the waveform entries to be spread across multiple lines. is that ok?

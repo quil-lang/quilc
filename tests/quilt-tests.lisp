@@ -31,6 +31,15 @@ SHIFT-PHASE 0 1 \"cz\" 1e-2
 SET-SCALE 0 \"xy\" 0.75
 ")))
 
+(deftest test-parsing-swap-phase ()
+  "Test whether we can parse SWAP-PHASE."
+  (not-signals quil-parse-error
+    (cl-quil::parse-quil-into-raw-program
+     "
+SWAP-PHASE 0 \"xy\" 1 \"xy\"
+SWAP-PHASE 0 1 \"cz\" 10 11 \"cz\"
+")))
+
 (deftest test-parsing-quilt-capture ()
   (not-signals quil-parse-error
     (cl-quil::parse-quil-into-raw-program

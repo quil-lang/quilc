@@ -223,10 +223,18 @@
 (define-simple-frame-mutation set-scale "SET-SCALE"
   "An instruction setting the scale of a frame.")
 
-;;; TODO Swap frame phases (not sure why)
+(defclass swap-phase (instruction)
+  ((left-qubits :initarg :left-qubits
+                :accessor swap-phase-left-qubits)
+   (left-frame :initarg :left-frame
+               :accessor swap-phase-left-frame)
+   (right-qubits :initarg :right-qubits
+                 :accessor swap-phase-right-qubits)
+   (right-frame :initarg :right-frame
+                :accessor swap-phase-right-frame))
+  (:documentation "An instruction representing a phase swap between two frames."))
 
-
-
+;;; TODO abstract out frame? so we have a frame type, consisting of qubits and name
 
 ;;; TODO arguments and mnemonic
 ;;; what is the motivation behind this? what is the "protocol" which is specified? how do we handle pulses?
