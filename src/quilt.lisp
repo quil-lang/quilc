@@ -163,7 +163,7 @@
 ;;; TODO check on whether this makes sense
 ;;; TODO why can't we read frame attributes to classical memory?
 
-(defclass frame-mutation (instruction)
+(defclass simple-frame-mutation (instruction)
   ((qubits :initarg :qubits
            :accessor target-qubits)
    (frame :initarg :frame
@@ -174,33 +174,33 @@
   (:metaclass abstract-class))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun expand-frame-mutation-definition (name mnemonic docstring)
+  (defun expand-simple-frame-mutation-definition (name mnemonic docstring)
     (check-type name symbol)
     (check-type mnemonic string)
     `(progn
-       (defclass ,name (frame-mutation)
+       (defclass ,name (simple-frame-mutation)
          ()
          (:documentation ,docstring))
 
        (defmethod mnemonic ((inst ,name)) (values ',mnemonic ',name)))))
 
-(defmethod arguments ((instr frame-mutation))
+(defmethod arguments ((instr simple-frame-mutation))
   (with-slots (qubits frame value)
       instr
     (coerce (append qubits (list frame value)) 'vector)))
 
-(defmacro define-frame-mutation (name mnemonic &body body)
+(defmacro define-simple-frame-mutation (name mnemonic &body body)
   (check-type mnemonic string)
   (check-type body list)
   (assert (= 1 (length body)))
-  (expand-frame-mutation-definition name mnemonic (first body)))
+  (expand-simple-frame-mutation-definition name mnemonic (first body)))
 
-(defmethod print-instruction-generic ((instr frame-mutation) (stream stream))
+(defmethod print-instruction-generic ((instr simple-frame-mutation) (stream stream))
   (format stream "~A~{ ~A~}"
           (mnemonic instr)
           (map 'list #'print-instruction-to-string (arguments instr))))
 
-(defmethod instantiate-instruction ((instr frame-mutation) param-value arg-value)
+(defmethod instantiate-instruction ((instr simple-frame-mutation) param-value arg-value)
   (let ((qubits (mapcar (transform-if #'is-formal arg-value)
                         (target-qubits instr)))
         (value (funcall (transform-if #'is-formal arg-value)
@@ -211,16 +211,16 @@
                    :value value)))
 
 
-(define-frame-mutation set-frequency "SET-FREQUENCY"
+(define-simple-frame-mutation set-frequency "SET-FREQUENCY"
   "An instruction setting the frequency of a frame.")
 
-(define-frame-mutation set-phase "SET-PHASE"
+(define-simple-frame-mutation set-phase "SET-PHASE"
   "An instruction setting the phase of a frame.")
 
-(define-frame-mutation shift-phase "SHIFT-PHASE"
+(define-simple-frame-mutation shift-phase "SHIFT-PHASE"
   "An instruction performing an additive shift of the phase of a frame.")
 
-(define-frame-mutation set-scale "SET-SCALE"
+(define-simple-frame-mutation set-scale "SET-SCALE"
   "An instruction setting the scale of a frame.")
 
 ;;; TODO Swap frame phases (not sure why)

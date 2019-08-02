@@ -18,7 +18,7 @@ DEFWAVEFORM my_custom_parameterized_waveform(%a):
 ")))
 
 
-(deftest test-parsing-frame-mutations ()
+(deftest test-parsing-simple-frame-mutations ()
   "Test whether we can parse various frame mutations."
   (not-signals quil-parse-error
     (cl-quil::parse-quil-into-raw-program
