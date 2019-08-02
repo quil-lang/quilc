@@ -44,9 +44,6 @@ measurements for which a calibration is defined."
                             (calibration-definition-name defn)))
         (return-from calibration-matches-p))
 
-    ;; TODO make sure we are enforcing somewhere that calibration definitions allow either
-    ;; constants or params/formals, but nothing else
-
     ;; Check that the parameters match.
     (unless (and (= (length parameters)
                     (length (calibration-definition-parameters defn)))

@@ -1,2 +1,2 @@
 DEFCAL X 0:
-    PULSE 0 "xy" gaussian(1, 2,3)
+    PULSE 0 "xy" gaussian(arg1: 1)
