@@ -33,31 +33,11 @@
 (defmethod apply-process ((processor processor-identity) &rest data)
   (first data))
 
-(defclass processor-measures (processor)
-  ((chip-specification :initform nil
-                       :initarg :chip-specification
-                       :reader processor-measures-chip-specification)))
-
 (defun measure-at-close-instrs (chip-specification)
   (loop :for j :below (length (elt (quil::chip-specification-objects chip-specification) 0))
         :collect (make-instance 'quil::measure
                                 :address (quil:mref "ro" j)
                                 :qubit (quil::qubit j))))
-
-(defmethod apply-process ((processor processor-measures) &rest data)
-  (let ((data (quil::copy-instance (first data))))
-    (setf (quil::parsed-program-memory-definitions data)
-      (append (list (quil::make-memory-descriptor
-		     :name "ro"
-		     :type quil::quil-bit
-		     :length (quil::chip-spec-n-qubits (processor-measures-chip-specification processor))))
-              (quil::parsed-program-memory-definitions data)))
-    (setf (quil::parsed-program-executable-code data)
-          (concatenate 'vector
-                       (quil::parsed-program-executable-code data)
-                       (measure-at-close-instrs
-                        (processor-measures-chip-specification processor))))
-    data))
 
 (defclass processor-L1-distance (processor)
   ())

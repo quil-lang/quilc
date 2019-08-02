@@ -10,34 +10,32 @@ Here is a Lisp snippet illustrating the usage of this library:
 
 ```
 (let ((*debug-noise-stream* *standard-output*)
-      (chip-spec ...))
+       (chip-spec (quil:build-8q-chip)))
   (pipeline
-   ;; variables / data / definitions
+     ;; variables / data / definitions
    ((producer      ()        (make-instance 'producer-random
                                             :program-volume-limit 20
                                             :chip-specification chip-spec
                                             :respect-topology t))
-    (preprocessors (i) (list (make-instance 'processor-identity)
-                             (make-instance 'processor-quilc
-                                            :executable-path "...")))
-    (processors    (j) (list (make-instance 'processor-measures
-                                            :chip-specification chip-spec)
-                             (make-instance 'processor-identity)))
-    (consumers     (j) (list (make-instance 'consumer-local-qvm
-                                            :trials 10)))
+  
+    (processors    (i)       (list (make-instance 'processor-identity)
+                                   (make-instance 'processor-quilc
+                                                  :executable-path "<path-to-quilc-executable>")))
+    (consumers     (j)       (list (make-instance 'consumer-local-qvm
+                                                  :trials 1000)))
     (post-process  ()        (make-instance 'processor-L1-distance)))
-   ;; actual process
-   (stepA ()
-          (produce-quil-program (producer)))
-   (stepB ((i preprocessors))
-          (progn
-            (quil::print-parsed-program (stepA))
-            (apply-process (preprocessors i) (stepA))))
-   (stepC ((j processors) (i preprocessors))
-          (apply-process (processors j) (stepB i)))
-   (stepD ((j consumers) (i preprocessors))
-          (consume-quil (consumers j) (stepC j i)))
-   (stepE ((l consumers) (k preprocessors)
-           (j consumers) (i preprocessors))
-          (apply-process (post-process) (stepD j i) (stepD l k)))))
+    ;;
+    (produced-program ()
+      (produce-quil-program (producer)))
+    (compiled-program ((i processors))
+      (progn
+        (quil::print-parsed-program (produced-program))
+        (apply-process (processors i) (produced-program))))
+    (qvm-results ((j consumers) (i processors))
+      (progn
+        (quil::print-parsed-program (compiled-program i))
+        (consume-quil (consumers j) (compiled-program i))))
+    (l1-distance ((l consumers) (k processors)
+                  (j consumers) (i processors))
+      (apply-process (post-process) (qvm-results j i) (qvm-results l k)))))
 ```

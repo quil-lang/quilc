@@ -65,6 +65,12 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
 (defclass producer-from-directory (producer)
   ((directory-path :initform nil)))
 
+(defun measure-at-close-instrs (chip-specification)
+  (loop :for j :below (length (elt (quil::chip-specification-objects chip-specification) 0))
+        :collect (make-instance 'quil::measure
+                                :address (quil:mref "ro" j)
+                                :qubit (quil::qubit j))))
+
 (defun random-protoquil (chip-specification   ; chip topology
                          program-depth-limit  ; limit to randomly generated program depth
                          program-volume-limit ; limit to randomly generated program volume
@@ -156,4 +162,14 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
     (setf (quil::parsed-program-executable-code parsed-program)
           (make-array (length instruction-list)
                       :initial-contents instruction-list))
+    ;;; Add measure instructions
+    (push (quil::make-memory-descriptor
+                :name "ro"
+                :type quil::quil-bit
+                :length (quil::chip-spec-n-qubits chip-specification))
+          (quil::parsed-program-memory-definitions parsed-program))
+    (setf (quil::parsed-program-executable-code parsed-program)
+          (concatenate 'vector
+                       (quil::parsed-program-executable-code parsed-program)
+                       (measure-at-close-instrs chip-specification)))
     parsed-program))
