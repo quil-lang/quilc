@@ -14,7 +14,7 @@
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
     :DECLARE :SHARING :OFFSET :PRAGMA
     :AS :MATRIX :PERMUTATION
-    :PULSE :CAPTURE :DELAY :FENCE
+    :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
     :DEFWAVEFORM :DEFCAL
     :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE))
 
@@ -113,7 +113,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW-CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -420,6 +420,9 @@ the immediately preceding line."
       ;; QuilT capture
       ((:CAPTURE)
        (parse-capture tok-lines))
+
+      ((:RAW-CAPTURE)
+       (parse-raw-capture tok-lines))
 
       ((:DEFWAVEFORM)
        (unless *definitions-allowed*
@@ -1460,6 +1463,7 @@ parameters and the remaining tokens."
                                    (cons qubit other-qubit-toks)))))
 
 ;;; TODO should we be able to capture-discard?
+;;; TODO qubit should be integer or formal. this macro isn't that helpful
 (defun parse-capture (tok-lines)
   (match-line ((op :CAPTURE) (qubit :INTEGER) (frame-name :STRING) &rest rest-toks) tok-lines
     (when (endp rest-toks)
@@ -1493,11 +1497,32 @@ parameters and the remaining tokens."
 
                   (t
                    (quil-parse-error "Expected address after MEASURE")))))
-          (make-instance 'capture 
+          (make-instance 'capture
                          :qubit (qubit (token-payload qubit))
                          :frame (frame (token-payload frame-name))
                          :waveform waveform-ref
                          :memory-ref address-obj)))))
+
+;;; TODO should RAW-CAPTURE allow for arithmetic expressions in the duration
+;;; TODO do we enforce rational durations?
+(defun parse-raw-capture (tok-lines)
+  (match-line ((op :RAW-CAPTURE) (qubit :INTEGER) (frame-name :STRING) &rest rest-toks) tok-lines
+    (unless (= 2 (length rest-toks))
+      (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
+    (let ((duration (parse-argument (first rest-toks)))
+          (addr (parse-argument (second rest-toks))))
+      (unless (or (and (is-constant duration)
+                       (realp (constant-value duration)))
+                  (is-formal duration))
+        (quil-parse-error "Expected RAW-CAPTURE duration to be a rational number or formal argument."))
+      (unless (is-mref addr)
+        (quil-parse-error "Expected a memory reference in RAW-CAPTURE, but observed ~A"
+                          (token-type (second rest-toks))))
+      (make-instance 'raw-capture
+                     :qubit (qubit (token-payload qubit))
+                     :frame (frame (token-payload frame-name))
+                     :duration duration
+                     :memory-ref addr))))
 
 (defun parse-frame-mutation (tok-type tok-lines)
   (match-line ((op tok-type) &rest rest-toks) tok-lines

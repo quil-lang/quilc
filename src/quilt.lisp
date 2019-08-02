@@ -261,8 +261,6 @@
                    :waveform (pulse-waveform instr))))
 
 ;;; Capture
-;;; TODO: do we need RAW-CAPTURE? couldn't we just have a raw(duration) waveform?
-;;; the only tricky business here is that the duration needs to be a rational number
 (defclass capture (instruction)
   ((qubit :initarg :qubit
           :accessor capture-qubit)
@@ -292,6 +290,39 @@
                    :qubit qubit
                    :frame (capture-frame instr)
                    :waveform (capture-waveform instr)
+                   :memory-ref memory-ref)))
+
+(defclass raw-capture (instruction)
+  ((qubit :initarg :qubit
+          :accessor raw-capture-qubit)
+   (frame :initarg :frame
+          :accessor raw-capture-frame)
+   (duration :initarg :duration
+             :accessor raw-capture-duration)
+   (memory-ref :initarg :memory-ref
+               :accessor raw-capture-memory-ref))
+  (:documentation "An instruction expressing the readout of raw
+  IQ values, to be stored in a region of classical memory."))
+
+(defmethod print-instruction-generic ((instr raw-capture) (stream stream))
+  (format stream "RAW-CAPTURE ~A ~A ~A ~A"
+          (print-instruction-generic (raw-capture-qubit instr) nil)
+          (print-instruction-generic (raw-capture-frame instr) nil)
+          (print-instruction-generic (raw-capture-duration instr) nil)
+          (print-instruction-generic (raw-capture-memory-ref instr) nil)))
+
+(defmethod instantiate-instruction ((instr raw-capture) param-value arg-value)
+  (let ((qubit (funcall (transform-if #'is-formal arg-value)
+                        (raw-capture-qubit instr)))
+        (memory-ref (funcall (transform-if #'is-formal arg-value)
+                             (raw-capture-memory-ref instr)))
+        (duration (funcall (transform-if #'is-formal arg-value)
+                           (raw-capture-duration instr))))
+    (check-mref memory-ref)
+    (make-instance 'raw-capture
+                   :qubit qubit
+                   :frame (raw-capture-frame instr)
+                   :duration duration
                    :memory-ref memory-ref)))
 
 ;;; Timing control
