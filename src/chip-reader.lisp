@@ -86,14 +86,6 @@
     (integer-list
      key)))
 
-(defun expand-isa-key (key)
-  (cond
-    ((and (stringp key)
-          (cl-ppcre:scan "^(\\d)+(-(\\d)+)*$" key))
-     (expand-key-to-integer-list key))
-    (t
-     key)))
-
 (defun dead-qubit-hash-table ()
   (yason:parse "{\"dead\": true}"))
 
@@ -270,6 +262,8 @@
                     (when (and (gate-binding-p binding)
                                (equalp (named-operator "RX") (gate-binding-operator binding))
                                (not (double= 0d0 (first (gate-binding-parameters binding)))))
+                      (unless (double= 0d0 (mod (first (gate-binding-parameters binding)) (/ pi 2)))
+                        (warn "Qubit ~a: applying f1QRB spec to unusual native gate RX(~a)" i (first (gate-binding-parameters binding))))
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity))))))))
   (when (gethash "2Q" specs-hash)
@@ -299,17 +293,17 @@
 ;; NOTE: This function (and its call sites) are an unfortunate anachronism of
 ;; CL-QUIL / quilc development. QPU specifications were originally sent over
 ;; the wire (or read in from disk) as JSON dictionaries, which have the
-;; restriction that the can only be keyed on strings. Internally, it would have
+;; restriction that they can only be keyed on strings. Internally, it would have
 ;; been more convenient to have them keyed on lists of numbers, and so we decided
 ;; on the convention that the string "n1" (with n1 a number) deserialize to the
 ;; list (n1), the string "n1-n2" deserialize to the list (n1 n2), and so on. we
-;; managed this at right at the deserialization layer by providing an
-;; :object-key-fn key to yason:parse.
+;; managed this right at the deserialization layer by providing an :object-key-fn
+;; key to yason:parse.
 ;;
 ;; later, we migrated to RPCQ, which does support sending dictionaries keyed on
 ;; non-strings over the wire, but we didn't initially make use of it: the client
 ;; still serialized the QPU specification through JSON, then sent the JSON string
-;; along to the deserialized by the above means. later, someone half-assed the
+;; along to be deserialized by the above means. later, someone half-assed the
 ;; RPCQ message |TargetDevice|, which broke the "isa" and "specs" top-level keys
 ;; from a QPU specification into RPCQ slots, but then marked their contents as
 ;; :any -> :any dictionaries and stored the non-JSON-serialized dictionaries
@@ -336,10 +330,10 @@
                   (setf key (sort (expand-key-to-integer-list key) #'<)))
                  (integer
                   (setf key (list key)))
-                 (vector
+                 (integer-vector
                   (setf key (sort (coerce key 'list) #'<)))
-                 (list
-                  (setf key (sort (copy-seq key) #'<))))
+                 (integer-list
+                  (setf key (sort (copy-list key) #'<))))
                (setf (gethash key new-sublayer) val)))))
     (let ((new-layer (make-hash-table :test #'equalp)))
       (a:when-let ((sublayer (gethash "1Q" layer)))
@@ -351,9 +345,9 @@
 (defun qpu-hash-table-to-chip-specification (hash-table)
   "Converts a QPU specification HASH-TABLE, to a chip-specification object.  Requires an \"isa\" layer."
   (check-type hash-table hash-table)
-  (let* ((isa-hash (or (gethash "isa" hash-table)
-                       (error 'missing-isa-layer-error)))
-         (isa-hash (sanitize-qpu-hash-layer isa-hash))
+  (let* ((isa-hash (sanitize-qpu-hash-layer
+                    (or (gethash "isa" hash-table)
+                        (error 'missing-isa-layer-error))))
          (chip-spec (make-chip-specification
                      :objects (make-array 2 :initial-contents (list (make-adjustable-vector)
                                                                     (make-adjustable-vector)))
