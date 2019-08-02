@@ -172,14 +172,10 @@
   \"16-17\": {}}}}"))
          (chip-spec (quil::qpu-hash-table-to-chip-specification isa)))
     (is (quil::chip-specification-p chip-spec))
-    ;; re-load the chip spec
-    (quil::load-isa-layer chip-spec (gethash "isa" isa))
+    (is (= 18 (quil::chip-spec-n-qubits chip-spec)))
     ;; check we got the goods
-    (dolist (presumed-dead '("4" "8" "9" "10" "11" "12"))
-      (let ((goods (gethash-chain (list "isa" "1Q" presumed-dead) isa)))
-        (is (and (not (null goods))
-                 (hash-table-p goods)
-                 (gethash "dead" goods))))))) ; RIP in piece
+    (dolist (presumed-dead '(4 8 9 10 11 12))
+      (is (quil::chip-spec-qubit-dead? chip-spec presumed-dead))))) ; RIP in piece
 
 (deftest test-bristlecone-chip ()
   "Test construction of Google's Bristlecone 72-qubit chip"
