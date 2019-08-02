@@ -46,7 +46,9 @@ SWAP-PHASE 0 1 \"cz\" 10 11 \"cz\"
      "
 # Simple capture of an IQ point
 DECLARE iq REAL[2]
+DECLARE iqs REAL[10000]
 CAPTURE 0 \"out\" flat(1e-6, 2+3*i) iq
+RAW-CAPTURE 0 \"out\" 1e-6 iqs
 ")))
 
 (deftest test-parsing-simple-calibration ()

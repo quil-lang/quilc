@@ -1420,32 +1420,17 @@ parameters and the remaining tokens."
 (declaim (optimize (speed 0) (space 0) (debug 3)))
 
 (defun parse-pulse (tok-lines)
-  (match-line ((op :PULSE) (qubit :INTEGER) &rest rest-toks) tok-lines
-      (multiple-value-bind (qubit-toks rest-toks)
-          ;; Consume tokens until we reach the frame's name (a string)
-          (take-until (lambda (tok) (eql ':STRING (token-type tok)))
-                      (cons qubit rest-toks))
-        (when (endp rest-toks)
-          (quil-parse-error "Expected a frame in PULSE, but none were found (did you forget quotes?)"))
-        ;; First up, qubit indices.
-        (let* ((qubits (mapcar (lambda (q)
-                                 (if (eql ':INTEGER (token-type q))
-                                     (qubit (token-payload q))
-                                     (quil-parse-error "Expected a qubit index in PULSE, but instead got ~A."
-                                                       (token-type q))))
-                               qubit-toks))
-               ;; Next token is the name of the frame.
-               (frame-name (frame
-                            (token-payload
-                             (first rest-toks)))))
-          ;; Finally, we should have a waveform reference.
-          (multiple-value-bind (waveform-ref rest) (parse-waveform-ref (rest rest-toks))
-            (unless (endp rest)
-              (quil-parse-error "Unexpected token ~A at end of PULSE instruction." (first rest)))
-            (make-instance 'pulse
-                           :qubits qubits
-                           :frame frame-name
-                           :waveform waveform-ref))))))
+  (match-line ((op :PULSE) &rest rest-toks) tok-lines
+    (multiple-value-bind (qubits frame-name rest-toks)
+        (parse-frame rest-toks ':PULSE)
+      (multiple-value-bind (waveform-ref rest)
+          (parse-waveform-ref rest-toks)
+        (unless (endp rest)
+          (quil-parse-error "Unexpected token ~A at end of PULSE instruction." (first rest)))
+        (make-instance 'pulse
+                       :qubits qubits
+                       :frame frame-name
+                       :waveform waveform-ref)))))
 
 (defun parse-delay (tok-lines)
   (match-line ((op :DELAY) (qubit :INTEGER) &rest duration-toks) tok-lines
@@ -1469,64 +1454,72 @@ parameters and the remaining tokens."
 ;;; TODO should we be able to capture-discard?
 ;;; TODO qubit should be integer or formal. this macro isn't that helpful
 (defun parse-capture (tok-lines)
-  (match-line ((op :CAPTURE) (qubit :INTEGER) (frame-name :STRING) &rest rest-toks) tok-lines
-    (when (endp rest-toks)
-      (quil-parse-error "CAPTURE instruction is missing waveform reference."))
-    (multiple-value-bind (waveform-ref rest-toks)
+  (match-line ((op :CAPTURE) &rest rest-toks) tok-lines
+    (multiple-value-bind (qubits frame-name rest-toks)
+        (parse-frame rest-toks ':CAPTURE)
+      (unless (= 1 (length qubits))
+        (quil-parse-error "CAPTURE instruction is only applicable to single-qubit frames."))
+      (when (endp rest-toks)
+        (quil-parse-error "CAPTURE instruction is missing waveform reference."))
+      (multiple-value-bind (waveform-ref rest-toks)
         (parse-waveform-ref rest-toks)
       (when (endp rest-toks)
         (quil-parse-error "CAPTURE instruction is missing memory reference."))
       (unless (endp (rest rest-toks))
         (quil-parse-error "Unexpected token ~A in CAPTURE" (rest rest-toks)))
       (let* ((address (first rest-toks))
-               (address-obj
-                (cond
-                  ;; Actual address to measure into.
-                  ((eql ':AREF (token-type address))
-                   (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
-                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
-                   (mref (car (token-payload address))
-                         (cdr (token-payload address))))
+             (address-obj
+               (cond
+                 ;; Actual address to measure into.
+                 ((eql ':AREF (token-type address))
+                  (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
+                    (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
+                  (mref (car (token-payload address))
+                        (cdr (token-payload address))))
 
-                  ;; Implicit address to measure into.
-                  ((and (eql ':NAME (token-type address))
-                        (find (token-payload address) *memory-region-names* :test #'string=))
-                   (mref (token-payload address) 0))
+                 ;; Implicit address to measure into.
+                 ((and (eql ':NAME (token-type address))
+                       (find (token-payload address) *memory-region-names* :test #'string=))
+                  (mref (token-payload address) 0))
 
-                  ;; Formal argument.
-                  ((eql ':NAME (token-type address))
-                   (unless *formal-arguments-allowed*
-                     (quil-parse-error "Found formal argument where it's not allowed."))
-                   (formal (token-payload address)))
+                 ;; Formal argument.
+                 ((eql ':NAME (token-type address))
+                  (unless *formal-arguments-allowed*
+                    (quil-parse-error "Found formal argument where it's not allowed."))
+                  (formal (token-payload address)))
 
-                  (t
-                   (quil-parse-error "Expected address after MEASURE")))))
-          (make-instance 'capture
-                         :qubit (qubit (token-payload qubit))
-                         :frame (frame (token-payload frame-name))
-                         :waveform waveform-ref
-                         :memory-ref address-obj)))))
+                 (t
+                  (quil-parse-error "Expected address after MEASURE")))))
+        (make-instance 'capture
+                       :qubit (first qubits)
+                       :frame frame-name
+                       :waveform waveform-ref
+                       :memory-ref address-obj))))))
 
 ;;; TODO should RAW-CAPTURE allow for arithmetic expressions in the duration
 ;;; TODO do we enforce rational durations?
 (defun parse-raw-capture (tok-lines)
-  (match-line ((op :RAW-CAPTURE) (qubit :INTEGER) (frame-name :STRING) &rest rest-toks) tok-lines
-    (unless (= 2 (length rest-toks))
-      (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
-    (let ((duration (parse-argument (first rest-toks)))
-          (addr (parse-argument (second rest-toks))))
-      (unless (or (and (is-constant duration)
-                       (realp (constant-value duration)))
-                  (is-formal duration))
-        (quil-parse-error "Expected RAW-CAPTURE duration to be a rational number or formal argument."))
-      (unless (is-mref addr)
-        (quil-parse-error "Expected a memory reference in RAW-CAPTURE, but observed ~A"
-                          (token-type (second rest-toks))))
-      (make-instance 'raw-capture
-                     :qubit (qubit (token-payload qubit))
-                     :frame (frame (token-payload frame-name))
-                     :duration duration
-                     :memory-ref addr))))
+  (match-line ((op :RAW-CAPTURE) &rest rest-toks) tok-lines
+    (multiple-value-bind (qubits frame-name rest-toks)
+        (parse-frame rest-toks ':RAW-CAPTURE)
+      (unless (= 1 (length qubits))
+        (quil-parse-error "CAPTURE instruction is only applicable to single-qubit frames."))
+      (unless (= 2 (length rest-toks))
+        (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
+      (let ((duration (parse-argument (first rest-toks)))
+            (addr (parse-argument (second rest-toks))))
+        (unless (or (and (is-constant duration)
+                         (realp (constant-value duration)))
+                    (is-formal duration))
+          (quil-parse-error "Expected RAW-CAPTURE duration to be a rational number or formal argument."))
+        (unless (is-mref addr)
+          (quil-parse-error "Expected a memory reference in RAW-CAPTURE, but observed ~A"
+                            (token-type (second rest-toks))))
+        (make-instance 'raw-capture
+                       :qubit (first qubits)
+                       :frame frame-name
+                       :duration duration
+                       :memory-ref addr)))))
 
 (defun parse-simple-frame-mutation (tok-type tok-lines)
   (match-line ((op tok-type) &rest rest-toks) tok-lines
