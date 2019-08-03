@@ -30,16 +30,24 @@
     (unless (uiop:file-exists-p file)
       (error "Could not include ~S because it does not exist." file))
     (let ((incl-pp (parse-quil-into-raw-program (a:read-file-into-string file))))
-      (setf (parsed-program-gate-definitions pp)
-            (append (parsed-program-gate-definitions pp)
-                    (parsed-program-gate-definitions incl-pp)))
-      (setf (parsed-program-circuit-definitions pp)
-            (append (parsed-program-circuit-definitions pp)
-                    (parsed-program-circuit-definitions incl-pp)))
+      (a:when-let ((collisions (intersection (parsed-program-memory-definitions pp)
+                                             (parsed-program-memory-definitions incl-pp)
+                                             :key #'memory-descriptor-name
+                                             :test #'string=)))
+        (quil-parse-error "Found memory declaration for ~A when processing ~S,
+but this region has already been declared elsewhere."
+                          (memory-descriptor-name (first collisions))
+                          file))
+      (a:appendf (parsed-program-gate-definitions pp)
+                 (parsed-program-gate-definitions incl-pp))
+      (a:appendf (parsed-program-circuit-definitions pp)
+                 (parsed-program-circuit-definitions incl-pp))
+      (a:appendf (parsed-program-memory-definitions pp)
+                 (parsed-program-memory-definitions incl-pp))
       (setf (parsed-program-executable-code pp)
             (splice-code-at (parsed-program-executable-code pp)
-                                        pos
-                                        (parsed-program-executable-code incl-pp)))
+                            pos
+                            (parsed-program-executable-code incl-pp)))
       pp)))
 
 (defun process-includes (pp &optional originating-file)
