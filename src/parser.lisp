@@ -1467,8 +1467,6 @@ Returns the frame qubits, the frame name, and the remaining tokens."
        (frame (token-payload (first rest-toks))) ; frame name
        (rest rest-toks)))))
 
-;;; TODO
-;;;  - this allows the waveform entries to be spread across multiple lines. is that ok?
 (defun parse-waveform-definition (tok-lines)
   "Parse a waveform definition from the token lines TOK-LINES."
   ;; Check that we have tokens left
