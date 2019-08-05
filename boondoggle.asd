@@ -21,4 +21,5 @@
                (:file "producers")
                (:file "consumers")
                (:file "processors")
-               (:file "pipeline")))
+               (:file "pipeline")
+               (:file "examples")))

@@ -167,7 +167,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                 :name "ro"
                 :type quil::quil-bit
                 :length (quil::chip-spec-n-qubits chip-specification))
-          (quil::parsed-program-memory-definitions parsed-program))
+          (quil:parsed-program-memory-definitions parsed-program))
     (setf (quil::parsed-program-executable-code parsed-program)
           (concatenate 'vector
                        (quil::parsed-program-executable-code parsed-program)
