@@ -24,17 +24,17 @@
       (post-process  ()        (make-instance 'processor-L1-distance)))
      ;;
      (produced-program ()
-                       (produce-quil-program (producer)))
+       (produce-quil-program (producer)))
      (compiled-program ((i processors))
-                       (progn
-                         (quil::print-parsed-program (produced-program))
-                         (apply-process (processors i) (produced-program))))
+       (progn
+         (quil::print-parsed-program (produced-program))
+         (apply-process (processors i) (produced-program))))
      (qvm-results ((j consumers) (i processors))
-                  (progn
-                    (quil::print-parsed-program (compiled-program i))
-                    (consume-quil (consumers j) (compiled-program i))))
+       (progn
+         (quil::print-parsed-program (compiled-program i))
+         (consume-quil (consumers j) (compiled-program i))))
      (l1-distance ((l consumers) (k processors)
                    (j consumers) (i processors))
-                  (apply-process (post-process) (qvm-results j i) (qvm-results l k))))))
+       (apply-process (post-process) (qvm-results j i) (qvm-results l k))))))
 
 
