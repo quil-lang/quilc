@@ -729,38 +729,32 @@ result of BODY, and the (possibly null) list of remaining lines.
                               (application-operator app)))
                        (return (values app rest-lines)))))))
 
-;;; TODO can we call this something like: parse an "expression"?
-;;; perhaps the more general TODO is to write down an honest grammar for Quil.
-(defun parse-application-parameter (toks)
+(defun parse-parameter-or-expression (toks)
   "Parse a single parameter. Consumes all tokens given."
+  (when (and (= 1 (length toks))
+             (eql ':PARAMETER (token-type (first toks))))
+    (return-from parse-parameter-or-expression (token-payload (first toks))))
+
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
     (let ((result (parse-arithmetic-tokens toks :eval t)))
       (cond
         ((and (null *arithmetic-parameters*)
               (null *segment-encountered*))
-         (cond
-           ((numberp result)
-            (constant result))
-           ((typep result 'memory-ref)
-            result)
-           (t
-            (quil-parse-error "A number was expected from arithmetic evaluation. Got something of type ~S."
-                              (type-of result)))))
+         (unless (numberp result)       ; TODO context
+           (quil-parse-error "A number was expected from arithmetic evaluation. Got something of type ~S."
+                             (type-of result)))
+         (constant result))
 
         ((or *formal-arguments-allowed*
              (and *segment-encountered*
                   (null *arithmetic-parameters*)))
-         (if (and (= 1 (length toks))
-                  (eql ':PARAMETER (token-type (first toks)))
-                  (= 1 (length *arithmetic-parameters*)))
-             (token-payload (first toks))
-             (make-delayed-expression
-              (mapcar #'first *arithmetic-parameters*)
-              (mapcar #'second *arithmetic-parameters*)
-              result)))
+         (make-delayed-expression
+          (mapcar #'first *arithmetic-parameters*)
+          (mapcar #'second *arithmetic-parameters*)
+          result))
 
-        (t
+        (t ; TODO context
          (quil-parse-error "Formal parameters found in a place they're not allowed."))))))
 
 (defun parse-application-parameters (arg-tokens &key name)
@@ -795,7 +789,7 @@ parameters and the remaining tokens."
                 (lambda (tok)
                   (eq ':comma (token-type tok)))
                 found-params))
-             (params (mapcar #'parse-application-parameter entries)))
+             (params (mapcar #'parse-parameter-or-expression entries)))
         (values params rest-line))))
 
 (defun parse-application (tok-lines)
@@ -1406,7 +1400,7 @@ parameters and the remaining tokens."
       (quil-parse-error "Expected a duration in DELAY instruction."))
     (make-instance 'delay
                    :qubit (parse-qubit qubit)
-                   :duration (parse-application-parameter duration-toks))))
+                   :duration (parse-parameter-or-expression duration-toks))))
 
 (defun parse-fence (tok-lines)
   (match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines
@@ -1462,7 +1456,7 @@ parameters and the remaining tokens."
     (multiple-value-bind (qubits frame-name value-toks)
         (parse-frame rest-toks tok-type)
       ;; TODO This allows for memory references in the value. Do we want that?
-      (let ((result (parse-application-parameter value-toks)))
+      (let ((result (parse-parameter-or-expression value-toks)))
         (make-instance
          (ecase tok-type
            ((:SET-FREQUENCY) 'set-frequency)
