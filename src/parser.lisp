@@ -607,30 +607,19 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 (defun parse-parameter (tok)
   "Parse a token/number/parameter TOK intended to be a parameter."
-  (typecase tok
-    (number (constant tok))
-    (param
-     (unless *formal-arguments-allowed*
-       (quil-parse-error "Found formal parameter where not allowed: ~S"
-                         tok))
-     tok)
-    (token
-     (let ((type (token-type tok)))
-       (case type
-         ((:PARAMETER)
-          (unless *formal-arguments-allowed*
-            (quil-parse-error "Found formal parameter where not allowed: ~S"
-                              (token-payload tok)))
-          (token-payload tok))
-         ((:COMPLEX)
-          (token-payload tok))
-         ((:INTEGER)
-          (constant (coerce (token-payload tok) 'double-float)))
-         (otherwise
-          (quil-parse-error "Token doesn't represent a parameter where expected: ~S" tok)))))
-    (t (quil-parse-error "Unexpected token type ~S: ~S"
-                         (type-of tok)
-                         tok))))
+  (let ((type (token-type tok)))
+    (case type
+      ((:PARAMETER)
+       (unless *formal-arguments-allowed*
+         (quil-parse-error "Found formal parameter where not allowed: ~S"
+                           (token-payload tok)))
+       (token-payload tok))
+      ((:COMPLEX)
+       (token-payload tok))
+      ((:INTEGER)
+       (constant (coerce (token-payload tok) 'double-float)))
+      (otherwise
+       (quil-parse-error "Token doesn't represent a parameter where expected: ~S" tok)))))
 
 (defun parse-argument (tok)
   "Parse a token TOK intended to be an argument."
@@ -730,67 +719,30 @@ result of BODY, and the (possibly null) list of remaining lines.
                        (return (values app rest-lines)))))))
 
 (defun parse-parameter-or-expression (toks)
-  "Parse a single parameter. Consumes all tokens given."
-  (when (and (= 1 (length toks))
-             (eql ':PARAMETER (token-type (first toks))))
-    (return-from parse-parameter-or-expression (token-payload (first toks))))
+  "Parse a parameter, which may possibly be a compound arithmetic expression. Consumes all tokens given."
+  (if (= 1 (length toks))
+      (parse-parameter (first toks))
+      (let ((*arithmetic-parameters* nil)
+            (*segment-encountered* nil))
+        (let ((result (parse-arithmetic-tokens toks :eval t)))
+          (cond
+            ((and (null *arithmetic-parameters*)
+                  (null *segment-encountered*))
+             (unless (numberp result)       ; TODO context
+               (quil-parse-error "A number was expected from arithmetic evaluation. Got something of type ~S."
+                                 (type-of result)))
+             (constant result))
 
-  (let ((*arithmetic-parameters* nil)
-        (*segment-encountered* nil))
-    (let ((result (parse-arithmetic-tokens toks :eval t)))
-      (cond
-        ((and (null *arithmetic-parameters*)
-              (null *segment-encountered*))
-         (unless (numberp result)       ; TODO context
-           (quil-parse-error "A number was expected from arithmetic evaluation. Got something of type ~S."
-                             (type-of result)))
-         (constant result))
+            ((or *formal-arguments-allowed*
+                 (and *segment-encountered*
+                      (null *arithmetic-parameters*)))
+             (make-delayed-expression
+              (mapcar #'first *arithmetic-parameters*)
+              (mapcar #'second *arithmetic-parameters*)
+              result))
 
-        ((or *formal-arguments-allowed*
-             (and *segment-encountered*
-                  (null *arithmetic-parameters*)))
-         (make-delayed-expression
-          (mapcar #'first *arithmetic-parameters*)
-          (mapcar #'second *arithmetic-parameters*)
-          result))
-
-        (t ; TODO context
-         (quil-parse-error "Formal parameters found in a place they're not allowed."))))))
-
-(defun parse-application-parameters (arg-tokens &key name)
-  "Parse the parameters from an application. Returns the parsed
-parameters and the remaining tokens."
-  ;; Check for parenthesis in first position to indicate
-  ;; parameters.
-  (unless (eql ':LEFT-PAREN (token-type (first arg-tokens)))
-    (return-from parse-application-parameters (values nil arg-tokens)))
-   ;; Remove :LEFT-PAREN
-  (pop arg-tokens)
-  ;; Time to parse out everything in between the parentheses...
-  (multiple-value-bind (found-params rest-line)
-      ;; ... but first we have to find the right paren.
-      (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
-                             arg-tokens)
-
-      ;; But if we didn't find it, then we have an unmatched
-      ;; parenthesis.
-      (when (endp rest-line)
-        (quil-parse-error "No matching right parenthesis in the ~
-                           application~@[ ~S~]."
-                          name))
-
-      ;; If we did find it, pop it off from where the arguments
-      ;; will lie.
-      (pop rest-line)
-      ;; Parse the params. Separate them by comma, evaluate them
-      ;; if necessary.
-      (let* ((entries
-               (split-sequence:split-sequence-if
-                (lambda (tok)
-                  (eq ':comma (token-type tok)))
-                found-params))
-             (params (mapcar #'parse-parameter-or-expression entries)))
-        (values params rest-line))))
+            (t ; TODO context
+             (quil-parse-error "Formal parameters found in a place they're not allowed.")))))))
 
 (defun parse-application (tok-lines)
   "Parse a gate or circuit application out of the lines of tokens TOK-LINES, returning an UNRESOLVED-APPLICATION."
@@ -799,7 +751,7 @@ parameters and the remaining tokens."
           (make-instance 'unresolved-application
                          :operator (named-operator (token-payload op)))
           (multiple-value-bind (params args)
-              (parse-application-parameters rest-toks :name (token-payload op))
+              (parse-parameters rest-toks :allow-expressions t)
 
             ;; Parse out the rest of the arguments and return.
             (make-instance 'unresolved-application
@@ -892,7 +844,7 @@ parameters and the remaining tokens."
         (setf name (token-payload (pop params-args)))
 
         (let ((*definition-context* :DEFGATE))
-          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+          (multiple-value-bind (params rest-line) (parse-parameters params-args)
             (when (eql ':AS (token-type (first rest-line)))
               (pop rest-line)
               (let* ((parsed-gate-tok (first rest-line))
@@ -1095,7 +1047,7 @@ parameters and the remaining tokens."
         (setf name (token-payload (pop params-args)))
 
         (let ((*definition-context* :DEFCIRCUIT))
-          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+          (multiple-value-bind (params rest-line) (parse-parameters params-args)
             ;; Check for colon and incise it.
             (let ((maybe-colon (last rest-line)))
               (when (or (null maybe-colon)
@@ -1530,7 +1482,7 @@ Returns the frame qubits, the frame name, and the remaining tokens."
         (setf name (token-payload (pop params-args)))
 
         (let ((*definition-context* :DEFWAVEFORM))
-          (multiple-value-bind (params rest-line) (parse-definition-parameters params-args)
+          (multiple-value-bind (params rest-line) (parse-parameters params-args)
             ;; Check for colon and incise it.
             (let ((maybe-colon (last rest-line)))
               (when (or (null maybe-colon)
@@ -1568,44 +1520,51 @@ Returns the frame qubits, the frame name, and the remaining tokens."
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a
 portion of a definition is being parsed.")
 
-;;; Parameters in a definition differ from parameters in an application.
-(defun parse-definition-parameters (params-args)
-  "Parse the parameters from a definition. Returns the parsed parameters
-and the reamining tokens."
+(defun parse-parameters (params-args &key allow-expressions)
+  "Parse a list of parameters, surrounded by a pair of parentheses. Returns the
+parsed parameters and the remaining tokens.
+
+When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a parameter context."
   (unless (eql ':LEFT-PAREN (token-type (first params-args)))
-    (return-from parse-definition-parameters (values nil params-args)))
+    (return-from parse-parameters (values nil params-args)))
 
   ;; Remove :LEFT-PAREN
   (pop params-args)
 
   ;; Parse out the parameters enclosed.
   (multiple-value-bind (found-params rest-line)
-      (take-until (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
-                  params-args)
+      (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
+                           params-args)
 
     ;; Error if we didn't find a right parenthesis.
     (when (endp rest-line)
-      (quil-parse-error "No matching right paren in~@[ ~A~] params" *definition-context*))
+      (quil-parse-error "No matching right paren in~@[ ~A~] parameters" *definition-context*))
 
     ;; Remove right paren and stash away params.
     (pop rest-line)
 
     ;; Some sanity checks for the parameter list. Must be of odd length,
     ;; and every other token should be a :COMMA
-    (unless (and (oddp (length found-params))
-                 (loop :for c :in (rest found-params) :by #'cddr
-                       :always (eql ':COMMA (token-type c))))
-      ;; TODO Some printer for tokens?
+    (unless (or allow-expressions
+                (and (oddp (length found-params))
+                     (loop :for c :in (rest found-params) :by #'cddr
+                           :always (eql ':COMMA (token-type c)))))
+      ;; TODO generalize context
       (quil-parse-error "Malformed parameter list~@[ in ~A~]: ~A" *definition-context* found-params))
+
     ;; Parse out the parameters.
-    (values
-     (loop :for p :in (remove ':COMMA found-params :key #'token-type)
-           :when (not (eql ':PARAMETER (token-type p)))
-             :do (quil-parse-error "Found something other than a parameter in a~@[ ~A~] parameter list: ~A"
-                                   *definition-context*
-                                   p)
-           :collect (parse-parameter p))
-     rest-line)))
+    (let ((entries
+            (split-sequence:split-sequence-if
+             (lambda (tok)
+               (eq ':COMMA (token-type tok)))
+             found-params))
+          (parse-op
+            (if allow-expressions
+                #'parse-parameter-or-expression
+                (lambda (toks)
+                  (parse-parameter (first toks))))))
+      (values (mapcar parse-op entries)
+              rest-line))))
 
 (defun parse-calibration-definition (tok-lines)
   "Parse out a calibration definition from the lines of tokens TOK-LINES."
@@ -1637,10 +1596,9 @@ and the reamining tokens."
           ;; Stash it away.
           (setf name (token-payload (pop params-args)))
 
-          ;; TODO Do we really want to recycle application parameter parsing code?
           (let ((*definition-context* :DEFCAL)
                 (*formal-arguments-allowed* t))
-            (multiple-value-bind (params rest-line) (parse-application-parameters params-args)
+            (multiple-value-bind (params rest-line) (parse-parameters params-args :allow-expressions t)
               (when (and is-measure-calibration
                          (not (null params)))
                 (quil-parse-error "MEASURE calibrations do not support parameters."))
@@ -1648,7 +1606,8 @@ and the reamining tokens."
               (dolist (param params)
                 (unless (or (is-constant param)
                             (is-param param))
-                  (quil-parse-error "Unexpected parameter type in DEFCAL.")))
+                  (quil-parse-error "Unexpected parameter type ~A in DEFCAL."
+                                    (type-of param))))
 
               ;; Check for colon and incise it.
               (let ((maybe-colon (last rest-line)))
@@ -1658,12 +1617,7 @@ and the reamining tokens."
                 (setf rest-line (butlast rest-line)))
 
               ;; Collect arguments and stash them away.
-              (loop :for arg :in rest-line
-                    :when (not (or (eql ':NAME (token-type arg))
-                                   (eql ':INTEGER (token-type arg))))
-                      :do (quil-parse-error "Invalid argument in DEFCAL line.")
-                    :collect (parse-argument arg) :into formal-args
-                    :finally (setf args formal-args))
+              (setf args (mapcar #'parse-qubit args))
 
               (when (and is-measure-calibration
                          (> (length args) 2))
@@ -1690,11 +1644,8 @@ and the reamining tokens."
                                        :body parsed-body)))
                  rest-lines)))))))))
 
-;;; TODO
-;;; - *formal-arguments-allowed* t ?
-;;; - can we be more consistent re: taking a slice of a line, a single line, or a list of lines?
 (defun parse-waveform-ref (toks)
-  (check-type toks list)
+  "Parse a waveform reference from the tokens TOKS. Returns the refererence and the remaining tokens."
   (when (endp toks)
     (quil-parse-error "Expected a waveform reference."))
   (let ((name-tok (first toks))
@@ -1703,14 +1654,11 @@ and the reamining tokens."
       (quil-parse-error "Expected a NAME when parsing waveform reference."))
     (if (endp rest-toks)
         (waveform-ref (token-payload name-tok))
-        (let ((*arithmetic-parameters* nil)
-              (*segment-encountered* nil))
-          (multiple-value-bind (params rest)
-              (parse-application-parameters rest-toks)
-            (when (null params)
-              (quil-parse-error "Invalid waveform parameters."))  ; TODO better message?
-            (values (%waveform-ref (token-payload name-tok) params)
-                    rest)))))) ;TODO call these params or args?
+        (multiple-value-bind (params rest)
+            (parse-parameters rest-toks :allow-expressions t)
+          (values
+           (%waveform-ref (token-payload name-tok) params)
+           rest)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
