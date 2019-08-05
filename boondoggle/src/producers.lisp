@@ -67,9 +67,9 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
 
 (defun measure-at-close-instrs (chip-specification)
   (loop :for j :below (length (elt (quil::chip-specification-objects chip-specification) 0))
-        :collect (make-instance 'quil::measure
+        :collect (make-instance 'quil:measure
                                 :address (quil:mref "ro" j)
-                                :qubit (quil::qubit j))))
+                                :qubit (quil:qubit j))))
 
 (defun random-protoquil (chip-specification   ; chip topology
                          program-depth-limit  ; limit to randomly generated program depth
