@@ -1,6 +1,7 @@
 ;;;; src/clifford/pauli.lisp
 ;;;;
-;;;; Author: Nik Tezak
+;;;; Authors: Nik Tezak
+;;;;          Robert Smith
 
 (in-package #:cl-quil.clifford)
 
@@ -79,6 +80,25 @@
         :for c :in (reverse (base4-list p))
         :do (setf idx (logior c (ash idx 2)))
         :finally (return idx)))
+
+(defun pauli-integer (p)
+  "Give a non-negative integer representation of the Pauli P, which is unique among only the Pauli operators of the same number of qubits.
+
+(Implementation details: This function is implemented so that a phase of {1, i} determines the LSB, and a phase of {+1, -1} determines the second LSB.
+
+Tensoring an I to the left does not affect the value. Assuming a phase of +1, tensoring an I to the right has the effect of shifting the value right by two bits.)"
+  (reduce (lambda (x acc)
+            (+ x (* 4 acc)))
+          (pauli-components p)
+          :from-end t
+          :initial-value 0))
+
+(defun integer-pauli (int n)
+  "Convert a non-negative integer INT to a Pauli operator of order N. (See PAULI-INTEGER for more details.)"
+  (loop :with c := (make-components n)
+        :for i :to n :do
+          (setf (values int (aref c i)) (floor int 4))
+        :finally (return (%make-pauli :components c))))
 
 (defmacro pair-membership (u v &rest cases)
   `(or ,@(loop :for (ui vi) :in cases
