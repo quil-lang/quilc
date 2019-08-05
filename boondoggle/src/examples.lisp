@@ -3,7 +3,7 @@
 
 (in-package #:boondoggle)
 
-;;;; File documentation
+;;;; This script measures the L1 distance between 
 
 (defun compiled/uncompiled-l1-distance ()
   ""

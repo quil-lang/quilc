@@ -33,14 +33,12 @@
 (defmethod apply-process ((processor processor-identity) &rest data)
   (first data))
 
-(defun measure-at-close-instrs (chip-specification)
-  (loop :for j :below (length (elt (quil::chip-specification-objects chip-specification) 0))
-        :collect (make-instance 'quil::measure
-                                :address (quil:mref "ro" j)
-                                :qubit (quil::qubit j))))
-
 (defclass processor-L1-distance (processor)
   ())
 
 (defmethod apply-process ((processor processor-L1-distance) &rest data)
+  "Calculate the L1 distance between two arguments. &rest expects only 2 position arguments,
+each of which is expected to be a list conformant with bitstring outputs from the quantum
+virtual machine, of the form '(0 1 1 1 0 0 ... 1).
+"
   (reduce #'+ (mapcar #'abs (mapcar #'- (first data) (second data)))))
