@@ -318,13 +318,12 @@ the immediately preceding line."
 (defparameter *parse-context* nil
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
 
-(defmacro disappointing-token-error (found-token expected-msg &rest format-args)
-  `(quil-parse-error "Expected ~A~@[ in A], but observed a token ~A with value ~A"
-                     ,expected-msg
-                     ,@format-args
-                     ,*parse-context*
-                     (token-type ,found-token)
-                     (token-payload ,found-token)))
+(defun disappointing-token-error (found-token expected-msg)
+  (quil-parse-error "Expected ~A~@[ in A~], but observed a token ~A with value ~A"
+                    expected-msg
+                    *parse-context*
+                    (token-type found-token)
+                    (token-payload found-token)))
 
 (defun parse-program-lines (tok-lines)
   "Parse the next AST object from the list of token lists. Returns two values:
@@ -521,7 +520,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                  `(unless (<= ,min-tokens
                              (length ,first-line)
                              . ,(when max-tokens (list max-tokens)))
-                    (quil-parse-error "Expected at least ~A ~@[ and at most ~A] tokens~@[ for instruction ~~A]."
+                    (quil-parse-error "Expected at least ~A ~@[ and at most ~A~] tokens~@[ for instruction ~~A~]."
                                      ,min-tokens
                                      ,max-tokens
                                      ,first-type)))
@@ -538,15 +537,16 @@ result of BODY, and the (possibly null) list of remaining lines.
   (case (token-type qubit-tok)
     ((:NAME)
      (unless *formal-arguments-allowed*
-       (quil-parse-error "Unexpected formal parameter ~A~@[ in ~A]."
+       (quil-parse-error "Unexpected formal parameter ~A~@[ in ~A~]."
                          (token-payload qubit-tok)
                          *parse-context*))
      (formal (token-payload qubit-tok)))
     ((:INTEGER) (qubit (token-payload qubit-tok)))
     (otherwise
      (disappointing-token-error qubit-tok
-                                "a name~@[ or a formal parameter~]"
-                                *formal-arguments-allowed*))))
+                                (if *formal-arguments-allowed*
+                                    "a name or formal parameter"
+                                    "a name")))))
 
 (defun parse-memory-or-formal-token (tok &key ensure-valid)
   (cond
@@ -554,7 +554,7 @@ result of BODY, and the (possibly null) list of remaining lines.
     ((eql ':AREF (token-type tok))
      (when (and ensure-valid
                 (not (find (car (token-payload tok)) *memory-region-names* :test #'string=)))
-       (quil-parse-error "Bad memory region name ~A~@[ in ~A]"
+       (quil-parse-error "Bad memory region name ~A~@[ in ~A~]"
                          (car (token-payload tok))
                          *parse-context*))
      (mref (car (token-payload tok))
@@ -568,15 +568,16 @@ result of BODY, and the (possibly null) list of remaining lines.
     ;; Formal argument.
     ((eql ':NAME (token-type tok))
      (unless *formal-arguments-allowed*
-       (quil-parse-error "Found formal argument ~A~@[ in ~A]."
+       (quil-parse-error "Found formal argument ~A~@[ in ~A~]."
                          (token-payload tok)
                          *parse-context*))
      (formal (token-payload tok)))
 
     (t
      (disappointing-token-error tok
-                                "an address~@[ or a formal argument~]"
-                                *formal-arguments-allowed*))))
+                                (if *formal-arguments-allowed*
+                                    "an address or formal argument"
+                                    "an address")))))
 
 (defun parse-simple-instruction (type tok-lines)
   (match-line ((op type)) tok-lines
@@ -627,7 +628,7 @@ result of BODY, and the (possibly null) list of remaining lines.
     (case type
       ((:PARAMETER)
        (unless *formal-arguments-allowed*
-         (quil-parse-error "Found formal parameter~@[ in ~A] where not allowed: ~S"
+         (quil-parse-error "Found formal parameter~@[ in ~A~] where not allowed: ~S"
                            *parse-context*
                            (token-payload tok)))
        (token-payload tok))
@@ -648,7 +649,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                                         :test #'string=)))
        (unless (or names-memory-region-p
                    *formal-arguments-allowed*)
-         (quil-parse-error "Unexpected formal argument ~A~@[ in ~A]."
+         (quil-parse-error "Unexpected formal argument ~A~@[ in ~A~]."
                            (token-payload tok)
                            *parse-context*))
        (if names-memory-region-p
@@ -740,7 +741,7 @@ result of BODY, and the (possibly null) list of remaining lines.
 (defun parse-parameter-or-expression (toks)
   "Parse a parameter, which may possibly be a compound arithmetic expression. Consumes all tokens given."
   (if (and (= 1 (length toks))
-           (not (eql ':NAME (token-type (first toks)))))
+           (not (member (token-type (first toks)) '(:NAME :AREF))))
       (parse-parameter (first toks))
       (let ((*arithmetic-parameters* nil)
             (*segment-encountered* nil))
@@ -804,8 +805,7 @@ result of BODY, and the (possibly null) list of remaining lines.
         ((endp (cdr non-words))
          (let ((last-tok (first non-words)))
            (unless (eql ':STRING (token-type last-tok))
-             (disappointing-token-error last-tok
-                                        "a terminating string"))
+             (disappointing-token-error last-tok "a terminating string"))
            (make-pragma words (token-payload last-tok))))
 
         (t
@@ -859,8 +859,7 @@ result of BODY, and the (possibly null) list of remaining lines.
 
         ;; Check for a name.
         (unless (eql ':NAME (token-type (first params-args)))
-          (disappointing-token-error (first params-args)
-                                     "a name"))
+          (disappointing-token-error (first params-args) "a name"))
 
         ;; We have a name. Stash it away.
         (setf name (token-payload (pop params-args)))
@@ -1213,7 +1212,9 @@ result of BODY, and the (possibly null) list of remaining lines.
     (unless (or (eql ':AREF (token-type addr))
                 (eql ':NAME (token-type addr)))
       (disappointing-token-error addr
-                                 "an address~:[~; or formal argument~]" *formal-arguments-allowed*))
+                                 (if *formal-arguments-allowed*
+                                     "an address or formal argument"
+                                     "an address")))
     (make-instance (ecase jump-type
                      ((:JUMP-WHEN) 'jump-when)
                      ((:JUMP-UNLESS) 'jump-unless))
@@ -1572,6 +1573,48 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
       (values (mapcar parse-op entries)
               rest-line))))
 
+(defun parse-waveform-parameter (toks)
+  (let ((name (first toks))
+        (colon (second toks))
+        (value-expr (rest (rest toks))))
+    (unless (and name
+                 colon
+                 value-expr
+                 (eql ':NAME (token-type name))
+                 (eql ':COLON (token-type colon)))
+      (quil-parse-error "Waveform parameters must be provided by name. Exected <name>: <value>."))
+    (list
+     (param (token-payload name))
+     (parse-parameter-or-expression value-expr))))
+
+(defun parse-waveform-parameters (params-args)
+  (unless (eql ':LEFT-PAREN (token-type (first params-args)))
+    (return-from parse-waveform-parameters (values nil params-args)))
+
+  ;; Remove :LEFT-PAREN
+  (pop params-args)
+
+  ;; Parse out the parameters enclosed.
+  (multiple-value-bind (found-params rest-line)
+      (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
+                           params-args)
+
+    ;; Error if we didn't find a right parenthesis.
+    (when (endp rest-line)
+      (quil-parse-error "No matching right paren in~@[ ~A~] parameters" *parse-context*))
+
+    ;; Remove right paren and stash away params.
+    (pop rest-line)
+
+    ;; Parse out the parameters.
+    (let ((entries
+            (split-sequence:split-sequence-if
+             (lambda (tok)
+               (eq ':COMMA (token-type tok)))
+             found-params)))
+      (values (mapcar #'parse-waveform-parameter entries)
+              rest-line))))
+
 (defun parse-calibration-definition (tok-lines)
   "Parse out a calibration definition from the lines of tokens TOK-LINES."
 
@@ -1656,12 +1699,12 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
   (let ((name-tok (first toks))
         (rest-toks (rest toks)))
     (unless (eql :NAME (token-type name-tok))
-      (quil-parse-error "Expected a NAME when parsing waveform reference~@[ in ~A]."
+      (quil-parse-error "Expected a NAME when parsing waveform reference~@[ in ~A~]."
                         name-tok))
     (if (endp rest-toks)
         (waveform-ref (token-payload name-tok))
         (multiple-value-bind (params rest)
-            (parse-parameters rest-toks :allow-expressions t)
+            (parse-waveform-parameters rest-toks)
           (values
            (%waveform-ref (token-payload name-tok) params)
            rest)))))

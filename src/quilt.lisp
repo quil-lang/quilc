@@ -16,13 +16,18 @@
 (defstruct  (waveform-ref (:constructor %waveform-ref (name args)))
   "A reference to a (possibly parametric) waveform."
   (name nil :read-only t :type string)
+  ;; A list of (name val) lists. 
   (args nil :read-only t :type list))
 
 (defun waveform-ref (name &rest args)
-  (%waveform-ref name args))
+  "Construct a waveform reference with keyword-value pairs given by ARGS."
+  (assert (evenp (length args)))
+  (%waveform-ref name
+                 (loop :for (name val) :on args :by #'cddr :while val
+                       :collect (list name val))))
 
 (defmethod print-instruction-generic ((thing waveform-ref) (stream stream))
-  (format stream "~A~@[(~{~A~^, ~})~]"
+  (format stream "~A~@[(~{~A: ~A~^, ~})~]"
           (waveform-ref-name thing)
           (mapcar (lambda (arg) (print-instruction-generic arg nil))
                   (waveform-ref-args thing))))
