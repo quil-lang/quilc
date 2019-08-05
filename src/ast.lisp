@@ -158,6 +158,89 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
   (check-type comment-string string)
   (setf (gethash x **comments**) comment-string))
 
+(a:define-constant +entering-rewiring-prefix+
+  "Entering rewiring: "
+  :test #'string=
+  :documentation "STRING prefix for \"entering rewiring\" comments. ")
+
+(a:define-constant +exiting-rewiring-prefix+
+  "Exiting rewiring: "
+  :test #'string=
+  :documentation "STRING prefix for \"exiting rewiring\" comments. ")
+
+(a:define-constant +entering/exiting-rewiring-prefix+
+  "Entering/exiting rewiring: "
+  :test #'string=
+  :documentation "STRING prefix for \"entering/exiting rewiring\" comments. ")
+
+(defun comment-entering-rewiring-p (rewiring-string)
+  "Does REWIRING-STRING start with +ENTERING-REWIRING-PREFIX+?"
+  (uiop:string-prefix-p +entering-rewiring-prefix+ rewiring-string))
+
+(defun comment-exiting-rewiring-p (rewiring-string)
+  "Does REWIRING-STRING start with +EXITING-REWIRING-PREFIX+?"
+  (uiop:string-prefix-p +exiting-rewiring-prefix+ rewiring-string))
+
+(defun comment-entering/exiting-rewiring-p (rewiring-string)
+  "Does REWIRING-STRING start with +ENTERING/EXITING-REWIRING-PREFIX+?"
+  (uiop:string-prefix-p +entering/exiting-rewiring-prefix+ rewiring-string))
+
+(defun %parse-single-rewiring (rewiring-string prefix)
+  "Parse a single REWIRING from REWIRING-STRING after discarding PREFIX."
+  (make-rewiring-from-string (subseq rewiring-string (length prefix))))
+
+(defun parse-entering-rewiring (rewiring-string)
+  "Parse an entering REWIRING from REWIRING-STRING."
+  (%parse-single-rewiring rewiring-string +entering-rewiring-prefix+))
+
+(defun parse-exiting-rewiring (rewiring-string)
+  "Parse an exiting REWIRING from REWIRING-STRING."
+  (%parse-single-rewiring rewiring-string +exiting-rewiring-prefix+))
+
+(defun parse-entering/exiting-rewiring (rewiring-string)
+  "Parse entering and exiting REWIRINGs from REWIRING-STRING.
+
+Return (VALUES ENTERING-REWIRING EXITING-REWIRING)."
+  ;; TODO:(appleby) Stolen from PARSED-PROGRAM-TO-LOGICAL-MATRIX. Replace this with something akin to MAKE-REWIRING-FROM-STRING.
+  (let ((*read-eval* nil))
+    (destructuring-bind (entering-vector . exiting-vector)
+        (read-from-string (subseq rewiring-string
+                                  (length +entering/exiting-rewiring-prefix+)))
+      (values (make-rewiring-from-l2p entering-vector)
+              (make-rewiring-from-l2p exiting-vector)))))
+
+(defun rewiring-comment-type (rewiring-string)
+  "Return the type of the rewiring comment in REWIRING-STRING.
+
+Possible return values are ':ENTERING, ':EXITING, and ':ENTERING/EXITING.
+
+If REWIRING-STRING does not have a valid rewiring comment prefix, signal an error."
+  (cond ((comment-entering-rewiring-p rewiring-string)
+         ':ENTERING)
+        ((comment-exiting-rewiring-p rewiring-string)
+         ':EXITING)
+        ((comment-entering/exiting-rewiring-p rewiring-string)
+         ':ENTERING/EXITING)
+        (t (error "Invalid rewiring comment: ~S" rewiring-string))))
+
+(defun make-rewiring-comment (&key entering exiting)
+  "Make a rewiring comment from the given ENTERING and EXITING rewirings.
+
+If both ENTERING and EXITING are non-null, make an :ENTERING/EXITING rewiring comment.
+If only ENTERING is non-null, make an :ENTERING rewiring comment.
+If only EXITING is non-null, make and :EXITING rewiring comment.
+If both ENTERING and EXITING are null, signal an error."
+  (cond ((and (not (null entering)) (not (null exiting)))
+         (format nil "~A(~A . ~A)"
+                 +entering/exiting-rewiring-prefix+
+                 (rewiring-l2p entering)
+                 (rewiring-l2p exiting)))
+        ((not (null entering))
+         (format nil "~A~A" +entering-rewiring-prefix+ (rewiring-l2p entering)))
+        ((not (null exiting))
+         (format nil "~A~A" +exiting-rewiring-prefix+ (rewiring-l2p exiting)))
+        (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass jump-target ()
