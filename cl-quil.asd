@@ -68,7 +68,8 @@
                              (:file "god-table")
                              (:file "god-table-utilities")
                              (:file "swap-representation")
-                             (:file "benchmarking-procedures")))
+                             (:file "benchmarking-procedures")
+                             (:file "perm")))
                (:module "compilers"
                 :serial t
                 :components ((:file "ucr-explode")
