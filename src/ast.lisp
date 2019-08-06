@@ -185,29 +185,25 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
   "Does REWIRING-STRING start with +ENTERING/EXITING-REWIRING-PREFIX+?"
   (uiop:string-prefix-p +entering/exiting-rewiring-prefix+ rewiring-string))
 
-(defun %parse-single-rewiring (rewiring-string prefix)
-  "Parse a single REWIRING from REWIRING-STRING after discarding PREFIX."
-  (make-rewiring-from-string (subseq rewiring-string (length prefix))))
+(defun %parse-rewiring (prefix rewiring-string make-rewiring)
+  "Call MAKE-REWIRING to parse a REWIRING from REWIRING-STRING after discarding PREFIX."
+  (funcall make-rewiring (subseq rewiring-string (length prefix))))
 
 (defun parse-entering-rewiring (rewiring-string)
   "Parse an entering REWIRING from REWIRING-STRING."
-  (%parse-single-rewiring rewiring-string +entering-rewiring-prefix+))
+  (%parse-rewiring +entering-rewiring-prefix+ rewiring-string #'make-rewiring-from-string))
 
 (defun parse-exiting-rewiring (rewiring-string)
   "Parse an exiting REWIRING from REWIRING-STRING."
-  (%parse-single-rewiring rewiring-string +exiting-rewiring-prefix+))
+  (%parse-rewiring +exiting-rewiring-prefix+ rewiring-string #'make-rewiring-from-string))
 
 (defun parse-entering/exiting-rewiring (rewiring-string)
   "Parse entering and exiting REWIRINGs from REWIRING-STRING.
 
 Return (VALUES ENTERING-REWIRING EXITING-REWIRING)."
-  ;; TODO:(appleby) Stolen from PARSED-PROGRAM-TO-LOGICAL-MATRIX. Replace this with something akin to MAKE-REWIRING-FROM-STRING.
-  (let ((*read-eval* nil))
-    (destructuring-bind (entering-vector . exiting-vector)
-        (read-from-string (subseq rewiring-string
-                                  (length +entering/exiting-rewiring-prefix+)))
-      (values (make-rewiring-from-l2p entering-vector)
-              (make-rewiring-from-l2p exiting-vector)))))
+  (%parse-rewiring +entering/exiting-rewiring-prefix+
+                   rewiring-string
+                   #'make-rewiring-pair-from-string))
 
 (defun rewiring-comment-type (rewiring-string)
   "Return the type of the rewiring comment in REWIRING-STRING.
