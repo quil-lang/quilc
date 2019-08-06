@@ -38,12 +38,9 @@
                        instr))))))
 
 (defmethod consume-quil ((consumer consumer-local-qvm) parsed-program)
-  "This function runs a Quil program on the QVM, and returns returns a histogram
-of counts of each resulting bitstring, ordered
-lexicographically, and normalized against total number of trials.
+  "This function runs a Quil program on the QVM, and returns returns a histogram of counts of each resulting bitstring, ordered lexicographically, and normalized against total number of trials.
 
-For bell state program with a large sampling count, the returned value would
-be (0.5d0 0.0d0 0.0d0 0.5d0).
+For bell state program with a large sampling count, the returned value would be (0.5d0 0.0d0 0.0d0 0.5d0).
 "
   (case (consumer-local-qvm-interface-mode consumer)
     (:http

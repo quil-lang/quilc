@@ -4,10 +4,7 @@
 (in-package #:boondoggle)
 
 (defun compiled/uncompiled-l1-distance ()
-  "This script measures the L1 distance between QVM results from
-compiled and uncompiled programs, respectively. It conforms to the
-boondoggle pattern of specifying producers, processors, consumers,
-and post-processors. In this case:
+  "This script measures the L1 distance between QVM results from compiled and uncompiled programs, respectively. It conforms to the boondoggle pattern of specifying producers, processors, consumers, and post-processors. In this case:
 
 1. Producers generate quil programs,
 2. Processors either compile or don't compile the generated program
@@ -15,18 +12,11 @@ and post-processors. In this case:
 3. Consumers run the program on the QVM, and
 4. Post-processors measure the L1 distance between the qvm results.
 
-In the generated `pipeline`, the producers, processors, consumers and
-post-processors are first defined as the output from various 
-make-instances.
+In the generated `pipeline`, the producers, processors, consumers and post-processors are first defined as the output from various make-instances.
 
-Note that the processors are indexed by compiled/uncompiled in the
-variable i, and that although the consumers are indexed by j, there
-is just one (the QVM). The qvm-results are indexed by both the
-consumer and the processor.
+Note that the processors are indexed by compiled/uncompiled in the variable i, and that although the consumers are indexed by j, there is just one (the QVM). The qvm-results are indexed by both the consumer and the processor.
 
-The processor-L1-distance post-process takes all consumers and processors
-as input (a.k.a. the qvm results and quil programs, respectively), and generates as
-output the L1 distance between all possible combinations."
+The processor-L1-distance post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the L1 distance between all possible combinations."
   (declare (optimize (debug 3)))
   (let ((*debug-noise-stream* *standard-output*)
         (chip-spec (quil::build-8q-chip)))
