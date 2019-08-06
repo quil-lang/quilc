@@ -37,6 +37,6 @@
   ())
 
 (defmethod apply-process ((processor processor-L1-distance) &rest data)
-  "Calculate the L1 distance between two arguments. &rest expects only 2 position arguments, each of which is expected to be a list conformant with bitstring outputs from the quantum virtual machine, of the form '(0 1 1 1 0 0 ... 1).
+  "Calculate the L1 distance between two arguments. &rest expects only 2 position arguments, each of which is expected to be a normalized histogram count of bitstring outputs from the QVM for a given quil program.
 "
   (reduce #'+ (mapcar #'abs (mapcar #'- (first data) (second data)))))
