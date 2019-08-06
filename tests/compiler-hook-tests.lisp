@@ -24,6 +24,12 @@
              (format nil "Exiting rewiring: ~a" out-rewiring-vector)))))
   pp)
 
+(defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)
+  (dolist (compress-qubits '(nil t))
+    (is (quil::operator=
+         (quil::parsed-program-to-logical-matrix pp-a :compress-qubits compress-qubits)
+         (quil::parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
+
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
 programs (modulo rewiring) to equivalent matrices."
@@ -35,8 +41,7 @@ CNOT 0 1
 CNOT 0 2
 ")
                                                  #(2 0 1) #(2 0 1))))
-    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+    (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-parsed-program-to-logical-matrix-swap-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
@@ -49,8 +54,7 @@ SWAP 0 1"))
 CNOT 0 1
 Z 0")
                                                  #(0 1) #(1 0))))
-    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+    (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-parsed-program-to-logical-matrix-entering-exiting-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix handles single-instruction entering/exiting
@@ -61,24 +65,24 @@ SWAP 0 1"))
         (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
 CNOT 0 1")
                                                  #(0 1) #(1 0))))
-    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+    (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-rewiring-modes ()
   "Iterates over the rewiring modes and tests that the addresser is well-behaved on each of them."
   ;; first, the straight-line rewiring methods
   (dolist (quil::*initial-rewiring-default-type* '(:naive :random :partial :greedy))
     (format t "~&    Testing rewiring type ~A~%" quil::*initial-rewiring-default-type*)
-    (finish-output)
-    (let* ((pstring "
-CNOT 0 2
-CNOT 1 3")
-           (pp (quil::parse-quil pstring))
-           (cpp (quil::compiler-hook (quil::parse-quil pstring)
-                                     (quil::build-nQ-linear-chip 4)
-                                     :protoquil t)))
-      (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                           (quil::parsed-program-to-logical-matrix cpp)))))
+    (dolist (pstring (list "CNOT 2 0" (format nil "CNOT 0 2~%CNOT 1 3")))
+      (let* ((pp (quil::parse-quil pstring))
+             (cpp (quil::compiler-hook (quil::parse-quil pstring)
+                                       (quil::build-nQ-linear-chip (quil:qubits-needed pp))
+                                       :protoquil t)))
+        (format t "~&        Testing program ~A~%" (parsed-program-executable-code pp))
+        (finish-output)
+        (dolist (compress-qubits '(nil t))
+          (is (quil::operator=
+               (quil::parsed-program-to-logical-matrix pp)
+               (quil::parsed-program-to-logical-matrix cpp :compress-qubits compress-qubits)))))))
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
@@ -90,8 +94,7 @@ CNOT 0 1
 CNOT 1 2
 CNOT 0 2
 JUMP @a")))
-      (quil::compiler-hook pp (quil::build-8Q-chip))
-      (is t))))
+      (not-signals error (quil::compiler-hook pp (quil::build-8Q-chip))))))
 
 (defun compare-compiled (file architecture)
   (let* ((orig-prog (quil::transform 'quil::compress-qubits
