@@ -49,7 +49,6 @@
                (:file "transformable-mixin")
                (:file "classical-memory")
                (:file "ast")
-               (:file "quilt")
                (:file "resource")
                (:file "define-pragma")
                (:file "pragmas")

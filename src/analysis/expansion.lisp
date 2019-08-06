@@ -319,4 +319,53 @@ depending on whether TEST passes."
 
       (if (not remake)
           instr
-          (make-instance 'measure :address addr :qubit q)))))
+          (make-instance 'measure :address addr :qubit q))))
+
+  (:method ((instr simple-frame-mutation) param-value arg-value)
+    (make-instance (class-of instr)
+                   :frame (instantiate-frame (target-frame instr) arg-value)
+                   :value (funcall (transform-if #'is-formal arg-value)
+                                   (mutation-value instr))))
+
+  (:method ((instr pulse) param-value arg-value)
+    (make-instance 'pulse
+                   :frame (instantiate-frame (pulse-frame instr) arg-value)
+                   :waveform (pulse-waveform instr)))
+
+  (:method ((instr capture) param-value arg-value)
+    (let ((memory-ref (funcall (transform-if #'is-formal arg-value)
+                               (capture-memory-ref instr))))
+      (check-mref memory-ref)
+      (make-instance 'capture
+                     :frame (instantiate-frame (capture-frame instr) arg-value)
+                     :waveform (capture-waveform instr)
+                     :memory-ref memory-ref)))
+
+  (:method ((instr raw-capture) param-value arg-value)
+    (let ((memory-ref (funcall (transform-if #'is-formal arg-value)
+                               (raw-capture-memory-ref instr)))
+          (duration (funcall (transform-if #'is-formal arg-value)
+                             (raw-capture-duration instr))))
+      (check-mref memory-ref)
+      (make-instance 'raw-capture
+                     :frame (instantiate-frame (raw-capture-frame instr) arg-value)
+                     :duration duration
+                     :memory-ref memory-ref)))
+
+  (:method ((instr delay) param-value arg-value)
+    (let ((qubit (funcall (transform-if #'is-formal arg-value)
+                          (delay-qubit instr)))
+          (duration (funcall (transform-if #'is-formal arg-value)
+                             (delay-duration instr))))
+      (make-instance 'delay
+                     :qubit qubit
+                     :duration duration)))
+  (:method ((instr fence) param-value arg-value)
+    (let ((qubits (mapcar (transform-if #'is-formal arg-value)
+                          (fence-qubits instr))))
+      (make-instance 'fence :qubits qubits))))
+
+(defun instantiate-frame (frame arg-value)
+  (let ((qubits (mapcar (transform-if #'is-formal arg-value)
+                        (frame-qubits frame))))
+    (frame qubits (frame-name frame))))
