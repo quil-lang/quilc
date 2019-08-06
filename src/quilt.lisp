@@ -2,16 +2,16 @@
 
 ;;; Atoms
 
-;;; TODO think through this
-;;; does a frame have a fixed arity?
-;;; how do pairs of frames interact
-;;; should qubits be added to this?
-(defstruct (frame (:constructor frame (name)))
+;;; TODO should a frame-name have a fixed arity?
+(defstruct (frame (:constructor frame (qubits name)))
   "A rotating frame, relative to which control or readout waveforms may be defined."
-  (name nil :type string))
+  (name nil :type string)
+  (qubits nil :type list))
 
 (defmethod print-instruction-generic ((thing frame) (stream stream))
-  (format stream "~S" (frame-name thing)))
+  (format stream "~{~A ~}~A"
+          (frame-qubits thing)
+          (frame-name thing)))
 
 (defstruct  (waveform-ref (:constructor %waveform-ref (name args)))
   "A reference to a (possibly parametric) waveform."
@@ -163,15 +163,9 @@
                  :body body))
 
 ;;; Frame Mutations
-;;; frame is <list of qubits> followed by <frame name>
-;;; Real is either a literal or an expression.
-;;; TODO check on whether this makes sense
-;;; TODO why can't we read frame attributes to classical memory?
 
 (defclass simple-frame-mutation (instruction)
-  ((qubits :initarg :qubits
-           :accessor target-qubits)
-   (frame :initarg :frame
+  ((frame :initarg :frame
           :accessor target-frame)
    (value :initarg :value
           :accessor mutation-value))
@@ -192,7 +186,7 @@
 (defmethod arguments ((instr simple-frame-mutation))
   (with-slots (qubits frame value)
       instr
-    (coerce (append qubits (list frame value)) 'vector)))
+    (coerce (list frame value) 'vector)))
 
 (defmacro define-simple-frame-mutation (name mnemonic &body body)
   (check-type mnemonic string)
@@ -205,16 +199,16 @@
           (mnemonic instr)
           (map 'list #'print-instruction-to-string (arguments instr))))
 
-(defmethod instantiate-instruction ((instr simple-frame-mutation) param-value arg-value)
+(defun instantiate-frame (frame arg-value)
   (let ((qubits (mapcar (transform-if #'is-formal arg-value)
-                        (target-qubits instr)))
-        (value (funcall (transform-if #'is-formal arg-value)
-                        (mutation-value instr))))
-    (make-instance (class-of instr)
-                   :qubits qubits
-                   :frame (target-frame instr)
-                   :value value)))
+                        (frame-qubits frame))))
+    (frame qubits (frame-name frame))))
 
+(defmethod instantiate-instruction ((instr simple-frame-mutation) param-value arg-value)
+  (make-instance (class-of instr)
+                 :frame (instantiate-frame (target-frame instr) arg-value)
+                 :value (funcall (transform-if #'is-formal arg-value)
+                                 (mutation-value instr))))
 
 (define-simple-frame-mutation set-frequency "SET-FREQUENCY"
   "An instruction setting the frequency of a frame.")
@@ -229,55 +223,38 @@
   "An instruction setting the scale of a frame.")
 
 (defclass swap-phase (instruction)
-  ((left-qubits :initarg :left-qubits
-                :accessor swap-phase-left-qubits)
-   (left-frame :initarg :left-frame
+  ((left-frame :initarg :left-frame
                :accessor swap-phase-left-frame)
-   (right-qubits :initarg :right-qubits
-                 :accessor swap-phase-right-qubits)
    (right-frame :initarg :right-frame
                 :accessor swap-phase-right-frame))
   (:documentation "An instruction representing a phase swap between two frames."))
-
-;;; TODO abstract out frame? so we have a frame type, consisting of qubits and name
 
 ;;; TODO arguments and mnemonic
 ;;; what is the motivation behind this? what is the "protocol" which is specified? how do we handle pulses?
 ;;; - it seems like they are used for printing
 
-
 ;;; Pulse
 
 (defclass pulse (instruction)
-  ((qubits :initarg :qubits
-          :accessor pulse-qubits)
-   (frame :initarg :frame
+  ((frame :initarg :frame
           :accessor pulse-frame)
    (waveform :initarg :waveform
              :accessor pulse-waveform))
   (:documentation "A pulse instruction."))
 
 (defmethod print-instruction-generic ((instr pulse) (stream stream))
-  (format stream "PULSE ~{~A ~}~A ~A"
-          (mapcar (lambda (q) (print-instruction-generic q nil))
-                  (pulse-qubits instr))
+  (format stream "PULSE ~A ~A"
           (print-instruction-generic (pulse-frame instr) nil)
           (print-instruction-generic (pulse-waveform instr) nil)))
 
-;;; TODO can waveform arguments be formal parameters?
 (defmethod instantiate-instruction ((instr pulse) param-value arg-value)
-  (let ((qubits (mapcar (transform-if #'is-formal arg-value)
-                        (pulse-qubits instr))))
-    (make-instance 'pulse
-                   :qubits qubits
-                   :frame (pulse-frame instr)
-                   :waveform (pulse-waveform instr))))
+  (make-instance 'pulse
+                 :frame (instantiate-frame (pulse-frame instr) arg-value)
+                 :waveform (pulse-waveform instr)))
 
 ;;; Capture
 (defclass capture (instruction)
-  ((qubit :initarg :qubit
-          :accessor capture-qubit)
-   (frame :initarg :frame
+  ((frame :initarg :frame
           :accessor capture-frame)
    (waveform :initarg :waveform
              :accessor capture-waveform)
@@ -287,28 +264,22 @@
   IQ values, to be stored in a region of classical memory."))
 
 (defmethod print-instruction-generic ((instr capture) (stream stream))
-  (format stream "CAPTURE ~A ~A ~A ~A"
-          (print-instruction-generic (capture-qubit instr) nil)
+  (format stream "CAPTURE ~A ~A ~A"
           (print-instruction-generic (capture-frame instr) nil)
           (print-instruction-generic (capture-waveform instr) nil)
           (print-instruction-generic (capture-memory-ref instr) nil)))
 
 (defmethod instantiate-instruction ((instr capture) param-value arg-value)
-  (let ((qubit (funcall (transform-if #'is-formal arg-value)
-                        (capture-qubit instr)))
-        (memory-ref (funcall (transform-if #'is-formal arg-value)
+  (let ((memory-ref (funcall (transform-if #'is-formal arg-value)
                              (capture-memory-ref instr))))
     (check-mref memory-ref)
     (make-instance 'capture
-                   :qubit qubit
-                   :frame (capture-frame instr)
+                   :frame (instantiate-frame (capture-frame instr) arg-value)
                    :waveform (capture-waveform instr)
                    :memory-ref memory-ref)))
 
 (defclass raw-capture (instruction)
-  ((qubit :initarg :qubit
-          :accessor raw-capture-qubit)
-   (frame :initarg :frame
+  ((frame :initarg :frame
           :accessor raw-capture-frame)
    (duration :initarg :duration
              :accessor raw-capture-duration)
@@ -318,23 +289,19 @@
   IQ values, to be stored in a region of classical memory."))
 
 (defmethod print-instruction-generic ((instr raw-capture) (stream stream))
-  (format stream "RAW-CAPTURE ~A ~A ~A ~A"
-          (print-instruction-generic (raw-capture-qubit instr) nil)
+  (format stream "RAW-CAPTURE ~A ~A ~A"
           (print-instruction-generic (raw-capture-frame instr) nil)
           (print-instruction-generic (raw-capture-duration instr) nil)
           (print-instruction-generic (raw-capture-memory-ref instr) nil)))
 
 (defmethod instantiate-instruction ((instr raw-capture) param-value arg-value)
-  (let ((qubit (funcall (transform-if #'is-formal arg-value)
-                        (raw-capture-qubit instr)))
-        (memory-ref (funcall (transform-if #'is-formal arg-value)
+  (let ((memory-ref (funcall (transform-if #'is-formal arg-value)
                              (raw-capture-memory-ref instr)))
         (duration (funcall (transform-if #'is-formal arg-value)
                            (raw-capture-duration instr))))
     (check-mref memory-ref)
     (make-instance 'raw-capture
-                   :qubit qubit
-                   :frame (raw-capture-frame instr)
+                   :frame (instantiate-frame (raw-capture-frame instr) arg-value)
                    :duration duration
                    :memory-ref memory-ref)))
 

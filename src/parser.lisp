@@ -1356,15 +1356,14 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 (defun parse-pulse (tok-lines)
   (match-line ((op :PULSE) &rest rest-toks) tok-lines
-    (multiple-value-bind (qubits frame-name rest-toks)
-        (parse-frame rest-toks ':PULSE)
+    (multiple-value-bind (frame rest-toks)
+        (parse-frame rest-toks)
       (multiple-value-bind (waveform-ref rest)
           (parse-waveform-ref rest-toks)
         (unless (endp rest)
           (quil-parse-error "Unexpected token ~A at end of PULSE instruction." (first rest)))
         (make-instance 'pulse
-                       :qubits qubits
-                       :frame frame-name
+                       :frame frame
                        :waveform waveform-ref)))))
 
 (defun parse-delay (tok-lines)
@@ -1382,9 +1381,9 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 (defun parse-capture (tok-lines)
   (match-line ((op :CAPTURE) &rest rest-toks) tok-lines
-    (multiple-value-bind (qubits frame-name rest-toks)
-        (parse-frame rest-toks ':CAPTURE)
-      (unless (= 1 (length qubits))
+    (multiple-value-bind (frame rest-toks)
+        (parse-frame rest-toks)
+      (unless (= 1 (length (frame-qubits frame)))
         (quil-parse-error "CAPTURE instruction is only applicable to single-qubit frames."))
       (when (endp rest-toks)
         (quil-parse-error "CAPTURE instruction is missing waveform reference."))
@@ -1397,18 +1396,17 @@ result of BODY, and the (possibly null) list of remaining lines.
         (let ((address-obj (parse-memory-or-formal-token (first rest-toks)
                                                          :ensure-valid t)))
           (make-instance 'capture
-                         :qubit (first qubits)
-                         :frame frame-name
+                         :frame frame
                          :waveform waveform-ref
                          :memory-ref address-obj))))))
 
 
 (defun parse-raw-capture (tok-lines)
   (match-line ((op :RAW-CAPTURE) &rest rest-toks) tok-lines
-    (multiple-value-bind (qubits frame-name rest-toks)
-        (parse-frame rest-toks ':RAW-CAPTURE)
-      (unless (= 1 (length qubits))
-        (quil-parse-error "CAPTURE instruction is only applicable to single-qubit frames."))
+    (multiple-value-bind (frame rest-toks)
+        (parse-frame rest-toks)
+      (unless (= 1 (length (frame-qubits frame)))
+        (quil-parse-error "RAW-CAPTURE instruction is only applicable to single-qubit frames."))
       (unless (= 2 (length rest-toks))
         (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
       (let ((duration (parse-argument (first rest-toks)))
@@ -1418,15 +1416,14 @@ result of BODY, and the (possibly null) list of remaining lines.
                     (is-formal duration))
           (quil-parse-error "Expected RAW-CAPTURE duration to be a real number or formal argument."))
         (make-instance 'raw-capture
-                       :qubit (first qubits)
-                       :frame frame-name
+                       :frame frame
                        :duration duration
                        :memory-ref addr)))))
 
 (defun parse-simple-frame-mutation (tok-type tok-lines)
   (match-line ((op tok-type) &rest rest-toks) tok-lines
-    (multiple-value-bind (qubits frame-name value-toks)
-        (parse-frame rest-toks tok-type)
+    (multiple-value-bind (frame value-toks)
+        (parse-frame rest-toks)
       (let ((result (parse-parameter-or-expression value-toks)))
         (make-instance
          (ecase tok-type
@@ -1434,38 +1431,34 @@ result of BODY, and the (possibly null) list of remaining lines.
            ((:SET-PHASE)     'set-phase)
            ((:SHIFT-PHASE)   'shift-phase)
            ((:SET-SCALE)     'set-scale))
-         :qubits qubits
-         :frame frame-name
+         :frame frame
          :value result)))))
 
 (defun parse-swap-phase (tok-lines)
   (match-line ((op :SWAP-PHASE) &rest rest-toks) tok-lines
-      (multiple-value-bind (left-qubits left-frame-name rest-toks)
-          (parse-frame rest-toks :SWAP-PHASE)
-        (multiple-value-bind (right-qubits right-frame-name rest-toks)
-            (parse-frame rest-toks :SWAP-PHASE)
+      (multiple-value-bind (left-frame rest-toks)
+          (parse-frame rest-toks)
+        (multiple-value-bind (right-frame rest-toks)
+            (parse-frame rest-toks)
           (unless (endp rest-toks)
             (quil-parse-error "Unexpected token ~A in SWAP-PHASE"
                               (token-type (first rest-toks))))
           (make-instance 'swap-phase
-                         :left-qubits left-qubits
-                         :left-frame left-frame-name
-                         :right-qubits right-qubits
-                         :right-frame right-frame-name)))))
+                         :left-frame left-frame
+                         :right-frame right-frame)))))
 
-(defun parse-frame (toks error-context)
+(defun parse-frame (toks)
   "Parse a frame from the list of tokens TOKS.
-Returns the frame qubits, the frame name, and the remaining tokens."
+Returns the frame and the remaining tokens."
   (multiple-value-bind (qubit-toks rest-toks)
       (take-until (lambda (tok) (eql ':STRING (token-type tok)))
                   toks)
     (let ((qubits (mapcar #'parse-qubit qubit-toks)))
       (when (endp rest-toks)
         (quil-parse-error "Expected a frame name in ~A, but none were found (did you forget quotes?)"
-                          error-context))
+                          *parse-context*))
       (values
-       qubits
-       (frame (token-payload (first rest-toks))) ; frame name
+       (frame qubits (token-payload (first rest-toks))) ; frame name
        (rest rest-toks)))))
 
 (defun parse-waveform-definition (tok-lines)
