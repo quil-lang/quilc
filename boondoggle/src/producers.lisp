@@ -66,8 +66,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
   ((directory-path :initform nil)))
 
 (defun measure-at-close-instrs (chip-specification)
-  "Apply MEASURE instructions on all qubits in a chip-specification. Assumes qubits are ordered from 0 to n with no skipped indices.
-"
+  "Apply MEASURE instructions on all qubits in a chip-specification. Assumes qubits are ordered from 0 to n with no skipped indices."
   (loop :for j :below (quil::chip-spec-n-qubits chip-specification)
         :collect (make-instance 'quil:measure
                                 :address (quil:mref "ro" j)
