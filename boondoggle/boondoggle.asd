@@ -5,7 +5,7 @@
 (asdf:defsystem #:boondoggle
   :description "A quilc/QVM/QPU integration tester."
   :author "Eric Peterson <eric@rigetti.com>"
-  :version (:read-file-form "boondoggle/VERSION.txt")
+  :version (:read-file-form "VERSION.txt")
   :depends-on (#:cl-quil
                #:command-line-arguments
                #:drakma
