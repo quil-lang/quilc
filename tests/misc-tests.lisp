@@ -259,6 +259,40 @@
       (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
 
+(deftest test-nth-instr ()
+  (dolist (pp (list (quil:parse-quil "")
+                    (with-output-to-quil
+                      "RESET")
+                    (with-output-to-quil
+                      "RESET"
+                      "MEASURE 0")
+                    (with-output-to-quil
+                      "RESET"
+                      "MEASURE 0"
+                      "HALT")))
+    (let* ((code (parsed-program-executable-code pp))
+           (length (length code)))
+      ;; Index out-of-bounds checks
+      (signals quil::invalid-bidirectional-index-error
+        (quil::nth-instr length pp))
+      (signals quil::invalid-bidirectional-index-error
+        (quil::nth-instr (1- (- length)) pp))
+
+      ;; Test all valid indices
+      (dotimes (i length)
+        (is (eq (quil::nth-instr i pp)
+                (aref code i)))
+        (is (eq (quil::nth-instr (- i length) pp)
+                (aref code i)))
+        (let ((no-op1 (make-instance 'quil::no-operation))
+              (no-op2 (make-instance 'quil::no-operation)))
+          ;; These two SETFs set the same location, hence the need for two distinct no-op
+          ;; instructions to compare against.
+          (setf (quil::nth-instr i pp) no-op1)
+          (is (eq no-op1 (aref code i)))
+          (setf (quil::nth-instr (- i length) pp) no-op2)
+          (is (eq no-op2 (aref code i))))))))
+
 (deftest test-make-rewiring-from-string ()
   (signals error (quil::make-rewiring-from-string ""))
   (signals error (quil::make-rewiring-from-string "foobar"))
@@ -287,16 +321,38 @@
         (is (equalp (quil::rewiring-l2p actual-first-rewiring) expected-first-rewiring))
         (is (equalp (quil::rewiring-l2p actual-second-rewiring) expected-second-rewiring))))))
 
-(defun %extract-trivial-exit-rewiring (pp)
-  "Extract the exit rewiring comment from parsed program PP. Trivial here means PP is expected to have a single exit rewiring. A more complicated CFG could produce multiple exit rewirings in a program, but that is outside our scope of interest."
-  (declare (type parsed-program pp))
-  (loop :with code := (parsed-program-executable-code pp)
-        :for i :below (length code)
-        :for comment := (quil::comment (elt code i))
-        :when (and comment
-                   (eq ':EXITING (quil::rewiring-comment-type comment)))
-          :return (quil::rewiring-l2p
-                   (quil::parse-exiting-rewiring comment))))
+(deftest test-extract-final-exit-rewiring-vector ()
+  (is (null (quil::extract-final-exit-rewiring-vector (quil:parse-quil ""))))
+
+  ;; test that the *final* rewiring is extracted
+  (let ((pp (with-output-to-quil
+              "RESET"
+              "MEASURE 0")))
+    (setf (quil::comment (quil::nth-instr 0 pp))
+          (quil::make-rewiring-comment :exiting #(0 1 2)))
+    (setf (quil::comment (quil::nth-instr 1 pp))
+          (quil::make-rewiring-comment :exiting #(1 0 2)))
+    (is (equalp #(1 0 2) (quil::extract-final-exit-rewiring-vector pp))))
+
+  ;; Each test in the loop should allocate to a fresh PARSED-PROGRAM; otherwise, comments attached
+  ;; earlier in the loop persist for later tests.
+  (dolist (quil (list "RESET"
+                      (format nil "RESET~%MEASURE 0")
+                      (format nil "RESET~%MEASURE 0~%HALT")))
+    ;; no rewirings
+    (is (null (quil::extract-final-exit-rewiring-vector (quil:parse-quil quil))))
+
+    ;; only enter rewiring
+    (is (null (quil::extract-final-exit-rewiring-vector
+               (attach-rewirings-to-program (quil:parse-quil quil) #(0 1 2) nil))))
+
+    ;; only exit rewiring
+    (is (equalp #(2 1 0) (quil::extract-final-exit-rewiring-vector
+                          (attach-rewirings-to-program (quil:parse-quil quil) nil #(2 1 0)))))
+
+    ;; both enter and exiting rewirings
+    (is (equalp #(2 1 0) (quil::extract-final-exit-rewiring-vector
+                          (attach-rewirings-to-program (quil:parse-quil quil) #(0 1 2) #(2 1 0)))))))
 
 (defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
   "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
@@ -336,7 +392,7 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
 (defun %test-measure-semantics (p-str)
   (let* ((p (parse-quil p-str))
          (p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil nil))
-         (rewiring (quil::qubit-relabeler (%extract-trivial-exit-rewiring p-comp))))
+         (rewiring (quil::qubit-relabeler (quil::extract-final-exit-rewiring-vector p-comp))))
     (loop :for i :below (expt 2 6) :do
       (let* ((qvm (%make-density-qvm-initialized-in-basis 3 i))
              (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))

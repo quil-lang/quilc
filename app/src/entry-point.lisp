@@ -523,58 +523,11 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
       ;; if we're supposed to output protoQuil, we need to strip the final HALT
       ;; instructions from the output
       (when protoquil
+        (setf (gethash "topological_swaps" statistics) topological-swaps)
+        (setf (gethash "final_rewiring" statistics)
+              (quil::extract-final-exit-rewiring-vector processed-program))
         (setf (parsed-program-executable-code processed-program)
-              (coerce
-               (loop :for instr :across (parsed-program-executable-code processed-program)
-                     :for j :from 0
-                     ;; if there's a comment, consider extracting from it the final_rewiring
-                     ;; entry for use in the statistics dictionary.
-                     :when (comment instr)
-                       :do (cond
-                             ((uiop:string-prefix-p "Exiting rewiring: " (comment instr))
-                              (let ((*read-eval* nil))
-                                (setf (gethash "final_rewiring" statistics)
-                                      (read-from-string
-                                       (subseq (comment instr) (length "Exiting rewiring: "))))))
-                             ((uiop:string-prefix-p "Entering/exiting rewiring: " (comment instr))
-                              (let ((comment (comment instr))
-                                    (length (length "Entering/exiting rewiring: ("))
-                                    (*read-eval* nil))
-                                (setf (gethash "final_rewiring" statistics)
-                                      (read-from-string
-                                       (subseq (comment instr) length (- (length comment)
-                                                                         (/ (- (length comment) length) 2)
-                                                                         2))))))
-                             (t nil))
-                           ;; if there's a HALT instruction with a rewiring comment on
-                           ;; it, we need to migrate the comment up one instruction
-                           ;; (and perhaps merge it with any comment already present)
-                     :when (and (plusp j)
-                                (typep instr 'halt)
-                                (comment instr))
-                       :do (cond
-                             ((comment (aref (parsed-program-executable-code processed-program)
-                                             (1- j)))
-                              (let ((*print-pretty* nil)
-                                    (prev-rewiring (subseq (comment (aref (parsed-program-executable-code processed-program)
-                                                                          (1- j)))
-                                                           (length "Entering rewiring: ")))
-                                    (this-rewiring (subseq (comment instr)
-                                                           (length "Exiting rewiring: "))))
-                                (setf (comment (aref (parsed-program-executable-code processed-program)
-                                                     (1- j)))
-                                      (format nil "Entering/exiting rewiring: (~a . ~a)"
-                                              prev-rewiring this-rewiring))))
-                             (t
-                              (setf (comment (aref (parsed-program-executable-code processed-program)
-                                                   (1- j)))
-                                    (comment instr))))
-                     :unless (typep instr 'halt)
-                       :collect instr)
-               'vector))
-
-        (setf (gethash "topological_swaps" statistics)
-              topological-swaps)
+              (%strip-halts-respecting-rewirings processed-program))
 
         (let ((lschedule (quil::make-lscheduler)))
           (loop :for instr :across (parsed-program-executable-code processed-program)
@@ -638,3 +591,32 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
                          (quil::lscheduler-calculate-depth lschedule)))))
 
       (values processed-program statistics))))
+
+(defun %strip-halts-respecting-rewirings (processed-program)
+  "Remove HALT instructions from PROCESSED-PROGRAM, but retain any EXITING rewirings."
+  (coerce
+   (loop :for instr :across (parsed-program-executable-code processed-program)
+         :for j :from 0
+         :when (and (plusp j)
+                    (typep instr 'halt)
+                    (comment instr))
+           :do (cond
+                 ((comment (aref (parsed-program-executable-code processed-program)
+                                 (1- j)))
+                  (let ((*print-pretty* nil)
+                        (prev-rewiring (subseq (comment (aref (parsed-program-executable-code processed-program)
+                                                              (1- j)))
+                                               (length "Entering rewiring: ")))
+                        (this-rewiring (subseq (comment instr)
+                                               (length "Exiting rewiring: "))))
+                    (setf (comment (aref (parsed-program-executable-code processed-program)
+                                         (1- j)))
+                          (format nil "Entering/exiting rewiring: (~a . ~a)"
+                                  prev-rewiring this-rewiring))))
+                 (t
+                  (setf (comment (aref (parsed-program-executable-code processed-program)
+                                       (1- j)))
+                        (comment instr))))
+         :unless (typep instr 'halt)
+           :collect instr)
+   'vector))
