@@ -17,7 +17,6 @@ In the generated `pipeline`, the producers, processors, consumers and post-proce
 Note that the processors are indexed by compiled/uncompiled in the variable i, and that although the consumers are indexed by j, there is just one (the QVM). The qvm-results are indexed by both the consumer and the processor.
 
 The processor-L1-distance post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the L1 distance between all possible combinations."
-  (declare (optimize (debug 3)))
   (let ((*debug-noise-stream* *standard-output*)
         (chip-spec (quil::build-8q-chip)))
     (let ((l1-results (boondoggle::pipeline

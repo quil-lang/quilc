@@ -6,11 +6,10 @@
   :description "Boondoggle tests."
   :author "Chris Osborn <chris@rigetti.com>"
   :license "Apache License 2.0 (See LICENSE.txt)"
-  :depends-on (#:quilc
+  :depends-on (#:cl-quil
                #:boondoggle
                #:fiasco
-               #:uiop
-               )
+               #:uiop)
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':boondoggle-tests
                                            '#:run-boondoggle-tests))
