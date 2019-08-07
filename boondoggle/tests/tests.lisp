@@ -1,4 +1,4 @@
-;;;; examples.lisp
+;;;; tests.lisp
 ;;;; Authors: Eric Peterson & Chris Osborn
 
 (in-package #:boondoggle-tests)
