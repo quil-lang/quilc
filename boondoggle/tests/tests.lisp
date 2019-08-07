@@ -26,7 +26,7 @@ The processor-L1-distance post-process takes all consumers and processors as inp
                                                                  :respect-topology t))      
                          (processors    (i)       (list (make-instance 'boondoggle::processor-identity)
                                                         (make-instance 'boondoggle::processor-quilc
-                                                                       :executable-path (namestring (truename #P"./quilc")))))
+                                                                       :executable-path (namestring #P"./quilc"))))
                          (consumers     (j)       (list (make-instance 'boondoggle::consumer-local-qvm
                                                                        :trials 1000)))
                          (post-process  ()        (make-instance 'boondoggle::processor-L1-distance)))
