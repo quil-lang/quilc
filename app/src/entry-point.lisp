@@ -593,30 +593,36 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
       (values processed-program statistics))))
 
 (defun %strip-halts-respecting-rewirings (processed-program)
-  "Remove HALT instructions from PROCESSED-PROGRAM, but retain any EXITING rewirings."
-  (coerce
-   (loop :for instr :across (parsed-program-executable-code processed-program)
-         :for j :from 0
-         :when (and (plusp j)
-                    (typep instr 'halt)
-                    (comment instr))
-           :do (cond
-                 ((comment (aref (parsed-program-executable-code processed-program)
-                                 (1- j)))
-                  (let ((*print-pretty* nil)
-                        (prev-rewiring (subseq (comment (aref (parsed-program-executable-code processed-program)
-                                                              (1- j)))
-                                               (length "Entering rewiring: ")))
-                        (this-rewiring (subseq (comment instr)
-                                               (length "Exiting rewiring: "))))
-                    (setf (comment (aref (parsed-program-executable-code processed-program)
-                                         (1- j)))
-                          (format nil "Entering/exiting rewiring: (~a . ~a)"
-                                  prev-rewiring this-rewiring))))
-                 (t
-                  (setf (comment (aref (parsed-program-executable-code processed-program)
-                                       (1- j)))
-                        (comment instr))))
-         :unless (typep instr 'halt)
-           :collect instr)
-   'vector))
+  "Remove HALT instructions from PROCESSED-PROGRAM, retaining any rewirings."
+  (flet ((assert-rewirings-compatible (rewiring-type instr prev-instr this-rewiring prev-rewiring)
+           ;; Either one of the rewirings is NULL, or they are EQUALP.
+           (assert (or (or (null this-rewiring)
+                           (null prev-rewiring))
+                       (equalp this-rewiring prev-rewiring))
+                   ()
+                   "Instructions have incompatible ~A rewirings:~@
+                           THIS: ~A ~A~@
+                           PREV: ~A ~A"
+                   rewiring-type instr this-rewiring prev-instr prev-rewiring)))
+    (loop
+      :for j :from 0
+      :for instr :across (parsed-program-executable-code processed-program)
+      :for prev-instr := (and (plusp j) (quil::nth-instr (1- j) processed-program))
+      :when (and (plusp j) (typep instr 'halt) (comment instr)) :do
+        (multiple-value-bind (this-entering this-exiting) (quil::instruction-rewirings instr)
+          (multiple-value-bind (prev-entering prev-exiting) (quil::instruction-rewirings prev-instr)
+            (assert-rewirings-compatible ':ENTERING instr prev-instr this-entering prev-entering)
+            (assert-rewirings-compatible ':EXITING instr prev-instr this-exiting prev-exiting)
+            ;; Because of the (COMMENT INSTR) in the above :WHEN loop clause, we know that at least
+            ;; one of THIS-ENTERING and THIS-EXITING is non-NIL. Furthermore, due to the
+            ;; ASSERT-REWIRINGS-COMPATIBLE calls we know that either at most one the this/prev
+            ;; rewirings are non-NIL, or else they are equal. If they are equal, it doesn't matter
+            ;; which one we pick. If they are both NIL, then MAKE-REWIRING-FROM-STRING will do the
+            ;; right thing and return either an :ENTERING or :EXITING rewiring comment.
+            (setf (comment prev-instr)
+                  (quil::make-rewiring-comment :entering (or this-entering prev-entering)
+                                               :exiting (or this-exiting prev-exiting)))))
+      :unless (typep instr 'halt)
+        :collect instr :into new-instructions
+      :finally
+         (return (coerce new-instructions 'vector)))))
