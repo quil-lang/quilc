@@ -11,6 +11,7 @@
                #:drakma
                #:uiop
                )
+  :in-order-to ((asdf:test-op (asdf:test-op #:boondoggle-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
                       (funcall compile)))
@@ -21,5 +22,4 @@
                (:file "producers")
                (:file "consumers")
                (:file "processors")
-               (:file "pipeline")
-               (:file "examples")))
+               (:file "pipeline")))
