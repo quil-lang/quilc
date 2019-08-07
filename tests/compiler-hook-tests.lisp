@@ -10,19 +10,25 @@
    "tests/compiler-hook-test-files/"))
 
 (defun attach-rewirings-to-program (pp in-rewiring-vector out-rewiring-vector)
-  (let ((code (quil::parsed-program-executable-code pp)))
-    (cond
-      ((< (length code) 1)
-       (error "Cannot attach rewirings to program with no instructions"))
-      ((= (length code) 1)
-       (setf (quil::comment (aref code 0))
-	     (quil::make-rewiring-comment :entering in-rewiring-vector
-                                          :exiting out-rewiring-vector)))
-      (t
-       (setf (quil::comment (aref code 0))
-             (quil::make-rewiring-comment :entering in-rewiring-vector))
-       (setf (quil::comment (aref code (1- (length code))))
-             (quil::make-rewiring-comment :exiting out-rewiring-vector)))))
+  (check-type in-rewiring-vector (or null quil::integer-vector))
+  (check-type out-rewiring-vector (or null quil::integer-vector))
+
+  (unless (and (null in-rewiring-vector) (null out-rewiring-vector))
+    (let ((code (quil::parsed-program-executable-code pp)))
+      (cond
+        ((< (length code) 1)
+         (error "Cannot attach rewirings to program with no instructions"))
+        ((= (length code) 1)
+         (setf (quil::comment (aref code 0))
+               (quil::make-rewiring-comment :entering in-rewiring-vector
+                                            :exiting out-rewiring-vector)))
+        (t
+         (when (not (null in-rewiring-vector))
+           (setf (quil::comment (aref code 0))
+                 (quil::make-rewiring-comment :entering in-rewiring-vector)))
+         (when (not (null out-rewiring-vector))
+           (setf (quil::comment (aref code (1- (length code))))
+                 (quil::make-rewiring-comment :exiting out-rewiring-vector)))))))
   pp)
 
 (defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)

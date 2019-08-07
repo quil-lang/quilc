@@ -1,5 +1,16 @@
 (in-package #:quilc-tests)
 
+;;; Cribbed from CL-QUIL-TESTs which itself cribbed from QVM-TESTS!
+(defmacro with-output-to-quil (&body body)
+  `(let ((quil:*allow-unresolved-applications* t))
+     (quil:parse-quil
+      (with-output-to-string (*standard-output*)
+        ,@(loop :for form :in body
+                :if (stringp form)
+                  :collect `(write-line ,form)
+                :else
+                  :collect form)))))
+
 (defmacro with-mocked-function-definitions (defs &body body)
   "Dynamically re-define global functions named in DEFS within BODY.
 

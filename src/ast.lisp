@@ -205,21 +205,6 @@ Return (VALUES ENTERING-REWIRING EXITING-REWIRING)."
                    rewiring-string
                    #'make-rewiring-pair-from-string))
 
-(defun instruction-rewirings (instruction)
-  "Return the pair of entering and exiting rewirings associated with instruction.
-
-Return (VALUES ENTERING EXITING) if INSTRUCTION has a combined ENTERING/EXITING rewiring attached.
-Return (VALUES ENTERING NIL) if INSTRUCTION has only an ENTERING rewiring.
-Return (VALUES NIL EXITING) if INSTRUCTION has only an EXITING rewiring.
-Return (VALUES NIL NIL) if INSTRUCTION has no rewiring attached."
-  (a:if-let ((comment (comment instruction)))
-    (ecase (rewiring-comment-type comment)
-      (:ENTERING (values (parse-entering-rewiring comment) nil))
-      (:EXITING  (values nil (parse-exiting-rewiring comment)))
-      (:ENTERING/EXITING (parse-entering/exiting-rewiring comment)))
-    ;; No comment attached to INSTRUCTION.
-    (values nil nil)))
-
 (defun rewiring-comment-type (rewiring-string)
   "Return the type of the rewiring comment in REWIRING-STRING.
 
@@ -259,6 +244,33 @@ If both ENTERING and EXITING are null, signal an error."
         ((not (null exiting))
          (format nil "~A~A" +exiting-rewiring-prefix+ exiting))
         (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL"))))
+
+(defun instruction-rewirings (instruction)
+  "Return the pair of entering and exiting rewirings associated with instruction.
+
+Return (VALUES ENTERING EXITING) if INSTRUCTION has a combined ENTERING/EXITING rewiring attached.
+Return (VALUES ENTERING NIL) if INSTRUCTION has only an ENTERING rewiring.
+Return (VALUES NIL EXITING) if INSTRUCTION has only an EXITING rewiring.
+Return (VALUES NIL NIL) if INSTRUCTION has no rewiring attached."
+  (a:if-let ((comment (comment instruction)))
+    (ecase (rewiring-comment-type comment)
+      (:ENTERING (values (parse-entering-rewiring comment) nil))
+      (:EXITING  (values nil (parse-exiting-rewiring comment)))
+      (:ENTERING/EXITING (parse-entering/exiting-rewiring comment)))
+    ;; No comment attached to INSTRUCTION.
+    (values nil nil)))
+
+(defun extract-final-exit-rewiring-vector (parsed-program)
+  "Extract the final exit rewiring comment from PARSED-PROGRAM and return it as a VECTOR.
+
+If no exit rewiring is found, return NIL."
+  (check-type parsed-program parsed-program)
+  (loop :with code := (parsed-program-executable-code parsed-program)
+        :for i :from (1- (length code)) :downto 0
+        :for exiting-rewiring := (nth-value 1 (instruction-rewirings (vnth i code)))
+        :when (not (null exiting-rewiring))
+          :return (quil::rewiring-l2p exiting-rewiring)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -451,6 +463,10 @@ numbers. It must start with a string.")
   (:documentation "An instruction to immediately halt all execution.")
   #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
+
+(defun haltp (x)
+  "Is X a HALT instruction?"
+  (typep x 'halt))
 
 (defmethod arguments ((instruction halt)) #())
 (defmethod mnemonic  ((instruction halt)) (values "HALT" 'halt))
@@ -1433,7 +1449,7 @@ For example,
 
 (defun %bounds-check-bidirectional-index (index length)
   (let* ((lower-bound (1- (- length)))
-         (upper-bound (1- length)))
+         (upper-bound length))
     (unless (< lower-bound index upper-bound)
       (error 'invalid-bidirectional-index-error
              :index index
