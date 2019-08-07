@@ -34,7 +34,7 @@
 (defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)
   (dolist (compress-qubits '(nil t))
     (is (quil::operator=
-         (quil::parsed-program-to-logical-matrix pp-a :compress-qubits compress-qubits)
+         (quil::parsed-program-to-logical-matrix pp-a)
          (quil::parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
 
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
@@ -86,10 +86,7 @@ CNOT 0 1")
                                        :protoquil t)))
         (format t "~&        Testing program ~A~%" (parsed-program-executable-code pp))
         (finish-output)
-        (dolist (compress-qubits '(nil t))
-          (is (quil::operator=
-               (quil::parsed-program-to-logical-matrix pp)
-               (quil::parsed-program-to-logical-matrix cpp :compress-qubits compress-qubits)))))))
+        (%parsed-program-to-logical-matrix-rewiring-test pp cpp))))
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
