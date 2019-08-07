@@ -205,6 +205,21 @@ Return (VALUES ENTERING-REWIRING EXITING-REWIRING)."
                    rewiring-string
                    #'make-rewiring-pair-from-string))
 
+(defun instruction-rewirings (instruction)
+  "Return the pair of entering and exiting rewirings associated with instruction.
+
+Return (VALUES ENTERING EXITING) if INSTRUCTION has a combined ENTERING/EXITING rewiring attached.
+Return (VALUES ENTERING NIL) if INSTRUCTION has only an ENTERING rewiring.
+Return (VALUES NIL EXITING) if INSTRUCTION has only an EXITING rewiring.
+Return (VALUES NIL NIL) if INSTRUCTION has no rewiring attached."
+  (a:if-let ((comment (comment instruction)))
+    (ecase (rewiring-comment-type comment)
+      (:ENTERING (values (parse-entering-rewiring comment) nil))
+      (:EXITING  (values nil (parse-exiting-rewiring comment)))
+      (:ENTERING/EXITING (parse-entering/exiting-rewiring comment)))
+    ;; No comment attached to INSTRUCTION.
+    (values nil nil)))
+
 (defun rewiring-comment-type (rewiring-string)
   "Return the type of the rewiring comment in REWIRING-STRING.
 
@@ -222,19 +237,27 @@ If REWIRING-STRING does not have a valid rewiring comment prefix, signal an erro
 (defun make-rewiring-comment (&key entering exiting)
   "Make a rewiring comment from the given ENTERING and EXITING rewirings.
 
+ENTERING and EXITING are both of type (OR NULL INTEGER-VECTOR REWIRING).
+
 If both ENTERING and EXITING are non-null, make an :ENTERING/EXITING rewiring comment.
 If only ENTERING is non-null, make an :ENTERING rewiring comment.
 If only EXITING is non-null, make and :EXITING rewiring comment.
 If both ENTERING and EXITING are null, signal an error."
+  (check-type entering (or null integer-vector rewiring))
+  (check-type exiting (or null integer-vector rewiring))
+
+  (when (typep entering 'rewiring)
+    (setf entering (rewiring-l2p entering)))
+
+  (when (typep exiting 'rewiring)
+    (setf exiting (rewiring-l2p exiting)))
+
   (cond ((and (not (null entering)) (not (null exiting)))
-         (format nil "~A(~A . ~A)"
-                 +entering/exiting-rewiring-prefix+
-                 (rewiring-l2p entering)
-                 (rewiring-l2p exiting)))
+         (format nil "~A(~A . ~A)" +entering/exiting-rewiring-prefix+ entering exiting))
         ((not (null entering))
-         (format nil "~A~A" +entering-rewiring-prefix+ (rewiring-l2p entering)))
+         (format nil "~A~A" +entering-rewiring-prefix+ entering))
         ((not (null exiting))
-         (format nil "~A~A" +exiting-rewiring-prefix+ (rewiring-l2p exiting)))
+         (format nil "~A~A" +exiting-rewiring-prefix+ exiting))
         (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1391,6 +1414,80 @@ For example,
    :circuit-definitions nil
    :memory-definitions nil
    :executable-code #()))
+
+;; A "bidirectional" index is one that allows indexing either from the start of a sequence or from
+;; the end, depending on whether the index is positive or negative, respectively. If the index is
+;; positive, it must be in the range [0, length-of-the-sequence). If index is negative, it must be
+;; in the range [-length-of-the-sequence, 0). Thus, the full range of valid bidirectional indices
+;; for a given sequence is [-length-of-the-sequence, length-of-the-sequence).
+(define-condition invalid-bidirectional-index-error (error)
+  ((index :initarg :index :reader invalid-bidirectional-index-error-index)
+   (lower-bound :initarg :lower-bound :reader invalid-bidirectional-index-error-lower-bound)
+   (upper-bound :initarg :upper-bound :reader invalid-bidirectional-index-error-upper-bound))
+  (:report (lambda (condition stream)
+             (format stream "Invalid bi-directional index ~A: Not in interval (~A, ~A)"
+                     (invalid-bidirectional-index-error-index condition)
+                     (invalid-bidirectional-index-error-lower-bound condition)
+                     (invalid-bidirectional-index-error-upper-bound condition))))
+  (:documentation "An error that is signaled when a bi-directional index is out of bounds."))
+
+(defun %bounds-check-bidirectional-index (index length)
+  (let* ((lower-bound (1- (- length)))
+         (upper-bound (1- length)))
+    (unless (< lower-bound index upper-bound)
+      (error 'invalid-bidirectional-index-error
+             :index index
+             :lower-bound lower-bound
+             :upper-bound upper-bound))))
+
+(defun %normalize-bidirectional-index (index length)
+  "Convert a bidirectional INDEX in the range [-LENGTH, LENGTH) into a \"standard\" non-negative integer index in the range [0, LENGTH).
+
+Checking that INDEX is in range is the caller's responsibility."
+  #+#:alternative
+  (if (minusp index)
+      (+ length index)
+      index)
+  (mod index length))
+
+;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
+;; possibly be sped up by doing away with type checking, doing away with "bidirectional" indices,
+;; making %NTH-INSTR into a macro that takes an &BODY, rather than a CONTINUATION, etc. If you need
+;; speed, you're probably better served by calling CL-QUIL::VNTH on the
+;; PARSED-PROGRAM-EXECUTABLE-CODE vector directly.
+
+(defun %nth-instr (index parsed-program continuation)
+  (check-type index integer)
+  (check-type parsed-program parsed-program)
+  (let* ((code (parsed-program-executable-code parsed-program))
+         (length (length code)))
+    (%bounds-check-bidirectional-index index length)
+    (funcall continuation code (%normalize-bidirectional-index index length))))
+
+(defun nth-instr (index parsed-program)
+  "Return the INSTRUCTION at position INDEX in PARSED-PROGRAM's EXECUTABLE-PROGRAM vector.
+
+INDEX can be a \"bidirectional\" index. That is any integer value in the range [-length, length), where length is (LENGTH (PARSED-PROGRAM-EXECUTABLE-CODE PARSED-PROGRAM)).
+
+Examples:
+
+;; Get the first instruction of PP.
+(nth-instr 0 pp)
+
+;; Also the first instruction, assuming that (= 5 (LENGTH (PARSED-PROGRAM-EXECUTABLE-CODE PP))).
+(nth-instr -5 pp)
+
+;; Get the last instruction.
+(nth-inst -1 pp)"
+  (%nth-instr index parsed-program
+              (lambda (code normalized-index)
+                (aref code normalized-index))))
+
+(defun (setf nth-instr) (value index parsed-program)
+  "Set the INSTRUCTION at position INDEX in PARSED-PROGRAM's EXECUTABLE-PROGRAM vector."
+  (%nth-instr index parsed-program
+              (lambda (code normalized-index)
+                (setf (aref code normalized-index) value))))
 
 (defun print-instruction-sequence (seq
                                    &key

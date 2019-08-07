@@ -294,10 +294,9 @@
         :for i :below (length code)
         :for comment := (quil::comment (elt code i))
         :when (and comment
-                   (uiop:string-prefix-p "Exiting rewiring: " comment))
+                   (eq ':EXITING (quil::rewiring-comment-type comment)))
           :return (quil::rewiring-l2p
-                   (quil::make-rewiring-from-string
-                    (subseq comment (length "Exiting rewiring: "))))))
+                   (quil::parse-exiting-rewiring comment))))
 
 (defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
   "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
