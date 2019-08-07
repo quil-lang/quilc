@@ -525,16 +525,15 @@ Return the following values:
               (basic-block-out-rewiring blk)
               (= 1 (length code-section)))
          (setf (comment (aref code-section 0))
-               (format nil "Entering/exiting rewiring: (~a . ~a)"
-                       (rewiring-l2p (basic-block-in-rewiring blk))
-                       (rewiring-l2p (basic-block-out-rewiring blk)))))
+               (make-rewiring-comment :entering (basic-block-in-rewiring blk)
+                                      :exiting (basic-block-out-rewiring blk))))
         (t
          (when (basic-block-in-rewiring blk)
            (setf (comment (aref code-section 0))
-                 (format nil "Entering rewiring: ~a" (rewiring-l2p (basic-block-in-rewiring blk)))))
+                 (make-rewiring-comment :entering (basic-block-in-rewiring blk))))
          (when (basic-block-out-rewiring blk)
            (setf (comment (aref code-section (1- (length code-section))))
-                 (format nil "Exiting rewiring: ~a" (rewiring-l2p (basic-block-out-rewiring blk))))))))
+                 (make-rewiring-comment :exiting (basic-block-out-rewiring blk)))))))
     code-section))
 
 (defun reconstitute-program (cfg)

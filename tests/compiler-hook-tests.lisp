@@ -16,12 +16,13 @@
        (error "Cannot attach rewirings to program with no instructions"))
       ((= (length code) 1)
        (setf (quil::comment (aref code 0))
-	     (format nil "Entering/exiting rewiring: (~a . ~a)" in-rewiring-vector out-rewiring-vector)))
+	     (quil::make-rewiring-comment :entering in-rewiring-vector
+                                          :exiting out-rewiring-vector)))
       (t
        (setf (quil::comment (aref code 0))
-             (format nil "Entering rewiring: ~a" in-rewiring-vector))
+             (quil::make-rewiring-comment :entering in-rewiring-vector))
        (setf (quil::comment (aref code (1- (length code))))
-             (format nil "Exiting rewiring: ~a" out-rewiring-vector)))))
+             (quil::make-rewiring-comment :exiting out-rewiring-vector)))))
   pp)
 
 (defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)
