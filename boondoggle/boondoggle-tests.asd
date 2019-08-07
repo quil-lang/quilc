@@ -13,7 +13,7 @@
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':boondoggle-tests
                                            '#:run-boondoggle-tests))
-  :pathname "boondoggle/tests"
+  :pathname "tests/"
   :serial t
   :components ((:file "package")
                (:file "suite")

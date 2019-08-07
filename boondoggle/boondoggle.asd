@@ -15,7 +15,7 @@
   :around-compile (lambda (compile)
                     (let (#+sbcl(sb-ext:*derive-function-types* t))
                       (funcall compile)))
-  :pathname "boondoggle/src/"
+  :pathname "src/"
   :serial t
   :components ((:file "package")
                (:file "options")
