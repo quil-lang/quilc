@@ -43,9 +43,9 @@ The processor-L1-distance post-process takes all consumers and processors as inp
                                        (boondoggle::consume-quil (consumers j) (compiled-program i))))
                         (l1-distance ((l consumers) (k processors) (j consumers) (i processors))
                                      (boondoggle::apply-process (post-process) (qvm-results j i) (qvm-results l k))))))
-      ;; Assert that off-diagonal elements of 2x2 matrix are equivalent
-      ;; TODO: Get flatten nested l1-results
-      (fiasco:is (=
-                  (car (cdr (car (car (car l1-results)))))
-                  (car (car (car (cdr (car l1-results)))))))
-      )))
+      (destructuring-bind ((((a b)) ((c d)))) l1-results ; l1 results are of the form e.g. ((((0.0d0 0.5d0)) ((0.5d0 0.0d0)))) 
+        (fiasco:is (= b c)) ; Off-diagonal elements must equal
+        (fiasco:is (= a d)) ; Diagonal elements must equal
+        (fiasco:is (= a 0.0)) ; Diagonal elements must be zero
+        (fiasco:is (<= b 2.0)) ; Off-diagonal elements must be less than 2.0
+))))
