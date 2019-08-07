@@ -301,7 +301,7 @@ BODY as an implicit PROGN."
             str)
     (let ((first-rewiring-string (aref matches 0))
           (second-rewiring-string (aref matches 1)))
-      (assert (= (length (aref matches 0)) (length (aref matches 1)))
+      (assert (= (length first-rewiring-string) (length second-rewiring-string))
               nil
               "Malformed rewiring pair string: length of rewirings don't match. ~@
                first:  ~A~@
