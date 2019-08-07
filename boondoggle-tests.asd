@@ -17,4 +17,4 @@
   :serial t
   :components ((:file "package")
                (:file "suite")
-               (:file "examples")))
+               (:file "tests")))
