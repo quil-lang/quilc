@@ -273,24 +273,22 @@
     (let* ((code (parsed-program-executable-code pp))
            (length (length code)))
       ;; Index out-of-bounds checks
-      (signals quil::invalid-bidirectional-index-error
-        (quil::nth-instr length pp))
-      (signals quil::invalid-bidirectional-index-error
-        (quil::nth-instr (1- (- length)) pp))
+      (signals error (quil::nth-instr length pp :from-end nil))
+      (signals error (quil::nth-instr length pp :from-end t))
+      (signals error (quil::nth-instr -1 pp :from-end nil))
+      (signals error (quil::nth-instr -1 pp :from-end t))
 
       ;; Test all valid indices
       (dotimes (i length)
-        (is (eq (quil::nth-instr i pp)
-                (aref code i)))
-        (is (eq (quil::nth-instr (- i length) pp)
-                (aref code i)))
+        (is (eq (quil::nth-instr i pp) (aref code i)))
+        (is (eq (quil::nth-instr (- length i 1) pp :from-end t) (aref code i)))
         (let ((no-op1 (make-instance 'quil::no-operation))
               (no-op2 (make-instance 'quil::no-operation)))
           ;; These two SETFs set the same location, hence the need for two distinct no-op
           ;; instructions to compare against.
           (setf (quil::nth-instr i pp) no-op1)
           (is (eq no-op1 (aref code i)))
-          (setf (quil::nth-instr (- i length) pp) no-op2)
+          (setf (quil::nth-instr (- length i 1) pp :from-end t) no-op2)
           (is (eq no-op2 (aref code i))))))))
 
 (deftest test-make-rewiring-from-string ()

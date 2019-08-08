@@ -1431,77 +1431,40 @@ For example,
    :memory-definitions nil
    :executable-code #()))
 
-;; A "bidirectional" index is one that allows indexing either from the start of a sequence or from
-;; the end, depending on whether the index is positive or negative, respectively. If the index is
-;; positive, it must be in the range [0, length-of-the-sequence). If index is negative, it must be
-;; in the range [-length-of-the-sequence, 0). Thus, the full range of valid bidirectional indices
-;; for a given sequence is [-length-of-the-sequence, length-of-the-sequence).
-(define-condition invalid-bidirectional-index-error (error)
-  ((index :initarg :index :reader invalid-bidirectional-index-error-index)
-   (lower-bound :initarg :lower-bound :reader invalid-bidirectional-index-error-lower-bound)
-   (upper-bound :initarg :upper-bound :reader invalid-bidirectional-index-error-upper-bound))
-  (:report (lambda (condition stream)
-             (format stream "Invalid bi-directional index ~A: Not in interval (~A, ~A)"
-                     (invalid-bidirectional-index-error-index condition)
-                     (invalid-bidirectional-index-error-lower-bound condition)
-                     (invalid-bidirectional-index-error-upper-bound condition))))
-  (:documentation "An error that is signaled when a bi-directional index is out of bounds."))
-
-(defun %bounds-check-bidirectional-index (index length)
-  (let* ((lower-bound (1- (- length)))
-         (upper-bound length))
-    (unless (< lower-bound index upper-bound)
-      (error 'invalid-bidirectional-index-error
-             :index index
-             :lower-bound lower-bound
-             :upper-bound upper-bound))))
-
-(defun %normalize-bidirectional-index (index length)
-  "Convert a bidirectional INDEX in the range [-LENGTH, LENGTH) into a \"standard\" non-negative integer index in the range [0, LENGTH).
-
-Checking that INDEX is in range is the caller's responsibility."
-  #+#:alternative
-  (if (minusp index)
-      (+ length index)
-      index)
-  (mod index length))
-
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
-;; possibly be sped up by doing away with type checking, doing away with "bidirectional" indices,
-;; making %NTH-INSTR into a macro that takes an &BODY, rather than a CONTINUATION, etc. If you need
-;; speed, you're probably better served by calling CL-QUIL::VNTH on the
-;; PARSED-PROGRAM-EXECUTABLE-CODE vector directly.
+;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
+;; an &BODY, rather than a CONTINUATION, etc. If you need speed, you're probably better served by
+;; calling AREF or CL-QUIL::VNTH on the PARSED-PROGRAM-EXECUTABLE-CODE vector directly.
 
-(defun %nth-instr (index parsed-program continuation)
+(defun %nth-instr (index parsed-program from-end continuation)
   (check-type index integer)
   (check-type parsed-program parsed-program)
   (let* ((code (parsed-program-executable-code parsed-program))
          (length (length code)))
-    (%bounds-check-bidirectional-index index length)
-    (funcall continuation code (%normalize-bidirectional-index index length))))
+    (funcall continuation code (if from-end (- length index 1) index))))
 
-(defun nth-instr (index parsed-program)
+(defun nth-instr (index parsed-program &key from-end)
   "Return the INSTRUCTION at position INDEX in PARSED-PROGRAM's EXECUTABLE-PROGRAM vector.
 
-INDEX can be a \"bidirectional\" index. That is any integer value in the range [-length, length), where length is (LENGTH (PARSED-PROGRAM-EXECUTABLE-CODE PARSED-PROGRAM)).
+If FROM-END is non-NIL, then INDEX is relative to the end of the instruction sequence, rather than the start. In either case, INDEX is zero-based and must fall in the range [0, length) where length is (LENGTH (PARSED-PROGRAM-EXECUTABLE-CODE PARSED-PROGRAM)).
 
 Examples:
 
 ;; Get the first instruction of PP.
 (nth-instr 0 pp)
 
-;; Also the first instruction, assuming that (= 5 (LENGTH (PARSED-PROGRAM-EXECUTABLE-CODE PP))).
-(nth-instr -5 pp)
+;; Also the first instruction
+(nth-instr (length (parsed-program-executable-code pp)) pp :from-end t)
 
 ;; Get the last instruction.
-(nth-inst -1 pp)"
-  (%nth-instr index parsed-program
+(nth-inst 0 pp :from-end t)"
+  (%nth-instr index parsed-program from-end
               (lambda (code normalized-index)
                 (aref code normalized-index))))
 
-(defun (setf nth-instr) (value index parsed-program)
+(defun (setf nth-instr) (value index parsed-program &key from-end)
   "Set the INSTRUCTION at position INDEX in PARSED-PROGRAM's EXECUTABLE-PROGRAM vector."
-  (%nth-instr index parsed-program
+  (%nth-instr index parsed-program from-end
               (lambda (code normalized-index)
                 (setf (aref code normalized-index) value))))
 
