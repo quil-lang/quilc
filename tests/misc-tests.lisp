@@ -143,56 +143,6 @@
     ((hash-table-p obj) (gethash-chain (rest chain) (gethash (first chain) obj)))
     (t (error "Invalid call to GETHASH-CHAIN."))))
 
-(deftest test-isa-1q-completion ()
-  "Test that the 1Q layer of the chip specification is complete."
-  (let* ((isa (yason:parse "{\"isa\":
-{\"1Q\": {\"0\": {},
-  \"1\": {},
-  \"2\": {},
-  \"3\": {},
-  \"5\": {},
-  \"6\": {},
-  \"7\": {},
-  \"13\": {},
-  \"14\": {},
-  \"15\": {},
-  \"16\": {},
-  \"17\": {}},
- \"2Q\": {\"0-1\": {},
-  \"0-7\": {},
-  \"1-2\": {},
-  \"1-16\": {},
-  \"2-3\": {},
-  \"2-15\": {},
-  \"5-6\": {},
-  \"6-7\": {},
-  \"13-14\": {},
-  \"14-15\": {},
-  \"15-16\": {},
-  \"16-17\": {}}}}"))
-         (chip-spec (quil::qpu-hash-table-to-chip-specification isa)))
-    (is (quil::chip-specification-p chip-spec))
-    (is (= 18 (quil::chip-spec-n-qubits chip-spec)))
-    ;; check we got the goods
-    (dolist (presumed-dead '(4 8 9 10 11 12))
-      (is (quil::chip-spec-qubit-dead? chip-spec presumed-dead))))) ; RIP in piece
-
-(deftest test-bristlecone-chip ()
-  "Test construction of Google's Bristlecone 72-qubit chip"
-  (let* ((chip (quil::build-bristlecone-chip))
-         (prgm (parse-quil
-                (with-output-to-string (s)
-                  (loop :for i :below (quil::chip-spec-n-qubits chip)
-                        :do (format s "H ~D~%" i)))))
-         ;; Bit of a kludge here. Since this is a large number of
-         ;; qubits, calculating its matrix representation will be a
-         ;; terribly long-winded affair.
-         (quil::*compress-carefully* nil))
-    (is (= 72 (quil::chip-spec-n-qubits chip)))
-    (is (= (* 11 11) (quil::chip-spec-n-links chip)))
-    (is (plusp (length (parsed-program-executable-code prgm))))
-    (is (plusp (length (parsed-program-executable-code (compiler-hook prgm chip)))))))
-
 (deftest test-power-of-two-p ()
   "Test that POWER-OF-TWO-P and POSITIVE-POWER-OF-TWO-P do what they say on the tin."
   (is (not (quil::power-of-two-p -2)))

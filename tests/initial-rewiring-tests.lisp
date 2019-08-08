@@ -83,15 +83,7 @@ HALT
          \"2Q\": {\"1-2\": {}, \"2-3\": {}}}}"))))
     (signals error (compiler-hook progm chip))))
 
-(defparameter *qpu-test-file-directory*
-  (asdf:system-relative-pathname
-   ':cl-quil-tests
-   "tests/qpu-test-files/"))
-
-(defun %read-test-chipspec (file-name)
-  (quil::read-chip-spec-file (merge-pathnames file-name *qpu-test-file-directory*)))
-
-(deftest test-sohaib-gh-361 ()
+(deftest test-sohaib-gh-361-regression ()
   "Regression test for github issue #361."
   ;; https://github.com/rigetti/quilc/issues/361
   (let ((progm (with-output-to-quil
