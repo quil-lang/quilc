@@ -615,7 +615,7 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
             (assert-rewirings-compatible ':EXITING instr prev-instr this-exiting prev-exiting)
             ;; Because of the (COMMENT INSTR) in the above :WHEN loop clause, we know that at least
             ;; one of THIS-ENTERING and THIS-EXITING is non-NIL. Furthermore, due to the
-            ;; ASSERT-REWIRINGS-COMPATIBLE calls we know that either at most one the this/prev
+            ;; ASSERT-REWIRINGS-COMPATIBLE calls we know that either at least one the this/prev
             ;; rewirings are non-NIL, or else they are equal. If they are equal, it doesn't matter
             ;; which one we pick. If they are both NIL, then MAKE-REWIRING-FROM-STRING will do the
             ;; right thing and return either an :ENTERING or :EXITING rewiring comment.
