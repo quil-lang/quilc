@@ -255,7 +255,6 @@ Returns a value list: (processed-program, of type parsed-program
                (do-greedy-temporal-addressing
                    (coerce (basic-block-code blk) 'list)
                  chip-specification
-                 :environs parsed-program
                  :initial-rewiring (if registrant
                                        (basic-block-in-rewiring blk)
                                        initial-rewiring)
@@ -284,7 +283,6 @@ Returns a value list: (processed-program, of type parsed-program
                (do-greedy-temporal-addressing
                  (coerce (basic-block-code blk) 'list)
                  chip-specification
-                 :environs parsed-program
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))
              (let* ((duration (chip-schedule-duration chip-schedule))

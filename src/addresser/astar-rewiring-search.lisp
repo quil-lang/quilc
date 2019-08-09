@@ -184,21 +184,19 @@ and its hash."
     (with-slots (base rewiring times) state
       (with-slots (size depth next-swaps) base
         ;; move to the new rewiring
-        (update-rewiring rewiring q0 q1)
-        (let ((hash (rewiring-hash rewiring))
-              (heuristic (funcall heuristic-fn rewiring))
-              (size (+ cost size))
-              (depth (max depth (+ cost (max (aref times q0) (aref times q1))))))
-          ;; restore the rewiring
-          (update-rewiring rewiring q0 q1)
-          (values (make-instance 'derived-search-state
-                                 :value (+ (* *addresser-a*-swap-search-heuristic-scale* heuristic)
-                                           (a*-distance-metric size depth))
-                                 :prev base
-                                 :swap swap
-                                 :size size
-                                 :depth depth)
-                  hash))))))
+        (with-update-rewiring rewiring q0 q1
+          (let ((hash (rewiring-hash rewiring))
+                (heuristic (funcall heuristic-fn rewiring))
+                (size (+ cost size))
+                (depth (max depth (+ cost (max (aref times q0) (aref times q1))))))
+            (values (make-instance 'derived-search-state
+                                   :value (+ (* *addresser-a*-swap-search-heuristic-scale* heuristic)
+                                             (a*-distance-metric size depth))
+                                   :prev base
+                                   :swap swap
+                                   :size size
+                                   :depth depth)
+                    hash)))))))
 
 (defun active-state-done (active-state done-fn)
   (funcall done-fn (active-state-rewiring active-state)))
