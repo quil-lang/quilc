@@ -199,7 +199,8 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     #+ccl ccl::double-float-positive-infinity
     #+ecl ext:double-float-positive-infinity
     #+sbcl sb-ext:double-float-positive-infinity
-    #-(or ccl ecl sbcl) (error "double-float-positive-infinity not available."))
+    #+allegro excl:*infinity-double*
+    #-(or ccl ecl sbcl allegro) (error "double-float-positive-infinity not available."))
 
 (a:define-constant pi #.(coerce cl:pi 'double-float))
 

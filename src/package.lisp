@@ -2,8 +2,12 @@
 ;;;;
 ;;;; Author: Robert Smith
 
+#+(or allegro)
+(rename-package :alexandria :alexandria '(:a))
+
 (defpackage #:cl-quil.resource
   (:use #:cl)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   (:export
    #:make-resource-collection           ; FUNCTION
@@ -32,6 +36,7 @@
         #:abstract-classes
         #:singleton-classes
         #:cl-quil.resource)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   ;; options.lisp
   (:export
@@ -448,6 +453,7 @@
   (:nicknames #:quil.clifford)
   (:use #:cl
         #:cl-permutation)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
 
   ;; clifford/ module
