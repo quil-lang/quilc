@@ -511,7 +511,7 @@ result of BODY, and the (possibly null) list of remaining lines.
         `(let ((,all-lines ,lines))
            ;; Check that we have a line to consume
            (when (endp ,all-lines)
-             (quil-parse-error "Unexpectedly reached end of program~@[ (expected ~A instruction)]." ,first-type))
+             (quil-parse-error "Unexpectedly reached end of program~@[ (expected ~A instruction)~]." ,first-type))
            (let ((,first-line (first ,all-lines)))
              ;; Check that we have the right number of tokens
              ,(let ((min-tokens (length required))
@@ -520,7 +520,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                  `(unless (<= ,min-tokens
                              (length ,first-line)
                              . ,(when max-tokens (list max-tokens)))
-                    (quil-parse-error "Expected at least ~A ~@[ and at most ~A~] tokens~@[ for instruction ~~A~]."
+                    (quil-parse-error "Expected at least ~A ~@[ and at most ~A~] tokens~@[ for instruction ~A~]."
                                      ,min-tokens
                                      ,max-tokens
                                      ,first-type)))

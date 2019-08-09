@@ -103,9 +103,7 @@ before erroring. Intended to avoid infinite loops.")
                    (elt args pos))))
            (instantiate (instr)
              (let ((x (instantiate-instruction instr #'param-value #'arg-value)))
-               (if (listp x)
-                   x
-                   (list x)))))
+               (a:ensure-list x))))
         (mapcan #'instantiate
                 (relabel-block-labels-uniquely defn-body))))))
 
