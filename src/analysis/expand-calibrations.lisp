@@ -3,8 +3,6 @@
 (define-transform expand-calibrations (expand-calibrations)
   "This transform applies all available calibrations. The result has no gate applications or
 measurements for which a calibration is defined."
-  process-includes
-  resolve-applications
   expand-circuits)
 
 (defparameter *gate-calibrations* (make-hash-table))
