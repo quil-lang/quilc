@@ -5,7 +5,7 @@
 (in-package #:cl-quil)
 
 (defvar *standard-post-process-transforms*
-  '(expand-circuits type-check)
+  '(expand-circuits expand-calibrations resolve-waveform-references type-check)
   "The standard transforms that are applied by PARSE-QUIL.")
 
 (defun error-on-ambiguous-memory-declaration  (condition)
@@ -30,7 +30,10 @@ signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HAN
       (;; We disallow multiple declarations of the same memory region (even if equivalent).
        (ambiguous-memory-declaration #'error-on-ambiguous-memory-declaration)
        ;; For gate or circuit definitions, the default choice is to "accept the mystery."
-       (ambiguous-gate-or-circuit-definition ambiguous-definition-handler))
+       (ambiguous-gate-or-circuit-definition ambiguous-definition-handler)
+       ;; TODO change these
+       (ambiguous-calibration-definition #'continue)
+       (ambiguous-waveform-definition #'continue))
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
              (pp (resolve-applications

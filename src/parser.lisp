@@ -1518,7 +1518,7 @@ Returns the frame and the remaining tokens."
                               :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
                             :else
                               :collect (second found-p))))
-                (values (make-waveform-definition name param-symbols parsed-entries)
+                (values (make-waveform-definition name param-symbols parsed-entries :context op)
                         rest-lines)))))))))
 
 (defun parse-parameters (params-args &key allow-expressions)
@@ -1671,18 +1671,21 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                              (null (second args)))
                         (make-instance 'measure-discard-calibration-definition
                                        :qubit (first args)
-                                       :body parsed-body))
+                                       :body parsed-body
+                                       :context op))
                        (is-measure-calibration
                         (make-instance 'measure-calibration-definition
                                        :qubit (first args)
                                        :address (second args)
-                                       :body parsed-body))
+                                       :body parsed-body
+                                       :context op))
                        (t
                         (make-instance 'gate-calibration-definition
                                        :name name
                                        :parameters params
                                        :arguments args
-                                       :body parsed-body)))
+                                       :body parsed-body
+                                       :context op)))
                  rest-lines)))))))))
 
 (defun parse-waveform-ref (toks)

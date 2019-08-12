@@ -3,3 +3,6 @@ DEFWAVEFORM my_custom_waveform:
 
 DEFWAVEFORM my_custom_parameterized_waveform(%a):
     (1+2*i)*%a, (3+4*i)*%a, (5+6*i)*%a
+
+PULSE 0 "xy" my_custom_waveform
+PULSE 0 "xy" my_custom_parameterized_waveform(a: 1.0)

@@ -29,12 +29,10 @@ determining ambiguity. Otherwise, return NIL."
                                                      (circuit-definition-arguments instr)))
       (waveform-definition (cons 'waveform-definition
                                  (waveform-definition-name instr)))
-      (calibration-definition (list 'calibration-definition
-                                    (calibration-definition-name instr)
-                                    (if (gate-calibration-definition instr)
-                                        (length (calibration-definition-parameters instr))
-                                        0)
-                                    (calibration-definition-arguments instr)))
+      ;; TODO actually think through what these signatures should be like
+      (gate-calibration-definition (list 'gate-calibration-definition
+                                         (calibration-definition-name instr)))
+      (measurement-calibration-definition (list 'measurement-calibration-definition))
       (memory-descriptor (cons 'memory-descriptor
                                (memory-descriptor-name instr))))))
 
