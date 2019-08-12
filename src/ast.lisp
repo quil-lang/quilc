@@ -138,11 +138,18 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (name nil :type string)
   (qubits nil :type list))
 
-(defstruct  (waveform-ref (:constructor %waveform-ref (name args)))
-  "A reference to a (possibly parametric) QuilT waveform."
+(defstruct (waveform-ref (:constructor %waveform-ref (name args)))
+  "An reference to a (possibly parametric) QuilT waveform."
   (name nil :read-only t :type string)
-  ;; A list of (name val) lists. 
-  (args nil :read-only t :type list))
+  ;; A list of (name val) lists.
+  ;; TODO args vs parameters?
+  (args nil :read-only t :type list)
+  ;; NAME-RESOLUTION starts off as null be will later be resolved to either
+  ;; i) a built in waveform
+  ;; ii) a waveform definition
+  (name-resolution nil :type (or null
+                                 standard-waveform
+                                 waveform-definition)))
 
 (defun waveform-ref (name &rest args)
   "Construct a waveform reference with keyword-value pairs given by ARGS."
@@ -151,6 +158,50 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                  (loop :for (name val) :on args :by #'cddr :while val
                        :collect (list name val))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; QuilT Waveforms ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass standard-waveform ()
+  ((duration :initarg :duration
+             :reader waveform-duration
+             :type float
+             :documentation "Duration of the waveform, in seconds."))
+  (:documentation "Base class for built-in waveforms.")
+  (:metaclass abstract-class))
+
+;;; TODO we need to be able to track :required and :default to generate messages
+
+(defclass gaussian-waveform (standard-waveform)
+  ((fwhm :initarg :fwhm
+         :type float
+         :documentation "Full Width Half Max shape parameter, in seconds.")
+   (t0 :initarg :t0
+       :type float
+       :documentation "Center time coordinate of the shape in seconds. Defaults
+       to mid-point of pulse."))
+  (:documentation "A Gaussian shaped waveform envelope defined for a specific frame."))
+
+(defclass drag-gaussian-waveform (standard-waveform)
+  ((fwhm :initarg :fwhm
+         :type float
+         :documentation "Full Width Half Max shape parameter, in seconds.")
+   (t0 :initarg :t0
+       :type float
+       :documentation "Center time coordinate of the shape in seconds. Defaults
+       to mid-point of pulse.")
+   (anh :initarg :anh
+        :type float
+        :initform -210e6
+        :documentation "Anharmonicity of the qubit, f01-f12 in (Hz)")
+   (alpha :initarg :alpha
+          :type float
+          :documentation "Dimensionless DRAG parameter"))
+  (:documentation "A DRAG Gaussian shaped waveform envelope defined for a specific frame."))
+
+(defclass flat-waveform (standard-waveform)
+  ((iq :initarg :iq
+       :type complex
+       :documentation "Individual IQ point to hold constant")))
 
 ;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
 
@@ -449,6 +500,8 @@ as a permutation."
 (defclass static-waveform-definition (waveform-definition)
   ()
   (:documentation "A waveform definition that has no parameters."))
+
+;;; TODO parametric vs parameterized
 
 (defclass parameterized-waveform-definition (waveform-definition)
   ((parameters :initarg :parameters
@@ -1523,13 +1576,13 @@ For example,
 
   (:method ((thing frame) (stream stream))
     (format stream "~{~A ~}~A"
-            (frame-qubits thing)
+            (mapcar #'print-instruction-to-string (frame-qubits thing))
             (frame-name thing)))
 
   (:method ((thing waveform-ref) (stream stream))
-    (format stream "~A~@[(~{~A: ~A~^, ~})~]"
+    (format stream "~A~@[(~{~{~A: ~A~}~^, ~})~]"
             (waveform-ref-name thing)
-            (mapcar #'print-instruction-to-string
+            (mapcar (lambda (name-and-value) (mapcar #'print-instruction-to-string name-and-value))
                     (waveform-ref-args thing))))
 
   ;; Actual instructions
