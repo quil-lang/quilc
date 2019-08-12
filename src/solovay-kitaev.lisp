@@ -12,25 +12,15 @@
 ;;; In the rest of this file, d(x, y) refers to the function of
 ;;; operator distance defined in the above paper and is equal to ||X -
 ;;; Y||, the operator norm of (X - Y).
+(defparameter +c-gc+ 0.8 "Constant that upper bounds the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U [found on page 8 of the paper]. Usually obtained numerically through testing gc-decompose on random unitaries.")
 
-;;; Constant that upper bounds the ratio between d(V, I) [or d(W, I)]
-;;; and sqrt(d(U, I)) if V and W are balanced group commutators of U
-;;; [found on page 8 of the paper]. 0.9 is a value obtained
-;;; numerically through testing gc-decompose on random unitaries.
-(defparameter +c-gc+ 0.9)
-;;; Constant that upper bounds the ratio between d(VWV'W', approximate
-;;; VWV'W') and eps^(3/2), for the balanced group commutators V, W of
-;;; a unitary and the eps-approximation of each commutator [eps = d(V,
-;;; approximate V) = d(W, approximate W)]. It is also assumed that
-;;; d(V, I) = d(W, I) < c-gc * sqrt(eps), which is true for group
-;;; commutator decompositions made inside the SK-algorithm. [found on
-;;; page 9 of the paper]
-
-;;; This should theoretically be approximately equal to (* 8 +c-gc+),
+;;; C-approx should theoretically be approximately equal to (* 8 +c-gc+),
 ;;; but as the paper's authors have shown, a c-approx as low as 2.67
 ;;; can work in practice [yielding a base approximation distance of
 ;;; 1/c-approx^2 = 0.14]. We'll use that for now.
-(defparameter +c-approx+ 2.67)
+(defparameter +c-approx+ 2.67 "Constant that upper bounds the ratio between d(VWV'W', approximate VWV'W') and eps^(3/2), for the balanced group commutators V, W of a unitary and the eps-approximation of each commutator [eps = d(V, approximate V) = d(W, approximate W)]. It is also assumed that d(V, I) = d(W, I) < c-gc * sqrt(eps), which is true for group
+commutator decompositions made inside the SK-algorithm.")
+
 ;;; One-qubit identity and pauli spin matrices, may be replaced later
 (defparameter +I+ (magicl:make-complex-matrix 2 2 '(1 0 0 1)))
 (defparameter +PX+ (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
@@ -44,7 +34,7 @@
 (defparameter +T+ (magicl:make-complex-matrix 2 2 `(1 0 0 ,(cis (/ pi 4)))))
 (defparameter +T-inv+ (magicl:make-complex-matrix 2 2 `(1 0 0 ,(cis (- (/ pi 4))))))
 ;;; Temporary constant
-(defparameter +ballie-radius+ 0.2)
+(defparameter +ballie-radius+ 0.1)
 
 ;;; ------------------------------------------------------------------
 ;;; --------------Various utility functions/structures----------------
@@ -97,7 +87,7 @@
   (w '() :type (or list commutator)))
 
 (defun seq-dagger (op-seq)
-  (reverse (mapcar (lambda (x) (+ (* 2 (floor x 2)) (- 1 (mod x 2)))) op-seq)))
+  (reverse (mapcar (lambda (x) (logxor #b1 x)) op-seq)))
 
 (defstruct (bloch-vector (:constructor make-bloch-vector))
   "A bloch-vector representation of unitaries as a rotation about an axis on the Bloch sphere."
@@ -121,19 +111,22 @@
 
 ;;; Charles
 (defun charles-distance (u s)
-  (- 1 (fidelity (magicl:multiply-complex-matrices
-                  (magicl:conjugate-transpose s)
-                  u))))
+  (- 1 (fidelity (m* (magicl:conjugate-transpose s) u))))
 
 ;;; Not sure which distance measure to use, this one or trace norm or charles' fidelity
-(defun distance (u s)
+(defun operator-dist (u s)
   "Returns d(u, s) = ||U - S||, the operator norm of U - S defined in the paper."
-  (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix u s)))))
-    (sqrt (reduce #'max (loop :for i :below (magicl:matrix-rows sigma) :collect (magicl:ref sigma i i))))))
+  (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s))))))
+    (loop :for i :below (magicl:matrix-rows sigma) :maximize (magicl:ref sigma i i))))
 
-(defun find-c-gc (num-trials)
+(defun trace-dist (u s)
+  "Returns the trace norm of U - S, equal to Tr[sqrt((U - S)'(U - S))]."
+  (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s))))))
+    (loop :for i :below (magicl:matrix-rows sigma) :summing (magicl:ref sigma i i) :into norm :finally (return norm))))
+
+(defun find-c-gc (num-trials &key (distance-function #'operator-dist) (decompose-func #'gc-decompose))
   "Numerically tests for the value of c-gc, the upper bound on the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U."
-  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (gc-decompose u) :maximize (/ (distance v +I+) (sqrt (distance u +I+)))))
+  (loop :for i :below num-trials :for u := (magicl:random-unitary 2) :for v := (funcall decompose-func u) :maximize (/ (funcall distance-function v +I+) (sqrt (funcall distance-function u +I+)))))
 
 ;;; ------------------------------------------------------------------
 ;;; -------------------------THE MEATY PART---------------------------
@@ -141,9 +134,9 @@
 
 (defclass decomposer ()
   ((gates :reader gates
-                :initarg :gates
-                :type (or cons (vector simple-gate *))
-                :documentation "Set of basis gates/operators to decompose to, including inverses.")
+          :initarg :gates
+          :type (or cons (vector simple-gate *))
+          :documentation "Set of basis gates/operators to decompose to, including inverses.")
    (gate-orders :reader gate-orders
                 :initarg :gate-orders
                 :type (or cons (vector fixnum *))
@@ -225,11 +218,12 @@
         :for bv1 := (random-bloch-vector (/ pi 2))
         :for bv2 := (random-bloch-vector (/ pi 2))
         :for bv-dist := (aa-ball-distance bv1 bv2)
-        :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+        :for mat-dist := (operator-dist (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
         ;; Checks if the random unitaries picked have an angle-axis
         ;; ball distance shorter than the diagonal of a grid cube
         :when (< bv-dist (sqrt (* 3 (expt subdivision 2))))
-          :maximize mat-dist))
+          :maximize mat-dist :into max-dist :and :sum mat-dist :into total :and :sum 1 :into num
+        :finally (return (list max-dist (/ total num)))))
 
 (defun epsilon0-vs-ball-dist (num-trials dist)
   "Numerically computes the max value of epsilon0 that DIST on the angle-axis ball would satisfy."
@@ -237,11 +231,12 @@
         :for bv1 := (random-bloch-vector (/ pi 2))
         :for bv2 := (random-bloch-vector (/ pi 2))
         :for bv-dist := (aa-ball-distance bv1 bv2)
-        :for mat-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+        :for mat-dist := (operator-dist (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
         ;; Checks if the random unitaries picked have an angle-axis
         ;; ball distance shorter than the diagonal of a grid cube
         :when (< bv-dist dist)
-          :maximize mat-dist))
+          :maximize mat-dist :into max-dist :and :sum mat-dist :into total :and :sum 1 :into num
+        :finally (return (list max-dist (/ total num)))))
 
 (defun matrix-to-grid-coord (mat subdivision)
   "Returns the grid coordinate of MAT when mapped to an axis-angle ball coordinate in a grid of size SUBDIVISION. The result is an array of 3 decimals corresponding to MAT's spatial coordinate in the grid."
@@ -313,7 +308,6 @@
       (format verbose "Division: ~D~%" ballie-r)
       (format (not verbose) "Generating base approximations...")
       (loop :for curr-depth :from 0 :to depth-limit :do
-        #+ignore(dotimes (curr-depth (1+ depth-limit)))
         (format verbose "Depth ~D search:" curr-depth)
         (finish-output)
         (setf max-depth curr-depth)
@@ -335,7 +329,8 @@
                                                          (+ (floor (aref exact-grid-coord 0)) (mod i 2))
                                                          (+ (floor (aref exact-grid-coord 1)) (mod (floor i 2) 2))
                                                          (+ (floor (aref exact-grid-coord 2)) (floor i 4))))))
-    (gethash (reduce (lambda (x y) (min (vector-distance x exact-grid-coord) (vector-distance y exact-grid-coord)))
+    (gethash (reduce (lambda (x y) (if (< (vector-distance x exact-grid-coord) (vector-distance y exact-grid-coord))
+                                       x y))
                      (cdr nearby-ballies) :initial-value (car nearby-ballies))
              base-approximations)))
 
@@ -343,25 +338,64 @@
 ;;; ---------------------Algorithm Calling-------------------------
 ;;; ---------------------------------------------------------------
 
+(defun brute-base (u decomposer max-depth)
+  "Testing brute force base approximation search."
+  (labels ((helper (depth seq mat last-idx rep-count)
+             (cond ((= depth max-depth)
+                    (if (< (operator-dist u mat) 0.1)
+                        seq
+                        nil))
+                   (t (loop :for gate :in (gates decomposer)
+                            :for i :from 0
+                            :for order := (elt (gate-orders decomposer) (floor i 2))
+                            ;; Don't use a gate if a) it has an odd
+                            ;; index and its inverse is already in
+                            ;; the gate set, b) we're repeating the
+                            ;; previous gate and its half-order is
+                            ;; exceeded, or c) we're using the
+                            ;; previous gate's inverse
+                            :if (and (not (and (= order 2) (oddp i)))
+                                     (or (and (= i last-idx)
+                                              (or (zerop order) (< rep-count
+                                                                   (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
+                                         (and (not (= i last-idx))
+                                              (not (= (floor i 2) (floor last-idx 2))))))
+                              :do (let ((found-seq (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))))
+                                    (when found-seq (return found-seq))))))))
+    (let ((discovered-seq (helper 0 '() +I+ -1 0)))
+      (if discovered-seq
+          discovered-seq
+          (format t "~%Nothing found...")))))
+
 ;;; Helper method for iterating through SK
 (defun sk-iter (base-approximations u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a vector of two items, which are each either a commutator or a base approximation."
   (if (zerop n)
-      (gethash (map 'vector #'floor (matrix-to-grid-coord u +ballie-radius+)) base-approximations)
+      (fetch-base-approximation base-approximations u) #+ignore(gethash (map 'vector #'floor (matrix-to-grid-coord u +ballie-radius+)) base-approximations)
       (multiple-value-bind (v w) (gc-decompose u)
         (let* ((v-next (sk-iter base-approximations v (1- n)))
                (w-next (sk-iter base-approximations w (1- n))))
           (cons (sk-iter base-approximations u (1- n)) (list (make-commutator :v v-next :w w-next)))))))
 
+(defun brute-sk-iter (decomposer u n)
+  "Brute force iteration"
+  (if (zerop n)
+      (brute-base u decomposer 18)
+      (let ((next-u (brute-sk-iter decomposer u (1- n))))
+        (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger (decompress-and-multiply decomposer next-u))))
+          (let* ((v-next (brute-sk-iter decomposer v (1- n)))
+                 (w-next (brute-sk-iter decomposer w (1- n))))
+            (cons next-u (list (make-commutator :v v-next :w w-next))))))))
+
 (defun decompose (decomposer unitary epsilon)
   "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U. When expanded into all its constituent unitaries, this decomposition is guaranteed to be within EPSILON of the original unitary."
   (let* ((eps0 (epsilon0 decomposer))
-         (depth 3 #+ignore(ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
+         (depth 4 #+ignore(ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
                                  (log (* eps0 +c-approx+ +c-approx+))))
                          (log (/ 3 2)))))
-    (sk-iter (base-approximations decomposer) unitary depth)))
+    (brute-sk-iter decomposer unitary depth) #+ignore(sk-iter (base-approximations decomposer) unitary depth)))
 
-(defun decompress (decomposer item) ;; TODO
+(defun decompress (decomposer item)
   "Expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate gate for each parity-inverse index inside, returning the decompressed list of gates."
   ;; TODO: still need to convert indices -> gates
   (if (typep item 'commutator)
@@ -372,6 +406,32 @@
       (if (typep (car item) 'list)
           (append (decompress decomposer (car item)) (decompress decomposer (cadr item)))
           item)))
+
+(defun decompress-and-multiply (decomposer item)
+  "Returns the matrix produced by expanding and multiplying together all the gates represented inside ITEM."
+  (if (typep item 'commutator)
+      (m* (decompress-and-multiply decomposer (commutator-v item))
+          (decompress-and-multiply decomposer (commutator-w item))
+          (magicl:dagger (decompress-and-multiply decomposer (commutator-v item)))
+          (magicl:dagger (decompress-and-multiply decomposer (commutator-w item))))
+      (if (typep (car item) 'list)
+          (m* (decompress-and-multiply decomposer (cadr item)) (decompress-and-multiply decomposer (car item)))
+          (reduce #'m*
+                  (reverse (mapcar (lambda (x) (elt (gates decomposer) x)) item))
+                  :initial-value +I+))))
+
+(defun approximate (decomposer u acc)
+  (let* ((seq (brute-base u decomposer 18))
+         (curr-approx (decompress-and-multiply decomposer seq)))
+    (loop :while (> (operator-dist u curr-approx) acc)
+          :do (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger curr-approx)))
+                (let* ((v-approx (approximate decomposer v (expt (/ acc +c-approx+) 2/3)))
+                       (w-approx (approximate decomposer w (expt (/ acc +c-approx+) 2/3)))
+                       (v-approx-mat (decompress-and-multiply decomposer v-approx))
+                       (w-approx-mat (decompress-and-multiply decomposer w-approx)))
+                  (setf curr-approx (m* v-approx-mat w-approx-mat (magicl:dagger v-approx-mat) (magicl:dagger w-approx-mat) curr-approx))
+                  (setf seq (cons seq (list (make-commutator :v v-approx :w w-approx))))))
+          :finally (return (values seq curr-approx)))))
 
 ;;; Conversions between matrix and bloch-vector representations of
 ;;; unitaries. To understand them, remember/note that for a rotation
@@ -393,12 +453,11 @@
 ;;; functions below do.
 (defun matrix-to-bloch-vector (mat)
   "Returns the bloch-vector corresponding to the unitary matrix MAT."
-  (let* ((phase-correction (bloch-phase-correction mat))
-         (mat (magicl:scale phase-correction mat))
-         (x-sin (* -1 (imagpart (magicl:ref mat 0 1))))
-         (y-sin (realpart (magicl:ref mat 1 0)))
-         (z-sin (imagpart (/ (- (magicl:ref mat 1 1) (magicl:ref mat 0 0)) 2)))
-         (cos-theta (realpart (/ (+ (magicl:ref mat 0 0) (magicl:ref mat 1 1)) 2)))
+  (let* ((phased-mat (bloch-phase-corrected-mat mat))
+         (x-sin (* -1 (imagpart (magicl:ref phased-mat 0 1))))
+         (y-sin (realpart (magicl:ref phased-mat 1 0)))
+         (z-sin (imagpart (/ (- (magicl:ref phased-mat 1 1) (magicl:ref phased-mat 0 0)) 2)))
+         (cos-theta (realpart (/ (+ (magicl:ref phased-mat 0 0) (magicl:ref phased-mat 1 1)) 2)))
          (sin-theta (sqrt (+ (expt x-sin 2) (expt y-sin 2) (expt z-sin 2))))
          (theta (* 2 (atan sin-theta cos-theta)))
          (axis (make-array 3)))
@@ -420,8 +479,8 @@
                        (magicl:scale (* ny axis-factor) +PY+)
                        (magicl:scale (* nz axis-factor) +PZ+))))
 
-(defun bloch-phase-correction (mat)
-  "Calculates the global phase adjustment needed to put a matrix MAT into the bloch-vector matrix form described in the comment above. MAT should be multiplied by the returned phase number to produce the desired form."
+(defun bloch-phase-corrected-mat (mat)
+  "Returns a matrix equal to MAT with corrected global phase such that it is in bloch-vector matrix form described in the comment above."
   (let* ((diag-sum (+ (magicl:ref mat 0 0) (magicl:ref mat 1 1)))
          (off-diag-sum (+ (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
          (off-diag-diff (- (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
@@ -433,10 +492,11 @@
     ;; difference and the off-diagonal sum should be purely
     ;; imaginary. Thus, we use the first non-zero number in these
     ;; quantities to find our phase correction.
-    (loop :for i :below 4
-          :for num :in phase-nums
-          :when (not (zerop num))
-            :do (return (* (/ (abs num) num) (if (evenp i) 1 #C(0 -1)))))))
+    (magicl:scale (loop :for i :below 4
+                        :for num :in phase-nums
+                        :when (not (zerop num))
+                          :do (return (* (/ (abs num) num) (if (evenp i) 1 #C(0 -1)))))
+                  mat)))
 
 ;;; ------------------------------------------------------------------
 ;;; -------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
@@ -465,6 +525,10 @@
 
 (defun find-transformation-matrix (a b)
   "Given unitaries A and B, finds the unitary S such that A = SBS'."
+  ;; The cross product of a-axis and b-axis represents an axis
+  ;; orthogonal to the axes of rotation for a and b. Thus, a
+  ;; rotation around this orthogonal axis by the angle between
+  ;; a-axis and b-axis is a transformation which does what we want.
   (let* ((a-bv (matrix-to-bloch-vector a))
          (b-bv (matrix-to-bloch-vector b))
          (a-axis (bloch-vector-axis a-bv))
@@ -475,7 +539,7 @@
     ;; Only bother finding an axis if the vectors aren't parallel
     (unless (and (zerop (vector-norm cross-prod)) (double~ dot-prod 0))
       (cond ((zerop (vector-norm cross-prod)) nil) ;; very special anti-parallel case
-            (t ;; General case
+            (t                                     ;; General case
              (vector-normalize cross-prod)
              (setf (bloch-vector-axis result-bv) cross-prod)
              (setf (bloch-vector-theta result-bv) (acos dot-prod)))))
@@ -506,8 +570,17 @@
          (rx-theta (bloch-vector-to-matrix (make-bloch-vector :theta u-theta :axis #(1 0 0))))
          (s (find-transformation-matrix u rx-theta)))
     (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
-      (values (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices b (magicl:dagger s)))
-              (magicl:multiply-complex-matrices s (magicl:multiply-complex-matrices c (magicl:dagger s)))))))
+      (values (m* s b (magicl:dagger s))
+              (m* s c (magicl:dagger s))))))
+
+(defun gc-decompose-alt (u)
+  "Alternative group commutator decomposition."
+  (let* ((u-cos-half-theta (cos (/ (bloch-vector-theta (matrix-to-bloch-vector u)) 2)))
+         (phi (* 2 (asin (expt (/ (- 1 u-cos-half-theta) 2) 1/4))))
+         (v (bloch-vector-to-matrix (make-bloch-vector :theta phi :axis #(1 0 0))))
+         (w (bloch-vector-to-matrix (make-bloch-vector :theta phi :axis #(0 1 0))))
+         (s (find-transformation-matrix u (m* v w (magicl:dagger v) (magicl:dagger w)))))
+    (values (m* s v (magicl:dagger s)) (m* s w (magicl:dagger s)))))
 
 ;;; Some functions which explore the ball representation of SU(2)
 (defun ball-op-distances ()
@@ -522,7 +595,7 @@
           :for i2 :across (bloch-vector-axis bv2)
           :do (setf (aref ball1 i) (* i1 (bloch-vector-theta bv1)))
               (setf (aref ball2 i) (* i2 (bloch-vector-theta bv2))))
-    (values (distance u1 u2) (vector-distance ball1 ball2))))
+    (values (operator-dist u1 u2) (vector-distance ball1 ball2))))
 
 (defun ball-op-distance-ratios (num-trials)
   (let ((min-ratio MOST-POSITIVE-FIXNUM)
@@ -533,7 +606,7 @@
         (setf max-ratio (max max-ratio (/ op-dist ball-dist)))))
     (format t "~%TESTING RATIO OF OPERATOR DISTANCE TO BALL DISTANCE~%Min: ~A~%Max: ~A~%" min-ratio max-ratio)))
 
-(defun op-dist-range (num-trials max-angle)
+(defun dist-range (num-trials max-angle &key (distance-function #'operator-dist))
   (let ((min-dist MOST-POSITIVE-FIXNUM)
         (max-dist MOST-NEGATIVE-FIXNUM))
     (loop :for i :below num-trials
@@ -541,10 +614,10 @@
           :for bv2 := (random-bloch-vector max-angle)
           :for u1 := (bloch-vector-to-matrix bv1)
           :for u2 := (bloch-vector-to-matrix bv2)
-          :for dist := (distance u1 u2)
+          :for dist := (funcall distance-function u1 u2)
           :do (setf min-dist (min min-dist dist))
               (setf max-dist (max max-dist dist)))
-    (format t "~%[TESTING THE RANGE OF OPERATOR DISTANCES]~%Up to max-angle: ~A~%Min op dist: ~A~%Max op dist: ~A~%" max-angle min-dist max-dist)))
+    (format t "~%[TESTING THE RANGE OF DISTANCES]~%Up to max-angle: ~A~%Min op dist: ~A~%Max op dist: ~A~%" max-angle min-dist max-dist)))
 
 (defun search-op-variations (num-trials target-dist &key (tolerance 0))
   (let ((min-dist MOST-POSITIVE-FIXNUM)
@@ -554,7 +627,7 @@
           :for bv1 := (random-bloch-vector (/ pi 2))
           :for bv2 := (random-bloch-vector (/ pi 2))
           :for bv-dist := (aa-ball-distance bv1 bv2)
-          :for op-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+          :for op-dist := (operator-dist (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
           :when (if (zerop tolerance) (< bv-dist target-dist) (< (abs (- bv-dist target-dist)) tolerance))
             :do (setf min-dist (min min-dist op-dist))
                 (setf max-dist (max max-dist op-dist))
@@ -574,7 +647,7 @@
           :for bv1 := (random-bloch-vector (/ pi 2))
           :for bv2 := (random-bloch-vector (/ pi 2))
           :for bv-dist := (aa-ball-distance bv1 bv2)
-          :for op-dist := (distance (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
+          :for op-dist := (operator-dist (bloch-vector-to-matrix bv1) (bloch-vector-to-matrix bv2))
           :when (if (zerop tolerance) (< op-dist target-dist) (< (abs (- op-dist target-dist)) tolerance))
             :do (setf min-dist (min min-dist bv-dist))
                 (setf max-dist (max max-dist bv-dist))

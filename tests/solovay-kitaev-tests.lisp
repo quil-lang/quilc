@@ -53,3 +53,10 @@
       (multiple-value-bind (v w) (cl-quil::gc-decompose u)
         (fiasco-assert-matrices-are-equal (magicl:multiply-complex-matrices v (magicl:multiply-complex-matrices w (magicl:multiply-complex-matrices (magicl:dagger v) (magicl:dagger w))))
                                           u)))))
+
+(deftest test-gc-decompose-alt ()
+  (dotimes (i 100)
+    (let ((u (magicl:random-unitary 2)))
+      (multiple-value-bind (v w) (cl-quil::gc-decompose-alt u)
+        (fiasco-assert-matrices-are-equal (magicl:multiply-complex-matrices v (magicl:multiply-complex-matrices w (magicl:multiply-complex-matrices (magicl:dagger v) (magicl:dagger w))))
+                                          u)))))
