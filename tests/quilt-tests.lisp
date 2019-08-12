@@ -1,6 +1,3 @@
-;;; TODO deprecate these parsing tests
-;;; (they are subsumed by the .quil example files)
-
 (in-package #:cl-quil-tests)
 
 (deftest test-gate-calibration-matching ()
@@ -57,7 +54,7 @@ MEASURE 0                               # 1
 MEASURE 1                               # 2
 MEASURE 0 ro                            # 3
 MEASURE 1 ro                            # 4
-")))
+" :transforms nil)))
     ;; We want to check whether definition i matches instruction j
     (let ((matches '((0 (1))            ; def 0 vs instruction 1
                      (1 (3))

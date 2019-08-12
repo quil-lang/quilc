@@ -1,5 +1,10 @@
 (in-package #:cl-quil)
 
+(define-transform resolve-waveform-references (resolve-waveform-references)
+  "This transform resolves all waveform references to their corresponding
+waveforms or waveform definitions."
+  expand-calibrations)
+
 (defparameter *standard-template-waveforms*
   (a:alist-hash-table
    (list (cons "gaussian" (find-class 'gaussian-waveform))
@@ -20,7 +25,7 @@
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   (let ((actual (mapcar #'first (waveform-ref-args waveform-ref))))
     (a:when-let ((missing (set-difference expected-parameters actual :test #'equalp)))
-      (quil-parse-error "Expected parameter ~A in waveform ~A, but none was found."
+      (quil-parse-error "Expected parameter ~A in waveform ~A."
                         (param-name (first missing))
                         (waveform-ref-name waveform-ref)))
     (a:when-let ((unexpected (set-difference actual expected-parameters :test #'equalp)))
@@ -57,22 +62,31 @@
                                 (custom-waveform-expected-parameters waveform-definition))
   waveform-definition)
 
-(defun resolve-waveform (waveform-ref waveform-definitions &key (use-defaults t))
-  "Construct an appropriate waveform instance from a waveform reference and a
-  list of definitions."
+(defun resolve-waveform-reference (waveform-ref waveform-definitions &key (use-defaults t))
+  "Destructively updates the waveform reference's resolution to an appropriate
+waveform or waveform definition."
   (assert (null (waveform-ref-name-resolution waveform-ref)))
   (let* ((name (waveform-ref-name waveform-ref))
          (resolution
-          (a:if-let ((default-binding (and use-defaults
-                                           (gethash name *standard-template-waveforms*))))
-            (resolve-standard-waveform waveform-ref default-binding)
-            (a:if-let ((defwaveform
-                           (or (find name waveform-definitions
-                                     :key #'waveform-definition-name
-                                     :test #'string=))))
-              (resolve-custom-waveform waveform-ref defwaveform)
-              (quil-parse-error "Waveform reference ~A does not match ~
+           (a:if-let ((default-binding (and use-defaults
+                                            (gethash name *standard-template-waveforms*))))
+             (resolve-standard-waveform waveform-ref default-binding)
+             (a:if-let ((defwaveform
+                            (find name waveform-definitions
+                                  :key #'waveform-definition-name
+                                  :test #'string=)))
+               (resolve-custom-waveform waveform-ref defwaveform)
+               (quil-parse-error "Waveform reference ~A does not match ~
                                 any standard or user defined waveforms." name)))))
     (setf (waveform-ref-name-resolution waveform-ref) resolution)
     waveform-ref))
 
+(defun resolve-waveform-references (parsed-program)
+  (let ((defs (parsed-program-waveform-definitions parsed-program)))
+    (loop :for instr :across (parsed-program-executable-code parsed-program)
+          :do (typecase instr
+                (pulse
+                 (resolve-waveform-reference (pulse-waveform instr) defs))
+                (capture
+                 (resolve-waveform-reference (capture-waveform instr) defs))))
+    parsed-program))

@@ -492,7 +492,10 @@ as a permutation."
   ((name :initarg :name
          :reader waveform-definition-name)
    (entries :initarg :entries
-            :reader waveform-definition-entries))
+            :reader waveform-definition-entries)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context))
   ;; TODO cache entries?
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified QuilT waveform definition."))
@@ -509,23 +512,28 @@ as a permutation."
                :documentation "A list of symbol parameter names."))
   (:documentation "A waveform definition that has named parameters."))
 
-(defun make-waveform-definition (name parameters entries)
+(defun make-waveform-definition (name parameters entries &key context)
   (check-type name string)
   (check-type parameters symbol-list)
   (if parameters
       (make-instance 'parameterized-waveform-definition
                      :name name
                      :parameters parameters
-                     :entries entries)
+                     :entries entries
+                     :context context)
       (make-instance 'static-waveform-definition
                      :name name
-                     :entries entries)))
+                     :entries entries
+                     :context context)))
 
 ;;; Calibration Definitions (QuilT)
 
 (defclass calibration-definition ()
   ((body :initarg :body
-         :reader calibration-definition-body))
+         :reader calibration-definition-body)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context))
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified calibration."))
 
@@ -553,7 +561,8 @@ as a permutation."
   ()
   (:documentation "A representation of a user-specifieed MEASURE (discard) calibration."))
 
-(defun make-calibration-definition (name params args body)
+;;; TODO: dead code?
+(defun make-calibration-definition (name params args body &key context)
   (check-type name string)
   (assert (every #'is-param params))
   (assert (every (lambda (arg)
@@ -566,7 +575,8 @@ as a permutation."
                  :name name
                  :parameters params
                  :arguments args
-                 :body body))
+                 :body body
+                 :context context))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1575,14 +1585,17 @@ For example,
       (print-delayed-expression (delayed-expression-expression thing) stream)))
 
   (:method ((thing frame) (stream stream))
-    (format stream "~{~A ~}~A"
+    (format stream "~{~A ~}\"~A\""
             (mapcar #'print-instruction-to-string (frame-qubits thing))
             (frame-name thing)))
 
   (:method ((thing waveform-ref) (stream stream))
-    (format stream "~A~@[(~{~{~A: ~A~}~^, ~})~]"
+    (format stream "~A~@[(~{~A~^, ~})~]"
             (waveform-ref-name thing)
-            (mapcar (lambda (name-and-value) (mapcar #'print-instruction-to-string name-and-value))
+            (mapcar (lambda (name-and-value)
+                      (format nil "~A: ~A"
+                              (param-name (first name-and-value))  ; TODO: do we want to print %arg or arg
+                              (print-instruction-to-string (second name-and-value))))
                     (waveform-ref-args thing))))
 
   ;; Actual instructions

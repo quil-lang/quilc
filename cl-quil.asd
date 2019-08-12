@@ -92,6 +92,7 @@
                              (:file "expansion")
                              (:file "expand-circuits")
                              (:file "expand-calibrations")
+                             (:file "resolve-waveforms")
                              (:file "rewrite-arithmetic")
                              (:file "fusion")
                              (:file "simplify-arithmetic")))
