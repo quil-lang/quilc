@@ -66,8 +66,12 @@ before erroring. Intended to avoid infinite loops.")
                                              (calibration-definition-arguments defn)
                                              (calibration-definition-body defn)))
         (measure-calibration-definition (values nil
-                                                (calibration-definition-arguments defn)
-                                                (calibration-definition-body defn))))
+                                                (list (measurement-calibration-qubit defn)
+                                                      (measure-calibration-address defn))
+                                                (calibration-definition-body defn)))
+        (measure-discard-calibration-definition (values nil
+                                                        (list (measurement-calibration-qubit defn))1
+                                                        (calibration-definition-body defn))))
     (assert (= (length params)
                (length defn-params)))
     (assert (= (length args)
