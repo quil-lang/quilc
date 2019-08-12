@@ -83,7 +83,7 @@ measurements for which a calibration is defined."
       (is-formal (measurement-calibration-qubit defn))))
 
 (defgeneric apply-calibration (instr)
-  (:method apply-calibration ((instr gate-application))
+  (:method ((instr gate-application))
     (let ((op (application-operator instr)))
       (unless (plain-operator-p op)
         (return-from apply-calibration instr))
@@ -101,14 +101,16 @@ measurements for which a calibration is defined."
       (instantiate-definition defn
                               nil
                               (list (measurement-qubit instr)
-                                    (measure-address instr)))))
+                                    (measure-address instr)))
+      instr))
 
   (:method ((instr measure-discard))
     (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                               *measure-discard-calibrations*)))
       (instantiate-definition defn
                               nil
-                              (list (measurement-qubit instr)))))
+                              (list (measurement-qubit instr)))
+      instr))
   (:method ((instr t))
     instr))
 
@@ -118,9 +120,13 @@ measurements for which a calibration is defined."
                         *measure-calibrations*
                         *measure-discard-calibrations*)
       (compute-calibration-tables parsed-program)
-    (loop :for instr :across (parsed-program-executable-code parsed-program)
-          :for expanded := (apply-calibration instr)
-          :if (listp expanded)
-            :append expanded
-          :else
-            :collect expanded)))
+    (let ((fully-expanded
+            (loop :for instr :across (parsed-program-executable-code parsed-program)
+                  :for expanded := (apply-calibration instr)
+                  :if (listp expanded)
+                    :append expanded
+                  :else
+                    :collect expanded)))
+      (setf (parsed-program-executable-code parsed-program)
+            (coerce fully-expanded 'vector))
+      parsed-program)))
