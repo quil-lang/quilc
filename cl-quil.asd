@@ -54,7 +54,6 @@
                (:file "pragmas")
                (:file "parser")
                (:file "gates")
-               (:file "environment")
                (:file "context")
                (:file "build-gate")
                (:file "define-compiler")
