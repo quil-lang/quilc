@@ -23,7 +23,7 @@ conforming to the list of EXPECTED-PARAMETERS."
     t))
 
 (defun resolve-standard-waveform (waveform-ref waveform-class)
-  (let ((param-map (standard-waveform-quilt-parameters waveform-class)))
+  (let ((param-map (quilt-waveform-parameter-alist waveform-class)))
     (validate-waveform-parameters waveform-ref
                                   (mapcar #'first param-map))
     (let ((obj (make-instance waveform-class)))
@@ -48,7 +48,7 @@ waveform or waveform definition."
   (let* ((name (waveform-ref-name waveform-ref))
          (resolution
            (a:if-let ((default-binding (and use-defaults
-                                            (gethash name *standard-template-waveforms*))))
+                                            (gethash name *quilt-to-waveform-class*))))
              (resolve-standard-waveform waveform-ref default-binding)
              (a:if-let ((defwaveform
                             (find name waveform-defns
