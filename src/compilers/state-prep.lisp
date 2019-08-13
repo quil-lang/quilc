@@ -20,10 +20,6 @@
   (:documentation "A pseudo-instruction representing any state-preparation circuit that carries SOURCE-WF into TARGET-WF."))
 
 ;;; XXX: Hack!
-(defmethod lookup-gate-in-environment ((gate state-prep-application) environs)
-  (declare (ignore gate environs))
-  nil)
-;;; XXX: Hack!
 (defmethod gate-matrix ((gate state-prep-application) &rest parameters)
   (declare (ignore gate parameters))
   nil)

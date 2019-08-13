@@ -369,12 +369,6 @@
    #:quil-parse-error                   ; CONDITION
    )
 
-  ;; environment.lisp
-  (:export
-   #:gate-not-found                     ; CONDITION
-   #:operator-description-gate-lifter   ; FUNCTION
-   )
-
   ;; desugar.lisp
   (:export
    #:qubits-needed                      ; FUNCTION
