@@ -49,6 +49,7 @@
                (:file "transformable-mixin")
                (:file "classical-memory")
                (:file "ast")
+               (:file "waveform")
                (:file "resource")
                (:file "define-pragma")
                (:file "pragmas")

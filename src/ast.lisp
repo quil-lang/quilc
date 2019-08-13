@@ -169,39 +169,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (:documentation "Base class for built-in waveforms.")
   (:metaclass abstract-class))
 
-;;; TODO we need to be able to track :required and :default to generate messages
-
-(defclass gaussian-waveform (standard-waveform)
-  ((fwhm :initarg :fwhm
-         :type float
-         :documentation "Full Width Half Max shape parameter, in seconds.")
-   (t0 :initarg :t0
-       :type float
-       :documentation "Center time coordinate of the shape in seconds. Defaults
-       to mid-point of pulse."))
-  (:documentation "A Gaussian shaped waveform envelope defined for a specific frame."))
-
-(defclass drag-gaussian-waveform (standard-waveform)
-  ((fwhm :initarg :fwhm
-         :type float
-         :documentation "Full Width Half Max shape parameter, in seconds.")
-   (t0 :initarg :t0
-       :type float
-       :documentation "Center time coordinate of the shape in seconds. Defaults
-       to mid-point of pulse.")
-   (anh :initarg :anh
-        :type float
-        :initform -210e6
-        :documentation "Anharmonicity of the qubit, f01-f12 in (Hz)")
-   (alpha :initarg :alpha
-          :type float
-          :documentation "Dimensionless DRAG parameter"))
-  (:documentation "A DRAG Gaussian shaped waveform envelope defined for a specific frame."))
-
-(defclass flat-waveform (standard-waveform)
-  ((iq :initarg :iq
-       :type complex
-       :documentation "Individual IQ point to hold constant")))
+;;; NOTE: Standard waveform definitions may be found in waveform.lisp
 
 ;;;;;;;;;;;;;;;;;;;;; Comment protocol for syntax tree objects  ;;;;;;;;;;;;;;;;;;;;
 
