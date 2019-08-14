@@ -18,8 +18,7 @@
 ;;; but as the paper's authors have shown, a c-approx as low as 2.67
 ;;; can work in practice [yielding a base approximation distance of
 ;;; 1/c-approx^2 = 0.14]. We'll use that for now.
-(defparameter +c-approx+ 2.67 "Constant that upper bounds the ratio between d(VWV'W', approximate VWV'W') and eps^(3/2), for the balanced group commutators V, W of a unitary and the eps-approximation of each commutator [eps = d(V, approximate V) = d(W, approximate W)]. It is also assumed that d(V, I) = d(W, I) < c-gc * sqrt(eps), which is true for group
-commutator decompositions made inside the SK-algorithm.")
+(defparameter +c-approx+ 2.67 "Constant that upper bounds the ratio between d(VWV'W', approximate VWV'W') and eps^(3/2), for the balanced group commutators V, W of a unitary and the eps-approximation of each commutator [eps = d(V, approximate V) = d(W, approximate W)]. It is also assumed that d(V, I) = d(W, I) < c-gc * sqrt(eps), which is true for group commutator decompositions made inside the SK-algorithm.")
 
 ;;; One-qubit identity and pauli spin matrices, may be replaced later
 (defparameter +I+ (magicl:make-complex-matrix 2 2 '(1 0 0 1)))
@@ -121,8 +120,9 @@ commutator decompositions made inside the SK-algorithm.")
 
 (defun trace-dist (u s)
   "Returns the trace norm of U - S, equal to Tr[sqrt((U - S)'(U - S))]."
-  (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s))))))
-    (loop :for i :below (magicl:matrix-rows sigma) :summing (magicl:ref sigma i i) :into norm :finally (return norm))))
+  (let ((sigma (nth-value 1 (magicl:svd (m* (magicl:dagger (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s)))
+                                            (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s)))))))
+    (loop :for i :below (magicl:matrix-rows sigma) :summing (sqrt (magicl:ref sigma i i)) :into norm :finally (return (/ norm 2)))))
 
 (defun find-c-gc (num-trials &key (distance-function #'operator-dist) (decompose-func #'gc-decompose))
   "Numerically tests for the value of c-gc, the upper bound on the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U."
@@ -338,11 +338,11 @@ commutator decompositions made inside the SK-algorithm.")
 ;;; ---------------------Algorithm Calling-------------------------
 ;;; ---------------------------------------------------------------
 
-(defun brute-base (u decomposer max-depth)
+(defun brute-base (u decomposer max-depth &key (epsilon0 0.14))
   "Testing brute force base approximation search."
   (labels ((helper (depth seq mat last-idx rep-count)
              (cond ((= depth max-depth)
-                    (if (< (operator-dist u mat) 0.1)
+                    (if (< (operator-dist u mat) epsilon0)
                         seq
                         nil))
                    (t (loop :for gate :in (gates decomposer)
@@ -365,44 +365,45 @@ commutator decompositions made inside the SK-algorithm.")
     (let ((discovered-seq (helper 0 '() +I+ -1 0)))
       (if discovered-seq
           discovered-seq
-          (format t "~%Nothing found...")))))
+          (format t "~%Nothing found for unitary ~A..." u)))))
 
 ;;; Helper method for iterating through SK
-(defun sk-iter (base-approximations u n)
+(defun sk-iter (decomposer u n)
   "An approximation iteration within the Solovay-Kitaev algorithm at a depth N. Returns a vector of two items, which are each either a commutator or a base approximation."
   (if (zerop n)
-      (fetch-base-approximation base-approximations u) #+ignore(gethash (map 'vector #'floor (matrix-to-grid-coord u +ballie-radius+)) base-approximations)
-      (multiple-value-bind (v w) (gc-decompose u)
-        (let* ((v-next (sk-iter base-approximations v (1- n)))
-               (w-next (sk-iter base-approximations w (1- n))))
-          (cons (sk-iter base-approximations u (1- n)) (list (make-commutator :v v-next :w w-next)))))))
-
-(defun brute-sk-iter (decomposer u n)
-  "Brute force iteration"
-  (if (zerop n)
-      (brute-base u decomposer 18)
-      (let ((next-u (brute-sk-iter decomposer u (1- n))))
+      (fetch-base-approximation (base-approximations decomposer) u) #+ignore(gethash (map 'vector #'floor (matrix-to-grid-coord u +ballie-radius+)) base-approximations)
+      (let ((next-u (sk-iter decomposer u (1- n))))
         (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger (decompress-and-multiply decomposer next-u))))
-          (let* ((v-next (brute-sk-iter decomposer v (1- n)))
-                 (w-next (brute-sk-iter decomposer w (1- n))))
+          (let* ((v-next (sk-iter decomposer v (1- n)))
+                 (w-next (sk-iter decomposer w (1- n))))
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
 
-(defun decompose (decomposer unitary epsilon)
+(defun brute-sk-iter (decomposer u n &key (epsilon0 0.14))
+  "Brute force iteration"
+  (if (zerop n)
+      (brute-base u decomposer 18 :epsilon0 epsilon0)
+      (let ((next-u (brute-sk-iter decomposer u (1- n) :epsilon0 epsilon0)))
+        (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger (decompress-and-multiply decomposer next-u))))
+          (let* ((v-next (brute-sk-iter decomposer v (1- n) :epsilon0 epsilon0))
+                 (w-next (brute-sk-iter decomposer w (1- n) :epsilon0 epsilon0)))
+            (cons next-u (list (make-commutator :v v-next :w w-next))))))))
+
+(defun decompose (decomposer unitary &key (depth 3) (epsilon0 0.14))
   "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U. When expanded into all its constituent unitaries, this decomposition is guaranteed to be within EPSILON of the original unitary."
-  (let* ((eps0 (epsilon0 decomposer))
-         (depth 4 #+ignore(ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
-                                 (log (* eps0 +c-approx+ +c-approx+))))
-                         (log (/ 3 2)))))
-    (brute-sk-iter decomposer unitary depth) #+ignore(sk-iter (base-approximations decomposer) unitary depth)))
+  ;; (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
+  ;;                                (log (* eps0 +c-approx+ +c-approx+))))
+  ;;                        (log (/ 3 2)))
+  (let* ((eps0 (epsilon0 decomposer)))
+    (brute-sk-iter decomposer unitary depth :epsilon0 epsilon0) #+ignore(sk-iter decomposer unitary depth)))
 
 (defun decompress (decomposer item)
   "Expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate gate for each parity-inverse index inside, returning the decompressed list of gates."
   ;; TODO: still need to convert indices -> gates
   (if (typep item 'commutator)
-      (append (decompress decomposer (commutator-v item))
-              (decompress decomposer (commutator-w item))
+      (append (seq-dagger (decompress decomposer (commutator-w item)))
               (seq-dagger (decompress decomposer (commutator-v item)))
-              (seq-dagger (decompress decomposer (commutator-w item))))
+              (decompress decomposer (commutator-w item))
+              (decompress decomposer (commutator-v item)))
       (if (typep (car item) 'list)
           (append (decompress decomposer (car item)) (decompress decomposer (cadr item)))
           item)))
@@ -421,16 +422,22 @@ commutator decompositions made inside the SK-algorithm.")
                   :initial-value +I+))))
 
 (defun approximate (decomposer u acc)
+  "An alternative function for decomposition that approximates a unitary U to an arbitrary accuracy ACC (using decomposer)."
   (let* ((seq (brute-base u decomposer 18))
-         (curr-approx (decompress-and-multiply decomposer seq)))
-    (loop :while (> (operator-dist u curr-approx) acc)
-          :do (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger curr-approx)))
-                (let* ((v-approx (approximate decomposer v (expt (/ acc +c-approx+) 2/3)))
-                       (w-approx (approximate decomposer w (expt (/ acc +c-approx+) 2/3)))
-                       (v-approx-mat (decompress-and-multiply decomposer v-approx))
-                       (w-approx-mat (decompress-and-multiply decomposer w-approx)))
-                  (setf curr-approx (m* v-approx-mat w-approx-mat (magicl:dagger v-approx-mat) (magicl:dagger w-approx-mat) curr-approx))
-                  (setf seq (cons seq (list (make-commutator :v v-approx :w w-approx))))))
+         (curr-approx (decompress-and-multiply decomposer seq))
+         (curr-depth 0))
+    (loop :while (< acc (operator-dist u curr-approx))
+          :do (uiop:nest
+               (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger curr-approx))))
+               #+ignore(multiple-value-bind (v-approx v-approx-mat) (approximate decomposer v (* +c-approx+ (expt curr-acc 3/2))))
+               #+ignore(multiple-value-bind (w-approx w-approx-mat) (approximate decomposer w (* +c-approx+ (expt curr-acc 3/2))))
+               (let* ((v-approx (decompose decomposer v :depth curr-depth))
+                      (v-approx-mat (decompress-and-multiply decomposer v-approx))
+                      (w-approx (decompose decomposer w :depth curr-depth))
+                      (w-approx-mat (decompress-and-multiply decomposer w-approx))))
+               (progn (setf curr-approx (m* v-approx-mat w-approx-mat (magicl:dagger v-approx-mat) (magicl:dagger w-approx-mat) curr-approx))
+                      (setf seq (cons seq (list (make-commutator :v v-approx :w w-approx))))
+                      (incf curr-depth)))
           :finally (return (values seq curr-approx)))))
 
 ;;; Conversions between matrix and bloch-vector representations of
@@ -581,6 +588,17 @@ commutator decompositions made inside the SK-algorithm.")
          (w (bloch-vector-to-matrix (make-bloch-vector :theta phi :axis #(0 1 0))))
          (s (find-transformation-matrix u (m* v w (magicl:dagger v) (magicl:dagger w)))))
     (values (m* s v (magicl:dagger s)) (m* s w (magicl:dagger s)))))
+
+;;; Function for testing the quality of approximations as a function of the base approximation error
+(defun test-base-approximations (decomposer start end &key (depth 3) (step-size 0.1) (trials 100))
+  (let ((avg-error 0))
+    (loop :for eps0 :from start :to end :by step-size :do
+      (setf avg-error 0)
+      (dotimes (i trials)
+        (let* ((u (magicl:random-unitary 2))
+               (u-approx (decompress-and-multiply decomposer (decompose decomposer u :depth depth :epsilon0 eps0))))
+          (incf avg-error (operator-dist u u-approx))))
+      (format t "~%Average error for eps0 = ~A: ~A" eps0 (/ avg-error trials)))))
 
 ;;; Some functions which explore the ball representation of SU(2)
 (defun ball-op-distances ()
