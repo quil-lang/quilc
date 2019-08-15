@@ -472,8 +472,6 @@ as a permutation."
   ()
   (:documentation "A waveform definition that has no parameters."))
 
-;;; TODO parametric vs parameterized
-
 (defclass parameterized-waveform-definition (waveform-definition)
   ((parameters :initarg :parameters
                :reader waveform-definition-parameters
@@ -656,9 +654,9 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 
 (defclass simple-frame-mutation (instruction)
   ((frame :initarg :frame
-          :accessor target-frame)
+          :accessor frame-mutation-target-frame)
    (value :initarg :value
-          :accessor mutation-value))
+          :accessor frame-mutation-value))
   (:documentation "An instruction representing the mutation of a frame attribute.")
   (:metaclass abstract-class))
 

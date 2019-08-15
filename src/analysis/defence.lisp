@@ -54,7 +54,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
                   (raw-capture-frame instr)))
     (delay (list (delay-qubit instr)))
     (simple-frame-mutation (frame-qubits
-                            (target-frame instr)))
+                            (frame-mutation-target-frame instr)))
     (swap-phase (append (frame-qubits (swap-phase-left-frame instr))
                         (frame-qubits (swap-phase-right-frame instr))))
     (fence (fence-qubits instr))))
