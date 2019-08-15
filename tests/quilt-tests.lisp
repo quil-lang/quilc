@@ -70,3 +70,42 @@ MEASURE 1 ro                            # 4
                   :do (if (member i match-indices)
                           (is result)
                           (is (not result))))))))))
+
+;;; TODO update package.lisp
+(deftest test-fence-expansion ()
+  (let ((pp (parse-quil "
+DECLARE ro BIT
+PULSE 0 \"xy\" flat(duration: 1, iq: 1)
+FENCE 0 1
+CAPTURE 0 \"xy\" flat(duration: 1, iq: 1) ro
+CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
+"))
+        (clocks (vector 0.0 0.0)))
+    (quil::expand-fences-to-delays pp)
+    ;; Check whether the FENCE resolves to suitable DELAY instrs
+    (flet ((qubit (instr)
+             (qubit-index
+              (etypecase instr
+                (quil::pulse (first (quil::frame-qubits (quil::pulse-frame instr))))
+                (quil::capture (first (quil::frame-qubits (quil::capture-frame instr))))
+                (quil::delay (quil::delay-qubit instr))))))
+      (loop :for instr :across (parsed-program-executable-code pp)
+            :do (let ((q (qubit instr)))
+                  ;; We expect the CAPTURE instructions to start at 1
+                  (when (typep instr 'quil::capture)
+                    (is (= 1.0 (aref clocks q))))
+                  (incf (aref clocks q) (quil::quilt-instruction-duration instr)))))))
+
+(deftest test-quilt-duration ()
+  (let ((pp (parse-quil "
+DEFWAVEFORM foo:
+    1.0, 1.0, 1.0, 1.0
+
+PULSE 0 \"xy\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)
+PULSE 0 \"xy\" foo
+"))
+        (sample-rate 2.0))
+    (flet ((instr (i)
+             (elt (parsed-program-executable-code pp) i)))
+      (is (= 1.0 (quil::quilt-instruction-duration (instr 0) sample-rate)))
+      (is (= 2.0 (quil::quilt-instruction-duration (instr 1) sample-rate))))))

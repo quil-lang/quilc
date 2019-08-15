@@ -936,7 +936,7 @@ result of BODY, and the (possibly null) list of remaining lines.
              (parse-arithmetic-tokens entry :eval t)))
     (mapcar #'simplify entries)))
 
-(defun parse-gate-or-waveform-entries (tok-lines)
+(defun parse-gate-or-waveform-entries (tok-lines &key required)
   ;; Do we have any lines to parse?
   (when (null tok-lines)
     (warn "End of program each when indented gate or waveform entries was expected.")
@@ -947,6 +947,8 @@ result of BODY, and the (possibly null) list of remaining lines.
       (indented-line (first tok-lines))
     ;; Is the first line indented?
     (unless indented?
+      (when required
+        (quil-parse-error "Expected indented gate or waveform entries, but alas, they weren't found. (Did you indent properly?)"))
       (warn "Expected indented gate or waveform entries but alas, they weren't found.")
       (return-from parse-gate-or-waveform-entries
         (values nil tok-lines)))
@@ -1497,7 +1499,7 @@ Returns the frame and the remaining tokens."
           (let ((*arithmetic-parameters* nil)
                 (*segment-encountered* nil))
             (multiple-value-bind (parsed-entries rest-lines)
-                (parse-gate-or-waveform-entries body-lines)
+                (parse-gate-or-waveform-entries body-lines :required t)
               ;; Check that we only refered to parameters in our param list.
               (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
                     :unless (find (param-name body-p) params :key #'param-name

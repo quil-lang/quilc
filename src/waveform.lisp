@@ -59,6 +59,8 @@ PARAMETERS:
 
        nil)))
 
+;;; TODO should we actually allow for defaults?
+
 (define-standard-waveform gaussian-waveform "gaussian"
   ((fwhm :quilt-name "fwhm"
          :type float
