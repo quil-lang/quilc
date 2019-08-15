@@ -73,7 +73,9 @@ For a program constructing a bell state with a large sampling count, the returne
                                  n)
                                ret))
                     :finally (return ret))))
-       (mapcar (lambda (n) (coerce (/ n (consumer-local-qvm-trials consumer)) 'double-float)) counts)))
+       ;; (mapcar (lambda (n) (coerce (/ n (consumer-local-qvm-trials consumer)) 'double-float)) counts)
+       counts
+       ))
     (:shared-memory
      (error "Shared memory mode not implemented."))))
 

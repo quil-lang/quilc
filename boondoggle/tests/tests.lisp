@@ -30,7 +30,7 @@ The processor-L1-distance post-process takes all consumers and processors as inp
                                                                        :executable-path (namestring #P"./quilc"))))
                          (consumer      ()        (make-instance 'boondoggle::consumer-local-qvm
                                                                  :trials 1000))
-                         (post-process  ()        (make-instance 'boondoggle::processor-L1-distance)))
+                         (post-process  ()        (make-instance 'boondoggle::processor-two-sample-chi-squared)))
                         (produced-program ()
                                           (boondoggle::produce-quil-program (producer)))
                         (compiled-program ((i processors))
@@ -41,10 +41,10 @@ The processor-L1-distance post-process takes all consumers and processors as inp
                                      (progn
                                        (quil::print-parsed-program (compiled-program i))
                                        (boondoggle::consume-quil (consumer) (compiled-program i))))
-                        (l1-distance ((k processors) (i processors))
-                                     (boondoggle::apply-process (post-process) (qvm-results i) (qvm-results k))
-                                       ))))
-      (destructuring-bind ((a b) (c d)) l1-results ; l1-results are of the form e.g. ((0.0d0 0.5d0) (0.5d0 0.0d0))
+                        (chi-squared-result ((k processors) (i processors))
+                                            (boondoggle::apply-process (post-process) (qvm-results i) (qvm-results k)))
+                        )))
+      (destructuring-bind ((a b) (c d)) chi-squared-result ; l1-results are of the form e.g. ((0.0d0 0.5d0) (0.5d0 0.0d0))
         (fiasco:is (= b c)) ; Off-diagonal elements must equal
         (fiasco:is (= a d)) ; Diagonal elements must equal
         (fiasco:is (= a 0.0)) ; Diagonal elements must be zero

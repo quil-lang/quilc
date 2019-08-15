@@ -37,5 +37,42 @@
   ())
 
 (defmethod apply-process ((processor processor-L1-distance) &rest data)
-  "Calculate the L1 distance between two arguments. &rest expects only 2 position arguments, each of which is expected to be a normalized histogram count of bitstring outputs from the QVM for a given quil program."
+  "Calculate the L1 distance between two arguments. &rest expects only 2 positional arguments, each of which is expected to be a normalized histogram count of bitstring outputs from the QVM."
   (reduce #'+ (mapcar (a:compose #'abs #'-) (first data) (second data))))
+
+(defclass processor-two-sample-chi-squared (processor)
+  ())
+
+(defmethod apply-process ((processor processor-two-sample-chi-squared) &rest data)
+  "Calculate a chi-squared statistic between two samples. &rest expects only 2 positional arguments, each of which is expected to be a histogram count of bitstring outputs from the QVM. This implementation of the two-sample chi-squared test is taken from https://www.itl.nist.gov/div898/software/dataplot/refman1/auxillar/chi2samp.htm, where the following variables are defined as:
+
+nq: number of qubits
+c: The total number of categories (bitstrings), 2^Nq.
+si: Histogram of bitstring counts for the first sample. Value of (first data).
+ri: Histogram of bitstring counts for the second sample. Value of (second data).
+
+c-filtered: Number of bitstrings (categories) where (si + ri) > 0
+si-filtered: Subset of si histogram, keeping only entries where (si + ri) > 0
+ri-filtered: Subset of ri histogram, keeping only entries where (si + ri) > 0
+
+k1 = Normalization factor for different sample sizes (see ref.)
+k2 = (/ 1 k1)
+"
+  (let* ((k1 (sqrt (/ (reduce #'+ (first data)) (reduce #'+ (second data)))))
+         (k2 (/ 1 k1)))
+    (multiple-value-bind (si-filtered ri-filtered c-filtered) (filter-lists-by-loop (first data) (second data)) 
+      (reduce #'+ (mapcar #'(lambda (si ri) (/ (- (* k1 ri) (* k2 si)) (+ ri si))) si-filtered ri-filtered)))))
+
+(defun filter-lists-by-loop (list1 list2)
+  "Take two lists as input, list1 and list2, and returns
+
+1. list1 filtered to the elements s.t. li1 + li2 > 0.
+2. list2 filtered to the elements s.t. li1 + li2 > 0.
+3. The length of the filtered lists above.
+"
+  (loop :for li1 :in list1
+        :for li2 :in list2
+        :for yes := (plusp (+ li1 li2))
+        :when yes :collect li1 :into list1-filtered
+        :when yes :collect li2 :into list2-filtered
+        :finally (return (values list1-filtered list2-filtered (length list1-filtered)))))
