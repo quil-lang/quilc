@@ -4,6 +4,7 @@
 
 (in-package #:cl-quil)
 
+;;; TODO: should quilt calibration expansion be standard?
 (defvar *standard-post-process-transforms*
   '(expand-circuits expand-calibrations resolve-waveform-references type-check)
   "The standard transforms that are applied by PARSE-QUIL.")

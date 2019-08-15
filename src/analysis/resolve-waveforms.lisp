@@ -5,6 +5,8 @@
 waveforms or waveform definitions."
   expand-calibrations)
 
+;;; TODO frames have a fixed sample-rate
+
 ;;; TODO check i) that values are constant, and ii) of the appropriate type
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   "Determines whether the waveform reference WAVEFORM-REF has parameter names

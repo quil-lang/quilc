@@ -335,6 +335,9 @@
     (dolist (param (application-parameters instr))
       (walk-parameter-for-real-values param memory-regions))))
 
+;;; TODO we should type-check CAPTURE and RAW-CAPTURE instructions
+;;; note: this requires having knowledge of the sample-rate
+
 (defun type-check (parsed-program)
   "Ensure classical type safety of PARSED-PROGRAM, coercing literals where appropriate."
   (flet ((typecheck-instruction-sequence (seq)
