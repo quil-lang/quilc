@@ -325,9 +325,9 @@ depending on whether TEST passes."
 
   (:method ((instr simple-frame-mutation) param-value arg-value)
     (make-instance (class-of instr)
-                   :frame (instantiate-frame (target-frame instr) arg-value)
+                   :frame (instantiate-frame (frame-mutation-target-frame instr) arg-value)
                    :value (funcall (transform-if #'is-formal arg-value)
-                                   (mutation-value instr))))
+                                   (frame-mutation-value instr))))
 
   (:method ((instr pulse) param-value arg-value)
     (make-instance 'pulse

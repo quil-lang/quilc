@@ -121,6 +121,13 @@
    #:memory-name                        ; TYPE (STRUCTURE)
    #:memory-name-region-name            ; READER
 
+   #:frame
+   #:frame-name
+
+   #:waveform-ref                       ; STRUCTURE
+   #:waveform-ref-name                  ; READER
+   #:waveform-ref-args                  ; READER
+
    #:jump-target                        ; CLASS
    #:jump-target-p                      ; FUNCTION
    #:jump-target-label                  ; READER
@@ -316,12 +323,71 @@
    #:gate-application                   ; CLASS
    #:gate-application-gate              ; GENERIC, METHOD
 
+   #:pulse                              ; CLASS
+   #:pulse-frame                        ; READER
+   #:pulse-waveform                     ; READER
+
+   #:capture                            ; CLASS
+   #:capture-frame                      ; READER
+   #:capture-waveform                   ; READER
+   #:capture-memory-ref                 ; READER
+
+   #:raw-capture                        ; CLASS
+   #:raw-capture-frame                  ; READER
+   #:raw-capture-duration               ; READER
+   #:raw-capture-memory-ref             ; READER
+
+   #:delay                              ; CLASS
+   #:delay-qubit                        ; READER
+   #:delay-duration                     ; READER
+
+   #:fence                              ; CLASS
+   #:fence-qubits                       ; READER
+
+   #:simple-frame-mutation              ; ABSTRACT CLASS
+   #:set-frequency                      ; CLASS
+   #:set-phase                          ; CLASS
+   #:shift-phase                        ; CLASS
+   #:set-scale                          ; CLASS
+   #:frame-mutation-target-frame        ; READER
+   #:frame-mutation-value               ; READER
+
+   #:swap-phase                         ; CLASS
+   #:swap-phase-left-frame              ; READER
+   #:swap-phase-right-frame             ; READER
+
    #:gate-definition                    ; CLASS
    #:static-gate-definition             ; CLASS
    #:parameterized-gate-definition      ; CLASS
    #:gate-definition-name               ; READER
    #:gate-definition-entries            ; READER
    #:gate-definition-parameters         ; READER
+
+   #:circuit-definition                 ; CLASS
+   #:circuit-definition-name            ; READER
+   #:circuit-definition-parameters      ; READER
+   #:circuit-definition-arguments       ; READER
+   #:circuit-definition-body            ; READER
+
+   #:waveform-definition                ; ABSTRACT CLASS
+   #:static-waveform-definition         ; CLASS
+   #:parameterized-waveform-definition  ; CLASS
+   #:waveform-definition-name           ; READER
+   #:waveform-definition-entries        ; READER
+   #:waveform-definition-parameters     ; READER
+
+   #:calibration-definition             ; ABSTRACT CLASS
+   #:gate-calibration-definition        ; CLASS
+   #:measurement-calibration-definition ; ABSTRACT CLASS
+   #:measure-calibration-definition     ; CLASS
+   #:measure-discard-calibration-definition ; CLASS
+   #:calibration-definition-body        ; READER
+   #:calibration-definition-name        ; READER
+   #:calibration-definition-parameters  ; READER
+   #:calibration-definition-arguments   ; READER
+   #:measurement-calibration-qubit      ; READER
+   #:measure-calibration-address        ; READER
+
 
    #:parsed-program                     ; CLASS
    #:parsed-program-gate-definitions    ; READER
