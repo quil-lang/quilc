@@ -1,5 +1,24 @@
 (in-package :cl-quil)
 
+;;; Given a 'simple quilt' program, this makes it even simpler: namely, FENCE instructions
+;;; are replaced with appropriate DELAY instructions. The basic idea is that something like
+;;;
+;;; PULSE 0 \"xy\" flat(duration: 1.0, iq: 1.0)
+;;; FENCE 0 1
+;;; PULSE 1 \"xy\" flat(duration: 1.0, iq: 1.0)
+;;;
+;;; can get converted to
+;;;
+;;; PULSE 0 \"xy\" flat(duration: 1.0, iq: 1.0)
+;;; DELAY 1 1.0
+;;; PULSE 1 \"xy\" flat(duration: 1.0, iq: 1.0)
+;;;
+;;; where synchronization is encoded in the newly introduced DELAY.
+;;;
+;;; By a simple quilt program, we mean a program consisting only of instructions
+;;; that have an immediately calculable duration. At present, this precludes the
+;;; use of control flow operations. See SIMPLE-QUILT-P below for more details.
+
 (define-transform expand-fences-to-delays (expand-fences-to-delays)
   "This transform replaces explicit synchronization in the form of FENCE instructions with implicit
 synchronization in the form of DELAY instructions on the appropriate qubit lines."

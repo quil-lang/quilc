@@ -1,5 +1,18 @@
 (in-package #:cl-quil)
 
+;;; Calibration Expansion
+;;;
+;;; This looks a lot like circuit expansion, and under the hood a lot of the
+;;; mechanics are the same. A few differences are worth pointing out:
+;;;
+;;;   - In its current incarnation, calibration expansion is not recursive. The assumption
+;;;     is that calibration bodies contain simple quilt instructions and nothing else.
+;;;   - The task of finding a calibration that matches a measurement or gate application
+;;;     is a bit more complicated than what is done for circuit expansion (namely,
+;;;     multiple definitions are allowed, and we match (TODO actually spell this out).
+
+;;; TODO Enforce that calibration bodies contain simple quilt instructions...
+
 (define-transform expand-calibrations (expand-calibrations)
   "This transform applies all available calibrations. The result has no gate applications or
 measurements for which a calibration is defined."
