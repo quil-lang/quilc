@@ -215,7 +215,7 @@ A logical line may be introduced either as the result of a :NEWLINE or a
 the case of :SEMICOLON, the following line is prefixed with the indentation of
 the immediately preceding line."
   ;; note: something like "H 0 ; X 1" will produce two lines for internal processing,
-  ;; but the tokens themselves maintain their original line numbers for error reporting
+  ;; but the tokens themselves maintain their original line numbers for error reporting.
   (declare (type list tokens)
            (optimize speed (space 0)))
   (let* ((pieces      (cons nil nil))
