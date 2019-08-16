@@ -4,20 +4,20 @@
 
 (in-package #:boondoggle-tests)
 
-(fiasco:deftest compiled/uncompiled-l1-distance ()
-  "This script measures the L1 distance between QVM results from compiled and uncompiled programs, respectively. It conforms to the boondoggle pattern of specifying producers, processors, consumers, and post-processors. In this case:
+(fiasco:deftest compiled/uncompiled-chi-squared-test ()
+  "This script calculates the two-sample chi-squared statistic between QVM results from compiled and uncompiled programs, respectively. It conforms to the boondoggle pattern of specifying producers, processors, consumers, and post-processors. In this case:
 
 1. Producers generate quil programs,
 2. Processors either compile or don't compile the generated program
    (perform the identity operation),
 3. the consumer runs the program on the QVM, and
-4. Post-processors measure the L1 distance between the qvm results.
+4. Post-processors calculate the chi-square statistic between the qvm results.
 
 In the generated `pipeline`, the producers, processors, consumers and post-processors are first defined as the output from various make-instances.
 
 Note that the processors are indexed by compiled/uncompiled in the variable i, and that although consumers could also be made plural with indexing, there is just one consumer (the QVM). The qvm-results are indexed by both the consumer and the processor.
 
-The processor-L1-distance post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the L1 distance between all possible combinations."
+The processor-two-sample-chi-squared  post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the chi-squared statistics (bundled with their categorical degrees of freedom) between all possible combinations."
   (let ((boondoggle::*debug-noise-stream* *standard-output*)
         (chip-spec (quil::build-8q-chip)))
         (let ((chi-squared-results (boondoggle::pipeline
