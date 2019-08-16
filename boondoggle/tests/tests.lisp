@@ -5,7 +5,15 @@
 (in-package #:boondoggle-tests)
 
 (fiasco:deftest compiled/uncompiled-chi-squared-test ()
-  "This script calculates the two-sample chi-squared statistic between QVM results from compiled and uncompiled programs, respectively. It conforms to the boondoggle pattern of specifying producers, processors, consumers, and post-processors. In this case:
+  "This script calculates the two-sample chi-squared statistic between QVM results from compiled and uncompiled programs, respectively.
+
+In this test we are creatong a quantum state `Psi` and `Psi'` from uncompiled and compiled programs `P` and `P'`, respectively. Measuring the resulting wavefunctions (with `N` trials each), we generate two bitstring histograms `H` and `H'`. We say that quilc works if we run the two-sample chi-squared test against `H` and `H'` and fail to reject the null hypothesis, that the underlying 'distributions' are not equal (`Psi != Psi'`).
+
+Bitstrings for K-qubit systems are equivalent to multinomial distributions of categorical data for 2^K categories. The one-sample chi-squared test checks whether a sample was taken from a given distribution. The two-sample chi-squared test checks whether two samples are taken from the same underlying (& unspecified) distribution.
+
+After calculating the chi-squared statistic for the two samples, we may compare that value against the output of the inverse-chi-squared function to determine the likelihood that the generated value does not reject the null hypothesis. Assuming that quilc works, and that we'd like tests to pass 99.9% of the time whiel working, we give 0.999 to the quantile-of-chi-square-distribution function below (together with the number of categories). The final check in the tests will fail if the calculated chi-squared value is greater than the 0.999th quantile threshold.
+
+This test conforms to the boondoggle pattern of specifying producers, processors, consumers, and post-processors. In this case:
 
 1. Producers generate quil programs,
 2. Processors either compile or don't compile the generated program
@@ -17,7 +25,9 @@ In the generated `pipeline`, the producers, processors, consumers and post-proce
 
 Note that the processors are indexed by compiled/uncompiled in the variable i, and that although consumers could also be made plural with indexing, there is just one consumer (the QVM). The qvm-results are indexed by both the consumer and the processor.
 
-The processor-two-sample-chi-squared  post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the chi-squared statistics (bundled with their categorical degrees of freedom) between all possible combinations."
+The processor-two-sample-chi-squared post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the chi-squared statistics (bundled with their categorical degrees of freedom) between all possible combinations.
+
+"
   (let ((boondoggle::*debug-noise-stream* *standard-output*)
         (chip-spec (quil::build-8q-chip)))
         (let ((chi-squared-results
