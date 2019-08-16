@@ -55,8 +55,11 @@ The processor-two-sample-chi-squared post-process takes all consumers and proces
                                       (boondoggle::apply-process (post-process) (qvm-results i) (qvm-results k))))))
       (destructuring-bind (((chi-1 deg-1) (chi-2 deg-2)) ((chi-3 deg-3) (chi-4 deg-4))) chi-squared-results ; chi-squared-results are of the form e.g. ((0.0d0 0.5d0) (0.5d0 0.0d0))
         (format t "chi-squared-results: ~A" chi-squared-results)
-        (fiasco:is (= chi-1 chi-4)) ; Off-diagonal elements must equal
-        (fiasco:is (= chi-2 chi-3)) ; Diagonal elements must equal
-        (fiasco:is (= chi-1 0.0)) ; Diagonal elements must be zero
-        (fiasco:is (<= chi-2 (sapa:quantile-of-chi-square-distribution deg-2 0.999))) ; Off-diagonal elements must be less than inverse-chi for 99.9% success rate.
+        (fiasco:is (= deg-2 deg-3)) ; Off-diagonal degree-of-freedom elements must equal
+        (fiasco:is (<= deg-1 deg-2)) ; Diagonal degree-of-freedom elements must be leq off-diagonal
+        (fiasco:is (<= deg-4 deg-2)) ; Same as above
+        (fiasco:is (= chi-1 chi-4)) ; Off-diagonal chi-square elements must equal
+        (fiasco:is (= chi-2 chi-3)) ; Diagonal chi-square elements must equal
+        (fiasco:is (= chi-1 0.0)) ; Diagonal chi-square elements must be zero
+        (fiasco:is (<= chi-2 (sapa:quantile-of-chi-square-distribution deg-2 0.999))) ; Off-diagonal chi-square elements must be less than inverse-chi for 99.9% success rate.
 ))))
