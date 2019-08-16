@@ -5,13 +5,13 @@
 (in-package #:boondoggle-tests)
 
 (fiasco:deftest compiled/uncompiled-chi-squared-test ()
-  "This script calculates the two-sample chi-squared statistic between QVM results from compiled and uncompiled programs, respectively.
+  "This script calculates the two-sample chi-squared statistic between QVM results from compiled and uncompiled programs, respectively, as a test for whether the two programs generate the same quantum state.
 
-In this test we are creatong a quantum state `Psi` and `Psi'` from uncompiled and compiled programs `P` and `P'`, respectively. Measuring the resulting wavefunctions (with `N` trials each), we generate two bitstring histograms `H` and `H'`. We say that quilc works if we run the two-sample chi-squared test against `H` and `H'` and fail to reject the null hypothesis, that the underlying 'distributions' are not equal (`Psi != Psi'`).
+In this test we are creating quantum states `Psi` and `Psi'` from uncompiled and compiled programs `P` and `P'`, respectively. Measuring the resulting wavefunctions (with `N` trials each), we generate two bitstring histograms `H` and `H'`. We say that quilc works if we run the two-sample chi-squared test against `H` and `H'` and fail to reject the null hypothesis, and therefore inferring that the underlying 'distributions' are equal (`Psi = Psi'`).
 
-Bitstrings for K-qubit systems are equivalent to multinomial distributions of categorical data for 2^K categories. The one-sample chi-squared test checks whether a sample was taken from a given distribution. The two-sample chi-squared test checks whether two samples are taken from the same underlying (& unspecified) distribution.
+Bitstrings for K-qubit systems are equivalent to multinomial distributions of categorical data for 2^K categories. The one-sample chi-squared test checks whether a sample was taken from a given distribution. The two-sample chi-squared test checks whether two samples are taken from the same underlying (and unspecified) distribution.
 
-After calculating the chi-squared statistic for the two samples, we may compare that value against the output of the inverse-chi-squared function to determine the likelihood that the generated value does not reject the null hypothesis. Assuming that quilc works, and that we'd like tests to pass 99.9% of the time whiel working, we give 0.999 to the quantile-of-chi-square-distribution function below (together with the number of categories). The final check in the tests will fail if the calculated chi-squared value is greater than the 0.999th quantile threshold. For more details on this implementation, see the processor-two-sample-chi-squared apply-process function in processors.lisp.
+After calculating the chi-squared statistic for the two samples, we may compare that value against the output of the inverse-chi-squared function to determine the likelihood that the generated value does not reject the null hypothesis. Assuming that we would like tests to pass 99.9% when quilc is working, we give 0.999 to the quantile-of-chi-square-distribution function below, together with the number of categories (degrees of freedom). The final check in the tests will fail if the calculated chi-squared value is greater than the 0.999th quantile threshold. For more details on this implementation, see the processor-two-sample-chi-squared apply-process docstring and references in processors.lisp.
 
 This test conforms to the boondoggle pattern of specifying producers, processors, consumers, and post-processors. In this case:
 
