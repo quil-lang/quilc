@@ -48,20 +48,23 @@
 
 nq: number of qubits
 c: The total number of categories (bitstrings), 2^Nq.
-si: Histogram of bitstring counts for the first sample. Value of (first data).
-ri: Histogram of bitstring counts for the second sample. Value of (second data).
+s: Histogram of bitstring counts for the first sample. Value of (first data).
+r: Histogram of bitstring counts for the second sample. Value of (second data).
 
 c-filtered: Number of bitstrings (categories) where (si + ri) > 0
-si-filtered: Subset of si histogram, keeping only entries where (si + ri) > 0
-ri-filtered: Subset of ri histogram, keeping only entries where (si + ri) > 0
+s-filtered: Subset of s histogram, keeping only entries where (si + ri) > 0
+r-filtered: Subset of r histogram, keeping only entries where (si + ri) > 0
 
 k1 = Normalization factor for different sample sizes (see ref.)
 k2 = (/ 1 k1)
+
+Returns the chi-squared statistic value, as well as the calculated degrees of freedom, in a list.
 "
   (let* ((k1 (sqrt (/ (reduce #'+ (first data)) (reduce #'+ (second data)))))
-         (k2 (/ 1 k1)))
-    (multiple-value-bind (si-filtered ri-filtered c-filtered) (filter-lists-by-loop (first data) (second data)) 
-      (reduce #'+ (mapcar #'(lambda (si ri) (/ (- (* k1 ri) (* k2 si)) (+ ri si))) si-filtered ri-filtered)))))
+         (k2 (/ k1)))
+    (multiple-value-bind (s-filtered r-filtered c-filtered) (filter-lists-by-loop (first data) (second data))
+      (list (reduce #'+ (mapcar (lambda (si ri) (expt (/ (- (* k1 ri) (* k2 si)) (+ ri si)) 2)) s-filtered r-filtered))
+            c-filtered))))
 
 (defun filter-lists-by-loop (list1 list2)
   "Take two lists as input, list1 and list2, and returns

@@ -20,7 +20,7 @@ Note that the processors are indexed by compiled/uncompiled in the variable i, a
 The processor-L1-distance post-process takes all consumers and processors as input (a.k.a. the qvm results and quil programs, respectively), and generates as output the L1 distance between all possible combinations."
   (let ((boondoggle::*debug-noise-stream* *standard-output*)
         (chip-spec (quil::build-8q-chip)))
-    (let ((l1-results (boondoggle::pipeline
+        (let ((chi-squared-results (boondoggle::pipeline
                         ((producer      ()        (make-instance 'boondoggle::producer-random
                                                                  :program-volume-limit 20
                                                                  :chip-specification chip-spec
@@ -44,9 +44,10 @@ The processor-L1-distance post-process takes all consumers and processors as inp
                         (chi-squared-result ((k processors) (i processors))
                                             (boondoggle::apply-process (post-process) (qvm-results i) (qvm-results k)))
                         )))
-      (destructuring-bind ((a b) (c d)) chi-squared-result ; l1-results are of the form e.g. ((0.0d0 0.5d0) (0.5d0 0.0d0))
-        (fiasco:is (= b c)) ; Off-diagonal elements must equal
-        (fiasco:is (= a d)) ; Diagonal elements must equal
-        (fiasco:is (= a 0.0)) ; Diagonal elements must be zero
-        (fiasco:is (<= b 2.0)) ; Off-diagonal elements must be less than 2.0
+      (destructuring-bind (((chi-1 deg-1) (chi-2 deg-2)) ((chi-3 deg-3) (chi-4 deg-4))) chi-squared-results ; chi-squared-results are of the form e.g. ((0.0d0 0.5d0) (0.5d0 0.0d0))
+        (format t "chi-squared-results: ~A" chi-squared-results)
+        (fiasco:is (= chi-1 chi-4)) ; Off-diagonal elements must equal
+        (fiasco:is (= chi-2 chi-3)) ; Diagonal elements must equal
+        (fiasco:is (= chi-1 0.0)) ; Diagonal elements must be zero
+        (fiasco:is (<= chi-2 (sapa:quantile-of-chi-square-distribution deg-2 0.999))) ; Off-diagonal elements must be less than inverse-chi for 99.9% success rate.
 ))))
