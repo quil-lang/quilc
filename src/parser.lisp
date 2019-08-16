@@ -254,7 +254,7 @@ the immediately preceding line."
                      (setf pieces-last (cdr pieces-last))
                      ;; Prepend appropriate indentation
                      (setf start (if (eq ':INDENTATION (token-type (car start)))
-                                     (cons (copy-structure (car start)) ; Shallow copy is ok here
+                                     (cons (car start)  ; Copy the indentation (line number on this token is irrelevant)
                                            (cdr end))
                                      (cdr end)))
                      (rplacd last nil)
