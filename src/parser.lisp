@@ -80,6 +80,8 @@
    (incf *line-number*)
    (setf *line-start-position* $>)
    (return ':NEWLINE))
+  ((eager "\\;")
+   (return ':SEMICOLON))
   ((eager "\\:")
    (return (tok :COLON)))
   ((eager "\\(")
@@ -205,10 +207,16 @@ INPUT-STRING that triggered the condition."
     (t                                            (cons (tok ':INDENTATION 0) line))))
 
 ;;; SPLIT-SEQUENCE was too slow for 10k+ tokens.
-(defun nsplit (wedge list)
-  "Split LIST into non-empty sublists that were separated by WEDGE."
-  (declare (type symbol wedge)
-           (type list list)
+(defun split-lines (tokens)
+  "Split TOKENS into non-empty sublists representing logical lines.
+
+A logical line may be introduced either as the result of a :NEWLINE or a
+:SEMICOLON token. In the case of a :NEWLINE, the lines are split as written. In
+the case of :SEMICOLON, the following line is prefixed with the indentation of
+the immediately preceding line."
+  ;; note: something like "H 0 ; X 1" will produce two lines for internal processing,
+  ;; but the tokens themselves maintain their original line numbers for error reporting
+  (declare (type list tokens)
            (optimize speed (space 0)))
   (let* ((pieces      (cons nil nil))
          (pieces-last pieces))
@@ -222,8 +230,8 @@ INPUT-STRING that triggered the condition."
                     (rplacd pieces-last (cons start nil))
                     (setf pieces-last (cdr pieces-last)))
                   pieces)
-                 ;; Found a wedge.
-                 ((eql wedge (car end))
+                 ;; Split off a newline
+                 ((eq ':NEWLINE (car end))
                   (cond
                     ((eq start end)
                      (let ((next (cdr start)))
@@ -234,14 +242,31 @@ INPUT-STRING that triggered the condition."
                      (setf start (cdr end))
                      (rplacd last nil)
                      (doit start start start))))
+                 ;; A semicolon also results in a new line being split, but we
+                 ;; also inherit the preceding indentation.
+                 ((eq ':SEMICOLON (car end))
+                  (cond
+                    ((eq start end)
+                     (let ((next (cdr start)))
+                       (doit next next next)))
+                    (t
+                     (rplacd pieces-last (cons start nil))
+                     (setf pieces-last (cdr pieces-last))
+                     ;; Prepend appropriate indentation
+                     (setf start (if (eq ':INDENTATION (token-type (car start)))
+                                     (cons (copy-structure (car start)) ; Shallow copy is ok here
+                                           (cdr end))
+                                     (cdr end)))
+                     (rplacd last nil)
+                     (doit start start start))))
                  ;; Keep on truckin'.
                  (t
                   (doit start end (cdr end))))))
-      (cdr (doit list list list)))))
+      (cdr (doit tokens tokens tokens)))))
 
 (defun tokenize (string)
   "Tokenize the Quil string STRING into a list of token lines with indentation resolved. Each token line is itself a list of tokens."
-  (let* ((lines (nsplit ':NEWLINE (tokenize-line 'line-lexer string))))
+  (let* ((lines (split-lines (tokenize-line 'line-lexer string))))
     (map-into lines #'ensure-indentation lines)
     (process-indentation lines)))
 
