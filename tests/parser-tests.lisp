@@ -41,6 +41,14 @@
             (declare (ignore c))
             (error 'quil:quil-parse-error)))))))
 
+(deftest test-semicolon-parsing ()
+  (let ((pp1 (parse-quil "H 0 ; X 1"))
+        (pp2 (parse-quil "DEFCIRCUIT foo:
+    X 0 ; H 0")))
+    (is (= 2 (length (parsed-program-executable-code pp1))))
+    (is (= 2 (length (quil::circuit-definition-body
+                      (first (parsed-program-circuit-definitions pp2))))))))
+
 (deftest test-pragma-parsing ()
   (let* ((p (with-output-to-quil
               "PRAGMA a"
