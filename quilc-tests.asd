@@ -10,6 +10,7 @@
                #:fiasco
                #:uiop
                #:alexandria
+               #:bordeaux-threads ; for RPCQ tests and SPECIAL-BINDINGS-LET*
                #:uuid
                )
   :perform (asdf:test-op (o s)
