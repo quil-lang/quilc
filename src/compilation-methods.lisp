@@ -151,7 +151,7 @@
 (defun compiler-hook (parsed-program
                       chip-specification
                       &key (protoquil nil)
-                           (rewiring-type (prog-rewiring-pragma parsed-program)))
+                           (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification)))
   "Runs a full compiler pass on a parsed-program object.
 
 Returns a value list: (processed-program, of type parsed-program
