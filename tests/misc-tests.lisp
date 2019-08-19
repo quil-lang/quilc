@@ -57,8 +57,7 @@
                    (format s ", ")))
                (format s "~%"))
              (format s "TEST ~{~d ~}" (a:iota qubit-count))))
-         (parsed-prog (quil::parse-quil-into-raw-program program-string)))
-    (setf parsed-prog (quil::transform 'quil::resolve-applications parsed-prog))
+         (parsed-prog (quil::parse-quil program-string)))
     (is (quil::matrix-equality (magicl:make-identity-matrix (expt 2 qubit-count))
                                (quil::make-matrix-from-quil (coerce (parsed-program-executable-code parsed-prog) 'list))))))
 

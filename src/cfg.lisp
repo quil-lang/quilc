@@ -659,10 +659,11 @@ Return the following values:
   nil)
 
 (defun output-cfg (quil out-file &key parallel dce simplify)
-  (let ((pp (parse-quil-into-raw-program (if (pathnamep quil)
-                                             (a:read-file-into-string quil)
-                                             quil))))
-    (setf pp (transform 'process-includes pp (if (pathnamep quil) quil nil)))
+  (let ((pp (parse-quil (if (pathnamep quil)
+                            (a:read-file-into-string quil)
+                            quil)
+                        :originating-file (and (pathnamep quil) quil)
+                        :transforms '(process-includes))))
     (output-cfg-from-program pp out-file :parallel parallel :dce dce :simplify simplify)))
 
 (defun output-cfg-from-program (pp out-file &key parallel dce simplify)

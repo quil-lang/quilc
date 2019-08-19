@@ -92,7 +92,7 @@ CNOT 0 1")
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
     (format t "~&    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
     (finish-output)
-    (let* ((pp (quil::parse-quil-into-raw-program "
+    (let* ((pp (quil::parse-quil "
 LABEL @a
 CNOT 0 1
 CNOT 1 2
@@ -217,7 +217,7 @@ MEASURE 0 ro[1]"))
 (deftest test-compiler-hook-reset-naive-rewiring ()
   ;; Note this numbering depends on the fact that the CZ gates are
   ;; native on the 8Q chip.
-  (let* ((pp (quil::parse-quil-into-raw-program "
+  (let* ((pp (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"NAIVE\"
 CZ 1 2
 CZ 3 4
@@ -233,7 +233,7 @@ CZ 5 6
                                (_ nil))))))))
 
 (deftest test-compiler-hook-reset-partial-rewiring ()
-  (let* ((pp (quil::parse-quil-into-raw-program "
+  (let* ((pp (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"PARTIAL\"
 CZ 1 2
 CZ 7 6
@@ -250,7 +250,7 @@ CZ 2 7
 
 (deftest test-compiling-empty-program ()
   "Test that an empty program goes through the pipes correctly."
-  (let* ((pp (quil::parse-quil-into-raw-program ""))
+  (let* ((pp (quil::parse-quil ""))
          (processed-program (quil::compiler-hook pp (quil::build-8Q-chip))))
     (is (every (lambda (isn)
                  (or (typep isn 'quil:halt)
@@ -276,9 +276,8 @@ CZ 2 7
                                                p)))))))
                                  (application-parameters instr))))
 
-         (make-pp ()
-           (quil::transform 'quil::resolve-applications
-                            (quil::parse-quil-into-raw-program program-string))))
+         (make-pp () (quil::parse-quil program-string
+                                       :transforms '(quil::resolve-applications))))
     (let* ((chip (quil::build-8Q-chip :architecture ':cz))
            (processed-pp (compiler-hook (make-pp) chip))
            (orig-pp (make-pp)))
@@ -330,7 +329,7 @@ CNOT 1 2"))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
-  (let ((pp (quil::parse-quil-into-raw-program "
+  (let ((pp (quil::parse-quil "
 DECLARE beta REAL[1]
 DECLARE gamma REAL[1]
 DECLARE ro BIT[3]
@@ -479,7 +478,7 @@ MEASURE 1
 
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
-  (let ((p (quil::compiler-hook (quil::parse-quil-into-raw-program "
+  (let ((p (quil::compiler-hook (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
                                 (quil::build-8Q-chip)))

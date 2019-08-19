@@ -8,7 +8,7 @@
 (in-package #:cl-quil-tests)
 
 (deftest test-typed-circuit-expansion ()
-  (let ((pp (quil::parse-quil-into-raw-program "
+  (let ((pp (quil::parse-quil "
 DECLARE a BIT
 
 DEFCIRCUIT CLEAR q scratch-bit:
@@ -18,10 +18,6 @@ DEFCIRCUIT CLEAR q scratch-bit:
     LABEL @end
 
 CLEAR 0 a")))
-    (quil::transform 'quil::process-includes pp nil)
-    (quil::transform 'quil::resolve-applications pp)
-    (quil::transform 'quil::expand-circuits pp)
-    (quil::transform 'quil::type-check pp)
     (let ((instr (aref (quil::parsed-program-executable-code pp) 0)))
       (is (typep instr 'quil::measure))
       (is (= (quil::qubit-index (quil::measurement-qubit instr)) 0))
@@ -29,7 +25,7 @@ CLEAR 0 a")))
                   (quil::mref "a" 0 (first (quil::parsed-program-memory-definitions pp))))))))
 
 (deftest test-constant-coercion ()
-  (let ((pp (quil::parse-quil-into-raw-program "
+  (let ((pp (quil::parse-quil "
 DECLARE stats INTEGER
 DECLARE angle REAL
 
@@ -38,10 +34,6 @@ MOVE stats 0
 MOVE angle 0
 
 RX(-2.0*angle) 0")))
-    (quil::transform 'quil::process-includes pp nil)
-    (quil::transform 'quil::resolve-applications pp)
-    (quil::transform 'quil::expand-circuits pp)
-    (quil::transform 'quil::type-check pp)
     (let ((code (parsed-program-executable-code pp)))
       (is (equalp quil::quil-integer (quil::constant-value-type
                                       (quil::classical-right-operand (aref code 0)))))
@@ -51,7 +43,7 @@ RX(-2.0*angle) 0")))
         (is (typep param 'quil::delayed-expression))))))
 
 (deftest test-compression-with-classical-angles ()
-  (let ((pp (quil::parse-quil-into-raw-program "
+  (let ((pp (quil::parse-quil "
 DECLARE val REAL[8]
 DECLARE ro BIT
 DECLARE int INTEGER
@@ -60,15 +52,11 @@ RZ(val[2]) 0
 RZ(val[0]+val[1]) 0
 RZ(val[1]) 0
 RZ(val[3]) 1")))
-    (quil::transform 'quil::process-includes pp nil)
-    (quil::transform 'quil::resolve-applications pp)
-    (quil::transform 'quil::expand-circuits pp)
-    (quil::transform 'quil::type-check pp)
     (let ((cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
       (is (= 3 (length (quil::parsed-program-executable-code cpp)))))))
 
 (deftest test-compression-with-classical-angles-+-resource-usage ()
-  (let ((pp (quil::parse-quil-into-raw-program "
+  (let ((pp (quil::parse-quil "
 DECLARE val REAL[8]
 DECLARE ro BIT
 DECLARE int INTEGER
@@ -78,10 +66,6 @@ STORE val int[0] val[1]
 RZ(val[0]+val[1]) 0
 RZ(val[1]) 0
 RZ(val[3]) 1")))
-    (quil::transform 'quil::process-includes pp nil)
-    (quil::transform 'quil::resolve-applications pp)
-    (quil::transform 'quil::expand-circuits pp)
-    (quil::transform 'quil::type-check pp)
     (let ((cpp (quil::compiler-hook pp (quil::build-8Q-chip))))
       (is (= 5 (length (quil::parsed-program-executable-code cpp)))))))
 

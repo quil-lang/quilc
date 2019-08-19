@@ -1641,27 +1641,31 @@ result of BODY, and the (possibly null) list of remaining lines.
               (nreverse memory-defs)
               (nreverse exec-code)))))
 
+(defun parse-quil-into-ast (string)
+  "Parse a string STRING into a sequence of raw Quil syntax objects."
+  (check-type string string)
+  (let* ((tok-lines (tokenize string)))
+    (loop :with parsed-program := nil
+          :until (null tok-lines) :do
+            (multiple-value-bind (program-entity rest-toks)
+                (parse-program-lines tok-lines)
+              (push program-entity parsed-program)
+              (setf tok-lines rest-toks))
+          :finally (return (nreverse parsed-program)))))
+
 (defun parse-quil-into-raw-program (string)
   "Parse a string STRING into a raw, untransformed PARSED-PROGRAM object."
   (check-type string string)
-  (let* ((tok-lines (tokenize string)))
-    (let ((parsed-program nil)
-          (*memory-region-names* nil))
-      (loop :named parse-loop
-            :until (null tok-lines) :do
-              (multiple-value-bind (program-entity rest-toks)
-                  (parse-program-lines tok-lines)
-                (push program-entity parsed-program)
-                (setf tok-lines rest-toks)))
-      (setf parsed-program (nreverse parsed-program))
-      ;; Return the parsed sequence of objects.
-      (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
-          (extract-code-sections parsed-program)
-        (make-instance 'parsed-program
-                       :gate-definitions gate-defs
-                       :circuit-definitions circ-defs
-                       :memory-definitions memory-defs
-                       :executable-code (coerce exec-code 'simple-vector))))))
+  (let* ((*memory-region-names* nil)
+         (parsed-program (parse-quil-into-ast string)))
+    ;; Return the parsed sequence of objects.
+    (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
+        (extract-code-sections parsed-program)
+      (make-instance 'parsed-program
+                     :gate-definitions gate-defs
+                     :circuit-definitions circ-defs
+                     :memory-definitions memory-defs
+                     :executable-code (coerce exec-code 'simple-vector)))))
 
 (defvar *safe-include-directory* nil)
 
