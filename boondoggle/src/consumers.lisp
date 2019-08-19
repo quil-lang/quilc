@@ -38,7 +38,9 @@
                        instr))))))
 
 (defmethod consume-quil ((consumer consumer-local-qvm) parsed-program)
-  "Runs a Quil program on the local QVM."
+  "This function runs a Quil program on the QVM, and returns a histogram of counts of each resulting bitstring ordered lexicographically.
+
+For a program constructing a bell state with a large sampling count, the returned value would be (<large-number> 0 0 <large-number>)."
   (case (consumer-local-qvm-interface-mode consumer)
     (:http
      (let* ((quil-instructions
@@ -71,7 +73,8 @@
                                  n)
                                ret))
                     :finally (return ret))))
-       (mapcar (lambda (n) (coerce (/ n (consumer-local-qvm-trials consumer)) 'double-float)) counts)))
+       counts
+       ))
     (:shared-memory
      (error "Shared memory mode not implemented."))))
 
