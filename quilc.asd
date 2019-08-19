@@ -16,10 +16,9 @@
                #:cl-quil
                #:cl-quil-benchmarking
                #:uiop
-               #:hunchentoot          ; deprecated
-               #:bordeaux-threads     ; deprecated
+               #:bordeaux-threads
                #:cl-syslog
-               #:rpcq                 ; to replace HUNCHENTOOT and B-T
+               #:rpcq
                #:drakma
                #:trivial-features     ; for portable *features*
                #:alexandria
