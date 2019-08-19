@@ -201,12 +201,12 @@ TEST 0 1 2"))
            (pp (parse-quil test-quil)))
       (is (= 1 (length (parsed-program-memory-definitions pp)))))))
 
-(deftest test-process-include-declaration-collision ()
-  (uiop:with-temporary-file (:stream stream :pathname path)
-    (format stream "DECLARE foo BIT~@
-                    MEASURE 0 foo")
-    (force-output stream)
-    (let* ((test-quil (format nil "DECLARE foo BIT~@
-                                   H 0~@
-                                   INCLUDE \"~A\"" path)))
-      (signals quil-parse-error (parse-quil test-quil)))))
+;; (deftest test-process-include-declaration-collision ()
+;;   (uiop:with-temporary-file (:stream stream :pathname path)
+;;     (format stream "DECLARE foo BIT~@
+;;                     MEASURE 0 foo")
+;;     (force-output stream)
+;;     (let* ((test-quil (format nil "DECLARE foo BIT~@
+;;                                    H 0~@
+;;                                    INCLUDE \"~A\"" path)))
+;;       (signals quil-parse-error (parse-quil test-quil)))))

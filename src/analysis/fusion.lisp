@@ -484,7 +484,6 @@ The list will actually be a list of lists, where each sublist commutes and can b
 
 (define-transform gate-fusion (fuse-gates-in-program)
   "Fuse gates together producing a new program that we stipulate will be more efficient to simulate."
-  process-includes
   ;; We need to resolve applications to the gate applications know
   ;; their definitions for fusion.
   resolve-applications)

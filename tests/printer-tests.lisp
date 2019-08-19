@@ -141,8 +141,7 @@ TEST(0.5) 0 1
 ")
          (after (parse-and-print-quil-to-string before :parser (lambda (string)
                                                                  (quil::parse-quil string
-                                                                                   :transforms '(quil::process-includes
-                                                                                                 quil::resolve-applications))))))
+                                                                                   :transforms '(quil::resolve-applications))))))
     (is (string= before after))))
 
 (deftest test-jump-to-integer-label-printing ()

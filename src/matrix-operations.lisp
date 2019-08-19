@@ -108,7 +108,6 @@ as needed so that they are the same size."
  than 'physical', qubits. When :COMPRESS-QUBITS is enabled (default:
  nil), qubit indices are permuted to minimize matrix size."
   (when compress-qubits
-    (setf pp (transform 'process-includes pp nil))
     (setf pp (transform 'compress-qubits pp)))
   ;; to handle a l2p rewiring, we need to conjugate the "physical"
   ;; matrix of a block by the permutation matrix associated with the

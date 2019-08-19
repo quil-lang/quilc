@@ -21,14 +21,6 @@
     (test-it t '((2 2)) '(2 2))
     (test-it t '((2) (1 1) (2 2 2) (1 1 1 1)) '(2 1 1 2 2 2 1 1 1 1))))
 
-(deftest test-code-splicing ()
-  (is (equalp (cl-quil::splice-code-at #(1 x 2 3) 1 #(a b c))
-              #(1 A B C 2 3)))
-  (is (equalp (cl-quil::splice-code-at #(x 1 2 3) 0 #(a b c))
-              #(A B C 1 2 3)))
-  (is (equalp (cl-quil::splice-code-at #(0 1 2 x) 3 #(a b c))
-              #(0 1 2 A B C))))
-
 (deftest test-append-reduce ()
   (is (equal nil (quil::reduce-append nil)))
   (is (equal nil (quil::reduce-append '(nil))))

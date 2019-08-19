@@ -31,7 +31,7 @@
 (defstruct (token (:constructor tok (type &optional payload (line *line-number*) (pathname *current-file*))))
   "A lexical token."
   (line nil :type (or null (integer 1)))
-  (pathname nil :type (or null pathname))
+  (pathname nil :type (or null string pathname))
   (type nil :type token-type)
   (payload nil))
 
@@ -1644,7 +1644,8 @@ result of BODY, and the (possibly null) list of remaining lines.
 (defun parse-quil-into-ast (string)
   "Parse a string STRING into a sequence of raw Quil syntax objects."
   (check-type string string)
-  (let* ((tok-lines (tokenize string)))
+  (let* ((*memory-region-names* nil)
+         (tok-lines (tokenize string)))
     (loop :with parsed-program := nil
           :until (null tok-lines) :do
             (multiple-value-bind (program-entity rest-toks)
@@ -1653,11 +1654,11 @@ result of BODY, and the (possibly null) list of remaining lines.
               (setf tok-lines rest-toks))
           :finally (return (nreverse parsed-program)))))
 
-(defun parse-quil-into-raw-program (string)
+(defun parse-quil-into-raw-program (string &optional originating-file)
   "Parse a string STRING into a raw, untransformed PARSED-PROGRAM object."
   (check-type string string)
-  (let* ((*memory-region-names* nil)
-         (parsed-program (parse-quil-into-ast string)))
+  (let ((parsed-program (parse-quil-into-ast string)))
+    (setf parsed-program (process-includes parsed-program originating-file))
     ;; Return the parsed sequence of objects.
     (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
         (extract-code-sections parsed-program)

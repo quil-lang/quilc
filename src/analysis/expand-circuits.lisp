@@ -6,7 +6,6 @@
 
 (define-transform expand-circuits (expand-circuits)
   "This transform expands all circuits to create a circuit-free program."
-  process-includes
   resolve-applications)
 
 (defun relabel-circuit-labels-uniquely (circuit-body)
