@@ -25,10 +25,13 @@
 
 (defvar *line-start-position* nil)
 (defvar *line-number* nil)
+(defvar *current-file* nil
+  "The pathname for the file being currently parsed.")
 
-(defstruct (token (:constructor tok (type &optional payload (line *line-number*))))
+(defstruct (token (:constructor tok (type &optional payload (line *line-number*) (pathname *current-file*))))
   "A lexical token."
   (line nil :type (or null (integer 1)))
+  (pathname nil :type (or null pathname))
   (type nil :type token-type)
   (payload nil))
 
@@ -277,10 +280,12 @@ the immediately preceding line."
   (:documentation "Representation of an error parsing Quil."))
 
 (define-condition quil-parse-error-at-line (quil-parse-error)
-  ((line :initarg :line :reader line-of-quil-parse-error))
+  ((line :initarg :line :reader line-of-quil-parse-error)
+   (pathname :initarg :pathname :reader pathname-of-quil-parse-error))
   (:report (lambda (condition stream)
-             (format stream "At line ~D: "
-                     (line-of-quil-parse-error condition))
+             (format stream "At line ~D~@[ (~A)~]: "
+                     (line-of-quil-parse-error condition)
+                     (pathname-of-quil-parse-error condition))
              (apply #'format stream (simple-condition-format-control condition)
                     (simple-condition-format-arguments condition)))))
 
@@ -292,6 +297,7 @@ the immediately preceding line."
   ;; right here in parser.lisp where *line-number* is more than likely set.
   (if *line-number*
       (error 'quil-parse-error-at-line :line *line-number*
+                                       :pathname *current-file*
                                        :format-control format-control
                                        :format-arguments format-args)
       (error 'quil-parse-error :format-control format-control
