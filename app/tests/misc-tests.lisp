@@ -44,6 +44,11 @@
         (dolist (stat stats)
           (is (not (nth-value 1 (gethash stat statistics)))))))))
 
+(deftest test-special-bindings-let* ()
+  (dolist (thing '(42 "a string" :a-keyword quoted-symbol (a cons)))
+    (is (eq thing (quilc::special-bindings-let* ((not-special thing))
+                    (bt:join-thread (bt:make-thread (lambda () not-special))))))))
+
 (deftest test-%strip-halts-respecting-rewirings ()
   ;; empty parsed prog
   (is (equalp #() (quilc::%strip-halts-respecting-rewirings (quil:parse-quil ""))))

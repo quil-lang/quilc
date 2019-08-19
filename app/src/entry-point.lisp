@@ -331,7 +331,7 @@ end of the name."
                   :collect `(,name ,value))
           (bordeaux-threads:*default-special-bindings*
             (list* ,@(loop :for (name value) :in let-defs
-                           :collect `(cons ',name ,name))
+                           :collect ``(,',name . ',,name))
                    bordeaux-threads:*default-special-bindings*)))
      ,@body))
 
