@@ -124,12 +124,23 @@
                           :parameters (map 'list #'intern-if-string (gethash "parameters" gate-datum))
                           :arguments (map 'list #'intern-if-string (gethash "arguments" gate-datum)))))))
 
+(defun deforestify-fidelity (fidelity)
+  "The fidelity values recorded in Forest DB are subject to various quirks. This \"parser\" un-quirks them."
+  (cond 
+    ((double= fidelity +forest-error-sentinel+)
+     +totally-awful-fidelity+)
+    ((> fidelity +near-perfect-fidelity+)
+     +near-perfect-fidelity+)
+    ((minusp fidelity)
+     (error "Chip specification contained negative fidelity ~a. I don't know what to do with this value." fidelity))
+    (t
+     fidelity)))
+
 (defun parse-gate-information (gate-datum)
   (let (args)
     (a:when-let ((fidelity (gethash "fidelity" gate-datum)))
-      (when (double= fidelity +forest-error-sentinel+)
-        (setf fidelity +totally-awful-fidelity+))
-      (setf args (list* ':fidelity fidelity args)))
+      (setf fidelity (deforestify-fidelity fidelity)
+            args (list* ':fidelity fidelity args)))
     (a:when-let ((duration (gethash "duration" gate-datum)))
       (setf args (list* ':duration duration args)))
     (apply #'make-gate-record args)))
@@ -254,8 +265,7 @@
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity)))))
                 (a:when-let ((fidelity (gethash "f1QRB" spec)))
-                  (when (double= fidelity +forest-error-sentinel+)
-                    (setf fidelity +totally-awful-fidelity+))
+                  (setf fidelity (deforestify-fidelity fidelity))
                   (dohash ((binding record) gate-info)
                     (when (and (gate-binding-p binding)
                                (equalp (named-operator "RX") (gate-binding-operator binding))
@@ -277,6 +287,7 @@
                                                                    :parameters parameters
                                                                    :arguments '(_ _)))
                                        (record (gethash binding gate-info)))
+                           (setf fidelity (deforestify-fidelity fidelity))
                            (setf (gethash binding gate-info)
                                  (copy-gate-record record :fidelity fidelity)))))
                   (setf (gethash "specs" (hardware-object-misc-data link))
