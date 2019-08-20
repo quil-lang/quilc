@@ -1617,6 +1617,23 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Entry Point ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-condition ambiguous-definition (quil-parse-error)
+  ((conflicts :initarg :conflicts :reader ambiguous-definition-conflicts
+              :documentation "A list of (filename . definition) pairs which conflict."))
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) definitions."))
+
+(define-condition ambiguous-gate-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE forms."))
+
+(define-condition ambiguous-memory-declaration (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DECLARE forms."))
+
+(define-condition ambiguous-circuit-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFCIRCUIT forms."))
+
 (defun extract-code-sections (code)
   "Partition CODE into three values:
 

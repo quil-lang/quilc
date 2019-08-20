@@ -4,12 +4,33 @@
 
 (in-package #:cl-quil)
 
+(defun definition-signature (instr)
+  "If instr is a definition or memory declaration, returns a signature used for
+determining ambiguity. Otherwise, return null."
+  (typecase instr
+    (gate-definition (cons 'gate-definition (gate-definition-name instr)))
+    (circuit-definition (cons 'circuit-definition (circuit-definition-name instr)))
+    (memory-descriptor (cons 'memory-descriptor (memory-descriptor-name instr)))))
+
+(defun signal-ambiguous-definition (instr file conflicts)
+  "Signal a condition indicating that the instruction INSTR parsed from FILE has
+a list of conflicts CONFLICTS."
+  (signal (etypecase instr
+            (gate-definition 'ambiguous-gate-definition)
+            (circuit-definition 'ambiguous-circuit-definition)
+            (memory-descriptor 'ambiguous-memory-declaration))
+          :conflicts (cons (cons instr file) conflicts)))
+
 (defun process-includes (raw-quil &optional originating-file)
   "Recursively process all INCLUDE instructions in the list RAW-QUIL. The
 result is a new sequence with the included quil instructions spliced in."
-  (let* ((expanded (cons nil nil))
+  (let* (;; We track the expanded list of instructions, and build it from its tail out
+         (expanded (cons nil nil))
          (expanded-tail expanded)
-         (seen-files (make-hash-table :test 'equalp)))
+         ;; We track seen files to check for cycles in the include graph
+         (seen-files (make-hash-table :test 'equalp))
+         ;; The following maps definition signatures to a list of (filename . defn) pairs
+         (seen-definitions (make-hash-table :test 'equalp)))
     (labels ((handle-include (incl originating-file)
                ;; load the file to be included, and recursively
                ;; expand includes within it
@@ -37,6 +58,15 @@ result is a new sequence with the included quil instructions spliced in."
                       (handle-include (car instrs) originating-file)
                       (expand-all-includes (cdr instrs) originating-file))
                      (t
+                      (let ((instr (car instrs)))
+                        (a:when-let ((signature (definition-signature instr)))
+                          ;; check for conflicts
+                          (with-simple-restart (continue "Continue with ambiguous definition.")
+                            (a:when-let ((entries (gethash signature seen-definitions)))
+                              (signal-ambiguous-definition instr originating-file entries)))
+                          ;; update definition table
+                          (push (cons instr originating-file)
+                                (gethash signature seen-definitions))))
                       (setf (cdr expanded-tail) instrs)
                       (setf expanded-tail (cdr expanded-tail))
                       (expand-all-includes (cdr instrs) originating-file)))))
