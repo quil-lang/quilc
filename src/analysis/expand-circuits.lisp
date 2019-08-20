@@ -5,8 +5,7 @@
 (in-package #:cl-quil)
 
 (define-transform expand-circuits (expand-circuits)
-  "This transform expands all circuits to create a circuit-free program."
-  resolve-applications)
+  "This transform expands all circuits to create a circuit-free program.")
 
 (defun relabel-circuit-labels-uniquely (circuit-body)
   "Non-destructively relabel all jump targets and associated JUMP-like instructions in the list of instructions CIRCUIT-BODY."

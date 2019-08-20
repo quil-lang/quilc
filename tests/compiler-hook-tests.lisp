@@ -276,8 +276,7 @@ CZ 2 7
                                                p)))))))
                                  (application-parameters instr))))
 
-         (make-pp () (quil::parse-quil program-string
-                                       :transforms '(quil::resolve-applications))))
+         (make-pp () (quil::parse-quil program-string :transforms nil)))
     (let* ((chip (quil::build-8Q-chip :architecture ':cz))
            (processed-pp (compiler-hook (make-pp) chip))
            (orig-pp (make-pp)))
@@ -366,7 +365,6 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]
 ")))
-    (quil::transform 'quil::resolve-applications pp)
     (multiple-value-bind (initial code final)
         (quil::do-greedy-temporal-addressing
             (coerce (parsed-program-executable-code pp) 'list)

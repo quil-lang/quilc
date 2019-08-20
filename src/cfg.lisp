@@ -666,7 +666,6 @@ Return the following values:
     (output-cfg-from-program pp out-file :parallel parallel :dce dce :simplify simplify)))
 
 (defun output-cfg-from-program (pp out-file &key parallel dce simplify)
-  (setf pp (transform 'resolve-applications pp))
   (setf pp (transform 'expand-circuits pp))
   (let ((cfg (program-cfg pp :dce dce :simplify simplify)))
     ;; Parallelize the CFG if asked for.

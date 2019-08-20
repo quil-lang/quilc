@@ -1654,20 +1654,6 @@ result of BODY, and the (possibly null) list of remaining lines.
               (setf tok-lines rest-toks))
           :finally (return (nreverse parsed-program)))))
 
-(defun parse-quil-into-raw-program (string &optional originating-file)
-  "Parse a string STRING into a raw, untransformed PARSED-PROGRAM object."
-  (check-type string string)
-  (let ((parsed-program (parse-quil-into-ast string)))
-    (setf parsed-program (process-includes parsed-program originating-file))
-    ;; Return the parsed sequence of objects.
-    (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
-        (extract-code-sections parsed-program)
-      (make-instance 'parsed-program
-                     :gate-definitions gate-defs
-                     :circuit-definitions circ-defs
-                     :memory-definitions memory-defs
-                     :executable-code (coerce exec-code 'simple-vector)))))
-
 (defvar *safe-include-directory* nil)
 
 (defun resolve-safely (filename)

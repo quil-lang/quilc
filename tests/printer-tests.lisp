@@ -140,8 +140,7 @@ DEFCIRCUIT TEST(%a) b c:
 TEST(0.5) 0 1
 ")
          (after (parse-and-print-quil-to-string before :parser (lambda (string)
-                                                                 (quil::parse-quil string
-                                                                                   :transforms '(quil::resolve-applications))))))
+                                                                 (quil::parse-quil string :transforms nil)))))
     (is (string= before after))))
 
 (deftest test-jump-to-integer-label-printing ()

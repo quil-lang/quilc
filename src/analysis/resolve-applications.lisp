@@ -4,9 +4,6 @@
 
 (in-package #:cl-quil)
 
-(define-transform resolve-applications (resolve-applications)
-  "A transform which converts a parsed program with unresolved applications to one where the applications have been resolved into gate or circuit applications.")
-
 (defvar *in-circuit-body* nil)
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
@@ -78,20 +75,25 @@
     (declare (ignore gate-definitions circuit-definitions))
     app))
 
-(defun resolve-applications (parsed-prog)
-  "Resolve all UNRESOLVE-APPLICATIONs within the executable code of PARSED-PROG."
-  (let ((gate-defs (parsed-program-gate-definitions parsed-prog))
-        (circ-defs (parsed-program-circuit-definitions parsed-prog)))
+(defun resolve-applications (raw-quil)
+  "Resolve all UNRESOLVED-APPLICATIONs within the list RAW-QUIL, returning a PARSED-PROGRAM."
+  (check-type raw-quil list)
+  (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
+      (extract-code-sections raw-quil)
     (flet ((resolve-instruction-sequence (seq)
              (map nil (lambda (thing)
                         (resolve-application thing
                                              :gate-definitions gate-defs
                                              :circuit-definitions circ-defs))
                   seq)))
-      (resolve-instruction-sequence (parsed-program-executable-code parsed-prog))
+      (resolve-instruction-sequence exec-code)
       (map nil (lambda (cd)
                  (let ((*in-circuit-body* t))
                    (resolve-instruction-sequence
                     (circuit-definition-body cd))))
-           circ-defs)))
-  parsed-prog)
+           circ-defs)
+      (make-instance 'parsed-program
+                     :gate-definitions gate-defs
+                     :circuit-definitions circ-defs
+                     :memory-definitions memory-defs
+                     :executable-code (coerce exec-code 'simple-vector)))))

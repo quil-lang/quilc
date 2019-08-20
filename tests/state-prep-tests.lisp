@@ -31,7 +31,6 @@ CNOT 0 1
 CNOT 1 2
 CNOT 2 3
 ")))
-    (quil::transform 'quil::resolve-applications quil)
     (dolist (instr (coerce (quil::parsed-program-executable-code quil) 'list))
       (quil::aqvm-apply-instruction aqvm instr))
     ;; check that the correct state was constructed
@@ -97,7 +96,6 @@ CNOT 6 5
 CNOT 3 5
 CNOT 3 5
 ")))
-    (quil::transform 'quil::resolve-applications pp)
     (dolist (instr (coerce (parsed-program-executable-code pp) 'list))
       (quil::aqvm-apply-instruction aqvm instr))
     (quil::aqvm-stop-simulating aqvm 10)

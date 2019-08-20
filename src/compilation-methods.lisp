@@ -161,9 +161,6 @@ Returns a value list: (processed-program, of type parsed-program
 
   (warm-chip-spec-lookup-cache chip-specification)
 
-  ;; start by doing some basic expansion transformations
-  (transform 'resolve-applications parsed-program)
-
   ;; we disallow compilation of programs that use memory aliasing
   (loop :for mdesc :in (parsed-program-memory-definitions parsed-program)
         :when (memory-descriptor-sharing-parent mdesc)

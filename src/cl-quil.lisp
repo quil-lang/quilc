@@ -5,13 +5,15 @@
 (in-package #:cl-quil)
 
 (defvar *standard-post-process-transforms*
-  '(resolve-applications expand-circuits type-check)
+  '(expand-circuits type-check)
   "The standard transforms that are applied by PARSE-QUIL.")
 
 (defun parse-quil (string &key originating-file (transforms *standard-post-process-transforms*))
   "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string."
   (let* ((*current-file* originating-file)
-         (pp (parse-quil-into-raw-program string originating-file)))
+         (raw-quil (parse-quil-into-ast string))
+         (pp (resolve-applications
+              (process-includes raw-quil originating-file))))
     (dolist (xform transforms pp)
       (setf pp (transform xform pp)))))
 
