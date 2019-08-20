@@ -34,8 +34,7 @@
                      "CNOT 0 15"
                      "CNOT 0 16"
                      "CNOT 1 2")
-                   ;; TODO:(appleby) switch this to use Aspen-4-10Q-A.qpu once gh-378 is resolved.
-                   (cl-quil-tests::%read-test-chipspec "Aspen-4-10Q-A-doctored-for-gh-378.qpu"))))
+                   (cl-quil-tests::%read-test-chipspec "Aspen-4-10Q-A.qpu"))))
 
 (deftest test-isa-1q-completion ()
   "Test that the 1Q layer of the chip specification is complete."

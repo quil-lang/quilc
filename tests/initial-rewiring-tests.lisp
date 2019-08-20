@@ -110,11 +110,7 @@ HALT
                  "RZ(-0.23607918922895188) 7"
                  "CNOT 1 7"
                  "CNOT 1 14"))
-        ;; TODO:(appleby) switch the un-altered Aspen-4-10Q-A.qpu file once this issue is resolved.
-        ;; We use a slightly doctored version of the Aspen-4-10Q-A.qpu chipspec file to work around
-        ;; gh-378. Specifically, we altered the original to make sure none of the specs contain
-        ;; f1QRB values > 1.0. See https://github.com/rigetti/quilc/issues/378
-        (chip (%read-test-chipspec "Aspen-4-10Q-A-doctored-for-gh-378.qpu")))
+        (chip (%read-test-chipspec "Aspen-4-10Q-A.qpu")))
     (not-signals error (compiler-hook progm chip))
     (not-signals error (compiler-hook progm chip :rewiring-type ':partial))
     (not-signals error (compiler-hook progm chip :rewiring-type ':greedy))
