@@ -26,7 +26,7 @@ result is a new sequence with the included quil instructions spliced in."
                    (error "Cycle detected in INCLUDe graph: ~S has already been processed." file))
                  (setf (gethash file seen-files) t)
                  (let* ((*current-file* file)
-                        (body (parse-quil-into-ast (a:read-file-into-string file))))
+                        (body (parse-quil-into-raw-program (a:read-file-into-string file))))
                    (expand-all-includes body file))))
              (expand-all-includes (instrs originating-file)
                ;; consume an instruction. if it's an include, we handoff to

@@ -11,7 +11,7 @@
 (defun parse-quil (string &key originating-file (transforms *standard-post-process-transforms*))
   "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string."
   (let* ((*current-file* originating-file)
-         (raw-quil (parse-quil-into-ast string))
+         (raw-quil (parse-quil-into-raw-program string))
          (pp (resolve-applications
               (process-includes raw-quil originating-file))))
     (dolist (xform transforms pp)

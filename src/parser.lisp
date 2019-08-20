@@ -1641,8 +1641,8 @@ result of BODY, and the (possibly null) list of remaining lines.
               (nreverse memory-defs)
               (nreverse exec-code)))))
 
-(defun parse-quil-into-ast (string)
-  "Parse a string STRING into a sequence of raw Quil syntax objects."
+(defun parse-quil-into-raw-program (string)
+  "Parse a string STRING into a list of raw Quil syntax objects."
   (check-type string string)
   (let* ((*memory-region-names* nil)
          (tok-lines (tokenize string)))
