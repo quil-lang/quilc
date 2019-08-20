@@ -448,12 +448,6 @@ Version ~A is available from https://www.rigetti.com/forest~%"
 					   *error-output*)))
        (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
        (*without-pretty-printing* without-pretty-printing)
-       (gate-blacklist (and gate-blacklist
-                            (split-sequence:split-sequence #\, (remove #\Space gate-blacklist)
-                                                           :remove-empty-subseqs t)))
-       (gate-whitelist (and gate-whitelist
-                            (split-sequence:split-sequence #\, (remove #\Space gate-whitelist)
-                                                           :remove-empty-subseqs t)))
        (quil::*enable-state-prep-compression* enable-state-prep-reductions)
        ;; Null out the streams. If no server mode is requested, these bindings will be modified
        ;; before calling run-CLI-mode, below.
@@ -494,8 +488,16 @@ Version ~A is available from https://www.rigetti.com/forest~%"
            (multiple-value-bind (processed-program statistics)
                (process-program program (lookup-isa-descriptor-for-name isa)
                                 :protoquil protoquil
-                                :gate-whitelist gate-whitelist
-                                :gate-blacklist gate-blacklist)
+                                :gate-whitelist (and gate-whitelist
+                                                     (split-sequence:split-sequence
+                                                      #\,
+                                                      (remove #\Space gate-whitelist)
+                                                      :remove-empty-subseqs t))
+                                :gate-blacklist (and gate-blacklist
+                                                     (split-sequence:split-sequence
+                                                      #\,
+                                                      (remove #\Space gate-blacklist)
+                                                      :remove-empty-subseqs t)))
              (print-program processed-program *quil-stream*)
              (when print-statistics
                (print-statistics statistics *quil-stream*))
