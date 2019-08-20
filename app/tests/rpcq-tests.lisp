@@ -88,58 +88,62 @@
 
 (deftest test-quil-to-native-quil-endpoint-overrides-server ()
   "Test that the \"quil-to-native-quil\" endpoint can override a server that has been started with -P."
-  ;; TODO This is a bit of a hack, but I can't get
-  ;; bt:*default-special-bindings* to work here.
-  (setf quilc::*protoquil* t)
-  (with-random-rpc-client (client)
-    (let* ((quil "H 0")
-           (isa (a:plist-hash-table
-                 (list
-                  "1Q" (a:plist-hash-table
-                        (list
-                         "0" (make-hash-table)))
-                  "2Q" (make-hash-table))))
-           (specs (make-hash-table))
-           (target-device (make-instance 'rpcq::|TargetDevice|
-                                         :|isa| isa
-                                         :|specs| specs))
-           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
-                                          :|quil| quil
-                                          :|target_device| target-device)))
-      (flet ((parse-response (protoquil)
-               (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
-        ;; :protoquil nil means defer to server, i.e. this should produce protoquil
-        (is (quil:protoquil-program-p (parse-response nil)))
-        ;; :protoquil ':false means no protoquil, override server's -P
-        (is (not (quil:protoquil-program-p (parse-response ':false))))
-        ;; :protoquil t means yes protoquil, regardless of what the server says
-        (is (quil:protoquil-program-p (parse-response t))))))
-  (setf quilc::*protoquil* nil)
+  (quilc::special-bindings-let* ((quilc::*protoquil* t))
+    ;; Bindings added to BT:*DEFAULT-SPECIAL-BINDINGS* are rebound in any threads created directly
+    ;; by the binding thread. Since BT:*DEFAULT-SPECIAL-BINDINGS* does not appear in as member of
+    ;; BT:*DEFAULT-SPECIAL-BINDINGS*, it won't be bound in child threads! If you want your bindings
+    ;; to persist in grandchildren threads (and beyond), then you must ask for it explicitly.
+    (quilc::special-bindings-let* ((bt:*default-special-bindings* bt:*default-special-bindings*))
+      (with-random-rpc-client (client)
+        (let* ((quil "H 0")
+               (isa (a:plist-hash-table
+                     (list
+                      "1Q" (a:plist-hash-table
+                            (list
+                             "0" (make-hash-table)))
+                      "2Q" (make-hash-table))))
+               (specs (make-hash-table))
+               (target-device (make-instance 'rpcq::|TargetDevice|
+                                             :|isa| isa
+                                             :|specs| specs))
+               (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                              :|quil| quil
+                                              :|target_device| target-device)))
+          (flet ((parse-response (protoquil)
+                   (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+            ;; :protoquil nil means defer to server, i.e. this should produce protoquil
+            (is (quil:protoquil-program-p (parse-response nil)))
+            ;; :protoquil ':false means no protoquil, override server's -P
+            (is (not (quil:protoquil-program-p (parse-response ':false))))
+            ;; :protoquil t means yes protoquil, regardless of what the server says
+            (is (quil:protoquil-program-p (parse-response t))))))))
 
   ;; Same tests but for *protoquil* = nil
-  (with-random-rpc-client (client)
-    (let* ((quil "H 0")
-           (isa (a:plist-hash-table
-                 (list
-                  "1Q" (a:plist-hash-table
-                        (list
-                         "0" (make-hash-table)))
-                  "2Q" (make-hash-table))))
-           (specs (make-hash-table))
-           (target-device (make-instance 'rpcq::|TargetDevice|
-                                         :|isa| isa
-                                         :|specs| specs))
-           (server-payload (make-instance 'rpcq::|NativeQuilRequest|
-                                          :|quil| quil
-                                          :|target_device| target-device)))
-      (flet ((parse-response (protoquil)
-               (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
-        ;; :protoquil nil means defer to server, i.e. this should not produce protoquil
-        (is (not (quil:protoquil-program-p (parse-response nil))))
-        ;; :protoquil ':false means no protoquil, override server's -P
-        (is (not (quil:protoquil-program-p (parse-response ':false))))
-        ;; :protoquil t means yes protoquil, regardless of what the server says
-        (is (quil:protoquil-program-p (parse-response t)))))))
+  (quilc::special-bindings-let* ((quilc::*protoquil* nil))
+    (quilc::special-bindings-let* ((bt:*default-special-bindings* bt:*default-special-bindings*))
+      (with-random-rpc-client (client)
+        (let* ((quil "H 0")
+               (isa (a:plist-hash-table
+                     (list
+                      "1Q" (a:plist-hash-table
+                            (list
+                             "0" (make-hash-table)))
+                      "2Q" (make-hash-table))))
+               (specs (make-hash-table))
+               (target-device (make-instance 'rpcq::|TargetDevice|
+                                             :|isa| isa
+                                             :|specs| specs))
+               (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                              :|quil| quil
+                                              :|target_device| target-device)))
+          (flet ((parse-response (protoquil)
+                   (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+            ;; :protoquil nil means defer to server, i.e. this should not produce protoquil
+            (is (not (quil:protoquil-program-p (parse-response nil))))
+            ;; :protoquil ':false means no protoquil, override server's -P
+            (is (not (quil:protoquil-program-p (parse-response ':false))))
+            ;; :protoquil t means yes protoquil, regardless of what the server says
+            (is (quil:protoquil-program-p (parse-response t)))))))))
 
 (deftest test-native-quil-to-binary-endpoint ()
   "Test that the \"native-quil-to-binary\" endpoint works."
