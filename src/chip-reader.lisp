@@ -128,8 +128,10 @@
   "The fidelity values recorded in Forest DB are subject to various quirks. This \"parser\" un-quirks them."
   (cond 
     ((double= fidelity +forest-error-sentinel+)
+     (warn "Chip specification contains a fidelity field populated by the Forest error sentinel. Replacing it with the default ~a." +totally-awful-fidelity+)
      +totally-awful-fidelity+)
     ((> fidelity +near-perfect-fidelity+)
+     (warn "Chip specification contained fidelity ~a > 1. Truncating to ~a." fidelity +near-perfect-fidelity+)
      +near-perfect-fidelity+)
     ((minusp fidelity)
      (error "Chip specification contained negative fidelity ~a. I don't know what to do with this value." fidelity))
