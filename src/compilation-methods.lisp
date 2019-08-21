@@ -213,7 +213,7 @@ Returns a value list: (processed-program, of type parsed-program
         (setf (basic-block-code new-final-blk) (coerce (nreverse instrs-measures) 'vector))
         ;; place the new block in the CFG and re-link them
         (push new-final-blk (cfg-blocks cfg))
-        (link-blocks new-final-blk (make-instance 'terminating-edge))
+        (link-blocks new-final-blk terminating-edge)
         (link-blocks final-blk (unconditional-edge new-final-blk))))
 
     ;; these local functions describe how we traverse / modify the CFG.

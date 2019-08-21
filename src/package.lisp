@@ -2,10 +2,17 @@
 ;;;;
 ;;;; Author: Robert Smith
 
+;;; Allegro (and other Lisps) don't support the non-standard "package
+;;; local nicknames".
+#-(or sbcl ecl ccl)
+(rename-package :alexandria :alexandria '(:a))
+
 (defpackage #:cl-quil.resource
   (:use #:cl)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   (:export
+   #:resource-collection                ; TYPE
    #:make-resource-collection           ; FUNCTION
    #:make-qubit-resource                ; FUNCTION
    #:make-null-resource                 ; FUNCTION
@@ -32,6 +39,7 @@
         #:abstract-classes
         #:singleton-classes
         #:cl-quil.resource)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   ;; options.lisp
   (:export
@@ -442,6 +450,7 @@
   (:nicknames #:quil.clifford)
   (:use #:cl
         #:cl-permutation)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
 
   ;; clifford/ module

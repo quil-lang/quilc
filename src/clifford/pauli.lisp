@@ -7,11 +7,11 @@
 
 ;;; This file implements an efficient representation of the Pauli
 ;;; group.
-
-(a:define-constant +paulis+
-    #(I X Z Y)
-  :test #'equalp
-  :documentation "The Pauli group symbols.")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (a:define-constant +paulis+
+      #(I X Z Y)
+    :test #'equalp
+    :documentation "The Pauli group symbols."))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (deftype base4 ()
