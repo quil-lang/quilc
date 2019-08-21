@@ -10,6 +10,7 @@
   #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   (:export
+   #:resource-collection                ; TYPE
    #:make-resource-collection           ; FUNCTION
    #:make-qubit-resource                ; FUNCTION
    #:make-null-resource                 ; FUNCTION

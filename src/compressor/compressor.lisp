@@ -735,9 +735,9 @@ other's."
     ))
 
 (defstruct governed-queue
-  (state :empty)
-  (contents nil)
-  (resources (make-null-resource)))
+  (state     ':empty              :type governor-state)
+  (resources (make-null-resource) :type resource-collection)
+  (contents  nil))
 
 (defun set-gq-fields (queue state contents resources)
   (setf (governed-queue-state queue) state)
@@ -758,7 +758,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
   (let* ((output nil)
          (n-qubits (chip-spec-n-qubits chip-specification))
          (governors (make-list (length (chip-specification-objects chip-specification))))
-         (global-governor (make-instance 'governed-queue))
+         (global-governor (make-governed-queue))
          (context (set-up-compilation-context :qubit-count n-qubits
                                               :simulate (and *enable-state-prep-compression* protoquil)
                                               :chip-specification chip-specification)))
