@@ -201,12 +201,37 @@ TEST 0 1 2"))
            (pp (parse-quil test-quil)))
       (is (= 1 (length (parsed-program-memory-definitions pp)))))))
 
-;; (deftest test-process-include-declaration-collision ()
-;;   (uiop:with-temporary-file (:stream stream :pathname path)
-;;     (format stream "DECLARE foo BIT~@
-;;                     MEASURE 0 foo")
-;;     (force-output stream)
-;;     (let* ((test-quil (format nil "DECLARE foo BIT~@
-;;                                    H 0~@
-;;                                    INCLUDE \"~A\"" path)))
-;;       (signals quil-parse-error (parse-quil test-quil)))))
+(deftest test-process-include-declaration-collision ()
+  (uiop:with-temporary-file (:stream stream :pathname path)
+    (format stream "DECLARE foo BIT~@
+                    MEASURE 0 foo")
+    (force-output stream)
+    (let* ((test-quil (format nil "DECLARE foo BIT~@
+                                   H 0~@
+                                   INCLUDE \"~A\"" path)))
+      (signals quil-parse-error (parse-quil test-quil)))))
+
+
+(deftest test-multiple-includes-good ()
+  (uiop:with-temporary-file (:stream stream :pathname path)
+    (format stream "X 0")
+    (force-output stream)
+    (let* ((test-quil (format nil "H 0~@
+                                   INCLUDE \"~A\"~@
+                                   INCLUDE \"~A\""
+                              path
+                              path))
+           (pp (parse-quil test-quil)))
+      (is (= 3 (length (parsed-program-executable-code pp)))))))
+
+(deftest test-cyclic-include ()
+  (uiop:with-temporary-file (:stream stream1 :pathname path1)
+    (uiop:with-temporary-file (:stream stream2 :pathname path2)
+      (format stream1 "X 0;INCLUDE \"~A\"" path2)
+      (format stream2 "X 0;INCLUDE \"~A\"" path1)
+      (force-output stream1)
+      (force-output stream2)
+      (signals quil-parse-error
+        (parse-quil (read-quil-file path1) :originating-file path1))
+      (signals quil-parse-error
+        (parse-quil (read-quil-file path1))))))

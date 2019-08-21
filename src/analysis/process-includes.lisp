@@ -5,8 +5,8 @@
 (in-package #:cl-quil)
 
 (defun definition-signature (instr)
-  "If instr is a definition or memory declaration, returns a signature used for
-determining ambiguity. Otherwise, return null."
+  "If INSTR is a definition or memory declaration, returns a signature used for
+determining ambiguity. Otherwise, return NIL."
   (typecase instr
     (gate-definition (cons 'gate-definition (gate-definition-name instr)))
     (circuit-definition (cons 'circuit-definition (circuit-definition-name instr)))
@@ -15,11 +15,10 @@ determining ambiguity. Otherwise, return null."
 (defun signal-ambiguous-definition (instr file conflicts)
   "Signal a condition indicating that the instruction INSTR parsed from FILE has
 a list of conflicts CONFLICTS."
-  (signal (etypecase instr
-            (gate-definition 'ambiguous-gate-definition)
-            (circuit-definition 'ambiguous-circuit-definition)
-            (memory-descriptor 'ambiguous-memory-declaration))
-          :conflicts (cons (cons instr file) conflicts)))
+  (etypecase instr
+    (gate-definition (signal 'ambiguous-gate-definition :conflicts (acons instr file conflicts)))
+    (circuit-definition (signal 'ambiguous-circuit-definition :conflicts (acons instr file conflicts)))
+    (memory-descriptor (signal 'ambiguous-memory-declaration :conflicts (acons instr file conflicts)))))
 
 (defun process-includes (raw-quil &optional originating-file)
   "Recursively process all INCLUDE instructions in the list RAW-QUIL. The
@@ -27,8 +26,10 @@ result is a new sequence with the included quil instructions spliced in."
   (let* (;; We track the expanded list of instructions, and build it from its tail out
          (expanded (cons nil nil))
          (expanded-tail expanded)
-         ;; We track seen files to check for cycles in the include graph
-         (seen-files (make-hash-table :test 'equalp))
+         ;; We track an active path of files from the "root" to whatever we are processing
+         ;; at the moment, in order to check for cycles.
+         (seen-files (when originating-file
+                       (list (namestring originating-file))))
          ;; The following maps definition signatures to a list of (filename . defn) pairs
          (seen-definitions (make-hash-table :test 'equalp)))
     (labels ((handle-include (incl originating-file)
@@ -42,13 +43,14 @@ result is a new sequence with the included quil instructions spliced in."
                  (when (uiop:relative-pathname-p file)
                    (setf file (merge-pathnames file originating-dir)))
                  (unless (uiop:file-exists-p file)
-                   (error "Could not include ~S because it does not exist." file))
-                 (when (gethash file seen-files)
-                   (error "Cycle detected in INCLUDe graph: ~S has already been processed." file))
-                 (setf (gethash file seen-files) t)
+                   (quil-parse-error "Could not include ~S because it does not exist." file))
+                 (when (member (namestring file) seen-files :test #'string=)
+                   (quil-parse-error "Cyclic INCLUDE detected: ~S is being INCLUDEd but has already been processed." file))
                  (let* ((*current-file* file)
                         (body (parse-quil-into-raw-program (a:read-file-into-string file))))
-                   (expand-all-includes body file))))
+                   (push (namestring file) seen-files)
+                   (unwind-protect (expand-all-includes body file)
+                     (pop seen-files)))))
              (expand-all-includes (instrs originating-file)
                ;; consume an instruction. if it's an include, we handoff to
                ;; HANDLE-INCLUDE before continuing

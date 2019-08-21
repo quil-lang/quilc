@@ -1664,7 +1664,7 @@ result of BODY, and the (possibly null) list of remaining lines.
   (let* ((*memory-region-names* nil)
          (tok-lines (tokenize string)))
     (loop :with parsed-program := nil
-          :until (null tok-lines) :do
+          :until (endp tok-lines) :do
             (multiple-value-bind (program-entity rest-toks)
                 (parse-program-lines tok-lines)
               (push program-entity parsed-program)

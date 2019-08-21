@@ -4,6 +4,7 @@
 
 (in-package #:cl-quil)
 
+;;; Used solely for application resolution to detect if we are resolving things inside of a circuit.
 (defvar *in-circuit-body* nil)
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
