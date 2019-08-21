@@ -292,7 +292,13 @@ If no exit rewiring is found, return NIL."
 
 ;;;;;;;;;;;;;;;;;;;; Gate and Circuit Definitions ;;;;;;;;;;;;;;;;;;;;
 
-(defclass gate-definition ()
+(defclass context-token-mixin ()
+  ((token :initarg :token
+          :accessor token-context))
+  (:documentation "Associates a 'context token' to an AST object, which may be
+  useful for downstream processing."))
+
+(defclass gate-definition (context-token-mixin)
   ((name :initarg :name
          :reader gate-definition-name)
    (entries :initarg :entries
@@ -373,7 +379,7 @@ as a permutation."
                        :name name
                        :entries entries))))
 
-(defclass circuit-definition ()
+(defclass circuit-definition (context-token-mixin)
   ((name :initarg :name
          :reader circuit-definition-name)
    (parameters :initarg :parameters

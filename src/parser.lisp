@@ -309,6 +309,15 @@ the immediately preceding line."
 (defvar *formal-arguments-allowed* nil
   "Dynamic variable to control whether formal parameters and arguments are allowed in the current parsing context.")
 
+(defmacro tag-with-context (tok &body body)
+  "Execute BODY and set the token context of the first resulting value to TOK."
+  (a:with-gensyms (results ast-obj)
+    `(let* ((,results (multiple-value-list
+                       (progn ,@body)))
+            (,ast-obj (first ,results)))
+       (setf (token-context ,ast-obj) ,tok)
+       (values-list ,results))))
+
 (defun parse-program-lines (tok-lines)
   "Parse the next AST object from the list of token lists. Returns two values:
 
@@ -334,7 +343,8 @@ the immediately preceding line."
 
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
-         (parse-circuit-definition tok-lines)))
+         (tag-with-context tok
+             (parse-circuit-definition tok-lines))))
 
       ;; Gate Definition
       ((:DEFGATE)
@@ -343,7 +353,8 @@ the immediately preceding line."
 
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
-         (parse-gate-definition tok-lines)))
+         (tag-with-context tok
+             (parse-gate-definition tok-lines))))
 
       ;; Memory Declaration
       ((:DECLARE)
