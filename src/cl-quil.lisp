@@ -8,10 +8,14 @@
   '(expand-circuits type-check)
   "The standard transforms that are applied by PARSE-QUIL.")
 
-(defun parse-quil (string &key originating-file (transforms *standard-post-process-transforms*))
+(defun parse-quil (string &key originating-file
+                            (transforms *standard-post-process-transforms*)
+                            (ambiguous-definition-handler #'continue))
   "Parse and process the Quil string STRING, which originated from the file
 ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed
-Quil string."
+Quil string. In the presence of multiple definitions with a common signature, a
+signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
+"
   (handler-bind
       ((ambiguous-memory-declaration
          (lambda  (c)
@@ -23,8 +27,9 @@ Quil string."
                  (previous-file (cdr (second (ambiguous-definition-conflicts c)))))
              (quil-parse-error "Memory region ~A~@[ (in ~A)~] has already been DECLAREd~@[ (in ~A)~]."
                                name recent-file previous-file))))
-       ;; Ignore other ambiguities (with undefined behavior).
-       (ambiguous-definition #'continue))
+       ;; Note: we could generally allow for more sophisticated handling, but for now the default
+       ;; is to continue chugging along.
+       (ambiguous-definition ambiguous-definition-handler))
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
              (pp (resolve-applications

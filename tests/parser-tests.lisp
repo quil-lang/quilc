@@ -191,7 +191,7 @@ TEST 0 1 2"))
       (is (typep (first gates) 'quil::permutation-gate-definition)))
     (signals quil-parse-error (parse-quil quil-bad))))
 
-(deftest test-process-include ()
+(deftest test-parsing-process-include ()
   (uiop:with-temporary-file (:stream stream :pathname path)
     (format stream "DECLARE foo BIT~@
                     MEASURE 0 foo")
@@ -201,7 +201,7 @@ TEST 0 1 2"))
            (pp (parse-quil test-quil)))
       (is (= 1 (length (parsed-program-memory-definitions pp)))))))
 
-(deftest test-process-include-declaration-collision ()
+(deftest test-parsing-include-declaration-collision ()
   (uiop:with-temporary-file (:stream stream :pathname path)
     (format stream "DECLARE foo BIT~@
                     MEASURE 0 foo")
@@ -211,8 +211,35 @@ TEST 0 1 2"))
                                    INCLUDE \"~A\"" path)))
       (signals quil-parse-error (parse-quil test-quil)))))
 
+(deftest test-parsing-include-defgate-ambiguity ()
+  (uiop:with-temporary-file (:stream stream :pathname path)
+    (format stream "
+DEFGATE FOO:
+    1/sqrt(2), 1/sqrt(2)
+    1/sqrt(2), -1/sqrt(2)")
+    (force-output stream)
+    (let* ((test-quil (format nil "
+DEFGATE FOO:
+    1/sqrt(2), 1/sqrt(2)
+    1/sqrt(2), -1/sqrt(2)
 
-(deftest test-multiple-includes-good ()
+INCLUDE \"~A\"" path)))
+      (signals quil::ambiguous-gate-or-circuit-definition
+        (parse-quil test-quil :ambiguous-definition-handler #'identity)))))
+
+(deftest test-parsing-defgate-defcircuit-ambiguity ()
+  (let ((test-quil "
+DEFGATE FOO(%a):
+    1/sqrt(2), 1/sqrt(2)
+    1/sqrt(2), -1/sqrt(2)
+
+DEFCIRCUIT FOO(%a) q v:
+    X q
+"))
+    (signals quil::ambiguous-gate-or-circuit-definition
+      (parse-quil test-quil :ambiguous-definition-handler #'identity))))
+
+(deftest test-parsing-multiple-includes-good ()
   (uiop:with-temporary-file (:stream stream :pathname path)
     (format stream "X 0")
     (force-output stream)
@@ -224,7 +251,7 @@ TEST 0 1 2"))
            (pp (parse-quil test-quil)))
       (is (= 3 (length (parsed-program-executable-code pp)))))))
 
-(deftest test-cyclic-include ()
+(deftest test-parsing-cyclic-include ()
   (uiop:with-temporary-file (:stream stream1 :pathname path1)
     (uiop:with-temporary-file (:stream stream2 :pathname path2)
       (format stream1 "X 0;INCLUDE \"~A\"" path2)

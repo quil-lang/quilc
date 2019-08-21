@@ -1231,7 +1231,8 @@ result of BODY, and the (possibly null) list of remaining lines.
                              :type type
                              :length length
                              :sharing-parent sharing-parent
-                             :sharing-offset-alist (reverse sharing-offset-alist))
+                             :sharing-offset-alist (reverse sharing-offset-alist)
+                             :token (first (first tok-lines)))
      (rest tok-lines))))
 
 (defun parse-label (tok-lines)
@@ -1633,41 +1634,13 @@ result of BODY, and the (possibly null) list of remaining lines.
               :documentation "A list of (filename . definition) pairs which conflict."))
   (:documentation "A condition indicating the presence of multiple (possibly conflicting) definitions."))
 
-(define-condition ambiguous-gate-definition (ambiguous-definition)
-  ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE forms."))
-
 (define-condition ambiguous-memory-declaration (ambiguous-definition)
   ()
   (:documentation "A condition indicating the presence of multiple (possibly conflicting) DECLARE forms."))
 
-(define-condition ambiguous-circuit-definition (ambiguous-definition)
+(define-condition ambiguous-gate-or-circuit-definition (ambiguous-definition)
   ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFCIRCUIT forms."))
-
-(defun extract-code-sections (code)
-  "Partition CODE into three values:
-
-    1. List of gate definitions.
-
-    2. List of circuit definitions.
-
-    3. List of code to execute."
-  (let ((gate-defs nil)
-        (circ-defs nil)
-        (memory-defs nil)
-        (exec-code nil))
-    (flet ((bin (x)
-             (typecase x
-               (gate-definition (push x gate-defs))
-               (circuit-definition (push x circ-defs))
-               (memory-descriptor (push x memory-defs))
-               (t (push x exec-code)))))
-      (mapc #'bin code)
-      (values (nreverse gate-defs)
-              (nreverse circ-defs)
-              (nreverse memory-defs)
-              (nreverse exec-code)))))
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE or DEFCIRCUIT forms."))
 
 (defun parse-quil-into-raw-program (string)
   "Parse a string STRING into a list of raw Quil syntax objects."
