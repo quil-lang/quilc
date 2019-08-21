@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-#+(or allegro)
+;;; Allegro (and other Lisps) don't support the non-standard "package
+;;; local nicknames".
+#+(or sbcl ecl ccl)
 (rename-package :alexandria :alexandria '(:a))
 
 (fiasco:define-test-package #:cl-quil-tests
