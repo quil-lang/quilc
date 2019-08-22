@@ -301,7 +301,7 @@ If no exit rewiring is found, return NIL."
     nil)
   (:documentation "Get the lexical context of an instruction."))
 
-(defclass gate-definition (lexical-context)
+(defclass gate-definition ()
   ((name :initarg :name
          :reader gate-definition-name)
    (entries :initarg :entries
