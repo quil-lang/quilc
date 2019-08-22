@@ -46,7 +46,17 @@ result is a new sequence with the included quil instructions spliced in."
                       (handle-include (car instrs) originating-file)
                       (expand-all-includes (cdr instrs) originating-file))
                      (t
-                      (setf (cdr expanded-tail) instrs)
-                      (setf expanded-tail (cdr expanded-tail))
-                      (expand-all-includes (cdr instrs) originating-file)))))
+                      (let ((recycled-cons instrs)
+                            (remaining-instrs (cdr instrs)))
+                        ;; Share the head cons of INSTRS in our result, which
+                        ;; also contains a non-INCLUDE as the CAR
+                        (rplacd expanded-tail recycled-cons)
+                        ;; Set the CDR of this cons to NIL. This isn't
+                        ;; necessary, but makes sure later modifications of this
+                        ;; code don't mistakenly traverse it.
+                        (rplacd recycled-cons nil)
+                        ;; Set the tail to our head cons (slightly used, still in good condition)
+                        (setf expanded-tail recycled-cons)
+                        ;; Proceed with the rest of the journey
+                        (expand-all-includes remaining-instrs originating-file))))))
       (expand-all-includes raw-quil originating-file))))
