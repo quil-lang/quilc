@@ -59,8 +59,11 @@ This also signals ambiguous definitions, which may be handled as needed."
         (all-seen-defns (make-hash-table :test 'equal)))
     (flet ((bin (instr)
              (a:when-let ((signature (definition-signature instr)))
-               (let ((originating-file (token-pathname
-                                        (lexical-context instr))))
+               (let ((originating-file (typecase (lexical-context instr)
+                                         (token
+                                          (token-pathname (lexical-context instr)))
+                                         (t
+                                          (quil-parse-error "Unable to resolve definition context ~A" instr)))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."

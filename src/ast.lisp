@@ -292,12 +292,14 @@ If no exit rewiring is found, return NIL."
 
 ;;;;;;;;;;;;;;;;;;;; Gate and Circuit Definitions ;;;;;;;;;;;;;;;;;;;;
 
-(defclass lexical-context ()
-  ((context :initarg :context
-            :type (or null token)
-            :accessor lexical-context))
-  (:metaclass abstract-class)
-  (:documentation "Associates a `lexical context' to an AST object, which may be useful for downstream processing."))
+;;; Note: In the future this might be expanded to include other objects.
+(deftype lexical-context () '(or null token))
+
+(defgeneric lexical-context (instr)
+  (:method ((instr t))
+    ;; By default, there is none.
+    nil)
+  (:documentation "Get the lexical context of an instruction."))
 
 (defclass gate-definition (lexical-context)
   ((name :initarg :name
@@ -308,7 +310,10 @@ If no exit rewiring is found, return NIL."
    ;; of many repeated calculations of a GATE object. See the function
    ;; GATE-DEFINITION-TO-GATE.
    (cached-gate :initform nil
-                :accessor %gate-definition-cached-gate))
+                :accessor %gate-definition-cached-gate)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context))
   (:metaclass abstract-class)
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 
@@ -383,7 +388,7 @@ as a permutation."
                        :entries entries
                        :context context))))
 
-(defclass circuit-definition (lexical-context)
+(defclass circuit-definition ()
   ((name :initarg :name
          :reader circuit-definition-name)
    (parameters :initarg :parameters
@@ -391,7 +396,10 @@ as a permutation."
    (arguments :initarg :arguments
               :reader circuit-definition-arguments)
    (body :initarg :body
-         :reader circuit-definition-body)))
+         :reader circuit-definition-body)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context)))
 
 (defun make-circuit-definition (name params args body &key context)
   (check-type name string)
