@@ -25,12 +25,18 @@
 
 (defvar *line-start-position* nil)
 (defvar *line-number* nil)
+(defvar *current-file* nil
+  "The pathname for the file being currently parsed.")
 
-(defstruct (token (:constructor tok (type &optional payload (line *line-number*))))
+(defstruct (token (:constructor tok (type &optional payload (line *line-number*) (pathname *current-file*))))
   "A lexical token."
-  (line nil :type (or null (integer 1)))
-  (type nil :type token-type)
-  (payload nil))
+  (line nil :type (or null (integer 1))
+            :read-only t)
+  (pathname nil :type (or null string pathname)
+                :read-only t)
+  (type nil :type token-type
+            :read-only t)
+  (payload nil :read-only t))
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
@@ -277,10 +283,12 @@ the immediately preceding line."
   (:documentation "Representation of an error parsing Quil."))
 
 (define-condition quil-parse-error-at-line (quil-parse-error)
-  ((line :initarg :line :reader line-of-quil-parse-error))
+  ((line :initarg :line :reader line-of-quil-parse-error)
+   (pathname :initarg :pathname :reader pathname-of-quil-parse-error))
   (:report (lambda (condition stream)
-             (format stream "At line ~D: "
-                     (line-of-quil-parse-error condition))
+             (format stream "At line ~D~@[ (~A)~]: "
+                     (line-of-quil-parse-error condition)
+                     (pathname-of-quil-parse-error condition))
              (apply #'format stream (simple-condition-format-control condition)
                     (simple-condition-format-arguments condition)))))
 
@@ -292,6 +300,7 @@ the immediately preceding line."
   ;; right here in parser.lisp where *line-number* is more than likely set.
   (if *line-number*
       (error 'quil-parse-error-at-line :line *line-number*
+                                       :pathname *current-file*
                                        :format-control format-control
                                        :format-arguments format-args)
       (error 'quil-parse-error :format-control format-control
@@ -887,30 +896,31 @@ result of BODY, and the (possibly null) list of remaining lines.
                  (parsed-gate-type (token-type parsed-gate-tok)))
             (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
               (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
-            (setf gate-type parsed-gate-type))))
+            (setf gate-type parsed-gate-type)))
 
-      (ecase gate-type
-        (:MATRIX
-         (parse-gate-entries-as-matrix body-lines params name))
-        (:PERMUTATION
-         (when params
-           (quil-parse-error "Permutation gate definitions do not support parameters."))
-         (parse-gate-entries-as-permutation body-lines name))))))
+        (ecase gate-type
+          (:MATRIX
+           (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
+          (:PERMUTATION
+           (when params
+             (quil-parse-error "Permutation gate definitions do not support parameters."))
+           (parse-gate-entries-as-permutation body-lines name :lexical-context op)))))))
 
-(defun parse-gate-entries-as-permutation (body-lines name)
+(defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)
   (multiple-value-bind (parsed-entries rest-lines)
       (parse-permutation-gate-entries body-lines)
     (validate-gate-permutation-size (length parsed-entries))
     (values (make-instance 'permutation-gate-definition
                            :name name
-                           :permutation parsed-entries)
+                           :permutation parsed-entries
+                           :context lexical-context)
             rest-lines)))
 
 (defun validate-gate-permutation-size (size)
   (unless (positive-power-of-two-p size)
     (quil-parse-error "Permutation gate entries do not represent a square matrix.")))
 
-(defun parse-gate-entries-as-matrix (body-lines params name)
+(defun parse-gate-entries-as-matrix (body-lines params name &key lexical-context)
   ;; Parse out the gate entries.
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
@@ -941,7 +951,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                     :else
                       :collect (second found-p))))
         ;; Return the gate definition.
-        (values (make-gate-definition name param-symbols parsed-entries)
+        (values (make-gate-definition name param-symbols parsed-entries :context lexical-context)
                 rest-lines)))))
 
 (defun parse-arithmetic-entries (entries)
@@ -1125,16 +1135,17 @@ result of BODY, and the (possibly null) list of remaining lines.
               :when (not (eql ':NAME (token-type arg)))
                 :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
               :collect (parse-argument arg) :into formal-args
-              :finally (setf args formal-args)))
+              :finally (setf args formal-args))
 
-      (multiple-value-bind (parsed-body rest-lines)
-          (parse-indented-body body-lines)
-        (values (make-circuit-definition
-                 name              ; Circuit name
-                 params            ; formal parameters
-                 args              ; formal arguments
-                 parsed-body)
-                rest-lines)))))
+        (multiple-value-bind (parsed-body rest-lines)
+            (parse-indented-body body-lines)
+          (values (make-circuit-definition
+                   name              ; Circuit name
+                   params            ; formal parameters
+                   args              ; formal arguments
+                   parsed-body
+                   :context op)
+                  rest-lines))))))
 
 (defun parse-quil-type (string)
   (check-type string string)
@@ -1214,7 +1225,8 @@ result of BODY, and the (possibly null) list of remaining lines.
                              :type type
                              :length length
                              :sharing-parent sharing-parent
-                             :sharing-offset-alist (reverse sharing-offset-alist))
+                             :sharing-offset-alist (reverse sharing-offset-alist)
+                             :lexical-context (first (first tok-lines)))
      (rest tok-lines))))
 
 (defun parse-label (tok-lines)
@@ -1611,51 +1623,31 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Entry Point ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun extract-code-sections (code)
-  "Partition CODE into three values:
+(define-condition ambiguous-definition ()
+  ((conflicts :initarg :conflicts :reader ambiguous-definition-conflicts
+              :documentation "A list of (filename . definition) pairs which conflict."))
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) definitions."))
 
-    1. List of gate definitions.
+(define-condition ambiguous-memory-declaration (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DECLARE forms."))
 
-    2. List of circuit definitions.
-
-    3. List of code to execute."
-  (let ((gate-defs nil)
-        (circ-defs nil)
-        (memory-defs nil)
-        (exec-code nil))
-    (flet ((bin (x)
-             (typecase x
-               (gate-definition (push x gate-defs))
-               (circuit-definition (push x circ-defs))
-               (memory-descriptor (push x memory-defs))
-               (t (push x exec-code)))))
-      (mapc #'bin code)
-      (values (nreverse gate-defs)
-              (nreverse circ-defs)
-              (nreverse memory-defs)
-              (nreverse exec-code)))))
+(define-condition ambiguous-gate-or-circuit-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE or DEFCIRCUIT forms."))
 
 (defun parse-quil-into-raw-program (string)
-  "Parse a string STRING into a raw, untransformed PARSED-PROGRAM object."
+  "Parse a string STRING into a list of raw Quil syntax objects."
   (check-type string string)
-  (let* ((tok-lines (tokenize string)))
-    (let ((parsed-program nil)
-          (*memory-region-names* nil))
-      (loop :named parse-loop
-            :until (null tok-lines) :do
-              (multiple-value-bind (program-entity rest-toks)
-                  (parse-program-lines tok-lines)
-                (push program-entity parsed-program)
-                (setf tok-lines rest-toks)))
-      (setf parsed-program (nreverse parsed-program))
-      ;; Return the parsed sequence of objects.
-      (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
-          (extract-code-sections parsed-program)
-        (make-instance 'parsed-program
-                       :gate-definitions gate-defs
-                       :circuit-definitions circ-defs
-                       :memory-definitions memory-defs
-                       :executable-code (coerce exec-code 'simple-vector))))))
+  (let* ((*memory-region-names* nil)
+         (tok-lines (tokenize string)))
+    (loop :with parsed-program := nil
+          :until (endp tok-lines) :do
+            (multiple-value-bind (program-entity rest-toks)
+                (parse-program-lines tok-lines)
+              (push program-entity parsed-program)
+              (setf tok-lines rest-toks))
+          :finally (return (nreverse parsed-program)))))
 
 (defvar *safe-include-directory* nil)
 

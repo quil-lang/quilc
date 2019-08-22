@@ -292,6 +292,15 @@ If no exit rewiring is found, return NIL."
 
 ;;;;;;;;;;;;;;;;;;;; Gate and Circuit Definitions ;;;;;;;;;;;;;;;;;;;;
 
+;;; Note: In the future this might be expanded to include other objects.
+(deftype lexical-context () '(or null token))
+
+(defgeneric lexical-context (instr)
+  (:method ((instr t))
+    ;; By default, there is none.
+    nil)
+  (:documentation "Get the lexical context of an instruction."))
+
 (defclass gate-definition ()
   ((name :initarg :name
          :reader gate-definition-name)
@@ -301,7 +310,10 @@ If no exit rewiring is found, return NIL."
    ;; of many repeated calculations of a GATE object. See the function
    ;; GATE-DEFINITION-TO-GATE.
    (cached-gate :initform nil
-                :accessor %gate-definition-cached-gate))
+                :accessor %gate-definition-cached-gate)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context))
   (:metaclass abstract-class)
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 
@@ -356,7 +368,7 @@ as a permutation."
         (unless found-one
           (return-from permutation-from-gate-entries nil))))))
 
-(defun make-gate-definition (name parameters entries)
+(defun make-gate-definition (name parameters entries &key context)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (check-type parameters symbol-list)
@@ -364,14 +376,17 @@ as a permutation."
       (make-instance 'parameterized-gate-definition
                     :name name
                     :parameters parameters
-                    :entries entries)
+                    :entries entries
+                    :context context)
       (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
-                       :permutation perm)
+                       :permutation perm
+                       :context context)
         (make-instance 'static-gate-definition
                        :name name
-                       :entries entries))))
+                       :entries entries
+                       :context context))))
 
 (defclass circuit-definition ()
   ((name :initarg :name
@@ -381,9 +396,12 @@ as a permutation."
    (arguments :initarg :arguments
               :reader circuit-definition-arguments)
    (body :initarg :body
-         :reader circuit-definition-body)))
+         :reader circuit-definition-body)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context)))
 
-(defun make-circuit-definition (name params args body)
+(defun make-circuit-definition (name params args body &key context)
   (check-type name string)
   (assert (every #'is-param params))
   (assert (every #'is-formal args))
@@ -391,7 +409,8 @@ as a permutation."
                  :name name
                  :parameters params
                  :arguments args
-                 :body body))
+                 :body body
+                 :context context))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;

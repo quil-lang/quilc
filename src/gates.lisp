@@ -292,7 +292,7 @@
 ;;; Load all of the standard gates from src/quil/stdgates.quil
 (global-vars:define-global-var **default-gate-definitions**
     (let ((table (make-hash-table :test 'equal))
-          (gate-defs (parsed-program-gate-definitions
+          (gate-defs (remove-if-not (lambda (obj) (typep obj 'gate-definition))
                       (parse-quil-into-raw-program
                        (a:read-file-into-string
                         (asdf:system-relative-pathname

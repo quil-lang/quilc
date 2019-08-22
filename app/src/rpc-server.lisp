@@ -167,7 +167,8 @@
 (defun rewrite-arithmetic-handler (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
-  (let ((program (quil::parse-quil-into-raw-program (rpcq::|RewriteArithmeticRequest-quil| request))))
+  (let ((program (quil::parse-quil (rpcq::|RewriteArithmeticRequest-quil| request)
+                                   :transforms nil)))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
       (let ((reformatted-rt (make-hash-table)))

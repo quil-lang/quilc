@@ -25,13 +25,12 @@
 (deftest test-aqvm-unlink-refuses-large-GHZ-state ()
   "Checks that an AQVM correctly assembles a GHZ state and then correctly disables itself."
   (let ((aqvm (quil::build-aqvm 8))
-        (quil (quil::parse-quil-into-raw-program "
+        (quil (quil::parse-quil "
 H 0
 CNOT 0 1
 CNOT 1 2
 CNOT 2 3
 ")))
-    (quil::transform 'quil::resolve-applications quil)
     (dolist (instr (coerce (quil::parsed-program-executable-code quil) 'list))
       (quil::aqvm-apply-instruction aqvm instr))
     ;; check that the correct state was constructed
@@ -71,7 +70,7 @@ CNOT 2 3
 (deftest test-aqvm-unlink-on-10Q ()
   (let ((quil::*aqvm-correlation-threshold* 4)
         (aqvm (quil::build-aqvm 11))
-        (pp (quil::parse-quil-into-raw-program "
+        (pp (quil::parse-quil "
 # set up wf
 RX(1.0) 3
 RX(1.3) 1
@@ -97,7 +96,6 @@ CNOT 6 5
 CNOT 3 5
 CNOT 3 5
 ")))
-    (quil::transform 'quil::resolve-applications pp)
     (dolist (instr (coerce (parsed-program-executable-code pp) 'list))
       (quil::aqvm-apply-instruction aqvm instr))
     (quil::aqvm-stop-simulating aqvm 10)

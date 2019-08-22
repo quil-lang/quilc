@@ -172,5 +172,4 @@ relabeled according to which free assignments remain."
   parsed-prog)
 
 (define-transform compress-qubits (compress-qubits)
-  "Relabel the qubits so that they are minimally numbered."
-  process-includes)
+  "Relabel the qubits so that they are minimally numbered.")

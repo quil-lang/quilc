@@ -127,7 +127,7 @@ R 0"))
       (not-signals error (quil::parse-quil after)))))
 
 (deftest test-circuit-and-declare-printing ()
-  ;; This test relies on the fact that PARSE-QUIL-INTO-RAW-PROGRAM doesn't EXPAND-CIRCUITS,
+  ;; This test relies on not applying the EXPAND-CIRCUITS transform,
   ;; otherwise it could be included in TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES, above.
   (let* ((before "DECLARE theta REAL[16]
 DECLARE theta-bits BIT[100] SHARING theta OFFSET 1 REAL
@@ -139,7 +139,8 @@ DEFCIRCUIT TEST(%a) b c:
 
 TEST(0.5) 0 1
 ")
-         (after (parse-and-print-quil-to-string before :parser #'quil::parse-quil-into-raw-program)))
+         (after (parse-and-print-quil-to-string before :parser (lambda (string)
+                                                                 (quil::parse-quil string :transforms nil)))))
     (is (string= before after))))
 
 (deftest test-jump-to-integer-label-printing ()

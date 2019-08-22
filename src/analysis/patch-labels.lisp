@@ -13,8 +13,7 @@ This changes the AST!
 
 becomes
 
-    JUMP-LABEL : JUMP -> non-negative integer."
-  process-includes)
+    JUMP-LABEL : JUMP -> non-negative integer.")
 
 (defun jump-target-positions (code)
   (loop :with positions := (make-hash-table :test 'equal)
