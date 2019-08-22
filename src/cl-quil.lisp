@@ -10,7 +10,7 @@
 
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)
-                            (ambiguous-definition-handler #'continue))
+                            (ambiguous-definition-handler (constantly nil)))
   "Parse and process the Quil string STRING, which originated from the file
 ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed
 Quil string. In the presence of multiple definitions with a common signature, a

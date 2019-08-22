@@ -20,22 +20,23 @@ determining ambiguity. Otherwise, return NIL."
                  name)))
     (typecase instr
       (gate-definition (gate-or-circuit-signature (gate-definition-name instr)
-                                                  (when (typep instr 'parameterized-gate-definition)
-                                                    (gate-definition-parameters instr))
+                                                  (if (typep instr 'parameterized-gate-definition)
+                                                      (gate-definition-parameters instr)
+                                                      nil)
                                                   (gate-definition-qubits-needed instr)) )
       (circuit-definition (gate-or-circuit-signature (circuit-definition-name instr)
                                                      (circuit-definition-parameters instr)
                                                      (circuit-definition-arguments instr)))
       (memory-descriptor (cons 'memory-descriptor (memory-descriptor-name instr))))))
 
-(defun signal-ambiguous-definition (instr file conflicts)
+(defun ambiguous-definition-condition (instr file conflicts)
   "Signal a condition indicating that the instruction INSTR parsed from FILE has
 a list of conflicts CONFLICTS."
   (let ((combined (acons instr file conflicts)))
     (etypecase instr
-      (gate-definition (signal 'ambiguous-gate-or-circuit-definition :conflicts combined))
-      (circuit-definition (signal 'ambiguous-gate-or-circuit-definition :conflicts combined))
-      (memory-descriptor (signal 'ambiguous-memory-declaration :conflicts combined)))))
+      (gate-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
+      (circuit-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
+      (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
 (defun extract-code-sections (code)
   "Partition CODE into four values:
@@ -59,11 +60,10 @@ This also signals ambiguous definitions, which may be handled as needed."
     (flet ((bin (instr)
              (a:when-let ((signature (definition-signature instr)))
                (let ((originating-file (token-pathname
-                                        (token-context instr))))
+                                        (lexical-context instr))))
                  ;; check for conflicts
-                 (with-simple-restart (continue "Continue with ambiguous definition.")
-                   (a:when-let ((entries (gethash signature all-seen-defns)))
-                     (signal-ambiguous-definition instr originating-file entries)))
+                 (a:when-let ((entries (gethash signature all-seen-defns)))
+                   (signal (ambiguous-definition-condition instr originating-file entries)))
                  (push (cons instr originating-file)
                        (gethash signature all-seen-defns))))
              (typecase instr

@@ -30,10 +30,13 @@
 
 (defstruct (token (:constructor tok (type &optional payload (line *line-number*) (pathname *current-file*))))
   "A lexical token."
-  (line nil :type (or null (integer 1)))
-  (pathname nil :type (or null string pathname))
-  (type nil :type token-type)
-  (payload nil))
+  (line nil :type (or null (integer 1))
+            :read-only t)
+  (pathname nil :type (or null string pathname)
+                :read-only t)
+  (type nil :type token-type
+            :read-only t)
+  (payload nil :read-only t))
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
@@ -309,15 +312,6 @@ the immediately preceding line."
 (defvar *formal-arguments-allowed* nil
   "Dynamic variable to control whether formal parameters and arguments are allowed in the current parsing context.")
 
-(defmacro tag-with-context (tok &body body)
-  "Execute BODY and set the token context of the first resulting value to TOK."
-  (a:with-gensyms (results ast-obj)
-    `(let* ((,results (multiple-value-list
-                       (progn ,@body)))
-            (,ast-obj (first ,results)))
-       (setf (token-context ,ast-obj) ,tok)
-       (values-list ,results))))
-
 (defun parse-program-lines (tok-lines)
   "Parse the next AST object from the list of token lists. Returns two values:
 
@@ -343,8 +337,7 @@ the immediately preceding line."
 
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
-         (tag-with-context tok
-             (parse-circuit-definition tok-lines))))
+         (parse-circuit-definition tok-lines)))
 
       ;; Gate Definition
       ((:DEFGATE)
@@ -353,8 +346,7 @@ the immediately preceding line."
 
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
-         (tag-with-context tok
-             (parse-gate-definition tok-lines))))
+         (parse-gate-definition tok-lines)))
 
       ;; Memory Declaration
       ((:DECLARE)
@@ -904,30 +896,31 @@ result of BODY, and the (possibly null) list of remaining lines.
                  (parsed-gate-type (token-type parsed-gate-tok)))
             (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
               (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
-            (setf gate-type parsed-gate-type))))
+            (setf gate-type parsed-gate-type)))
 
-      (ecase gate-type
-        (:MATRIX
-         (parse-gate-entries-as-matrix body-lines params name))
-        (:PERMUTATION
-         (when params
-           (quil-parse-error "Permutation gate definitions do not support parameters."))
-         (parse-gate-entries-as-permutation body-lines name))))))
+        (ecase gate-type
+          (:MATRIX
+           (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
+          (:PERMUTATION
+           (when params
+             (quil-parse-error "Permutation gate definitions do not support parameters."))
+           (parse-gate-entries-as-permutation body-lines name :lexical-context op)))))))
 
-(defun parse-gate-entries-as-permutation (body-lines name)
+(defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)
   (multiple-value-bind (parsed-entries rest-lines)
       (parse-permutation-gate-entries body-lines)
     (validate-gate-permutation-size (length parsed-entries))
     (values (make-instance 'permutation-gate-definition
                            :name name
-                           :permutation parsed-entries)
+                           :permutation parsed-entries
+                           :context lexical-context)
             rest-lines)))
 
 (defun validate-gate-permutation-size (size)
   (unless (positive-power-of-two-p size)
     (quil-parse-error "Permutation gate entries do not represent a square matrix.")))
 
-(defun parse-gate-entries-as-matrix (body-lines params name)
+(defun parse-gate-entries-as-matrix (body-lines params name &key lexical-context)
   ;; Parse out the gate entries.
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
@@ -958,7 +951,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                     :else
                       :collect (second found-p))))
         ;; Return the gate definition.
-        (values (make-gate-definition name param-symbols parsed-entries)
+        (values (make-gate-definition name param-symbols parsed-entries :context lexical-context)
                 rest-lines)))))
 
 (defun parse-arithmetic-entries (entries)
@@ -1142,16 +1135,17 @@ result of BODY, and the (possibly null) list of remaining lines.
               :when (not (eql ':NAME (token-type arg)))
                 :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
               :collect (parse-argument arg) :into formal-args
-              :finally (setf args formal-args)))
+              :finally (setf args formal-args))
 
-      (multiple-value-bind (parsed-body rest-lines)
-          (parse-indented-body body-lines)
-        (values (make-circuit-definition
-                 name              ; Circuit name
-                 params            ; formal parameters
-                 args              ; formal arguments
-                 parsed-body)
-                rest-lines)))))
+        (multiple-value-bind (parsed-body rest-lines)
+            (parse-indented-body body-lines)
+          (values (make-circuit-definition
+                   name              ; Circuit name
+                   params            ; formal parameters
+                   args              ; formal arguments
+                   parsed-body
+                   :context op)
+                  rest-lines))))))
 
 (defun parse-quil-type (string)
   (check-type string string)
@@ -1232,7 +1226,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                              :length length
                              :sharing-parent sharing-parent
                              :sharing-offset-alist (reverse sharing-offset-alist)
-                             :token (first (first tok-lines)))
+                             :lexical-context (first (first tok-lines)))
      (rest tok-lines))))
 
 (defun parse-label (tok-lines)

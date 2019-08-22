@@ -49,9 +49,9 @@
   (sharing-parent nil :read-only t :type (or null string))
   (sharing-offset-alist nil :read-only t :type list)
   ;; Context token, available for later resolution
-  (token nil :read-only t :type (or null token)))
+  (lexical-context nil :read-only t :type (or null token)))
 
-(defmethod token-context ((obj memory-descriptor))
+(defmethod lexical-context ((obj memory-descriptor))
   (memory-descriptor-token obj))
 
 (defun simple-memory-descriptor-p (desc)

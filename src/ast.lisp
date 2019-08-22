@@ -292,13 +292,14 @@ If no exit rewiring is found, return NIL."
 
 ;;;;;;;;;;;;;;;;;;;; Gate and Circuit Definitions ;;;;;;;;;;;;;;;;;;;;
 
-(defclass context-token-mixin ()
-  ((token :initarg :token
-          :accessor token-context))
-  (:documentation "Associates a 'context token' to an AST object, which may be
-  useful for downstream processing."))
+(defclass lexical-context ()
+  ((context :initarg :context
+            :type (or null token)
+            :accessor lexical-context))
+  (:metaclass abstract-class)
+  (:documentation "Associates a `lexical context' to an AST object, which may be useful for downstream processing."))
 
-(defclass gate-definition (context-token-mixin)
+(defclass gate-definition (lexical-context)
   ((name :initarg :name
          :reader gate-definition-name)
    (entries :initarg :entries
@@ -362,7 +363,7 @@ as a permutation."
         (unless found-one
           (return-from permutation-from-gate-entries nil))))))
 
-(defun make-gate-definition (name parameters entries)
+(defun make-gate-definition (name parameters entries &key context)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (check-type parameters symbol-list)
@@ -370,16 +371,19 @@ as a permutation."
       (make-instance 'parameterized-gate-definition
                     :name name
                     :parameters parameters
-                    :entries entries)
+                    :entries entries
+                    :context context)
       (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
-                       :permutation perm)
+                       :permutation perm
+                       :context context)
         (make-instance 'static-gate-definition
                        :name name
-                       :entries entries))))
+                       :entries entries
+                       :context context))))
 
-(defclass circuit-definition (context-token-mixin)
+(defclass circuit-definition (lexical-context)
   ((name :initarg :name
          :reader circuit-definition-name)
    (parameters :initarg :parameters
@@ -389,7 +393,7 @@ as a permutation."
    (body :initarg :body
          :reader circuit-definition-body)))
 
-(defun make-circuit-definition (name params args body)
+(defun make-circuit-definition (name params args body &key context)
   (check-type name string)
   (assert (every #'is-param params))
   (assert (every #'is-formal args))
@@ -397,7 +401,8 @@ as a permutation."
                  :name name
                  :parameters params
                  :arguments args
-                 :body body))
+                 :body body
+                 :context context))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
