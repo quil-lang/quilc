@@ -63,7 +63,8 @@ This also signals ambiguous definitions, which may be handled as needed."
                                         (lexical-context instr))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
-                   (signal (ambiguous-definition-condition instr originating-file entries)))
+                   (cerror "Continue with ambiguous definition."
+                           (ambiguous-definition-condition instr originating-file entries)))
                  (push (cons instr originating-file)
                        (gethash signature all-seen-defns))))
              (typecase instr

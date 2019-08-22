@@ -10,7 +10,7 @@
 
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)
-                            (ambiguous-definition-handler (constantly nil)))
+                            (ambiguous-definition-handler #'continue))
   "Parse and process the Quil string STRING, which originated from the file
 ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed
 Quil string. In the presence of multiple definitions with a common signature, a
@@ -29,7 +29,7 @@ signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HAN
                                name recent-file previous-file))))
        ;; Note: we could generally allow for more sophisticated handling, but for now the default
        ;; is to continue chugging along.
-       (ambiguous-definition ambiguous-definition-handler))
+       (ambiguous-gate-or-circuit-definition ambiguous-definition-handler))
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
              (pp (resolve-applications

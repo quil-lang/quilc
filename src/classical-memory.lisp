@@ -52,7 +52,7 @@
   (lexical-context nil :read-only t :type (or null token)))
 
 (defmethod lexical-context ((obj memory-descriptor))
-  (memory-descriptor-token obj))
+  (memory-descriptor-lexical-context obj))
 
 (defun simple-memory-descriptor-p (desc)
   "Is the object DESC a memory descriptor that is \"simple\", i.e., does not alias?"

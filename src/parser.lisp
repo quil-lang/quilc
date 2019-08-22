@@ -1623,7 +1623,7 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Entry Point ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-condition ambiguous-definition (quil-parse-error)
+(define-condition ambiguous-definition ()
   ((conflicts :initarg :conflicts :reader ambiguous-definition-conflicts
               :documentation "A list of (filename . definition) pairs which conflict."))
   (:documentation "A condition indicating the presence of multiple (possibly conflicting) definitions."))
