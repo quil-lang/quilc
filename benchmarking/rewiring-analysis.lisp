@@ -141,18 +141,19 @@
                    (break "~A" e))
                  (return-from by-assignment (list nil nil 1)))))
            (funcall assn (lambda ()
-                           (rest (multiple-value-list (compiler-hook (get-prog prog-source) chip)))))))
+                           (multiple-value-list (compiler-hook (get-prog prog-source) chip))))))
 
        (by-chip (prog-source chip)
          (loop
            :for (label assn) :on assignments :by #'cddr
-           :for (swaps duration elapsed) := (by-assignment prog-source chip assn)
-           :nconc (list label (list swaps duration elapsed))))
+           :for (compiled-program swaps duration elapsed) := (by-assignment prog-source chip assn)
+           :for fidelity := (quil::calculate-instructions-fidelity (coerce (quil::parsed-program-executable-code compiled-program) 'list) chip)
+           :nconc (list label (list swaps duration elapsed fidelity))))
 
        (by-prog (prog-source)
          (loop
            :with max-needed := (apply #'max (quil::prog-used-qubits (get-prog prog-source)))
-           :for (label chip) :in chips
+           :for (label . chip) :in chips
            :for n-qubits := (quil::chip-spec-n-qubits chip)
            :when (< max-needed (quil::chip-spec-n-qubits chip))
              :nconc (list label (by-chip prog-source chip)))))
@@ -184,10 +185,10 @@
    :executable-code (concatenate
                      'vector
                      ;; force start with the identity rewiring
-                     (list (make-instance 'application-force-rewiring :target initial))
+                     (list (make-instance 'quil::application-force-rewiring :target initial))
 
                      ;; force end with the desired rewiring
-                     (list (make-instance 'application-force-rewiring :target target)))))
+                     (list (make-instance 'quil::application-force-rewiring :target target)))))
 
 (defun generate-random-rewiring-prog (n-qubits state)
   (let ((*random-state* #+sbcl (sb-ext:seed-random-state state)
@@ -202,9 +203,9 @@
   (declare (ignore break-on-error include-runtime))
   (remf args :rewiring-qubits)
   (setf (getf args :chips)
-        (loop :for (name . chip) :in chips
+        (loop :for (name chip) :in chips
               :when (= (quil::chip-spec-n-qubits chip) rewiring-qubits) :collect (cons name chip)))
-  (apply #'measure-performance assn
+  (apply 'measure-performance assn
          :progs (loop
                   :for i :below 20
                   :collect (let ((curval i))
@@ -296,3 +297,14 @@
     :a*-depth  (:partial :a*           :a*           1d0 :depth)
     :a*-sum    (:partial :a*           :a*           1d0 :sum)
     ))
+
+(defvar *cost-fn-weight-style-assn*
+    (make-assignments
+        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                         #+ecl  (make-random-state 1)
+                         #-(or sbcl ecl) (error "don't know how to seed random state"))
+         (quil::*compressor-passes* 1))
+        (quil::*cost-fn-weight-style*)
+      :duration   (:duration)
+      :fidelity   (:fidelity)
+      ))
