@@ -208,3 +208,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (fresh-line stream)
   (dohash ((key val) hash)
     (format stream "~a -> ~a~%" key val)))
+
+(defun xor (&rest vals)
+  (oddp (loop :for val :in vals
+              :count val)))
