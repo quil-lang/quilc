@@ -264,7 +264,7 @@ used to specify CHIP-SPEC."
   (check-type qubit1 unsigned-byte)
   (check-type gate-information (or null hash-table))
   (assert (/= qubit0 qubit1))
-  (assert (xor (null gate-information) (null type)))
+  (assert (a:xor (null gate-information) (null type)))
   (setf type (a:ensure-list type))
   (let* ((obj (make-hardware-object
                :order 1
@@ -324,7 +324,7 @@ used to specify CHIP-SPEC."
 
  * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
   (check-type gate-information (or null hash-table))
-  (assert (xor (null gate-information) (null type)))
+  (assert (a:xor (null gate-information) (null type)))
   (let ((obj (make-hardware-object :order 0)))
     ;; new style of initialization
     (when gate-information
