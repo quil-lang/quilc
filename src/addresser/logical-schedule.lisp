@@ -599,6 +599,7 @@ mapping instructions to their tags. "
      (hash-table-count (lscheduler-earlier-instrs lschedule))))
 
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
+  (declare (optimize (debug 3)))
   (labels ((fidelity-combinator (val1 val2)
              (* val1 val2))
            (fidelity-bumper (instr value)
@@ -634,7 +635,7 @@ mapping instructions to their tags. "
     (multiple-value-bind (max-value value-hash)
         (lscheduler-walk-graph lschedule
                                :base-value 1d0
-                               :bump-value #'fidelity-bumper
+                               :bump-value (lambda (instr value) (let ((fid (fidelity-bumper instr value))) (format t "~/cl-quil:instruction-fmt/ -> ~a~%" instr fid) fid))
                                :test-values #'fidelity-combinator)
       (declare (ignore max-value))
       (loop :with fidelity := 1d0
