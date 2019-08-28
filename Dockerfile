@@ -1,5 +1,5 @@
 # specify the dependency versions (can be overriden with --build_arg)
-ARG rpcq_version=2.7.2
+ARG rpcq_version=2.7.3
 ARG qvm_version=1.10.0
 ARG quicklisp_version=2019-07-11
 
