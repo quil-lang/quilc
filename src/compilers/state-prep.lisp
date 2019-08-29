@@ -301,3 +301,21 @@
      (state-prep-2Q-compiler instr))
     (otherwise
      (state-prep-trampolining-compiler instr))))
+
+(defun schmidt-decomposition (phi num-a num-b)
+  "Given a wavefunction PHI containing subystems of size NUM-A and NUM-B qubits, compute the Schmidt decomposition of PHI.
+Returns c, U, V, where c is vector and U,V are unitary matrices (of dimensions
+NUM-A and NUM-B respectively) such that
+
+   PHI = \sum_{i} d_i U_i V _i
+
+where U_i, V_i denotes the ith column of the matrix U, V respectively."
+  (assert (= (qubit-count phi) (+ num-a num-b)))
+  (let ((reshaped (magicl:make-matrix :rows (expt 2 num-a)
+                                      :cols (expt 2 num-b)
+                                      :data phi)))
+    (multiple-value-bind (u d vt)
+        (magicl:svd reshaped)
+      (values u
+              (magicl:matrix-diagonal d)
+              (magicl:transpose vt)))))
