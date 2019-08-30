@@ -68,52 +68,44 @@ CNOT 2 3
            (magicl:multiply-complex-matrices output-matrix random-matrix)
            (magicl:diag 2 2 (list 1d0 1d0)))))))
 
+(defun wf-to-matrix (wf)
+  "Convert a sequence WF to a corresponding column vector."
+  (magicl:make-matrix :rows (length wf)
+                      :cols 1
+                      :data (copy-seq wf)))
+
 (deftest test-state-prep-4q ()
   (let* ((qubits (mapcar #'quil::qubit (list 0 1 2 3)))
-         (size (expt 2 (length qubits)))
-         (random-matrix (quil::random-special-unitary size))
-         (column (loop :for j :below size :collect (magicl:ref random-matrix j 0)))
+         (source-wf (quil::random-wavefunction 4))
+         (target-wf (quil::random-wavefunction 4))
          (instr (make-instance 'quil::state-prep-application
                                :arguments qubits
-                               :target-wf (make-array size :initial-contents column :element-type '(complex double-float))
-                               :source-wf (make-array size :initial-element #C(0d0 0d0) :element-type '(complex double-float)))))
-    (setf (aref (quil::state-prep-application-source-wf instr) 0) #C(1d0 0d0))
+                               :target-wf target-wf
+                               :source-wf source-wf)))
     (let* ((output-matrix (quil::make-matrix-from-quil
                            (quil::expand-to-native-instructions
                             (quil::state-prep-4q-compiler instr)
                             (quil::build-8Q-chip))))
-           (prefactor (/ (magicl:ref random-matrix 0 0) (magicl:ref output-matrix 0 0)))
-           (result (magicl:scale prefactor (magicl:matrix-column output-matrix 0))))
+           (result (magicl:multiply-complex-matrices
+                    output-matrix
+                    (wf-to-matrix source-wf)))
+           (prefactor (/ (aref target-wf 0) (magicl:ref result 0 0))))
+      (setf result (magicl:scale prefactor result))
       (is (quil::matrix-equality result
-                                 (magicl:make-complex-vector column))))))
-
-(defun destructively-swap-significance (seq)
-  "Given a sequence SEQ of length 2**N, swap elements at all pairs of indices i and j with
-mirrored binary expansions (e.g. 1010 <--> 0101)."
-  (let ((n (quil::qubit-count seq)))
-    (assert (= (expt 2 n) (length seq)))
-    (dotimes (i (expt 2 (1- n)) seq)
-      (let ((j (loop :with old := i
-                     :with new := 0
-                     :repeat n
-                     :do (progn (setf new (+ (ash new 1) (mod old 2)))
-                                (setf old (ash old -1)))
-                     :finally (return new))))
-        (rotatef (elt seq i) (elt seq j))))))
+                                 (wf-to-matrix target-wf))))))
 
 (deftest test-schmidt-decomposition ()
-  (let* ((random-matrix (quil::random-special-unitary 16))
-         (column (loop :for j :below 16 :collect (magicl:ref random-matrix j 0))))
-    (multiple-value-bind (c U V) (quil::schmidt-decomposition column 2 2)
+  (let* ((random-wf (quil::random-wavefunction 4)))
+    (multiple-value-bind (c U V) (quil::schmidt-decomposition random-wf 2 2)
       (let* ((schmidt-terms (loop :for i :from 0 :below 4
                                   :collect (magicl:scale (aref c i)
                                                          (magicl::kron
                                                           (magicl:matrix-column U i)
                                                           (magicl:matrix-column V i)))))
-             (reconstructed-column (apply #'magicl:add-matrix schmidt-terms)))
+             (reconstructed-wf (apply #'magicl:add-matrix schmidt-terms)))
         ;; adjust for column major nonsense
-        (is (quil::matrix-equality reconstructed-column
-                                   (magicl:make-complex-vector column)))))))
+        (is (quil::matrix-equality reconstructed-wf
+                                   (wf-to-matrix random-wf)))))))
 
 (deftest test-aqvm-unlink-on-10Q ()
   (let ((quil::*aqvm-correlation-threshold* 4)

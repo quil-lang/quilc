@@ -304,36 +304,61 @@
     (otherwise
      (state-prep-trampolining-compiler instr))))
 
-(defun state-prep-4q (target-wf q0 q1 q2 q3 &key reversed)
-  ;; TODO docstring
-  (assert (= 4 (qubit-count target-wf)))
-  (multiple-value-bind (c U V)
-      (schmidt-decomposition target-wf 2 2)
-    (list
-     ;; prepare on qubits 2,3
-     (make-instance 'state-prep-application
-                    :source-wf (build-ground-state 2) ; TODO allow for general source
-                    :target-wf c
-                    :arguments (list (qubit q2) (qubit q3)))  ; TODO qubit or integers?
+(defun state-prep-4q (wf q0 q1 q2 q3 &key reversed)
+  "Produce instructions to prepare the wavefunction WF with respect to qubits Q0
+Q1 Q2 Q3, starting from the zero state. If REVERSED is T, the instructions
+instead prepare the zero state from WF."
+  (assert (= 4 (qubit-count wf)))
+  ;; each function in the following FLET is responsible for handling the REVERSED
+  ;; flag on its own
+  (flet ((state-prep-2q (source target qubit-indices)
+           (when reversed
+             (rotatef source target))
+           (make-instance 'state-prep-application
+                          :source-wf source
+                          :target-wf target
+                          :arguments (mapcar #'qubit qubit-indices)))
+         (cnot (a b)
+           (build-gate "CNOT" nil a b))
+         (2q-evolution (U a b)
+           (anon-gate "STATE-2Q"
+                      (if reversed (magicl:dagger U) U)
+                      a b)))
+    (multiple-value-bind (c U V)
+        (schmidt-decomposition wf 2 2)
+      (let ((instrs
+              (list
+               ;; prepare on qubits 2,3
+               (state-prep-2q (build-ground-state 2)
+                              c
+                              (list q2 q3))
+               ;; entangle
+               (cnot q2 q0)
+               (cnot q3 q1)
 
-     ;; entangle
-     (build-gate "CNOT" nil q2 q0)
-     (build-gate "CNOT" nil q3 q1)
-
-     ;; apply gates, transposing qubits to account for LSB <-> MSB mismatch
-     (anon-gate "STATE-2Q" U q3 q2)
-     (anon-gate "STATE-2Q" V q1 q0))))
+               ;; apply unitaries, transposing qubits to account for LSB <-> MSB mismatch
+               (2q-evolution U q3 q2)
+               (2q-evolution V q1 q0))))
+        (if reversed
+            (reverse instrs)
+            instrs)))))
 
 (define-compiler state-prep-4Q-compiler
     ((instr (_ _ q0 q1 q2 q3)
             :where (typep instr 'state-prep-application)))
   "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
-  (let ((target-wf (vector-scale
-                     (/ (norm (coerce (state-prep-application-target-wf instr) 'list)))
-                     (coerce (state-prep-application-target-wf instr) 'list))))
-    (flet ((invert (instr)
-             (typecase instr ))))
-    (state-prep-4q target-wf q0 q1 q2 q3)))
+  (let ((source-wf (vector-scale
+                    (/ (norm (coerce (state-prep-application-source-wf instr) 'list)))
+                    (coerce (state-prep-application-source-wf instr) 'list)))
+        (target-wf (vector-scale
+                    (/ (norm (coerce (state-prep-application-target-wf instr) 'list)))
+                    (coerce (state-prep-application-target-wf instr) 'list))))
+    (append
+     ;; prepare source -> zero state
+     (state-prep-4q source-wf q0 q1 q2 q3
+                    :reversed t)
+     ;; prepare zero state -> target
+     (state-prep-4q target-wf q0 q1 q2 q3))))
 
 (defun coerce-to-complex-double-vector (elts)
   (map '(vector (complex double-float))
