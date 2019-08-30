@@ -11,7 +11,7 @@ Quilc comprises two projects. The first, `cl-quil`, does the heavy
 lifting of parsing, compiling, and optimizing Quil code. The second,
 `quilc`, presents an external interface for using `cl-quil`, either using
 the binary `quilc` application directly, or alternatively by
-communicating with a server (HTTP or [RPCQ](https://github.com/rigetti/rpcq/)).
+communicating with an [RPCQ](https://github.com/rigetti/rpcq/) server.
 
 Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at
 [Rigetti Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
@@ -97,40 +97,11 @@ $ cat large_file.quil | quilc
 
 For various reasons (e.g. not having to repeatedly load the `quilc`
 binary into memory, communicating over a network) `quilc` provides a
-server interface. `quilc` currently supports two server modes:
-
-##### HTTP
-
-The HTTP server was the original implementation of the server mode. It is now deprecated in favour
-of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
-```
-$ quilc -S
-+-----------------+
-|  W E L C O M E  |
-|   T O   T H E   |
-|  R I G E T T I  |
-|     Q U I L     |
-| C O M P I L E R |
-+-----------------+
-Copyright (c) 2016-2019 Rigetti Computing.
-
-
-
->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
-future, it will be removed.  You're advised to modify your client code to talk
-to the RPCQ version instead.
->>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-[2019-01-29 13:59:18] Starting server: 0.0.0.0 : 6000.
-```
-
-##### RPCQ
-
-[RPCQ](https://github.com/rigetti/rpcq/) is an open-source RPC framework developed at Rigetti for
-efficient network communication through the QCS stack. The server is started in RPCQ-mode using
-the `-R` flag
+an [RPCQ](https://github.com/rigetti/rpcq/) server
+interface. [RPCQ](https://github.com/rigetti/rpcq/) is an open-source
+RPC framework developed at Rigetti for efficient network communication
+through the QCS stack. The server is started in RPCQ-mode using the
+`-R` flag
 
 ```
 $ quilc -R
