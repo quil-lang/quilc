@@ -81,15 +81,10 @@ or (2) communicating with the `quilc` server.
 
 #### quilc
 
-> *Note*: If you're on Windows and using the Command Prompt, the echo
-> command is slightly different to the examples shown below: do not
-> wrap your quil code in quotes. For example, in Command Prompt, you
-> would do `echo H 0 | quilc` *not* `echo "H 0" | quilc`.
-
 The `quilc` binary reads Quil code provided on `stdin`:
 
 ``` shell
-$ echo "H 0" | quilc
+$ echo H 0 | quilc
 $ cat large_file.quil | quilc
 ```
 
@@ -201,7 +196,7 @@ docker run --rm -it rigetti/quilc
 2. You can alternatively pipe Quil instructions into the `quilc` container if you drop the `-t`.
 
 ```shell
-echo "H 0" | docker run --rm -i rigetti/quilc
+echo H 0 | docker run --rm -i rigetti/quilc
 ```
 
 To run `quilc` in server mode, do the following:
