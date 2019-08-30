@@ -299,8 +299,46 @@
      (state-prep-1Q-compiler instr))
     (2
      (state-prep-2Q-compiler instr))
+    (4
+     (state-prep-4Q-compiler instr))
     (otherwise
      (state-prep-trampolining-compiler instr))))
+
+(defun state-prep-4q (target-wf q0 q1 q2 q3 &key reversed)
+  ;; TODO docstring
+  (assert (= 4 (qubit-count target-wf)))
+  (multiple-value-bind (c U V)
+      (schmidt-decomposition target-wf 2 2)
+    (list
+     ;; prepare on qubits 2,3
+     (make-instance 'state-prep-application
+                    :source-wf (build-ground-state 2) ; TODO allow for general source
+                    :target-wf c
+                    :arguments (list (qubit q2) (qubit q3)))  ; TODO qubit or integers?
+
+     ;; entangle
+     (build-gate "CNOT" nil q2 q0)
+     (build-gate "CNOT" nil q3 q1)
+
+     ;; apply gates, transposing qubits to account for LSB <-> MSB mismatch
+     (anon-gate "STATE-2Q" U q3 q2)
+     (anon-gate "STATE-2Q" V q1 q0))))
+
+(define-compiler state-prep-4Q-compiler
+    ((instr (_ _ q0 q1 q2 q3)
+            :where (typep instr 'state-prep-application)))
+  "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
+  (let ((target-wf (vector-scale
+                     (/ (norm (coerce (state-prep-application-target-wf instr) 'list)))
+                     (coerce (state-prep-application-target-wf instr) 'list))))
+    (flet ((invert (instr)
+             (typecase instr ))))
+    (state-prep-4q target-wf q0 q1 q2 q3)))
+
+(defun coerce-to-complex-double-vector (elts)
+  (map '(vector (complex double-float))
+       (lambda (val) (coerce val '(complex double-float)))
+       elts))
 
 (defun schmidt-decomposition (phi num-a num-b)
   "Given a wavefunction PHI containing subystems of size NUM-A and NUM-B qubits, compute the Schmidt decomposition of PHI.
@@ -311,11 +349,16 @@ NUM-A and NUM-B respectively) such that
 
 where U_i, V_i denotes the ith column of the matrix U, V respectively."
   (assert (= (qubit-count phi) (+ num-a num-b)))
-  (let ((reshaped (magicl:make-matrix :rows (expt 2 num-a)
-                                      :cols (expt 2 num-b)
-                                      :data phi)))
+  (when (listp phi)
+    (setf phi (coerce-to-complex-double-vector phi)))
+  (let* ((size-a (expt 2 num-a))
+         (size-b (expt 2 num-b))
+         ;; tranpose here to make this row-major
+         (reshaped (magicl:transpose (magicl:make-matrix :rows size-a
+                                                         :cols size-b
+                                                         :data phi))))
     (multiple-value-bind (u d vt)
         (magicl:svd reshaped)
-      (values u
-              (magicl:matrix-diagonal d)
+      (values (coerce-to-complex-double-vector (magicl:matrix-diagonal d))
+              u
               (magicl:transpose vt)))))
