@@ -110,19 +110,19 @@
               (subseq parameters
                       (/ (length parameters) 2)))
             (averages
-              (mapcar (lambda (x y) (constant
-                                     (/ (+ (constant-value x)
-                                           (constant-value y))
-                                        2)))
-                      high-order-params
-                      low-order-params))
+	      (mapcar (lambda (x y) (constant
+				     (/ (+ (constant-value x)
+					   (constant-value y))
+					2)))
+		      high-order-params
+		      low-order-params))
             (differences
-              (mapcar (lambda (x y) (constant
-                                     (/ (- (constant-value x)
-                                           (constant-value y))
-                                        2)))
-                      high-order-params
-                      low-order-params)))
+	      (mapcar (lambda (x y) (constant
+				     (/ (- (constant-value x)
+					   (constant-value y))
+					2)))
+		      high-order-params
+		      low-order-params)))
        (cond
          ((every (lambda (param) (double= 0d0 (constant-value param)))
                  parameters)
@@ -130,13 +130,12 @@
          ((every (lambda (param) (double= (constant-value (first parameters))
                                           (constant-value param)))
                  parameters)
-          (list (build-gate roll-type (list (constant-value (first parameters))) target)))
+          (inst roll-type (list (constant-value (first parameters))) target))
          ((= 1 (length differences))
-          (list
-             (apply #'build-gate op (alexandria:ensure-list averages) (alexandria:ensure-list rest))
-             (build-gate "CNOT" () control      target)
-             (apply #'build-gate op (alexandria:ensure-list differences) (alexandria:ensure-list rest))
-             (build-gate "CNOT" () control      target)))
+	  (inst* op     averages    rest)
+	  (inst  "CNOT" ()          control target)
+	  (inst* op     differences rest)
+	  (inst  "CNOT" ()          control target))
          (t
           ;; see the comments above this function for an explanation of what's
           ;; going on here and why.
@@ -157,13 +156,12 @@
             ;; by feeding it differences-prime, the second UCR will give the alternative
             ;; decomposition indicated in the comments, and the extra BUILD-GATEs will
             ;; move the controlled gate into place.
-            (list
-             (apply #'build-gate op (alexandria:ensure-list averages) (alexandria:ensure-list rest))
-             (build-gate "CNOT" () (first rest) target)
-             (build-gate "CNOT" () control      target)
-             (apply #'build-gate op (alexandria:ensure-list differences-prime) (alexandria:ensure-list rest))
-             (build-gate "CNOT" () (first rest) target)
-             (build-gate "CNOT" () control      target)))))))
+	    (inst* op     averages          rest)
+	    (inst  "CNOT" ()                (first rest) target)
+	    (inst  "CNOT" ()                control      target)
+	    (inst* op     differences-prime rest)
+	    (inst  "CNOT" ()                (first rest) target)
+	    (inst  "CNOT" ()                control      target))))))
     (_
      (give-up-compilation))))
 
@@ -200,12 +198,9 @@
                                            (constant-value y))
                                         2)))
                       high-order-params
-                      low-order-params)))
-       (labels ((ucr (params args)
-                  (apply #'build-gate op (alexandria:ensure-list params) (alexandria:ensure-list args)))
-                (build-gates (gate-data)
-                  (mapcar (lambda (arg-list) (apply #'build-gate arg-list)) gate-data))
-                (but-last (ell)
+                      low-order-params))
+	    (UCR-op (repeatedly-fork op (1- (length rest)))))
+       (labels ((but-last (ell)
                   (reverse (rest (reverse ell)))))
          (cond
            ;; if all the UCR parameters are zero, return a NOP (or the CNOT we were meant to cancel with)
@@ -216,52 +211,50 @@
            ((every (lambda (param) (double= (constant-value (first parameters))
                                             (constant-value param)))
                    parameters)
-            (list (build-gate roll-type (list (constant-value (first parameters))) target)))
+            (inst roll-type (list (constant-value (first parameters))) target))
            ;; we're ready to output the list of compiled instructions. we do case
            ;; analysis to decide whether we need to emit smaller UCRs or just rolls.
            ((and (= 1 (length averages))
                  (string= "RY" roll-type))
-            (build-gates `(("RY"    ,averages    ,target)
-                           ("Z"     ()           ,control)
-                           ("Z"     ()           ,target)
-                           ("RZ"    (,pi/2)      ,target)
-                           ("ISWAP" ()           ,target ,control)
-                           ("RY"    ,differences ,control)
-                           ("ISWAP" ()           ,target ,control)
-                           ("RZ"    (,-pi/2)     ,target))))
+	    (inst "RY"    averages    target)
+            (inst "Z"     ()          control)
+            (inst "Z"     ()          target)
+            (inst "RZ"    `(,pi/2)    target)
+            (inst "ISWAP" ()          target control)
+            (inst "RY"    differences control)
+            (inst "ISWAP" ()          target control)
+            (inst "RZ"    `(,-pi/2)   target))
            ((and (= 1 (length averages))
                  (string= "RZ" roll-type))
-            (build-gates `(("RZ"    ,averages    ,target)
-                           ("X"     ()           ,target)
-                           ("Z"     ()           ,control)
-                           ("RY"    (,-pi/2)     ,target)
-                           ("ISWAP" ()           ,target ,control)
-                           ("RY"    ,differences ,control)
-                           ("ISWAP" ()           ,target ,control)
-                           ("RY"    (,pi/2)      ,target))))
+	    (inst "RZ"    averages    target)
+            (inst "X"     ()          target)
+            (inst "Z"     ()          control)
+            (inst "RY"    `(,-pi/2)   target)
+            (inst "ISWAP" ()          target control)
+            (inst "RY"    differences control)
+            (inst "ISWAP" ()          target control)
+            (inst "RY"    `(,pi/2)    target))
            ;; also shorter UCRs, this time with ISWAPs.
            ((string= "RY" roll-type)
-            (list
-             (ucr averages rest)        ; skip first control
-             (build-gate "Z" nil control)
-             (build-gate "Z" nil target)
-             (build-gate "RZ" (list pi/2) target)
-             (build-gate "ISWAP" () control target)
-             (ucr differences (append (but-last rest) (list control)))
-             (build-gate "ISWAP" () control target)
-             (build-gate "RZ" (list -pi/2) target)))
+	    (inst* ucr-op  averages    rest)	; skip first control
+	    (inst  "Z"     nil         control)
+	    (inst  "Z"     nil         target)
+	    (inst  "RZ"   `(,pi/2)     target)
+	    (inst  "ISWAP" () control  target)
+	    (inst* ucr-op  differences (append (but-last rest) (list control)))
+	    (inst  "ISWAP" () control  target)
+	    (inst  "RZ"   `(,-pi/2)    target))
            ((string= "RZ" roll-type)
-            (list
-             (ucr averages rest)
-             (build-gate "X" nil target)
-             (build-gate "Z" nil control)
-             (build-gate "RY" (list -pi/2) target)
-             (build-gate "ISWAP" () control target)
-             (build-gate "RX" (list pi/2) control)
-             (ucr differences (append (but-last rest) (list control)))
-             (build-gate "RX" (list -pi/2) control)
-             (build-gate "ISWAP" () control target)
-             (build-gate "RY" (list pi/2) target)))
+	    (inst* ucr-op  averages    rest)
+	    (inst  "X"     nil         target)
+	    (inst  "Z"     nil         control)
+	    (inst  "RY"   `(,-pi/2)    target)
+	    (inst  "ISWAP" () control  target)
+	    (inst  "RX"   `(,pi/2)     control)
+	    (inst* ucr-op  differences (append (but-last rest) (list control)))
+	    (inst  "RX"   `(,-pi/2)    control)
+	    (inst  "ISWAP" ()          control target)
+	    (inst  "RY"   `(,pi/2)     target))
            (t
             (error "It shouldn't be possible to get here, because of the guard in uniformly-controlled-roll-p."))))))
     (_
