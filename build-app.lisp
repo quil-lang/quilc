@@ -42,9 +42,10 @@
     #-win32
     (asdf:load-system "cl-quil/tweedledum")
     ;; TODO Something is broken here. If zap-info is left to do it's thing on
-    ;; Windows, there is a weird error. This is a short-term fix.
+    ;; Windows or SBCL 1.5.6+, there is a weird error. This is a short-term fix.
     #-win32
-    (funcall (read-from-string "quilc::zap-info"))
+    (when (uiop:version< (lisp-implementation-version) "1.5.6")
+      (funcall (read-from-string "quilc::zap-info")))
     (funcall (read-from-string "quilc::setup-debugger"))
     (when (option-present-p "--quilc-sdk")
       (load "app/src/mangle-shared-objects.lisp"))
