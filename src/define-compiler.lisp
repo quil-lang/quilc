@@ -884,7 +884,6 @@ FINISH-COMPILER is a local macro usable within a compiler body."
         (compiler-context (gensym "COMPILER-CONTEXT"))
         (x  (gensym "X"))
         (xs (gensym "XS"))
-	(retval (gensym "RETVAL"))
 	(retval-p (gensym "RETVAL-P")))
     `(block ,compiler-context
        (let* ((,list (cons nil nil))
@@ -915,9 +914,9 @@ FINISH-COMPILER is a local macro usable within a compiler body."
 		  (inst* (&rest ,xs)
 		    (apply #'inst (apply #'list* ,xs))))
            (declare (dynamic-extent #'inst))
-           (macrolet ((finish-compiler (&optional (,retval nil ,retval-p))
+           (macrolet ((finish-compiler (&optional (retval nil ,retval-p))
 			(if ,retval-p
-			    '(return-from ,compiler-context ,retval)
+			    `(return-from ,',compiler-context ,retval)
 			    '(return-from ,compiler-context (cdr (the cons ,list))))))
              ,@body
              ;; Implicitly return the collected instructions.
