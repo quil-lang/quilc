@@ -768,65 +768,49 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
   (unless (typep body 'cons)
     (return-from estimate-output-gates-from-raw-code (make-occurrence-table)))
   (case (first body)
-    (build-gate
-     (destructuring-bind (head name param-list &rest qubit-list) body
-       (declare (ignore head))
-       (let ((table (make-hash-table :test #'equalp))
-             (operator (if (stringp name)
-                           (named-operator name)
-                           name))
-             (param-list (cond
-                           ((endp param-list)
-                            nil)
-                           ((and (typep param-list 'list)
-                                 (= 2 (length param-list))
-                                 (typep (second param-list) 'list))
-                            (loop :for item :in (second param-list)
-                                  :if (typep item 'number)
-                                    :collect item
-                                  :else
-                                    :collect '_))
-                           (t
-                            '_)))
-             (qubit-list (mapcar (lambda (x)
-                                   (typecase x
-                                     (number x)
-                                     (otherwise '_)))
-                                 qubit-list)))
-         (setf (gethash (make-gate-binding :operator operator
-                                           :parameters param-list
-                                           :arguments qubit-list)
-                        table)
-               1)
-         table)))
-    (anon-gate
-     (destructuring-bind (head name matrix &rest qubit-list) body
-       (declare (ignore head name matrix))
-       (let ((table (make-hash-table :test #'equalp))
-             (qubit-list (mapcar (lambda (x)
-                                   (typecase x
-                                     (number x)
-                                     (otherwise '_)))
-                                 qubit-list)))
-         (setf (gethash (make-gate-binding :operator '_
-                                           :parameters '_ 
-                                           :arguments qubit-list)
-                        table)
-               1)
-         table)))
-    (apply
-     (destructuring-bind (head fn &rest args) body
-       (declare (ignore head))
-       (case fn
-         ((build-gate #'build-gate)
-          (destructuring-bind (name param-list qubit-list) args
-            (declare (ignore qubit-list))
-            (estimate-output-gates-from-raw-code
-             `(build-gate ,name ,param-list
-                          ,@(loop :for j :below (gate-definition-qubits-needed (lookup-standard-gate name))
-                                  :collect '_)))))
-         (otherwise
-          (make-occurrence-table)))))
+    (inst
+     (case (length body)
+       ;; are we a raw gate?
+       (2
+	(a:plist-hash-table (list (make-gate-binding :operator '_
+						     :parameters '_
+						     :arguments nil)
+				  1)
+			    :test #'equalp))
+       ;; we must be a gate description.
+       (otherwise
+	(destructuring-bind (head name param-list &rest qubit-list) body
+	  (declare (ignore head))
+	  (let ((table (make-hash-table :test #'equalp))
+		(operator (typecase name
+			    (string (named-operator name))
+			    (symbol name)
+			    (otherwise '_)))
+		(param-list (cond
+			      ((and (typep param-list 'list)
+				    (endp param-list))
+			       nil)
+			      ((and (typep param-list 'list)
+				    (= 2 (length param-list))
+				    (typep (second param-list) 'list))
+			       (loop :for item :in (second param-list)
+				     :if (typep item 'number)
+				       :collect item
+				     :else
+				       :collect '_))
+			      (t
+			       '_)))
+		(qubit-list (mapcar (lambda (x)
+				      (typecase x
+					(number x)
+					(otherwise '_)))
+				    qubit-list)))
+	    (setf (gethash (make-gate-binding :operator operator
+					      :parameters param-list
+					      :arguments qubit-list)
+			   table)
+		  1)
+	    table)))))
     (otherwise
      (let ((table (make-occurrence-table)))
        (dolist (subbody body table)
@@ -856,6 +840,88 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                                          op)))
                           :parameters (second (second source))
                           :arguments (rest (rest (second source))))))))
+
+;;; here are the forms directly related to DEFINE-COMPILER, whether its
+;;; destructuring or utilities available with its body.
+
+;; within the body of a DEFINE-COMPILER, we publish instructions to output
+;; using a DEFINE-VOP-like INST macro, and we quit a compiler early using
+;; FINISH-COMPILER.
+
+;; first, prohibit the use of these items outside of a compiler body
+(defun inst (&rest xs)
+  "Emit the instructions XS in the current compiler context.
+
+INST is a local function usable within the dynamic extent of a compiler body."
+  (declare (ignore xs))
+  (error "INST can only be used in the body of a compiler."))
+
+(define-compiler-macro inst (&rest xs)
+  (declare (ignore xs))
+  (error "INST can only be used in the body of a compiler."))
+
+(defun inst* (&rest xs)
+  "Emit the instructions XS in the current compiler context. Treat the last argument of XS as a list of arguments, as if using APPLY #'BUILD-GATE.
+
+INST* is a local function usable within the dynamic extent of a compiler body."
+  (declare (ignore xs))
+  (error "INST* can only be used in the body of a compiler."))
+
+(define-compiler-macro inst* (&rest xs)
+  (declare (ignore xs))
+  (error "INST* can only be used in the body of a compiler."))
+
+(defmacro finish-compiler ()
+  "Finish compiling, retuning all instructed emitted with INST.
+
+FINISH-COMPILER is a local macro usable within a compiler body."
+  (error "FINISH-COMPILER can only be used in the body of a compiler."))
+
+(defmacro with-inst (&body body)
+  "Define INST, INST*, and FINISH-COMPILER handlers extending over BODY."
+  (let ((list (gensym "LIST"))
+        (tail (gensym "TAIL"))
+        (compiler-context (gensym "COMPILER-CONTEXT"))
+        (x  (gensym "X"))
+        (xs (gensym "XS"))
+	(retval (gensym "RETVAL"))
+	(retval-p (gensym "RETVAL-P")))
+    `(block ,compiler-context
+       (let* ((,list (cons nil nil))
+              (,tail ,list))
+         (declare (dynamic-extent ,list)
+                  (type cons ,list ,tail))
+         (labels ((inst (&rest ,xs)
+                    (declare (optimize speed (safety 0) (debug 0) (space 0)))
+		    (let (,x)
+		      (cond
+			;; check for a raw gate object
+			((and (= 1 (length ,xs))
+			      (typep (first ,xs) 'gate-application))
+			 (setf ,x (first ,xs)))
+			;; check for a build-gate signature
+			((and (<= 3 (length ,xs))
+			      (typep (cadr ,xs) 'list))
+			 (setf ,x (apply #'build-gate ,xs)))
+			;; check for an anon-gate signature
+			((and (<= 3 (length ,xs))
+			      (typep (cadr ,xs) 'magicl:matrix))
+			 (setf ,x (apply #'anon-gate ,xs)))
+			(t
+			 (error "INST argument pattern not recognized: ~a" ,xs)))
+		      (rplacd ,tail (cons ,x nil))
+		      (setf ,tail (cdr ,tail))
+		      (values)))
+		  (inst* (&rest ,xs)
+		    (apply #'inst (apply #'list* ,xs))))
+           (declare (dynamic-extent #'inst))
+           (macrolet ((finish-compiler (&optional (,retval nil ,retval-p))
+			(if ,retval-p
+			    '(return-from ,compiler-context ,retval)
+			    '(return-from ,compiler-context (cdr (the cons ,list))))))
+             ,@body
+             ;; Implicitly return the collected instructions.
+             (finish-compiler)))))))
 
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users
@@ -895,7 +961,7 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
   (labels ((expand-bindings (bindings env)
              (cond
                ((endp bindings)
-                `(values (progn ,@body)
+                `(values (with-inst ,@body)
                          t))
                ((typep (first bindings) 'symbol)
                 (expand-bindings (rest bindings)
