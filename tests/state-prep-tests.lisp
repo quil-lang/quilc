@@ -76,21 +76,23 @@ CNOT 2 3
                             (quil::build-8Q-chip)))))
       (check-state-prep source-wf target-wf output-matrix))))
 
-(deftest test-state-prep-4q ()
+(deftest test-state-prep-4q-compiler ()
+  "Check that STATE-PREP-4Q-COMPILER (with arbitrary SOURCE-WF and TARGET-WF) correctly compiles into native instructions."
   (let* ((qubits (mapcar #'quil::qubit (list 0 1 2 3)))
          (source-wf (quil::random-wavefunction 4))
          (target-wf (quil::random-wavefunction 4))
          (instr (make-instance 'quil::state-prep-application
                                :arguments qubits
                                :target-wf target-wf
-                               :source-wf source-wf)))
-    (let* ((output-matrix (quil::make-matrix-from-quil
-                           (quil::expand-to-native-instructions
-                            (quil::state-prep-4q-compiler instr)
-                            (quil::build-8Q-chip)))))
-      (check-state-prep source-wf target-wf output-matrix))))
+                               :source-wf source-wf))
+         (output-matrix (quil::make-matrix-from-quil
+                         (quil::expand-to-native-instructions
+                          (quil::state-prep-4q-compiler instr)
+                          (quil::build-8Q-chip)))))
+    (check-state-prep source-wf target-wf output-matrix)))
 
 (deftest test-schmidt-decomposition ()
+  "Check that a random wavefunction can be reconstructed from its SCHMIDT-DECOMPOSITION."
   (let* ((random-wf (quil::random-wavefunction 4)))
     (multiple-value-bind (c U V) (quil::schmidt-decomposition random-wf 2 2)
       (let* ((schmidt-terms (loop :for i :from 0 :below 4

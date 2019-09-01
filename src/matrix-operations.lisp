@@ -186,14 +186,14 @@ as needed so that they are the same size."
   "Get a random complex unit vector with (EXPT 2 N-QUBITS) entries."
   (let* ((size (expt 2 n-qubits)))
     (loop :repeat size
-          :for c := (complex (alexandria:gaussian-random)
-                                 (alexandria:gaussian-random))
+          :for c := (complex (a:gaussian-random)
+                             (a:gaussian-random))
           :collect c :into entries
           :sum (expt (abs c) 2) :into norm-squared
           :finally
              (return (make-array size
                                  :initial-contents
-                                 (let ((scaling-factor (/ 1 (sqrt norm-squared))))
+                                 (let ((scaling-factor (/ (sqrt norm-squared))))
                                    (mapcar (lambda (c) (* scaling-factor c)) entries))
                                  :element-type '(complex double-float))))))
 
@@ -269,7 +269,7 @@ as needed so that they are the same size."
         (loop :for u :in ret :do
           (setf v (vector-difference v (vector-scale (dot-product v u) u))))
         (when (not (double= 0 (norm v)))
-          (setf ret (cons (vector-scale (/ 1 (norm v)) v) ret)))))
+          (setf ret (cons (vector-scale (/ (norm v)) v) ret)))))
     ret))
 
 (defun collinearp (vect1 vect2)

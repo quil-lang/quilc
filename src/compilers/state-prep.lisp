@@ -238,13 +238,13 @@
        elts))
 
 (defun schmidt-decomposition (phi num-a num-b)
-  "Given a wavefunction PHI containing subystems of size NUM-A and NUM-B qubits, compute the Schmidt decomposition of PHI.
-Returns c, U, V, where c is vector and U,V are unitary matrices (of dimensions
-NUM-A and NUM-B respectively) such that
-
-   PHI = \sum_{i} d_i U_i V _i
-
-where U_i, V_i denotes the ith column of the matrix U, V respectively."
+  "Given a wavefunction PHI containing subystems of size NUM-A and NUM-B qubits, compute the Schmidt decomposition of PHI."
+  ;; Returns c, U, V, where c is vector and U, V are unitary matrices (of dimensions
+  ;; NUM-A and NUM-B respectively) such that
+  ;;
+  ;;    PHI = \sum_{i} c_i U_i V _i
+  ;;
+  ;; where U_i, V_i denotes the ith column of the matrix U, V respectively.
   (assert (= (qubit-count phi) (+ num-a num-b)))
   (when (listp phi)
     (setf phi (coerce-to-complex-double-vector phi)))
@@ -261,10 +261,8 @@ where U_i, V_i denotes the ith column of the matrix U, V respectively."
               (magicl:transpose vt)))))
 
 (defun state-prep-4q (wf q0 q1 q2 q3 &key reversed)
-  "Produce instructions to prepare the wavefunction WF with respect to qubits Q0
-Q1 Q2 Q3, starting from the zero state. If REVERSED is T, the instructions
-instead prepare the zero state from WF."
-   ;;; The following is from arXiv:1003.5760
+  "Produce instructions to prepare the wavefunction WF with respect to qubits Q0 Q1 Q2 Q3, starting from the zero state. If REVERSED is T, the instructions instead prepare the zero state from WF."
+  ;; The following is from arXiv:1003.5760
   (assert (= 4 (qubit-count wf)))
   ;; each function in the following FLET is responsible for handling the REVERSED
   ;; flag on its own
@@ -276,7 +274,7 @@ instead prepare the zero state from WF."
                           :target-wf target
                           :arguments (mapcar #'qubit qubit-indices)))
          (cnot (a b)
-           (build-gate "CNOT" nil a b))
+           (build-gate "CNOT" () a b))
          (2q-evolution (U a b)
            (anon-gate "STATE-2Q"
                       (if reversed (magicl:dagger U) U)
