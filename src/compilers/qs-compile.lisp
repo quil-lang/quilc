@@ -96,17 +96,14 @@
                 ;; m = (u0 (+) u1) Z(Lphi) Y(thetas) Z(Rphi) (v0 (+) v1)
                 ;;   = uL Z(evals-u) uR Z(Lphi) Y(thetas) Z(Rphi) vL Z(evals-v) vR
                 ;; which we use to build the output circuit.
-                ;;
-                ;; NOTE: the order here is reversed from the matrix decomp.
-                ;; since the composition order of instructions is backwards
 		(inst* "QSC-VR" vR                 rest)
 		(inst* UCR-Z    (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
 		                (append rest (list control)))
 		(inst* "QSC-VL" vL                 rest)
-		(inst* "RZ"     (list (* -2 Rphi)) control)
+		(inst  "RZ"     (list (* -2 Rphi)) control)
 		(inst* UCR-Y    (mapcar (lambda (x) (constant (* 2 x))) thetas)
 		                (append rest (list control)))
-		(inst* "RZ"     (list (* -2 Lphi)) control)
+		(inst  "RZ"     (list (* -2 Lphi)) control)
 		(inst* "QSC-UR" uR                 rest)
 		(inst* UCR-Z    (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
 		                (append rest (list control)))
