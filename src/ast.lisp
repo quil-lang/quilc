@@ -1073,6 +1073,9 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
 (defun application-operator-name (app)
   (operator-description-name (application-operator app)))
 
+(defun application-operator-root-name (app)
+  (operator-description-root-name (application-operator app)))
+
 (defclass unresolved-application (application)
   ()
   (:documentation "Represents an application that hasn't yet been resolved. Possibilities:

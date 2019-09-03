@@ -543,11 +543,11 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
         (let ((lschedule (quil::make-lscheduler)))
           (loop :for instr :across (parsed-program-executable-code processed-program)
                 :when (and (typep instr 'gate-application)
-                           (not (member (application-operator instr)
+                           (not (member (cl-quil::application-operator-root-name instr)
                                         gate-blacklist
                                         :test #'string=))
                            (or (null gate-whitelist)
-                               (member (application-operator instr)
+                               (member (cl-quil::application-operator-root-name instr)
                                        gate-whitelist
                                        :test #'string=)))
                   :do (quil::append-instruction-to-lschedule lschedule instr))
