@@ -198,8 +198,7 @@
                                            (constant-value y))
                                         2)))
                       high-order-params
-                      low-order-params))
-            (UCR-op (repeatedly-fork op (1- (length rest)))))
+                      low-order-params)))
        (labels ((but-last (ell)
                   (reverse (rest (reverse ell)))))
          (cond
@@ -236,22 +235,22 @@
             (inst "RY"    `(,pi/2)    target))
            ;; also shorter UCRs, this time with ISWAPs.
            ((string= "RY" roll-type)
-            (inst* ucr-op  averages    rest)    ; skip first control
+            (inst* op      averages    rest)    ; skip first control
             (inst  "Z"     nil         control)
             (inst  "Z"     nil         target)
             (inst  "RZ"   `(,pi/2)     target)
             (inst  "ISWAP" () control  target)
-            (inst* ucr-op  differences (append (but-last rest) (list control)))
+            (inst* op      differences (append (but-last rest) (list control)))
             (inst  "ISWAP" () control  target)
             (inst  "RZ"   `(,-pi/2)    target))
            ((string= "RZ" roll-type)
-            (inst* ucr-op  averages    rest)
+            (inst* op      averages    rest)
             (inst  "X"     nil         target)
             (inst  "Z"     nil         control)
             (inst  "RY"   `(,-pi/2)    target)
             (inst  "ISWAP" () control  target)
             (inst  "RX"   `(,pi/2)     control)
-            (inst* ucr-op  differences (append (but-last rest) (list control)))
+            (inst* op      differences (append (but-last rest) (list control)))
             (inst  "RX"   `(,-pi/2)    control)
 	    (inst  "ISWAP" ()          control target)
 	    (inst  "RY"   `(,pi/2)     target))
