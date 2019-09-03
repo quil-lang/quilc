@@ -94,7 +94,11 @@ OPTIONS: plist of options governing applicability of the compiler binding."
      (when (measure-binding-target obj)
        (format stream " ~a" (measure-binding-target obj))))
     (gate-binding
-     (print-operator-description (gate-binding-operator obj) stream)
+     (typecase (gate-binding-operator obj)
+       (operator-description
+        (print-operator-description (gate-binding-operator obj) stream))
+       (otherwise
+        (print (gate-binding-operator obj) stream)))
      (a:when-let ((params (gate-binding-parameters obj)))
        (typecase params
          (symbol
@@ -781,11 +785,13 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                          (otherwise (return-from estimate-output-gates-from-raw-code
                                       (make-occurrence-table)))))
              (param-list (cond
-                           ;; nonstandard helper
-                           ((and (equalp param-list '(quote ())))
-                            nil)
                            ((typep param-list 'list)
-                            (loop :for item :in (rest param-list)
+                            (loop :for item :in (case (first param-list)
+                                                  ((quote #+sbcl sb-int:quasiquote)
+                                                   (second param-list))
+                                                  ((list)
+                                                   (rest param-list))
+                                                  (otherwise param-list))
                                   :if (typep item 'number)
                                     :collect item
                                   :else
@@ -1137,12 +1143,9 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                   :options ',options
                                   :body '(locally ,@decls ,@body)
                                   :output-gates ,(if (getf options ':output-gateset)
-                                                     `(a:alist-hash-table
-                                                       (mapcar (lambda (x)
-                                                                 (cons (make-binding-from-source
-                                                                        (list '_ (car x)))
-                                                                       (cdr x)))
-                                                               ',(getf options ':output-gateset))
+                                                     `(a:plist-hash-table
+                                                       (loop :for (args count) :on ,(getf options ':output-gateset) :by #'cddr
+                                                             :nconc (list (apply #'make-gate-binding args) count))
                                                        :test #'equalp)
                                                      `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
                                   :function (a:named-lambda ,name (,@variable-names &key context)
