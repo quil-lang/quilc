@@ -214,17 +214,21 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
 
 (define-compiler SWAP-to-native-SWAPs ((swap-gate ("SWAP" () q0 q1))
                                        :gateset-reducer nil
-                                       :chip-specification chip-spec)
+                                       :chip-specification chip-spec
+                                       :output-gateset `((:operator ,(named-operator "SWAP")
+                                                          :arguments (_ _)) 1))
   (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
     (unless computed-path
       (give-up-compilation))
     (let* ((f-list (mapcar (lambda (q1 q2) (build-gate "SWAP" '() q1 q2))
                            computed-path (rest computed-path))))
-      (append f-list (rest (reverse f-list))))))
+      (finish-compiler (append f-list (rest (reverse f-list)))))))
 
 (define-compiler CNOT-to-native-CNOTs ((cnot-gate ("CNOT" () q1 q0))
                                        :gateset-reducer nil
-                                       :chip-specification chip-spec)
+                                       :chip-specification chip-spec
+                                       :output-gateset `((:operator ,(named-operator "CNOT")
+                                                          :arguments (_ _)) 1))
   ;; find a shortest path between the two qubits in the swap gate
   (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
     (when (= 2 (length computed-path))
@@ -248,15 +252,18 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                  (list
                   (apply #'build-gate "CNOT" '() first-two-qubits))
                  inner-string-copy))))))
-      (build-CNOT-string computed-path))))
+      (finish-compiler (build-CNOT-string computed-path)))))
 
 (define-compiler CZ-to-native-CZs ((cz-gate ("CZ" () q0 q1))
                                    :full-context context
-                                   :gateset-reducer nil)
-  (nconc
-   (list (build-gate "RY" '(#.(/ pi 2)) q1))
-   (CNOT-to-native-CNOTs (build-gate "CNOT" () q0 q1) :context context)
-   (list (build-gate "RY" '(#.(/ pi -2)) q1))))
+                                   :gateset-reducer nil
+                                   :output-gateset `((:operator ,(named-operator "CZ")
+                                                      :arguments (_ _)) 1))
+  (finish-compiler
+   (nconc
+    (list (build-gate "RY" '(#.(/ pi 2)) q1))
+    (CNOT-to-native-CNOTs (build-gate "CNOT" () q0 q1) :context context)
+    (list (build-gate "RY" '(#.(/ pi -2)) q1)))))
 
 (define-compiler ISWAP-to-native-ISWAPs ((iswap-gate ("ISWAP" _ _ _))
                                          :gateset-reducer nil
@@ -270,23 +277,30 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                                :nconc (if (string= "CNOT" (application-operator-name instr))
                                           (CNOT-to-iSWAP instr)
                                           (list instr)))))
-    iswaps-on-chip))
+    (finish-compiler iswaps-on-chip)))
 
 (define-compiler CPHASE-to-native-CPHASEs ((cphase-gate ("CPHASE" _ _ _))
                                            :gateset-reducer nil
-                                           :full-context context)
-  (let* ((cnot-equivalent (CPHASE-to-CNOT cphase-gate)))
-    (mapcan (lambda (g)
-              (cond
-                ((string= "CNOT" (application-operator-name g))
-                 (CNOT-to-native-CNOTs g :context context))
-                (t
-                 (list g))))
-            cnot-equivalent)))
+                                           :full-context context
+                                           :output-gateset `((:operator
+                                                              ,(named-operator "CPHASE")
+                                                              :arguments (_ _)) 1))
+  (let ((cnot-equivalent (CPHASE-to-CNOT cphase-gate)))
+    (finish-compiler
+     (mapcan (lambda (g)
+               (cond
+                 ((string= "CNOT" (application-operator-name g))
+                  (CNOT-to-native-CNOTs g :context context))
+                 (t
+                  (list g))))
+             cnot-equivalent))))
 
 (define-compiler PISWAP-to-native-PISWAPs ((piswap-gate ("PISWAP" (theta) q0 q1))
                                            :gateset-reducer nil
-                                           :chip-specification chip-spec)
+                                           :chip-specification chip-spec
+                                           :output-gateset `((:operator
+                                                              ,(named-operator "PISWAP")
+                                                              :arguments (_ _)) 1))
   (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
     (labels
         ((build-PISWAP-string (index-list)
@@ -302,4 +316,5 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                 (let ((temp-string (build-PISWAP-string (rest index-list)))
                       (gate (list (build-gate "SWAP" () a b))))
                   (append gate temp-string gate)))))))
-      (build-PISWAP-string computed-path))))
+      (finish-compiler
+       (build-PISWAP-string computed-path)))))
