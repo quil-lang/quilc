@@ -1101,6 +1101,19 @@ FINISH-COMPILER is a local macro usable within a compiler body."
     (expand-bindings bindings nil)))
 
 (defun enact-compiler-options (options body)
+  "Produces code used to enact options passed to DEFINE-COMPILER.
+
+FULL-CONTEXT: Names a symbol to which the active COMPILATION-CONTEXT will be bound.
+
+CHIP-SPECIFICATION: Names a symbol to which the active CHIP-SPECIFICATION will be bound.
+
+GATESET-REDUCER: When NIL, this compiler is filtered from participation in compression. Defaults to T.
+
+CLASS: The compiler constructed by DEFINE-COMPILER will be of the specified subclass of COMPILER.
+
+PERMIT-BINDING-MISMATCHES-WHEN: A predicate that, when true, permits the compiler to skip equality matching during gate destructuring.  For instance, this can be used to allow approximate matches.
+
+OUTPUT-GATESET: A plist keyed on arguments to MAKE-GATE-BINDING with values in frequency count.  If specified supplants DEFINE-COMPILER's automatic estimation of the gate production of the compiler routine."
   (when (endp options)
     (return-from enact-compiler-options body))
   (destructuring-bind (key val &rest remaining-options) options
@@ -1122,7 +1135,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
        (error "Unknown compiler option: ~a." (first options))))))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
-  "Defines and registers a COMPILER object."
+  "Defines and registers a COMPILER object.  For detailed options information, see ENACT-COMPILER-OPTIONS."
   (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
     (multiple-value-bind (bindings options) (cleave-options bindings)
       (let* ((parsed-bindings (mapcar #'make-binding-from-source bindings))
