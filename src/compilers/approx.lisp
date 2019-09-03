@@ -618,10 +618,11 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
           (inst "Z"     ()              q1)
           (dolist (instr
                    (sandwich-with-local-gates
-                    (list (build-gate "ISWAP" '()       q1 q0)
-                          (build-gate "RY"    `(,alpha) q1)
-                          (build-gate "RY"    `(,beta)  q0)
-                          (build-gate "ISWAP" '()       q1 q0))
+                    (with-inst
+                      (inst "ISWAP" '()       q1 q0)
+                      (inst "RY"    `(,alpha) q1)
+                      (inst "RY"    `(,beta)  q0)
+                      (inst "ISWAP" '()       q1 q0))
                     a d b q1 q0))
             (inst instr)))))))
 
