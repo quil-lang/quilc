@@ -476,12 +476,13 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                    (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
                    (,q1 (qubit-index (first (application-arguments ,instr-name))))
                    (,q0 (qubit-index (second (application-arguments ,instr-name)))))
-	       (finish-compiler
-		(sandwich-with-local-gates ,circuit
-					   (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-					   (build-canonical-gate-in-magic-basis ,coord)
-					   (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-					   ,q1 ,q0)))))))))
+               (multiple-value-bind (complete-circuit fidelity)
+                   (sandwich-with-local-gates ,circuit
+                                              (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                              (build-canonical-gate-in-magic-basis ,coord)
+                                              (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                              ,q1 ,q0)
+                 (finish-compiler (values complete-circuit fidelity))))))))))
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
@@ -526,9 +527,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                       ;; otherwise, this solution will do.
                       (t
                        (dolist (instr (circuit-template ,template-values ,q1 ,q0))
-                         (inst instr))
-                       #+ignore
-                       (finish-compilation (values (circuit-template ,template-values ,q1 ,q0) (- 1 ,goodness))))))))
+                         (inst instr)))))))
              (run-optimizer)))))))
 
 
