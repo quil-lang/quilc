@@ -110,19 +110,19 @@
               (subseq parameters
                       (/ (length parameters) 2)))
             (averages
-	      (mapcar (lambda (x y) (constant
-				     (/ (+ (constant-value x)
-					   (constant-value y))
-					2)))
-		      high-order-params
-		      low-order-params))
+              (mapcar (lambda (x y) (constant
+                                     (/ (+ (constant-value x)
+                                           (constant-value y))
+                                        2)))
+                      high-order-params
+                      low-order-params))
             (differences
-	      (mapcar (lambda (x y) (constant
-				     (/ (- (constant-value x)
-					   (constant-value y))
-					2)))
-		      high-order-params
-		      low-order-params)))
+              (mapcar (lambda (x y) (constant
+                                     (/ (- (constant-value x)
+                                           (constant-value y))
+                                        2)))
+                      high-order-params
+                      low-order-params)))
        (cond
          ((every (lambda (param) (double= 0d0 (constant-value param)))
                  parameters)
@@ -132,10 +132,10 @@
                  parameters)
           (inst roll-type (list (constant-value (first parameters))) target))
          ((= 1 (length differences))
-	  (inst* op     averages    rest)
-	  (inst  "CNOT" ()          control target)
-	  (inst* op     differences rest)
-	  (inst  "CNOT" ()          control target))
+          (inst* op     averages    rest)
+          (inst  "CNOT" ()          control target)
+          (inst* op     differences rest)
+          (inst  "CNOT" ()          control target))
          (t
           ;; see the comments above this function for an explanation of what's
           ;; going on here and why.
@@ -156,12 +156,12 @@
             ;; by feeding it differences-prime, the second UCR will give the alternative
             ;; decomposition indicated in the comments, and the extra BUILD-GATEs will
             ;; move the controlled gate into place.
-	    (inst* op     averages          rest)
-	    (inst  "CNOT" ()                (first rest) target)
-	    (inst  "CNOT" ()                control      target)
-	    (inst* op     differences-prime rest)
-	    (inst  "CNOT" ()                (first rest) target)
-	    (inst  "CNOT" ()                control      target))))))
+            (inst* op     averages          rest)
+            (inst  "CNOT" ()                (first rest) target)
+            (inst  "CNOT" ()                control      target)
+            (inst* op     differences-prime rest)
+            (inst  "CNOT" ()                (first rest) target)
+            (inst  "CNOT" ()                control      target))))))
     (_
      (give-up-compilation))))
 
@@ -199,7 +199,7 @@
                                         2)))
                       high-order-params
                       low-order-params))
-	    (UCR-op (repeatedly-fork op (1- (length rest)))))
+            (UCR-op (repeatedly-fork op (1- (length rest)))))
        (labels ((but-last (ell)
                   (reverse (rest (reverse ell)))))
          (cond
@@ -216,7 +216,7 @@
            ;; analysis to decide whether we need to emit smaller UCRs or just rolls.
            ((and (= 1 (length averages))
                  (string= "RY" roll-type))
-	    (inst "RY"    averages    target)
+            (inst "RY"    averages    target)
             (inst "Z"     ()          control)
             (inst "Z"     ()          target)
             (inst "RZ"    `(,pi/2)    target)
@@ -226,7 +226,7 @@
             (inst "RZ"    `(,-pi/2)   target))
            ((and (= 1 (length averages))
                  (string= "RZ" roll-type))
-	    (inst "RZ"    averages    target)
+            (inst "RZ"    averages    target)
             (inst "X"     ()          target)
             (inst "Z"     ()          control)
             (inst "RY"    `(,-pi/2)   target)
@@ -236,23 +236,23 @@
             (inst "RY"    `(,pi/2)    target))
            ;; also shorter UCRs, this time with ISWAPs.
            ((string= "RY" roll-type)
-	    (inst* ucr-op  averages    rest)	; skip first control
-	    (inst  "Z"     nil         control)
-	    (inst  "Z"     nil         target)
-	    (inst  "RZ"   `(,pi/2)     target)
-	    (inst  "ISWAP" () control  target)
-	    (inst* ucr-op  differences (append (but-last rest) (list control)))
-	    (inst  "ISWAP" () control  target)
-	    (inst  "RZ"   `(,-pi/2)    target))
+            (inst* ucr-op  averages    rest)    ; skip first control
+            (inst  "Z"     nil         control)
+            (inst  "Z"     nil         target)
+            (inst  "RZ"   `(,pi/2)     target)
+            (inst  "ISWAP" () control  target)
+            (inst* ucr-op  differences (append (but-last rest) (list control)))
+            (inst  "ISWAP" () control  target)
+            (inst  "RZ"   `(,-pi/2)    target))
            ((string= "RZ" roll-type)
-	    (inst* ucr-op  averages    rest)
-	    (inst  "X"     nil         target)
-	    (inst  "Z"     nil         control)
-	    (inst  "RY"   `(,-pi/2)    target)
-	    (inst  "ISWAP" () control  target)
-	    (inst  "RX"   `(,pi/2)     control)
-	    (inst* ucr-op  differences (append (but-last rest) (list control)))
-	    (inst  "RX"   `(,-pi/2)    control)
+            (inst* ucr-op  averages    rest)
+            (inst  "X"     nil         target)
+            (inst  "Z"     nil         control)
+            (inst  "RY"   `(,-pi/2)    target)
+            (inst  "ISWAP" () control  target)
+            (inst  "RX"   `(,pi/2)     control)
+            (inst* ucr-op  differences (append (but-last rest) (list control)))
+            (inst  "RX"   `(,-pi/2)    control)
 	    (inst  "ISWAP" ()          control target)
 	    (inst  "RY"   `(,pi/2)     target))
            (t

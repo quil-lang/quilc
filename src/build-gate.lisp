@@ -66,12 +66,12 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
 
 (defun repeatedly-fork (op n)
   (loop :repeat n
-	:do (setf op (forked-operator op))
-	:finally (return op)))
+        :do (setf op (forked-operator op))
+        :finally (return op)))
 
 (defun build-UCR (roll-name params qubit &rest qubits)
   (apply #'build-gate (repeatedly-fork (named-operator roll-name) (length qubits))
-	 params qubit qubits))
+         params qubit qubits))
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 

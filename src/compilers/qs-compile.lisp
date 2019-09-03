@@ -87,10 +87,10 @@
                                                     evals-v)
                                        (magicl:conjugate-transpose vL)
                                        v1)))
-		     ;; some convenient shorthand for inst below
-		     (control (first (application-arguments instr)))
-		     (rest (rest (application-arguments instr)))
-		     (UCR-Y (repeatedly-fork (named-operator "RY") (length rest)))
+                     ;; some convenient shorthand for inst below
+                     (control (first (application-arguments instr)))
+                     (rest (rest (application-arguments instr)))
+                     (UCR-Y (repeatedly-fork (named-operator "RY") (length rest)))
 		     (UCR-Z (repeatedly-fork (named-operator "RZ") (length rest))))
                 ;; we now have the equality
                 ;; m = (u0 (+) u1) Z(Lphi) Y(thetas) Z(Rphi) (v0 (+) v1)

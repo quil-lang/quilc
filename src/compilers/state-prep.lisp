@@ -192,8 +192,8 @@
                                                                    source-wf
                                                                    qubit-complex))
               (setf abs-so-source (abs (segre-obstruction-2Q source-wf)))
-	      (dolist (instr prefix-circuit)
-		(inst instr)))))))
+              (dolist (instr prefix-circuit)
+                (inst instr)))))))
     (let ((phase-so-source (phase (segre-obstruction-2Q source-wf)))
           (phase-so-target (phase (segre-obstruction-2Q target-wf))))
       (unless (double= phase-so-source phase-so-target)
@@ -214,8 +214,8 @@
                    (double= (aref source-v 1) (aref target-v 1))
                    (double= (aref source-v 2) (aref target-v 2))
                    (double= (aref source-v 3) (aref target-v 3)))
-	;; NOTE: this is a hard return which escapes the implicit WITH-INST,
-	;;       which might even have PREFIX-CIRCUIT junk in it
+        ;; NOTE: this is a hard return which escapes the implicit WITH-INST,
+        ;;       which might even have PREFIX-CIRCUIT junk in it
         (return-from state-prep-2Q-compiler
           (state-prep-trampolining-compiler instr)))
       ;; write t^dag s as a member of SU(2) x SU(2)
@@ -226,8 +226,8 @@
                source-matrix
                +edag-basis+))
         ;; write out the instructions
-	(inst "LHS-state-prep-gate" c1 (second (application-arguments instr)))
-	(inst "RHS-state-prep-gate" c0 (first (application-arguments instr)))))))
+        (inst "LHS-state-prep-gate" c1 (second (application-arguments instr)))
+        (inst "RHS-state-prep-gate" c0 (first (application-arguments instr)))))))
 
 (define-compiler state-prep-trampolining-compiler
     ((instr :where (typep instr 'state-prep-application)))
@@ -266,7 +266,7 @@
       (multiple-value-bind (zero-to-target-Y-angles zero-to-target-Z-angles target-wf)
           (calculate-state-prep-angles (state-prep-application-target-wf instr) -1.0d0)
         (let* ((ucr-arguments (reverse (application-arguments instr)))
-	       (UCR-Y (repeatedly-fork (named-operator "RY") (1- (length ucr-arguments))))
+               (UCR-Y (repeatedly-fork (named-operator "RY") (1- (length ucr-arguments))))
 	       (UCR-Z (repeatedly-fork (named-operator "RZ") (1- (length ucr-arguments)))))
           ;; build the resulting circuit
 	  ;; move from source Z to ground Z

@@ -779,38 +779,38 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
 			    :test #'equalp))
        ;; we must be a gate description.
        (otherwise
-	(destructuring-bind (head name param-list &rest qubit-list) body
-	  (declare (ignore head))
-	  (let ((table (make-hash-table :test #'equalp))
-		(operator (typecase name
-			    (string (named-operator name))
-			    (symbol name)
-			    (otherwise '_)))
-		(param-list (cond
-			      ((and (typep param-list 'list)
-				    (endp param-list))
-			       nil)
-			      ((and (typep param-list 'list)
-				    (= 2 (length param-list))
-				    (typep (second param-list) 'list))
-			       (loop :for item :in (second param-list)
-				     :if (typep item 'number)
-				       :collect item
-				     :else
-				       :collect '_))
-			      (t
-			       '_)))
-		(qubit-list (mapcar (lambda (x)
-				      (typecase x
-					(number x)
-					(otherwise '_)))
-				    qubit-list)))
-	    (setf (gethash (make-gate-binding :operator operator
-					      :parameters param-list
-					      :arguments qubit-list)
-			   table)
-		  1)
-	    table)))))
+        (destructuring-bind (head name param-list &rest qubit-list) body
+          (declare (ignore head))
+          (let ((table (make-hash-table :test #'equalp))
+                (operator (typecase name
+                            (string (named-operator name))
+                            (symbol name)
+                            (otherwise '_)))
+                (param-list (cond
+                              ((and (typep param-list 'list)
+                                    (endp param-list))
+                               nil)
+                              ((and (typep param-list 'list)
+                                    (= 2 (length param-list))
+                                    (typep (second param-list) 'list))
+                               (loop :for item :in (second param-list)
+                                     :if (typep item 'number)
+                                       :collect item
+                                     :else
+                                       :collect '_))
+                              (t
+                               '_)))
+                (qubit-list (mapcar (lambda (x)
+                                      (typecase x
+                                        (number x)
+                                        (otherwise '_)))
+                                    qubit-list)))
+            (setf (gethash (make-gate-binding :operator operator
+                                              :parameters param-list
+                                              :arguments qubit-list)
+                           table)
+                  1)
+            table)))))
     (otherwise
      (let ((table (make-occurrence-table)))
        (dolist (subbody body table)
@@ -887,32 +887,32 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                   (type cons ,list ,tail))
          (labels ((inst (&rest ,xs)
                     (declare (optimize speed (safety 0) (debug 0) (space 0)))
-		    (let (,x)
-		      (cond
-			;; check for a raw gate object
-			((and (= 1 (length ,xs))
-			      (typep (first ,xs) 'gate-application))
-			 (setf ,x (first ,xs)))
-			;; check for a build-gate signature
-			((and (<= 3 (length ,xs))
-			      (typep (cadr ,xs) 'list))
-			 (setf ,x (apply #'build-gate ,xs)))
-			;; check for an anon-gate signature
-			((and (<= 3 (length ,xs))
-			      (typep (cadr ,xs) 'magicl:matrix))
-			 (setf ,x (apply #'anon-gate ,xs)))
-			(t
-			 (error "INST argument pattern not recognized: ~a" ,xs)))
-		      (rplacd ,tail (cons ,x nil))
-		      (setf ,tail (cdr ,tail))
-		      (values)))
-		  (inst* (&rest ,xs)
-		    (apply #'inst (apply #'list* ,xs))))
+                    (let (,x)
+                      (cond
+                        ;; check for a raw gate object
+                        ((and (= 1 (length ,xs))
+                              (typep (first ,xs) 'gate-application))
+                         (setf ,x (first ,xs)))
+                        ;; check for a build-gate signature
+                        ((and (<= 3 (length ,xs))
+                              (typep (cadr ,xs) 'list))
+                         (setf ,x (apply #'build-gate ,xs)))
+                        ;; check for an anon-gate signature
+                        ((and (<= 3 (length ,xs))
+                              (typep (cadr ,xs) 'magicl:matrix))
+                         (setf ,x (apply #'anon-gate ,xs)))
+                        (t
+                         (error "INST argument pattern not recognized: ~a" ,xs)))
+                      (rplacd ,tail (cons ,x nil))
+                      (setf ,tail (cdr ,tail))
+                      (values)))
+                  (inst* (&rest ,xs)
+                    (apply #'inst (apply #'list* ,xs))))
            (declare (dynamic-extent #'inst))
            (macrolet ((finish-compiler (&optional (retval nil ,retval-p))
-			(if ,retval-p
-			    `(return-from ,',compiler-context ,retval)
-			    '(return-from ,compiler-context (cdr (the cons ,list))))))
+                        (if ,retval-p
+                            `(return-from ,',compiler-context ,retval)
+                            '(return-from ,compiler-context (cdr (the cons ,list))))))
              ,@body
              ;; Implicitly return the collected instructions.
              (finish-compiler)))))))

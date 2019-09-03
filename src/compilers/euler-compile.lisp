@@ -30,12 +30,12 @@
                        `(gate-matrix instr))))
            (multiple-value-bind (,u0 ,u1 ,v0 ,v1 ,angles) (magicl:lapack-csd m 1 1)
              (inst ,outer-gate `(,(* ,outer-prefactor
-				     (- (phase (magicl:ref ,v1 0 0))
-					(phase (magicl:ref ,v0 0 0)))))
-		   q)
-	     (inst ,inner-gate `(,(* ,inner-prefactor 2 (first ,angles)))
-		   q)
-	     (inst ,outer-gate `(,(* ,outer-prefactor
+                                     (- (phase (magicl:ref ,v1 0 0))
+                                        (phase (magicl:ref ,v0 0 0)))))
+                   q)
+             (inst ,inner-gate `(,(* ,inner-prefactor 2 (first ,angles)))
+                   q)
+             (inst ,outer-gate `(,(* ,outer-prefactor
 				     (- (phase (magicl:ref ,u1 0 0))
 					(phase (magicl:ref ,u0 0 0)))))
 		   q)))))))

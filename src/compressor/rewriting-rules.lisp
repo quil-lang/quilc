@@ -119,8 +119,8 @@
                   (y (,h (,(* sign2 pi 1/2)) q))
                   (z (,g (,(* sign3 pi 1/2)) q)))
                (inst ,h '(,(* sign3 pi 1/2)) q)
-	       (inst ,g '(,(* sign2 pi 1/2)) q)
-	       (inst ,h '(,(* sign1 pi 1/2)) q))))
+               (inst ,g '(,(* sign2 pi 1/2)) q)
+               (inst ,h '(,(* sign1 pi 1/2)) q))))
         '(1 -1) '(1 -1) '(1 -1))))
 
 (rewrite-GHG-as-HGH "RX" "RZ")
@@ -286,7 +286,7 @@
            (inst "RZ" (list pi) control))
           (#b1110                     ; -++- masks to -+++
            (inst "RZ" (list pi) control)
-	   (inst "RZ" (list pi) target))
+           (inst "RZ" (list pi) target))
           (otherwise
            (give-up-compilation)))))))
 
@@ -348,7 +348,7 @@
            (inst "RZ" `(,theta) control))
           (#b1110                     ; t00t masks to t000
            (inst "RZ" `(,theta) control)
-	   (inst "RZ" `(,theta) target))
+           (inst "RZ" `(,theta) target))
           (otherwise
            (give-up-compilation)))))))
 

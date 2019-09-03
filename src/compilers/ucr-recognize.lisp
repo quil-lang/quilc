@@ -38,16 +38,16 @@
                                              (constant (* -2 (phase (magicl:ref matrix jp jp)))))
                                        (double= (magicl:ref matrix jp jp)
                                                 (conjugate (magicl:ref matrix jpp jpp)))))
-		   (inst* (repeatedly-fork (named-operator "RZ") (1- log-dimension))
-			  angles
+                   (inst* (repeatedly-fork (named-operator "RZ") (1- log-dimension))
+                          angles
                           (append (subseq (application-arguments instr)
-					  0
-					  (- log-dimension d 1))
-				  (subseq (application-arguments instr)
-					  (- log-dimension d))
-				  (list (nth (- log-dimension d 1)
-					     (application-arguments instr)))))
-		   (finish-compiler)))
+                                          0
+                                          (- log-dimension d 1))
+                                  (subseq (application-arguments instr)
+                                          (- log-dimension d))
+                                  (list (nth (- log-dimension d 1)
+                                             (application-arguments instr)))))
+                   (finish-compiler)))
        (give-up-compilation))
       ;; are we a UCRY matrix? these have three salient properties:
       ;;
