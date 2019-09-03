@@ -879,12 +879,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
 
 (defmacro with-inst (&body body)
   "Define INST, INST*, and FINISH-COMPILER handlers extending over BODY."
-  (let ((list (gensym "LIST"))
-        (tail (gensym "TAIL"))
-        (compiler-context (gensym "COMPILER-CONTEXT"))
-        (x  (gensym "X"))
-        (xs (gensym "XS"))
-	(retval-p (gensym "RETVAL-P")))
+  (a:with-gensyms (list tail compiler-context x xs retval-p)
     `(block ,compiler-context
        (let* ((,list (cons nil nil))
               (,tail ,list))
