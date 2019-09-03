@@ -35,7 +35,9 @@
                :do (setf (gethash (pathname-name system-file) system-table)
                          (merge-pathnames system-file)))))
          (local-system-search (name)
-           (values (gethash name system-table))))
+           (values (gethash name system-table)))
+         (strip-version-githash (version)
+           (subseq version 0 (position #\- version :test #'eql))))
     (load-systems-table)
     (push #'local-system-search asdf:*system-definition-search-functions*)
     (asdf:load-system "quilc")
@@ -44,7 +46,7 @@
     ;; TODO Something is broken here. If zap-info is left to do it's thing on
     ;; Windows or SBCL 1.5.6+, there is a weird error. This is a short-term fix.
     #-win32
-    (when (uiop:version< (lisp-implementation-version) "1.5.6")
+    (when (uiop:version< (strip-version-githash (lisp-implementation-version)) "1.5.6")
       (funcall (read-from-string "quilc::zap-info")))
     (funcall (read-from-string "quilc::setup-debugger"))
     (when (option-present-p "--quilc-sdk")
