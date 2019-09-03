@@ -585,7 +585,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
       (compiler (format t "~&is the output from applying ~a, coming from...~%" item))
       (hash-table
        (dohash ((key val) item)
-         (format t "~a -> ~a~%" key val))))))
+         (format t "~/cl-quil::binding-fmt/ -> ~a~%" key val))))))
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
