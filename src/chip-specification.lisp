@@ -400,6 +400,7 @@ used to specify CHIP-SPEC."
             'ucr-compiler-to-iswap))
         (constantly 'state-prep-1q-compiler)
         (constantly 'state-prep-2q-compiler)
+        (constantly 'state-prep-4q-compiler)
         (constantly 'state-prep-trampolining-compiler)
         (constantly 'recognize-ucr)
         (lambda (chip-spec arch)
