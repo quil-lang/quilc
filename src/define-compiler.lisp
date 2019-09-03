@@ -769,48 +769,40 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
     (return-from estimate-output-gates-from-raw-code (make-occurrence-table)))
   (case (first body)
     (inst
-     (case (length body)
-       ;; are we a raw gate?
-       (2
-	(a:plist-hash-table (list (make-gate-binding :operator '_
-						     :parameters '_
-						     :arguments nil)
-				  1)
-			    :test #'equalp))
-       ;; we must be a gate description.
-       (otherwise
-        (destructuring-bind (head name param-list &rest qubit-list) body
-          (declare (ignore head))
-          (let ((table (make-hash-table :test #'equalp))
-                (operator (typecase name
-                            (string (named-operator name))
-                            (symbol name)
-                            (otherwise '_)))
-                (param-list (cond
-                              ((and (typep param-list 'list)
-                                    (endp param-list))
-                               nil)
-                              ((and (typep param-list 'list)
-                                    (= 2 (length param-list))
-                                    (typep (second param-list) 'list))
-                               (loop :for item :in (second param-list)
-                                     :if (typep item 'number)
-                                       :collect item
-                                     :else
-                                       :collect '_))
-                              (t
-                               '_)))
-                (qubit-list (mapcar (lambda (x)
-                                      (typecase x
-                                        (number x)
-                                        (otherwise '_)))
-                                    qubit-list)))
-            (setf (gethash (make-gate-binding :operator operator
-                                              :parameters param-list
-                                              :arguments qubit-list)
-                           table)
-                  1)
-            table)))))
+     (when (= 2 (length body))
+       (return-from estimate-output-gates-from-raw-code
+         (make-occurrence-table)))
+     (destructuring-bind (head name param-list &rest qubit-list) body
+       (declare (ignore head))
+       (let ((table (make-hash-table :test #'equalp))
+             (operator (typecase name
+                         (string (named-operator name))
+                         (symbol name)
+                         (otherwise (return-from estimate-output-gates-from-raw-code
+                                      (make-occurrence-table)))))
+             (param-list (cond
+                           ;; nonstandard helper
+                           ((and (equalp param-list '(quote ())))
+                            nil)
+                           ((typep param-list 'list)
+                            (loop :for item :in (rest param-list)
+                                  :if (typep item 'number)
+                                    :collect item
+                                  :else
+                                    :collect '_))
+                           (t
+                            '_)))
+             (qubit-list (mapcar (lambda (x)
+                                   (typecase x
+                                     (number x)
+                                     (otherwise '_)))
+                                 qubit-list)))
+         (setf (gethash (make-gate-binding :operator operator
+                                           :parameters param-list
+                                           :arguments qubit-list)
+                        table)
+               1)
+         table)))
     (otherwise
      (let ((table (make-occurrence-table)))
        (dolist (subbody body table)

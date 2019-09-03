@@ -470,17 +470,18 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
            (define-compiler ,name (,@bindings
                                    :class approximate-compiler
                                    :permit-binding-mismatches-when *enable-approximate-compilation*)
-             ,@decls
              ,docstring
-             (let ((,circuit (progn ,@body))
+	     ,@decls
+             (let ((,circuit (with-inst ,@body))
                    (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
                    (,q1 (qubit-index (first (application-arguments ,instr-name))))
                    (,q0 (qubit-index (second (application-arguments ,instr-name)))))
-               (sandwich-with-local-gates ,circuit
-                                          (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                          (build-canonical-gate-in-magic-basis ,coord)
-                                          (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                          ,q1 ,q0))))))))
+	       (finish-compiler
+		(sandwich-with-local-gates ,circuit
+					   (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+					   (build-canonical-gate-in-magic-basis ,coord)
+					   (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+					   ,q1 ,q0)))))))))
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
@@ -491,12 +492,13 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
            ((,instr ("CAN" _ ,q1 ,q0)
                     ;; this is here to throw the compiler hunter across the scent
                     :where t))
-         ,@decls
          ,@(when docstring (list docstring))
+	 ,@decls
          (let* ((,coord (mapcar #'constant-value (application-parameters ,instr))))
            (labels
                ((circuit-template (,parameter-array ,q1 ,q0)
-                  ,@parametric-circuit)
+                  (with-inst
+		    ,@parametric-circuit))
                 (run-optimizer ()
                   (multiple-value-bind (,template-values ,goodness)
                       (cl-grnm:nm-optimize
@@ -523,58 +525,60 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                        (give-up-compilation))
                       ;; otherwise, this solution will do.
                       (t
-                       (values (circuit-template ,template-values ,q1 ,q0) (- 1 ,goodness)))))))
+                       (dolist (instr (circuit-template ,template-values ,q1 ,q0))
+                         (inst instr))
+                       #+ignore
+                       (finish-compilation (values (circuit-template ,template-values ,q1 ,q0) (- 1 ,goodness))))))))
              (run-optimizer)))))))
 
 
 (define-canonical-circuit-approximation nearest-circuit-of-depth-0
     ((instr ("CAN" (0 0 0) q1 q0)))
   "Produces a decomposition of the canonical gate using zero two-qubit operations."
-  (list (build-gate "I" () q0)
-        (build-gate "I" () q1)))
+  (inst "I" () q0)
+  (inst "I" () q1))
 
 (define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-1
     ((instr ("CAN" (#.(/ pi 2) #.(/ pi 2) 0) q1 q0)))
-  (list (build-gate "ISWAP" '() q1 q0)))
+  (inst "ISWAP" () q1 q0))
 
 (define-canonical-circuit-approximation nearest-XY-circuit-of-depth-1
     ((instr ("CAN" (alpha alpha 0) q1 q0)))
-  (list (build-gate "PISWAP" (list (* 2 alpha)) q1 q0)))
+  (inst "PISWAP" (list (* 2 alpha)) q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-1
     ((instr ("CAN" (#.(/ pi 2) 0 0) q1 q0)))
-  (list (build-gate "CZ" () q1 q0)))
+  (inst "CZ" () q1 q0))
 
 (define-canonical-circuit-approximation nearest-CPHASE-circuit-of-depth-1
     ((instr ("CAN" (alpha 0 0) q1 q0)))
-  (list (build-gate "CPHASE" (list (* 2 alpha)) q1 q0)))
+  (inst "CPHASE" (list (* 2 alpha)) q1 q0))
 
 (define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-2 
     ((instr ("CAN" (alpha beta 0) q1 q0)))
-  (list (build-gate "ISWAP" '()          q1 q0)
-        (build-gate "RY"    (list alpha) q1)
-        (build-gate "RY"    (list beta)  q0)
-        (build-gate "ISWAP" '()          q1 q0)))
+  (inst "ISWAP" ()           q1 q0)
+  (inst "RY"    (list alpha) q1)
+  (inst "RY"    (list beta)  q0)
+  (inst "ISWAP" ()           q1 q0))
 
 (define-searching-approximate-template nearest-XY-XY-template-of-depth-2 (coord q1 q0 array)
     (:predicate nil                     ; TODO: replace this with a convexity test
      :parameter-count 6)
-  (list
-   (build-gate "PISWAP" (list (aref array 4))     q1 q0)
-   (build-gate "RZ"     (list (aref array 5))     q0)
-   (build-gate "RZ"     (list (- (aref array 5))) q1)
-   (build-gate "RY"     (list (aref array 0))     q0)
-   (build-gate "RY"     (list (aref array 1))     q1)
-   (build-gate "RZ"     (list (aref array 2))     q0)
-   (build-gate "RZ"     (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
+  (inst "PISWAP" (list (aref array 4))     q1 q0)
+  (inst "RZ"     (list (aref array 5))     q0)
+  (inst "RZ"     (list (- (aref array 5))) q1)
+  (inst "RY"     (list (aref array 0))     q0)
+  (inst "RY"     (list (aref array 1))     q1)
+  (inst "RZ"     (list (aref array 2))     q0)
+  (inst "RZ"     (list (- (aref array 2))) q1)
+  (inst "PISWAP" (list (aref array 3))     q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-ISWAP-circuit-of-depth-2
     ((instr ("CAN" (#.(/ pi 2) beta gamma) q1 q0)))
-  (list (build-gate "ISWAP" () q1 q0)
-        (build-gate "RY" (list (- (/ pi 2) beta)) q0)
-        (build-gate "RY" (list (- (/ pi 2) gamma)) q1)
-        (build-gate "CZ" () q1 q0)))
+  (inst "ISWAP" () q1 q0)
+  (inst "RY"    (list (- (/ pi 2) beta))  q0)
+  (inst "RY"    (list (- (/ pi 2) gamma)) q1)
+  (inst "CZ"    () q1 q0))
 
 (define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-3
     ((instr ("CAN" (_ _ _) q1 q0)))
@@ -609,68 +613,67 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
       (multiple-value-bind (a d b) (orthogonal-decomposition mprime)
         (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
           (declare (ignore gamma))
-          (list* (build-gate "RY"    (list (- sigma)) q0)
-                 (build-gate "ISWAP" '()              q1 q0)
-                 (build-gate "Z"     '()              q0)
-                 (build-gate "Z"     '()              q1)
-                 (sandwich-with-local-gates
-                  (list (build-gate "ISWAP" '()       q1 q0)
-                        (build-gate "RY"    `(,alpha) q1)
-                        (build-gate "RY"    `(,beta)  q0)
-                        (build-gate "ISWAP" '()       q1 q0))
-                  a d b q1 q0)))))))
+          (inst "RY"    (list (- sigma)) q0)
+          (inst "ISWAP" ()              q1 q0)
+          (inst "Z"     ()              q0)
+          (inst "Z"     ()              q1)
+          (dolist (instr
+                   (sandwich-with-local-gates
+                    (list (build-gate "ISWAP" '()       q1 q0)
+                          (build-gate "RY"    `(,alpha) q1)
+                          (build-gate "RY"    `(,beta)  q0)
+                          (build-gate "ISWAP" '()       q1 q0))
+                    a d b q1 q0))
+            (inst instr)))))))
 
 (define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
     (:predicate nil ; TODO: replace this with a convexity test
      :parameter-count 3)
-  (list
-   (build-gate "ISWAP"  ()                    q0 q1)
-   (build-gate "RY"     (list (aref array 0)) q0)
-   (build-gate "RY"     (list (aref array 1)) q1)
-   (build-gate "CPHASE" (list (aref array 2)) q0 q1)))
+  (inst "ISWAP"  ()                    q0 q1)
+  (inst "RY"     (list (aref array 0)) q0)
+  (inst "RY"     (list (aref array 1)) q1)
+  (inst "CPHASE" (list (aref array 2)) q0 q1))
 
 (define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
     (:predicate nil   ; TODO: replace this with a convexity test
      :parameter-count 4)
-  (list
-   (build-gate "CZ"     ()                        q1 q0)
-   (build-gate "RY"     (list (aref array 0))     q0)
-   (build-gate "RY"     (list (aref array 1))     q1)
-   (build-gate "RZ"     (list (aref array 2))     q0)
-   (build-gate "RZ"     (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
+  (inst "CZ"     ()                        q1 q0)
+  (inst "RY"     (list (aref array 0))     q0)
+  (inst "RY"     (list (aref array 1))     q1)
+  (inst "RZ"     (list (aref array 2))     q0)
+  (inst "RZ"     (list (- (aref array 2))) q1)
+  (inst "PISWAP" (list (aref array 3))     q1 q0))
 
 (define-searching-approximate-template nearest-CPHASE-XY-template-of-depth-2 (coord q1 q0 array)
     (:predicate nil                     ; TODO: replace this with a convexity test
      :parameter-count 5)
-  (list
-   (build-gate "CPHASE" (list (aref array 4))     q1 q0)
-   (build-gate "RY"     (list (aref array 0))     q0)
-   (build-gate "RY"     (list (aref array 1))     q1)
-   (build-gate "RZ"     (list (aref array 2))     q0)
-   (build-gate "RZ"     (list (- (aref array 2))) q1)
-   (build-gate "PISWAP" (list (aref array 3))     q1 q0)))
+  (inst "CPHASE" (list (aref array 4))     q1 q0)
+  (inst "RY"     (list (aref array 0))     q0)
+  (inst "RY"     (list (aref array 1))     q1)
+  (inst "RZ"     (list (aref array 2))     q0)
+  (inst "RZ"     (list (- (aref array 2))) q1)
+  (inst "PISWAP" (list (aref array 3))     q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-2
     ((instr ("CAN" (alpha beta 0d0) q1 q0)))    
-  (list (build-gate "CZ" () q1 q0)
-        (build-gate "RY" (list alpha) q1)
-        (build-gate "RY" (list beta) q0)
-        (build-gate "CZ" () q1 q0)))
+  (inst "CZ" () q1 q0)
+  (inst "RY" (list alpha) q1)
+  (inst "RY" (list beta) q0)
+  (inst "CZ" () q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-3
     ((instr ("CAN" (alpha beta gamma) q1 q0)))
   (let ((a (- alpha    pi))
         (b (- pi       beta))
         (c (- (/ pi 2) gamma)))
-    (list (build-gate "CZ" '()            q0 q1)
-          (build-gate "RY" '(#.(/ pi -2)) q0)
-          (build-gate "RY" (list b)       q1)
-          (build-gate "RZ" (list c)       q0)
-          (build-gate "CZ" '()            q0 q1)
-          (build-gate "RY" (list a)       q1)
-          (build-gate "RY" '(#.(/ pi 2))  q0)
-          (build-gate "CZ" '()            q0 q1))))
+    (inst "CZ"  ()            q0 q1)
+    (inst "RY" '(#.(/ pi -2)) q0)
+    (inst "RY"  (list b)      q1)
+    (inst "RZ"  (list c)      q0)
+    (inst "CZ"  ()            q0 q1)
+    (inst "RY"  (list a)      q1)
+    (inst "RY" '(#.(/ pi 2))  q0)
+    (inst "CZ"  ()            q0 q1)))
 
 
 ;;; here lies the logic underlying the approximate compilation routine.
@@ -681,9 +684,15 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
       (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
              (m (magicl:scale (expt (magicl:det m) -1/4) m)))
         (multiple-value-bind (a d b) (orthogonal-decomposition m)
-          (destructuring-bind (alpha beta gamma) (get-canonical-coords-from-diagonal d)
-            (sandwich-with-local-gates (list (build-gate "CAN" `(,alpha ,beta ,gamma) q1 q0))
-                                       a d b q1 q0))))
+	  (let ((canonical-coords (get-canonical-coords-from-diagonal d)))
+	    (destructuring-bind (b0 b1 center-circuit a0 a1)
+		(sandwich-with-local-gates (list (build-gate "CAN" canonical-coords q1 q0))
+					   a d b q1 q0)
+	      (inst "A0"  (gate-matrix a0) q0)
+	      (inst "A1"  (gate-matrix a1) q1)
+	      (inst "CAN" canonical-coords q1 q0)
+	      (inst "B0"  (gate-matrix b0) q0)
+	      (inst "B1"  (gate-matrix b1) q1)))))
     (unknown-gate-parameter ()
       (give-up-compilation :because ':invalid-domain))))
 
