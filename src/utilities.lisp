@@ -8,6 +8,19 @@
   (check-type slot-name symbol)
   (error "The slot named ~S is required." slot-name))
 
+(defgeneric copy-instance (instance)
+  (:documentation
+   "Create a shallow copy of the object INSTANCE.
+WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.")
+  (:method ((instance t))
+    (let* ((class (class-of instance))
+           (copy (allocate-instance class)))
+      (dolist (slot (mapcar #'closer-mop:slot-definition-name (closer-mop:class-slots class)))
+        (when (slot-boundp instance slot)
+          (setf (slot-value copy slot)
+                (slot-value instance slot))))
+      copy)))
+
 (defmacro postpend (obj place)
   `(if ,place
        (push ,obj (cdr (last ,place)))
@@ -27,9 +40,20 @@
   (setf (aref vector index) val))
 
 (defmacro dohash (((key val) hash &optional ret) &body body)
-  `(progn (maphash (lambda (,key ,val) ,@body)
-                   ,hash)
-          ,ret))
+  `(loop :for ,key :being :the :hash-keys :of ,hash
+           :using (hash-value ,val)
+         :do ,@body
+         ,@(when ret `(:finally (return ,ret)))))
+
+(defun findhash (item hash &rest args &key (key nil key-p) (test nil test-p))
+  (declare (ignore args))
+  (dohash ((hash-key hash-val) hash)
+    (let* ((val  (if key-p (funcall key hash-val) hash-val))
+           (bool (if test-p
+                     (funcall test item val)
+                     (eql val item))))
+      (when bool
+        (return (values hash-key hash-val))))))
 
 (defmacro define-global-counter (counter-name incf-name)
   `(progn
@@ -141,6 +165,10 @@ Return two values:
   "Given an INTEGER N, return true if N is a power of 2, greater than 1."
   (and (> n 1) (power-of-two-p n)))
 
+(defun perfect-square-p (n)
+  "Given a non-negative INTEGER N, return true if N is a perfect square."
+  (= n (expt (isqrt n) 2)))
+
 ;;; Rotate-byte function courtesy of cl-utilities, from
 ;;; https://github.com/Publitechs/cl-utilities/blob/master/rotate-byte.lisp
 #+sbcl (declaim (inline rotate-byte))
@@ -149,7 +177,6 @@ Return two values:
 integer that contains the bits of INTEGER rotated COUNT times
 leftwards within the byte specified by BYTESPEC, and elsewhere
 contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
-  (declare (optimize (speed 3) (safety 0) (space 0) (debug 1)))
   #-sbcl
   (let ((size (byte-size bytespec)))
     (when (= size 0)
@@ -172,6 +199,12 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     #+ccl ccl::double-float-positive-infinity
     #+ecl ext:double-float-positive-infinity
     #+sbcl sb-ext:double-float-positive-infinity
-    #-(or ccl ecl sbcl) (error "double-float-positive-infinity not available."))
+    #+allegro excl:*infinity-double*
+    #-(or ccl ecl sbcl allegro) (error "double-float-positive-infinity not available."))
 
 (a:define-constant pi #.(coerce cl:pi 'double-float))
+
+(defun print-hash (hash &optional (stream *standard-output*))
+  (fresh-line stream)
+  (dohash ((key val) hash)
+    (format stream "~a -> ~a~%" key val)))

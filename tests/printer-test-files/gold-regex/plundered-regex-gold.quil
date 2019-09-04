@@ -1,0 +1,457 @@
+# Input
+# Plundered from ../../good-test-files/good-basic-defgate.quil
+# just some basic DEFGATEs without params
+
+# DEFGATES w/o params.
+DEFGATE H0:
+    0.707, 0.707
+    0.707, -0.707
+
+DEFGATE H1:
+    1/sqrt(2), 1/sqrt(2)
+    1/sqrt(2), -1/sqrt(2)
+
+H0 0
+H1 1
+# Output
+DEFGATE H0:
+    0\.707, 0\.707
+    0\.707, -0\.707
+
+DEFGATE H1:
+    0\.707\d+, 0\.707\d+
+    0\.707\d+, -0\.707\d+
+
+
+H0 0
+H1 1
+
+# Input
+# Plundered from ../../good-test-files/good-classical-arithmetic.quil
+# make sure arithmetic in classical instructions is fine
+#
+# From issue QVM-47
+DECLARE b BIT
+DECLARE theta REAL
+
+MOVE theta -3.14
+MOVE theta -pi
+MOVE theta -pi/2
+MOVE theta ((2*pi)+1)/0.5
+
+LT b theta -3.14
+LT b theta -pi
+LT b theta -pi/2
+LT b theta ((2*pi)+1)/0.5
+
+# Output
+DECLARE b BIT
+DECLARE theta REAL
+
+MOVE theta\[0\] -3\.14
+MOVE theta\[0\] -pi
+MOVE theta\[0\] -pi/2
+MOVE theta\[0\] 14\.5663\d+
+LT b\[0\] theta\[0\] -3\.14
+LT b\[0\] theta\[0\] -pi
+LT b\[0\] theta\[0\] -pi/2
+LT b\[0\] theta\[0\] 14\.5663\d+
+
+# Input
+# Plundered from ../../good-test-files/good-complex-complex-number.quil
+# Complex number syntax.
+RY(-1.1E-1-1.2e2i) 1
+
+# Output
+RY\(-0\.110{4,}\d*-120\.0+i\) 1
+
+# Input
+# Plundered from ../../good-test-files/good-complex-params.quil
+# gates with complex params
+
+CPHASE(pi/2) 1 0
+CPHASE(cos(sin(2*pi/3))*cis(-1)*exp(i*pi)) 3 4
+
+# Output
+CPHASE\(pi/2\) 1 0
+CPHASE\(-0\.3500\d+\+0.5451\d+i\) 3 4
+
+# Input
+# Plundered from ../../good-test-files/good-teleport.quil
+DECLARE ro BIT[2]
+
+DEFCIRCUIT TELEPORT A q B:
+    # Bell pair
+    H        A
+    CNOT     A B
+
+    # Teleport
+    CNOT     q A
+    H        q
+    MEASURE  q ro[0]
+    MEASURE  A ro[1]
+
+    # Classically communicate measurements
+    JUMP-UNLESS @SKIP ro[1]
+    X B
+    LABEL @SKIP
+    JUMP-UNLESS @END ro[0]
+    Z B
+    LABEL @END
+
+# If Alice's qubits are 0 and 1
+# and Bob's is 5
+TELEPORT 0 1 5
+
+# Output
+DECLARE ro BIT\[2\]
+
+DEFCIRCUIT TELEPORT A q B:
+    H A
+    CNOT A B
+    CNOT q A
+    H q
+    MEASURE q ro\[0\]
+    MEASURE A ro\[1\]
+    JUMP-UNLESS @SKIP ro\[1\]
+    X B
+    LABEL @SKIP
+    JUMP-UNLESS @END ro\[0\]
+    Z B
+    LABEL @END
+
+
+H 0
+CNOT 0 5
+CNOT 1 0
+H 1
+MEASURE 1 ro\[0\]
+MEASURE 0 ro\[1\]
+JUMP-UNLESS @__SKIP_(\d+) ro\[1\]
+X 5
+LABEL @__SKIP_\1
+JUMP-UNLESS @__END_(\d+) ro\[0\]
+Z 5
+LABEL @__END_\2
+
+# Input
+#
+# The repetition of the "-UNUSED\d+" portion of the regex in the
+# output section is required because we feed the output back through
+# another parse->print cycle as part of the "fixed-point check" at
+# test time. As such, the generated parameter name will look like
+# "%a-UNUSED123" the first time through, then "%a-UNUSED123-UNUSED456"
+# after the second pass.
+#
+# Plundered from ../../good-test-files/good-unused-gate-definition-parameter.quil
+# unused parameter in gate definition
+DEFGATE FOO(%a):
+    1.0, 0.0
+    0.0, 1.0
+
+# Output
+DEFGATE FOO\(%a(-UNUSED\d+){1,2}\):
+    1\.0, 0\.0
+    0\.0, 1\.0
+
+
+
+# Input
+# Plundered from ../../compiler-hook-test-files/commuting-CPHASEs.quil
+H 0
+PRAGMA COMMUTING_BLOCKS
+PRAGMA BLOCK
+CPHASE(0.2) 0 1
+PRAGMA END_BLOCK
+PRAGMA BLOCK
+CPHASE(0.3) 0 2
+PRAGMA END_BLOCK
+PRAGMA BLOCK
+CPHASE(0.4) 1 2
+PRAGMA END_BLOCK
+PRAGMA BLOCK
+CNOT 0 2
+RZ(0.5) 2
+CNOT 0 2
+PRAGMA END_BLOCK
+PRAGMA END_COMMUTING_BLOCKS
+CZ 1 2
+
+# Output
+H 0
+PRAGMA COMMUTING_BLOCKS
+PRAGMA BLOCK
+CPHASE\(0\.2\) 0 1
+PRAGMA END_BLOCK
+PRAGMA BLOCK
+CPHASE\(0\.30{4,}\d*\) 0 2
+PRAGMA END_BLOCK
+PRAGMA BLOCK
+CPHASE\(0\.4\) 1 2
+PRAGMA END_BLOCK
+PRAGMA BLOCK
+CNOT 0 2
+RZ\(0\.5\) 2
+CNOT 0 2
+PRAGMA END_BLOCK
+PRAGMA END_COMMUTING_BLOCKS
+CZ 1 2
+
+# Input
+# Plundered from ../../compiler-hook-test-files/johannes-CPHASE.quil
+# test file supplied by Johannes Otterbach
+
+H 0
+H 1
+H 2
+H 3
+H 4
+X 0
+PHASE(4.3806879867915676) 0
+X 0
+PHASE(4.3806879867915676) 0
+CPHASE(2.1903439933957838) 0 4
+CPHASE(2.1903439933957838) 1 4
+CPHASE(2.1903439933957838) 2 4
+CPHASE(2.1903439933957838) 3 4
+H 0
+RZ(-4.1246139468778829) 0
+H 0
+H 1
+RZ(-4.1246139468778829) 1
+H 1
+H 2
+RZ(-4.1246139468778829) 2
+H 2
+H 3
+RZ(-4.1246139468778829) 3
+H 3
+H 4
+RZ(-4.1246139468778829) 4
+H 4
+X 0
+PHASE(9.564271161482031) 0
+X 0
+PHASE(9.564271161482031) 0
+CPHASE(4.7821355807410155) 0 4
+CPHASE(4.7821355807410155) 1 4
+CPHASE(4.7821355807410155) 2 4
+CPHASE(4.7821355807410155) 3 4
+H 0
+RZ(-3.6447465906867933) 0
+H 0
+H 1
+RZ(-3.6447465906867933) 1
+H 1
+H 2
+RZ(-3.6447465906867933) 2
+H 2
+H 3
+RZ(-3.6447465906867933) 3
+H 3
+H 4
+RZ(-3.6447465906867933) 4
+H 4
+X 0
+PHASE(8.6554770455449344) 0
+X 0
+PHASE(8.6554770455449344) 0
+CPHASE(4.3277385227724672) 0 4
+CPHASE(4.3277385227724672) 1 4
+CPHASE(4.3277385227724672) 2 4
+CPHASE(4.3277385227724672) 3 4
+H 0
+RZ(-4.2319533284265045) 0
+H 0
+H 1
+RZ(-4.2319533284265045) 1
+H 1
+H 2
+RZ(-4.2319533284265045) 2
+H 2
+H 3
+RZ(-4.2319533284265045) 3
+H 3
+H 4
+RZ(-4.2319533284265045) 4
+H 4
+X 0
+PHASE(0.86716016266179041) 0
+X 0
+PHASE(0.86716016266179041) 0
+CPHASE(0.43358008133089521) 0 4
+CPHASE(0.43358008133089521) 1 4
+CPHASE(0.43358008133089521) 2 4
+CPHASE(0.43358008133089521) 3 4
+H 0
+RZ(-4.3410695853709713) 0
+H 0
+H 1
+RZ(-4.3410695853709713) 1
+H 1
+H 2
+RZ(-4.3410695853709713) 2
+H 2
+H 3
+RZ(-4.3410695853709713) 3
+H 3
+H 4
+RZ(-4.3410695853709713) 4
+H 4
+X 0
+PHASE(7.4065209286933804) 0
+X 0
+PHASE(7.4065209286933804) 0
+CPHASE(3.7032604643466902) 0 4
+CPHASE(3.7032604643466902) 1 4
+CPHASE(3.7032604643466902) 2 4
+CPHASE(3.7032604643466902) 3 4
+H 0
+RZ(-2.7729736718770379) 0
+H 0
+H 1
+RZ(-2.7729736718770379) 1
+H 1
+H 2
+RZ(-2.7729736718770379) 2
+H 2
+H 3
+RZ(-2.7729736718770379) 3
+H 3
+H 4
+RZ(-2.7729736718770379) 4
+H 4
+
+# Output
+H 0
+H 1
+H 2
+H 3
+H 4
+X 0
+PHASE\(4\.3806\d+\) 0
+X 0
+PHASE\(4\.3806\d+\) 0
+CPHASE\(2\.1903\d+\) 0 4
+CPHASE\(2\.1903\d+\) 1 4
+CPHASE\(2\.1903\d+\) 2 4
+CPHASE\(2\.1903\d+\) 3 4
+H 0
+RZ\(-4\.1246\d+\) 0
+H 0
+H 1
+RZ\(-4\.1246\d+\) 1
+H 1
+H 2
+RZ\(-4\.1246\d+\) 2
+H 2
+H 3
+RZ\(-4\.1246\d+\) 3
+H 3
+H 4
+RZ\(-4\.1246\d+\) 4
+H 4
+X 0
+PHASE\(9\.5642\d+\) 0
+X 0
+PHASE\(9\.5642\d+\) 0
+CPHASE\(4\.7821\d+\) 0 4
+CPHASE\(4\.7821\d+\) 1 4
+CPHASE\(4\.7821\d+\) 2 4
+CPHASE\(4\.7821\d+\) 3 4
+H 0
+RZ\(-3\.6447\d+\) 0
+H 0
+H 1
+RZ\(-3\.6447\d+\) 1
+H 1
+H 2
+RZ\(-3\.6447\d+\) 2
+H 2
+H 3
+RZ\(-3\.6447\d+\) 3
+H 3
+H 4
+RZ\(-3\.6447\d+\) 4
+H 4
+X 0
+PHASE\(8\.6554\d+\) 0
+X 0
+PHASE\(8\.6554\d+\) 0
+CPHASE\(4\.3277\d+\) 0 4
+CPHASE\(4\.3277\d+\) 1 4
+CPHASE\(4\.3277\d+\) 2 4
+CPHASE\(4\.3277\d+\) 3 4
+H 0
+RZ\(-4\.2319\d+\) 0
+H 0
+H 1
+RZ\(-4\.2319\d+\) 1
+H 1
+H 2
+RZ\(-4\.2319\d+\) 2
+H 2
+H 3
+RZ\(-4\.2319\d+\) 3
+H 3
+H 4
+RZ\(-4\.2319\d+\) 4
+H 4
+X 0
+PHASE\(0\.8671\d+\) 0
+X 0
+PHASE\(0\.8671\d+\) 0
+CPHASE\(0\.4335\d+\) 0 4
+CPHASE\(0\.4335\d+\) 1 4
+CPHASE\(0\.4335\d+\) 2 4
+CPHASE\(0\.4335\d+\) 3 4
+H 0
+RZ\(-4\.3410\d+\) 0
+H 0
+H 1
+RZ\(-4\.3410\d+\) 1
+H 1
+H 2
+RZ\(-4\.3410\d+\) 2
+H 2
+H 3
+RZ\(-4\.3410\d+\) 3
+H 3
+H 4
+RZ\(-4\.3410\d+\) 4
+H 4
+X 0
+PHASE\(7\.4065\d+\) 0
+X 0
+PHASE\(7\.4065\d+\) 0
+CPHASE\(3\.7032\d+\) 0 4
+CPHASE\(3\.7032\d+\) 1 4
+CPHASE\(3\.7032\d+\) 2 4
+CPHASE\(3\.7032\d+\) 3 4
+H 0
+RZ\(-2\.7729\d+\) 0
+H 0
+H 1
+RZ\(-2\.7729\d+\) 1
+H 1
+H 2
+RZ\(-2\.7729\d+\) 2
+H 2
+H 3
+RZ\(-2\.7729\d+\) 3
+H 3
+H 4
+RZ\(-2\.7729\d+\) 4
+H 4
+
+# Input
+# Plundered from ../../compiler-hook-test-files/translate-and-thread.quil
+RY(0.3) 0
+CZ 0 2
+RX(0.2) 1
+
+# Output
+RY\(0\.30{4,}\d*\) 0
+CZ 0 2
+RX\(0\.2\) 1
+

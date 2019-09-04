@@ -14,6 +14,10 @@
   (l2p #() :type integeropt-vector)
   (p2l #() :type integeropt-vector))
 
+(defmethod print-object :around ((object rewiring) stream)
+  (let ((*print-pretty* nil))
+    (call-next-method)))
+
 (defun inverse-matches-forward-p (forward inverse)
   "Checks that each non-NIL mapping in FORWARD has a corresponding inverse mapping in
 INVERSE."
@@ -267,3 +271,41 @@ BODY as an implicit PROGN."
                      (error "Malformed rewiring string: unexpected token ~a" token))))
                 tokens)))
     (make-rewiring-from-l2p integer-vec)))
+
+(defun make-rewiring-pair-from-string (str)
+  "Safely extract a pair of REWIRINGs from a string representation of a CONS of two integer vectors."
+  (multiple-value-bind (matchedp matches)
+      ;; This monstrosity matches strings of the form "(#(\d+ ...) . #(\d+ ...))"
+      (let ((match-int-vector
+              '(:REGISTER
+                (:SEQUENCE "#("
+                 (:GREEDY-REPETITION 0 NIL
+                  (:GROUP (:SEQUENCE :DIGIT-CLASS (:GREEDY-REPETITION 0 1 #\ ))))
+                 #\)))))
+        (cl-ppcre:scan-to-strings
+         `(:SEQUENCE
+           :START-ANCHOR
+           #\(
+           ,match-int-vector
+           (:GREEDY-REPETITION 0 NIL :WHITESPACE-CHAR-CLASS)
+           #\.
+           (:GREEDY-REPETITION 0 NIL :WHITESPACE-CHAR-CLASS)
+           ,match-int-vector
+           #\)
+           :END-ANCHOR)
+         str))
+    (assert matchedp
+            nil
+            "Malformed rewiring pair string: ~@
+             input ~A is not of the form (#(...) . #(...))."
+            str)
+    (let ((first-rewiring-string (aref matches 0))
+          (second-rewiring-string (aref matches 1)))
+      (assert (= (length first-rewiring-string) (length second-rewiring-string))
+              nil
+              "Malformed rewiring pair string: length of rewirings don't match. ~@
+               first:  ~A~@
+               second: ~A"
+              first-rewiring-string second-rewiring-string)
+      (values (make-rewiring-from-string first-rewiring-string)
+              (make-rewiring-from-string second-rewiring-string)))))

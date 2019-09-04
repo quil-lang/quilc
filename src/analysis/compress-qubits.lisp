@@ -77,11 +77,11 @@ relabeled according to which free assignments remain."
       (setf indices-used (sort indices-used #'<))
       ;; now, relabel stuff we missed in the first pass, but in the
       ;; original order (to make the resulting rewiring trimmable)
-      (setf to-relabel (nreverse to-relabel))  
+      (setf to-relabel (nreverse to-relabel))
       (dotimes (i num-qubits)
         (cond ((eql i (first indices-used))
                (pop indices-used))
-              (t 
+              (t
                (setf (qubit-index (pop to-relabel)) i))))
       (make-rewiring-from-l2p
        (map 'vector #'qubit-index qubit-list)))))
@@ -96,6 +96,23 @@ relabeled according to which free assignments remain."
   (:method ((isn instruction) relabeler)
     (declare (ignore relabeler))
     nil)
+
+  (:method :after ((isn instruction) relabeler)
+    ;; If INSTRUCTION has a rewiring comment attached, update it.
+    (a:when-let (comment (comment isn))
+      (setf (comment isn)
+            (ecase (rewiring-comment-type comment)
+              ((:ENTERING)
+               (make-rewiring-comment :entering (relabel-rewiring (parse-entering-rewiring comment)
+                                                                  relabeler)))
+              ((:EXITING)
+               (make-rewiring-comment :exiting (relabel-rewiring (parse-exiting-rewiring comment)
+                                                                 relabeler)))
+              ((:ENTERING/EXITING)
+               (multiple-value-bind (entering-rewiring exiting-rewiring)
+                   (parse-entering/exiting-rewiring comment)
+                 (make-rewiring-comment :entering (relabel-rewiring entering-rewiring relabeler)
+                                        :exiting (relabel-rewiring exiting-rewiring relabeler))))))))
 
   (:method ((isn measurement) relabeler)
     (funcall relabeler (measurement-qubit isn)))
@@ -155,5 +172,4 @@ relabeled according to which free assignments remain."
   parsed-prog)
 
 (define-transform compress-qubits (compress-qubits)
-  "Relabel the qubits so that they are minimally numbered."
-  process-includes)
+  "Relabel the qubits so that they are minimally numbered.")

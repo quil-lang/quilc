@@ -162,11 +162,13 @@
       ((or (factor-I p) (factor-Z p))
        (multiple-value-bind (coeff next-pauli)
            (pauli-matrix-p (magicl::slice p 0 (/ m 2) 0 (/ n 2)))
-         (values coeff (concatenate-or-nil next-pauli pauli))))
+         (values coeff (concatenate-or-nil pauli next-pauli))))
       ((or (factor-Y p) (factor-X p))
-       (multiple-value-bind (coeff next-pauli) (pauli-matrix-p
-                                                  (magicl::slice p (/ m 2) m 0 (/ n 2)))
-         (values (phase-to-string (* (string-to-phase coeff) (if (factor-Y p) #C(0 -1) 1))) (concatenate-or-nil next-pauli pauli))))
+       (multiple-value-bind (coeff next-pauli)
+           (pauli-matrix-p (magicl::slice p (/ m 2) m 0 (/ n 2)))
+         (values (phase-to-string (* (string-to-phase coeff)
+                                     (if (factor-Y p) #C(0 -1) 1)))
+                 (concatenate-or-nil pauli next-pauli))))
       (t nil))))
 
 (let ((memo-table (make-hash-table :test #'equal)))

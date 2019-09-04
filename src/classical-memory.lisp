@@ -47,7 +47,12 @@
   ;; NOTE: we may want to make these writeable for a compiler that slots user-
   ;;       defined memory spaces into hardware-available memory spaces
   (sharing-parent nil :read-only t :type (or null string))
-  (sharing-offset-alist nil :read-only t :type list))
+  (sharing-offset-alist nil :read-only t :type list)
+  ;; Context token, available for later resolution
+  (lexical-context nil :read-only t :type (or null token)))
+
+(defmethod lexical-context ((obj memory-descriptor))
+  (memory-descriptor-lexical-context obj))
 
 (defun simple-memory-descriptor-p (desc)
   "Is the object DESC a memory descriptor that is \"simple\", i.e., does not alias?"

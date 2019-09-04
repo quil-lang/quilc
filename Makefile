@@ -8,7 +8,6 @@ QUICKLISP_HOME=$(HOME)/quicklisp
 QUICKLISP_SETUP=$(QUICKLISP_HOME)/setup.lisp
 QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
 	--eval '(push (truename ".") asdf:*central-registry*)' \
-	--eval '(push :hunchentoot-no-ssl *features*)' \
 	--eval '(push :drakma-no-ssl *features*)' \
 	--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)"
 QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
@@ -76,6 +75,16 @@ else
 	echo "Non-Linux-based platforms unsupported"
 endif
 
+
+ifeq ($(UNAME_S),Darwin)
+LIBTWEEDLEDUM := libtweedledum.dylib
+else
+LIBTWEEDLEDUM := libtweedledum.so
+endif
+.PHONY: install-tweedledum
+install-tweedledum:
+	install src/contrib/tweedledum/$(LIBTWEEDLEDUM) /usr/local/lib
+
 ###############################################################################
 # BUILD
 ###############################################################################
@@ -84,7 +93,6 @@ endif
 quilc: system-index.txt tweedledum
 	$(SBCL) $(FOREST_SDK_FEATURE) \
 	        --eval "(setf sb-ext:\*on-package-variance\* '(:warn (:swank :swank-backend :swank-repl) :error t))" \
-		--eval '(push :hunchentoot-no-ssl *features*)' \
 		--eval '(push :drakma-no-ssl *features*)' \
 		--load "build-app.lisp" \
 		$(FOREST_SDK_OPTION) \

@@ -1,4 +1,18 @@
-FROM rigetti/rpcq
+# specify the dependency versions (can be overriden with --build_arg)
+ARG rpcq_version=2.7.3
+ARG qvm_version=1.10.0
+ARG quicklisp_version=2019-07-11
+
+# use multi-stage builds to independently pull dependency versions
+FROM rigetti/rpcq:$rpcq_version as rpcq
+FROM rigetti/qvm:$qvm_version as qvm
+FROM rigetti/lisp:$quicklisp_version
+
+# copy over rpcq source from the first build stage
+COPY --from=rpcq /src/rpcq /src/rpcq
+
+# copy over qvm source from the second build stage (needed for unit tests)
+COPY --from=qvm /src/qvm /src/qvm
 
 ARG build_target
 
@@ -10,7 +24,7 @@ RUN make dump-version-info install-test-deps
 # build the quilc app
 ADD . /src/quilc
 WORKDIR /src/quilc
-RUN git clean -fdx && make ${build_target}
+RUN git clean -fdx && CXX=clang++-7 make ${build_target} && make install-tweedledum && ldconfig
 
 EXPOSE 5555
 EXPOSE 6000

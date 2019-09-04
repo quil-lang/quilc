@@ -4,22 +4,6 @@
 
 (in-package #:cl-quil)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defgeneric copy-instance (instance)
-  (:documentation
-   "Create a shallow copy of the object INSTANCE.
-
-WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.")
-  (:method ((instance t))
-    (let* ((class (class-of instance))
-           (copy (allocate-instance class)))
-      (dolist (slot (mapcar #'closer-mop:slot-definition-name (closer-mop:class-slots class)))
-        (when (slot-boundp instance slot)
-          (setf (slot-value copy slot)
-                (slot-value instance slot))))
-      copy)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;; Atomic Elements ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defstruct (qubit (:constructor qubit (index)))
@@ -174,6 +158,120 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
   (check-type comment-string string)
   (setf (gethash x **comments**) comment-string))
 
+(a:define-constant +entering-rewiring-prefix+
+  "Entering rewiring: "
+  :test #'string=
+  :documentation "STRING prefix for \"entering rewiring\" comments. ")
+
+(a:define-constant +exiting-rewiring-prefix+
+  "Exiting rewiring: "
+  :test #'string=
+  :documentation "STRING prefix for \"exiting rewiring\" comments. ")
+
+(a:define-constant +entering/exiting-rewiring-prefix+
+  "Entering/exiting rewiring: "
+  :test #'string=
+  :documentation "STRING prefix for \"entering/exiting rewiring\" comments. ")
+
+(defun comment-entering-rewiring-p (rewiring-string)
+  "Does REWIRING-STRING start with +ENTERING-REWIRING-PREFIX+?"
+  (uiop:string-prefix-p +entering-rewiring-prefix+ rewiring-string))
+
+(defun comment-exiting-rewiring-p (rewiring-string)
+  "Does REWIRING-STRING start with +EXITING-REWIRING-PREFIX+?"
+  (uiop:string-prefix-p +exiting-rewiring-prefix+ rewiring-string))
+
+(defun comment-entering/exiting-rewiring-p (rewiring-string)
+  "Does REWIRING-STRING start with +ENTERING/EXITING-REWIRING-PREFIX+?"
+  (uiop:string-prefix-p +entering/exiting-rewiring-prefix+ rewiring-string))
+
+(defun %parse-rewiring (prefix rewiring-string make-rewiring)
+  "Call MAKE-REWIRING to parse a REWIRING from REWIRING-STRING after discarding PREFIX."
+  (funcall make-rewiring (subseq rewiring-string (length prefix))))
+
+(defun parse-entering-rewiring (rewiring-string)
+  "Parse an entering REWIRING from REWIRING-STRING."
+  (%parse-rewiring +entering-rewiring-prefix+ rewiring-string #'make-rewiring-from-string))
+
+(defun parse-exiting-rewiring (rewiring-string)
+  "Parse an exiting REWIRING from REWIRING-STRING."
+  (%parse-rewiring +exiting-rewiring-prefix+ rewiring-string #'make-rewiring-from-string))
+
+(defun parse-entering/exiting-rewiring (rewiring-string)
+  "Parse entering and exiting REWIRINGs from REWIRING-STRING.
+
+Return (VALUES ENTERING-REWIRING EXITING-REWIRING)."
+  (%parse-rewiring +entering/exiting-rewiring-prefix+
+                   rewiring-string
+                   #'make-rewiring-pair-from-string))
+
+(defun rewiring-comment-type (rewiring-string)
+  "Return the type of the rewiring comment in REWIRING-STRING.
+
+Possible return values are ':ENTERING, ':EXITING, and ':ENTERING/EXITING.
+
+If REWIRING-STRING does not have a valid rewiring comment prefix, signal an error."
+  (cond ((comment-entering-rewiring-p rewiring-string)
+         ':ENTERING)
+        ((comment-exiting-rewiring-p rewiring-string)
+         ':EXITING)
+        ((comment-entering/exiting-rewiring-p rewiring-string)
+         ':ENTERING/EXITING)
+        (t (error "Invalid rewiring comment: ~S" rewiring-string))))
+
+(defun make-rewiring-comment (&key entering exiting)
+  "Make a rewiring comment from the given ENTERING and EXITING rewirings.
+
+ENTERING and EXITING are both of type (OR NULL INTEGER-VECTOR REWIRING).
+
+If both ENTERING and EXITING are non-null, make an :ENTERING/EXITING rewiring comment.
+If only ENTERING is non-null, make an :ENTERING rewiring comment.
+If only EXITING is non-null, make and :EXITING rewiring comment.
+If both ENTERING and EXITING are null, signal an error."
+  (check-type entering (or null integer-vector rewiring))
+  (check-type exiting (or null integer-vector rewiring))
+
+  (when (typep entering 'rewiring)
+    (setf entering (rewiring-l2p entering)))
+
+  (when (typep exiting 'rewiring)
+    (setf exiting (rewiring-l2p exiting)))
+
+  (cond ((and (not (null entering)) (not (null exiting)))
+         (format nil "~A(~A . ~A)" +entering/exiting-rewiring-prefix+ entering exiting))
+        ((not (null entering))
+         (format nil "~A~A" +entering-rewiring-prefix+ entering))
+        ((not (null exiting))
+         (format nil "~A~A" +exiting-rewiring-prefix+ exiting))
+        (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL"))))
+
+(defun instruction-rewirings (instruction)
+  "Return the pair of entering and exiting rewirings associated with instruction.
+
+Return (VALUES ENTERING EXITING) if INSTRUCTION has a combined ENTERING/EXITING rewiring attached.
+Return (VALUES ENTERING NIL) if INSTRUCTION has only an ENTERING rewiring.
+Return (VALUES NIL EXITING) if INSTRUCTION has only an EXITING rewiring.
+Return (VALUES NIL NIL) if INSTRUCTION has no rewiring attached."
+  (a:if-let ((comment (comment instruction)))
+    (ecase (rewiring-comment-type comment)
+      (:ENTERING (values (parse-entering-rewiring comment) nil))
+      (:EXITING  (values nil (parse-exiting-rewiring comment)))
+      (:ENTERING/EXITING (parse-entering/exiting-rewiring comment)))
+    ;; No comment attached to INSTRUCTION.
+    (values nil nil)))
+
+(defun extract-final-exit-rewiring-vector (parsed-program)
+  "Extract the final exit rewiring comment from PARSED-PROGRAM and return it as a VECTOR.
+
+If no exit rewiring is found, return NIL."
+  (check-type parsed-program parsed-program)
+  (loop :with code := (parsed-program-executable-code parsed-program)
+        :for i :from (1- (length code)) :downto 0
+        :for exiting-rewiring := (nth-value 1 (instruction-rewirings (vnth i code)))
+        :when (not (null exiting-rewiring))
+          :return (quil::rewiring-l2p exiting-rewiring)))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass jump-target ()
@@ -194,6 +292,15 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
 
 ;;;;;;;;;;;;;;;;;;;; Gate and Circuit Definitions ;;;;;;;;;;;;;;;;;;;;
 
+;;; Note: In the future this might be expanded to include other objects.
+(deftype lexical-context () '(or null token))
+
+(defgeneric lexical-context (instr)
+  (:method ((instr t))
+    ;; By default, there is none.
+    nil)
+  (:documentation "Get the lexical context of an instruction."))
+
 (defclass gate-definition ()
   ((name :initarg :name
          :reader gate-definition-name)
@@ -203,7 +310,10 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
    ;; of many repeated calculations of a GATE object. See the function
    ;; GATE-DEFINITION-TO-GATE.
    (cached-gate :initform nil
-                :accessor %gate-definition-cached-gate))
+                :accessor %gate-definition-cached-gate)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context))
   (:metaclass abstract-class)
   (:documentation "A representation of a raw, user-specified gate definition. This is *not* supposed to be an executable representation."))
 
@@ -258,7 +368,7 @@ as a permutation."
         (unless found-one
           (return-from permutation-from-gate-entries nil))))))
 
-(defun make-gate-definition (name parameters entries)
+(defun make-gate-definition (name parameters entries &key context)
   "Make a static or parameterized gate definition instance, depending on the existence of PARAMETERS."
   (check-type name string)
   (check-type parameters symbol-list)
@@ -266,14 +376,17 @@ as a permutation."
       (make-instance 'parameterized-gate-definition
                     :name name
                     :parameters parameters
-                    :entries entries)
+                    :entries entries
+                    :context context)
       (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
-                       :permutation perm)
+                       :permutation perm
+                       :context context)
         (make-instance 'static-gate-definition
                        :name name
-                       :entries entries))))
+                       :entries entries
+                       :context context))))
 
 (defclass circuit-definition ()
   ((name :initarg :name
@@ -283,9 +396,12 @@ as a permutation."
    (arguments :initarg :arguments
               :reader circuit-definition-arguments)
    (body :initarg :body
-         :reader circuit-definition-body)))
+         :reader circuit-definition-body)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context)))
 
-(defun make-circuit-definition (name params args body)
+(defun make-circuit-definition (name params args body &key context)
   (check-type name string)
   (assert (every #'is-param params))
   (assert (every #'is-formal args))
@@ -293,7 +409,8 @@ as a permutation."
                  :name name
                  :parameters params
                  :arguments args
-                 :body body))
+                 :body body
+                 :context context))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -365,6 +482,10 @@ numbers. It must start with a string.")
   (:documentation "An instruction to immediately halt all execution.")
   #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
+
+(defun haltp (x)
+  "Is X a HALT instruction?"
+  (typep x 'halt))
 
 (defmethod arguments ((instruction halt)) #())
 (defmethod mnemonic  ((instruction halt)) (values "HALT" 'halt))
@@ -952,6 +1073,9 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
 (defun application-operator-name (app)
   (operator-description-name (application-operator app)))
 
+(defun application-operator-root-name (app)
+  (operator-description-root-name (application-operator app)))
+
 (defclass unresolved-application (application)
   ()
   (:documentation "Represents an application that hasn't yet been resolved. Possibilities:
@@ -1046,33 +1170,36 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 (defvar *print-polar-form* nil
   "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
 
+(declaim (type (vector rational) **reasonable-rationals**))
+(global-vars:define-global-var **reasonable-rationals**
+    (coerce (nconc (a:iota 10 :start 1)
+                   (delete-duplicates
+                    (loop :for denom :in '(2 3 4 6 8 16)
+                          :nconc (loop :for numer :from 1 :below (* 2 denom)
+                                       :when (/= numer denom)
+                                         :collect (/ numer denom)))
+                    :from-end t))
+            'vector)
+  "The list of RATIONAL multiples of PI that are checked by FORMAT-REAL when *PRINT-FRACTIONAL-RADIANS* is T.")
+
 (defun format-real (r stream)
   "Print the real number R nicely to the stream STREAM."
   (check-type r real)
   (check-type stream stream)
   (cond
-    (*print-fractional-radians*
-     (cond
-       ((double~ r pi)
-        (format stream "pi"))
-       ((double~ r (- pi))
-        (format stream "-pi"))
-       (t
-        (dolist (denom '(2 3 4 6 8 16))
-          (dotimes (numer (* 2 denom))
-            (when (and (/= numer denom)
-                       (double~ (abs r) (/ (* pi numer) denom)))
-              (cond
-                ((= numer 1)
-                 (format stream "~:[~;-~]pi/~d" (minusp r) denom))
-                ((zerop numer)
-                 (format stream "~F" r))
-                (t (format stream "~:[~;-~]~d*pi/~d" (minusp r) numer denom)))
-              (return-from format-real))))
-        ;; If we cannot find a nice fraction of pi, just print the
-        ;; real number
-        (format stream "~F" r))))
+    ((or (double~ (abs r) 0) (not *print-fractional-radians*))
+     (format stream "~F" r))
     (t
+     (loop :with r-abs := (abs r)
+           :for rr :across **reasonable-rationals**
+           :for numer := (numerator rr)
+           :for denom := (denominator rr)
+           :when (double~ r-abs (/ (* pi numer) denom)) :do
+             ;; Pretty-print "reasonable" integer and fractional multiples of pi.
+             (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
+                     (minusp r) (= 1 numer) numer (= 1 denom) denom)
+             (return-from format-real))
+     ;; If we cannot find a nice fraction of pi, just print the real number.
      (format stream "~F" r))))
 
 (defun real-fmt (stream r &optional colon-modifier at-modifier)
@@ -1094,7 +1221,7 @@ For example,
     ((complexp z)
      (cond
        ((zerop (imagpart z))
-        (format-complex (realpart z) stream))
+        (format-real (realpart z) stream))
        (*print-polar-form*
         (format stream "~F∠" (abs z))
         (format-real (mod (phase z) (* 2 pi)) stream))
@@ -1293,7 +1420,7 @@ For example,
                             (etypecase z
                               (number
                                (format-complex z s))
-                              (list
+                              ((or list symbol)
                                (print-instruction (make-delayed-expression nil nil z) s)))))
                         (subseq (gate-definition-entries gate)
                                 (* i gate-size)
@@ -1325,6 +1452,43 @@ For example,
    :circuit-definitions nil
    :memory-definitions nil
    :executable-code #()))
+
+;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
+;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
+;; an &BODY, rather than a CONTINUATION, etc. If you need speed, you're probably better served by
+;; calling AREF or CL-QUIL::VNTH on the PARSED-PROGRAM-EXECUTABLE-CODE vector directly.
+
+(defun %nth-instr (index parsed-program from-end continuation)
+  (check-type index integer)
+  (check-type parsed-program parsed-program)
+  (let* ((code (parsed-program-executable-code parsed-program))
+         (length (length code)))
+    (funcall continuation code (if from-end (- length index 1) index))))
+
+(defun nth-instr (index parsed-program &key from-end)
+  "Return the INSTRUCTION at position INDEX in PARSED-PROGRAM's EXECUTABLE-PROGRAM vector.
+
+If FROM-END is non-NIL, then INDEX is relative to the end of the instruction sequence, rather than the start. In either case, INDEX is zero-based and must fall in the range [0, length) where length is (LENGTH (PARSED-PROGRAM-EXECUTABLE-CODE PARSED-PROGRAM)).
+
+Examples:
+
+;; Get the first instruction of PP.
+(nth-instr 0 pp)
+
+;; Also the first instruction
+(nth-instr (length (parsed-program-executable-code pp)) pp :from-end t)
+
+;; Get the last instruction.
+(nth-inst 0 pp :from-end t)"
+  (%nth-instr index parsed-program from-end
+              (lambda (code normalized-index)
+                (aref code normalized-index))))
+
+(defun (setf nth-instr) (value index parsed-program &key from-end)
+  "Set the INSTRUCTION at position INDEX in PARSED-PROGRAM's EXECUTABLE-PROGRAM vector."
+  (%nth-instr index parsed-program from-end
+              (lambda (code normalized-index)
+                (setf (aref code normalized-index) value))))
 
 (defun print-instruction-sequence (seq
                                    &key

@@ -7,7 +7,7 @@
   :author "Robert Smith <robert@rigetti.com>"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
-               #:qvm
+               (:version #:qvm "1.9.0")
                #:magicl
                #:alexandria
                #:fiasco
@@ -15,6 +15,7 @@
                #:yacc                     ; for the conditions
                (:version #:alexa "1.0.1") ; for the conditions
                #:cl-permutation
+               #:cl-ppcre
                )
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':cl-quil-tests
@@ -24,6 +25,8 @@
   :components ((:file "package")
                (:file "suite")
                (:file "utilities")
+               (:file "logical-matrix-sanity-tests")
+               (:file "chip-specification-tests")
                (:file "initial-rewiring-tests")
                (:file "lexer-tests")
                (:file "parser-tests")

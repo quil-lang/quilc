@@ -15,18 +15,63 @@
                 :else
                   :collect form)))))
 
+(defun matrix-mismatch (m u &key (test #'quil::double~))
+  "Return a LIST of the (ROW COL) indices of the first mismatch between M and U.
+
+If M and U are equal under TEST, return NIL."
+  (check-type m magicl:matrix)
+  (check-type u magicl:matrix)
+  (assert (and (= (magicl:matrix-rows m) (magicl:matrix-rows u))
+               (= (magicl:matrix-cols m) (magicl:matrix-cols u))))
+  (dotimes (r (magicl:matrix-rows m))
+    (dotimes (c (magicl:matrix-cols m))
+      (unless (funcall test (magicl:ref m r c) (magicl:ref u r c))
+        (return-from matrix-mismatch (list r c))))))
+
+(defun %print-matrix-mismatch (m u &key (test #'quil::double~)
+                                        stream)
+  (a:if-let (mismatch-position (matrix-mismatch m u :test test))
+    (format stream
+            "First mismatch at position: ~A~@
+             First matrix:~%~A~@
+             Second matrix:~%~A"
+            mismatch-position
+            m u)
+    (format stream "No matrix mismatch found.")))
+
+(defun matrix-mismatch-fmt (stream arguments &optional colon-modifier at-modifier)
+  "Like the function %PRINT-MATRIX-MISMATCH, but is compatible with format strings using the ~/.../ directive.
+
+This function is intended to be used in FIASCO assertion error messages. FIASCO evaluates format
+args regardless of whether a test passes or fails, but FORMAT is only called to print the error
+message on failure. Thus, using MATRIX-MISMATCH-FMT in your FIASCO format control string allows you
+to only compute the MATRIX-MISMATCH for failing tests, which is usually what you want.
+
+For example,
+
+    (format t \"~/cl-quil-tests::matrix-mismatch-fmt/\" (list matrix-a matrix-b))
+    (format t \"~/cl-quil-tests::matrix-mismatch-fmt/\" (list matrix-a matrix-b #'test-function))
+"
+  (declare (ignore colon-modifier at-modifier))
+  (destructuring-bind (m u &optional test) arguments
+    (if (null test)
+        (%print-matrix-mismatch m u :stream stream)
+        (%print-matrix-mismatch m u :stream stream :test test))))
+
 (defun fiasco-assert-matrices-are-equal (m u)
   (is (= (magicl:matrix-rows u) (magicl:matrix-rows m)))
   (is (= (magicl:matrix-cols u) (magicl:matrix-cols m)))
   (setf u (quil::scale-out-matrix-phases u m))
-  (is (loop :for i :below (magicl:matrix-rows m) :always
-         (loop :for j :below (magicl:matrix-cols m) :always
-            (< (abs (- (magicl:ref m i j) (magicl:ref u i j))) 0.01)))
-      (with-output-to-string (s)
-        (format s "Matrix comparison failed.~%Input matrix:")
-        (magicl::pprint-matrix s m)
-        (format s "~%Output matrix:~%")
-        (magicl::pprint-matrix s u))))
+  (flet ((test~ (a b)
+           (< (abs (- a b)) 0.01)))
+    (is (loop :for i :below (magicl:matrix-rows m) :always
+          (loop :for j :below (magicl:matrix-cols m) :always
+            (test~ (magicl:ref m i j) (magicl:ref u i j))))
+        ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion succeeds.
+        ;; Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH when/if the
+        ;; above assertion actually fails.
+        "Matrix comparison failed. ~/cl-quil-tests::matrix-mismatch-fmt/"
+        (list m u #'test~))))
 
 (defun build-anonymous-gate (matrix &rest qubit-indices)
   (make-instance 'cl-quil::gate-application
@@ -313,7 +358,13 @@ Roughly:
       (dolist (t (parse-golden-file f))
         (funcall test-case-function t)))
 
-TEST-CASE-FUNCTION is function that takes a single GOLDEN-TEST-CASE argument.
+TEST-CASE-FUNCTION is function that takes two arguments:
+
+   1. a GOLDEN-TEST-CASE
+
+   2. a STRING that contains information about the GOLDEN-TEST-CASE-FILE and GOLDEN-TEST-CASE-LINE.
+   This string can be passed as the optional MESSAGE argument to FIASCO assertion macros to include
+   information about where the failing GOLDEN-TEST-CASE is located.
 
 GOLDEN-FILES is a LIST of PATHNAMEs indicating golden files to test.
 
@@ -323,7 +374,10 @@ case being processed. STREAM defaults to T."
     (format stream "~&    Testing golden file ~A at line:" (pathname-name file))
     (dolist (test-case (parse-golden-file file))
       (format stream " ~D" (golden-test-case-line test-case))
-      (funcall test-case-function test-case))))
+      (let ((*always-show-failed-sexp* t))
+        (funcall test-case-function test-case (format nil "~&Golden test case at (file:line): ~A:~D"
+                                                      (golden-test-case-file test-case)
+                                                      (golden-test-case-line test-case)))))))
 
 (defun update-golden-file-output-sections (file-paths output-callback
                                            &key (if-exists ':supersede) skip-prompt)

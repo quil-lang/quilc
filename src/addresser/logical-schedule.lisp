@@ -4,6 +4,40 @@
 
 (in-package #:cl-quil)
 
+;;; This file implements the LOGICAL-SCHEDULER data structure, which is used by the addresser
+;;; to organize and manage resource dependencies between instructions on 'logical' qubits.
+;;;
+;;; Quil instructions rely on some mixture of classical (memory regions) and
+;;; quantum (qubits) resources. In the general case, it is these resource dependencies,
+;;; rather than the strict linearization of straight line quil, which dictate the sequencing of
+;;; physical instructions. For example, in the program
+;;;
+;;;   X 0          (i)
+;;;   H 3          (ii)
+;;;   CNOT 0 1     (iii)
+;;;   X 3          (iv)
+;;;   CNOT 1 3     (v)
+;;;
+;;; the instructions (iii) and (iv) could have equivalently been transposed. The
+;;; partial ordering imposed by resource constraints is
+;;;
+;;;            ---> CNOT 0 1 ---> X 0
+;;;           /
+;;;   CNOT 1 3
+;;;           \
+;;;            -----> X 3 ------> H 3
+;;;
+;;; where the arrow A ---> B means that A logically follows B.
+;;;
+;;; The logical scheduler (defined below) holds a set of instructions and their
+;;; resource dependencies. In particular, it maintain a list of 'first' or 'top'
+;;; instructions (corresponding to the right fringe of the above diagram, i.e. X
+;;; 0 and H 3), a set of 'last' or 'bottom' instructions (corresponding to the
+;;; left fringe, i.e. CNOT 1 3), as well as hash tables storing information on
+;;; the dependencies. It works almost as a queue: instructions may be added to
+;;; the left fringe via APPEND-INSTRUCTIONS-TO-LSCHEDULE, and may be removed
+;;; from the right fringe by LSCHEDULER-DEQUEUE-INSTRUCTION.
+
 (defgeneric instruction-resources (instr)
   (:documentation "Returns the resources used by INSTR."))
 
@@ -541,9 +575,7 @@ mapping instructions to their tags. "
              (declare (ignore order address))
              (let (duration)
                (when obj
-                 (setf duration
-                       (funcall (hardware-object-native-instructions obj)
-                                instr)))
+                 (setf duration (hardware-object-native-instruction-p obj instr)))
                (if duration
                    (+ duration value)
                    value)))))
@@ -579,38 +611,21 @@ mapping instructions to their tags. "
                  (typecase instr
                    (measure
                     (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                           (specs-hash (gethash "specs" (hardware-object-misc-data qubit-obj))))
-                      (unless specs-hash
+                           (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
+                                               (hardware-object-gate-information qubit-obj))))
+                      (unless specs-obj
                         (warn-and-skip instr))
-                      (setf fidelity (gethash "fRO" specs-hash))
-                      (unless fidelity
-                        (warn-and-skip instr))))
+                      (setf fidelity (gate-record-fidelity specs-obj))))
                    (application
-                    (multiple-value-bind (order address obj)
-                        (lookup-hardware-address chip-spec instr)
-                      (declare (ignore order address))
+                    (let ((obj (lookup-hardware-object chip-spec instr)))
                       (unless obj
                         (warn-and-skip instr))
-                      (let ((specs-hash (gethash "specs" (hardware-object-misc-data obj))))
+                      (let ((specs-hash (hardware-object-gate-information obj)))
                         (unless specs-hash (warn-and-skip instr))
-                        (setf fidelity
-                              ;; We can extract the name here directly
-                              ;; because INSTR will only be within our
-                              ;; native gate set, which will never
-                              ;; have gate modifiers.
-                              (a:switch ((application-operator-name instr) :test #'string=)
-                                ;; special handling for the 1Q gates
-                                ("RX"
-                                 (gethash "f1QRB" specs-hash))
-                                ("RZ"
-                                 1)
-                                ;; in general, try to look the data up out of the table
-                                (otherwise
-                                 (gethash
-                                  (format nil "f~a" (application-operator-name instr))
-                                  specs-hash))))
-                        (unless fidelity
-                          (warn-and-skip instr)))))
+                        (dohash ((key val) specs-hash)
+                          (when (binding-subsumes-p key (get-binding-from-instr instr))
+                            (setf fidelity (gate-record-fidelity val))))
+                        (unless fidelity (warn-and-skip instr)))))
                    (otherwise
                     (warn-and-skip instr)))
                  (* value

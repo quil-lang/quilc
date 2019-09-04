@@ -38,8 +38,8 @@ permutation record duration."
         (permutation-record-duration (vnth 0 (hardware-object-permutation-gates
                                               (chip-spec-nth-link chip-spec link-index)))))))
   (flet ((get-it (chip-spec isn)
-           (a:if-let ((obj (nth-value 2 (lookup-hardware-address chip-spec isn))))
-             (funcall (hardware-object-native-instructions obj) isn)
+           (a:if-let ((obj (lookup-hardware-object chip-spec isn)))
+             (hardware-object-native-instruction-p obj isn)
              nil)))
     (declare (inline get-it))
     (etypecase inst

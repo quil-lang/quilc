@@ -1,16 +1,17 @@
 ;;;; src/clifford/pauli.lisp
 ;;;;
-;;;; Author: Nik Tezak
+;;;; Authors: Nik Tezak
+;;;;          Robert Smith
 
 (in-package #:cl-quil.clifford)
 
 ;;; This file implements an efficient representation of the Pauli
 ;;; group.
-
-(a:define-constant +paulis+
-    #(I X Z Y)
-  :test #'equalp
-  :documentation "The Pauli group symbols.")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (a:define-constant +paulis+
+      #(I X Z Y)
+    :test #'equalp
+    :documentation "The Pauli group symbols."))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (deftype base4 ()
@@ -79,6 +80,25 @@
         :for c :in (reverse (base4-list p))
         :do (setf idx (logior c (ash idx 2)))
         :finally (return idx)))
+
+(defun pauli-integer (p)
+  "Give a non-negative integer representation of the Pauli P, which is unique among only the Pauli operators of the same number of qubits.
+
+(Implementation details: This function is implemented so that a phase of {1, i} determines the LSB, and a phase of {+1, -1} determines the second LSB.
+
+Tensoring an I to the left does not affect the value. Assuming a phase of +1, tensoring an I to the right has the effect of shifting the value right by two bits.)"
+  (reduce (lambda (x acc)
+            (+ x (* 4 acc)))
+          (pauli-components p)
+          :from-end t
+          :initial-value 0))
+
+(defun integer-pauli (int n)
+  "Convert a non-negative integer INT to a Pauli operator of order N. (See PAULI-INTEGER for more details.)"
+  (loop :with c := (make-components n)
+        :for i :to n :do
+          (setf (values int (aref c i)) (floor int 4))
+        :finally (return (%make-pauli :components c))))
 
 (defmacro pair-membership (u v &rest cases)
   `(or ,@(loop :for (ui vi) :in cases
@@ -168,7 +188,8 @@ If STREAM is T, print to standard output. Otherwise print to STREAM."
 phase factor)."
     (unless (and (every #'pauli-sym-p s) (base4-p p))
       (error "Malformed Pauli-string S or phase-factor P."))
-    (let ((c (make-components (list-length s))))
+    (let ((c (make-components (list-length s)))
+          (s (reverse s)))
       (setf (aref c 0) p)
       (prog1 (%make-pauli :components c)
         (loop :for i :from 1
@@ -220,7 +241,7 @@ phase factor)."
   (let ((result (pauli-identity n (phase-factor a))))
     (loop
       :for i :from 1
-      :for idx :in idxs
+      :for idx :in (reverse idxs)
       :for ai := (aref (pauli-components a) i)
       :do (setf (aref (pauli-components result) (1+ idx)) ai))
     result))
@@ -285,12 +306,12 @@ hash-function."
   (make-hash-table :test 'pauli= :hash-function 'pauli-hash))
 
 (defmethod tensor-mul ((a pauli) (b pauli))
-  (let* ((na (num-qubits a))
-         (n (+ na (num-qubits b)))
+  (let* ((nb (num-qubits b))
+         (n (+ nb (num-qubits a)))
          (c (make-components n)))
     (setf (aref c 0) (%phase-mul (phase-factor a) (phase-factor b)))
-    (replace c (pauli-components a) :start1 1 :start2 1)
-    (replace c (pauli-components b) :start1 (+ 1 na) :start2 1)
+    (replace c (pauli-components b) :start1 1 :start2 1)
+    (replace c (pauli-components a) :start1 (+ 1 nb) :start2 1)
     (%make-pauli :components c)))
 
 (defmethod group-inv ((p pauli))

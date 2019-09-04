@@ -7,7 +7,16 @@
 (defparameter *printer-test-files-directory*
   (asdf:system-relative-pathname
    ':cl-quil-tests
-   "tests/printer-test-files/"))
+   "tests/printer-test-files/")
+  "Path to directory containing printer test files. Note that unlike most other test file directories used in this test-suite, all the actual input files are contained in subdirectories of this one. See also *PRINTER-TEST-FILES-GOLD-STANDARD-DIRECTORY* and *PRINTER-TEST-FILES-GOLD-REGEX-DIRECTORY*.")
+
+(defparameter *printer-test-files-gold-standard-directory*
+  (merge-pathnames #P"gold-standard/" *printer-test-files-directory*)
+  "Path to directory containing golden files whose expected output sections can be compared with STRING=.")
+
+(defparameter *printer-test-files-gold-regex-directory*
+  (merge-pathnames #P"gold-regex/" *printer-test-files-directory*)
+  "Path to directory containing golden files whose expected output sections must be compared via regex.")
 
 (defun parse-and-print-quil-to-string (input
                                        &key (parser #'quil:parse-quil)
@@ -16,14 +25,46 @@
     (funcall printer (funcall parser input) s)))
 
 (defun update-print-parsed-program-golden-files (&key skip-prompt)
-  "Call UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES on all the files in *PRINTER-TEST-FILES-DIRECTORY*.
+  "Call UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES on all the files in the gold-standard subdirectory
+of *PRINTER-TEST-FILES-DIRECTORY*.
+
+We limit updating of golden files to the gold-standard directory because they are the only ones that
+can be easily updated in an automated fashion. The files in the gold-regex directory make use of
+regexes in their output sections, which makes automated update complicated. The number of
+regex-enabled tests is small, so updating them by hand shouldn't be too tedious. You can always call
+UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS on them manually, then re-instate any required regexes.
 
 See the documentation string for UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES for more info and an
 admonition against carelessness."
   (update-golden-file-output-sections
-   (uiop:directory-files *printer-test-files-directory* #P"*.quil")
+   (uiop:directory-files *printer-test-files-gold-standard-directory* #P"*.quil")
    #'parse-and-print-quil-to-string
    :skip-prompt skip-prompt))
+
+
+(defun %golden-parse-print-tester (check-output)
+  "Return a function that can be passed to MAP-GOLDEN-FILES-AND-TEST-CASES which uses CHECK-OUTPUT
+to compare output sections.
+
+%GOLDEN-PARSE-PRINT-TESTER is a helper function for TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES."
+  (check-type check-output function)
+  (lambda (test-case golden-error-message)
+    (let* ((input (golden-test-case-input test-case))
+           (expected-output (golden-test-case-output test-case))
+           (actual-output nil)
+           (skip-fixed-point-check-p (uiop:string-prefix-p "# Disable fixed-point check" input)))
+      ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
+      ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
+      (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
+      (not-signals error (quil:parse-quil actual-output))
+      (is (funcall check-output expected-output actual-output) golden-error-message)
+
+      ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
+      ;; might fail, so skip it if we find a magic cookie at the start of the input section
+      ;; indicating that we should do so.
+      (unless skip-fixed-point-check-p
+        (is (funcall check-output expected-output (parse-and-print-quil-to-string actual-output))
+            golden-error-message)))))
 
 (deftest test-print-parsed-program-golden-files ()
   "Ensure that PRINT-PARSED-PROGRAM produces the expected output and that it is parseable by PARSE-QUIL."
@@ -34,31 +75,15 @@ admonition against carelessness."
   ;; examine the diffs of the old vs new output *carefully* to ensure all the changes are intended
   ;; or expected. Golden files are precious, and their sanctity must be preserved. Thank you.
 
-  (let ((golden-files (uiop:directory-files *printer-test-files-directory* #P"*.quil")))
+  (let ((golden-files (uiop:directory-files *printer-test-files-gold-standard-directory* #P"*.quil")))
+    (format t "~&  Gold-standard tests:")
     (is (not (null golden-files)))
-    (map-golden-files-and-test-cases
-     (lambda (test-case)
-       (let ((*always-show-failed-sexp* t)
-             (input (golden-test-case-input test-case))
-             (expected-output (golden-test-case-output test-case))
-             (actual-output nil)
-             (message (format nil "~&Golden test case at (file:line): ~A:~D"
-                              (golden-test-case-file test-case)
-                              (golden-test-case-line test-case))))
-         ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
-         ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
-         (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
-         (not-signals error (quil:parse-quil actual-output))
-         (is (string= expected-output actual-output) message)
+    (map-golden-files-and-test-cases (%golden-parse-print-tester #'string=) golden-files))
 
-         ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
-         ;; might fail, so skip it if we find a magic cookie at the start of the input section
-         ;; indicating that we should do so.
-         (unless (a:starts-with-subseq "# Disable fixed-point check" input)
-           (is (string= expected-output
-                        (parse-and-print-quil-to-string expected-output))
-               message))))
-     golden-files)))
+  (let ((golden-files (uiop:directory-files *printer-test-files-gold-regex-directory* #P"*.quil")))
+    (format t "~&  Gold-regex tests:")
+    (is (not (null golden-files)))
+    (map-golden-files-and-test-cases (%golden-parse-print-tester #'cl-ppcre:scan) golden-files)))
 
 (deftest test-instruction-fmt ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\"" (format nil "~/cl-quil:instruction-fmt/"
@@ -102,7 +127,7 @@ R 0"))
       (not-signals error (quil::parse-quil after)))))
 
 (deftest test-circuit-and-declare-printing ()
-  ;; This test relies on the fact that PARSE-QUIL-INTO-RAW-PROGRAM doesn't EXPAND-CIRCUITS,
+  ;; This test relies on not applying the EXPAND-CIRCUITS transform,
   ;; otherwise it could be included in TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES, above.
   (let* ((before "DECLARE theta REAL[16]
 DECLARE theta-bits BIT[100] SHARING theta OFFSET 1 REAL
@@ -114,7 +139,8 @@ DEFCIRCUIT TEST(%a) b c:
 
 TEST(0.5) 0 1
 ")
-         (after (parse-and-print-quil-to-string before :parser #'quil::parse-quil-into-raw-program)))
+         (after (parse-and-print-quil-to-string before :parser (lambda (string)
+                                                                 (quil::parse-quil string :transforms nil)))))
     (is (string= before after))))
 
 (deftest test-jump-to-integer-label-printing ()
@@ -128,3 +154,137 @@ TEST(0.5) 0 1
   (is (string= (quil::print-instruction-to-string
                 (quil::make-instance 'quil::jump-unless :label 1 :address (quil::mref "ro" 2)))
                "JUMP-UNLESS {absolute address 1} ro[2]")))
+
+
+(defun %check-format-single (test-function format-control input expected-output
+                             &key print-fractional-radians print-polar-form)
+  (let ((quil::*print-fractional-radians* print-fractional-radians)
+        (quil::*print-polar-form* print-polar-form))
+    (is (funcall test-function expected-output (format nil format-control input)))))
+
+(defun %check-format (test-function format-control testcases
+                      &key print-fractional-radians print-polar-form)
+  (loop :for (input . expected-output) :in testcases :do
+    (%check-format-single test-function format-control input expected-output
+                          :print-fractional-radians print-fractional-radians
+                          :print-polar-form print-polar-form)))
+
+(defun %pprint-rational-as-pi-multiple (r)
+  "Approximate the pretty printing parts of CL-QUIL::FORMAT-REAL.
+
+Used as a helper function in TEST-REAL-FMT."
+  (check-type r (rational 0))
+  (let ((p (numerator r))
+        (q (denominator r)))
+    (cond ((= 1 p q)
+           (format nil "pi"))
+          ((= 1 p)
+           (format nil "pi/~D" q))
+          ((= 1 q)
+           (format nil "~D*pi" p))
+          (t
+           (format nil "~D*pi/~D" p q)))))
+
+(deftest test-complex-fmt ()
+  ;; Test some simple cases which should be unaffected by *PRINT-POLAR-FORM*
+  (let ((simple-cases '((0 . "0.0")
+                        (0.0 . "0.0")
+                        (0.0d0 . "0.0")
+                        (#C(0 0) . "0.0")
+                        (#C(0.0 0.0) . "0.0")
+                        (#C(0.0d0 0.0d0) . "0.0")
+                        (42.42 . "42.42")
+                        (42.42d0 . "42.42")
+                        (#C(4.2 0) . "4.2"))))
+    (%check-format #'string= "~/quil:complex-fmt/" simple-cases :print-polar-form t)
+    (%check-format #'string= "~/quil:complex-fmt/" simple-cases :print-polar-form nil))
+
+  ;; Test some cases with non-zero IMAGPART with *PRINT-POLAR-FORM* = NIL.
+  (let ((complex-cases '((#C(0.0 1.0) . "1.0i")
+                         (#C(0.0 -1.0) . "-1.0i")
+                         (#C(-1.0 1.0) . "-1.0+1.0i")
+                         (#C(-1.0 -1.0) . "-1.0-1.0i")
+                         (#C(42.42 123.45) . "42.42+123.45i")
+                         (#C(42.42d0 123.45d0) . "42.42+123.45i"))))
+    (%check-format #'string= "~/quil:complex-fmt/" complex-cases
+                   :print-polar-form nil :print-fractional-radians t)
+    (%check-format #'string= "~/quil:complex-fmt/" complex-cases
+                   :print-polar-form nil :print-fractional-radians nil))
+
+  ;; Test *PRINT-POLAR-FORM* = T and *PRINT-FRACTIONAL-RADIANS* = T.
+  (%check-format #'string=
+                 "~/quil:complex-fmt/"
+                 `((#C(0.0 1.0) . "1.0∠pi/2")
+                   (#C(0.0 -1.0) . "1.0∠3*pi/2")
+                   (,(cis quil::pi) . "1.0∠pi")
+                   (,(cis (- quil::pi)) . "1.0∠pi")
+                   (,(cis (/ quil::pi 2)) . "1.0∠pi/2")
+                   (,(cis (/ quil::pi 4)) . "1.0∠pi/4"))
+                 :print-polar-form t
+                 :print-fractional-radians t))
+
+(deftest test-real-fmt ()
+  ;; Test some simple cases which should be unaffected by *PRINT-FRACTIONAL-RADIANS*.
+  (let ((simple-cases `((-1e-5 . "-0.00001")
+                        (-1.1 . "-1.1")
+                        (-1.1d0 . "-1.1")
+                        (-1 . "-1.0")
+                        (-1.0 . "-1.0")
+                        (-4/5 . "-0.8")
+                        (-0 . "0.0")
+                        (0 . "0.0")
+                        (0.0 . "0.0")
+                        (0.0d0 . "0.0")
+                        (1 . "1.0")
+                        (1.0 . "1.0")
+                        (3/2 . "1.5")
+                        (2.3 . "2.3")
+                        (1234.1234 . "1234.1234")
+                        (2e10 . "20000000000.0"))))
+    (%check-format #'string= "~/quil:real-fmt/" simple-cases :print-fractional-radians t)
+    (%check-format #'string= "~/quil:real-fmt/" simple-cases :print-fractional-radians nil))
+
+  ;; Test *PRINT-FRACTIONAL-RADIANS* = NIL.
+  (%check-format #'uiop:string-prefix-p
+                 "~/quil:real-fmt/"
+                 `((,(- quil::pi) . "-3.1415")
+                   (,quil::pi . "3.1415")
+                   (,(* (- 1) (/ quil::pi 2)) . "-1.5707")
+                   (,(* (- 3) (/ quil::pi 2)) . "-4.7123")
+                   (,(* (- 1) (/ quil::pi 3)) . "-1.0471")
+                   (,(* 1 (/ quil::pi 4)) . "0.7853")
+                   (,(* 5 (/ quil::pi 6)) . "2.6179"))
+                 :print-fractional-radians nil)
+
+  ;; Test *PRINT-FRACTIONAL-RADIANS* = T.
+  (let ((loose-threshold quil::+double-comparison-threshold-loose+)
+        ;; fudge-factor of 20x because numerical analysis is hard (let's go shopping)
+        (epsilon (* 20 double-float-epsilon)))
+    (flet ((in-bounds- (r)
+             (+ (- r loose-threshold) epsilon))
+           (in-bounds+ (r)
+             (- (+ r loose-threshold) epsilon))
+           (out-of-bounds- (r)
+             (- r loose-threshold epsilon))
+           (out-of-bounds+ (r)
+             (+ r loose-threshold epsilon))
+           (check (pred r expected)
+             (%check-format-single pred "~/quil:real-fmt/" r expected :print-fractional-radians t)))
+      (loop :for rr :across quil::**reasonable-rationals**
+            :for rr-pi := (* rr quil::pi)
+            :for minus-rr-pi := (- rr-pi)
+            :for rr-pi-expected := (%pprint-rational-as-pi-multiple rr)
+            :for minus-rr-pi-expected := (concatenate 'string "-" rr-pi-expected) :do
+              (progn
+                (check #'string= (in-bounds- rr-pi) rr-pi-expected)
+                (check #'string= rr-pi rr-pi-expected)
+                (check #'string= (in-bounds+ rr-pi) rr-pi-expected)
+
+                (check #'string= (in-bounds- minus-rr-pi) minus-rr-pi-expected)
+                (check #'string= minus-rr-pi minus-rr-pi-expected)
+                (check #'string= (in-bounds+ minus-rr-pi) minus-rr-pi-expected)
+
+                (check (complement #'string=) (out-of-bounds- rr-pi) rr-pi-expected)
+                (check (complement #'string=) (out-of-bounds+ rr-pi) rr-pi-expected)
+                (check (complement #'string=) (out-of-bounds- minus-rr-pi) minus-rr-pi-expected)
+                (check (complement #'string=) (out-of-bounds+ minus-rr-pi) minus-rr-pi-expected))))))

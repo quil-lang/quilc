@@ -2,10 +2,17 @@
 ;;;;
 ;;;; Author: Robert Smith
 
+;;; Allegro (and other Lisps) don't support the non-standard "package
+;;; local nicknames".
+#-(or sbcl ecl ccl)
+(rename-package :alexandria :alexandria '(:a))
+
 (defpackage #:cl-quil.resource
   (:use #:cl)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   (:export
+   #:resource-collection                ; TYPE
    #:make-resource-collection           ; FUNCTION
    #:make-qubit-resource                ; FUNCTION
    #:make-null-resource                 ; FUNCTION
@@ -32,6 +39,7 @@
         #:abstract-classes
         #:singleton-classes
         #:cl-quil.resource)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
   ;; options.lisp
   (:export
@@ -56,8 +64,8 @@
 
   ;; classical-memory.lisp
   (:export
-   #:quil-memory-model-error            ; CONDITION
-   #:quil-type                          ; TYPE (ADT)
+   #:quil-memory-model-error      ; CONDITION
+   #:quil-type                    ; TYPE (ADT)
    #:quil-bit                     ; TYPE (ADT), FUNCTION (CONSTRUCTOR)
    #:quil-octet                   ; TYPE (ADT), FUNCTION (CONSTRUCTOR)
    #:quil-integer                 ; TYPE (ADT), FUNCTION (CONSTRUCTOR)
@@ -160,122 +168,122 @@
 
    #:classical-trinary-instruction      ; ABSTRACT CLASS
 
-   #:classical-load                     ; CLASS
-   #:classical-store                    ; CLASS
-   #:classical-equality                 ; CLASS
-   #:classical-greater-than             ; CLASS
-   #:classical-greater-equal            ; CLASS
-   #:classical-less-than                ; CLASS
-   #:classical-less-equal               ; CLASS
-   #:classical-division-real/immediate                  ; TYPED-CLASS
-   #:classical-less-equal-bit/bit/immediate             ; TYPED-CLASS
-   #:classical-less-than-bit/integer/integer            ; TYPED-CLASS
-   #:classical-equality-bit/bit/immediate               ; TYPED-CLASS
-   #:classical-less-than-bit/integer/immediate          ; TYPED-CLASS
-   #:classical-move-bit/bit                             ; TYPED-CLASS
-   #:classical-less-equal-bit/integer/immediate         ; TYPED-CLASS
-   #:classical-and-octet/octet                          ; TYPED-CLASS
-   #:classical-convert-real/integer                     ; TYPED-CLASS
-   #:classical-convert-integer/real                     ; TYPED-CLASS
-   #:classical-move-integer/immediate                   ; TYPED-CLASS
-   #:classical-convert-integer/bit                      ; TYPED-CLASS
-   #:classical-store-octet*/integer/immediate           ; TYPED-CLASS
-   #:classical-greater-equal-bit/real/immediate         ; TYPED-CLASS
-   #:classical-exclusive-or-integer/immediate           ; TYPED-CLASS
-   #:classical-store-octet*/integer/octet               ; TYPED-CLASS
-   #:classical-addition-integer/integer                 ; TYPED-CLASS
-   #:classical-store-integer*/integer/immediate         ; TYPED-CLASS
-   #:classical-not-integer                              ; TYPED-CLASS
-   #:classical-convert-bit/integer                      ; TYPED-CLASS
-   #:classical-exclusive-or-bit/immediate               ; TYPED-CLASS
-   #:classical-move-integer/integer                     ; TYPED-CLASS
-   #:classical-greater-equal-bit/bit/bit                ; TYPED-CLASS
-   #:classical-move-real/immediate                      ; TYPED-CLASS
-   #:classical-not-octet                                ; TYPED-CLASS
-   #:classical-store-real*/integer/immediate            ; TYPED-CLASS
-   #:classical-greater-equal-bit/octet/octet            ; TYPED-CLASS
-   #:classical-less-than-bit/octet/octet                ; TYPED-CLASS
-   #:classical-and-octet/immediate                      ; TYPED-CLASS
-   #:classical-inclusive-or-integer/integer             ; TYPED-CLASS
-   #:classical-less-than-bit/bit/immediate              ; TYPED-CLASS
-   #:classical-addition-integer/immediate               ; TYPED-CLASS
-   #:classical-equality-bit/octet/octet                 ; TYPED-CLASS
-   #:classical-multiplication-real/immediate            ; TYPED-CLASS
-   #:classical-greater-equal-bit/real/real              ; TYPED-CLASS
-   #:classical-inclusive-or-octet/octet                 ; TYPED-CLASS
-   #:classical-less-than-bit/real/real                  ; TYPED-CLASS
-   #:classical-exchange-integer/integer                 ; TYPED-CLASS
-   #:classical-load-octet/octet*/integer                ; TYPED-CLASS
-   #:classical-inclusive-or-bit/bit                     ; TYPED-CLASS
-   #:classical-and-bit/immediate                        ; TYPED-CLASS
-   #:classical-division-integer/immediate               ; TYPED-CLASS
-   #:classical-and-integer/integer                      ; TYPED-CLASS
-   #:classical-less-equal-bit/real/real                 ; TYPED-CLASS
-   #:classical-move-octet/immediate                     ; TYPED-CLASS
-   #:classical-division-integer/integer                 ; TYPED-CLASS
-   #:classical-greater-than-bit/integer/immediate       ; TYPED-CLASS
-   #:classical-subtraction-integer/integer              ; TYPED-CLASS
-   #:classical-move-bit/immediate                       ; TYPED-CLASS
-   #:classical-exclusive-or-octet/octet                 ; TYPED-CLASS
-   #:classical-and-integer/immediate                    ; TYPED-CLASS
-   #:classical-greater-equal-bit/bit/immediate          ; TYPED-CLASS
-   #:classical-greater-than-bit/bit/immediate           ; TYPED-CLASS
-   #:classical-subtraction-real/real                    ; TYPED-CLASS
-   #:classical-store-bit*/integer/immediate             ; TYPED-CLASS
-   #:classical-convert-real/bit                         ; TYPED-CLASS
-   #:classical-not-bit                                  ; TYPED-CLASS
-   #:classical-and-bit/bit                              ; TYPED-CLASS
-   #:classical-less-than-bit/octet/immediate            ; TYPED-CLASS
-   #:classical-move-octet/octet                         ; TYPED-CLASS
-   #:classical-multiplication-integer/immediate         ; TYPED-CLASS
-   #:classical-convert-bit/real                         ; TYPED-CLASS
-   #:classical-addition-real/immediate                  ; TYPED-CLASS
-   #:classical-store-bit*/integer/bit                   ; TYPED-CLASS
-   #:classical-exclusive-or-integer/integer             ; TYPED-CLASS
-   #:classical-multiplication-integer/integer           ; TYPED-CLASS
-   #:classical-exclusive-or-octet/immediate             ; TYPED-CLASS
-   #:classical-equality-bit/integer/immediate           ; TYPED-CLASS
-   #:classical-exchange-octet/octet                     ; TYPED-CLASS
-   #:classical-store-integer*/integer/integer           ; TYPED-CLASS
-   #:classical-move-real/real                           ; TYPED-CLASS
-   #:classical-equality-bit/octet/immediate             ; TYPED-CLASS
-   #:classical-less-equal-bit/octet/octet               ; TYPED-CLASS
-   #:classical-less-equal-bit/integer/integer           ; TYPED-CLASS
-   #:classical-store-real*/integer/real                 ; TYPED-CLASS
-   #:classical-subtraction-integer/immediate            ; TYPED-CLASS
-   #:classical-less-than-bit/bit/bit                    ; TYPED-CLASS
-   #:classical-inclusive-or-octet/immediate             ; TYPED-CLASS
-   #:classical-greater-than-bit/bit/bit                 ; TYPED-CLASS
-   #:classical-inclusive-or-bit/immediate               ; TYPED-CLASS
-   #:classical-inclusive-or-integer/immediate           ; TYPED-CLASS
-   #:classical-equality-bit/real/real                   ; TYPED-CLASS
-   #:classical-equality-bit/bit/bit                     ; TYPED-CLASS
-   #:classical-greater-than-bit/octet/immediate         ; TYPED-CLASS
-   #:classical-multiplication-real/real                 ; TYPED-CLASS
-   #:classical-less-than-bit/real/immediate             ; TYPED-CLASS
-   #:classical-greater-than-bit/real/immediate          ; TYPED-CLASS
-   #:classical-greater-than-bit/real/real               ; TYPED-CLASS
-   #:classical-subtraction-real/immediate               ; TYPED-CLASS
-   #:classical-equality-bit/integer/integer             ; TYPED-CLASS
-   #:classical-greater-than-bit/octet/octet             ; TYPED-CLASS
-   #:classical-exchange-real/real                       ; TYPED-CLASS
-   #:classical-load-real/real*/integer                  ; TYPED-CLASS
-   #:classical-negate-integer                           ; TYPED-CLASS
-   #:classical-greater-equal-bit/integer/immediate      ; TYPED-CLASS
-   #:classical-exchange-bit/bit                         ; TYPED-CLASS
-   #:classical-exclusive-or-bit/bit                     ; TYPED-CLASS
-   #:classical-negate-real                              ; TYPED-CLASS
-   #:classical-less-equal-bit/real/immediate            ; TYPED-CLASS
-   #:classical-load-integer/integer*/integer            ; TYPED-CLASS
-   #:classical-greater-equal-bit/octet/immediate        ; TYPED-CLASS
-   #:classical-division-real/real                       ; TYPED-CLASS
-   #:classical-equality-bit/real/immediate              ; TYPED-CLASS
-   #:classical-less-equal-bit/bit/bit                   ; TYPED-CLASS
-   #:classical-greater-than-bit/integer/integer         ; TYPED-CLASS
-   #:classical-less-equal-bit/octet/immediate           ; TYPED-CLASS
-   #:classical-addition-real/real                       ; TYPED-CLASS
-   #:classical-load-bit/bit*/integer                    ; TYPED-CLASS
-   #:classical-greater-equal-bit/integer/integer        ; TYPED-CLASS
+   #:classical-load                                ; CLASS
+   #:classical-store                               ; CLASS
+   #:classical-equality                            ; CLASS
+   #:classical-greater-than                        ; CLASS
+   #:classical-greater-equal                       ; CLASS
+   #:classical-less-than                           ; CLASS
+   #:classical-less-equal                          ; CLASS
+   #:classical-division-real/immediate             ; TYPED-CLASS
+   #:classical-less-equal-bit/bit/immediate        ; TYPED-CLASS
+   #:classical-less-than-bit/integer/integer       ; TYPED-CLASS
+   #:classical-equality-bit/bit/immediate          ; TYPED-CLASS
+   #:classical-less-than-bit/integer/immediate     ; TYPED-CLASS
+   #:classical-move-bit/bit                        ; TYPED-CLASS
+   #:classical-less-equal-bit/integer/immediate    ; TYPED-CLASS
+   #:classical-and-octet/octet                     ; TYPED-CLASS
+   #:classical-convert-real/integer                ; TYPED-CLASS
+   #:classical-convert-integer/real                ; TYPED-CLASS
+   #:classical-move-integer/immediate              ; TYPED-CLASS
+   #:classical-convert-integer/bit                 ; TYPED-CLASS
+   #:classical-store-octet*/integer/immediate      ; TYPED-CLASS
+   #:classical-greater-equal-bit/real/immediate    ; TYPED-CLASS
+   #:classical-exclusive-or-integer/immediate      ; TYPED-CLASS
+   #:classical-store-octet*/integer/octet          ; TYPED-CLASS
+   #:classical-addition-integer/integer            ; TYPED-CLASS
+   #:classical-store-integer*/integer/immediate    ; TYPED-CLASS
+   #:classical-not-integer                         ; TYPED-CLASS
+   #:classical-convert-bit/integer                 ; TYPED-CLASS
+   #:classical-exclusive-or-bit/immediate          ; TYPED-CLASS
+   #:classical-move-integer/integer                ; TYPED-CLASS
+   #:classical-greater-equal-bit/bit/bit           ; TYPED-CLASS
+   #:classical-move-real/immediate                 ; TYPED-CLASS
+   #:classical-not-octet                           ; TYPED-CLASS
+   #:classical-store-real*/integer/immediate       ; TYPED-CLASS
+   #:classical-greater-equal-bit/octet/octet       ; TYPED-CLASS
+   #:classical-less-than-bit/octet/octet           ; TYPED-CLASS
+   #:classical-and-octet/immediate                 ; TYPED-CLASS
+   #:classical-inclusive-or-integer/integer        ; TYPED-CLASS
+   #:classical-less-than-bit/bit/immediate         ; TYPED-CLASS
+   #:classical-addition-integer/immediate          ; TYPED-CLASS
+   #:classical-equality-bit/octet/octet            ; TYPED-CLASS
+   #:classical-multiplication-real/immediate       ; TYPED-CLASS
+   #:classical-greater-equal-bit/real/real         ; TYPED-CLASS
+   #:classical-inclusive-or-octet/octet            ; TYPED-CLASS
+   #:classical-less-than-bit/real/real             ; TYPED-CLASS
+   #:classical-exchange-integer/integer            ; TYPED-CLASS
+   #:classical-load-octet/octet*/integer           ; TYPED-CLASS
+   #:classical-inclusive-or-bit/bit                ; TYPED-CLASS
+   #:classical-and-bit/immediate                   ; TYPED-CLASS
+   #:classical-division-integer/immediate          ; TYPED-CLASS
+   #:classical-and-integer/integer                 ; TYPED-CLASS
+   #:classical-less-equal-bit/real/real            ; TYPED-CLASS
+   #:classical-move-octet/immediate                ; TYPED-CLASS
+   #:classical-division-integer/integer            ; TYPED-CLASS
+   #:classical-greater-than-bit/integer/immediate  ; TYPED-CLASS
+   #:classical-subtraction-integer/integer         ; TYPED-CLASS
+   #:classical-move-bit/immediate                  ; TYPED-CLASS
+   #:classical-exclusive-or-octet/octet            ; TYPED-CLASS
+   #:classical-and-integer/immediate               ; TYPED-CLASS
+   #:classical-greater-equal-bit/bit/immediate     ; TYPED-CLASS
+   #:classical-greater-than-bit/bit/immediate      ; TYPED-CLASS
+   #:classical-subtraction-real/real               ; TYPED-CLASS
+   #:classical-store-bit*/integer/immediate        ; TYPED-CLASS
+   #:classical-convert-real/bit                    ; TYPED-CLASS
+   #:classical-not-bit                             ; TYPED-CLASS
+   #:classical-and-bit/bit                         ; TYPED-CLASS
+   #:classical-less-than-bit/octet/immediate       ; TYPED-CLASS
+   #:classical-move-octet/octet                    ; TYPED-CLASS
+   #:classical-multiplication-integer/immediate    ; TYPED-CLASS
+   #:classical-convert-bit/real                    ; TYPED-CLASS
+   #:classical-addition-real/immediate             ; TYPED-CLASS
+   #:classical-store-bit*/integer/bit              ; TYPED-CLASS
+   #:classical-exclusive-or-integer/integer        ; TYPED-CLASS
+   #:classical-multiplication-integer/integer      ; TYPED-CLASS
+   #:classical-exclusive-or-octet/immediate        ; TYPED-CLASS
+   #:classical-equality-bit/integer/immediate      ; TYPED-CLASS
+   #:classical-exchange-octet/octet                ; TYPED-CLASS
+   #:classical-store-integer*/integer/integer      ; TYPED-CLASS
+   #:classical-move-real/real                      ; TYPED-CLASS
+   #:classical-equality-bit/octet/immediate        ; TYPED-CLASS
+   #:classical-less-equal-bit/octet/octet          ; TYPED-CLASS
+   #:classical-less-equal-bit/integer/integer      ; TYPED-CLASS
+   #:classical-store-real*/integer/real            ; TYPED-CLASS
+   #:classical-subtraction-integer/immediate       ; TYPED-CLASS
+   #:classical-less-than-bit/bit/bit               ; TYPED-CLASS
+   #:classical-inclusive-or-octet/immediate        ; TYPED-CLASS
+   #:classical-greater-than-bit/bit/bit            ; TYPED-CLASS
+   #:classical-inclusive-or-bit/immediate          ; TYPED-CLASS
+   #:classical-inclusive-or-integer/immediate      ; TYPED-CLASS
+   #:classical-equality-bit/real/real              ; TYPED-CLASS
+   #:classical-equality-bit/bit/bit                ; TYPED-CLASS
+   #:classical-greater-than-bit/octet/immediate    ; TYPED-CLASS
+   #:classical-multiplication-real/real            ; TYPED-CLASS
+   #:classical-less-than-bit/real/immediate        ; TYPED-CLASS
+   #:classical-greater-than-bit/real/immediate     ; TYPED-CLASS
+   #:classical-greater-than-bit/real/real          ; TYPED-CLASS
+   #:classical-subtraction-real/immediate          ; TYPED-CLASS
+   #:classical-equality-bit/integer/integer        ; TYPED-CLASS
+   #:classical-greater-than-bit/octet/octet        ; TYPED-CLASS
+   #:classical-exchange-real/real                  ; TYPED-CLASS
+   #:classical-load-real/real*/integer             ; TYPED-CLASS
+   #:classical-negate-integer                      ; TYPED-CLASS
+   #:classical-greater-equal-bit/integer/immediate ; TYPED-CLASS
+   #:classical-exchange-bit/bit                    ; TYPED-CLASS
+   #:classical-exclusive-or-bit/bit                ; TYPED-CLASS
+   #:classical-negate-real                         ; TYPED-CLASS
+   #:classical-less-equal-bit/real/immediate       ; TYPED-CLASS
+   #:classical-load-integer/integer*/integer       ; TYPED-CLASS
+   #:classical-greater-equal-bit/octet/immediate   ; TYPED-CLASS
+   #:classical-division-real/real                  ; TYPED-CLASS
+   #:classical-equality-bit/real/immediate         ; TYPED-CLASS
+   #:classical-less-equal-bit/bit/bit              ; TYPED-CLASS
+   #:classical-greater-than-bit/integer/integer    ; TYPED-CLASS
+   #:classical-less-equal-bit/octet/immediate      ; TYPED-CLASS
+   #:classical-addition-real/real                  ; TYPED-CLASS
+   #:classical-load-bit/bit*/integer               ; TYPED-CLASS
+   #:classical-greater-equal-bit/integer/integer   ; TYPED-CLASS
 
    #:jump                               ; ABSTRACT CLASS
    #:jump-label                         ; READER
@@ -326,6 +334,8 @@
    #:instruction-fmt                    ; FUNCTION (format directive)
    #:real-fmt                           ; FUNCTION (format directive)
    #:complex-fmt                        ; FUNCTION (format directive)
+
+   #:comment                            ; FUNCTION
    )
 
   ;; gates.lisp
@@ -351,6 +361,7 @@
    #:parameterized-gate-function        ; READER
 
    #:controlled-gate                    ; CLASS
+   #:forked-gate                        ; CLASS
    #:dagger-gate                        ; CLASS
    #:target                             ; READER
 
@@ -364,12 +375,6 @@
   (:export
    #:parse-quil-into-raw-program        ; FUNCTION
    #:quil-parse-error                   ; CONDITION
-   )
-
-  ;; environment.lisp
-  (:export
-   #:gate-not-found                     ; CONDITION
-   #:operator-description-gate-lifter   ; FUNCTION
    )
 
   ;; desugar.lisp
@@ -407,6 +412,7 @@
   ;; chip-specification.lisp
   (:export
    #:build-8q-chip                      ; FUNCTION
+   #:warm-hardware-objects              ; FUNCTION
    )
 
   ;; pragmas.lisp
@@ -419,7 +425,7 @@
 
   ;; matrix-operations.lisp
   (:export
-   #:parsed-program-to-logical-matrix ; FUNCTION
+   #:parsed-program-to-logical-matrix   ; FUNCTION
    )
 
   ;; type-safety.lisp
@@ -430,6 +436,7 @@
   ;; utilities.lisp
   (:export
    #:ilog2                              ; FUNCTION
+   #:rotate-byte                        ; FUNCTION
    )
 
   ;; relabeling.lisp
@@ -443,6 +450,7 @@
   (:nicknames #:quil.clifford)
   (:use #:cl
         #:cl-permutation)
+  #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
 
   ;; clifford/ module

@@ -4,10 +4,82 @@
 
 (in-package #:cl-quil)
 
-(define-transform resolve-applications (resolve-applications)
-  "A transform which converts a parsed program with unresolved applications to one where the applications have been resolved into gate or circuit applications.")
-
+;;; Used solely for application resolution to detect if we are resolving things
+;;; inside of a circuit.
 (defvar *in-circuit-body* nil)
+
+(defun definition-signature (instr)
+  "If INSTR is a definition or memory declaration, returns a signature used for
+determining ambiguity. Otherwise, return NIL."
+  (flet ((gate-or-circuit-signature (name params args)
+           ;; TODO in principle the signature should include the number of params and args
+           ;; since e.g. we can tell the difference between FOO 1 and FOO 1 2. however,
+           ;; for now we follow the convention of not discriminating between these.
+           (declare (ignore params args))
+           (list 'gate-or-circuit-definition
+                 name)))
+    (typecase instr
+      (gate-definition (gate-or-circuit-signature (gate-definition-name instr)
+                                                  (if (typep instr 'parameterized-gate-definition)
+                                                      (gate-definition-parameters instr)
+                                                      nil)
+                                                  (gate-definition-qubits-needed instr)) )
+      (circuit-definition (gate-or-circuit-signature (circuit-definition-name instr)
+                                                     (circuit-definition-parameters instr)
+                                                     (circuit-definition-arguments instr)))
+      (memory-descriptor (cons 'memory-descriptor (memory-descriptor-name instr))))))
+
+(defun ambiguous-definition-condition (instr file conflicts)
+  "Signal a condition indicating that the instruction INSTR parsed from FILE has
+a list of conflicts CONFLICTS."
+  (let ((combined (acons instr file conflicts)))
+    (etypecase instr
+      (gate-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
+      (circuit-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
+      (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
+
+(defun extract-code-sections (code)
+  "Partition CODE into four values:
+
+    1. List of gate definitions.
+
+    2. List of circuit definitions.
+
+    3. List of memory descriptors.
+
+    4. List of code to execute.
+
+This also signals ambiguous definitions, which may be handled as needed."
+  ;; Note: this preserves the order of definitions.
+  (let ((gate-defs nil)
+        (circ-defs nil)
+        (memory-defs nil)
+        (exec-code nil)
+        ;; The following maps definition signatures to a list of (filename . defn) pairs
+        (all-seen-defns (make-hash-table :test 'equal)))
+    (flet ((bin (instr)
+             (a:when-let ((signature (definition-signature instr)))
+               (let ((originating-file (typecase (lexical-context instr)
+                                         (token
+                                          (token-pathname (lexical-context instr)))
+                                         (t
+                                          (quil-parse-error "Unable to resolve definition context ~A" instr)))))
+                 ;; check for conflicts
+                 (a:when-let ((entries (gethash signature all-seen-defns)))
+                   (cerror "Continue with ambiguous definition."
+                           (ambiguous-definition-condition instr originating-file entries)))
+                 (push (cons instr originating-file)
+                       (gethash signature all-seen-defns))))
+             (typecase instr
+               (gate-definition (push instr gate-defs))
+               (circuit-definition (push instr circ-defs))
+               (memory-descriptor (push instr memory-defs))
+               (t (push instr exec-code)))))
+      (mapc #'bin code)
+      (values (nreverse gate-defs)
+              (nreverse circ-defs)
+              (nreverse memory-defs)
+              (nreverse exec-code)))))
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
 (defgeneric resolve-application (app &key gate-definitions circuit-definitions)
@@ -78,20 +150,25 @@
     (declare (ignore gate-definitions circuit-definitions))
     app))
 
-(defun resolve-applications (parsed-prog)
-  "Resolve all UNRESOLVE-APPLICATIONs within the executable code of PARSED-PROG."
-  (let ((gate-defs (parsed-program-gate-definitions parsed-prog))
-        (circ-defs (parsed-program-circuit-definitions parsed-prog)))
+(defun resolve-applications (raw-quil)
+  "Resolve all UNRESOLVED-APPLICATIONs within the list RAW-QUIL, returning a PARSED-PROGRAM."
+  (check-type raw-quil list)
+  (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
+      (extract-code-sections raw-quil)
     (flet ((resolve-instruction-sequence (seq)
              (map nil (lambda (thing)
                         (resolve-application thing
                                              :gate-definitions gate-defs
                                              :circuit-definitions circ-defs))
                   seq)))
-      (resolve-instruction-sequence (parsed-program-executable-code parsed-prog))
+      (resolve-instruction-sequence exec-code)
       (map nil (lambda (cd)
                  (let ((*in-circuit-body* t))
                    (resolve-instruction-sequence
                     (circuit-definition-body cd))))
-           circ-defs)))
-  parsed-prog)
+           circ-defs)
+      (make-instance 'parsed-program
+                     :gate-definitions gate-defs
+                     :circuit-definitions circ-defs
+                     :memory-definitions memory-defs
+                     :executable-code (coerce exec-code 'simple-vector)))))

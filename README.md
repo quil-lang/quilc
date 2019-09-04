@@ -11,7 +11,7 @@ Quilc comprises two projects. The first, `cl-quil`, does the heavy
 lifting of parsing, compiling, and optimizing Quil code. The second,
 `quilc`, presents an external interface for using `cl-quil`, either using
 the binary `quilc` application directly, or alternatively by
-communicating with a server (HTTP or [RPCQ](https://github.com/rigetti/rpcq/)).
+communicating with an [RPCQ](https://github.com/rigetti/rpcq/) server.
 
 Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at
 [Rigetti Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
@@ -28,12 +28,21 @@ arbitrary Quil code, either provided directly to the binary or to the
 optimized for the configured instruction set architecture (ISA),
 targeting the native gates specified by the ISA.
 
+
+### Cloning the repository
+
+To clone the quilc repository and its bundled submodules, run the following command:
+
+``` shell
+git clone --recurse-submodules https://github.com/rigetti/quilc.git
+```
+
 ### Building the Quil Compiler
 
 Prerequisites to building `quilc` are:
 
 1. Standard UNIX build tools
-2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
+2. [SBCL](http://www.sbcl.org/) (a recent version, but [*not* SBCL 1.5.6](#sbcl-156)): Common Lisp compiler
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
 4. [ZeroMQ](http://zeromq.org/intro:get-the-software): Messaging library
    required by RPCQ. Development headers are required at build time.
@@ -72,15 +81,10 @@ or (2) communicating with the `quilc` server.
 
 #### quilc
 
-> *Note*: If you're on Windows and using the Command Prompt, the echo
-> command is slightly different to the examples shown below: do not
-> wrap your quil code in quotes. For example, in Command Prompt, you
-> would do `echo H 0 | quilc` *not* `echo "H 0" | quilc`.
-
 The `quilc` binary reads Quil code provided on `stdin`:
 
 ``` shell
-$ echo "H 0" | quilc
+$ echo H 0 | quilc
 $ cat large_file.quil | quilc
 ```
 
@@ -88,40 +92,11 @@ $ cat large_file.quil | quilc
 
 For various reasons (e.g. not having to repeatedly load the `quilc`
 binary into memory, communicating over a network) `quilc` provides a
-server interface. `quilc` currently supports two server modes:
-
-##### HTTP
-
-The HTTP server was the original implementation of the server mode. It is now deprecated in favour
-of the RPCQ server mode. Do not depend on it. You can create the HTTP server with the `-S` flag
-```
-$ quilc -S
-+-----------------+
-|  W E L C O M E  |
-|   T O   T H E   |
-|  R I G E T T I  |
-|     Q U I L     |
-| C O M P I L E R |
-+-----------------+
-Copyright (c) 2016-2019 Rigetti Computing.
-
-
-
->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-The HTTP endpoint has been deprecated in favor of the RPCQ endpoint.  In the
-future, it will be removed.  You're advised to modify your client code to talk
-to the RPCQ version instead.
->>>>>>>>>>>>>>>>>>>>>>>>>>>>> END IMPORTANT NOTICE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
-[2019-01-29 13:59:18] Starting server: 0.0.0.0 : 6000.
-```
-
-##### RPCQ
-
-[RPCQ](https://github.com/rigetti/rpcq/) is an open-source RPC framework developed at Rigetti for
-efficient network communication through the QCS stack. The server is started in RPCQ-mode using
-the `-R` flag
+an [RPCQ](https://github.com/rigetti/rpcq/) server
+interface. [RPCQ](https://github.com/rigetti/rpcq/) is an open-source
+RPC framework developed at Rigetti for efficient network communication
+through the QCS stack. The server is started in RPCQ-mode using the
+`-R` flag
 
 ```
 $ quilc -R
@@ -182,12 +157,28 @@ A few good entry points to exploring the library are:
 * The function `cl-quil:compiler-hook` which constructs a control-flow
   graph (CFG) and then performs various optimizations on the CFG.
 
-## Automated Packaging with Docker
+## Automated Build, Test, and Release with Docker
 
 The CI pipeline for `quilc` produces a Docker image, available at
 [`rigetti/quilc`](https://hub.docker.com/r/rigetti/quilc).
-
 To get the latest stable version of `quilc`, run `docker pull rigetti/quilc`.
+To instead pull a specific version of quilc, run `docker pull rigetti/quilc:VERSION`,
+where `VERSION` is something like `1.10.4`.
+
+The Dockerfile for quilc builds from three parent Docker images:
+
+1. [`rigetti/lisp`](https://hub.docker.com/r/rigetti/lisp): Contains SBCL, Quicklisp, and
+   third-party libraries.
+2. [`rigetti/rpcq`](https://hub.docker.com/r/rigetti/rpcq): Contains the message spec and
+   RPC framework used by quilc.
+3. [`rigetti/qvm`](https://hub.docker.com/r/rigetti/qvm): Contains the Quantum Virtual Machine,
+   used in the quilc tests.
+
+The Dockerfile for quilc intentionally pins the versions of these three images,
+which means that the version numbers must be actively incremented as necessary.
+If the build for quilc is failing, this is probably the place to look, because
+the unit tests are run inside of a freshly-built quilc Docker image as part of
+the GitLab CI pipeline.
 
 ## Running the Quil Compiler with Docker
 
@@ -205,7 +196,7 @@ docker run --rm -it rigetti/quilc
 2. You can alternatively pipe Quil instructions into the `quilc` container if you drop the `-t`.
 
 ```shell
-echo "H 0" | docker run --rm -i rigetti/quilc
+echo H 0 | docker run --rm -i rigetti/quilc
 ```
 
 To run `quilc` in server mode, do the following:
@@ -227,12 +218,25 @@ assigned host ports. You can then inspect the mapping using `docker port CONTAIN
 
 ## Release Process
 
-1. Update `VERSION.txt` and dependency versions (if applicable) and push the commit to `master`.
+1. Update `VERSION.txt` and push the commit to `master`.
 2. Push a git tag `vX.Y.Z` that contains the same version number as in `VERSION.txt`.
 3. Verify that the resulting build (triggered by pushing the tag) completes successfully.
 4. Publish a [release](https://github.com/rigetti/quilc/releases) using the tag as the name.
 5. Close the [milestone](https://github.com/rigetti/quilc/milestones) associated with this release,
    and migrate incomplete issues to the next one.
+6. Update the quilc version of downstream dependencies (if applicable, see next section).
+
+## Downstream Dependencies
+
+Currently, there are a couple different components of the Forest SDK that depend on quilc:
+
+1. [qvm](https://github.com/rigetti/qvm)
+2. [pyquil](https://github.com/rigetti/pyquil)
+3. [forest-benchmarking](https://github.com/rigetti/forest-benchmarking)
+
+It is the responsibility of the releaser to verify that the latest quilc release does not
+break the test suites of these downstream dependencies. All of these repositories pull the
+latest released version of quilc as part of their CI pipelines.
 
 # Get involved!
 
@@ -246,3 +250,16 @@ If you need help with some code or want to discuss some technical issues, you ca
 `#dev` channel on [Slack](https://rigetti-forest.slack.com/).
 
 We look forward to meeting and working with you!
+
+# Incompatible software versions
+
+## SBCL 1.5.6
+
+There is [an issue](https://github.com/rigetti/quilc/issues/401) with
+SBCL 1.5.6 that results in unhandled memory faults in
+`SB-VM::FUNCALLABLE-INSTANCE-TRAMP` when attempting to run quilc
+compiled with that version of SBCL. The issue was resolved with SBCL
+commit
+[550c4d2](https://sourceforge.net/p/sbcl/sbcl/ci/550c4d23c77cc670fb95d7216e3c6d493bbd76eb/). For
+this reason, it's not possible to use quilc or cl-quil with SBCL
+1.5.6, but any other recent SBCL version should work fine.

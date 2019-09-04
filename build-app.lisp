@@ -6,7 +6,6 @@
 (unless *load-truename*
   (error "This file is meant to be loaded."))
 
-(pushnew :hunchentoot-no-ssl *features*)
 (pushnew :drakma-no-ssl *features*)
 
 (require 'asdf)
@@ -36,16 +35,19 @@
                :do (setf (gethash (pathname-name system-file) system-table)
                          (merge-pathnames system-file)))))
          (local-system-search (name)
-           (values (gethash name system-table))))
+           (values (gethash name system-table)))
+         (strip-version-githash (version)
+           (subseq version 0 (position #\- version :test #'eql))))
     (load-systems-table)
     (push #'local-system-search asdf:*system-definition-search-functions*)
     (asdf:load-system "quilc")
     #-win32
     (asdf:load-system "cl-quil/tweedledum")
     ;; TODO Something is broken here. If zap-info is left to do it's thing on
-    ;; Windows, there is a weird error. This is a short-term fix.
+    ;; Windows or SBCL 1.5.6+, there is a weird error. This is a short-term fix.
     #-win32
-    (funcall (read-from-string "quilc::zap-info"))
+    (when (uiop:version< (strip-version-githash (lisp-implementation-version)) "1.5.6")
+      (funcall (read-from-string "quilc::zap-info")))
     (funcall (read-from-string "quilc::setup-debugger"))
     (when (option-present-p "--quilc-sdk")
       (load "app/src/mangle-shared-objects.lisp"))

@@ -1,0 +1,4 @@
+X 0
+# a.k.a CONTROLLED X 2 0. Will introduce a rewiring for targets where
+# qubits 2 and 0 are not adjacent.
+CONTROLLED FORKED X 2 1 0

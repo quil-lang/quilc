@@ -181,5 +181,4 @@ a list of the original memory descriptors (to which the user can write
 any value, which is not allowed for the new descriptor, _p) as well as
 a mapping from _p[i] to the original delayed expression of the ith
 gate with parameter arithmetic."
-  process-includes
   expand-circuits)

@@ -70,12 +70,6 @@
     (#.(string #\Tab) :indentation)
     (#.(format nil "~C    ~C    " #\Tab #\Tab) :indentation)))
 
-(deftest test-nsplit ()
-  "Test that NSPLIT works."
-  (is (null (quil::nsplit 'x nil)))
-  (is (equalp '((1) (2 3 4) (5 6)) (quil::nsplit 'x (list 'x 1 'x 2 3 4 'x 5 6 'x 'x))))
-  (is (equalp '((1 2 3 4 5 6))     (quil::nsplit 'x (list 1 2 3 4 5 6)))))
-
 (defun token-type-or-newline (tok)
   (if (eq tok ':newline)
       ':newline

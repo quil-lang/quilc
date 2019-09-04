@@ -59,11 +59,27 @@
                                                      (quil.clifford:pauli-from-symbols '(I Y X)))
                             (quil.clifford:pauli-from-symbols '(I Z Y) 2)))
 
-  (is (quil.clifford:pauli= (quil.clifford:embed (quil.clifford:pauli-from-symbols '(X Y) 2) 4 '(2 1))
+  (is (quil.clifford:pauli= (quil.clifford:embed (quil.clifford:pauli-from-symbols '(X Y) 2) 4 '(1 2))
                             (quil.clifford:pauli-from-symbols '(I Y X I) 2)))
 
   (is (quil.clifford:pauli= (quil.clifford:tensor-mul quil.clifford::+X+ quil.clifford::+Z+)
                             (quil.clifford:pauli-from-symbols '(X Z)))))
+
+(deftest test-pauli-integer ()
+  (flet ((int (s)
+           (cl-quil.clifford::pauli-integer
+            (cl-quil.clifford:pauli-from-string s))))
+    (loop :for i :from 1 :to 10 :do
+      (is (= 0 (int (make-string i :initial-element #\I)))))
+    (is (= 1 (int "iI")))
+    (is (= 2 (int "-I")))
+    (is (= 3 (int "-iI")))
+    (is (= 4 (int "X")))
+    (is (= 4 (int "IIIIX")))
+    (loop :for n :from 1 :to 9 :do
+      (is (loop :for i :below (expt 4 (1+ n))
+                :always (= i (cl-quil.clifford::pauli-integer
+                              (cl-quil.clifford::integer-pauli i n))))))))
 
 (deftest test-clifford-identity ()
   (loop :for i :from 1 :to 10 :do
@@ -86,7 +102,7 @@
         )
     (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:clifford-identity 3) xyz)
                               xyz))
-    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:hadamard 3 2) xyz)
+    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:hadamard 3 0) xyz)
                               xyx))
     (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford::clifford-from-pauli (quil.clifford:pauli-from-symbols '(Z Y Z))) xyz)
                               (quil.clifford:pauli-from-symbols '(X Y Z) 2)))
@@ -294,3 +310,10 @@
     (is (cl-quil.clifford::global-phase~
          phased-bell-wf
          (cl-quil.clifford::tableau-wavefunction phased-bell-tab)))))
+
+(deftest test-clifford-as-perm ()
+  (loop :for i :from 1 :to 4 :do
+    (format t "~&    Testing n=~D..." i)
+    (is (= (cl-quil.clifford:count-clifford i)
+           (perm:group-order (cl-quil.clifford::clifford-group-as-perm-group i))))
+    (finish-output)))

@@ -39,7 +39,8 @@
     (def number-list       number-list-p       list     number)
     (def symbol-list       symbol-list-p       list     symbol)
     (def string-sequence   string-sequence-p   sequence string)
-    (def integeropt-vector integeropt-vector-p vector   (or null integer))))
+    (def integeropt-vector integeropt-vector-p vector   (or null integer))
+    (def integer-vector    integer-vector-p    vector   integer)))
 
 (deftype unsigned-fixnum ()
   `(and fixnum unsigned-byte))

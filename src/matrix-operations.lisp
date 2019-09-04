@@ -108,7 +108,6 @@ as needed so that they are the same size."
  than 'physical', qubits. When :COMPRESS-QUBITS is enabled (default:
  nil), qubit indices are permuted to minimize matrix size."
   (when compress-qubits
-    (setf pp (transform 'process-includes pp nil))
     (setf pp (transform 'compress-qubits pp)))
   ;; to handle a l2p rewiring, we need to conjugate the "physical"
   ;; matrix of a block by the permutation matrix associated with the
@@ -119,27 +118,15 @@ as needed so that they are the same size."
     :with rewiring := (make-rewiring 1)
     :for instr :across (parsed-program-executable-code pp)
     :do (progn
-          (flet ((apply-entering-rewiring (instr &optional vector)
-                   (let* ((*read-eval* nil)
-                          (raw-rewiring (if vector
-                                            (make-rewiring-from-l2p vector)
-                                            (make-rewiring-from-string
-                                             (subseq (comment instr)
-                                                     (length "Entering rewiring: ")))))
-                          (trimmed (trim-rewiring raw-rewiring)))
+          (flet ((apply-entering-rewiring (raw-rewiring)
+                   (let ((trimmed (trim-rewiring raw-rewiring)))
                      (setf mat (reduce #'matrix-rescale-and-multiply
                                        (list (rewiring-to-permutation-matrix-l2p trimmed)
                                              (rewiring-to-permutation-matrix-p2l rewiring)
                                              mat))
                            rewiring trimmed)))
-                 (apply-exiting-rewiring (instr &optional vector)
-                   (let* ((*read-eval* nil)
-                          (raw-rewiring (if vector
-                                            (make-rewiring-from-l2p vector)
-                                            (make-rewiring-from-l2p
-                                             (read-from-string (subseq (comment instr)
-                                                                       (length "Exiting rewiring: ")))))))
-                     (setf rewiring (trim-rewiring raw-rewiring))))
+                 (apply-exiting-rewiring (raw-rewiring)
+                   (setf rewiring (trim-rewiring raw-rewiring)))
                  (apply-instr (instr)
                    (typecase instr
                      (gate-application
@@ -150,28 +137,19 @@ as needed so that they are the same size."
                       t)
                      (pragma
                       t)
-                     (otherwise 
+                     (otherwise
                       (error "Instruction ~a is not a gate application." instr)))))
-            (cond
-              ((and (comment instr)
-                    (uiop:string-prefix-p "Entering/exiting rewiring: " (comment instr)))
-               (let ((*read-eval* nil))
-                 (destructuring-bind (entering-vector . exiting-vector)
-                     (read-from-string (subseq (comment instr)
-                                               (length "Entering/exiting rewiring: ")))
-                   (apply-entering-rewiring instr entering-vector)
-                   (apply-instr instr)
-                   (apply-exiting-rewiring instr exiting-vector))))
-              (t
-               (when (and (comment instr)
-                          (uiop:string-prefix-p "Entering rewiring: " (comment instr)))
-                 (apply-entering-rewiring instr))
-               (apply-instr instr)
-               (when (and (comment instr)
-                          (uiop:string-prefix-p "Exiting rewiring: " (comment instr)))
-                 (apply-exiting-rewiring instr)))))
+
+            (multiple-value-bind (entering-rewiring exiting-rewiring) (instruction-rewirings instr)
+              (when (not (null entering-rewiring))
+                (apply-entering-rewiring entering-rewiring))
+              (apply-instr instr)
+              (when (not (null exiting-rewiring))
+                (apply-exiting-rewiring exiting-rewiring))))
+
           (when (typep instr 'halt)
             (loop-finish)))
+
     :finally (return (matrix-rescale-and-multiply
                       (rewiring-to-permutation-matrix-p2l rewiring)
                       mat))))
@@ -203,6 +181,21 @@ as needed so that they are the same size."
 (defun random-special-unitary (n)
   (let ((m (magicl:random-unitary n)))
     (magicl:scale (expt (magicl:det m) (/ (- n))) m)))
+
+(defun random-wavefunction (n-qubits)
+  "Get a random complex unit vector with (EXPT 2 N-QUBITS) entries."
+  (let ((size (expt 2 n-qubits)))
+    (loop :repeat size
+          :for c := (complex (a:gaussian-random)
+                             (a:gaussian-random))
+          :collect c :into entries
+          :sum (expt (abs c) 2) :into norm-squared
+          :finally
+             (return (make-array size
+                                 :initial-contents
+                                 (let ((scaling-factor (/ (sqrt norm-squared))))
+                                   (mapcar (lambda (c) (* scaling-factor c)) entries))
+                                 :element-type '(complex double-float))))))
 
 (defun orthonormalize-matrix (m)
   "Applies Gram-Schmidt to the columns of a full rank square matrix to produce a unitary matrix."
@@ -276,7 +269,7 @@ as needed so that they are the same size."
         (loop :for u :in ret :do
           (setf v (vector-difference v (vector-scale (dot-product v u) u))))
         (when (not (double= 0 (norm v)))
-          (setf ret (cons (vector-scale (/ 1 (norm v)) v) ret)))))
+          (push (vector-scale (/ (norm v)) v) ret))))
     ret))
 
 (defun collinearp (vect1 vect2)

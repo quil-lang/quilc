@@ -66,6 +66,19 @@
 ;;; helper functions for algebraically-reduce-instructions, including the doubly-linked
 ;;; list structure peephole-rewriter-node which is used for rewinding the peephole rewriter
 
+(defun calculate-instructions-2q-depth (instructions)
+  (let ((lschedule (make-lscheduler)))
+    (append-instructions-to-lschedule lschedule instructions)
+    (or (lscheduler-walk-graph lschedule
+                               :base-value 0
+                               :bump-value (lambda (instr value)
+                                             (if (and (typep instr 'gate-application)
+                                                      (< 1 (length (application-arguments instr))))
+                                                 (1+ value)
+                                                 value))
+                               :test-values #'max)
+        0)))
+
 (defun calculate-instructions-duration (instructions chip-specification)
   "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
   (let ((lschedule (make-lscheduler)))
@@ -216,14 +229,18 @@ other's."
                                           context)
   "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      (;; let the context know that we've passed inspection of NODE, so that the
+      ( ;; utility for calculating how many instructions a rewriting rule requests
+       (rewriting-rule-count (compiler)
+         (length (cleave-options (compiler-bindings compiler))))
+       
+       ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
        (update-context (node)
          (setf (peephole-rewriter-node-context node)
-               (update-compressor-context (peephole-rewriter-node-context
-                                           (peephole-rewriter-node-prev node))
-                                          (peephole-rewriter-node-instr node)
-                                          :destructive? nil)))
+               (update-compilation-context (peephole-rewriter-node-context
+                                            (peephole-rewriter-node-prev node))
+                                           (peephole-rewriter-node-instr node)
+                                           :destructive? nil)))
 
        ;; having selected an appropriate sequence of instructions, actually
        ;; apply the available rewriting rules. if we find one that applies,
@@ -241,14 +258,15 @@ other's."
                             ;; TODO: consider calculating this subseq only once.
                             (subseq nodes-for-inspection 0 (rewriting-rule-count rule)))))
                    (let ((output
-                           (apply (rewriting-rule-consumer rule)
-                                  (peephole-rewriter-node-context
-                                   (peephole-rewriter-node-prev
-                                    (first relevant-nodes-for-inspection)))
-                                  (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection))))
+                           (apply rule
+                                  (append
+                                   (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection)
+                                   (list ':context (peephole-rewriter-node-context
+                                                    (peephole-rewriter-node-prev
+                                                     (first relevant-nodes-for-inspection))))))))
                      (format *compiler-noise-stream*
                              "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~a.~%"
-                             (rewriting-rule-readable-name rule))
+                             (compiler-name rule))
                      ;; if the rule was triggered, splice it in and remove
                      ;; all of the instructions that the rule touched.
                      ;;
@@ -269,7 +287,7 @@ other's."
        ;; successfully, we rewind by the peephole window and try again. if it
        ;; fails, we fall through, step through to the next node, and try again.
        (outer-instruction-loop (node)
-         (do (;; for each instruction...
+         (do ( ;; for each instruction...
               (node #1=(peephole-rewriter-node-next node) #1#))
              ((null node))
            (update-context node)
@@ -290,7 +308,7 @@ other's."
                  ;; enlarge the complex
                  (setf qubit-complex (union qubit-complex new-complex))
                  ;; try to find an associated hardware object for this complex
-                 (let ((obj (nth-value 2 (lookup-hardware-address-by-qubits chip-specification qubit-complex))))
+                 (let ((obj (lookup-hardware-object-by-qubits chip-specification qubit-complex)))
                    ;; if we can, then we want to loop over the object's rewrite rules.
                    ;; if we can't, we fall through and do nothing.
                    (a:when-let
@@ -346,12 +364,11 @@ other's."
       ;; otherwise, we have a quantum instruction
       (t
        ;; try to locate it on hardware.
-       (let ((obj (nth-value 2 (lookup-hardware-address chip instr)))
+       (let ((obj (lookup-hardware-object chip instr))
              (translation-results nil))
          (cond
            ;; are we native? then stick this instruction onto the output.
-           ((and obj
-                 (funcall (hardware-object-native-instructions obj) instr))
+           ((and obj (hardware-object-native-instruction-p obj instr))
             (pop instructions)
             (push instr processed))
            ;; apply a translation and use those instructions instead.
@@ -413,8 +430,8 @@ other's."
               chip-specification))))
 
       (destructuring-bind (start-wf wf-qc)
-          (if (compressor-context-aqvm context)
-              (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
+          (if (compilation-context-aqvm context)
+              (aqvm-extract-state (compilation-context-aqvm context) qubits-on-obj)
               '(:not-simulated :not-simulated))
         ;; there's one case where we know state prep applies: when qubits-on-obj
         ;; exhausts wf-qc. in this case, wf corresponds to a single column of the
@@ -449,8 +466,7 @@ other's."
   ;;      off the qubit complex because a state-preparation circuit might
   ;;      involve a strictly larger qubit complex than the one associated to
   ;;      the original instruction sequence.
-  (let ((qubits-on-obj (or (qubits-in-instr-list decompiled-instructions)
-                           (qubits-in-instr-list instructions))))
+  (let ((qubits-on-obj (qubits-in-instr-list (append decompiled-instructions instructions))))
     (labels
         ((check-quil-agrees-as-matrices ()
            (let* ((relabeling
@@ -536,7 +552,7 @@ other's."
                                            (+ n (* n n))))
                         (ls-reduced (make-lscheduler))
                         (ls-reduced-decompiled (make-lscheduler))
-                        (chip-spec (compressor-context-chip-specification context)))
+                        (chip-spec (compilation-context-chip-specification context)))
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert (>= (* trace-fidelity
@@ -549,7 +565,7 @@ other's."
                             sequence.")))))))
 
       (destructuring-bind (start-wf wf-qc)
-          (aqvm-extract-state (compressor-context-aqvm context) qubits-on-obj)
+          (aqvm-extract-state (compilation-context-aqvm context) qubits-on-obj)
         (when (and (not (eql ':not-simulated start-wf))
                    *enable-state-prep-compression*)
           (let ((final-wf (nondestructively-apply-instrs-to-wf instructions
@@ -565,10 +581,23 @@ other's."
           (t
            (check-quil-agrees-as-matrices)))))))
 
-
 (defun compress-instructions-in-context (instructions chip-specification context)
   "Dispatch routine for doing rewriting, algebraic and linear-algebraic, on a sequence of INSTRUCTIONS."
-  (handler-case
+  (handler-bind ((error (lambda (c)
+                          (declare (ignore c))
+                          (let ((*print-circle* nil)
+                                (*print-pretty* nil)
+                                (*print-fractional-radians* nil))
+                            (write-line "A violent error occurred when compressing a subsequence." *error-output*)
+                            (write-line "The offending subsequence is:" *error-output*)
+                            (print-code-list instructions *error-output*)
+                            (write-line "The current compression context is:" *error-output*)
+                            (princ context *error-output*)
+                            (finish-output *error-output*)
+                            ;; We explicitly do *NOT* handle the error
+                            ;; here. We just want to indicate to the
+                            ;; user that an error happened down here.
+                            ))))
       ;; start by making a decision about how we're going to do linear algebraic compression
       (let ((decompiled-instructions (decompile-instructions-in-context instructions
                                                                         chip-specification
@@ -608,18 +637,7 @@ other's."
           (format-quil-sequence *compiler-noise-stream*
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
-          result-instructions))
-    (error (c)
-      (let ((*print-circle* nil)
-            (*print-pretty* nil)
-            (*print-fractional-radians* nil))
-        (write-line "A violent error occurred when compressing a subsequence." *error-output*)
-        (write-line "The offending subsequence is:" *error-output*)
-        (print-code-list instructions *error-output*)
-        (write-line "The current compression context is:" *error-output*)
-        (princ context *error-output*)
-        (finish-output *error-output*))
-      (error c))))
+          result-instructions))))
 
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
@@ -643,6 +661,8 @@ other's."
            ;; grouping together blocks by their determination type, this extracts
            ;; the top two blocks of instructions
            (grab-first-two-blocks (instructions)
+             (when (endp instructions)
+               (return-from grab-first-two-blocks nil))
              (let ((first-type (instruction-type (first instructions)))
                    second-type
                    first-block
@@ -695,7 +715,7 @@ other's."
       (let ((new-context context))
         (dolist (instr first-block)
           (setf new-context
-                (update-compressor-context new-context instr
+                (update-compilation-context new-context instr
                                            :destructive? nil)))
         (return-from compress-instructions-with-possibly-unknown-params
           (compress-instructions-with-possibly-unknown-params
@@ -715,9 +735,9 @@ other's."
     ))
 
 (defstruct governed-queue
-  (state :empty)
-  (contents nil)
-  (resources (make-null-resource)))
+  (state     ':empty              :type governor-state)
+  (resources (make-null-resource) :type resource-collection)
+  (contents  nil))
 
 (defun set-gq-fields (queue state contents resources)
   (setf (governed-queue-state queue) state)
@@ -739,9 +759,9 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
          (n-qubits (chip-spec-n-qubits chip-specification))
          (governors (make-list (length (chip-specification-objects chip-specification))))
          (global-governor (make-governed-queue))
-         (context (set-up-compressor-context :qubit-count n-qubits
-                                             :simulate (and *enable-state-prep-compression* protoquil)
-                                             :chip-specification chip-specification)))
+         (context (set-up-compilation-context :qubit-count n-qubits
+                                              :simulate (and *enable-state-prep-compression* protoquil)
+                                              :chip-specification chip-specification)))
     (labels (;; these are some routines that govern the behavior of the massive FSM
              ;; we're constructing.
              ;;
@@ -1024,7 +1044,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                     :downto 0
                     :do (dotimes (address (length (nth order governors)))
                           (transition-governor-state order address ':flushing)))
-                  (update-compressor-context context instr :destructive? t)
+                  (update-compilation-context context instr :destructive? t)
                   ;; and output this instruction
                   (push instr output))
 
@@ -1053,7 +1073,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                     ;; if we were passing, this might be a two-flusher.
                                     (unless (eq (governed-queue-state governed-queue) ':empty)
                                       (transition-governor-state order address ':flushing))))))
-                    (update-compressor-context context instr :destructive? t))
+                    (update-compilation-context context instr :destructive? t))
                   ;; and write out the instruction
                   (push instr output))
 
@@ -1079,7 +1099,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                        (apply #'process-instruction instr
                               (governed-queue-contents governed-queue)))
                       (:flushing
-                       (update-compressor-context context instr :destructive? t)
+                       (update-compilation-context context instr :destructive? t)
                        (push instr output))
                       (:fragile
                        (transition-governor-state order address ':flushing)
@@ -1101,7 +1121,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
       ;; iterate over the incoming instructions
       (dolist (instr instructions)
         (process-instruction instr)
-        (clean-up-compressor-context context :destructive? t))
+        (clean-up-compilation-context context :destructive? t))
       ;; we're done processing the instructions, but the queueing system might
       ;; still have gunk left in it.  flush all of the governors, biggest first
       (transition-governor-state ':global ':global ':flushing)

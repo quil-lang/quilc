@@ -136,8 +136,15 @@ DEFGATE PSWAP(%theta):
     0, cis(%theta), 0,           0
     0, 0,           0,           1
 
+# Lesser-known standard gates
 DEFGATE PISWAP(%theta):
     1, 0,               0,               0
     0, cos(%theta/2),   i*sin(%theta/2), 0
     0, i*sin(%theta/2), cos(%theta/2),   0
     0, 0,               0,               1
+
+DEFGATE CAN(%alpha, %beta, %gamma):
+    (cis((%alpha+%beta-%gamma)/2)+cis((%alpha-%beta+%gamma)/2))/2, 0, 0, (cis((%alpha-%beta+%gamma)/2)-cis((%alpha+%beta-%gamma)/2))/2
+    0, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, 0
+    0, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, 0
+    (cis((%alpha-%beta+%gamma)/2)-cis((%alpha+%beta-%gamma)/2))/2, 0, 0, (cis((%alpha+%beta-%gamma)/2)+cis((%alpha-%beta+%gamma)/2))/2

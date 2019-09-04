@@ -10,19 +10,32 @@
    "tests/compiler-hook-test-files/"))
 
 (defun attach-rewirings-to-program (pp in-rewiring-vector out-rewiring-vector)
-  (let ((code (quil::parsed-program-executable-code pp)))
-    (cond
-      ((< (length code) 1)
-       (error "Cannot attach rewirings to program with no instructions"))
-      ((= (length code) 1)
-       (setf (quil::comment (aref code 0))
-	     (format nil "Entering/exiting rewiring: (~a . ~a)" in-rewiring-vector out-rewiring-vector)))
-      (t
-       (setf (quil::comment (aref code 0))
-             (format nil "Entering rewiring: ~a" in-rewiring-vector))
-       (setf (quil::comment (aref code (1- (length code))))
-             (format nil "Exiting rewiring: ~a" out-rewiring-vector)))))
+  (check-type in-rewiring-vector (or null quil::integer-vector))
+  (check-type out-rewiring-vector (or null quil::integer-vector))
+
+  (unless (and (null in-rewiring-vector) (null out-rewiring-vector))
+    (let ((code (quil::parsed-program-executable-code pp)))
+      (cond
+        ((< (length code) 1)
+         (error "Cannot attach rewirings to program with no instructions"))
+        ((= (length code) 1)
+         (setf (quil::comment (aref code 0))
+               (quil::make-rewiring-comment :entering in-rewiring-vector
+                                            :exiting out-rewiring-vector)))
+        (t
+         (when (not (null in-rewiring-vector))
+           (setf (quil::comment (aref code 0))
+                 (quil::make-rewiring-comment :entering in-rewiring-vector)))
+         (when (not (null out-rewiring-vector))
+           (setf (quil::comment (aref code (1- (length code))))
+                 (quil::make-rewiring-comment :exiting out-rewiring-vector)))))))
   pp)
+
+(defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)
+  (dolist (compress-qubits '(nil t))
+    (is (quil::operator=
+         (quil::parsed-program-to-logical-matrix pp-a)
+         (quil::parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
 
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
@@ -35,8 +48,7 @@ CNOT 0 1
 CNOT 0 2
 ")
                                                  #(2 0 1) #(2 0 1))))
-    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+    (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-parsed-program-to-logical-matrix-swap-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix converts equivalent
@@ -49,8 +61,7 @@ SWAP 0 1"))
 CNOT 0 1
 Z 0")
                                                  #(0 1) #(1 0))))
-    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+    (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-parsed-program-to-logical-matrix-entering-exiting-rewiring ()
   "Test whether quil::parsed-program-to-logical-matrix handles single-instruction entering/exiting
@@ -61,37 +72,33 @@ SWAP 0 1"))
         (pp-rewired (attach-rewirings-to-program (quil::parse-quil "
 CNOT 0 1")
                                                  #(0 1) #(1 0))))
-    (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                         (quil::parsed-program-to-logical-matrix pp-rewired)))))
+    (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-rewiring-modes ()
   "Iterates over the rewiring modes and tests that the addresser is well-behaved on each of them."
   ;; first, the straight-line rewiring methods
   (dolist (quil::*initial-rewiring-default-type* '(:naive :random :partial :greedy))
     (format t "~&    Testing rewiring type ~A~%" quil::*initial-rewiring-default-type*)
-    (finish-output)
-    (let* ((pstring "
-CNOT 0 2
-CNOT 1 3")
-           (pp (quil::parse-quil pstring))
-           (cpp (quil::compiler-hook (quil::parse-quil pstring)
-                                     (quil::build-nQ-linear-chip 4)
-                                     :protoquil t)))
-      (is (quil::operator= (quil::parsed-program-to-logical-matrix pp)
-                           (quil::parsed-program-to-logical-matrix cpp)))))
+    (dolist (pstring (list "CNOT 2 0" (format nil "CNOT 0 2~%CNOT 1 3")))
+      (let* ((pp (quil::parse-quil pstring))
+             (cpp (quil::compiler-hook (quil::parse-quil pstring)
+                                       (quil::build-nQ-linear-chip (quil:qubits-needed pp))
+                                       :protoquil t)))
+        (format t "~&        Testing program ~A~%" (parsed-program-executable-code pp))
+        (finish-output)
+        (%parsed-program-to-logical-matrix-rewiring-test pp cpp))))
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
   (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
     (format t "~&    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
     (finish-output)
-    (let* ((pp (quil::parse-quil-into-raw-program "
+    (let* ((pp (quil::parse-quil "
 LABEL @a
 CNOT 0 1
 CNOT 1 2
 CNOT 0 2
 JUMP @a")))
-      (quil::compiler-hook pp (quil::build-8Q-chip))
-      (is t))))
+      (not-signals error (quil::compiler-hook pp (quil::build-8Q-chip))))))
 
 (defun compare-compiled (file architecture)
   (let* ((orig-prog (quil::transform 'quil::compress-qubits
@@ -99,11 +106,15 @@ JUMP @a")))
          (proc-prog
            (quil::compiler-hook (quil::transform 'quil::compress-qubits
                                                  (cl-quil::read-quil-file file))
-                                (quil::build-nQ-linear-chip 5 :architecture architecture))))
+                                (quil::build-nQ-linear-chip 5 :architecture architecture)
+                                :protoquil t)))
     (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                  (quil::parsed-program-to-logical-matrix proc-prog)))))
+                                  (quil::parsed-program-to-logical-matrix proc-prog)))
+    (list
+     (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
+                                                    'list)))))
 
-(deftest test-compiler-hook ()
+(deftest test-compiler-hook (&key print-stats)
   "Test whether the compiler hook preserves semantic equivalence for
 some test programs."
   (finish-output *debug-io*)
@@ -114,7 +125,9 @@ some test programs."
         (format *debug-io* "      Testing file ~a:" (pathname-name file))
         (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
           (format *debug-io* " ~a" architecture)
-          (compare-compiled file architecture))
+          (let ((stats (compare-compiled file architecture)))
+            (when print-stats
+              (format *debug-io* "~a" stats))))
         (terpri *debug-io*)))))
 
 (deftest test-compression-bug-QUILC-152 ()
@@ -146,7 +159,7 @@ RX(pi) 2
     (CL-QUIL::COMPRESS-INSTRUCTIONS-IN-CONTEXT
      (coerce instructions 'list)
      (quil::build-nQ-linear-chip 4 :architecture ':cphase)
-     (quil::set-up-compressor-context :qubit-count 4 :simulate t))))
+     (quil::set-up-compilation-context :qubit-count 4 :simulate t))))
 
 (defun shuffle-list (l &optional (k nil))
         (let* ((elt (nth (random (length l)) l))
@@ -204,7 +217,7 @@ MEASURE 0 ro[1]"))
 (deftest test-compiler-hook-reset-naive-rewiring ()
   ;; Note this numbering depends on the fact that the CZ gates are
   ;; native on the 8Q chip.
-  (let* ((pp (quil::parse-quil-into-raw-program "
+  (let* ((pp (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"NAIVE\"
 CZ 1 2
 CZ 3 4
@@ -220,7 +233,7 @@ CZ 5 6
                                (_ nil))))))))
 
 (deftest test-compiler-hook-reset-partial-rewiring ()
-  (let* ((pp (quil::parse-quil-into-raw-program "
+  (let* ((pp (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"PARTIAL\"
 CZ 1 2
 CZ 7 6
@@ -237,7 +250,7 @@ CZ 2 7
 
 (deftest test-compiling-empty-program ()
   "Test that an empty program goes through the pipes correctly."
-  (let* ((pp (quil::parse-quil-into-raw-program ""))
+  (let* ((pp (quil::parse-quil ""))
          (processed-program (quil::compiler-hook pp (quil::build-8Q-chip))))
     (is (every (lambda (isn)
                  (or (typep isn 'quil:halt)
@@ -263,9 +276,7 @@ CZ 2 7
                                                p)))))))
                                  (application-parameters instr))))
 
-         (make-pp ()
-           (quil::transform 'quil::resolve-applications
-                            (quil::parse-quil-into-raw-program program-string))))
+         (make-pp () (quil::parse-quil program-string :transforms nil)))
     (let* ((chip (quil::build-8Q-chip :architecture ':cz))
            (processed-pp (compiler-hook (make-pp) chip))
            (orig-pp (make-pp)))
@@ -317,7 +328,7 @@ CNOT 1 2"))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
-  (let ((pp (quil::parse-quil-into-raw-program "
+  (let ((pp (quil::parse-quil "
 DECLARE beta REAL[1]
 DECLARE gamma REAL[1]
 DECLARE ro BIT[3]
@@ -354,7 +365,6 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]
 ")))
-    (quil::transform 'quil::resolve-applications pp)
     (multiple-value-bind (initial code final)
         (quil::do-greedy-temporal-addressing
             (coerce (parsed-program-executable-code pp) 'list)
@@ -466,7 +476,7 @@ MEASURE 1
 
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
-  (let ((p (quil::compiler-hook (quil::parse-quil-into-raw-program "
+  (let ((p (quil::compiler-hook (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
                                 (quil::build-8Q-chip)))
@@ -478,12 +488,10 @@ CCNOT 0 1 2")
            (cond
              ((not (typep instr 'gate-application))
               value)
-             (t
-              (quil::operator-match
-                (((("CZ" () _ _) instr))
-                 (1+ value))
-                (_
-                 value))))))
+             ((adt:with-data (named-operator name) (application-operator instr)
+                (string= "CZ" name))
+              (1+ value))
+             (t value))))
       (let ((CZ-depth (quil::lscheduler-walk-graph ls :bump-value #'value-bumper)))
         (is (>= 8 CZ-depth))))))
 
@@ -499,6 +507,5 @@ CCNOT 0 1 2")
     (multiple-value-bind (order index obj)
         (quil::lookup-hardware-address-by-qubits chip (list 1 2))
       (declare (ignore order index))
-      (is (= (funcall (quil::hardware-object-native-instructions obj)
-                      (quil::build-gate "CZ" () 1 2))
+      (is (= (quil::hardware-object-native-instruction-p obj (quil::build-gate "CZ" () 1 2))
              (quil::chip-schedule-resource-carving-point sched (quil::make-qubit-resource 1 2)))))))

@@ -33,19 +33,22 @@
     (remove-duplicates
     (loop :for instr :across (quil::parsed-program-executable-code parsed-program)
           :when (typep instr 'quil::measure)
-            :collect (quil::address-value
+            :collect (quil::memory-ref-position
                       (quil::measure-address
                        instr))))))
 
 (defmethod consume-quil ((consumer consumer-local-qvm) parsed-program)
-  "Runs a Quil program on the local QVM."
+  "This function runs a Quil program on the QVM, and returns a histogram of counts of each resulting bitstring ordered lexicographically.
+
+For a program constructing a bell state with a large sampling count, the returned value would be (<large-number> 0 0 <large-number>)."
   (case (consumer-local-qvm-interface-mode consumer)
     (:http
      (let* ((quil-instructions
               (with-output-to-string (s)
                 (quil::print-parsed-program parsed-program s)))
             (classical-addresses
-              (get-consumer-registers consumer parsed-program))
+              (a:plist-hash-table
+                (list "ro" (get-consumer-registers consumer parsed-program))))
             (qvm-payload (yason:encode
                           (a:plist-hash-table
                            (list "type" "multishot"
@@ -59,9 +62,10 @@
                                    :content (with-output-to-string (s)
                                               (yason:encode qvm-payload s))
                                    :content-type "application/json; charset=utf-8"))
+            (parsed-response (yason:parse qvm-response))
             (counts
-              (loop :with ret := (make-list (expt 2 (length classical-addresses)) :initial-element 0)
-                    :for result :in (yason:parse qvm-response)
+              (loop :with ret := (make-list (expt 2 (length (gethash "ro" classical-addresses))) :initial-element 0)
+                    :for result :in (gethash "ro" parsed-response)
                     :do (incf (nth
                                (let ((n 0))
                                  (dolist (x result)
@@ -69,7 +73,8 @@
                                  n)
                                ret))
                     :finally (return ret))))
-       (mapcar (lambda (n) (coerce (/ n (consumer-local-qvm-trials consumer)) 'double-float)) counts)))
+       counts
+       ))
     (:shared-memory
      (error "Shared memory mode not implemented."))))
 

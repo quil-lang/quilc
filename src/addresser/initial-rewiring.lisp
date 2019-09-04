@@ -10,8 +10,8 @@
 
 (in-package #:cl-quil)
 
-(defparameter *initial-rewiring-default-type* ':naive
-  "Determines the default initial rewiring type when not provided and no PRAGMA present.
+(defparameter *initial-rewiring-default-type* ':partial
+  "Determines the default initial rewiring type when not provided and PROG-INITIAL-REWIRING-HEURISTIC cannot determine that a NAIVE rewiring is \"safe\".
 
 PARTIAL: Start with a completely empty rewiring.
 GREEDY: Attempt to rewire greedily based on distance of 2-qubit gates.
@@ -154,17 +154,38 @@ If no
 
     PRAGMA INITIAL_REWIRING \"...\"
 
-is found, then it will return *INITIAL-REWIRING-DEFAULT-TYPE*."
+is found, then return NIL"
   (loop :for inst :across (parsed-program-executable-code parsed-prog) :do
     (cond
       ((typep inst 'pragma)
        (when (typep inst 'pragma-initial-rewiring)
          (return-from prog-rewiring-pragma (pragma-rewiring-type inst))))
       (t
-       (return))))
-  ;; If we didn't find anything, no instructions, nothing!, then just
-  ;; return the default.
-  *initial-rewiring-default-type*)
+       (return-from prog-rewiring-pragma nil)))))
+
+(defun %naively-applicable-p (gate-app chip-spec
+                              &aux (qubit-indices (application-qubit-indices gate-app)))
+  "Return true if the given GATE-APP's arguments correspond to a valid HARDWARE-OBJECT in CHIP-SPEC."
+  (and (not (null (lookup-hardware-object-by-qubits chip-spec qubit-indices)))
+       (or (/= 1 (length qubit-indices))
+           (not (chip-spec-qubit-dead? chip-spec (first qubit-indices))))))
+
+(defun %filter-gate-applications (parsed-prog)
+  "Remove non-GATE-APPICATION's from PARSED-PROG's instruction sequence."
+  (remove-if-not #'gate-application-p
+                 (parsed-program-executable-code parsed-prog)))
+
+(defun prog-initial-rewiring-heuristic (parsed-prog chip-spec)
+  "Return a resonable guess at the initial rewiring for PARSED-PROG that is compatible with CHIP-SPEC.
+
+If PARSED-PROG contains an explicit PRAGMA INITIAL_REWIRING, respect it.
+Otherwise, if every GATE-APPLICATION in PARSED-PROG can use a NAIVE rewiring, return ':NAIVE.
+Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
+  (or (prog-rewiring-pragma parsed-prog)
+      (and (every (a:rcurry #'%naively-applicable-p chip-spec)
+                  (%filter-gate-applications parsed-prog))
+           ':naive)
+      *initial-rewiring-default-type*))
 
 ;;; We need to find some rewiring that makes sure that connected qubits all
 ;;; appear in the same location on the QPU. We make the assumption that

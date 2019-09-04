@@ -16,10 +16,9 @@
                #:cl-quil
                #:cl-quil-benchmarking
                #:uiop
-               #:hunchentoot          ; deprecated
-               #:bordeaux-threads     ; deprecated
+               #:bordeaux-threads
                #:cl-syslog
-               #:rpcq                 ; to replace HUNCHENTOOT and B-T
+               #:rpcq
                #:drakma
                #:trivial-features     ; for portable *features*
                #:alexandria
@@ -30,12 +29,12 @@
                       (funcall compile)))
   :serial t
   :components ((:file "package")
+               (:file "globals")
                (:file "versions")
                #+sbcl
                (:file "impl/sbcl")
                #+clozure
                (:file "impl/clozure")
-               (:file "web-server")
                (:file "rpc-server")
                (:file "printers")
                (:file "entry-point")))

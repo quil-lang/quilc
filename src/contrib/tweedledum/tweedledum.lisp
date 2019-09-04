@@ -40,10 +40,11 @@
 
 ;; TODO  ecpeterson a minute ago
 ;;         As the overripe plum scent might indicate, some changes will probably need to be made
-(defun compile-perm-gate-with-tweedledum (instr)
+(defun compile-perm-gate-with-tweedledum (instr &key context)
   "Compile the cl-quil instruction INSTR using tweedledum's permutation gate
 compilation routines. Conforms to the cl-quil compiler interface, and calls
 GIVE-UP-COMPILATION if INSTR is not a permutation gate."
+  (declare (ignore context))
   (unless (slot-boundp instr 'quil::name-resolution)
     (quil::give-up-compilation))
   (let ((res (quil::gate-application-resolution instr)))

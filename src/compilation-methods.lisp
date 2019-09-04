@@ -54,38 +54,40 @@
 
 (defun apply-translation-compilers (instruction chip-spec hardware-object)
   "Wrapper function that calls the compilers associated to HARDWARE-OBJECT and the generic compilers associated to CHIP-SPEC in precedence order, returning the first found expansion of INSTRUCTION as a sequence."
-  (labels ((try-compiler (compilation-method)
-             "Applies COMPILATION-METHOD to INSTRUCTION. If it succeeds, end
+  (let ((context (make-compilation-context :chip-specification chip-spec)))
+    (labels ((try-compiler (compilation-method)
+               "Applies COMPILATION-METHOD to INSTRUCTION. If it succeeds, end
               the whole procedure and return the resulting instruction sequence.
               If it fails, cede control by returning NIL."
-             (restart-case
-                 (handler-case
-                     (let ((result (funcall compilation-method instruction)))
-                       (let ((*print-pretty* nil))
-                         (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Applying compiler ~a to ~a.~%"
-                                 compilation-method
-                                 (print-instruction instruction nil)))
-                       (dolist (instr result)
-                         (write-string "    " *compiler-noise-stream*)
-                         (print-instruction instr *compiler-noise-stream*)
-                         (terpri *compiler-noise-stream*))
-                       (return-from apply-translation-compilers result))
-                   (compiler-does-not-apply () nil))
-               (try-next-compiler ()
-                 :report "Ignore this error and try the next compiler in the list."))))
-    ;; if this is a thread invocation, call its expander
-    (when (typep instruction 'application-thread-invocation)
-      (return-from apply-translation-compilers
-        (application-thread-invocation-thread instruction)))
-    ;; then try the compilers attached to the hardware object
-    (when hardware-object
-      (map nil #'try-compiler (hardware-object-compilation-methods hardware-object)))
-    ;; if those fail, try the global compilers
-    (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
-    ;; if those failed too, there's really nothing more to do.
-    (format *compiler-noise-stream* "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~a.~%"
-            (print-instruction instruction nil))
-    (give-up-compilation)))
+               (restart-case
+                   (handler-case
+                       (let ((result (funcall compilation-method instruction :context context)))
+                         (let ((*print-pretty* nil))
+                           (format *compiler-noise-stream*
+                                   "APPLY-TRANSLATION-COMPILERS: Applying ~a to ~/quil:instruction-fmt/.~%"
+                                   compilation-method instruction))
+                         (dolist (instr result)
+                           (write-string "    " *compiler-noise-stream*)
+                           (print-instruction instr *compiler-noise-stream*)
+                           (terpri *compiler-noise-stream*))
+                         (return-from apply-translation-compilers result))
+                     (compiler-does-not-apply () nil))
+                 (try-next-compiler ()
+                   :report "Ignore this error and try the next compiler in the list."))))
+      ;; if this is a thread invocation, call its expander
+      (when (typep instruction 'application-thread-invocation)
+        (return-from apply-translation-compilers
+          (application-thread-invocation-thread instruction)))
+      ;; then try the compilers attached to the hardware object
+      (when hardware-object
+        (map nil #'try-compiler (hardware-object-compilation-methods hardware-object)))
+      ;; if those fail, try the global compilers
+      (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
+      ;; if those failed too, there's really nothing more to do.
+      (format *compiler-noise-stream*
+              "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/.~%"
+              instruction)
+      (give-up-compilation))))
 
 
 ;;; Core public-facing routine for a full compilation pass.
@@ -149,7 +151,7 @@
 (defun compiler-hook (parsed-program
                       chip-specification
                       &key (protoquil nil)
-                           (rewiring-type (prog-rewiring-pragma parsed-program)))
+                           (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification)))
   "Runs a full compiler pass on a parsed-program object.
 
 Returns a value list: (processed-program, of type parsed-program
@@ -158,9 +160,6 @@ Returns a value list: (processed-program, of type parsed-program
   (format *compiler-noise-stream* "COMPILER-HOOK: entrance.~%")
 
   (warm-chip-spec-lookup-cache chip-specification)
-
-  ;; start by doing some basic expansion transformations
-  (transform 'resolve-applications parsed-program)
 
   ;; we disallow compilation of programs that use memory aliasing
   (loop :for mdesc :in (parsed-program-memory-definitions parsed-program)
@@ -211,7 +210,7 @@ Returns a value list: (processed-program, of type parsed-program
         (setf (basic-block-code new-final-blk) (coerce (nreverse instrs-measures) 'vector))
         ;; place the new block in the CFG and re-link them
         (push new-final-blk (cfg-blocks cfg))
-        (link-blocks new-final-blk (make-instance 'terminating-edge))
+        (link-blocks new-final-blk terminating-edge)
         (link-blocks final-blk (unconditional-edge new-final-blk))))
 
     ;; these local functions describe how we traverse / modify the CFG.
@@ -253,7 +252,6 @@ Returns a value list: (processed-program, of type parsed-program
                (do-greedy-temporal-addressing
                    (coerce (basic-block-code blk) 'list)
                  chip-specification
-                 :environs parsed-program
                  :initial-rewiring (if registrant
                                        (basic-block-in-rewiring blk)
                                        initial-rewiring)
@@ -282,7 +280,6 @@ Returns a value list: (processed-program, of type parsed-program
                (do-greedy-temporal-addressing
                  (coerce (basic-block-code blk) 'list)
                  chip-specification
-                 :environs parsed-program
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))
              (let* ((duration (chip-schedule-duration chip-schedule))

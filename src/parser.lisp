@@ -25,12 +25,18 @@
 
 (defvar *line-start-position* nil)
 (defvar *line-number* nil)
+(defvar *current-file* nil
+  "The pathname for the file being currently parsed.")
 
-(defstruct (token (:constructor tok (type &optional payload (line *line-number*))))
+(defstruct (token (:constructor tok (type &optional payload (line *line-number*) (pathname *current-file*))))
   "A lexical token."
-  (line nil :type (or null (integer 1)))
-  (type nil :type token-type)
-  (payload nil))
+  (line nil :type (or null (integer 1))
+            :read-only t)
+  (pathname nil :type (or null string pathname)
+                :read-only t)
+  (type nil :type token-type
+            :read-only t)
+  (payload nil :read-only t))
 
 (defmethod print-object ((obj token) stream)
   (print-unreadable-object (obj stream :type t :identity nil)
@@ -80,6 +86,8 @@
    (incf *line-number*)
    (setf *line-start-position* $>)
    (return ':NEWLINE))
+  ((eager "\\;")
+   (return ':SEMICOLON))
   ((eager "\\:")
    (return (tok :COLON)))
   ((eager "\\(")
@@ -205,10 +213,16 @@ INPUT-STRING that triggered the condition."
     (t                                            (cons (tok ':INDENTATION 0) line))))
 
 ;;; SPLIT-SEQUENCE was too slow for 10k+ tokens.
-(defun nsplit (wedge list)
-  "Split LIST into non-empty sublists that were separated by WEDGE."
-  (declare (type symbol wedge)
-           (type list list)
+(defun split-lines (tokens)
+  "Split TOKENS into non-empty sublists representing logical lines.
+
+A logical line may be introduced either as the result of a :NEWLINE or a
+:SEMICOLON token. In the case of a :NEWLINE, the lines are split as written. In
+the case of :SEMICOLON, the following line is prefixed with the indentation of
+the immediately preceding line."
+  ;; note: something like "H 0 ; X 1" will produce two lines for internal processing,
+  ;; but the tokens themselves maintain their original line numbers for error reporting.
+  (declare (type list tokens)
            (optimize speed (space 0)))
   (let* ((pieces      (cons nil nil))
          (pieces-last pieces))
@@ -222,8 +236,8 @@ INPUT-STRING that triggered the condition."
                     (rplacd pieces-last (cons start nil))
                     (setf pieces-last (cdr pieces-last)))
                   pieces)
-                 ;; Found a wedge.
-                 ((eql wedge (car end))
+                 ;; Split off a newline
+                 ((eq ':NEWLINE (car end))
                   (cond
                     ((eq start end)
                      (let ((next (cdr start)))
@@ -234,14 +248,31 @@ INPUT-STRING that triggered the condition."
                      (setf start (cdr end))
                      (rplacd last nil)
                      (doit start start start))))
+                 ;; A semicolon also results in a new line being split, but we
+                 ;; also inherit the preceding indentation.
+                 ((eq ':SEMICOLON (car end))
+                  (cond
+                    ((eq start end)
+                     (let ((next (cdr start)))
+                       (doit next next next)))
+                    (t
+                     (rplacd pieces-last (cons start nil))
+                     (setf pieces-last (cdr pieces-last))
+                     ;; Prepend appropriate indentation
+                     (setf start (if (eq ':INDENTATION (token-type (car start)))
+                                     (cons (car start)  ; Copy the indentation (line number on this token is irrelevant)
+                                           (cdr end))
+                                     (cdr end)))
+                     (rplacd last nil)
+                     (doit start start start))))
                  ;; Keep on truckin'.
                  (t
                   (doit start end (cdr end))))))
-      (cdr (doit list list list)))))
+      (cdr (doit tokens tokens tokens)))))
 
 (defun tokenize (string)
   "Tokenize the Quil string STRING into a list of token lines with indentation resolved. Each token line is itself a list of tokens."
-  (let* ((lines (nsplit ':NEWLINE (tokenize-line 'line-lexer string))))
+  (let* ((lines (split-lines (tokenize-line 'line-lexer string))))
     (map-into lines #'ensure-indentation lines)
     (process-indentation lines)))
 
@@ -252,10 +283,12 @@ INPUT-STRING that triggered the condition."
   (:documentation "Representation of an error parsing Quil."))
 
 (define-condition quil-parse-error-at-line (quil-parse-error)
-  ((line :initarg :line :reader line-of-quil-parse-error))
+  ((line :initarg :line :reader line-of-quil-parse-error)
+   (pathname :initarg :pathname :reader pathname-of-quil-parse-error))
   (:report (lambda (condition stream)
-             (format stream "At line ~D: "
-                     (line-of-quil-parse-error condition))
+             (format stream "At line ~D~@[ (~A)~]: "
+                     (line-of-quil-parse-error condition)
+                     (pathname-of-quil-parse-error condition))
              (apply #'format stream (simple-condition-format-control condition)
                     (simple-condition-format-arguments condition)))))
 
@@ -267,6 +300,7 @@ INPUT-STRING that triggered the condition."
   ;; right here in parser.lisp where *line-number* is more than likely set.
   (if *line-number*
       (error 'quil-parse-error-at-line :line *line-number*
+                                       :pathname *current-file*
                                        :format-control format-control
                                        :format-arguments format-args)
       (error 'quil-parse-error :format-control format-control
@@ -369,56 +403,104 @@ INPUT-STRING that triggered the condition."
        (quil-parse-error "Got an unexpected token of type ~S ~
                           when trying to parse a program." tok-type)))))
 
+;; Many instructions are given by a single line of a few tokens. The
+;; MATCH-LINE macro below just captures some boilerplate common to the
+;; parsing of such instructions (namely, checking that there are the right
+;; number and type of tokens, destructuring the corresponding token list,
+;; and returning a result along with the rest of the lines.
+(defmacro match-line (token-specs lines &body body)
+  "Bind the tokens in the first line of LINES according to the specified
+TOKEN-SPECS. These bindings are made available in the BODY.
+
+A TOKEN-SPEC looks like a lambda list. There is support for three sorts
+of bindings: required, optional, and rest. If specializers (for required)
+or default values (for optional) are provided, these symbols are used to enforce
+a given token type.
+
+For example, the spec ((op :RESET) &optional q) would match a single RESET
+token, or a RESET token followed by a second token.
+
+In accordance with the typical usage here, there are two values returned: the
+result of BODY, and the (possibly null) list of remaining lines.
+"
+  ;; check that specified token types are valid
+  (dolist (spec token-specs)
+    (when (and (listp spec)
+               (keywordp (second spec))
+               (not (typep (second spec) 'token-type)))
+      (error "Invalid token type ~S" (second spec))))
+  (let ((all-lines (gensym))
+        (first-line (gensym)))
+    (flet ((token-typecheck-clause (spec opt)
+             (when (listp spec)
+               (let ((spec-name (first spec))
+                     (spec-type (second spec)))
+                 (when spec-type
+                   `((unless
+                         ,(if opt
+                              `(or (null ,spec-name)
+                                   (eql ',spec-type (token-type ,spec-name)))
+                              `(eql ,spec-type (token-type ,spec-name)))
+                       (quil-parse-error
+                        ,(if (keywordp spec-type)  ; If possible, format at expansion time.
+                             (format nil "Expected ~S token, but got ~~S." spec-type)
+                             `(format nil "Expected ~S token, but got ~~S." ,spec-type))
+                        (token-type ,spec-name)))))))))
+    (multiple-value-bind (required optional rest)
+        (a:parse-ordinary-lambda-list token-specs
+                                               :allow-specializers t)
+      (let ((stripped-lambda-list (mapcar #'a:ensure-car
+                                          token-specs))
+            (first-type (second (first required))))
+        `(let ((,all-lines ,lines))
+           ;; Check that we have a line to consume
+           (when (endp ,all-lines)
+             (quil-parse-error "Unexpectedly reached end of program~@[ (expected ~A instruction)]." ,first-type))
+           (let ((,first-line (first ,all-lines)))
+             ;; Check that we have the right number of tokens
+             ,(let ((min-tokens (length required))
+                    (max-tokens (unless rest
+                                  (+ (length required) (length optional)))))
+                 `(unless (<= ,min-tokens
+                             (length ,first-line)
+                             . ,(when max-tokens (list max-tokens)))
+                    (quil-parse-error "Expected at least ~A ~@[ and at most ~A] tokens~@[ for instruction ~~A]."
+                                     ,min-tokens
+                                     ,max-tokens
+                                     ,first-type)))
+             (destructuring-bind ,stripped-lambda-list ,first-line
+               ;; Check the various token types
+               ,@(mapcan (lambda (s) (token-typecheck-clause s nil))
+                         required)
+               ,@(mapcan (lambda (s) (token-typecheck-clause s t))
+                         optional)
+               (values (progn ,@body)
+                       (rest ,all-lines))))))))))
+
 (defun parse-simple-instruction (type tok-lines)
-  ;; Check that we have a line with exactly one token.
-  (when (or (null tok-lines)
-            (/= 1 (length (first tok-lines))))
-    (quil-parse-error "Invalid line format for ~S" type))
-  (let ((tok (first (first tok-lines))))
-    ;; Check that we actually have the token we expect.
-    (unless (eql type (token-type tok))
-      (quil-parse-error "Not a ~S token" type))
-    ;; Return the objects.
-    (values (ecase (token-type tok)
-              ((:HALT)  (make-instance 'halt))
-              ((:RESET) (make-instance 'reset))
-              ((:NOP)   (make-instance 'no-operation))
-              ((:WAIT)  (make-instance 'wait)))
-            (rest tok-lines))))
+  (match-line ((op type)) tok-lines
+    (ecase (token-type op)
+      ((:HALT)  (make-instance 'halt))
+      ((:RESET) (make-instance 'reset))
+      ((:NOP)   (make-instance 'no-operation))
+      ((:WAIT)  (make-instance 'wait)))))
 
 (defun parse-reset-instruction (tok-lines)
   "Parse either a 'RESET' or 'RESET <q>' instruction where <q> is a :NAME or :INTEGER into a RESET or RESET-QUBIT instruction, respectively."
-  (let ((reset-line (first tok-lines))
-        (rest-lines (rest tok-lines)))
-    ;; Check that we have a line with either exactly one (full reset) or exactly two (targeted reset) tokens.
-    (when (or (null tok-lines)
-              (not (<= 1 (length reset-line) 2)))
-      (quil-parse-error "Invalid line format for RESET"))
-    (let ((reset-tok (first reset-line))
-          (target-tok (second reset-line)))
-
-      ;; Check that we actually have the token we expect.
-      (unless (eql :RESET (token-type reset-tok))
-        (quil-parse-error "Expected a :RESET token."))
-
-      (if (null target-tok)
-          ;; global RESET
-          (values
-           (make-instance 'reset)
-           rest-lines)
-
-          ;; targeted RESET
-          (values
-           (make-instance
-            'reset-qubit
-            ;; target can be explicit qubit index or name (if inside DEFCIRCUIT)
-            :target (ecase (token-type target-tok)
-                      ((:NAME)
-                       (unless *formal-arguments-allowed*
-                         (quil-parse-error "Found formal parameter in RESET where not allowed."))
-                       (formal (token-payload target-tok)))
-                      ((:INTEGER) (qubit (token-payload target-tok)))))
-           rest-lines)))))
+  (match-line ((op :RESET) &optional q) tok-lines
+    (if (null q)
+        ;; global RESET
+        (make-instance 'reset) 
+        ;; targeted RESET
+        (make-instance
+         'reset-qubit
+         ;; target can be explicit qubit index or name (if inside DEFCIRCUIT)
+         :target (ecase (token-type q)
+                   ((:NAME)
+                    (unless *formal-arguments-allowed*
+                      (quil-parse-error "Found formal parameter in RESET where not allowed."))
+                    (formal (token-payload q)))
+                   ((:INTEGER) (qubit (token-payload q))))))))
 
 (defun take-until (f list)
   "Take elements of LIST until the boolean function F is satisfied. More specifically, split LIST into two lists A and B (as two values) such that
@@ -566,7 +648,7 @@ INPUT-STRING that triggered the condition."
             :finally (progn
                        (setf (application-operator app)
                              (apply-modifiers-to-operator
-                              processed-modifiers
+                              (reverse processed-modifiers)
                               (application-operator app)))
                        (return (values app rest-lines)))))))
 
@@ -661,168 +743,91 @@ INPUT-STRING that triggered the condition."
 
 (defun parse-measurement (tok-lines)
   "Parse a measurement out of the lines of tokens TOK-LINES."
-  ;; Make sure we have a line to parse.
-  (when (null tok-lines)
-    (quil-parse-error "Unexpectedly reached end of program, expecting MEASURE."))
+  (match-line ((op :MEASURE) qubit &optional address) tok-lines
+    ;; Convert token to either a formal or a QUBIT object.
+    (case (token-type qubit)
+      ((:INTEGER)
+       (setf qubit (qubit (token-payload qubit))))
+      ((:NAME)
+       (unless *formal-arguments-allowed*
+         (quil-parse-error "Found a formal argument where it's not allowed."))
+       (setf qubit (formal (token-payload qubit))))
+      (t
+       (quil-parse-error "Expected qubit after MEASURE.")))
+    (if (null address)
+        (make-instance 'measure-discard :qubit qubit)
+        (let ((address-obj
+                (cond
+                  ;; Actual address to measure into.
+                  ((eql ':AREF (token-type address))
+                   (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
+                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
+                   (mref (car (token-payload address))
+                         (cdr (token-payload address))))
 
-  ;; Next we need to discriminate between
-  ;;
-  ;;    MEASURE x
-  ;;
-  ;; and
-  ;;
-  ;;    MEASURE x y
-  (destructuring-bind (measure-line . rest-lines) tok-lines
-    ;; Entire line must be two or three tokens long.
-    (unless (or (= 2 (length measure-line))
-                (= 3 (length measure-line)))
-      (quil-parse-error "Malformed MEASURE line."))
+                  ;; Implicit address to measure into.
+                  ((and (eql ':NAME (token-type address))
+                        (find (token-payload address) *memory-region-names* :test #'string=))
+                   (mref (token-payload address) 0))
 
-    ;; Now we can destructure it.
-    (destructuring-bind (measure-tok qubit &optional address)
-        measure-line
+                  ;; Formal argument.
+                  ((eql ':NAME (token-type address))
+                   (unless *formal-arguments-allowed*
+                     (quil-parse-error "Found formal argument where it's not allowed."))
+                   (formal (token-payload address)))
 
-      ;; First token must obviously be MEASURE.
-      (unless (eql ':MEASURE (token-type measure-tok))
-        (quil-parse-error "Expected MEASURE token, got ~S" (token-type measure-tok)))
-
-      ;; Convert token to either a formal or a QUBIT object.
-      (case (token-type qubit)
-        ((:INTEGER)
-         (setf qubit (qubit (token-payload qubit))))
-        ((:NAME)
-         (unless *formal-arguments-allowed*
-           (quil-parse-error "Found a formal argument where it's not allowed."))
-         (setf qubit (formal (token-payload qubit))))
-        (t
-         (quil-parse-error "Expected qubit after MEASURE.")))
-
-      ;; Parse the address.
-      (cond
-        ;; No address provided.
-        ((null address)
-         (values (make-instance 'measure-discard :qubit qubit)
-                 rest-lines))
-
-        ;; Actual address to measure into.
-        ((eql ':AREF (token-type address))
-         (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
-           (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
-         (values (make-instance 'measure
-                                :qubit qubit
-                                :address (mref (car (token-payload address))
-                                               (cdr (token-payload address))))
-                 rest-lines))
-
-        ;; Implicit address to measure into.
-        ((and (eql ':NAME (token-type address))
-              (find (token-payload address) *memory-region-names* :test #'string=))
-
-         (values (make-instance 'measure
-                                :qubit qubit
-                                :address (mref (token-payload address) 0))
-                 rest-lines))
-
-        ;; Formal argument.
-        ((eql ':NAME (token-type address))
-         (unless *formal-arguments-allowed*
-           (quil-parse-error "Found formal argument where it's not allowed."))
-
-         (values (make-instance 'measure
-                                :qubit qubit
-                                :address (formal (token-payload address)))
-                 rest-lines))
-
-        (t
-         (quil-parse-error "Expected address after MEASURE"))))))
+                  (t
+                   (quil-parse-error "Expected address after MEASURE")))))
+          (make-instance 'measure
+                         :qubit qubit
+                         :address address-obj)))))
 
 (defun parse-pragma (tok-lines)
   "Parse a PRAGMA out of the lines of tokens TOK-LINES."
-  ;; Check that we have something to parse.
-  (when (null tok-lines)
-    (quil-parse-error "Unexpectedly reached end of program, expecting PRAGMA."))
+  (match-line ((op :PRAGMA) (word-tok :NAME) &rest word-toks) tok-lines
+    (multiple-value-bind (words non-words)
+        (take-until (lambda (tok) (not (member (token-type tok) '(:NAME :INTEGER)))) (cons word-tok word-toks))
+      (setf words (mapcar #'token-payload words))
 
-  (let ((pragma-line (first tok-lines)))
-    ;; Check that our line are at least two tokens, INCLUDE and
-    ;; whatever follows.
-    (unless (<= 2 (length pragma-line))
-      (quil-parse-error "PRAGMA line must have at least one identifier"))
+      (cond
+        ((null non-words)
+         (make-pragma words))
 
-    ;; Destructure it into components.
-    (destructuring-bind (pragma-tok &rest word-toks) pragma-line
-      ;; Check that it's actually a PRAGMA instruction.
-      (unless (eql ':PRAGMA (token-type pragma-tok))
-        (quil-parse-error "Unexpected token ~S, expected PRAGMA" (token-type pragma-tok)))
-      (unless (eql ':NAME (token-type (car word-toks)))
-        (quil-parse-error "Unexpected token ~S, expected identifier after PRAGMA." (token-type (car word-toks))))
-      (multiple-value-bind (words non-words)
-          (take-until (lambda (tok) (not (member (token-type tok) '(:NAME :INTEGER)))) word-toks)
-        (setf words (mapcar #'token-payload words))
+        ((endp (cdr non-words))
+         (let ((last-tok (first non-words)))
+           (unless (eql ':STRING (token-type last-tok))
+             (quil-parse-error "Expected string at end of PRAGMA (or nothing), got ~S."
+                               (token-type last-tok)))
+           (make-pragma words (token-payload last-tok))))
 
-        (cond
-          ((null non-words)
-           (values (make-pragma words)
-                   (rest tok-lines)))
-
-          ((endp (cdr non-words))
-           (let ((last-tok (first non-words)))
-             (unless (eql ':STRING (token-type last-tok))
-               (quil-parse-error "Expected string at end of PRAGMA (or nothing), got ~S."
-                                 (token-type last-tok)))
-             (values (make-pragma words (token-payload last-tok))
-                     (rest tok-lines))))
-
-          (t
-           (quil-parse-error "Unexpected tokens near the end of a PRAGMA.")))))))
+        (t
+         (quil-parse-error "Unexpected tokens near the end of a PRAGMA."))))))
 
 (defun parse-include (tok-lines)
   "Parse an INCLUDE out of the lines of tokens TOK-LINES."
-  ;; Check that we have something to parse.
-  (when (null tok-lines)
-    (quil-parse-error "Unexpectedly reached end of program, expecting INCLUDE."))
-
-  (let ((include-line (first tok-lines)))
-    ;; Check that our line is exactly two tokens for INCLUDE str
-    (unless (= 2 (length include-line))
-      (quil-parse-error "Unexpected tokens in INCLUDE line"))
-
-    ;; Destructure it into components.
-    (destructuring-bind (include-tok path-tok) include-line
-      ;; Check that it's actually an INCLUDE instruction.
-      (unless (eql ':INCLUDE (token-type include-tok))
-        (quil-parse-error "Unexpected token ~S, expected INCLUDE" (token-type include-tok)))
-
-      ;; Check that we are including a string (though we don't check if it's a valid path yet).
-      (unless (eql ':STRING (token-type path-tok))
-        (quil-parse-error "Expecting a pathname string to INCLUDE"))
-
-      ;; Return the object.
-      (values
-       (make-instance 'include :pathname (token-payload path-tok))
-       (rest tok-lines)))))
+  (match-line ((op :INCLUDE) (path :STRING)) tok-lines
+    (make-instance 'include :pathname (token-payload path))))
 
 (defun validate-gate-matrix-size (gate-name num-entries)
   "For the gate named GATE-NAME, check that NUM-ENTRIES is a valid number of entries for a gate matrix."
-  (flet ((perfect-square-p (n)
-           (= n (expt (isqrt n) 2))))
-    (unless (<= 4 num-entries)
-      (quil-parse-error "There must be at least 4 entries (a one-qubit ~
+  (unless (<= 4 num-entries)
+    (quil-parse-error "There must be at least 4 entries (a one-qubit ~
                          operator) for the gate ~A being defined. Got ~D."
-                        gate-name
-                        num-entries))
-    (unless (perfect-square-p num-entries)
-      (quil-parse-error "The number of entries of the gate ~A being defined ~
+                      gate-name
+                      num-entries))
+  (unless (perfect-square-p num-entries)
+    (quil-parse-error "The number of entries of the gate ~A being defined ~
                          must be a perfect square (i.e., it must be a square ~
                          matrix. I got ~D entries."
-                        gate-name
-                        num-entries))
-    (unless (positive-power-of-two-p (isqrt num-entries))
-      (quil-parse-error "The gate ~A being defined isn't a square 2^n x 2^n ~
+                      gate-name
+                      num-entries))
+  (unless (positive-power-of-two-p (isqrt num-entries))
+    (quil-parse-error "The gate ~A being defined isn't a square 2^n x 2^n ~
                          matrix. In particular, it is a ~D x ~D matrix."
-                        gate-name
-                        (isqrt num-entries)
-                        (isqrt num-entries)))
-    t))
+                      gate-name
+                      (isqrt num-entries)
+                      (isqrt num-entries)))
+  t)
 
 (defun parse-gate-definition (tok-lines)
   "Parse a gate definition from the token lines TOK-LINES."
@@ -891,30 +896,31 @@ INPUT-STRING that triggered the condition."
                  (parsed-gate-type (token-type parsed-gate-tok)))
             (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
               (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
-            (setf gate-type parsed-gate-type))))
+            (setf gate-type parsed-gate-type)))
 
-      (ecase gate-type
-        (:MATRIX
-         (parse-gate-entries-as-matrix body-lines params name))
-        (:PERMUTATION
-         (when params
-           (quil-parse-error "Permutation gate definitions do not support parameters."))
-         (parse-gate-entries-as-permutation body-lines name))))))
+        (ecase gate-type
+          (:MATRIX
+           (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
+          (:PERMUTATION
+           (when params
+             (quil-parse-error "Permutation gate definitions do not support parameters."))
+           (parse-gate-entries-as-permutation body-lines name :lexical-context op)))))))
 
-(defun parse-gate-entries-as-permutation (body-lines name)
+(defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)
   (multiple-value-bind (parsed-entries rest-lines)
       (parse-permutation-gate-entries body-lines)
     (validate-gate-permutation-size (length parsed-entries))
     (values (make-instance 'permutation-gate-definition
                            :name name
-                           :permutation parsed-entries)
+                           :permutation parsed-entries
+                           :context lexical-context)
             rest-lines)))
 
 (defun validate-gate-permutation-size (size)
   (unless (positive-power-of-two-p size)
     (quil-parse-error "Permutation gate entries do not represent a square matrix.")))
 
-(defun parse-gate-entries-as-matrix (body-lines params name)
+(defun parse-gate-entries-as-matrix (body-lines params name &key lexical-context)
   ;; Parse out the gate entries.
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
@@ -945,7 +951,7 @@ INPUT-STRING that triggered the condition."
                     :else
                       :collect (second found-p))))
         ;; Return the gate definition.
-        (values (make-gate-definition name param-symbols parsed-entries)
+        (values (make-gate-definition name param-symbols parsed-entries :context lexical-context)
                 rest-lines)))))
 
 (defun parse-arithmetic-entries (entries)
@@ -953,8 +959,7 @@ INPUT-STRING that triggered the condition."
 "
   (labels ((simplify (entry)
              (parse-arithmetic-tokens entry :eval t)))
-    (let ((simple-entries (mapcar #'simplify entries)))
-      simple-entries)))
+    (mapcar #'simplify entries)))
 
 (defun parse-gate-entries (tok-lines)
   ;; Do we have any lines to parse?
@@ -1130,16 +1135,17 @@ INPUT-STRING that triggered the condition."
               :when (not (eql ':NAME (token-type arg)))
                 :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
               :collect (parse-argument arg) :into formal-args
-              :finally (setf args formal-args)))
+              :finally (setf args formal-args))
 
-      (multiple-value-bind (parsed-body rest-lines)
-          (parse-indented-body body-lines)
-        (values (make-circuit-definition
-                 name              ; Circuit name
-                 params            ; formal parameters
-                 args              ; formal arguments
-                 parsed-body)
-                rest-lines)))))
+        (multiple-value-bind (parsed-body rest-lines)
+            (parse-indented-body body-lines)
+          (values (make-circuit-definition
+                   name              ; Circuit name
+                   params            ; formal parameters
+                   args              ; formal arguments
+                   parsed-body
+                   :context op)
+                  rest-lines))))))
 
 (defun parse-quil-type (string)
   (check-type string string)
@@ -1219,50 +1225,18 @@ INPUT-STRING that triggered the condition."
                              :type type
                              :length length
                              :sharing-parent sharing-parent
-                             :sharing-offset-alist (reverse sharing-offset-alist))
+                             :sharing-offset-alist (reverse sharing-offset-alist)
+                             :lexical-context (first (first tok-lines)))
      (rest tok-lines))))
 
 (defun parse-label (tok-lines)
   "Parse a label out of the lines of tokens TOK-LINES."
-
-  ;; Check that we have something to parse.
-  (when (null tok-lines)
-    (quil-parse-error "Expected LABEL, reached EOF"))
-
-  (let ((line (first tok-lines)))
-    ;; Make sure the line is exactly two tokens long.
-    (unless (= 2 (length line))
-      (quil-parse-error "Malformed line when LABEL was expected."))
-
-    (destructuring-bind (label-tok label-name-tok)
-        line
-      ;; Check that the first thing is a LABEL token.
-      (unless (eql ':LABEL (token-type label-tok))
-        (quil-parse-error "Expected LABEL, got ~S" (token-type label-tok)))
-
-      ;; Check that the second thing is a label name.
-      (unless (eql ':LABEL-NAME (token-type label-name-tok))
-        (quil-parse-error "Expecting a label name, got ~S" (token-type label-name-tok)))
-
-      ;; Return the label.
-      (values
-       (make-instance 'jump-target :label (token-payload label-name-tok))
-       (rest tok-lines)))))
+  (match-line ((op :LABEL) (label-name :LABEL-NAME)) tok-lines
+    (make-instance 'jump-target :label (token-payload label-name))))
 
 (defun parse-jump (tok-lines)
-  (when (null tok-lines)
-    (quil-parse-error "Expected JUMP, reached EOF"))
-  (let ((line (first tok-lines)))
-    (unless (= 2 (length line))
-      (quil-parse-error "Malformed line when JUMP was expected."))
-    (destructuring-bind (jump-tok label-tok)
-        line
-      (unless (eql ':JUMP (token-type jump-tok))
-        (quil-parse-error "Expected JUMP, got ~S" (token-type jump-tok)))
-      (unless (eql ':LABEL-NAME (token-type label-tok))
-        (quil-parse-error "Expecting a label reference after JUMP got ~S" (token-type label-tok)))
-      (values (make-instance 'unconditional-jump :label (token-payload label-tok))
-              (rest tok-lines)))))
+  (match-line ((op :JUMP) (label :LABEL-NAME)) tok-lines
+    (make-instance 'unconditional-jump :label (token-payload label))))
 
 (defun parse-memory-or-formal-token (tok)
   (cond
@@ -1305,143 +1279,87 @@ INPUT-STRING that triggered the condition."
     (t
      (parse-memory-or-formal-token tok))))
 
-(defun parse-conditional-jump (tok-type tok-lines)
-  (when (null tok-lines)
-    (quil-parse-error "Expected conditional jump, reached EOF"))
-  (let ((line (first tok-lines)))
-    (unless (= 3 (length line))
-      (quil-parse-error "Malformed line when conditional jump was expected."))
-    (destructuring-bind (jump-tok label-tok addr-tok)
-        line
-      (unless (or (eql ':JUMP-WHEN (token-type jump-tok))
-                  (eql ':JUMP-UNLESS (token-type jump-tok)))
-        (quil-parse-error "Expected conditional jump, got ~S" (token-type jump-tok)))
-      (unless (eql ':LABEL-NAME (token-type label-tok))
-        (quil-parse-error "Expecting a label reference after JUMP got ~S" (token-type label-tok)))
-      (unless (or (eql ':AREF (token-type addr-tok))
-                  (eql ':NAME (token-type addr-tok)))
-        (quil-parse-error "Expected an address~:[~; or formal argument~] for conditional jump, got ~S" *formal-arguments-allowed* (token-type addr-tok)))
-      (values
-       (ecase tok-type
-         ((:JUMP-WHEN)
-          (make-instance 'jump-when
-                         :label (token-payload label-tok)
-                         :address (parse-memory-or-formal-token addr-tok)))
-         ((:JUMP-UNLESS)
-          (make-instance 'jump-unless
-                         :label (token-payload label-tok)
-                         :address (parse-memory-or-formal-token addr-tok))))
-       (rest tok-lines)))))
+(defun parse-conditional-jump (jump-type tok-lines)
+  (match-line ((jump jump-type) (label :LABEL-NAME) addr) tok-lines
+    (unless (or (eql ':AREF (token-type addr))
+                (eql ':NAME (token-type addr)))
+      (quil-parse-error "Expected an address~:[~; or formal argument~] for conditional jump, got ~S" *formal-arguments-allowed* (token-type addr)))
+    (make-instance (ecase jump-type
+                     ((:JUMP-WHEN) 'jump-when)
+                     ((:JUMP-UNLESS) 'jump-unless))
+                   :label (token-payload label)
+                   :address (parse-memory-or-formal-token addr))))
 
 (defun parse-unary-classical (tok-type tok-lines)
   (check-type tok-type (member :NEG :NOT))
-  (when (null tok-lines)
-    (quil-parse-error "Expected unary instruction, but reached EOF"))
-  (let ((line (first tok-lines)))
-    (unless (= 2 (length line))
-      (quil-parse-error "Malformed line when unary instruction was expected."))
-    (destructuring-bind (instr-tok addr-tok)
-        line
-      (unless (member (token-type instr-tok) '(:NEG :NOT))
-        (quil-parse-error "Expected unary instruction token, got ~S" (token-type instr-tok)))
-      (let ((target (parse-memory-or-formal-token addr-tok)))
-        (values (ecase tok-type
-                  (:NEG (make-instance 'classical-negate :target target))
-                  (:NOT (make-instance 'classical-not :target target)))
-                (rest tok-lines))))))
+  (match-line ((instr tok-type) addr) tok-lines
+    (let ((target (parse-memory-or-formal-token addr)))
+      (ecase tok-type
+        (:NEG (make-instance 'classical-negate :target target))
+        (:NOT (make-instance 'classical-not :target target))))))
 
 (defun parse-binary-classical (tok-type tok-lines)
   (check-type tok-type (member :AND :IOR :XOR :MOVE :EXCHANGE :CONVERT :ADD :SUB
                                :MUL :DIV))
-  (when (null tok-lines)
-    (quil-parse-error "Expected binary instruction but reached EOF"))
-  (let ((line (first tok-lines)))
-    (unless (<= 3 (length line))
-      (quil-parse-error "Malformed line when binary instruction was expected."))
-    (destructuring-bind (instr-tok left-addr-tok &rest right-addr-toks)
-        line
-      (unless (find (token-type instr-tok) '(:AND :IOR :XOR :MOVE :EXCHANGE
-                                             :CONVERT :ADD :SUB :MUL :DIV))
-        (quil-parse-error "Expected binary instruction token, got ~S" (token-type instr-tok)))
-      (let ((left (parse-memory-or-formal-token left-addr-tok))
-            (right (parse-classical-argument right-addr-toks)))
-        (when (and (member (token-type instr-tok) '(:EXCHANGE :CONVERT))
-                   (not (or (typep right 'memory-ref)
-                            (typep right 'formal))))
-          (quil-parse-error "Second argument of EXCHANGE/CONVERT command expected to be a memory address, but got ~S"
-                            (type-of right)))
-        (values (ecase tok-type
-                  (:AND (make-instance 'classical-and :left left :right right))
-                  (:IOR (make-instance 'classical-inclusive-or :left left :right right))
-                  (:XOR (make-instance 'classical-exclusive-or :left left :right right))
-                  (:MOVE (make-instance 'classical-move :left left :right right))
-                  (:EXCHANGE (make-instance 'classical-exchange :left left :right right))
-                  (:CONVERT (make-instance 'classical-convert :left left :right right))
-                  (:ADD (make-instance 'classical-addition :left left :right right))
-                  (:SUB (make-instance 'classical-subtraction :left left :right right))
-                  (:MUL (make-instance 'classical-multiplication :left left :right right))
-                  (:DIV (make-instance 'classical-division :left left :right right)))
-                (rest tok-lines))))))
+  (match-line ((instr tok-type) left-addr right-addr &rest right-addrs) tok-lines
+    (let ((left (parse-memory-or-formal-token left-addr))
+          (right (parse-classical-argument (cons right-addr right-addrs))))
+      (when (and (member (token-type instr) '(:EXCHANGE :CONVERT))
+                 (not (or (typep right 'memory-ref)
+                          (typep right 'formal))))
+        (quil-parse-error "Second argument of EXCHANGE/CONVERT command expected to be a memory address, but got ~S"
+                          (type-of right)))
+      (ecase tok-type
+        (:AND (make-instance 'classical-and :left left :right right))
+        (:IOR (make-instance 'classical-inclusive-or :left left :right right))
+        (:XOR (make-instance 'classical-exclusive-or :left left :right right))
+        (:MOVE (make-instance 'classical-move :left left :right right))
+        (:EXCHANGE (make-instance 'classical-exchange :left left :right right))
+        (:CONVERT (make-instance 'classical-convert :left left :right right))
+        (:ADD (make-instance 'classical-addition :left left :right right))
+        (:SUB (make-instance 'classical-subtraction :left left :right right))
+        (:MUL (make-instance 'classical-multiplication :left left :right right))
+        (:DIV (make-instance 'classical-division :left left :right right))))))
 
 (defun parse-trinary-classical (tok-type tok-lines)
   (check-type tok-type (member :LOAD :STORE :EQ :GT :GE :LT :LE))
-  (when (null tok-lines)
-    (quil-parse-error "Expected trinary instruction but reached EOF"))
-  (let ((line (first tok-lines)))
-    (unless (<= 4 (length line))
-      (quil-parse-error "Malformed line when trinary instruction was expected."))
-    (destructuring-bind (instr-tok target-tok left-tok &rest right-toks)
-        line
-      (unless (find (token-type instr-tok) '(:LOAD :STORE :EQ :GT :GE :LT :LE))
-        (quil-parse-error "Expected trinary instruction token, got ~S" (token-type instr-tok)))
-      (flet ((parse-memory-region-name (tok)
+  (match-line ((instr tok-type) target left right &rest rest) tok-lines
+    (setf right (cons right rest))
+    (flet ((parse-memory-region-name (tok)
                (unless (eql ':NAME (token-type tok))
                  (quil-parse-error "Expected a memory region name, but got token of type ~S"
                                    (token-type tok)))
                (unless (find (token-payload tok) *memory-region-names* :test #'string=)
                  (quil-parse-error "Unknown memory region name ~S"
                                    (token-payload tok)))
-               (memory-name (token-payload tok))))
-        (let (target left right result)
-          (ecase tok-type
+             (memory-name (token-payload tok))))
+      (ecase tok-type
             ((:LOAD)
-             (unless (= 1 (length right-toks))
+             (unless (= 1 (length right))
                (quil-parse-error "Invalid right argument to LOAD."))
-             (setf target (parse-memory-or-formal-token target-tok))
-             (setf left (parse-memory-region-name left-tok))
-             (setf right (parse-classical-argument right-toks))
-             (setf result (make-instance 'classical-load
-                                         :target target
-                                         :left left
-                                         :right right)))
+             (make-instance 'classical-load
+                            :target (parse-memory-or-formal-token target)
+                            :left (parse-memory-region-name left)
+                            :right (parse-classical-argument right)))
             ((:STORE)
-             (unless (= 1 (length right-toks))
+             (unless (= 1 (length right))
                (quil-parse-error "Malformed STORE. Expected a memory reference ~
                                   as the third argument."))
-             (setf target (parse-memory-region-name target-tok))
-             (setf left (parse-classical-argument (list left-tok)))
-             (setf right (parse-memory-or-formal-token (first right-toks)))
-             (setf result (make-instance 'classical-store
-                                         :target target
-                                         :left left
-                                         :right right)))
+             (make-instance 'classical-store
+                            :target (parse-memory-region-name target)
+                            :left (parse-classical-argument (list left))
+                            :right (parse-memory-or-formal-token (first right))))
             ((:EQ :GT :GE :LT :LE)
-             (setf target (parse-memory-or-formal-token target-tok))
-             (setf left (parse-classical-argument (list left-tok)))
-             (setf right (parse-classical-argument right-toks))
-             (setf result
-                   (make-instance
-                    (ecase tok-type
-                      (:EQ 'classical-equality)
-                      (:GT 'classical-greater-than)
-                      (:GE 'classical-greater-equal)
-                      (:LT 'classical-less-than)
-                      (:LE 'classical-less-equal))
-                    :target target
-                    :left left
-                    :right right))))
-          (values result
-                  (rest tok-lines)))))))
+             (make-instance
+              (ecase tok-type
+                (:EQ 'classical-equality)
+                (:GT 'classical-greater-than)
+                (:GE 'classical-greater-equal)
+                (:LT 'classical-less-than)
+                (:LE 'classical-less-equal))
+              :target (parse-memory-or-formal-token target)
+              :left (parse-classical-argument (list left))
+              :right (parse-classical-argument right)))))))
 
 (defun indented-line (tok-line)
   (if (eql ':INDENT (token-type (first tok-line)))
@@ -1705,51 +1623,31 @@ INPUT-STRING that triggered the condition."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Entry Point ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun extract-code-sections (code)
-  "Partition CODE into three values:
+(define-condition ambiguous-definition ()
+  ((conflicts :initarg :conflicts :reader ambiguous-definition-conflicts
+              :documentation "A list of (filename . definition) pairs which conflict."))
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) definitions."))
 
-    1. List of gate definitions.
+(define-condition ambiguous-memory-declaration (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DECLARE forms."))
 
-    2. List of circuit definitions.
-
-    3. List of code to execute."
-  (let ((gate-defs nil)
-        (circ-defs nil)
-        (memory-defs nil)
-        (exec-code nil))
-    (flet ((bin (x)
-             (typecase x
-               (gate-definition (push x gate-defs))
-               (circuit-definition (push x circ-defs))
-               (memory-descriptor (push x memory-defs))
-               (t (push x exec-code)))))
-      (mapc #'bin code)
-      (values (nreverse gate-defs)
-              (nreverse circ-defs)
-              (nreverse memory-defs)
-              (nreverse exec-code)))))
+(define-condition ambiguous-gate-or-circuit-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE or DEFCIRCUIT forms."))
 
 (defun parse-quil-into-raw-program (string)
-  "Parse a string STRING into a raw, untransformed PARSED-PROGRAM object."
+  "Parse a string STRING into a list of raw Quil syntax objects."
   (check-type string string)
-  (let* ((tok-lines (tokenize string)))
-    (let ((parsed-program nil)
-          (*memory-region-names* nil))
-      (loop :named parse-loop
-            :until (null tok-lines) :do
-              (multiple-value-bind (program-entity rest-toks)
-                  (parse-program-lines tok-lines)
-                (push program-entity parsed-program)
-                (setf tok-lines rest-toks)))
-      (setf parsed-program (nreverse parsed-program))
-      ;; Return the parsed sequence of objects.
-      (multiple-value-bind (gate-defs circ-defs memory-defs exec-code)
-          (extract-code-sections parsed-program)
-        (make-instance 'parsed-program
-                       :gate-definitions gate-defs
-                       :circuit-definitions circ-defs
-                       :memory-definitions memory-defs
-                       :executable-code (coerce exec-code 'simple-vector))))))
+  (let* ((*memory-region-names* nil)
+         (tok-lines (tokenize string)))
+    (loop :with parsed-program := nil
+          :until (endp tok-lines) :do
+            (multiple-value-bind (program-entity rest-toks)
+                (parse-program-lines tok-lines)
+              (push program-entity parsed-program)
+              (setf tok-lines rest-toks))
+          :finally (return (nreverse parsed-program)))))
 
 (defvar *safe-include-directory* nil)
 

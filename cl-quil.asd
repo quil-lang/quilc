@@ -27,9 +27,9 @@
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
                #:trivial-garbage        ; weak hash tables
+               #:cl-heap
                #:cl-permutation
                #:queues.priority-queue
-               #:cl-ppcre               ; CHP file parsing
                #+sbcl #:sb-rotate-byte
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))
@@ -54,8 +54,9 @@
                (:file "pragmas")
                (:file "parser")
                (:file "gates")
-               (:file "environment")
-               (:file "operator-bind")
+               (:file "context")
+               (:file "build-gate")
+               (:file "define-compiler")
                (:module "clifford"
                 :serial t
                 :components ((:file "qubit-algebra")
@@ -66,7 +67,8 @@
                              (:file "god-table")
                              (:file "god-table-utilities")
                              (:file "swap-representation")
-                             (:file "benchmarking-procedures")))
+                             (:file "benchmarking-procedures")
+                             (:file "perm")))
                (:module "compilers"
                 :serial t
                 :components ((:file "ucr-explode")
@@ -106,9 +108,7 @@
                              (:file "temporal-addresser")))
                (:module "compressor"
                 :serial t
-                :components ((:file "rewriting-rule-data-type")
-                             (:file "compressor-configuration")
-                             (:file "context")
+                :components ((:file "compressor-configuration")
                              (:file "compressor")
                              (:file "wavefunctions")
                              (:file "rewriting-rules")))

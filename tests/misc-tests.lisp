@@ -21,14 +21,6 @@
     (test-it t '((2 2)) '(2 2))
     (test-it t '((2) (1 1) (2 2 2) (1 1 1 1)) '(2 1 1 2 2 2 1 1 1 1))))
 
-(deftest test-code-splicing ()
-  (is (equalp (cl-quil::splice-code-at #(1 x 2 3) 1 #(a b c))
-              #(1 A B C 2 3)))
-  (is (equalp (cl-quil::splice-code-at #(x 1 2 3) 0 #(a b c))
-              #(A B C 1 2 3)))
-  (is (equalp (cl-quil::splice-code-at #(0 1 2 x) 3 #(a b c))
-              #(0 1 2 A B C))))
-
 (deftest test-append-reduce ()
   (is (equal nil (quil::reduce-append nil)))
   (is (equal nil (quil::reduce-append '(nil))))
@@ -57,8 +49,7 @@
                    (format s ", ")))
                (format s "~%"))
              (format s "TEST ~{~d ~}" (a:iota qubit-count))))
-         (parsed-prog (quil::parse-quil-into-raw-program program-string)))
-    (setf parsed-prog (quil::transform 'quil::resolve-applications parsed-prog))
+         (parsed-prog (quil::parse-quil program-string)))
     (is (quil::matrix-equality (magicl:make-identity-matrix (expt 2 qubit-count))
                                (quil::make-matrix-from-quil (coerce (parsed-program-executable-code parsed-prog) 'list))))))
 
@@ -143,60 +134,6 @@
     ((hash-table-p obj) (gethash-chain (rest chain) (gethash (first chain) obj)))
     (t (error "Invalid call to GETHASH-CHAIN."))))
 
-(deftest test-isa-1q-completion ()
-  "Test that the 1Q layer of the chip specification is complete."
-  (let* ((isa (yason:parse "{\"isa\":
-{\"1Q\": {\"0\": {},
-  \"1\": {},
-  \"2\": {},
-  \"3\": {},
-  \"5\": {},
-  \"6\": {},
-  \"7\": {},
-  \"13\": {},
-  \"14\": {},
-  \"15\": {},
-  \"16\": {},
-  \"17\": {}},
- \"2Q\": {\"0-1\": {},
-  \"0-7\": {},
-  \"1-2\": {},
-  \"1-16\": {},
-  \"2-3\": {},
-  \"2-15\": {},
-  \"5-6\": {},
-  \"6-7\": {},
-  \"13-14\": {},
-  \"14-15\": {},
-  \"15-16\": {},
-  \"16-17\": {}}}}"))
-         (chip-spec (quil::qpu-hash-table-to-chip-specification isa)))
-    (is (quil::chip-specification-p chip-spec))
-    ;; re-load the chip spec
-    (quil::load-isa-layer chip-spec (gethash "isa" isa))
-    ;; check we got the goods
-    (dolist (presumed-dead '("4" "8" "9" "10" "11" "12"))
-      (let ((goods (gethash-chain (list "isa" "1Q" presumed-dead) isa)))
-        (is (and (not (null goods))
-                 (hash-table-p goods)
-                 (gethash "dead" goods))))))) ; RIP in piece
-
-(deftest test-bristlecone-chip ()
-  "Test construction of Google's Bristlecone 72-qubit chip"
-  (let* ((chip (quil::build-bristlecone-chip))
-         (prgm (parse-quil
-                (with-output-to-string (s)
-                  (loop :for i :below (quil::chip-spec-n-qubits chip)
-                        :do (format s "H ~D~%" i)))))
-         ;; Bit of a kludge here. Since this is a large number of
-         ;; qubits, calculating its matrix representation will be a
-         ;; terribly long-winded affair.
-         (quil::*compress-carefully* nil))
-    (is (= 72 (quil::chip-spec-n-qubits chip)))
-    (is (= (* 11 11) (quil::chip-spec-n-links chip)))
-    (is (plusp (length (parsed-program-executable-code prgm))))
-    (is (plusp (length (parsed-program-executable-code (compiler-hook prgm chip)))))))
-
 (deftest test-power-of-two-p ()
   "Test that POWER-OF-TWO-P and POSITIVE-POWER-OF-TWO-P do what they say on the tin."
   (is (not (quil::power-of-two-p -2)))
@@ -263,17 +200,98 @@
       (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
       (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
 
-(defun %extract-trivial-exit-rewiring (pp)
-  "Extract the exit rewiring comment from parsed program PP. Trivial here means PP is expected to have a single exit rewiring. A more complicated CFG could produce multiple exit rewirings in a program, but that is outside our scope of interest."
-  (declare (type parsed-program pp))
-  (loop :with code := (parsed-program-executable-code pp)
-        :for i :below (length code)
-        :for comment := (quil::comment (elt code i))
-        :when (and comment
-                   (uiop:string-prefix-p "Exiting rewiring: " comment))
-          :return (quil::rewiring-l2p
-                   (quil::make-rewiring-from-string
-                    (subseq comment (length "Exiting rewiring: "))))))
+(deftest test-nth-instr ()
+  (dolist (pp (list (quil:parse-quil "")
+                    (with-output-to-quil
+                      "RESET")
+                    (with-output-to-quil
+                      "RESET"
+                      "MEASURE 0")
+                    (with-output-to-quil
+                      "RESET"
+                      "MEASURE 0"
+                      "HALT")))
+    (let* ((code (parsed-program-executable-code pp))
+           (length (length code)))
+      ;; Index out-of-bounds checks
+      (signals error (quil::nth-instr length pp :from-end nil))
+      (signals error (quil::nth-instr length pp :from-end t))
+      (signals error (quil::nth-instr -1 pp :from-end nil))
+      (signals error (quil::nth-instr -1 pp :from-end t))
+
+      ;; Test all valid indices
+      (dotimes (i length)
+        (is (eq (quil::nth-instr i pp) (aref code i)))
+        (is (eq (quil::nth-instr (- length i 1) pp :from-end t) (aref code i)))
+        (let ((no-op1 (make-instance 'quil::no-operation))
+              (no-op2 (make-instance 'quil::no-operation)))
+          ;; These two SETFs set the same location, hence the need for two distinct no-op
+          ;; instructions to compare against.
+          (setf (quil::nth-instr i pp) no-op1)
+          (is (eq no-op1 (aref code i)))
+          (setf (quil::nth-instr (- length i 1) pp :from-end t) no-op2)
+          (is (eq no-op2 (aref code i))))))))
+
+(deftest test-make-rewiring-from-string ()
+  (signals error (quil::make-rewiring-from-string ""))
+  (signals error (quil::make-rewiring-from-string "foobar"))
+  (signals error (quil::make-rewiring-from-string "(0 1 2)"))
+  (signals error (quil::make-rewiring-from-string "#(0 1 2"))
+  (signals error (quil::make-rewiring-from-string "#(1)"))
+  (signals error (quil::make-rewiring-from-string "#(0 3 2)"))
+  (signals error (quil::make-rewiring-pair-from-string ""))
+  (signals error (quil::make-rewiring-pair-from-string "()"))
+  (signals error (quil::make-rewiring-pair-from-string "(1 . 2)"))
+  (signals error (quil::make-rewiring-pair-from-string "(#(0 . #())"))
+  (signals error (quil::make-rewiring-pair-from-string "(#(0) . #())"))
+  (signals error (quil::make-rewiring-pair-from-string "( #(0) . #(0) )"))
+  (signals error (quil::make-rewiring-pair-from-string "(#(0) #(0))"))
+  (signals error (quil::make-rewiring-pair-from-string "#(0) #(0)"))
+
+  (dolist (input '("#()" "#(0)" "#(0 1 2)" "#(2 1 0)" "#(1 0 3 4 2 5 6)"))
+    (is (equalp (quil::rewiring-l2p (quil::make-rewiring-from-string input))
+                (read-from-string input))))
+
+  (dolist (input '("(#() . #())" "(#(0) . #(0))" "(#(0 2 1 4 3) . #(3 2 0 1 4))"))
+    (multiple-value-bind (actual-first-rewiring actual-second-rewiring)
+        (quil::make-rewiring-pair-from-string input)
+      (destructuring-bind (expected-first-rewiring . expected-second-rewiring)
+          (read-from-string input)
+        (is (equalp (quil::rewiring-l2p actual-first-rewiring) expected-first-rewiring))
+        (is (equalp (quil::rewiring-l2p actual-second-rewiring) expected-second-rewiring))))))
+
+(deftest test-extract-final-exit-rewiring-vector ()
+  (is (null (quil::extract-final-exit-rewiring-vector (quil:parse-quil ""))))
+
+  ;; test that the *final* rewiring is extracted
+  (let ((pp (with-output-to-quil
+              "RESET"
+              "MEASURE 0")))
+    (setf (quil::comment (quil::nth-instr 0 pp))
+          (quil::make-rewiring-comment :exiting #(0 1 2)))
+    (setf (quil::comment (quil::nth-instr 1 pp))
+          (quil::make-rewiring-comment :exiting #(1 0 2)))
+    (is (equalp #(1 0 2) (quil::extract-final-exit-rewiring-vector pp))))
+
+  ;; Each test in the loop should allocate to a fresh PARSED-PROGRAM; otherwise, comments attached
+  ;; earlier in the loop persist for later tests.
+  (dolist (quil (list "RESET"
+                      (format nil "RESET~%MEASURE 0")
+                      (format nil "RESET~%MEASURE 0~%HALT")))
+    ;; no rewirings
+    (is (null (quil::extract-final-exit-rewiring-vector (quil:parse-quil quil))))
+
+    ;; only enter rewiring
+    (is (null (quil::extract-final-exit-rewiring-vector
+               (attach-rewirings-to-program (quil:parse-quil quil) #(0 1 2) nil))))
+
+    ;; only exit rewiring
+    (is (equalp #(2 1 0) (quil::extract-final-exit-rewiring-vector
+                          (attach-rewirings-to-program (quil:parse-quil quil) nil #(2 1 0)))))
+
+    ;; both enter and exiting rewirings
+    (is (equalp #(2 1 0) (quil::extract-final-exit-rewiring-vector
+                          (attach-rewirings-to-program (quil:parse-quil quil) #(0 1 2) #(2 1 0)))))))
 
 (defun %make-density-qvm-initialized-in-basis (num-qubits basis-index)
   "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
@@ -313,7 +331,7 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
 (defun %test-measure-semantics (p-str)
   (let* ((p (parse-quil p-str))
          (p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil nil))
-         (rewiring (quil::qubit-relabeler (%extract-trivial-exit-rewiring p-comp))))
+         (rewiring (quil::qubit-relabeler (quil::extract-final-exit-rewiring-vector p-comp))))
     (loop :for i :below (expt 2 6) :do
       (let* ((qvm (%make-density-qvm-initialized-in-basis 3 i))
              (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))
