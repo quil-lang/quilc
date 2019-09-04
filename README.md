@@ -42,7 +42,7 @@ git clone --recurse-submodules https://github.com/rigetti/quilc.git
 Prerequisites to building `quilc` are:
 
 1. Standard UNIX build tools
-2. [SBCL (a recent version)](http://www.sbcl.org/): Common Lisp compiler
+2. [SBCL](http://www.sbcl.org/) (a recent version, but [*not* SBCL 1.5.6](#sbcl-156)): Common Lisp compiler
 3. [Quicklisp](https://www.quicklisp.org/beta/): Common Lisp library manager
 4. [ZeroMQ](http://zeromq.org/intro:get-the-software): Messaging library
    required by RPCQ. Development headers are required at build time.
@@ -250,3 +250,16 @@ If you need help with some code or want to discuss some technical issues, you ca
 `#dev` channel on [Slack](https://rigetti-forest.slack.com/).
 
 We look forward to meeting and working with you!
+
+# Incompatible software versions
+
+## SBCL 1.5.6
+
+There is [an issue](https://github.com/rigetti/quilc/issues/401) with
+SBCL 1.5.6 that results in unhandled memory faults in
+`SB-VM::FUNCALLABLE-INSTANCE-TRAMP` when attempting to run quilc
+compiled with that version of SBCL. The issue was resolved with SBCL
+commit
+[550c4d2](https://sourceforge.net/p/sbcl/sbcl/ci/550c4d23c77cc670fb95d7216e3c6d493bbd76eb/). For
+this reason, it's not possible to use quilc or cl-quil with SBCL
+1.5.6, but any other recent SBCL version should work fine.
