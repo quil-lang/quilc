@@ -12,9 +12,9 @@ doc/*.log
 doc/*.pdf
 doc/*.synctex.gz
 doc/*.toc
-empty.cpp
 src/contrib/tweedledum/empty.cpp
 src/contrib/tweedledum/build
 src/contrib/tweedledum/rigetti-sbcl
 src/contrib/tweedledum/libtweedledum.{so,dylib}
+src/contrib/tweedledum/tweedledum.{so,dylib}
 .DS_Store

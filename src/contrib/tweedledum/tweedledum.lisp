@@ -9,7 +9,7 @@
 (in-package #:cl-quil.tweedledum)
 
 (cffi:define-foreign-library
-    (libtweedledum :search-path "/usr/local/lib/rigetti/")
+    (libtweedledum :search-path "/usr/local/lib/")
   (:darwin (:or #.(merge-pathnames "libtweedledum.dylib"
                                    (or *compile-file-truename*
                                        *load-truename*))
@@ -71,6 +71,11 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
          (quil::give-up-compilation))))))
 
 (defun load-tweedledum ()
+  (unless (and *tweedledum-libs-loaded* (tweedledum-present-p))
+    (cffi:load-foreign-library 'libtweedledum)
+    (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
+    (setf *tweedledum-libs-loaded* t))
+
   (cffi:load-foreign-library 'libtweedledum)
   (unless *tweedledum-libs-loaded*
     (push (constantly 'compile-perm-gate-with-tweedledum)
@@ -82,20 +87,16 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
   (uiop:symbol-call ':cl-quil-tests
                     '#:run-cl-quil-tests))
 
+#+sbcl
 (defun tweedledum-present-p ()
   "Determine if tweedledum is callable."
   ;; On a non-SBCL system it will fall back to the default behavior for dynamic libraries.
-  (let ((present-p t))
-    #+sbcl
-    (handler-case (synthesis-dbs '(0))
-      (sb-kernel::undefined-alien-function-error (condition)
-        (declare (ignore condition))
-        (setf present-p nil)))
-    present-p))
+  (handler-case (synthesis-dbs '(0))
+    (sb-kernel::undefined-alien-function-error (condition)
+      (declare (ignore condition))
+      (return-from tweedledum-present-p nil)))
+  t)
+#-sbcl
+(error "Don't know what to do on non-SBCL systems.")
 
-;; TODO Some error handling here
-(unless *tweedledum-libs-loaded*
-  (unless (tweedledum-present-p)
-    (cffi:load-foreign-library 'libtweedledum))
-  (push (constantly 'compile-perm-gate-with-tweedledum) cl-quil::*global-compilers*)
-  (setf *tweedledum-libs-loaded* t))
+(load-tweedledum)
