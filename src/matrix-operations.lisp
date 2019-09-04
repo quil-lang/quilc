@@ -182,6 +182,21 @@ as needed so that they are the same size."
   (let ((m (magicl:random-unitary n)))
     (magicl:scale (expt (magicl:det m) (/ (- n))) m)))
 
+(defun random-wavefunction (n-qubits)
+  "Get a random complex unit vector with (EXPT 2 N-QUBITS) entries."
+  (let ((size (expt 2 n-qubits)))
+    (loop :repeat size
+          :for c := (complex (a:gaussian-random)
+                             (a:gaussian-random))
+          :collect c :into entries
+          :sum (expt (abs c) 2) :into norm-squared
+          :finally
+             (return (make-array size
+                                 :initial-contents
+                                 (let ((scaling-factor (/ (sqrt norm-squared))))
+                                   (mapcar (lambda (c) (* scaling-factor c)) entries))
+                                 :element-type '(complex double-float))))))
+
 (defun orthonormalize-matrix (m)
   "Applies Gram-Schmidt to the columns of a full rank square matrix to produce a unitary matrix."
   ;; consider each column
@@ -254,7 +269,7 @@ as needed so that they are the same size."
         (loop :for u :in ret :do
           (setf v (vector-difference v (vector-scale (dot-product v u) u))))
         (when (not (double= 0 (norm v)))
-          (setf ret (cons (vector-scale (/ 1 (norm v)) v) ret)))))
+          (push (vector-scale (/ (norm v)) v) ret))))
     ret))
 
 (defun collinearp (vect1 vect2)

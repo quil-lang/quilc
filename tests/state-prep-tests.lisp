@@ -4,23 +4,34 @@
 
 (in-package #:cl-quil-tests)
 
+(defun wf-to-matrix (wf)
+  "Convert a sequence WF to a corresponding column vector."
+  (magicl:make-matrix :rows (length wf)
+                      :cols 1
+                      :data (copy-seq wf)))
+
+(defun check-state-prep (source-wf target-wf matrix)
+  "Checks whether SOURCE-WF maps to TARGET-WF under the specified MATRIX."
+  (let* ((result (magicl:multiply-complex-matrices matrix
+                                                   (wf-to-matrix source-wf)))
+         (prefactor (/ (aref target-wf 0) (magicl:ref result 0 0))))
+    (is (quil::matrix-equality (magicl:scale prefactor result)
+                               (wf-to-matrix target-wf)))))
+
 (deftest test-state-prep-formation ()
   "Checks that STATE-PREP-APPLICATION (with SOURCE-WF in the ground state) correctly compiles into native instructions."
-  (let* ((random-matrix (quil::random-special-unitary 16))
-         (column (loop :for j :below 16 :collect (magicl:ref random-matrix j 0)))
+  (let* ((qubits (mapcar #'quil:qubit (list 0 1 2 3)))
+         (target-wf (quil::random-wavefunction (length qubits)))
+         (source-wf (quil::build-ground-state (length qubits)))
          (instr (make-instance 'quil::state-prep-application
-                               :arguments (mapcar #'quil::qubit (list 0 1 2 3))
-                               :target-wf (make-array 16 :initial-contents column :element-type '(complex double-float))
-                               :source-wf (make-array 16 :initial-element #C(0d0 0d0) :element-type '(complex double-float)))))
-    (setf (aref (quil::state-prep-application-source-wf instr) 0) #C(1d0 0d0))
+                               :arguments qubits
+                               :target-wf target-wf
+                               :source-wf source-wf)))
     (let* ((output-matrix (quil::make-matrix-from-quil
                            (quil::expand-to-native-instructions
                             (list instr)
-                            (quil::build-8Q-chip))))
-           (prefactor (/ (magicl:ref random-matrix 0 0) (magicl:ref output-matrix 0 0))))
-      (is (loop :for j :below 16
-                :always (quil::double= (magicl:ref random-matrix j 0)
-                                       (* prefactor (magicl:ref output-matrix j 0))))))))
+                            (quil::build-8Q-chip)))))
+      (check-state-prep source-wf target-wf output-matrix))))
 
 (deftest test-aqvm-unlink-refuses-large-GHZ-state ()
   "Checks that an AQVM correctly assembles a GHZ state and then correctly disables itself."
@@ -53,19 +64,50 @@ CNOT 2 3
 
 (deftest test-state-prep-1q-source-and-target ()
   "Checks that STATE-PREP-APPLICATION (with arbitrary SOURCE-WF and TARGET-WF) correctly compiles into native instructions."
-  (let* ((random-matrix (quil::random-special-unitary 2))
-         (column (loop :for j :below 2 :collect (magicl:ref random-matrix j 0)))
+  (let* ((source-wf (quil::random-wavefunction 1))
+         (target-wf (quil::random-wavefunction 1))
          (instr (make-instance 'quil::state-prep-application
                                :arguments (mapcar #'quil::qubit (list 0))
-                               :target-wf (make-array 2 :initial-contents (list 1d0 0d0))
-                               :source-wf (make-array 2 :initial-contents column))))
+                               :target-wf target-wf
+                               :source-wf source-wf)))
     (let* ((output-matrix (quil::make-matrix-from-quil
                            (quil::expand-to-native-instructions
                             (list instr)
                             (quil::build-8Q-chip)))))
-      (is (quil::matrix-equality
-           (magicl:multiply-complex-matrices output-matrix random-matrix)
-           (magicl:diag 2 2 (list 1d0 1d0)))))))
+      (check-state-prep source-wf target-wf output-matrix))))
+
+(deftest test-state-prep-4q-compiler ()
+  "Check that STATE-PREP-4Q-COMPILER (with arbitrary SOURCE-WF and TARGET-WF) correctly compiles into native instructions."
+  (let* ((qubits (mapcar #'quil::qubit (list 0 1 2 3)))
+         (source-wf (quil::random-wavefunction 4))
+         (target-wf (quil::random-wavefunction 4))
+         (instr (make-instance 'quil::state-prep-application
+                               :arguments qubits
+                               :target-wf target-wf
+                               :source-wf source-wf))
+         (output-matrix (quil::make-matrix-from-quil
+                         (quil::expand-to-native-instructions
+                          (quil::state-prep-4q-compiler instr)
+                          (quil::build-8Q-chip)))))
+    (check-state-prep source-wf target-wf output-matrix)))
+
+(deftest test-schmidt-decomposition ()
+  "Check that a random wavefunction can be reconstructed from its SCHMIDT-DECOMPOSITION."
+  (flet ((matrix-column (m i)
+           (magicl::slice m
+                          0 (magicl:matrix-rows m)
+                          i (1+ i))))
+    (let* ((random-wf (quil::random-wavefunction 4)))
+      (multiple-value-bind (c U V) (quil::schmidt-decomposition random-wf 2 2)
+        (let* ((schmidt-terms (loop :for i :from 0 :below 4
+                                    :collect (magicl:scale (aref c i)
+                                                           (magicl::kron
+                                                            (matrix-column U i)
+                                                            (matrix-column V i)))))
+               (reconstructed-wf (apply #'magicl:add-matrix schmidt-terms)))
+          ;; adjust for column major nonsense
+          (is (quil::matrix-equality reconstructed-wf
+                                     (wf-to-matrix random-wf))))))))
 
 (deftest test-aqvm-unlink-on-10Q ()
   (let ((quil::*aqvm-correlation-threshold* 4)

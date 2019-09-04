@@ -232,6 +232,90 @@
                                      :operator #.(named-operator "RHS-state-prep-gate")
                                      :arguments (list (first (application-arguments instr))))))))))
 
+(defun coerce-to-complex-double-vector (elts)
+  (map '(vector (complex double-float))
+       (lambda (val) (coerce val '(complex double-float)))
+       elts))
+
+(defun schmidt-decomposition (phi num-a num-b)
+  "Given a wavefunction PHI containing subystems of size NUM-A and NUM-B qubits, compute the Schmidt decomposition of PHI."
+  ;; Returns c, U, V, where c is a vector and U, V are unitary matrices (of dimensions
+  ;; NUM-A and NUM-B respectively) such that
+  ;;
+  ;;    PHI = \sum_{i} c_i U_i V _i
+  ;;
+  ;; where U_i, V_i denotes the ith column of the matrix U, V respectively.
+  (assert (= (qubit-count phi) (+ num-a num-b)))
+  (when (listp phi)
+    (setf phi (coerce-to-complex-double-vector phi)))
+  (let* ((size-a (expt 2 num-a))
+         (size-b (expt 2 num-b))
+         ;; tranpose here to make this row-major
+         (reshaped (magicl:transpose (magicl:make-matrix :rows size-a
+                                                         :cols size-b
+                                                         :data phi))))
+    (multiple-value-bind (u d vt)
+        (magicl:svd reshaped)
+      (values (coerce-to-complex-double-vector (magicl:matrix-diagonal d))
+              u
+              (magicl:transpose vt)))))
+
+(defun state-prep-4q (wf q0 q1 q2 q3 &key reversed)
+  "Produce instructions to prepare the wavefunction WF with respect to qubits Q0 Q1 Q2 Q3, starting from the zero state. If REVERSED is T, the instructions instead prepare the zero state from WF."
+  ;; The following is from arXiv:1003.5760
+  (assert (= 4 (qubit-count wf)))
+  ;; each function in the following FLET is responsible for handling the REVERSED
+  ;; flag on its own
+  (flet ((state-prep-2q (source target qubit-indices)
+           (when reversed
+             (rotatef source target))
+           (make-instance 'state-prep-application
+                          :source-wf source
+                          :target-wf target
+                          :arguments (mapcar #'qubit qubit-indices)))
+         (cnot (a b)
+           (build-gate "CNOT" () a b))
+         (2q-evolution (U a b)
+           (anon-gate "STATE-2Q"
+                      (if reversed (magicl:dagger U) U)
+                      a b)))
+    (multiple-value-bind (c U V)
+        (schmidt-decomposition wf 2 2)
+      (let ((instrs
+              (list
+               ;; prepare on qubits 2,3
+               (state-prep-2q (build-ground-state 2)
+                              c
+                              (list q2 q3))
+               ;; entangle
+               (cnot q2 q0)
+               (cnot q3 q1)
+
+               ;; apply unitaries, transposing qubits to account for LSB <-> MSB mismatch
+               (2q-evolution U q3 q2)
+               (2q-evolution V q1 q0))))
+        (if reversed
+            (reverse instrs)
+            instrs)))))
+
+(define-compiler state-prep-4Q-compiler
+    ((instr (_ _ q0 q1 q2 q3)
+            :where (typep instr 'state-prep-application)))
+  "Compiler for STATE-PREP-APPLICATION instances that target a single qubit."
+  (let ((source-wf (vector-scale
+                    (/ (norm (coerce (state-prep-application-source-wf instr) 'list)))
+                    (coerce (state-prep-application-source-wf instr) 'list)))
+        (target-wf (vector-scale
+                    (/ (norm (coerce (state-prep-application-target-wf instr) 'list)))
+                    (coerce (state-prep-application-target-wf instr) 'list))))
+    (append
+     ;; prepare source -> zero state
+     (state-prep-4q source-wf q0 q1 q2 q3
+                    :reversed t)
+     ;; prepare zero state -> target
+     (state-prep-4q target-wf q0 q1 q2 q3))))
+
+
 (define-compiler state-prep-trampolining-compiler
     ((instr :where (typep instr 'state-prep-application)))
   "Recursive compiler for STATE-PREP-APPLICATION instances. It's probably wise to use this only if the state preparation instruction targets at least two qubits."
@@ -290,14 +374,16 @@
 (defun state-prep-compiler (instr &key (target ':cz))
   "Compiles a STATE-PREP-APPLICATION instance by intelligently selecting one of the special-case compilation routines above."
   (declare (ignore target))
-  
+
   (unless (typep instr 'state-prep-application)
     (give-up-compilation))
-  
+
   (case (length (application-arguments instr))
     (1
      (state-prep-1Q-compiler instr))
     (2
      (state-prep-2Q-compiler instr))
+    (4
+     (state-prep-4Q-compiler instr))
     (otherwise
      (state-prep-trampolining-compiler instr))))
