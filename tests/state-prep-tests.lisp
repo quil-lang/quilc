@@ -93,17 +93,21 @@ CNOT 2 3
 
 (deftest test-schmidt-decomposition ()
   "Check that a random wavefunction can be reconstructed from its SCHMIDT-DECOMPOSITION."
-  (let* ((random-wf (quil::random-wavefunction 4)))
-    (multiple-value-bind (c U V) (quil::schmidt-decomposition random-wf 2 2)
-      (let* ((schmidt-terms (loop :for i :from 0 :below 4
-                                  :collect (magicl:scale (aref c i)
-                                                         (magicl::kron
-                                                          (magicl:matrix-column U i)
-                                                          (magicl:matrix-column V i)))))
-             (reconstructed-wf (apply #'magicl:add-matrix schmidt-terms)))
-        ;; adjust for column major nonsense
-        (is (quil::matrix-equality reconstructed-wf
-                                   (wf-to-matrix random-wf)))))))
+  (flet ((matrix-column (m i)
+           (magicl::slice m
+                          0 (magicl:matrix-rows m)
+                          i (1+ i))))
+    (let* ((random-wf (quil::random-wavefunction 4)))
+      (multiple-value-bind (c U V) (quil::schmidt-decomposition random-wf 2 2)
+        (let* ((schmidt-terms (loop :for i :from 0 :below 4
+                                    :collect (magicl:scale (aref c i)
+                                                           (magicl::kron
+                                                            (matrix-column U i)
+                                                            (matrix-column V i)))))
+               (reconstructed-wf (apply #'magicl:add-matrix schmidt-terms)))
+          ;; adjust for column major nonsense
+          (is (quil::matrix-equality reconstructed-wf
+                                     (wf-to-matrix random-wf))))))))
 
 (deftest test-aqvm-unlink-on-10Q ()
   (let ((quil::*aqvm-correlation-threshold* 4)
