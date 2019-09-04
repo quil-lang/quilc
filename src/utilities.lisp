@@ -208,3 +208,14 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (fresh-line stream)
   (dohash ((key val) hash)
     (format stream "~a -> ~a~%" key val)))
+
+;;; Cribbed from QVM-TESTS
+(defmacro with-output-to-quil (&body body)
+  `(let ((quil:*allow-unresolved-applications* t))
+     (quil:parse-quil
+      (with-output-to-string (*standard-output*)
+        ,@(loop :for form :in body
+                :if (stringp form)
+                  :collect `(write-line ,form)
+                :else
+                  :collect form)))))

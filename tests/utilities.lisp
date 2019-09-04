@@ -4,17 +4,6 @@
 
 (in-package #:cl-quil-tests)
 
-;;; Cribbed from QVM-TESTS
-(defmacro with-output-to-quil (&body body)
-  `(let ((quil:*allow-unresolved-applications* t))
-     (quil:parse-quil
-      (with-output-to-string (*standard-output*)
-        ,@(loop :for form :in body
-                :if (stringp form)
-                  :collect `(write-line ,form)
-                :else
-                  :collect form)))))
-
 (defun matrix-mismatch (m u &key (test #'quil::double~))
   "Return a LIST of the (ROW COL) indices of the first mismatch between M and U.
 

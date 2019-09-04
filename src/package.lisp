@@ -328,6 +328,7 @@
    #:parsed-program-circuit-definitions ; READER
    #:parsed-program-memory-definitions  ; READER
    #:parsed-program-executable-code     ; READER
+   #:print-parsed-program               ; FUNCTION
 
    #:*print-fractional-radians*         ; PARAMETER
    #:print-instruction                  ; FUNCTION
@@ -437,6 +438,7 @@
   (:export
    #:ilog2                              ; FUNCTION
    #:rotate-byte                        ; FUNCTION
+   #:with-output-to-quil                ; MACRO
    )
 
   ;; relabeling.lisp
