@@ -232,8 +232,7 @@ appear in the same connected component of the qpu"
                 :when (not component)
                   :do (setf component index)
                 :always (and index (= index component)))
-        (#+#:ignore error #-#:ignore warn
-         "User program incompatible with chip: naive rewiring crosses chip component boundaries"))
+        (error "User program incompatible with chip: naive rewiring crosses chip component boundaries"))
       (return-from prog-initial-rewiring (make-rewiring n-qubits)))
 
     (assert (<= (length needed) (length cc)) ()
