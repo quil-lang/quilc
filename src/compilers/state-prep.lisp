@@ -239,7 +239,7 @@
 
 (defun schmidt-decomposition (phi num-a num-b)
   "Given a wavefunction PHI containing subystems of size NUM-A and NUM-B qubits, compute the Schmidt decomposition of PHI."
-  ;; Returns c, U, V, where c is vector and U, V are unitary matrices (of dimensions
+  ;; Returns c, U, V, where c is a vector and U, V are unitary matrices (of dimensions
   ;; NUM-A and NUM-B respectively) such that
   ;;
   ;;    PHI = \sum_{i} c_i U_i V _i
