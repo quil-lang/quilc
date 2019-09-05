@@ -142,17 +142,22 @@ measurements for which a calibration is defined."
   applicable calibration during calibration expansion.")
 
 (defun recursively-expand-instruction (instr)
-  (let ((expanded (apply-calibration instr)))
-    (format t "Expanding ~A to ~A~%" instr expanded)
-    (when (and *require-applicable-calibration*
+  (let ((*expansion-depth* (1+ *expansion-depth*)))
+    (unless (<= *expansion-depth* *expansion-limit*)
+      "Exceeded recursion limit of ~D for calibration expansion. ~
+      Current object being expanded is ~A."
+      *expansion-limit*
+      instr)
+    (a:if-let ((expanded (apply-calibration instr)))
+      ;; Recursively expand the new instructions
+      (a:mappend #'recursively-expand-instruction expanded)
+      ;; Otherwise, handle the base case.
+      (if (and *require-applicable-calibration*
                (null expanded)
                (typep instr '(or gate-application measure measure-discard)))
-      (quil-parse-error "Expected a calibration definition associated with ~A, but none was found."
-                        instr))
-    (if expanded
-        ;; Recursively expand the new instructions
-        (a:mappend #'recursively-expand-instruction expanded)
-        (list instr))))
+          (quil-parse-error "Expected a calibration definition associated with ~A, but none was found."
+                            instr)
+          (list instr)))))
 
 (defun expand-calibrations (parsed-program &key strict)
   "Expand all gate applications and measurements in PARSED-PROGRAM for which there is a corresponding calibration definition. If STRICT is T, then it is an error for a gate application or measurement to not have a matching calibration."
@@ -160,10 +165,12 @@ measurements for which a calibration is defined."
                         *measure-calibrations*
                         *measure-discard-calibrations*)
       (compute-calibration-tables parsed-program)
-    (let* ((*require-applicable-calibration* strict)
-           (expanded
-            (loop :for instr :across (parsed-program-executable-code parsed-program)
-                  :append (recursively-expand-instruction instr))))
-      (setf (parsed-program-executable-code parsed-program)
-            (coerce expanded 'vector))
-      parsed-program)))
+    (let ((*require-applicable-calibration* strict)
+          (*expansion-context* ':DEFCAL)
+          (*expansion-depth* 0))
+      (let ((expanded
+              (loop :for instr :across (parsed-program-executable-code parsed-program)
+                    :append (recursively-expand-instruction instr))))
+        (setf (parsed-program-executable-code parsed-program)
+              (coerce expanded 'vector)))))
+  parsed-program)

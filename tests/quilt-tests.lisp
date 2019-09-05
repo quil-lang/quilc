@@ -48,6 +48,17 @@ X 0")))
     (is (typep (elt (parsed-program-executable-code pp) 0)
                'no-operation))))
 
+(deftest test-infinitely-recursive-calibrations ()
+  (let ((pp (parse-quil "
+DEFCAL X 0:
+    RX(pi) 0
+
+DEFCAL RX(pi) 0:
+    X 0
+
+X 0" :transforms nil)))
+    (signals quil-parse-error (quil::expand-calibrations pp))))
+
 
 (deftest test-measurement-calibration-matching ()
   (let ((pp (parse-quil "

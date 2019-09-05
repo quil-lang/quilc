@@ -1,5 +1,6 @@
 (in-package #:cl-quil)
 
+;;; TODO do I actually want to use this
 (deftype expansion-context ()
   '(member nil :DEFCIRCUIT :DEFCAL))
 
@@ -21,8 +22,9 @@ before erroring. Intended to avoid infinite loops.")
                 :when (jump-target-p instr)
                   :collect (let ((name (label-name (jump-target-label instr))))
                              (when (assoc name alist :test #'string=)
-                               (quil-parse-error "Duplicate label ~S in DEFCIRCUIT"
-                                                 name))
+                               (quil-parse-error "Duplicate label ~S~@[ in ~A]"
+                                                 name
+                                                 *expansion-context*))
                              (list name (genlabel name)))
                     :into alist
                 :finally (return alist))))
@@ -80,12 +82,13 @@ before erroring. Intended to avoid infinite loops.")
     (let ((*expansion-depth* (if (boundp '*expansion-depth*)
                                  (1+ *expansion-depth*)
                                  1)))
-      (assert (<= *expansion-depth* *expansion-limit*)
-              ()
-              "Exceeded recursion limit of ~D for circuit/calibration expansion. ~
+      (unless (<= *expansion-depth* *expansion-limit*)
+        (quil-parse-error
+         "Exceeded recursion limit of ~D during~@[ ~A~] expansion. ~
              Current object being expanded is ~A."
-              *expansion-limit*
-              defn)
+         *expansion-limit*
+         (or *expansion-context* "circuit/calibration")
+         defn))
       (labels
           ((param-value (param)
              (if (not (is-param param))
