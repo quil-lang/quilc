@@ -313,8 +313,12 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                 (list (build-gate "PISWAP" `(,theta) a b)))
                ;; recursive case
                (t
-                (let ((temp-string (build-PISWAP-string (rest index-list)))
-                      (gate (list (build-gate "SWAP" () a b))))
-                  (append gate temp-string gate)))))))
-      (finish-compiler
-       (build-PISWAP-string computed-path)))))
+                (append (list (build-gate "SWAP" () a b))
+                        (build-PISWAP-string (rest index-list))
+                        (list (build-gate "SWAP" () a b))))))))
+      (cond
+        ((= 2 (length computed-path))
+         (give-up-compilation))
+        (t
+         (finish-compiler
+          (build-PISWAP-string computed-path)))))))
