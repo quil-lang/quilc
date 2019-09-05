@@ -12,14 +12,15 @@
   (flet ((always-error (x)
            (declare (ignore x))
            (error "Not in a circuit expansion context.")))
-    (let* ((*expansion-context* ':DEFCIRCUIT)
-           (flat-instrs
-             (loop :for instr :across (parsed-program-executable-code parsed-program)
-                   :for instantiated := (instantiate-instruction instr #'always-error #'always-error)
-                   :if (listp instantiated)
-                     :append instantiated
-                   :else
-                     :collect instantiated)))
-      (setf (parsed-program-executable-code parsed-program)
-            (coerce flat-instrs 'vector))
-      parsed-program)))
+    (let ((*expansion-context* ':DEFCIRCUIT)
+          (*expansion-depth* 0))
+      (let ((flat-instrs
+              (loop :for instr :across (parsed-program-executable-code parsed-program)
+                    :for instantiated := (instantiate-instruction instr #'always-error #'always-error)
+                    :if (listp instantiated)
+                      :append instantiated
+                    :else
+                      :collect instantiated)))
+        (setf (parsed-program-executable-code parsed-program)
+              (coerce flat-instrs 'vector)))))
+  parsed-program)
