@@ -16,7 +16,8 @@ RZ(pi/2) 0                              # 1
 RZ(pi/2) 1                              # 2
 X 0                                     # 3
 MEASURE 1                               # 4
-")))
+"
+                        :transforms nil)))
     ;; We want to check whether definition i matches instruction j
     (let ((matches '((0 (1))            ; def 0 vs instruction 1
                      (1 (0 1))
@@ -54,7 +55,8 @@ MEASURE 0                               # 1
 MEASURE 1                               # 2
 MEASURE 0 ro                            # 3
 MEASURE 1 ro                            # 4
-" :transforms nil)))
+"
+                        :transforms nil)))
     ;; We want to check whether definition i matches instruction j
     (let ((matches '((0 (1))            ; def 0 vs instruction 1
                      (1 (3))
@@ -70,6 +72,16 @@ MEASURE 1 ro                            # 4
                   :do (if (member i match-indices)
                           (is result)
                           (is (not result))))))))))
+
+(deftest test-strict-calibration-expansion ()
+    (let ((pp (parse-quil "
+DEFCAL X 0:
+    PULSE 0 \"xy\" flat(duration: 1, iq: 1)
+
+X 1"
+                          :transforms nil)))
+      (signals quil::quil-parse-error
+        (quil::expand-calibrations pp :strict t))))
 
 ;;; TODO update package.lisp
 (deftest test-fence-expansion ()
