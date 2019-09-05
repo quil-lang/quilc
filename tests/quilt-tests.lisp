@@ -16,7 +16,8 @@ RZ(pi/2) 0                              # 1
 RZ(pi/2) 1                              # 2
 X 0                                     # 3
 MEASURE 1                               # 4
-")))
+"
+                        :transforms nil)))
     ;; We want to check whether definition i matches instruction j
     (let ((matches '((0 (1))            ; def 0 vs instruction 1
                      (1 (0 1))
@@ -31,6 +32,32 @@ MEASURE 1                               # 4
                   :do (if (member i match-indices)
                           (is result)
                           (is (not result))))))))))
+
+;;; TODO: should we allow pulse etc in circuits?
+
+(deftest test-recursive-calibration ()
+  (let ((pp (parse-quil "
+DEFCAL X 0:
+    RX(pi) 0
+
+DEFCAL RX(%theta) q:
+    NOP
+
+X 0")))
+    (is (= 1 (length (parsed-program-executable-code pp))))
+    (is (typep (elt (parsed-program-executable-code pp) 0)
+               'no-operation))))
+
+(deftest test-infinitely-recursive-calibrations ()
+  (let ((pp (parse-quil "
+DEFCAL X 0:
+    RX(pi) 0
+
+DEFCAL RX(pi) 0:
+    X 0
+
+X 0" :transforms nil)))
+    (signals quil-parse-error (quil::expand-calibrations pp))))
 
 
 (deftest test-measurement-calibration-matching ()
@@ -54,7 +81,8 @@ MEASURE 0                               # 1
 MEASURE 1                               # 2
 MEASURE 0 ro                            # 3
 MEASURE 1 ro                            # 4
-" :transforms nil)))
+"
+                        :transforms nil)))
     ;; We want to check whether definition i matches instruction j
     (let ((matches '((0 (1))            ; def 0 vs instruction 1
                      (1 (3))
@@ -70,6 +98,26 @@ MEASURE 1 ro                            # 4
                   :do (if (member i match-indices)
                           (is result)
                           (is (not result))))))))))
+
+(deftest test-strict-calibration-expansion ()
+  (let ((pp (parse-quil "
+DEFCAL X 0:
+    PULSE 0 \"xy\" flat(duration: 1, iq: 1)
+
+X 1"
+                        :transforms nil)))
+    (signals quil::quil-parse-error
+      (quil::expand-calibrations pp :strict t))))
+
+(deftest test-case-sensitive-calibration-expansion ()
+  (let ((pp (parse-quil "
+DEFCAL x 0:
+    PULSE 0 \"xy\" flat(duration: 1, iq: 1)
+
+X 0"
+                        :transforms nil)))
+    (signals quil::quil-parse-error
+      (quil::expand-calibrations pp :strict t))))
 
 ;;; TODO update package.lisp
 (deftest test-fence-expansion ()
