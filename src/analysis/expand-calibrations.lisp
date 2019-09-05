@@ -70,7 +70,7 @@ measurements for which a calibration is defined."
                    ;; For each calibration parameter, there are two cases:
                    ;; constant values or formal parameters
                    (every (lambda (app-param cal-param)
-                            (if (is-constant cal-param) 
+                            (if (is-constant cal-param)
                                 (equalp app-param cal-param) ; TODO is this the right comparison to make?
                                 (is-param cal-param)))
                           parameters
@@ -137,24 +137,33 @@ measurements for which a calibration is defined."
   (:method ((instr t))
     nil))
 
+(defparameter *require-applicable-calibration* nil
+  "If T, an error will be signalled if an instruction fails to match an
+  applicable calibration during calibration expansion.")
+
+(defun recursively-expand-instruction (instr)
+  (let ((expanded (apply-calibration instr)))
+    (format t "Expanding ~A to ~A~%" instr expanded)
+    (when (and *require-applicable-calibration*
+               (null expanded)
+               (typep instr '(or gate-application measure measure-discard)))
+      (quil-parse-error "Expected a calibration definition associated with ~A, but none was found."
+                        instr))
+    (if expanded
+        ;; Recursively expand the new instructions
+        (a:mappend #'recursively-expand-instruction expanded)
+        (list instr))))
+
 (defun expand-calibrations (parsed-program &key strict)
   "Expand all gate applications and measurements in PARSED-PROGRAM for which there is a corresponding calibration definition. If STRICT is T, then it is an error for a gate application or measurement to not have a matching calibration."
   (multiple-value-bind (*gate-calibrations*
                         *measure-calibrations*
                         *measure-discard-calibrations*)
       (compute-calibration-tables parsed-program)
-    (let ((fully-expanded
+    (let* ((*require-applicable-calibration* strict)
+           (expanded
             (loop :for instr :across (parsed-program-executable-code parsed-program)
-                  :for expanded := (apply-calibration instr)
-                  :when (and strict
-                             (typep instr '(or gate-application measure measure-discard))
-                             (null expanded))
-                    :do (quil-parse-error "Expected a calibration definition associated with ~A, but none was found."
-                                          instr)
-                  :if expanded
-                    :append expanded
-                  :else
-                    :collect instr)))
+                  :append (recursively-expand-instruction instr))))
       (setf (parsed-program-executable-code parsed-program)
-            (coerce fully-expanded 'vector))
+            (coerce expanded 'vector))
       parsed-program)))

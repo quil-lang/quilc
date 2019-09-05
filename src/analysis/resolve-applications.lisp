@@ -186,6 +186,11 @@ This also signals ambiguous definitions, which may be handled as needed."
                    (resolve-instruction-sequence
                     (circuit-definition-body cd))))
            circ-defs)
+      (map nil (lambda (cd)
+                 (let ((*in-circuit-body* t)) ; TODO rename
+                   (resolve-instruction-sequence
+                    (calibration-definition-body cd))))
+           cal-defs)
       (make-instance 'parsed-program
                      :gate-definitions gate-defs
                      :circuit-definitions circ-defs

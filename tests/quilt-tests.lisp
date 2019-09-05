@@ -33,6 +33,21 @@ MEASURE 1                               # 4
                           (is result)
                           (is (not result))))))))))
 
+;;; TODO: should we allow pulse etc in circuits?
+
+(deftest test-recursive-calibration ()
+  (let ((pp (parse-quil "
+DEFCAL X 0:
+    RX(pi) 0
+
+DEFCAL RX(%theta) q:
+    NOP
+
+X 0")))
+    (is (= 1 (length (parsed-program-executable-code pp))))
+    (is (typep (elt (parsed-program-executable-code pp) 0)
+               'no-operation))))
+
 
 (deftest test-measurement-calibration-matching ()
   (let ((pp (parse-quil "
