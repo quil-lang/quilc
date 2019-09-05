@@ -74,14 +74,24 @@ MEASURE 1 ro                            # 4
                           (is (not result))))))))))
 
 (deftest test-strict-calibration-expansion ()
-    (let ((pp (parse-quil "
+  (let ((pp (parse-quil "
 DEFCAL X 0:
     PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 
 X 1"
-                          :transforms nil)))
-      (signals quil::quil-parse-error
-        (quil::expand-calibrations pp :strict t))))
+                        :transforms nil)))
+    (signals quil::quil-parse-error
+      (quil::expand-calibrations pp :strict t))))
+
+(deftest test-case-sensitive-calibration-expansion ()
+  (let ((pp (parse-quil "
+DEFCAL x 0:
+    PULSE 0 \"xy\" flat(duration: 1, iq: 1)
+
+X 0"
+                        :transforms nil)))
+    (signals quil::quil-parse-error
+      (quil::expand-calibrations pp :strict t))))
 
 ;;; TODO update package.lisp
 (deftest test-fence-expansion ()
