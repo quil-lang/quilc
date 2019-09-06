@@ -39,4 +39,12 @@
          :quilc-compiled (length (quil::parsed-program-executable-code default-comp))
          :tweed-compiled (length (quil::parsed-program-executable-code tweedle-comp)))))))
 
+(defun make-diagonal-matrix-from-phases (phases)
+  (let ((m (magicl:make-zero-matrix (length phases) (length phases))))
+    (loop :for i :below (length phases)
+          :for p :in phases :do
+            (setf (magicl:ref m i i) (complex (cos p) (sin p))))
+    m))
 
+;; (make-diagonal-matrix-from-phases (list 0.5 0.5))
+;; (mapcar #'phase (magicl:matrix-diagonal (make-diagonal-matrix-from-phases (list 0.5 0.5))))

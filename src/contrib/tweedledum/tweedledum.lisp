@@ -91,10 +91,6 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
   t)
 
 (defun compile-diagonal-gate-with-tweedledum (instr)
-  ;; TODO Probably don't want to be checking for diagonality for every
-  ;; instruction. Like with permutation gates, diagonality should be
-  ;; available as part of the structure definition. Maybe that already
-  ;; exists.
   (let ((m (quil:gate-matrix instr)))
     (unless (diagonal-p m)
       (quil::give-up-compilation))
@@ -116,16 +112,6 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
 
 (defun tweedledum-decompile-diagonal-matrix (matrix)
   (compile-diagonal-gate-with-tweedledum matrix))
-
-(defun make-diagonal-matrix-from-phases (phases)
-  (let ((m (magicl:make-zero-matrix (length phases) (length phases))))
-    (loop :for i :below (length phases)
-          :for p :in phases :do
-            (setf (magicl:ref m i i) (complex (cos p) (sin p))))
-    m))
-
-;; (make-diagonal-matrix-from-phases (list 0.5 0.5))
-;; (mapcar #'phase (magicl:matrix-diagonal (make-diagonal-matrix-from-phases (list 0.5 0.5))))
 
 (defun load-tweedledum ()
   (cffi:load-foreign-library 'libtweedledum)
