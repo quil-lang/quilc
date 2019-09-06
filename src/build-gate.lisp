@@ -59,10 +59,11 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
   (check-type operator string)
   (check-type matrix magicl:matrix)
   (push qubit qubits)
-  (make-instance 'gate-application
-                 :operator (named-operator (format nil "~a-~a" operator (get-anonymous-gate-counter)))
-                 :gate matrix
-                 :arguments (mapcar #'%capture-arg qubits)))
+  (let ((name (format nil "~a-~a" operator (get-anonymous-gate-counter))))
+    (make-instance 'gate-application
+                   :operator (named-operator name)
+                   :gate (make-instance 'simple-gate :matrix matrix :name name)
+                   :arguments (mapcar #'%capture-arg qubits))))
 
 (defun build-UCR (roll-name params qubit &rest qubits)
   (loop :with op := (named-operator roll-name)
