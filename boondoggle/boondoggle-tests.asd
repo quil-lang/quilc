@@ -9,6 +9,7 @@
   :depends-on (#:cl-quil
                #:boondoggle
                #:fiasco
+               #:sapaclisp
                #:uiop)
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':boondoggle-tests
