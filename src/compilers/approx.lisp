@@ -371,19 +371,16 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 
     pi/2 >= c1 >= c2 >= |c3|."
   (assert (= 4 (magicl:matrix-rows d) (magicl:matrix-cols d)))
-  (labels ((test (seq) (double>= (/ pi 2) (first seq) (second seq) (abs (third seq))))
+  (labels ((test (seq) (double>= pi/2 (first seq) (second seq) (abs (third seq))))
            (wrap-value (z)
-             (let* ((pi/2 (/ pi 2))
-                    (z (- (mod (+ z pi/2) pi) pi/2)))
-               (if (double= (/ pi -2) z)
-                   (- z)
-                   z)))
+             (let ((z (- (mod (+ z pi/2) pi) pi/2)))
+               (if (double= -pi/2 z) (- z) z)))
            (try-to-canonicalize (a b c)
              (let ((intermediate-value (sort (mapcar #'wrap-value (list a b c)) #'>)))
                (cond
                  ((member 0d0 intermediate-value :test #'double=)
                   (sort (mapcar #'abs intermediate-value) #'>))
-                 ((member #.(/ pi 2) intermediate-value :test #'double=)
+                 ((member pi/2 intermediate-value :test #'double=)
                   (sort (mapcar #'abs intermediate-value) #'>))
                  (t intermediate-value)))))
     (let* ((angles (mapcar #'phase (matrix-diagonal-entries d)))
@@ -511,7 +508,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                        (make-array ,parameter-count
                                    :initial-contents (mapcar #'random
                                                              (make-list ,parameter-count
-                                                                        :initial-element (* 2 pi))))
+                                                                        :initial-element 2pi)))
                        :max-function-calls *approximate-template-search-limit*)
                     (cond
                       ;; if we promised an exact solution but haven't found it yet,
@@ -538,7 +535,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (inst "I" () q1))
 
 (define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-1
-    ((instr ("CAN" (#.(/ pi 2) #.(/ pi 2) 0) q1 q0)))
+    ((instr ("CAN" (#.pi/2 #.pi/2 0) q1 q0)))
   (inst "ISWAP" () q1 q0))
 
 (define-canonical-circuit-approximation nearest-XY-circuit-of-depth-1
@@ -546,7 +543,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (inst "PISWAP" (list (* 2 alpha)) q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-1
-    ((instr ("CAN" (#.(/ pi 2) 0 0) q1 q0)))
+    ((instr ("CAN" (#.pi/2 0 0) q1 q0)))
   (inst "CZ" () q1 q0))
 
 (define-canonical-circuit-approximation nearest-CPHASE-circuit-of-depth-1
@@ -573,10 +570,10 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (inst "PISWAP" (list (aref array 3))     q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-ISWAP-circuit-of-depth-2
-    ((instr ("CAN" (#.(/ pi 2) beta gamma) q1 q0)))
+    ((instr ("CAN" (#.pi/2 beta gamma) q1 q0)))
   (inst "ISWAP" () q1 q0)
-  (inst "RY"    (list (- (/ pi 2) beta))  q0)
-  (inst "RY"    (list (- (/ pi 2) gamma)) q1)
+  (inst "RY"    (list (- pi/2 beta))  q0)
+  (inst "RY"    (list (- pi/2 gamma)) q1)
   (inst "CZ"    () q1 q0))
 
 (define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-3
@@ -663,17 +660,17 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-3
     ((instr ("CAN" (alpha beta gamma) q1 q0)))
-  (let ((a (- alpha    pi))
-        (b (- pi       beta))
-        (c (- (/ pi 2) gamma)))
-    (inst "CZ"  ()            q0 q1)
-    (inst "RY" '(#.(/ pi -2)) q0)
-    (inst "RY"  (list b)      q1)
-    (inst "RZ"  (list c)      q0)
-    (inst "CZ"  ()            q0 q1)
-    (inst "RY"  (list a)      q1)
-    (inst "RY" '(#.(/ pi 2))  q0)
-    (inst "CZ"  ()            q0 q1)))
+  (let ((a (- alpha pi))
+        (b (- pi    beta))
+        (c (- pi/2  gamma)))
+    (inst "CZ"  ()        q0 q1)
+    (inst "RY" '(#.-pi/2) q0)
+    (inst "RY"  (list b)  q1)
+    (inst "RZ"  (list c)  q0)
+    (inst "CZ"  ()        q0 q1)
+    (inst "RY"  (list a)  q1)
+    (inst "RY" '(#.pi/2)  q0)
+    (inst "CZ"  ()        q0 q1)))
 
 
 ;;; here lies the logic underlying the approximate compilation routine.
