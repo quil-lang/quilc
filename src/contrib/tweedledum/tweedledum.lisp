@@ -100,6 +100,8 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
 (quil::define-compiler tweedledum-diagonal-gate
     ((instr :where (and
                     (slot-boundp instr 'quil::name-resolution)
+                    (not (typep instr 'quil:forked-gate))
+                    (> (length (quil:application-arguments instr)) 2))))
   (let ((m (quil::make-matrix-from-quil (list instr))))
     (unless (diagonal-p m)
       (quil::give-up-compilation))
