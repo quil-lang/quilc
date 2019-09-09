@@ -18,7 +18,6 @@ extern "C" {
   extern char* tweedledum_synthesis_diagonal(double* angles, uint32_t size) {
     using namespace tweedledum;
     std::vector<double> vangles(angles, angles + size);
-    std::cout << vangles.size() << std::endl;
     auto network = diagonal_synth<gg_network<mcmt_gate>>(vangles);
 
     std::stringstream ss;
