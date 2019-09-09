@@ -64,23 +64,27 @@ before erroring. Intended to avoid infinite loops.")
                   instr))))
       (mapcar #'relabel-instruction quil-block))))
 
+(defun destructure-definition (defn)
+  "Given a quilt definition DEFN, return three values: a list of the parameters, a list of the formal arguments, and the definition body."
+  (etypecase defn
+    (circuit-definition (values (circuit-definition-parameters defn)
+                                (circuit-definition-arguments defn)
+                                (circuit-definition-body defn)))
+    (gate-calibration-definition (values (calibration-definition-parameters defn)
+                                         (calibration-definition-arguments defn)
+                                         (calibration-definition-body defn)))
+    (measure-calibration-definition (values nil
+                                            (list (measurement-calibration-qubit defn)
+                                                  (measure-calibration-address defn))
+                                            (calibration-definition-body defn)))
+    (measure-discard-calibration-definition (values nil
+                                                    (list (measurement-calibration-qubit defn))1
+                                                    (calibration-definition-body defn)))))
+
 (defun instantiate-definition (defn params args)
   "Fill in the given definition DEFN with the list of parameter and argument values PARAMS and ARGS."
   (multiple-value-bind (defn-params defn-args defn-body)
-      (etypecase defn                   ; TODO should this be replaced with generics?
-        (circuit-definition (values (circuit-definition-parameters defn)
-                                    (circuit-definition-arguments defn)
-                                    (circuit-definition-body defn)))
-        (gate-calibration-definition (values (calibration-definition-parameters defn)
-                                             (calibration-definition-arguments defn)
-                                             (calibration-definition-body defn)))
-        (measure-calibration-definition (values nil
-                                                (list (measurement-calibration-qubit defn)
-                                                      (measure-calibration-address defn))
-                                                (calibration-definition-body defn)))
-        (measure-discard-calibration-definition (values nil
-                                                        (list (measurement-calibration-qubit defn))1
-                                                        (calibration-definition-body defn))))
+      (destructure-definition defn)
     (assert (= (length params)
                (length defn-params)))
     (assert (= (length args)
@@ -163,7 +167,7 @@ depending on whether TEST passes."
 (defgeneric instantiate-instruction (instr param-value arg-value)
   (:documentation "Given an instruction INSTR possibly with formal parameters/variables, instantiate it with the proper parameter/argument values provided by the unary functions PARAM-VALUE and ARG-VALUE, which take PARAM and FORMAL objects respectively as arguments. Return the instruction or a list of instructions as a result.")
   (:method ((instr circuit-application) param-value arg-value)
-    (let ((params (mapcar (transform-if (constantly t) (substitute-parameter param-value)) ; TODO this can be simplified...
+    (let ((params (mapcar (substitute-parameter param-value)
                           (application-parameters instr)))
           (args (mapcar (transform-if #'is-formal arg-value)
                         (application-arguments instr))))
