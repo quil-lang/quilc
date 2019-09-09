@@ -122,11 +122,32 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
 
 (defun load-tweedledum ()
   (cffi:load-foreign-library 'libtweedledum)
-  ;; TODO Some error handling here
-  (unless *tweedledum-libs-loaded*
-    (push (constantly 'compile-perm-gate-with-tweedledum)
-          cl-quil::*global-compilers*))
-  (setf *tweedledum-libs-loaded* t))
+  (setf *tweedledum-libs-loaded* t)
+  (install-tweedledum-compilers))
+
+(defparameter *tweedledum-compilers-installed* nil
+  "")
+
+(defun install-tweedledum-compilers (&key (permutation t) (diagonal t))
+  (unless *tweedledum-compilers-installed*
+    ;; The # is important here.
+    (when permutation
+      (push (constantly #'compile-perm-gate-with-tweedledum)
+            cl-quil::*global-compilers*)
+      (push #'compile-perm-gate-with-tweedledum
+            *tweedledum-compilers-installed*))
+    (when diagonal
+      (push (constantly #'compile-diagonal-gate-with-tweedledum)
+            cl-quil::*global-compilers*)
+      (push #'compile-diagonal-gate-with-tweedledum
+            *tweedledum-compilers-installed*))))
+
+(defun uninstall-tweedledum-compilers ()
+  (when *tweedledum-compilers-installed*
+    (pop *tweedledum-compilers-installed*)
+    (pop cl-quil::*global-compilers*)
+    (uninstall-tweedledum-compilers)))
+
 
 (defun run-tweedledum-tests ()
   (load-tweedledum)
