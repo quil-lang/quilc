@@ -23,9 +23,7 @@ extern "C" {
     std::stringstream ss;
     write_quil(network, ss);
     const std::string resultstr = ss.str();
-    char* str = (char*) malloc( (resultstr.length()+1) * sizeof(char) );
-    strcpy(str, resultstr.c_str());
-    return str;
+    return strdup(resultstr.c_str());
   }
 
   extern char* tweedledum_synthesis_dbs(uint32_t* perm, uint32_t size) {
