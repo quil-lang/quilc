@@ -123,6 +123,7 @@
 
    #:frame
    #:frame-name
+   #:frame-qubits
 
    #:waveform-ref                       ; STRUCTURE
    #:waveform-ref-name                  ; READER
@@ -375,6 +376,7 @@
    #:waveform-definition-name           ; READER
    #:waveform-definition-entries        ; READER
    #:waveform-definition-parameters     ; READER
+   #:waveform-definition-sample-rate    ; READER
 
    #:calibration-definition             ; ABSTRACT CLASS
    #:gate-calibration-definition        ; CLASS
