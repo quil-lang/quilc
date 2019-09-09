@@ -1,11 +1,20 @@
 (in-package #:cl-quil)
 
-;;; TODO do I actually want to use this
+;;; Since both circuit and calibration expansion rely on some common code, but
+;;; we would like error messages to be as specific as possible, we choose to
+;;; explicitly track an "expansion context".
+
 (deftype expansion-context ()
   '(member nil :DEFCIRCUIT :DEFCAL))
 
 (defparameter *expansion-context* nil
   "The context for expansion, mainly used for error messages.")
+
+(defun expansion-error (format-control &rest format-args)
+  "Signal a QUIL-PARSE-ERROR, incorporating information about the expansion context."
+  (quil-parse-error "While expanding ~A: ~A"
+                    (or *expansion-context* "circuit or calibration")
+                    (apply #'format nil format-control format-args)))
 
 (defparameter *expansion-limit* 256
   "Limit the number of recursive circuit or calibration expansions that can happen
@@ -22,9 +31,7 @@ before erroring. Intended to avoid infinite loops.")
                 :when (jump-target-p instr)
                   :collect (let ((name (label-name (jump-target-label instr))))
                              (when (assoc name alist :test #'string=)
-                               (quil-parse-error "Duplicate label ~S~@[ in ~A]"
-                                                 name
-                                                 *expansion-context*))
+                               (expansion-error "Duplicate label ~S" name))
                              (list name (genlabel name)))
                     :into alist
                 :finally (return alist))))
@@ -83,11 +90,9 @@ before erroring. Intended to avoid infinite loops.")
                                  (1+ *expansion-depth*)
                                  1)))
       (unless (<= *expansion-depth* *expansion-limit*)
-        (quil-parse-error
-         "Exceeded recursion limit of ~D during~@[ ~A~] expansion. ~
-             Current object being expanded is ~A."
+        (expansion-error
+         "Exceeded recursion limit of ~D. Current object being expanded is ~A."
          *expansion-limit*
-         (or *expansion-context* "circuit/calibration")
          defn))
       (labels
           ((param-value (param)
@@ -97,7 +102,7 @@ before erroring. Intended to avoid infinite loops.")
                                       :key #'param-name
                                       :test #'string-equal)))
                    (when (null pos)
-                     (error "No defined parameter named ~S" param))
+                     (expansion-error "No defined parameter named ~S" param))
                    (elt params pos))))
            (arg-value (arg)
              (if (not (is-formal arg))
@@ -106,7 +111,7 @@ before erroring. Intended to avoid infinite loops.")
                                       :key #'formal-name
                                       :test #'string-equal)))
                    (when (null pos)
-                     (error "No argument named ~S" (formal-name arg)))
+                     (expansion-error "No argument named ~S" (formal-name arg)))
                    (elt args pos))))
            (instantiate (instr)
              (let ((x (instantiate-instruction instr #'param-value #'arg-value)))
