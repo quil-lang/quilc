@@ -519,21 +519,20 @@ Return the following values:
       ;; If a jump was never used, we better add one to the end
       (unless jump-used
         (add-to-section end-jump)))
-    (let ((*print-pretty* nil))
-      (cond
-        ((and (basic-block-in-rewiring blk)
-              (basic-block-out-rewiring blk)
-              (= 1 (length code-section)))
+    (cond
+      ((and (basic-block-in-rewiring blk)
+            (basic-block-out-rewiring blk)
+            (= 1 (length code-section)))
+       (setf (comment (aref code-section 0))
+             (make-rewiring-comment :entering (basic-block-in-rewiring blk)
+                                    :exiting (basic-block-out-rewiring blk))))
+      (t
+       (when (basic-block-in-rewiring blk)
          (setf (comment (aref code-section 0))
-               (make-rewiring-comment :entering (basic-block-in-rewiring blk)
-                                      :exiting (basic-block-out-rewiring blk))))
-        (t
-         (when (basic-block-in-rewiring blk)
-           (setf (comment (aref code-section 0))
-                 (make-rewiring-comment :entering (basic-block-in-rewiring blk))))
-         (when (basic-block-out-rewiring blk)
-           (setf (comment (aref code-section (1- (length code-section))))
-                 (make-rewiring-comment :exiting (basic-block-out-rewiring blk)))))))
+               (make-rewiring-comment :entering (basic-block-in-rewiring blk))))
+       (when (basic-block-out-rewiring blk)
+         (setf (comment (aref code-section (1- (length code-section))))
+               (make-rewiring-comment :exiting (basic-block-out-rewiring blk))))))
     code-section))
 
 (defun reconstitute-program (cfg)
