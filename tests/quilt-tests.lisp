@@ -144,9 +144,26 @@ CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
                     (is (= 1.0 (aref clocks q))))
                   (incf (aref clocks q) (quil::quilt-instruction-duration instr)))))))
 
+(deftest test-quilt-defwaveform-sample-rate ()
+  (signals quil-parse-error
+    (parse-quil "
+DEFWAVEFORM foo:
+    1.0, 1.0, 1.0, 1.0"))
+  (signals quil-parse-error
+    (parse-quil "
+DEFWAVEFORM foo 4+2*i:
+    1.0, 1.0, 1.0, 1.0"))
+  (let ((pp (parse-quil "
+DEFWAVEFORM foo 4.0:
+    1.0, 1.0, 1.0, 1.0")))
+    (is (= 4.0
+           (constant-value
+            (waveform-definition-sample-rate
+             (first (parsed-program-waveform-definitions pp))))))))
+
 (deftest test-quilt-duration ()
   (let ((pp (parse-quil "
-DEFWAVEFORM foo:
+DEFWAVEFORM foo 4.0:
     1.0, 1.0, 1.0, 1.0
 
 PULSE 0 \"xy\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)
