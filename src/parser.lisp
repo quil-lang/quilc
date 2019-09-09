@@ -936,7 +936,8 @@ result of BODY, and the (possibly null) list of remaining lines.
              (parse-arithmetic-tokens entry :eval t)))
     (mapcar #'simplify entries)))
 
-(defun parse-gate-or-waveform-entries (tok-lines &key required)
+(defun parse-gate-or-waveform-entries (tok-lines &key require-indent)
+  "Parse comma separated gate or waveform entries from TOK-LINES. Returns the the parsed entries as well as the remaining lines. If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly indented."
   ;; Do we have any lines to parse?
   (when (null tok-lines)
     (warn "End of program each when indented gate or waveform entries was expected.")
@@ -947,7 +948,7 @@ result of BODY, and the (possibly null) list of remaining lines.
       (indented-line (first tok-lines))
     ;; Is the first line indented?
     (unless indented?
-      (when required
+      (when require-indent
         (quil-parse-error "Expected indented gate or waveform entries, but alas, they weren't found. (Did you indent properly?)"))
       (warn "Expected indented gate or waveform entries but alas, they weren't found.")
       (return-from parse-gate-or-waveform-entries
@@ -1450,8 +1451,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                          :right-frame right-frame)))))
 
 (defun parse-frame (toks)
-  "Parse a frame from the list of tokens TOKS.
-Returns the frame and the remaining tokens."
+  "Parse a frame from the list of tokens TOKS. Returns the frame and the remaining tokens."
   (multiple-value-bind (qubit-toks rest-toks)
       (take-until (lambda (tok) (eql ':STRING (token-type tok)))
                   toks)
@@ -1463,6 +1463,17 @@ Returns the frame and the remaining tokens."
        (frame qubits (token-payload (first rest-toks))) ; frame name
        (rest rest-toks)))))
 
+(defun parse-sample-rate (toks)
+  "Parse a sample rate from TOKS, consuming all tokens and returning a constant."
+  (unless toks
+    (quil-parse-error "DEFWAVEFORM requires a sample rate, but none was given."))
+  (when (< 1 (length toks))
+    (quil-parse-error "DEFWAVEFORM sample rate may not be a compound arithmetic expression."))
+  (let ((rate (parse-arithmetic-tokens toks)))
+    (unless (realp rate)
+      (quil-parse-error "Expected a real number for DEFWAVEFORM sample rate, but got ~A instead." rate))
+    (constant rate)))
+
 (defun parse-waveform-definition (tok-lines)
   "Parse a waveform definition from the token lines TOK-LINES."
   ;; Check that we have tokens left
@@ -1470,7 +1481,8 @@ Returns the frame and the remaining tokens."
     (quil-parse-error "EOF reached when waveform definition expected"))
 
   ;; Get the parameter and body lines
-  (let (name)
+  (let (name
+        sample-rate)
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFWAVEFORM.
@@ -1490,16 +1502,19 @@ Returns the frame and the remaining tokens."
         (setf name (token-payload (pop params-args)))
 
         (multiple-value-bind (params rest-line) (parse-parameters params-args)
+
+          (setf sample-rate (parse-sample-rate (butlast rest-line)))
+
           ;; Check for colon and incise it.
           (let ((maybe-colon (last rest-line)))
             (when (or (null maybe-colon)
                       (not (eql ':COLON (token-type (first maybe-colon)))))
-              (quil-parse-error "Expected a colon in DEFWAVEFORM")))
+              (quil-parse-error "Expected a colon terminating the first line of DEFWAVEFORM.")))
 
           (let ((*arithmetic-parameters* nil)
                 (*segment-encountered* nil))
             (multiple-value-bind (parsed-entries rest-lines)
-                (parse-gate-or-waveform-entries body-lines :required t)
+                (parse-gate-or-waveform-entries body-lines :require-indent t)
               ;; Check that we only refered to parameters in our param list.
               (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
                     :unless (find (param-name body-p) params :key #'param-name
@@ -1520,7 +1535,7 @@ Returns the frame and the remaining tokens."
                               :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
                             :else
                               :collect (second found-p))))
-                (values (make-waveform-definition name param-symbols parsed-entries :context op)
+                (values (make-waveform-definition name param-symbols parsed-entries sample-rate :context op)
                         rest-lines)))))))))
 
 (defun parse-parameters (params-args &key allow-expressions)

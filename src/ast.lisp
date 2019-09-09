@@ -463,7 +463,9 @@ as a permutation."
             :reader waveform-definition-entries)
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context))
+            :accessor lexical-context)
+   (sample-rate :initarg :sample-rate
+                :reader waveform-definition-sample-rate))
   ;; TODO cache entries?
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified QuilT waveform definition."))
@@ -478,7 +480,7 @@ as a permutation."
                :documentation "A list of symbol parameter names."))
   (:documentation "A waveform definition that has named parameters."))
 
-(defun make-waveform-definition (name parameters entries &key context)
+(defun make-waveform-definition (name parameters entries sample-rate &key context)
   (check-type name string)
   (check-type parameters symbol-list)
   (if parameters
@@ -486,10 +488,12 @@ as a permutation."
                      :name name
                      :parameters parameters
                      :entries entries
+                     :sample-rate sample-rate
                      :context context)
       (make-instance 'static-waveform-definition
                      :name name
                      :entries entries
+                     :sample-rate sample-rate
                      :context context)))
 
 ;;; Calibration Definitions (QuilT)
