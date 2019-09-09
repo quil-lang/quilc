@@ -43,33 +43,33 @@
 (define-euler-compiler euler-YXY-compiler
     :outer-gate "RY"
     :inner-gate "RX"
-    :prefix-quil (list (build-gate "RX" `(,(/ pi -2)) 0)
-                       (build-gate "RY" `(,(/ pi -2)) 0)))
+    :prefix-quil (list (build-gate "RX" `(,-pi/2) 0)
+                       (build-gate "RY" `(,-pi/2) 0)))
 
 (define-euler-compiler euler-ZXZ-compiler
     :outer-gate "RZ"
     :inner-gate "RX"
-    :prefix-quil (list (build-gate "RZ" `(,(/ pi -2)) 0)))
+    :prefix-quil (list (build-gate "RZ" `(,-pi/2) 0)))
 
 (define-euler-compiler euler-XYX-compiler
     :outer-gate "RX"
     :inner-gate "RY"
     :outer-prefactor -1
-    :prefix-quil (list (build-gate "RY" `(,(/ pi -2)) 0)))
+    :prefix-quil (list (build-gate "RY" `(,-pi/2) 0)))
 
 (define-euler-compiler euler-XZX-compiler
     :outer-gate "RX"
     :inner-gate "RZ"
     :outer-prefactor -1
     :inner-prefactor -1
-    :prefix-quil (list (build-gate "RY" `(,(/ pi -2)) 0)
-                       (build-gate "RX" `(,(/ pi -2)) 0)))
+    :prefix-quil (list (build-gate "RY" `(,-pi/2) 0)
+                       (build-gate "RX" `(,-pi/2) 0)))
 
 (define-euler-compiler euler-YZY-compiler
     :outer-gate "RY"
     :inner-gate "RZ"
     :inner-prefactor -1
-    :prefix-quil (list (build-gate "RX" `(,(/ pi -2)) 0)))
+    :prefix-quil (list (build-gate "RX" `(,-pi/2) 0)))
 
 (define-euler-compiler euler-ZYZ-compiler
     :outer-gate "RZ"

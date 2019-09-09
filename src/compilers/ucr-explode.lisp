@@ -177,8 +177,6 @@
             (control (first arguments))
             (target (first (last arguments)))
             (rest (rest arguments))
-            (pi/2 (constant (/ pi 2)))
-            (-pi/2 (constant (/ pi -2)))
             (high-order-params
               (subseq parameters
                       0 (/ (length parameters) 2)))

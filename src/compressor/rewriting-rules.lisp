@@ -47,13 +47,13 @@
 (define-compiler eliminate-full-RX-rotations
     ((x ("RX" (theta) _)
         :where (and (typep theta 'double-float)
-                    (double= (/ theta (* 2 pi)) (round (/ theta (* 2 pi)))))))
+                    (double= (/ theta 2pi) (round (/ theta 2pi))))))
   nil)
 
 (define-compiler normalize-RX-rotations
     ((x ("RX" (theta) q)
         :where (typep theta 'double-float)))
-  (let ((reduced-theta (- (mod (+ pi theta) (* 2 pi)) pi)))
+  (let ((reduced-theta (- (mod (+ pi theta) 2pi) pi)))
     (give-up-compilation-unless
         (and (< pi (abs theta))
              (< (abs reduced-theta) (abs theta)))
@@ -62,10 +62,10 @@
 (define-compiler agglutinate-RXs
     ((x ("RX" (theta) q))
      (y ("RX" (phi)   q)))
-  (inst "RX" `(,(param-mod (param-+ theta phi) (* 2 pi))) q))
+  (inst "RX" `(,(param-mod (param-+ theta phi) 2pi)) q))
 
 (define-compiler prefer-RXpi-to-RXnegpi
-    ((x ("RX" (#.(- pi)) q)))
+    ((x ("RX" (#.-pi) q)))
   (inst "RX" '(#.pi) q))
 
 (define-compiler agglutinate-RZs
@@ -76,34 +76,34 @@
 (define-compiler eliminate-full-RZ-rotations
     ((x ("RZ" (theta) _)
         :where (and (typep theta 'double-float)
-                    (double= (/ theta (* 2 pi)) (round (/ theta (* 2 pi)))))))
+                    (double= (/ theta 2pi) (round (/ theta 2pi))))))
   nil)
 
 (define-compiler normalize-RZ-rotations
     ((x ("RZ" (theta) q)
         :where (typep theta 'double-float)))
-  (let ((reduced-theta (- (mod (+ pi theta) (* 2 pi)) pi)))
+  (let ((reduced-theta (- (mod (+ pi theta) 2pi) pi)))
     (give-up-compilation-unless
         (and (< pi (abs theta))
              (< (abs reduced-theta) (abs theta)))
       (inst "RZ" (list reduced-theta) q))))
 
 (define-compiler prefer-RZpi-to-RZnegpi
-    ((x ("RZ" (#.(- pi)) q)))
+    ((x ("RZ" (#.-pi) q)))
   (inst "RZ" '(#.pi) q))
 
 
 (define-compiler sort-RX-after-Z
     ((x ("RX" (theta) q))
      (y ("RZ" (#.pi)  q)))
-  (inst "RZ" '(#.pi)       q)
+  (inst "RZ" '(#.pi)                  q)
   (inst "RX" `(,(param-* -1d0 theta)) q))
 
 (define-compiler sort-X-after-RZ
     ((x ("RX" (#.pi)  q))
      (y ("RZ" (theta) q)))
   (inst "RZ" `(,(param-* -1d0 theta)) q)
-  (inst "RX" '(#.pi)       q))
+  (inst "RX" '(#.pi)                  q))
 
 (defmacro rewrite-GHG-as-HGH (g h)
   `(progn
@@ -131,11 +131,11 @@
 #+#:ignore
 (define-compiler rewrite-XZX-as-ZXZ
     ((x ("RX" (theta) q)
-        :where (double= (/ pi 2) (abs theta)))
+        :where (double= pi/2 (abs theta)))
      (y ("RZ" (phi)   q)
-        :where (double= (/ pi 2) (abs phi)))
+        :where (double= pi/2 (abs phi)))
      (z ("RX" (psi)   q)
-        :where (double= (/ pi 2) (abs psi))))
+        :where (double= pi/2 (abs psi))))
   (inst "RZ" `(,psi)   q)
   (inst "RX" `(,phi)   q)
   (inst "RZ" `(,theta) q))
@@ -169,18 +169,18 @@
 (define-compiler normalize-PISWAP
     ((x ("PISWAP" (theta) p q)
         :where (typep theta 'double-float)))
-  (let ((reduced-theta (mod theta (* 4 pi))))
+  (let ((reduced-theta (mod theta 4pi)))
     (give-up-compilation-unless
         (not (double= theta reduced-theta))
       (inst "PISWAP" (list reduced-theta) p q))))
 
 (define-compiler eliminate-half-PISWAP
-    ((x ("PISWAP" (#.(* 2 pi)) p q)))
+    ((x ("PISWAP" (#.2pi) p q)))
   (inst "RZ" '(#.pi) p)
   (inst "RZ" '(#.pi) q))
 
 (define-compiler eliminate-full-PISWAP
-    ((x ("PISWAP" (#.(* 4 pi)) _ _)))
+    ((x ("PISWAP" (#.4pi) _ _)))
   nil)
 
 ;; TODO: add a variant of this for symmetric applications of RZ
@@ -197,8 +197,8 @@
     ((x ("PISWAP" (theta) p q)
         :where (and (typep theta 'double-float)
                     (double= theta (* pi (floor theta pi))))))
-  (inst "PISWAP" `(,(param-+ theta (- pi))) p q)
-  (inst "ISWAP"   ()              p q))
+  (inst "PISWAP" `(,(param-+ theta -pi)) p q)
+  (inst "ISWAP"   ()                     p q))
 
 (define-compiler agglutinate-ISWAP-on-left-into-PISWAP
     ((x ("ISWAP"  ()      p q))
@@ -222,7 +222,7 @@
 (define-compiler commute-control-RZ-after-CNOT
     ((x ("RZ"   (theta) control))
      (y ("CNOT" ()      control target)))
-  (inst "CNOT" () control target)
+  (inst "CNOT" ()       control target)
   (inst "RZ"  `(,theta) control))
 
 (define-compiler commute-target-RX-after-CNOT
@@ -243,7 +243,7 @@
     ((x ("RZ" (theta) q))
      (y ("CZ" ()      q1 q2)
         :where (or (= q q1) (= q q2))))
-  (inst "CZ"  () q1 q2)
+  (inst "CZ"  ()       q1 q2)
   (inst "RZ" `(,theta) q))
 
 (define-compiler commute-X-after-CZ
@@ -301,14 +301,14 @@
 (define-compiler eliminate-full-CPHASE
     ((x ("CPHASE" (theta) _ _)
         :where (and (typep theta 'double-float)
-                    (double= 0d0 (mod theta (* 2 pi))))))
+                    (double= 0d0 (mod theta 2pi)))))
   nil)
 
 (define-compiler normalize-CPHASE
     ((x ("CPHASE" (theta) p q)
         :where (and (typep theta 'double-float)
-                    (not (double= theta (mod theta (* 2 pi)))))))
-  (inst "CPHASE" `(,(mod theta (* 2 pi))) p q))
+                    (not (double= theta (mod theta 2pi))))))
+  (inst "CPHASE" `(,(mod theta 2pi)) p q))
 
 (define-compiler commute-RZ-after-CPHASE
     ((x ("RZ"     (theta) q))

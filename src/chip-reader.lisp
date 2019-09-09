@@ -272,7 +272,7 @@
                     (when (and (gate-binding-p binding)
                                (equalp (named-operator "RX") (gate-binding-operator binding))
                                (not (double= 0d0 (first (gate-binding-parameters binding)))))
-                      (unless (double= 0d0 (mod (first (gate-binding-parameters binding)) (/ pi 2)))
+                      (unless (double= 0d0 (mod (first (gate-binding-parameters binding)) pi/2))
                         (warn "Qubit ~a: applying f1QRB spec to unusual native gate RX(~a)" i (first (gate-binding-parameters binding))))
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity))))))))

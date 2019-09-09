@@ -348,11 +348,11 @@ used to specify CHIP-SPEC."
       (when (member ':RZ type)
         (stash-gate-record "RZ" '(_) (list q) 1/100 +near-perfect-fidelity+))
       (when (member ':X/2 type)
-        (stash-gate-record "RX" '(#.(/ pi 2))  `(,q) 9 0.98d0)
-        (stash-gate-record "RX" '(#.(/ pi -2)) `(,q) 9 0.98d0)
-        (stash-gate-record "RX" '(#.pi)        `(,q) 9 0.98d0)
-        (stash-gate-record "RX" '(#.(- pi))    `(,q) 9 0.98d0)
-        (stash-gate-record "RX" '(0d0)         `(,q) 9 +near-perfect-fidelity+)))
+        (stash-gate-record "RX" '(#.pi/2)  `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.-pi/2) `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.pi)    `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.-pi)   `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(0d0)     `(,q) 9 +near-perfect-fidelity+)))
     ;; return the qubit
     obj))
 
