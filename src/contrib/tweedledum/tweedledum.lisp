@@ -90,8 +90,14 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
                        (return-from diagonal-p nil)))
   t)
 
-(defun compile-diagonal-gate-with-tweedledum (instr)
-  (let ((m (quil:gate-matrix instr)))
+(defun rescale (m)
+  (magicl:scale (/ (magicl:ref m 0 0)) m))
+
+(defun compile-diagonal-gate-with-tweedledum (instr &key context)
+  (declare (ignore context))
+  (unless (slot-boundp instr 'quil::name-resolution)
+    (quil::give-up-compilation))
+  (let ((m (quil::make-matrix-from-quil (list instr))))
     (unless (diagonal-p m)
       (quil::give-up-compilation))
     ;; This synthesis routine works on the unitary
@@ -100,7 +106,8 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
     ;;
     ;; and takes as input the angles t_i; hence (rest ...) and #'-
     ;; below.
-    (let ((angles (mapcar (a:compose #'- #'phase) (rest (magicl:matrix-diagonal m)))))
+    (let ((angles (mapcar (a:compose #'- #'phase)
+                          (rest (magicl:matrix-diagonal (rescale m))))))
       (coerce (quil::parsed-program-executable-code
                (quil:parse-quil
                 (synthesis-diagonal angles)))
