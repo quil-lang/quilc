@@ -47,6 +47,10 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
   (declare (ignore context))
   (unless (slot-boundp instr 'quil::name-resolution)
     (quil::give-up-compilation))
+  )
+
+(quil::define-compiler tweedledum-permutation-gate
+    ((instr :where (slot-boundp instr 'quil::name-resolution)))
   (let ((res (quil::gate-application-resolution instr)))
     (when (typep res 'quil::gate-definition)
       (setf res (quil::gate-definition-to-gate res)))
@@ -93,10 +97,9 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
 (defun rescale (m)
   (magicl:scale (/ (magicl:ref m 0 0)) m))
 
-(defun compile-diagonal-gate-with-tweedledum (instr &key context)
-  (declare (ignore context))
-  (unless (slot-boundp instr 'quil::name-resolution)
-    (quil::give-up-compilation))
+(quil::define-compiler tweedledum-diagonal-gate
+    ((instr :where (and
+                    (slot-boundp instr 'quil::name-resolution)
   (let ((m (quil::make-matrix-from-quil (list instr))))
     (unless (diagonal-p m)
       (quil::give-up-compilation))
@@ -113,13 +116,6 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
                 (synthesis-diagonal angles)))
               'list))))
 
-(defun native-decompile-diagonal-matrix (matrix qubits chip)
-  (quil::expand-to-native-instructions (list (apply #'quil::anon-gate "DUMMY-NAME" matrix qubits))
-                                       chip))
-
-(defun tweedledum-decompile-diagonal-matrix (matrix)
-  (compile-diagonal-gate-with-tweedledum matrix))
-
 (defun load-tweedledum ()
   (cffi:load-foreign-library 'libtweedledum)
   (setf *tweedledum-libs-loaded* t)
@@ -132,14 +128,14 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
   (unless *tweedledum-compilers-installed*
     ;; The # is important here.
     (when permutation
-      (push (constantly #'compile-perm-gate-with-tweedledum)
+      (push (constantly #'tweedledum-permutation-gate)
             cl-quil::*global-compilers*)
-      (push #'compile-perm-gate-with-tweedledum
+      (push #'tweedledum-permutation-gate
             *tweedledum-compilers-installed*))
     (when diagonal
-      (push (constantly #'compile-diagonal-gate-with-tweedledum)
+      (push (constantly #'tweedledum-diagonal-gate)
             cl-quil::*global-compilers*)
-      (push #'compile-diagonal-gate-with-tweedledum
+      (push #'tweedledum-diagonal-gate
             *tweedledum-compilers-installed*))))
 
 (defun uninstall-tweedledum-compilers ()
