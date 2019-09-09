@@ -237,13 +237,14 @@ If both ENTERING and EXITING are null, signal an error."
   (when (typep exiting 'rewiring)
     (setf exiting (rewiring-l2p exiting)))
 
-  (cond ((and (not (null entering)) (not (null exiting)))
-         (format nil "~A(~A . ~A)" +entering/exiting-rewiring-prefix+ entering exiting))
-        ((not (null entering))
-         (format nil "~A~A" +entering-rewiring-prefix+ entering))
-        ((not (null exiting))
-         (format nil "~A~A" +exiting-rewiring-prefix+ exiting))
-        (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL"))))
+  (let ((*print-pretty* nil))
+    (cond ((and (not (null entering)) (not (null exiting)))
+           (format nil "~A(~A . ~A)" +entering/exiting-rewiring-prefix+ entering exiting))
+          ((not (null entering))
+           (format nil "~A~A" +entering-rewiring-prefix+ entering))
+          ((not (null exiting))
+           (format nil "~A~A" +exiting-rewiring-prefix+ exiting))
+          (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL")))))
 
 (defun instruction-rewirings (instruction)
   "Return the pair of entering and exiting rewirings associated with instruction.
