@@ -9,9 +9,7 @@
 ;;;     is that calibration bodies contain simple quilt instructions and nothing else.
 ;;;   - The task of finding a calibration that matches a measurement or gate application
 ;;;     is a bit more complicated than what is done for circuit expansion (namely,
-;;;     multiple definitions are allowed, and we match (TODO actually spell this out).
-
-;;; TODO Enforce that calibration bodies contain simple quilt instructions...
+;;;     multiple definitions are allowed, with match priority given to later definitions).
 
 (define-transform expand-calibrations (expand-calibrations)
   "This transform applies all available calibrations. The result has no gate applications or
@@ -155,8 +153,8 @@ measurements for which a calibration is defined."
       (if (and *require-applicable-calibration*
                (null expanded)
                (typep instr '(or gate-application measure measure-discard)))
-          (quil-parse-error "Expected a calibration definition associated with ~A, but none was found."
-                            instr)
+          (expansion-error "Expected a calibration definition associated with ~A, but none was found."
+                           instr)
           (list instr)))))
 
 (defun expand-calibrations (parsed-program &key strict)
