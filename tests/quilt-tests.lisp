@@ -24,7 +24,7 @@ MEASURE 1                               # 4
                      (2 (0 1 2)))))
       (dolist (calib matches)
         (destructuring-bind (defn-index match-indices) calib
-          (let ((defn (elt (quil::parsed-program-calibration-definitions pp)
+          (let ((defn (elt (parsed-program-calibration-definitions pp)
                            defn-index)))
             (loop :for instr :across (parsed-program-executable-code pp)
                   :for i :from 0
@@ -90,7 +90,7 @@ MEASURE 1 ro                            # 4
                      (3 (3 4)))))
       (dolist (calib matches)
         (destructuring-bind (defn-index match-indices) calib
-          (let ((defn (elt (quil::parsed-program-calibration-definitions pp)
+          (let ((defn (elt (parsed-program-calibration-definitions pp)
                            defn-index)))
             (loop :for instr :across (parsed-program-executable-code pp)
                   :for i :from 0
@@ -106,7 +106,7 @@ DEFCAL X 0:
 
 X 1"
                         :transforms nil)))
-    (signals quil::quil-parse-error
+    (signals quil-parse-error
       (quil::expand-calibrations pp :strict t))))
 
 (deftest test-case-sensitive-calibration-expansion ()
@@ -116,7 +116,7 @@ DEFCAL x 0:
 
 X 0"
                         :transforms nil)))
-    (signals quil::quil-parse-error
+    (signals quil-parse-error
       (quil::expand-calibrations pp :strict t))))
 
 ;;; TODO update package.lisp
@@ -134,13 +134,13 @@ CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
     (flet ((qubit (instr)
              (qubit-index
               (etypecase instr
-                (quil::pulse (first (quil::frame-qubits (quil::pulse-frame instr))))
-                (quil::capture (first (quil::frame-qubits (quil::capture-frame instr))))
-                (quil::delay (quil::delay-qubit instr))))))
+                (pulse (first (frame-qubits (pulse-frame instr))))
+                (capture (first (frame-qubits (capture-frame instr))))
+                (delay (delay-qubit instr))))))
       (loop :for instr :across (parsed-program-executable-code pp)
             :do (let ((q (qubit instr)))
                   ;; We expect the CAPTURE instructions to start at 1
-                  (when (typep instr 'quil::capture)
+                  (when (typep instr 'capture)
                     (is (= 1.0 (aref clocks q))))
                   (incf (aref clocks q) (quil::quilt-instruction-duration instr)))))))
 

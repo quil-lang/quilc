@@ -123,6 +123,7 @@
 
    #:frame
    #:frame-name
+   #:frame-qubits
 
    #:waveform-ref                       ; STRUCTURE
    #:waveform-ref-name                  ; READER
