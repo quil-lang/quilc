@@ -148,6 +148,12 @@ GIVE-UP-COMPILATION if INSTR is not a permutation gate."
     (pop cl-quil::*global-compilers*)
     (uninstall-tweedledum-compilers)))
 
+(defmacro with-tweedledum ((&key (permutation t) (diagonal t)) &body body)
+  `(prog2
+       (uninstall-tweedledum-compilers)
+       (install-tweedledum-compilers :permutation ,permutation :diagonal ,diagonal)
+       ,@body
+     (uninstall-tweedledum-compilers)))
 
 (defun run-tweedledum-tests ()
   (load-tweedledum)
