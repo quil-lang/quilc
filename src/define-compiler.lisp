@@ -787,7 +787,10 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
              (param-list (cond
                            ((typep param-list 'list)
                             (loop :for item :in (case (first param-list)
-                                                  ((quote #+sbcl sb-int:quasiquote)
+                                                  ((quote
+                                                    ;; generic attempt to detect quasiquotes
+                                                    #+(or sbcl ecl ccl clisp) #.(first (quote `(t)))
+                                                    #-(or sbcl ecl ccl clisp) #.(cerror "Bravely, boldly, stupidly continue." "I don't know how to detect quasiquotes."))
                                                    (second param-list))
                                                   ((list)
                                                    (rest param-list))
