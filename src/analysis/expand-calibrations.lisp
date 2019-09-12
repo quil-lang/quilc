@@ -16,9 +16,9 @@
 measurements for which a calibration is defined."
   expand-circuits)
 
-(defparameter *gate-calibrations* (make-hash-table :test 'equal))
-(defparameter *measure-calibrations* nil)
-(defparameter *measure-discard-calibrations* nil)
+(defvar *gate-calibrations*)
+(defvar *measure-calibrations*)
+(defvar *measure-discard-calibrations*)
 
 (defun compute-calibration-tables (parsed-program)
   "Extract the calibration definitions from PARSED-PROGRAM. Returns three values:
@@ -29,7 +29,7 @@ measurements for which a calibration is defined."
 
 3. a list of measure discard calibrations."
   (let ((gate-calibrations
-          (make-hash-table :test 'equal)) ; quil is case sensitive
+          (make-hash-table :test 'equalp)) ; EQUALP b/c this table is keyed by OPERATOR-DESCRIPTIONs
         measure-calibrations
         measure-discard-calibrations)
     (dolist (defn (parsed-program-calibration-definitions parsed-program))
@@ -38,7 +38,7 @@ measurements for which a calibration is defined."
       ;; reverse order.
       (etypecase defn
         (gate-calibration-definition
-         (push defn (gethash (calibration-definition-name defn)
+         (push defn (gethash (calibration-definition-operator defn)
                              gate-calibrations)))
         (measure-calibration-definition
          (push defn measure-calibrations))
@@ -56,10 +56,12 @@ measurements for which a calibration is defined."
 
   (:method ((defn gate-calibration-definition) (instr gate-application))
     (with-slots (operator parameters arguments) instr
-      ;; Check INSTR is a simple application, with the right operator name
-      (unless (and (plain-operator-p operator)
-                   (string= (operator-description-name operator)
-                            (calibration-definition-name defn)))
+      ;; Check INSTR matches DEFN name and modifiers
+      (unless (and (equalp operator (calibration-definition-operator defn))
+                   ;; EQUALP by itself is too lax for us, since quil is case sensitive
+                   (string= (operator-description-root-name operator)
+                            (operator-description-root-name
+                             (calibration-definition-operator defn))))
         (return-from calibration-matches-p))
 
       ;; Check that the parameters match.
@@ -109,7 +111,7 @@ measurements for which a calibration is defined."
         (return-from apply-calibration))
 
       (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
-                                (gethash (operator-description-name op) *gate-calibrations*))))
+                                (gethash op *gate-calibrations*))))
         (instantiate-definition defn
                                 (application-parameters instr)
                                 (application-arguments instr))

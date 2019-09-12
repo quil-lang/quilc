@@ -384,7 +384,7 @@
    #:measure-calibration-definition     ; CLASS
    #:measure-discard-calibration-definition ; CLASS
    #:calibration-definition-body        ; READER
-   #:calibration-definition-name        ; READER
+   #:calibration-definition-operator    ; READER
    #:calibration-definition-parameters  ; READER
    #:calibration-definition-arguments   ; READER
    #:measurement-calibration-qubit      ; READER

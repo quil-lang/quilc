@@ -33,6 +33,32 @@ MEASURE 1                               # 4
                           (is result)
                           (is (not result))))))))))
 
+(deftest test-modified-calibration-matching ()
+  (let ((pp (parse-quil "
+DEFCAL RZ(pi/2) 0:                      # 0
+    SHIFT-PHASE 0 \"xy\" pi/2
+
+DEFCAL DAGGER RZ(pi/2) 0:
+    SHIFT-PHASE 0 \"xy\" -pi/2          # 1
+
+RZ(pi/2) 0                              # 0
+DAGGER RZ(pi/2) 0                       # 1
+DAGGER DAGGER RZ(pi/2) 0                # 2
+"
+                        :transforms nil)))
+    (let ((matches '((0 (0))
+                     (1 (1)))))
+      (dolist (calib matches)
+        (destructuring-bind (defn-index match-indices) calib
+          (let ((defn (elt (parsed-program-calibration-definitions pp)
+                           defn-index)))
+            (loop :for instr :across (parsed-program-executable-code pp)
+                  :for i :from 0
+                  :for result := (quil::calibration-matches-p defn instr)
+                  :do (if (member i match-indices)
+                          (is result)
+                          (is (not result))))))))))
+
 ;;; TODO: should we allow pulse etc in circuits?
 
 (deftest test-recursive-calibration ()
