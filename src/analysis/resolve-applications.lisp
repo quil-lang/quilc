@@ -31,7 +31,7 @@ determining ambiguity. Otherwise, return NIL."
                                  (waveform-definition-name instr)))
       ;; TODO actually think through what these signatures should be like
       (gate-calibration-definition (list 'gate-calibration-definition
-                                         (calibration-definition-name instr)))
+                                         (calibration-definition-operator instr)))
       (measurement-calibration-definition (list 'measurement-calibration-definition))
       (memory-descriptor (cons 'memory-descriptor
                                (memory-descriptor-name instr))))))
