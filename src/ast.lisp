@@ -508,8 +508,9 @@ as a permutation."
   (:documentation "A representation of a user-specified calibration."))
 
 (defclass gate-calibration-definition (calibration-definition)
-  ((name :initarg :name
-         :reader calibration-definition-name)
+  ((operator :initarg :operator
+             :type operator-description
+             :reader calibration-definition-operator)
    (parameters :initarg :parameters
                :reader calibration-definition-parameters)
    (arguments :initarg :arguments
@@ -530,24 +531,6 @@ as a permutation."
 (defclass measure-discard-calibration-definition (measurement-calibration-definition)
   ()
   (:documentation "A representation of a user-specifieed MEASURE (discard) calibration."))
-
-;;; TODO: dead code?
-(defun make-calibration-definition (name params args body &key context)
-  (check-type name string)
-  (assert (every #'is-param params))
-  (assert (every (lambda (arg)
-                   (or (is-formal arg)
-                       (qubit-p arg)))
-                 args))
-  (make-instance (if (string-equal "MEASURE" name)
-                     'measure-calibration-definition
-                     'gate-calibration-definition)
-                 :name name
-                 :parameters params
-                 :arguments args
-                 :body body
-                 :context context))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1724,7 +1707,8 @@ For example,
                     (waveform-definition-entries thing))))
 
   (:method ((defn gate-calibration-definition) (stream stream))
-    (format stream "DEFCAL ~a" (calibration-definition-name defn))
+    (format stream "DEFCAL ")
+    (print-operator-description (calibration-definition-operator defn))
     (unless (endp (calibration-definition-parameters defn))
       (format stream "(~{~a~^, ~})"
               (mapcar #'print-instruction-to-string (calibration-definition-parameters defn))))
@@ -1738,7 +1722,7 @@ For example,
     (terpri stream))
 
   (:method ((defn measure-calibration-definition) (stream stream))
-    (format stream "DEFCAL ~a" (calibration-definition-name defn))
+    (format stream "DEFCAL MEASURE")
     (unless (endp (calibration-definition-arguments defn))
       (format stream "~{ ~a~}"
               (mapcar #'print-instruction-to-string (calibration-definition-arguments defn))))

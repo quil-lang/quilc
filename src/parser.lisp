@@ -713,7 +713,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                                         (controlled-operator base-operator)))
           (:DAGGER
            (apply-modifiers-to-operator (rest processed-modifiers)
-                                        (involutive-dagger-operator base-operator)))
+                                        (dagger-operator base-operator)))
           (:FORKED
            (apply-modifiers-to-operator (rest processed-modifiers)
                                         (forked-operator base-operator)))))))
@@ -1632,31 +1632,44 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
   (when (null tok-lines)
     (quil-parse-error "EOF reached when calibration definition expected"))
 
-  (let (name args)
+  (let (operator
+        arguments)
     ;; Split off the header line from the body lines.
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
-      ;; Check that we have a well-formed header line.
-      (destructuring-bind (op . params-args) parameter-line
+      ;; Check that we have a well-formed header lGine.
+      (destructuring-bind (decal-tok . rest-line) parameter-line
         ;; We must be working with a DEFCAL
-        (unless (eql ':DEFCAL (token-type op))
+        (unless (eql ':DEFCAL (token-type decal-tok))
           (quil-parse-error "DEFCAL expected. Got ~S"
-                            (token-type op)))
+                            (token-type decal-tok)))
 
         ;; Check that there are tokens following DEFCAL.
-        (when (null params-args)
+        (when (null rest-line)
           (quil-parse-error "Expected more after DEFCAL token"))
 
-        (let ((is-measure-calibration (eql ':MEASURE (token-type (first params-args)))))
-          ;; Check for name.
-          (unless (or is-measure-calibration
-                      (eql ':NAME (token-type (first params-args))))
-            (quil-parse-error "Expected a name for the calibration."))
+        (let ((is-measure-calibration (eql ':MEASURE (token-type (first rest-line)))))
 
-          ;; Stash it away.
-          (setf name (token-payload (pop params-args)))
+          (cond (is-measure-calibration (pop rest-line))
+                (t
+                 ;; Build an operator description, consuming tokens from REST-LINE
+                 (multiple-value-bind (modifiers remaining)
+                     (take-until (complement #'gate-modifier-token-p) rest-line)
+
+                   (setf rest-line remaining)
+
+                   ;; Check for name.
+                   (unless (eql ':NAME (token-type (first rest-line)))
+                     (quil-parse-error "Expected a name for the gate calibration."))
+
+                   (let ((name (token-payload (pop rest-line))))
+                     (setf operator (apply-modifiers-to-operator
+                                     (mapcar (lambda (tok)
+                                               (list (token-type tok)))
+                                             (reverse modifiers))
+                                     (named-operator name)))))))
 
           (let ((*formal-arguments-allowed* t))
-            (multiple-value-bind (params rest-line) (parse-parameters params-args :allow-expressions t)
+            (multiple-value-bind (params rest-line) (parse-parameters rest-line :allow-expressions t)
               (when (and is-measure-calibration
                          (not (null params)))
                 (quil-parse-error "MEASURE calibrations do not support parameters."))
@@ -1675,35 +1688,35 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                 (setf rest-line (butlast rest-line)))
 
               ;; Collect arguments and stash them away.
-              (setf args (mapcar #'parse-qubit rest-line))
+              (setf arguments (mapcar #'parse-qubit rest-line))
 
               (when (and is-measure-calibration
-                         (> (length args) 2))
+                         (> (length arguments) 2))
                 (quil-parse-error "Too many arguments for DEFCAL MEASURE."))
 
-              (multiple-value-bind (parsed-body rest-lines)
+              (multiple-value-bind (parsed-body remaining-lines)
                   (parse-indented-body body-lines)
                 (values
                  (cond ((and is-measure-calibration
-                             (null (second args)))
+                             (null (second arguments)))
                         (make-instance 'measure-discard-calibration-definition
-                                       :qubit (first args)
+                                       :qubit (first arguments)
                                        :body parsed-body
-                                       :context op))
+                                       :context decal-tok))
                        (is-measure-calibration
                         (make-instance 'measure-calibration-definition
-                                       :qubit (first args)
-                                       :address (second args)
+                                       :qubit (first arguments)
+                                       :address (second arguments)
                                        :body parsed-body
-                                       :context op))
+                                       :context decal-tok))
                        (t
                         (make-instance 'gate-calibration-definition
-                                       :name name
+                                       :operator operator
                                        :parameters params
-                                       :arguments args
+                                       :arguments arguments
                                        :body parsed-body
-                                       :context op)))
-                 rest-lines)))))))))
+                                       :context decal-tok)))
+                 remaining-lines)))))))))
 
 (defun parse-waveform-ref (toks)
   "Parse a waveform reference from the tokens TOKS. Returns the refererence and the remaining tokens."
