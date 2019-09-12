@@ -12,9 +12,10 @@
 
 (defun expansion-error (format-control &rest format-args)
   "Signal a QUIL-PARSE-ERROR, incorporating information about the expansion context."
-  (quil-parse-error "While expanding ~A: ~A"
+  (quil-parse-error "While expanding ~A: ~?"
                     (or *expansion-context* "circuit or calibration")
-                    (apply #'format nil format-control format-args)))
+                    format-control
+                    format-args))
 
 (defparameter *expansion-limit* 256
   "Limit the number of recursive circuit or calibration expansions that can happen

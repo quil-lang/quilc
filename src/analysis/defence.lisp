@@ -1,6 +1,6 @@
 (in-package :cl-quil)
 
-;;; Given a 'simple quilt' program, this makes it even simpler: namely, FENCE instructions
+;;; Given a 'simple' quilt program, this makes it even simpler: namely, FENCE instructions
 ;;; are replaced with appropriate DELAY instructions. The basic idea is that something like
 ;;;
 ;;; PULSE 0 \"xy\" flat(duration: 1.0, iq: 1.0)
@@ -25,11 +25,10 @@ synchronization in the form of DELAY instructions on the appropriate qubit lines
   expand-calibrations
   resolve-waveform-references)
 
-(defun simple-quilt-p (instr)
-  "Check whether the given instruction is a simple quilt operation."
-  (typep instr '(or pulse capture raw-capture
-                    delay fence
-                    simple-frame-mutation swap-phase)))
+(deftype simple-quilt-instruction ()
+  '(or pulse capture raw-capture
+    delay fence
+    simple-frame-mutation swap-phase))
 
 (defun resolved-waveform (instr)
   "Get the resolved waveform of an instruction, if it exists."
@@ -82,12 +81,12 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 (defun expand-fences-to-delays (parsed-program &optional sample-rate)
   "Expand FENCE instructions to corresponding DELAY instructions on each relevant
 qubit line. For custom waveform definitions, SAMPLE-RATE (in Hz) must be provided."
-  (let (;; Indexed by qubit indices i.e. numbers
+  (let (;; Indexed by qubit indices i.e. nonnegative integers
         (qubit-clocks (make-hash-table))
         ;; Non-FENCE instructions
         new-instrs)
     (flet ((process-instr (instr)
-             (unless (simple-quilt-p instr)
+             (unless (typep instr 'simple-quilt-instruction)
                (quil-parse-error "Cannot resolve timing information for non-quilt instruction ~A" instr))
              (let* ((qubits (quilt-instruction-qubits instr))
                     (latest (loop :for q :in qubits
