@@ -39,6 +39,8 @@
 ;;; --------------Various utility functions/structures----------------
 ;;; ------------------------------------------------------------------
 
+;;; Some of the functions below might have better alternatives
+;;; elsewhere; if they exist, they can replace these ones
 (defun vector-dot-product (a b)
   "Dot product between vectors A and B."
   (assert (= (length a) (length b)))
@@ -77,15 +79,13 @@
     (loop :for i :below (length v) :do (setf (aref v i) (/ (aref v i) norm)))
     norm))
 
-;; (defun gate-from-index (gates idx)
-;;   "Given an index IDX in parity-inverse convention, return the corresponding basis gate from BASIS-GATES, which is the basis gate indexed by (floor idx 2) and inverted if idx is odd (just the original gate if idx is even)."
-;;   (aref gates (floor idx)))
-
 (defstruct commutator
+  "A commutator object containing matrices V and W, for purposes of compressing the approximations returned by decompositions. When expanded, it has the value VWV'W'."
   (v '() :type (or list commutator))
   (w '() :type (or list commutator)))
 
 (defun seq-dagger (op-seq)
+  "Returns the sequence of gate indices equivalent to the complex conjugate of operator corresponding to OP-SEQ by changing the parity of each index and reversing the sequence."
   (reverse (mapcar (lambda (x) (logxor #b1 x)) op-seq)))
 
 (defstruct (bloch-vector (:constructor make-bloch-vector))
@@ -165,8 +165,9 @@
   (:documentation "A decomposer which uses the Solovay-Kitaev algorithm to approximately decompose arbitrary unitaries to a finite set of basis gates."))
 
 (defun make-decomposer (basis-gates num-qubits epsilon0)
-  "Initializer for a unitary decomposer."
-  ;; (assert (< epsilon0 (/ (expt +c-approx+ 2))) (epsilon0) "ERROR: the provided base approximation epsilon ~A is not less than ~A, which it must be for approximations to improve on each iteration." epsilon0 (/ (expt +c-approx+ 2)))
+  "Initializer for a unitary decomposer. Upon initialization, generates the base approximations necessary for the decomposer's function."
+  ;; This assertion will eventually be needed for when epsilon0 is actually used, to ensure that the approximation protocol works.
+  #+ignore(assert (< epsilon0 (/ (expt +c-approx+ 2))) (epsilon0) "ERROR: the provided base approximation epsilon ~A is not less than ~A, which it must be for approximations to improve on each iteration." epsilon0 (/ (expt +c-approx+ 2)))
   (make-instance 'decomposer
                  :gates (loop :for gate :in basis-gates
                               :collect gate #+ignore(simple-gate-matrix gate)
@@ -174,8 +175,8 @@
                  :gate-orders (loop :for gate :in basis-gates :collect (find-order gate))
                  :num-qubits num-qubits
                  :epsilon0 epsilon0
-                 :subdivision +ballie-radius+ ;; TODO
-                 :base-approximations (generate-base-approximations-ballies basis-gates :depth-limit 23 :verbose t)))
+                 :subdivision +ballie-radius+ 
+                 :base-approximations (generate-base-approximations-ballies basis-gates :depth-limit 20 :verbose t)))
 
 ;;; NOTE: REQUIRES 1e-6 TOLERANCE ON MAGICL:IDENTITYP
 (defun find-order (mat)
@@ -196,12 +197,16 @@
 ;;; modulo global phase). A unitary which is a rotation about an axis
 ;;; in 3d space by an angle theta is mapped to a point of radius theta
 ;;; in the direction of the rotation axis; thus, the entire group is
-;;; mapped to a ball of radius pi. The Euclidean distance between
-;;; points in the angle-axis ball is not perfectly correlated with our
-;;; desired metric of operator distance, but is related closely enough
-;;; to serve as a surprisingly good heuristic. It is also much more
-;;; convenient to work with than a 3-sphere, which is a big reason for
-;;; why I'm using this.
+;;; mapped to a ball of radius pi. Then, dividing up the ball into a
+;;; grid of a certain spacing, we can store one sequence per grid
+;;; section and ensure that the entire ball is covered by these grid
+;;; representatives.
+
+;;; The Euclidean distance between points in the angle-axis ball is
+;;; not perfectly correlated with our desired metric of operator
+;;; distance, but is related closely enough to serve as a surprisingly
+;;; good heuristic. It is also much more convenient to work with than
+;;; a 3-sphere, which is a big reason for why I'm using this.
 
 (defun bloch-vector-to-ball-coord (bv)
   "Returns the axis-angle ball coordinate of a bloch-vector BV."
@@ -243,30 +248,20 @@
   (concatenate 'vector (loop :for x :across (bloch-vector-to-ball-coord (matrix-to-bloch-vector mat))
                              :collect (/ x subdivision))))
 
-;; (defun num-reachable-areas (subdivision)
-;;   "Returns the total number of grid cubes of length SUBDIVISION that are reachable within the angle-axis ball, i.e. the number of cubes which intersect the ball."
-;;   (let ((diameter (1+ (floor (/ (* 2 pi) subdivision))))
-;;         (offset (ceiling (/ pi subdivision))))
-;;     (dotimes (i (expt diameter 3))
-;;       (let ((x (- (mod i diameter) offset))
-;;             (y (- (mod (floor i diameter) diameter) offset))
-;;             (z (- (floor i (expt diameter 2)) offset)))))))
-
 ;;; Generate a hash table of grid coordinate -> unitary. Populate
 ;;; using IDDFS, as we want to minimize approximation lengths.
-(defun generate-base-approximations-ballies (basis-gates &key (ballie-r +ballie-radius+) (depth-limit 10) (verbose nil) (debug nil)) ;; TODO
+(defun generate-base-approximations-ballies (basis-gates &key (ballie-r +ballie-radius+) (depth-limit 10) (verbose nil) (debug nil))
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   ;; Gates of odd index [2n + 1] correspond to the inverse of gate [2n]
   (let* ((gates (loop :for gate :in basis-gates
                       :collect gate #+ignore(simple-gate-matrix gate)
-                      :collect (magicl:dagger gate #+ignore(simple-gate-matrix gate)))) ;; TODO
+                      :collect (magicl:dagger gate #+ignore(simple-gate-matrix gate))))
          (gate-orders (loop :for gate :in basis-gates :collect (find-order gate)))
          (approx-table (make-hash-table :test 'equalp))
          (max-depth 0)
          (prev-count 0)
          (overcounted 0)
-         (neglected 0)
-         (oeis-magic-num 12345678))
+         (neglected 0))
     (loop :for gate :in gates
           :for i :from 0
           :do (format verbose "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
@@ -289,12 +284,14 @@
                      (t (loop :for gate :in gates
                               :for i :from 0
                               :for order := (elt gate-orders (floor i 2))
-                              ;; Don't use a gate if a) it has an odd
-                              ;; index and its inverse is already in
-                              ;; the gate set, b) we're repeating the
-                              ;; previous gate and its half-order is
-                              ;; exceeded, or c) we're using the
-                              ;; previous gate's inverse
+                              ;; Don't use a gate if any of these
+                              ;; conditions hold:
+                              ;;  a) it has an odd index and its
+                              ;;  inverse is already in the gate set
+                              ;;  b) we're repeating the previous gate
+                              ;;  and its half-order is exceeded, or
+                              ;;  c) we're using the previous gate's
+                              ;;  inverse
                               :if (and (not (and (= order 2) (oddp i)))
                                        (or (and (= i last-idx)
                                                 (or (zerop order) (< rep-count
@@ -315,14 +312,12 @@
         (setf neglected 0)
         (helper 0 '() +I+ -1 0)
         (format verbose " (~D new, ~D overcounted, ~D neglected)" (- (hash-table-count approx-table) prev-count) overcounted neglected)
-        (format verbose" (~$% filled so far, ~D to go)~%" (* 100 (/ (hash-table-count approx-table) oeis-magic-num))
-                (- oeis-magic-num (hash-table-count approx-table)))
         (format (not verbose) ".")
         (setf prev-count (hash-table-count approx-table)))
       approx-table)))
 
 ;;; Will just be a hash table lookup
-(defun fetch-base-approximation (base-approximations u) ;; TODO
+(defun fetch-base-approximation (base-approximations u)
   "Returns the base case approximation for a unitary U, represented as a list of indices in parity-inverse convention."
   (let* ((exact-grid-coord (matrix-to-grid-coord u +ballie-radius+))
          (nearby-ballies (loop :for i :below 8 :collect (vector
@@ -334,38 +329,40 @@
                      (cdr nearby-ballies) :initial-value (car nearby-ballies))
              base-approximations)))
 
+(defun brute-base (u decomposer max-depth &key (epsilon0 0.14))
+  "A brute force method for finding a base approximation to U with sequences of maximum length MAX-DEPTH."
+  (labels ((helper (depth seq mat last-idx rep-count)
+             (if (< (operator-dist u mat) epsilon0)
+                 seq
+                 (if (< depth max-depth)
+                     (loop :for gate :in (gates decomposer)
+                           :for i :from 0
+                           :for order := (elt (gate-orders decomposer) (floor i 2))
+                           ;; Don't use a gate if a) it has an odd
+                           ;; index and its inverse is already in
+                           ;; the gate set, b) we're repeating the
+                           ;; previous gate and its half-order is
+                           ;; exceeded, or c) we're using the
+                           ;; previous gate's inverse
+                           :if (and (not (and (= order 2) (oddp i)))
+                                    (or (and (= i last-idx)
+                                             (or (zerop order) (< rep-count
+                                                                  (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
+                                        (and (not (= i last-idx))
+                                             (not (= (floor i 2) (floor last-idx 2))))))
+                             :do (let ((found-seq (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))))
+                                   (when found-seq (return found-seq))))
+                     nil))))
+    (if (< (operator-dist u +I+) epsilon0)
+        '()
+        (let ((discovered-seq (helper 0 '() +I+ -1 0)))
+          (if discovered-seq
+              discovered-seq
+              (format t "~%Nothing found for unitary ~A..." u))))))
+
 ;;; ---------------------------------------------------------------
 ;;; ---------------------Algorithm Calling-------------------------
 ;;; ---------------------------------------------------------------
-
-(defun brute-base (u decomposer max-depth &key (epsilon0 0.14))
-  "Testing brute force base approximation search."
-  (labels ((helper (depth seq mat last-idx rep-count)
-             (cond ((= depth max-depth)
-                    (if (< (operator-dist u mat) epsilon0)
-                        seq
-                        nil))
-                   (t (loop :for gate :in (gates decomposer)
-                            :for i :from 0
-                            :for order := (elt (gate-orders decomposer) (floor i 2))
-                            ;; Don't use a gate if a) it has an odd
-                            ;; index and its inverse is already in
-                            ;; the gate set, b) we're repeating the
-                            ;; previous gate and its half-order is
-                            ;; exceeded, or c) we're using the
-                            ;; previous gate's inverse
-                            :if (and (not (and (= order 2) (oddp i)))
-                                     (or (and (= i last-idx)
-                                              (or (zerop order) (< rep-count
-                                                                   (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
-                                         (and (not (= i last-idx))
-                                              (not (= (floor i 2) (floor last-idx 2))))))
-                              :do (let ((found-seq (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))))
-                                    (when found-seq (return found-seq))))))))
-    (let ((discovered-seq (helper 0 '() +I+ -1 0)))
-      (if discovered-seq
-          discovered-seq
-          (format t "~%Nothing found for unitary ~A..." u)))))
 
 ;;; Helper method for iterating through SK
 (defun sk-iter (decomposer u n)
@@ -379,7 +376,7 @@
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
 
 (defun brute-sk-iter (decomposer u n &key (epsilon0 0.14))
-  "Brute force iteration"
+  "An alternative to sk-iter which uses the brute force approximation method instead."
   (if (zerop n)
       (brute-base u decomposer 18 :epsilon0 epsilon0)
       (let ((next-u (brute-sk-iter decomposer u (1- n) :epsilon0 epsilon0)))
@@ -389,16 +386,21 @@
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
 
 (defun decompose (decomposer unitary &key (depth 3) (epsilon0 0.14))
-  "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U. When expanded into all its constituent unitaries, this decomposition is guaranteed to be within EPSILON of the original unitary."
-  ;; (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
-  ;;                                (log (* eps0 +c-approx+ +c-approx+))))
-  ;;                        (log (/ 3 2)))
-  (let* ((eps0 (epsilon0 decomposer)))
+  "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U, at a given depth."
+  ;; This depth variable will require some investigation on how to
+  ;; determine its value. Here, the ignored expression is the
+  ;; theoretically predicted value, but it depends on +c-approx+ which
+  ;; is only empirically determined and quite shaky.
+  (let* ((eps0 (epsilon0 decomposer))
+         #+ignore(depth (ceiling (log (/ (log (* epsilon +c-approx+ +c-approx+))
+                                 (log (* eps0 +c-approx+ +c-approx+))))
+                         (log (/ 3 2)))))
     (brute-sk-iter decomposer unitary depth :epsilon0 epsilon0) #+ignore(sk-iter decomposer unitary depth)))
 
+;;; Note that this function will crash if any element of ITEM could
+;;; not be approximated, i.e. there is a NIL somewhere inside ITEM.
 (defun decompress (decomposer item)
-  "Expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate gate for each parity-inverse index inside, returning the decompressed list of gates."
-  ;; TODO: still need to convert indices -> gates
+  "Recursively expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate gate for each parity-inverse index inside, returning the decompressed list of gates."
   (if (typep item 'commutator)
       (append (seq-dagger (decompress decomposer (commutator-w item)))
               (seq-dagger (decompress decomposer (commutator-v item)))
@@ -415,14 +417,14 @@
           (decompress-and-multiply decomposer (commutator-w item))
           (magicl:dagger (decompress-and-multiply decomposer (commutator-v item)))
           (magicl:dagger (decompress-and-multiply decomposer (commutator-w item))))
-      (if (typep (car item) 'list)
+      (if (and item (typep (car item) 'list))
           (m* (decompress-and-multiply decomposer (cadr item)) (decompress-and-multiply decomposer (car item)))
           (reduce #'m*
                   (reverse (mapcar (lambda (x) (elt (gates decomposer) x)) item))
                   :initial-value +I+))))
 
 (defun approximate (decomposer u acc)
-  "An alternative function for decomposition that approximates a unitary U to an arbitrary accuracy ACC (using decomposer)."
+  "A decomposition function that takes a desired accuracy ACC and approximates a unitary U to accuracy ACC (using decomposer)."
   (let* ((seq (brute-base u decomposer 18))
          (curr-approx (decompress-and-multiply decomposer seq))
          (curr-depth 0))
@@ -430,10 +432,10 @@
           :do (uiop:nest
                (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger curr-approx))))
                #+ignore(multiple-value-bind (v-approx v-approx-mat) (approximate decomposer v (* +c-approx+ (expt curr-acc 3/2))))
-               #+ignore(multiple-value-bind (w-approx w-approx-mat) (approximate decomposer w (* +c-approx+ (expt curr-acc 3/2))))
-               (let* ((v-approx (decompose decomposer v :depth curr-depth))
+               #+ignore(multiple-value-bind (w-approx w-approx-mat) (approximate decomposer w (* +c-approx+ (e     xpt curr-acc 3/2))))
+               (let* ((v-approx (decompose decomposer v :depth 4))
                       (v-approx-mat (decompress-and-multiply decomposer v-approx))
-                      (w-approx (decompose decomposer w :depth curr-depth))
+                      (w-approx (decompose decomposer w :depth 4))
                       (w-approx-mat (decompress-and-multiply decomposer w-approx))))
                (progn (setf curr-approx (m* v-approx-mat w-approx-mat (magicl:dagger v-approx-mat) (magicl:dagger w-approx-mat) curr-approx))
                       (setf seq (cons seq (list (make-commutator :v v-approx :w w-approx))))
@@ -443,10 +445,10 @@
 ;;; Conversions between matrix and bloch-vector representations of
 ;;; unitaries. To understand them, remember/note that for a rotation
 ;;; of an angle theta about the bloch sphere axis <x, y, z> with unit
-;;; norm, the corresponding matrix representation is U = cos(t/2)*I -
-;;; isin(t/2) * (x*X + y*Y + z*Z), where t = theta/2 and X, Y, Z are
-;;; the usual Pauli matrices (I = identity). Thus, a unitary obtained
-;;; from this representation would have the form
+;;; norm, the corresponding matrix representation is U = cos(t)*I -
+;;; isin(t) * (x*X + y*Y + z*Z), where t = theta/2 and X, Y, Z are the
+;;; usual Pauli matrices (I = identity). Thus, a unitary obtained from
+;;; this representation would have the form
 ;;;
 ;;;           /                                           \
 ;;;           | cos(t) - z*i*sin(t)    -sin(t)*(x*i + y)  |
@@ -600,8 +602,12 @@
           (incf avg-error (operator-dist u u-approx))))
       (format t "~%Average error for eps0 = ~A: ~A" eps0 (/ avg-error trials)))))
 
-;;; Some functions which explore the ball representation of SU(2)
+;;; -----------------------------------------------------------------
+;;; Below are some functions which explore the characteristics of the
+;;; axis-angle ball representation of SU(2)
+;;; -----------------------------------------------------------------
 (defun ball-op-distances ()
+  "Finds a random pair of unitaries (of maximum rotation angle pi) and returns two values: their distance using the operator-distance measure and using the vector-distance (or ball-distance) measure."
   (let* ((bv1 (random-bloch-vector pi))
          (bv2 (random-bloch-vector pi))
          (u1 (bloch-vector-to-matrix bv1))
@@ -616,6 +622,7 @@
     (values (operator-dist u1 u2) (vector-distance ball1 ball2))))
 
 (defun ball-op-distance-ratios (num-trials)
+  "Tests for the maximum and minimum ratios of operator-distance to ball-distance for NUM-TRIALS of ball-op-distances()."
   (let ((min-ratio MOST-POSITIVE-FIXNUM)
         (max-ratio MOST-NEGATIVE-FIXNUM))
     (dotimes (i num-trials)
@@ -625,6 +632,7 @@
     (format t "~%TESTING RATIO OF OPERATOR DISTANCE TO BALL DISTANCE~%Min: ~A~%Max: ~A~%" min-ratio max-ratio)))
 
 (defun dist-range (num-trials max-angle &key (distance-function #'operator-dist))
+  "Finds the difference between the maximum and minimum values of DISTANCE-FUNCTION for NUM-TRIALS of random unitary pairs, when each unitary has a maximum angle of MAX-ANGLE."
   (let ((min-dist MOST-POSITIVE-FIXNUM)
         (max-dist MOST-NEGATIVE-FIXNUM))
     (loop :for i :below num-trials
@@ -638,6 +646,7 @@
     (format t "~%[TESTING THE RANGE OF DISTANCES]~%Up to max-angle: ~A~%Min op dist: ~A~%Max op dist: ~A~%" max-angle min-dist max-dist)))
 
 (defun search-op-variations (num-trials target-dist &key (tolerance 0))
+  "Given a value TARGET-DIST, return the maximum and minimum operator-distances between two randomly chosen unitaries with a ball-distance of TARGET-DIST."
   (let ((min-dist MOST-POSITIVE-FIXNUM)
         (max-dist MOST-NEGATIVE-FIXNUM)
         (hits 0))
@@ -658,6 +667,7 @@
               tolerance min-dist (/ (- max-dist min-dist) 1.2)))))
 
 (defun search-ball-variations (num-trials target-dist &key (tolerance 0))
+  "Given a value TARGET-DIST, return the maximum and minimum ball-distances between two randomly chosen unitaries with a ball-distance of TARGET-DIST."
   (let ((min-dist MOST-POSITIVE-FIXNUM)
         (max-dist MOST-NEGATIVE-FIXNUM)
         (hits 0))
@@ -678,5 +688,6 @@
               tolerance min-dist (/ (- max-dist min-dist) pi)))))
 
 (defun compare-variations (num-trials tolerance-var)
+  "Compares the results of search-ball-variations and search-op-variations."
   (search-ball-variations num-trials tolerance-var)
   (search-op-variations num-trials (* tolerance-var (/ pi (sqrt 2)))))
