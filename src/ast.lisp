@@ -133,7 +133,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (setf (delayed-expression-params c) (mapcar f (delayed-expression-params de)))
     c))
 
-(defstruct (frame (:constructor frame (qubits name))) ; TODO should a frame-name have a fixed arity?
+(defstruct (frame (:constructor frame (qubits name)))
   "A reference to a QuilT rotating frame, relative to which control or readout waveforms may be defined."
   (name nil :type string)
   (qubits nil :type list))
@@ -466,7 +466,6 @@ as a permutation."
             :accessor lexical-context)
    (sample-rate :initarg :sample-rate
                 :reader waveform-definition-sample-rate))
-  ;; TODO cache entries?
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified QuilT waveform definition."))
 
@@ -1838,7 +1837,7 @@ Examples:
   (unless (endp (parsed-program-gate-definitions parsed-program))
     (format s "~%"))
 
-  ;; write out circuits  ;; TODO why are we not using PRINT-INSTRUCTION?
+  ;; write out circuits  TODO why are we not using PRINT-INSTRUCTION?
   (dolist (circuit-defn (parsed-program-circuit-definitions parsed-program))
     (format s "DEFCIRCUIT ~a"
             (circuit-definition-name circuit-defn))
