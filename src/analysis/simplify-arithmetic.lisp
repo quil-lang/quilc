@@ -21,8 +21,18 @@
   "A transform which converts a parsed program with potentially complicated arithmetic to one that has simplified arithmetic expressions")
 
 (defstruct affine-representation
-  "Data structure that represents a linear expression."
+  "This data structure represents linear arithmetic expressions of the form
+
+      CONSTANT + COEFFICIENTS_0 * MEMORY-REF_0 + COEFFICIENTS_1 * MEMORY-REF_1 + ... + COEFFICIENTS_n * MEMORY-REF_n
+
+   where
+
+      CONSTANT is the DOUBLE-FLOAT constant offset of the expression
+      COEFFICIENTS_i is the DOUBLE-FLOAT coefficient for MEMORY-REF_i
+      MEMORY-REF_i is the MEMORY-REF with coefficient COEFFICIENTS_i
+"
   (constant 0d0 :type double-float)
+  ;; This builds a hash table with MEMORY-REFs as keys and their DOUBLE-FLOAT coefficients as values
   (coefficients (make-hash-table :test #'equalp) :type hash-table))
 
 (defun expression->affine-representation (de)
