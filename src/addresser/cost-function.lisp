@@ -55,7 +55,7 @@
              ; this is guaranteed to be the only 2Q permutation anyway.
             (weight (ecase *cost-fn-weight-style*
                       (:duration (permutation-record-duration (vnth 0 (hardware-object-permutation-gates (chip-spec-nth-link chip-spec link-index)))))
-                      (:fidelity (- (log (swap-fidelity chip-spec link-index))))))
+                      (:fidelity (* (permutation-record-duration (vnth 0 (hardware-object-permutation-gates (chip-spec-nth-link chip-spec link-index)))) (- (log (swap-fidelity chip-spec link-index)))))))
             (left-vertex (vnth 0 (chip-spec-qubits-on-link chip-spec link-index)))
             (right-vertex (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))))
         (setf (aref dist right-vertex left-vertex) weight)
