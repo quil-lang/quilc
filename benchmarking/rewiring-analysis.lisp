@@ -63,7 +63,7 @@
 (defparameter *rewiring-explicit-test-chips*
   '((:0006q-2ring *chip-6q-2ring*)
     (:0008q *chip-0008q*)
-    (:0016q *chip-0016q*)
+    #+ignore(:0016q *chip-0016q*)
     (:0020q-linear *chip-0020q-linear*)
     (:0020q-skew-rect *chip-0020q-skew-rect*))
   "Explicit layouts for testing the initial rewiring performance")
