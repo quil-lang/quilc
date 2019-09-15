@@ -1,6 +1,6 @@
 # QUILC
 
-[![pipeline status](https://gitlab.com/rigetti/quilc/badges/master/pipeline.svg)](https://gitlab.com/rigetti/quilc/commits/master)
+[![pipeline status](https://gitlab.com/rigetti/forest/quilc/badges/master/pipeline.svg)](https://gitlab.com/rigetti/forest/quilc/commits/master)
 [![github release](https://img.shields.io/github/release/rigetti/quilc.svg)](https://github.com/rigetti/quilc/releases)
 [![docker pulls](https://img.shields.io/docker/pulls/rigetti/quilc.svg)](https://hub.docker.com/r/rigetti/quilc)
 
