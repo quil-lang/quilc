@@ -601,7 +601,7 @@ mapping instructions to their tags. "
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
   (declare (optimize (debug 3)))
   (labels ((fidelity-combinator (val1 val2)
-             (* val1 val2))
+             (min val1 val2))
            (fidelity-bumper (instr value)
              (flet ((warn-and-skip (instr)
                       (format *compiler-noise-stream*
