@@ -1707,7 +1707,7 @@ For example,
 
   (:method ((defn gate-calibration-definition) (stream stream))
     (format stream "DEFCAL ")
-    (print-operator-description (calibration-definition-operator defn))
+    (print-operator-description (calibration-definition-operator defn) stream)
     (unless (endp (calibration-definition-parameters defn))
       (format stream "(~{~a~^, ~})"
               (mapcar #'print-instruction-to-string (calibration-definition-parameters defn))))
