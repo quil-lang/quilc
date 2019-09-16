@@ -935,7 +935,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
     (return-from binding-environment nil))
   (nconc (when (match-symbol-p (gate-binding-operator binding))
            (list (cons (gate-binding-operator binding) t)))
-         (unless (wildcard-pattern-p (gate-binding-parameters binding))
+         (unless (symbolp (gate-binding-parameters binding))
            (mapcan (lambda (param)
                      (when (match-symbol-p param)
                        (list (cons param t))))
@@ -1046,17 +1046,24 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                            :test test))))))
            
            (expand-parameters (binding env rest)
-             (if (wildcard-pattern-p (gate-binding-parameters binding))
-                 rest
-                 (expand-sequence (gate-binding-parameters binding)
-                                  env
-                                  rest
-                                  :gensym-name "PARAM"
-                                  :seq-accessor 'application-parameters
-                                  :gate-name (compiler-binding-name binding)
-                                  :ele-accessor 'constant-value
-                                  :ele-type 'constant
-                                  :test 'double=)))
+             (cond
+               ((wildcard-pattern-p (gate-binding-parameters binding))
+                rest)
+               ((and (gate-binding-parameters binding) ; no NILs please
+                     (symbolp (gate-binding-parameters binding)))
+                `(let ((,(gate-binding-parameters binding)
+                         (mapcar #'constant-value (application-parameters ,(compiler-binding-name binding)))))
+                   ,rest))
+               (t
+                (expand-sequence (gate-binding-parameters binding)
+                                 env
+                                 rest
+                                 :gensym-name "PARAM"
+                                 :seq-accessor 'application-parameters
+                                 :gate-name (compiler-binding-name binding)
+                                 :ele-accessor 'constant-value
+                                 :ele-type 'constant
+                                 :test 'double=))))
            
            (expand-arguments (binding env rest)
              (expand-sequence (gate-binding-arguments binding)

@@ -481,51 +481,53 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                                               ,q1 ,q0)
                  (finish-compiler (values complete-circuit fidelity))))))))))
 
-(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array) (&key predicate parameter-count) &body parametric-circuit)
+(defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array)
+                                                 (&key predicate
+                                                       parameter-count)
+                                                 &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
   (a:with-gensyms (instr a d b in goodness template-values)
     (multiple-value-bind (parametric-circuit decls docstring)
         (alexandria:parse-body parametric-circuit :documentation t)
       `(define-canonical-circuit-approximation ,name
-           ((,instr ("CAN" _ ,q1 ,q0)
-                    ;; this is here to throw the compiler hunter across the scent
+           ((,instr ("CAN" ,coord ,q1 ,q0)
+                    ;; this is here to throw the compiler hunter off the scent
                     :where t))
          ,@(when docstring (list docstring))
 	 ,@decls
-         (let* ((,coord (mapcar #'constant-value (application-parameters ,instr))))
-           (labels
-               ((circuit-template (,parameter-array ,q1 ,q0)
-                  (with-inst
-		    ,@parametric-circuit))
-                (run-optimizer ()
-                  (multiple-value-bind (,template-values ,goodness)
-                      (cl-grnm:nm-optimize
-                       (lambda (,in)
-                         (multiple-value-bind (,a ,d ,b)
-                             (orthogonal-decomposition (make-matrix-from-quil (circuit-template ,in 1 0)))
-                           (declare (ignore ,a ,b))
-                           (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal ,d))))
-                       (make-array ,parameter-count
-                                   :initial-contents (mapcar #'random
-                                                             (make-list ,parameter-count
-                                                                        :initial-element 2pi)))
-                       :max-function-calls *approximate-template-search-limit*)
-                    (cond
-                      ;; if we promised an exact solution but haven't found it yet,
-                      ;; try again.
-                      ((and (not (double= 0d0 ,goodness))
-                            ,predicate)
-                       (run-optimizer))
-                      ;; if we are unsure about the existence of an exact solution, we
-                      ;; haven't found one yet, but the user is demanding one, give up.
-                      ((and (not *enable-approximate-compilation*)
-                            (not (double= 0d0 ,goodness)))
-                       (give-up-compilation))
-                      ;; otherwise, this solution will do.
-                      (t
-                       (dolist (instr (circuit-template ,template-values ,q1 ,q0))
-                         (inst instr)))))))
-             (run-optimizer)))))))
+         (labels
+             ((circuit-template (,parameter-array ,q1 ,q0)
+                (with-inst
+                  ,@parametric-circuit))
+              (run-optimizer ()
+                (multiple-value-bind (,template-values ,goodness)
+                    (cl-grnm:nm-optimize
+                     (lambda (,in)
+                       (multiple-value-bind (,a ,d ,b)
+                           (orthogonal-decomposition (make-matrix-from-quil (circuit-template ,in 1 0)))
+                         (declare (ignore ,a ,b))
+                         (fidelity-coord-distance ,coord (get-canonical-coords-from-diagonal ,d))))
+                     (make-array ,parameter-count
+                                 :initial-contents (mapcar #'random
+                                                           (make-list ,parameter-count
+                                                                      :initial-element 2pi)))
+                     :max-function-calls *approximate-template-search-limit*)
+                  (cond
+                    ;; if we promised an exact solution but haven't found it yet,
+                    ;; try again.
+                    ((and (not (double= 0d0 ,goodness))
+                          ,predicate)
+                     (run-optimizer))
+                    ;; if we are unsure about the existence of an exact solution, we
+                    ;; haven't found one yet, but the user is demanding one, give up.
+                    ((and (not *enable-approximate-compilation*)
+                          (not (double= 0d0 ,goodness)))
+                     (give-up-compilation))
+                    ;; otherwise, this solution will do.
+                    (t
+                     (dolist (instr (circuit-template ,template-values ,q1 ,q0))
+                       (inst instr)))))))
+           (run-optimizer))))))
 
 
 (define-canonical-circuit-approximation nearest-circuit-of-depth-0
