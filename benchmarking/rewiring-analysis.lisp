@@ -196,20 +196,53 @@
                         #-(or sbcl ecl) (error "don't know how to seed random state")))
     (make-rewiring-prog (quil::generate-random-rewiring n-qubits))))
 
+(defun generate-handshake-prog (n-qubits state)
+  (declare (ignore state))
+  (make-instance
+   'parsed-program
+   :executable-code (concatenate
+                     'vector
+                     (list (make-instance 'quil::pragma-commuting-blocks))
+                     (loop :for i :below n-qubits
+                                  :nconc (loop :for j :below i
+                                               :collect (make-instance 'quil::pragma-block)
+                                               :collect (quil::build-gate "CZ" () i j)
+                                               :collect (make-instance 'quil::pragma-end-block)))
+                     (list (make-instance 'quil::pragma-end-commuting-blocks)))))
+
 (defun measure-rewiring-swap-search (assn &rest args
                                           &key break-on-error include-runtime
                                                (rewiring-qubits 20)
-                                               (chips (rewiring-test-chips)))
+                                               (chips (rewiring-test-chips))
+                                               (trials 20))
   (declare (ignore break-on-error include-runtime))
   (remf args :rewiring-qubits)
+  (remf args :trials)
   (setf (getf args :chips)
         (loop :for (name chip) :in chips
               :when (= (quil::chip-spec-n-qubits chip) rewiring-qubits) :collect (cons name chip)))
   (apply 'measure-performance assn
          :progs (loop
-                  :for i :below 20
+                  :for i :below trials
                   :collect (let ((curval i))
                              (lambda () (generate-random-rewiring-prog rewiring-qubits curval))))
+         args))
+
+(defun measure-handshake-prog-performance (assn &rest args
+                                                &key break-on-error include-runtime
+                                                     (n-qubits 20)
+                                                     (chips (rewiring-test-chips))
+                                                     (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
+  (apply 'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :collect (lambda () (generate-handshake-prog n-qubits 0)))
          args))
 
 (defvar *basic-swap-search-assn*
