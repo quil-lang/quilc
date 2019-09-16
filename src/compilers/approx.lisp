@@ -625,14 +625,6 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                     a d b q1 q0))
             (inst instr)))))))
 
-(define-searching-approximate-template nearest-CPHASE-ISWAP-template-of-depth-2 (coord q1 q0 array)
-    (:predicate nil ; TODO: replace this with a convexity test
-     :parameter-count 3)
-  (inst "ISWAP"  ()                    q0 q1)
-  (inst "RY"     (list (aref array 0)) q0)
-  (inst "RY"     (list (aref array 1)) q1)
-  (inst "CPHASE" (list (aref array 2)) q0 q1))
-
 (define-searching-approximate-template nearest-CZ-XY-template-of-depth-2 (coord q1 q0 array)
     (:predicate nil   ; TODO: replace this with a convexity test
      :parameter-count 4)
