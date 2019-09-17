@@ -42,9 +42,7 @@
     (push #'local-system-search asdf:*system-definition-search-functions*)
     (asdf:load-system "quilc")
     #-win32
-    (progn 
-      (asdf:load-system "cl-quil/tweedledum")
-      (uiop:symbol-call "CL-QUIL.TWEEDLEDUM" "LOAD-TWEEDLEDUM"))
+    (asdf:load-system "cl-quil/tweedledum")
     ;; TODO Something is broken here. If zap-info is left to do it's thing on
     ;; Windows or SBCL 1.5.6+, there is a weird error. This is a short-term fix.
     #-win32
