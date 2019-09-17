@@ -982,67 +982,67 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                (t
                 (error "Malformed binding in compiler form: ~a" binding))))
            
-           (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name ele-accessor ele-type test)
+           (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name elt-accessor elt-type test)
              (let* ((target-length (length seq))
                     (seq-var (gensym (format nil "~aS" gensym-name)))
-                    (ele-vars (loop :repeat target-length
+                    (elt-vars (loop :repeat target-length
                                     :collect (gensym gensym-name)))
-                    (dead-vars (loop :for v :in ele-vars
+                    (dead-vars (loop :for v :in elt-vars
                                      :for p :in seq
                                      :when (wildcard-pattern-p p)
                                        :collect v)))
                `(let ((,seq-var (,seq-accessor ,gate-name)))
                   (when (= (length ,seq-var) ,target-length)
-                    (destructuring-bind ,ele-vars
+                    (destructuring-bind ,elt-vars
                         ,seq-var
                       ,@(when dead-vars
                           (list `(declare (ignore ,@dead-vars))))
                       ,(expand-each-element seq
-                                            ele-vars
+                                            elt-vars
                                             env
                                             rest
-                                            :ele-accessor ele-accessor
-                                            :ele-type ele-type
+                                            :elt-accessor elt-accessor
+                                            :elt-type elt-type
                                             :test test))))))
            
-           (expand-each-element (seq ele-vars env rest &key ele-accessor ele-type test)
+           (expand-each-element (seq elt-vars env rest &key elt-accessor elt-type test)
              (when (endp seq)
                (return-from expand-each-element rest))
              (let ((ele (first seq))
-                   (var (first ele-vars)))
+                   (var (first elt-vars)))
                (cond
                  ((wildcard-pattern-p ele)
                   (expand-each-element (rest seq)
-                                       (rest ele-vars)
+                                       (rest elt-vars)
                                        env
                                        rest
-                                       :ele-accessor ele-accessor
-                                       :ele-type ele-type
+                                       :elt-accessor elt-accessor
+                                       :elt-type elt-type
                                        :test test))
                  ((and (match-symbol-p ele)
                        (not (lookup ele env)))
                   ;; fresh binding
-                  `(let ((,ele (if (typep ,var ',ele-type)
-                                   (,ele-accessor ,var)
+                  `(let ((,ele (if (typep ,var ',elt-type)
+                                   (,elt-accessor ,var)
                                    ,var)))
                      ,(expand-each-element (rest seq)
-                                           (rest ele-vars)
+                                           (rest elt-vars)
                                            (list* (cons ele t) env)
                                            rest
-                                           :ele-accessor ele-accessor
-                                           :ele-type ele-type
+                                           :elt-accessor elt-accessor
+                                           :elt-type elt-type
                                            :test test)))
                  (t
                   ;; existing binding / data. insert test check
                   `(when (or ,permit-binding-mismatches-when
-                             (and (typep ,var ',ele-type)
-                                  (,test ,ele (,ele-accessor ,var))))
+                             (and (typep ,var ',elt-type)
+                                  (,test ,ele (,elt-accessor ,var))))
                      ,(expand-each-element (rest seq)
-                                           (rest ele-vars)
+                                           (rest elt-vars)
                                            env
                                            rest
-                                           :ele-accessor ele-accessor
-                                           :ele-type ele-type
+                                           :elt-accessor elt-accessor
+                                           :elt-type elt-type
                                            :test test))))))
            
            (expand-parameters (binding env rest)
@@ -1061,8 +1061,8 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                  :gensym-name "PARAM"
                                  :seq-accessor 'application-parameters
                                  :gate-name (compiler-binding-name binding)
-                                 :ele-accessor 'constant-value
-                                 :ele-type 'constant
+                                 :elt-accessor 'constant-value
+                                 :elt-type 'constant
                                  :test 'double=))))
            
            (expand-arguments (binding env rest)
@@ -1072,8 +1072,8 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                               :gensym-name "ARG"
                               :seq-accessor 'application-arguments
                               :gate-name (compiler-binding-name binding)
-                              :ele-accessor 'qubit-index
-                              :ele-type 'qubit
+                              :elt-accessor 'qubit-index
+                              :elt-type 'qubit
                               :test '=))
            
            (expand-options (binding env rest)
