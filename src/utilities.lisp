@@ -202,7 +202,12 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     #+allegro excl:*infinity-double*
     #-(or ccl ecl sbcl allegro) (error "double-float-positive-infinity not available."))
 
-(a:define-constant pi #.(coerce cl:pi 'double-float))
+(defconstant pi    (coerce cl:pi 'double-float))
+(defconstant -pi   (- pi))
+(defconstant pi/2  (/ pi 2))
+(defconstant -pi/2 (/ pi -2))
+(defconstant 2pi   (* 2 pi))
+(defconstant 4pi   (* 4 pi))
 
 (defun print-hash (hash &optional (stream *standard-output*))
   (fresh-line stream)

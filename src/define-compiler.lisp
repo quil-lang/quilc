@@ -94,7 +94,11 @@ OPTIONS: plist of options governing applicability of the compiler binding."
      (when (measure-binding-target obj)
        (format stream " ~a" (measure-binding-target obj))))
     (gate-binding
-     (print-operator-description (gate-binding-operator obj) stream)
+     (typecase (gate-binding-operator obj)
+       (operator-description
+        (print-operator-description (gate-binding-operator obj) stream))
+       (otherwise
+        (print (gate-binding-operator obj) stream)))
      (a:when-let ((params (gate-binding-parameters obj)))
        (typecase params
          (symbol
@@ -581,7 +585,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
       (compiler (format t "~&is the output from applying ~a, coming from...~%" item))
       (hash-table
        (dohash ((key val) item)
-         (format t "~a -> ~a~%" key val))))))
+         (format t "~/cl-quil::binding-fmt/ -> ~a~%" key val))))))
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
@@ -633,7 +637,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                  (special-cost (occurrence-table-cost (first special-path) target-gateset)))
             ;; did we in fact beat out the generic machinery?
             (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
-                       (>= special-cost generic-cost))
+                       (> special-cost generic-cost))
               ;; then store it!
               (setf (gethash compiler compiler-hash) special-cost))))
         
@@ -768,20 +772,29 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
   (unless (typep body 'cons)
     (return-from estimate-output-gates-from-raw-code (make-occurrence-table)))
   (case (first body)
-    (build-gate
+    (inst
+     (when (= 2 (length body))
+       (return-from estimate-output-gates-from-raw-code
+         (make-occurrence-table)))
      (destructuring-bind (head name param-list &rest qubit-list) body
        (declare (ignore head))
        (let ((table (make-hash-table :test #'equalp))
-             (operator (if (stringp name)
-                           (named-operator name)
-                           name))
+             (operator (typecase name
+                         (string (named-operator name))
+                         (symbol name)
+                         (otherwise (return-from estimate-output-gates-from-raw-code
+                                      (make-occurrence-table)))))
              (param-list (cond
-                           ((endp param-list)
-                            nil)
-                           ((and (typep param-list 'list)
-                                 (= 2 (length param-list))
-                                 (typep (second param-list) 'list))
-                            (loop :for item :in (second param-list)
+                           ((typep param-list 'list)
+                            (loop :for item :in (case (first param-list)
+                                                  ((quote
+                                                    ;; generic attempt to detect quasiquotes
+                                                    #+(or sbcl ecl ccl clisp) #.(first (quote `(t)))
+                                                    #-(or sbcl ecl ccl clisp) #.(cerror "Bravely, boldly, stupidly continue." "I don't know how to detect quasiquotes."))
+                                                   (second param-list))
+                                                  ((list)
+                                                   (rest param-list))
+                                                  (otherwise param-list))
                                   :if (typep item 'number)
                                     :collect item
                                   :else
@@ -799,34 +812,6 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                         table)
                1)
          table)))
-    (anon-gate
-     (destructuring-bind (head name matrix &rest qubit-list) body
-       (declare (ignore head name matrix))
-       (let ((table (make-hash-table :test #'equalp))
-             (qubit-list (mapcar (lambda (x)
-                                   (typecase x
-                                     (number x)
-                                     (otherwise '_)))
-                                 qubit-list)))
-         (setf (gethash (make-gate-binding :operator '_
-                                           :parameters '_ 
-                                           :arguments qubit-list)
-                        table)
-               1)
-         table)))
-    (apply
-     (destructuring-bind (head fn &rest args) body
-       (declare (ignore head))
-       (case fn
-         ((build-gate #'build-gate)
-          (destructuring-bind (name param-list qubit-list) args
-            (declare (ignore qubit-list))
-            (estimate-output-gates-from-raw-code
-             `(build-gate ,name ,param-list
-                          ,@(loop :for j :below (gate-definition-qubits-needed (lookup-standard-gate name))
-                                  :collect '_)))))
-         (otherwise
-          (make-occurrence-table)))))
     (otherwise
      (let ((table (make-occurrence-table)))
        (dolist (subbody body table)
@@ -857,6 +842,82 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                           :parameters (second (second source))
                           :arguments (rest (rest (second source))))))))
 
+;;; here are the forms directly related to DEFINE-COMPILER, whether its
+;;; destructuring or utilities available with its body.
+
+;; within the body of a DEFINE-COMPILER, we publish instructions to output
+;; using a DEFINE-VOP-like INST macro, and we quit a compiler early using
+;; FINISH-COMPILER.
+
+;; first, prohibit the use of these items outside of a compiler body
+(defun inst (&rest xs)
+  "Emit the instructions XS in the current compiler context.
+
+INST is a local function usable within the dynamic extent of a compiler body."
+  (declare (ignore xs))
+  (error "INST can only be used in the body of a compiler."))
+
+(define-compiler-macro inst (&rest xs)
+  (declare (ignore xs))
+  (error "INST can only be used in the body of a compiler."))
+
+(defun inst* (&rest xs)
+  "Emit the instructions XS in the current compiler context. Treat the last argument of XS as a list of arguments, as if using APPLY #'BUILD-GATE.
+
+INST* is a local function usable within the dynamic extent of a compiler body."
+  (declare (ignore xs))
+  (error "INST* can only be used in the body of a compiler."))
+
+(define-compiler-macro inst* (&rest xs)
+  (declare (ignore xs))
+  (error "INST* can only be used in the body of a compiler."))
+
+(defmacro finish-compiler ()
+  "Finish compiling, retuning all instructed emitted with INST.
+
+FINISH-COMPILER is a local macro usable within a compiler body."
+  (error "FINISH-COMPILER can only be used in the body of a compiler."))
+
+(defmacro with-inst (&body body)
+  "Define INST, INST*, and FINISH-COMPILER handlers extending over BODY."
+  (a:with-gensyms (list tail compiler-context x xs retval-p)
+    `(block ,compiler-context
+       (let* ((,list (cons nil nil))
+              (,tail ,list))
+         (declare (dynamic-extent ,list)
+                  (type cons ,list ,tail))
+         (labels ((inst (&rest ,xs)
+                    (declare (optimize speed (safety 0) (debug 0) (space 0)))
+                    (let (,x)
+                      (cond
+                        ;; check for a raw gate object
+                        ((and (= 1 (length ,xs))
+                              (typep (first ,xs) 'gate-application))
+                         (setf ,x (first ,xs)))
+                        ;; check for a build-gate signature
+                        ((and (<= 3 (length ,xs))
+                              (typep (cadr ,xs) 'list))
+                         (setf ,x (apply #'build-gate ,xs)))
+                        ;; check for an anon-gate signature
+                        ((and (<= 3 (length ,xs))
+                              (typep (cadr ,xs) 'magicl:matrix))
+                         (setf ,x (apply #'anon-gate ,xs)))
+                        (t
+                         (error "INST argument pattern not recognized: ~a" ,xs)))
+                      (rplacd ,tail (cons ,x nil))
+                      (setf ,tail (cdr ,tail))
+                      (values)))
+                  (inst* (&rest ,xs)
+                    (apply #'inst (apply #'list* ,xs))))
+           (declare (dynamic-extent #'inst))
+           (macrolet ((finish-compiler (&optional (retval nil ,retval-p))
+                        (if ,retval-p
+                            `(return-from ,',compiler-context ,retval)
+                            '(return-from ,compiler-context (cdr (the cons ,list))))))
+             ,@body
+             ;; Implicitly return the collected instructions.
+             (finish-compiler)))))))
+
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users
 ;; to write `#.pi`, since it's more visually offsetting.
@@ -874,7 +935,7 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
     (return-from binding-environment nil))
   (nconc (when (match-symbol-p (gate-binding-operator binding))
            (list (cons (gate-binding-operator binding) t)))
-         (unless (wildcard-pattern-p (gate-binding-parameters binding))
+         (unless (symbolp (gate-binding-parameters binding))
            (mapcan (lambda (param)
                      (when (match-symbol-p param)
                        (list (cons param t))))
@@ -895,7 +956,7 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
   (labels ((expand-bindings (bindings env)
              (cond
                ((endp bindings)
-                `(values (progn ,@body)
+                `(values (with-inst ,@body)
                          t))
                ((typep (first bindings) 'symbol)
                 (expand-bindings (rest bindings)
@@ -921,81 +982,88 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                (t
                 (error "Malformed binding in compiler form: ~a" binding))))
            
-           (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name ele-accessor ele-type test)
+           (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name elt-accessor elt-type test)
              (let* ((target-length (length seq))
                     (seq-var (gensym (format nil "~aS" gensym-name)))
-                    (ele-vars (loop :repeat target-length
+                    (elt-vars (loop :repeat target-length
                                     :collect (gensym gensym-name)))
-                    (dead-vars (loop :for v :in ele-vars
+                    (dead-vars (loop :for v :in elt-vars
                                      :for p :in seq
                                      :when (wildcard-pattern-p p)
                                        :collect v)))
                `(let ((,seq-var (,seq-accessor ,gate-name)))
                   (when (= (length ,seq-var) ,target-length)
-                    (destructuring-bind ,ele-vars
+                    (destructuring-bind ,elt-vars
                         ,seq-var
                       ,@(when dead-vars
                           (list `(declare (ignore ,@dead-vars))))
                       ,(expand-each-element seq
-                                            ele-vars
+                                            elt-vars
                                             env
                                             rest
-                                            :ele-accessor ele-accessor
-                                            :ele-type ele-type
+                                            :elt-accessor elt-accessor
+                                            :elt-type elt-type
                                             :test test))))))
            
-           (expand-each-element (seq ele-vars env rest &key ele-accessor ele-type test)
+           (expand-each-element (seq elt-vars env rest &key elt-accessor elt-type test)
              (when (endp seq)
                (return-from expand-each-element rest))
              (let ((ele (first seq))
-                   (var (first ele-vars)))
+                   (var (first elt-vars)))
                (cond
                  ((wildcard-pattern-p ele)
                   (expand-each-element (rest seq)
-                                       (rest ele-vars)
+                                       (rest elt-vars)
                                        env
                                        rest
-                                       :ele-accessor ele-accessor
-                                       :ele-type ele-type
+                                       :elt-accessor elt-accessor
+                                       :elt-type elt-type
                                        :test test))
                  ((and (match-symbol-p ele)
                        (not (lookup ele env)))
                   ;; fresh binding
-                  `(let ((,ele (if (typep ,var ',ele-type)
-                                   (,ele-accessor ,var)
+                  `(let ((,ele (if (typep ,var ',elt-type)
+                                   (,elt-accessor ,var)
                                    ,var)))
                      ,(expand-each-element (rest seq)
-                                           (rest ele-vars)
+                                           (rest elt-vars)
                                            (list* (cons ele t) env)
                                            rest
-                                           :ele-accessor ele-accessor
-                                           :ele-type ele-type
+                                           :elt-accessor elt-accessor
+                                           :elt-type elt-type
                                            :test test)))
                  (t
                   ;; existing binding / data. insert test check
                   `(when (or ,permit-binding-mismatches-when
-                             (and (typep ,var ',ele-type)
-                                  (,test ,ele (,ele-accessor ,var))))
+                             (and (typep ,var ',elt-type)
+                                  (,test ,ele (,elt-accessor ,var))))
                      ,(expand-each-element (rest seq)
-                                           (rest ele-vars)
+                                           (rest elt-vars)
                                            env
                                            rest
-                                           :ele-accessor ele-accessor
-                                           :ele-type ele-type
+                                           :elt-accessor elt-accessor
+                                           :elt-type elt-type
                                            :test test))))))
            
            (expand-parameters (binding env rest)
-             (if (wildcard-pattern-p (gate-binding-parameters binding))
-                 rest
-                 (expand-sequence (gate-binding-parameters binding)
-                                  env
-                                  rest
-                                  :gensym-name "PARAM"
-                                  :seq-accessor 'application-parameters
-                                  :gate-name (compiler-binding-name binding)
-                                  :ele-accessor 'constant-value
-                                  :ele-type 'constant
-                                  :test 'double=)))
+             (cond
+               ((wildcard-pattern-p (gate-binding-parameters binding))
+                rest)
+               ((and (gate-binding-parameters binding) ; no NILs please
+                     (symbolp (gate-binding-parameters binding)))
+                `(let ((,(gate-binding-parameters binding)
+                         (mapcar #'constant-value (application-parameters ,(compiler-binding-name binding)))))
+                   ,rest))
+               (t
+                (expand-sequence (gate-binding-parameters binding)
+                                 env
+                                 rest
+                                 :gensym-name "PARAM"
+                                 :seq-accessor 'application-parameters
+                                 :gate-name (compiler-binding-name binding)
+                                 :elt-accessor 'constant-value
+                                 :elt-type 'constant
+                                 :test 'double=))))
            
            (expand-arguments (binding env rest)
              (expand-sequence (gate-binding-arguments binding)
@@ -1004,8 +1072,8 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                               :gensym-name "ARG"
                               :seq-accessor 'application-arguments
                               :gate-name (compiler-binding-name binding)
-                              :ele-accessor 'qubit-index
-                              :ele-type 'qubit
+                              :elt-accessor 'qubit-index
+                              :elt-type 'qubit
                               :test '=))
            
            (expand-options (binding env rest)
@@ -1043,6 +1111,19 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
     (expand-bindings bindings nil)))
 
 (defun enact-compiler-options (options body)
+  "Produces code used to enact options passed to DEFINE-COMPILER.  BODY is a lump of compiler code (typically generated by DEFINE-COMPILER-FORM), and OPTIONS is a plist with the following keys:
+
+FULL-CONTEXT: Names a symbol to which the active COMPILATION-CONTEXT will be bound.
+
+CHIP-SPECIFICATION: Names a symbol to which the active CHIP-SPECIFICATION will be bound.
+
+GATESET-REDUCER: When NIL, this compiler is filtered from participation in compression. Defaults to T.
+
+CLASS: The compiler constructed by DEFINE-COMPILER will be of the specified subclass of COMPILER.
+
+PERMIT-BINDING-MISMATCHES-WHEN: A predicate that, when true, permits the compiler to skip equality matching during gate destructuring.  For instance, this can be used to allow approximate matches.
+
+OUTPUT-GATESET: A plist keyed on arguments to MAKE-GATE-BINDING with values in frequency count.  If specified supplants DEFINE-COMPILER's automatic estimation of the gate production of the compiler routine."
   (when (endp options)
     (return-from enact-compiler-options body))
   (destructuring-bind (key val &rest remaining-options) options
@@ -1064,7 +1145,7 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
        (error "Unknown compiler option: ~a." (first options))))))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
-  "Defines and registers a COMPILER object."
+  "Defines and registers a COMPILER object.  For detailed options information, see ENACT-COMPILER-OPTIONS."
   (multiple-value-bind (body decls docstring) (alexandria:parse-body body :documentation t)
     (multiple-value-bind (bindings options) (cleave-options bindings)
       (let* ((parsed-bindings (mapcar #'make-binding-from-source bindings))
@@ -1085,12 +1166,9 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                                   :options ',options
                                   :body '(locally ,@decls ,@body)
                                   :output-gates ,(if (getf options ':output-gateset)
-                                                     `(a:alist-hash-table
-                                                       (mapcar (lambda (x)
-                                                                 (cons (make-binding-from-source
-                                                                        (list '_ (car x)))
-                                                                       (cdr x)))
-                                                               ',(getf options ':output-gateset))
+                                                     `(a:plist-hash-table
+                                                       (loop :for (args count) :on ,(getf options ':output-gateset) :by #'cddr
+                                                             :nconc (list (apply #'make-gate-binding args) count))
                                                        :test #'equalp)
                                                      `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
                                   :function (a:named-lambda ,name (,@variable-names &key context)

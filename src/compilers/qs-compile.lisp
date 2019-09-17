@@ -86,30 +86,25 @@
                                                     (/ row-count 2)
                                                     evals-v)
                                        (magicl:conjugate-transpose vL)
-                                       v1))))
+                                       v1)))
+                     ;; some convenient shorthand for inst below
+                     (control (first (application-arguments instr)))
+                     (rest (rest (application-arguments instr)))
+                     (UCR-Y (repeatedly-fork (named-operator "RY") (length rest)))
+		     (UCR-Z (repeatedly-fork (named-operator "RZ") (length rest))))
                 ;; we now have the equality
                 ;; m = (u0 (+) u1) Z(Lphi) Y(thetas) Z(Rphi) (v0 (+) v1)
                 ;;   = uL Z(evals-u) uR Z(Lphi) Y(thetas) Z(Rphi) vL Z(evals-v) vR
                 ;; which we use to build the output circuit.
-                ;;
-                ;; NOTE: the order here is reversed from the matrix decomp.
-                ;; since the composition order of instructions is backwards
-                (list
-                 (apply #'anon-gate "QSC-VR" vR (rest (application-arguments instr)))
-                 (apply #'build-UCR "RZ"
-                        (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
-                        (append (rest (application-arguments instr))
-                                (list (first (application-arguments instr)))))
-                 (apply #'anon-gate "QSC-VL" vL (rest (application-arguments instr)))
-                 (build-gate "RZ" (list (* -2 Rphi)) (first (application-arguments instr)))
-                 (apply #'build-UCR "RY"
-                        (mapcar (lambda (x) (constant (* 2 x))) thetas)
-                        (append (rest (application-arguments instr))
-                                (list (first (application-arguments instr)))))
-                 (build-gate "RZ" (list (* -2 Lphi)) (first (application-arguments instr)))
-                 (apply #'anon-gate "QSC-UR" uR (rest (application-arguments instr)))
-                 (apply #'build-UCR "RZ"
-                        (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
-                        (append (rest (application-arguments instr))
-                                (list (first (application-arguments instr)))))
-                 (apply #'anon-gate "QSC-UL" uL (rest (application-arguments instr))))))))))))
+		(inst* "QSC-VR" vR                 rest)
+		(inst* UCR-Z    (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
+		                (append rest (list control)))
+		(inst* "QSC-VL" vL                 rest)
+		(inst  "RZ"     (list (* -2 Rphi)) control)
+		(inst* UCR-Y    (mapcar (lambda (x) (constant (* 2 x))) thetas)
+		                (append rest (list control)))
+		(inst  "RZ"     (list (* -2 Lphi)) control)
+		(inst* "QSC-UR" uR                 rest)
+		(inst* UCR-Z    (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
+		                (append rest (list control)))
+		(inst* "QSC-UL" uL                 rest)))))))))

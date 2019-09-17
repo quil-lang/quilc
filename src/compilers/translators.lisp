@@ -17,144 +17,143 @@
 ;;       order of expressiveness.
 
 (define-compiler H-to-YX ((H-gate ("H" () q)))
-  (list (build-gate "RY" '(#.(/ pi 2)) q)
-        (build-gate "X"  ()            q)))
+  (inst "RY" '(#.pi/2) q)
+  (inst "X"  ()        q))
 
 (define-compiler Z-to-XYX ((Z-gate ("Z" () q)))
-  (list (build-gate "RX" '(#.(/ pi -2)) q)
-        (build-gate "Y"  ()             q)
-        (build-gate "RX" '(#.(/ pi 2))  q)))
+  (inst "RX" '(#.-pi/2) q)
+  (inst "Y"  ()         q)
+  (inst "RX" '(#.pi/2)  q))
 
-(define-compiler Yhalf-to-HX ((yhalf-gate ("RY" (#.(/ pi 2)) q)))
-  (list (build-gate "H" () q)
-        (build-gate "X" () q)))
+(define-compiler Yhalf-to-HX ((yhalf-gate ("RY" (#.pi/2) q)))
+  (inst "H" () q)
+  (inst "X" () q))
 
 (define-compiler RY-to-XZX ((ry-gate ("RY" (alpha) q)))
-  (list (build-gate "RX" '(#.(/ pi 2))  q)
-        (build-gate "RZ" `(,alpha)      q)
-        (build-gate "RX" '(#.(/ pi -2)) q)))
+  (inst "RX" '(#.pi/2)  q)
+  (inst "RZ" `(,alpha)  q)
+  (inst "RX" '(#.-pi/2) q))
 
 (define-compiler RX-to-ZXZXZ ((rx-gate ("RX" (alpha) q)))
-  (list (build-gate "RZ" '(#.(/ pi 2))  q)
-        (build-gate "RX" '(#.(/ pi 2))  q)
-        (build-gate "RZ" `(,alpha)      q)
-        (build-gate "RX" '(#.(/ pi -2)) q)
-        (build-gate "RZ" '(#.(/ pi -2)) q)))
+  (inst "RZ" '(#.pi/2)  q)
+  (inst "RX" '(#.pi/2)  q)
+  (inst "RZ" `(,alpha)  q)
+  (inst "RX" '(#.-pi/2) q)
+  (inst "RZ" '(#.-pi/2) q))
 
 (define-compiler PHASE-to-RZ ((phase-gate ("PHASE" (alpha) q)))
-  (list (build-gate "RZ" `(,alpha) q)))
+  (inst "RZ" `(,alpha) q))
 
 ;; standard 2Q gate translators
 
 (define-compiler CZ-to-CPHASE ((CZ-gate ("CZ" () q1 q0)))
-  (list (build-gate "CPHASE" '(#.pi) q1 q0)))
+  (inst "CPHASE" '(#.pi) q1 q0))
 
 (define-compiler CPHASE-to-CNOT ((CPHASE-gate ("CPHASE" (alpha) p q)))
-  (list
-   (build-gate "CNOT" ()                            p q)
-   (build-gate "RZ"   (list (param-* alpha -0.5d0)) q)
-   (build-gate "CNOT" ()                            p q)
-   (build-gate "RZ"   (list (param-* alpha  0.5d0)) q)
-   (build-gate "RZ"   (list (param-* alpha  0.5d0)) p)))
+  (inst "CNOT" ()                            p q)
+  (inst "RZ"   (list (param-* alpha -0.5d0)) q)
+  (inst "CNOT" ()                            p q)
+  (inst "RZ"   (list (param-* alpha  0.5d0)) q)
+  (inst "RZ"   (list (param-* alpha  0.5d0)) p))
 
 (define-compiler CNOT-to-CZ ((cnot-gate ("CNOT" () q1 q0)))
-  (list (build-gate "RY" '(#.(/ pi 2))  q0)
-        (build-gate "CZ" ()             q0 q1)
-        (build-gate "RY" '(#.(/ pi -2)) q0)
-        (build-gate "Z"  ()             q1)))
+  (inst "RY" '(#.pi/2)  q0)
+  (inst "CZ" ()         q0 q1)
+  (inst "RY" '(#.-pi/2) q0)
+  (inst "Z"  ()         q1))
 
 (define-compiler CNOT-to-flipped-CNOT ((cnot-gate ("CNOT" () control target))
                                        :gateset-reducer nil)
-  (list (build-gate "H"    () control)
-        (build-gate "H"    () target)
-        (build-gate "CNOT" () target control) ; !!
-        (build-gate "H"    () control)
-        (build-gate "H"    () target)))
+  (inst "H"    () control)
+  (inst "H"    () target)
+  (inst "CNOT" () target control) ; !!
+  (inst "H"    () control)
+  (inst "H"    () target))
 
 (define-compiler iSWAP-to-CNOT ((iswap-gate ("ISWAP" () q1 q0)))
-  (list (build-gate "RY"   '(#.(/ pi 2))   q1)
-        (build-gate "RZ"   '(#.(/ pi -2))  q1)
-        (build-gate "RY"   '(#.(/ pi 2))   q0)
-        (build-gate "RZ"   '(#.(/ pi 2))   q0)
-        (build-gate "CNOT" ()              q1 q0)
-        (build-gate "RX"   '(#.(/ pi 2))   q1)
-        (build-gate "RZ"   '(#.(/ pi -2))  q0)
-        (build-gate "CNOT" ()              q1 q0)
-        (build-gate "RZ"   '(#.(* pi 3/2)) q1)
-        (build-gate "RY"   '(#.(/ pi 2))   q1)
-        (build-gate "RZ"   '(#.pi)         q1)
-        (build-gate "RZ"   '(#.(* pi 5/2)) q0)
-        (build-gate "RY"   '(#.(/ pi 2))   q0)
-        (build-gate "RZ"   '(#.pi)         q0)))
+  (inst "RY"   '(#.pi/2)       q1)
+  (inst "RZ"   '(#.-pi/2)      q1)
+  (inst "RY"   '(#.pi/2)       q0)
+  (inst "RZ"   '(#.pi/2)       q0)
+  (inst "CNOT" ()              q1 q0)
+  (inst "RX"   '(#.pi/2)       q1)
+  (inst "RZ"   '(#.-pi/2)      q0)
+  (inst "CNOT" ()              q1 q0)
+  (inst "RZ"   '(#.(* pi 3/2)) q1)
+  (inst "RY"   '(#.pi/2)       q1)
+  (inst "RZ"   '(#.pi)         q1)
+  (inst "RZ"   '(#.(* pi 5/2)) q0)
+  (inst "RY"   '(#.pi/2)       q0)
+  (inst "RZ"   '(#.pi)         q0))
 
 (define-compiler CZ-to-CNOT ((cz-gate ("CZ" () q1 q0)))
-  (list (build-gate "RY"   '(#.(/ pi 2))  q1)
-        (build-gate "CNOT" ()             q0 q1)
-        (build-gate "RY"   '(#.(/ pi -2)) q1)))
+  (inst "RY"   '(#.pi/2)  q1)
+  (inst "CNOT" ()         q0 q1)
+  (inst "RY"   '(#.-pi/2) q1))
 
 (define-compiler iSWAP-to-PSWAP ((iswap-gate ("ISWAP" () q1 q0)))
-  (list (build-gate "PSWAP" '(#.(/ pi 2)) q1 q0)))
+  (inst "PSWAP" '(#.pi/2) q1 q0))
 
 (define-compiler ISWAP-to-PISWAP ((iswap-gate ("ISWAP" () q1 q0)))
-  (list (build-gate "PISWAP" '(#.pi) q1 q0)))
+  (inst "PISWAP" '(#.pi) q1 q0))
 
 ;; thanks, optimal 2Q compiler
 (define-compiler PSWAP-to-CNOT ((pswap-gate ("PSWAP" (theta) q0 q1)))
-  (list (build-gate "RY"   '(#.(/ pi 2))  q1)
-        (build-gate "RZ"   '(#.pi)        q0)
-        (build-gate "RY"   '(#.(/ pi 2))  q0)
-        (build-gate "RZ"   '(#.(/ pi -2)) q0)
-        (build-gate "CNOT" ()             q1 q0)
-        (build-gate "CNOT" ()             q0 q1)
-        (build-gate "RY"   `(,(param-* -1d0 theta)) q1)
-        (build-gate "CNOT" ()             q1 q0)
-        (build-gate "RZ"   '(#.(/ pi -2)) q1)
-        (build-gate "RY"   '(#.(/ pi 2))  q1)
-        (build-gate "RZ"   '(#.pi)        q0)
-        (build-gate "RY"   '(#.(/ pi 2))  q0)
-        (build-gate "RZ"   '(#.pi)        q0)))
+  (inst "RY"   '(#.pi/2)  q1)
+  (inst "RZ"   '(#.pi)    q0)
+  (inst "RY"   '(#.pi/2)  q0)
+  (inst "RZ"   '(#.-pi/2) q0)
+  (inst "CNOT" ()         q1 q0)
+  (inst "CNOT" ()         q0 q1)
+  (inst "RY"   `(,(param-* -1d0 theta)) q1)
+  (inst "CNOT" ()         q1 q0)
+  (inst "RZ"   '(#.-pi/2) q1)
+  (inst "RY"   '(#.pi/2)  q1)
+  (inst "RZ"   '(#.pi)    q0)
+  (inst "RY"   '(#.pi/2)  q0)
+  (inst "RZ"   '(#.pi)    q0))
 
 (define-compiler CNOT-to-iSWAP ((cnot-gate ("CNOT" () q0 q1)))
-  (list (build-gate "RZ"    '(#.(/ pi -2)) q0)
-        (build-gate "Z"     ()             q0)
-        (build-gate "Z"     ()             q1)
-        (build-gate "ISWAP" ()             q0 q1)
-        (build-gate "RY"    '(#.(/ pi -2)) q0)
-        (build-gate "ISWAP" ()             q0 q1)
-        (build-gate "RX"    '(#.(/ pi -2)) q1)))
+  (inst "RZ"    '(#.-pi/2) q0)
+  (inst "Z"     ()         q0)
+  (inst "Z"     ()         q1)
+  (inst "ISWAP" ()         q0 q1)
+  (inst "RY"    '(#.-pi/2) q0)
+  (inst "ISWAP" ()         q0 q1)
+  (inst "RX"    '(#.-pi/2) q1))
 
 (define-compiler SWAP-to-CNOT ((swap-gate ("SWAP" () q0 q1)))
-  (list (build-gate "CNOT" () q0 q1)
-        (build-gate "CNOT" () q1 q0)
-        (build-gate "CNOT" () q0 q1)))
+  (inst "CNOT" () q0 q1)
+  (inst "CNOT" () q1 q0)
+  (inst "CNOT" () q0 q1))
 
 (define-compiler SWAP-to-PSWAP ((swap-gate ("SWAP" () q0 q1)))
-  (list (build-gate "PSWAP" '(0d0) q0 q1)))
+  (inst "PSWAP" '(0d0) q0 q1))
 
 (define-compiler SWAP-to-ISWAP ((swap-gate ("SWAP" () q0 q1)))
-  (list (build-gate "ISWAP" () q0 q1)
-        (build-gate "RX"    '(#.(/ pi 2)) q1)
-        (build-gate "ISWAP" () q0 q1)
-        (build-gate "RX"    '(#.(/ pi 2)) q0)
-        (build-gate "ISWAP" () q0 q1)
-        (build-gate "RX"    '(#.(/ pi 2)) q1)))
+  (inst "ISWAP" ()        q0 q1)
+  (inst "RX"    '(#.pi/2) q1)
+  (inst "ISWAP" ()        q0 q1)
+  (inst "RX"    '(#.pi/2) q0)
+  (inst "ISWAP" ()        q0 q1)
+  (inst "RX"    '(#.pi/2) q1))
 
 (define-compiler CCNOT-to-CNOT ((ccnot-gate ("CCNOT" () q0 q1 q2)))
-  (list (build-gate "H"    ()             q2)
-        (build-gate "CNOT" ()             q1 q2)
-        (build-gate "RZ"   '(#.(/ pi -4)) q2)
-        (build-gate "CNOT" ()             q0 q2)
-        (build-gate "RZ"   '(#.(/ pi 4))  q2)
-        (build-gate "CNOT" ()             q1 q2)
-        (build-gate "RZ"   '(#.(/ pi -4)) q2)
-        (build-gate "CNOT" ()             q0 q2)
-        (build-gate "RZ"   '(#.(/ pi 4))  q1)
-        (build-gate "RZ"   '(#.(/ pi 4))  q2)
-        (build-gate "CNOT" ()             q0 q1)
-        (build-gate "H"    ()             q2)
-        (build-gate "RZ"   '(#.(/ pi 4))  q0)
-        (build-gate "RZ"   '(#.(/ pi -4)) q1)
-        (build-gate "CNOT" ()             q0 q1)))
+  (inst "H"    ()             q2)
+  (inst "CNOT" ()             q1 q2)
+  (inst "RZ"   '(#.(/ pi -4)) q2)
+  (inst "CNOT" ()             q0 q2)
+  (inst "RZ"   '(#.(/ pi 4))  q2)
+  (inst "CNOT" ()             q1 q2)
+  (inst "RZ"   '(#.(/ pi -4)) q2)
+  (inst "CNOT" ()             q0 q2)
+  (inst "RZ"   '(#.(/ pi 4))  q1)
+  (inst "RZ"   '(#.(/ pi 4))  q2)
+  (inst "CNOT" ()             q0 q1)
+  (inst "H"    ()             q2)
+  (inst "RZ"   '(#.(/ pi 4))  q0)
+  (inst "RZ"   '(#.(/ pi -4)) q1)
+  (inst "CNOT" ()             q0 q1))
 
 (defun find-shortest-path-on-chip-spec (chip-spec start-node target-node)
   "Returns a sequence of qubit indices that reach from START-NODE to TARGET-NODE on CHIP-SPEC, or NIL if no path can be found.
@@ -215,17 +214,21 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
 
 (define-compiler SWAP-to-native-SWAPs ((swap-gate ("SWAP" () q0 q1))
                                        :gateset-reducer nil
-                                       :chip-specification chip-spec)
+                                       :chip-specification chip-spec
+                                       :output-gateset `((:operator ,(named-operator "SWAP")
+                                                          :arguments (_ _)) 1))
   (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
     (unless computed-path
       (give-up-compilation))
     (let* ((f-list (mapcar (lambda (q1 q2) (build-gate "SWAP" '() q1 q2))
                            computed-path (rest computed-path))))
-      (append f-list (rest (reverse f-list))))))
+      (finish-compiler (append f-list (rest (reverse f-list)))))))
 
 (define-compiler CNOT-to-native-CNOTs ((cnot-gate ("CNOT" () q1 q0))
                                        :gateset-reducer nil
-                                       :chip-specification chip-spec)
+                                       :chip-specification chip-spec
+                                       :output-gateset `((:operator ,(named-operator "CNOT")
+                                                          :arguments (_ _)) 1))
   ;; find a shortest path between the two qubits in the swap gate
   (let* ((computed-path (find-shortest-path-on-chip-spec chip-spec q1 q0)))
     (when (= 2 (length computed-path))
@@ -249,15 +252,18 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                  (list
                   (apply #'build-gate "CNOT" '() first-two-qubits))
                  inner-string-copy))))))
-      (build-CNOT-string computed-path))))
+      (finish-compiler (build-CNOT-string computed-path)))))
 
 (define-compiler CZ-to-native-CZs ((cz-gate ("CZ" () q0 q1))
                                    :full-context context
-                                   :gateset-reducer nil)
-  (nconc
-   (list (build-gate "RY" '(#.(/ pi 2)) q1))
-   (CNOT-to-native-CNOTs (build-gate "CNOT" () q0 q1) :context context)
-   (list (build-gate "RY" '(#.(/ pi -2)) q1))))
+                                   :gateset-reducer nil
+                                   :output-gateset `((:operator ,(named-operator "CZ")
+                                                      :arguments (_ _)) 1))
+  (finish-compiler
+   (nconc
+    (list (build-gate "RY" '(#.pi/2) q1))
+    (CNOT-to-native-CNOTs (build-gate "CNOT" () q0 q1) :context context)
+    (list (build-gate "RY" '(#.-pi/2) q1)))))
 
 (define-compiler ISWAP-to-native-ISWAPs ((iswap-gate ("ISWAP" _ _ _))
                                          :gateset-reducer nil
@@ -271,23 +277,30 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                                :nconc (if (string= "CNOT" (application-operator-name instr))
                                           (CNOT-to-iSWAP instr)
                                           (list instr)))))
-    iswaps-on-chip))
+    (finish-compiler iswaps-on-chip)))
 
 (define-compiler CPHASE-to-native-CPHASEs ((cphase-gate ("CPHASE" _ _ _))
                                            :gateset-reducer nil
-                                           :full-context context)
-  (let* ((cnot-equivalent (CPHASE-to-CNOT cphase-gate)))
-    (mapcan (lambda (g)
-              (cond
-                ((string= "CNOT" (application-operator-name g))
-                 (CNOT-to-native-CNOTs g :context context))
-                (t
-                 (list g))))
-            cnot-equivalent)))
+                                           :full-context context
+                                           :output-gateset `((:operator
+                                                              ,(named-operator "CPHASE")
+                                                              :arguments (_ _)) 1))
+  (let ((cnot-equivalent (CPHASE-to-CNOT cphase-gate)))
+    (finish-compiler
+     (mapcan (lambda (g)
+               (cond
+                 ((string= "CNOT" (application-operator-name g))
+                  (CNOT-to-native-CNOTs g :context context))
+                 (t
+                  (list g))))
+             cnot-equivalent))))
 
 (define-compiler PISWAP-to-native-PISWAPs ((piswap-gate ("PISWAP" (theta) q0 q1))
                                            :gateset-reducer nil
-                                           :chip-specification chip-spec)
+                                           :chip-specification chip-spec
+                                           :output-gateset `((:operator
+                                                              ,(named-operator "PISWAP")
+                                                              :arguments (_ _)) 1))
   (let ((computed-path (find-shortest-path-on-chip-spec chip-spec q0 q1)))
     (labels
         ((build-PISWAP-string (index-list)
@@ -300,7 +313,12 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
                 (list (build-gate "PISWAP" `(,theta) a b)))
                ;; recursive case
                (t
-                (let ((temp-string (build-PISWAP-string (rest index-list)))
-                      (gate (list (build-gate "SWAP" () a b))))
-                  (append gate temp-string gate)))))))
-      (build-PISWAP-string computed-path))))
+                (append (list (build-gate "SWAP" () a b))
+                        (build-PISWAP-string (rest index-list))
+                        (list (build-gate "SWAP" () a b))))))))
+      (cond
+        ((= 2 (length computed-path))
+         (give-up-compilation))
+        (t
+         (finish-compiler
+          (build-PISWAP-string computed-path)))))))

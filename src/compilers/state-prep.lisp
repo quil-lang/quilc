@@ -55,7 +55,7 @@
                                (- (second source-wf))
                                (conjugate (second source-wf))
                                (first source-wf)))))
-    (list (anon-gate "STATE-1Q" (m* matrix-target matrix-source) q))))
+    (inst "STATE-1Q" (m* matrix-target matrix-source) q)))
 
 
 ;; setting up 2Q state preparation requires some helper functions
@@ -191,7 +191,9 @@
               (setf source-wf (nondestructively-apply-instrs-to-wf prefix-circuit
                                                                    source-wf
                                                                    qubit-complex))
-              (setf abs-so-source (abs (segre-obstruction-2Q source-wf))))))))
+              (setf abs-so-source (abs (segre-obstruction-2Q source-wf)))
+              (dolist (instr prefix-circuit)
+                (inst instr)))))))
     (let ((phase-so-source (phase (segre-obstruction-2Q source-wf)))
           (phase-so-target (phase (segre-obstruction-2Q target-wf))))
       (unless (double= phase-so-source phase-so-target)
@@ -212,6 +214,8 @@
                    (double= (aref source-v 1) (aref target-v 1))
                    (double= (aref source-v 2) (aref target-v 2))
                    (double= (aref source-v 3) (aref target-v 3)))
+        ;; NOTE: this is a hard return which escapes the implicit WITH-INST,
+        ;;       which might even have PREFIX-CIRCUIT junk in it
         (return-from state-prep-2Q-compiler
           (state-prep-trampolining-compiler instr)))
       ;; write t^dag s as a member of SU(2) x SU(2)
@@ -222,15 +226,8 @@
                source-matrix
                +edag-basis+))
         ;; write out the instructions
-        (append prefix-circuit
-                (list (make-instance 'gate-application
-                                     :gate c1
-                                     :operator #.(named-operator "LHS-state-prep-gate")
-                                     :arguments (list (second (application-arguments instr))))
-                      (make-instance 'gate-application
-                                     :gate c0
-                                     :operator #.(named-operator "RHS-state-prep-gate")
-                                     :arguments (list (first (application-arguments instr))))))))))
+        (inst "LHS-state-prep-gate" c1 (second (application-arguments instr)))
+        (inst "RHS-state-prep-gate" c0 (first (application-arguments instr)))))))
 
 (defun coerce-to-complex-double-vector (elts)
   (map '(vector (complex double-float))
@@ -352,22 +349,23 @@
         (calculate-state-prep-angles (state-prep-application-source-wf instr))
       (multiple-value-bind (zero-to-target-Y-angles zero-to-target-Z-angles target-wf)
           (calculate-state-prep-angles (state-prep-application-target-wf instr) -1.0d0)
-        (let ((ucr-arguments (reverse (application-arguments instr))))
+        (let* ((ucr-arguments (reverse (application-arguments instr)))
+               (UCR-Y (repeatedly-fork (named-operator "RY") (1- (length ucr-arguments))))
+	       (UCR-Z (repeatedly-fork (named-operator "RZ") (1- (length ucr-arguments)))))
           ;; build the resulting circuit
-          (list
-           ;; move from source Z to ground Z
-           (apply #'build-UCR "RZ" source-to-zero-Z-angles ucr-arguments)
-           ;; move from source Y to ground Y
-           (apply #'build-UCR "RY" source-to-zero-Y-angles ucr-arguments)
-           ;; trampoline
-           (make-instance 'state-prep-application
-                          :source-wf source-wf
-                          :target-wf target-wf
-                          :arguments (rest (application-arguments instr)))
-           ;; move from ground to target Y
-           (apply #'build-UCR "RY" zero-to-target-Y-angles ucr-arguments)
-           ;; move from ground to target Z
-           (apply #'build-UCR "RZ" zero-to-target-Z-angles ucr-arguments)))))))
+	  ;; move from source Z to ground Z
+	  (inst* UCR-Z source-to-zero-Z-angles ucr-arguments)
+	  ;; move from source Y to ground Y
+	  (inst* UCR-Y source-to-zero-Y-angles ucr-arguments)
+	  ;; trampoline
+	  (inst (make-instance 'state-prep-application
+			       :source-wf source-wf
+			       :target-wf target-wf
+			       :arguments (rest (application-arguments instr))))
+	  ;; move from ground to target Y
+	  (inst* UCR-Y zero-to-target-Y-angles ucr-arguments)
+	  ;; move from ground to target Z
+	  (inst* UCR-Z zero-to-target-Z-angles ucr-arguments))))))
 
 
 ;; this decomposition algorithm is based off of Section 4 of /0406176, our old QSC favorite

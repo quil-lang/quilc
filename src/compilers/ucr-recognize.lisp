@@ -38,17 +38,16 @@
                                              (constant (* -2 (phase (magicl:ref matrix jp jp)))))
                                        (double= (magicl:ref matrix jp jp)
                                                 (conjugate (magicl:ref matrix jpp jpp)))))
-                   (return-from recognize-ucr
-                     (list
-                      (apply #'build-UCR "RZ" angles
-                             (append
-                              (subseq (application-arguments instr)
-                                      0
-                                      (- log-dimension d 1))
-                              (subseq (application-arguments instr)
-                                      (- log-dimension d))
-                              (list (nth (- log-dimension d 1)
-                                         (application-arguments instr)))))))))
+                   (inst* (repeatedly-fork (named-operator "RZ") (1- log-dimension))
+                          angles
+                          (append (subseq (application-arguments instr)
+                                          0
+                                          (- log-dimension d 1))
+                                  (subseq (application-arguments instr)
+                                          (- log-dimension d))
+                                  (list (nth (- log-dimension d 1)
+                                             (application-arguments instr)))))
+                   (finish-compiler)))
        (give-up-compilation))
       ;; are we a UCRY matrix? these have three salient properties:
       ;;
@@ -84,15 +83,14 @@
                                             (double= m-jpp-jpp (realpart m-jpp-jpp))
                                             (double= m-jp-jp m-jpp-jpp)
                                             (double= m-jp-jpp (- m-jpp-jp)))))
-                   (return-from recognize-ucr
-                     (list
-                      (apply #'build-UCR "RY" angles
-                             (append
-                              (subseq (application-arguments instr)
-                                      0
-                                      (- log-dimension d 1))
-                              (subseq (application-arguments instr)
-                                      (- log-dimension d))
-                              (list (nth (- log-dimension d 1)
-                                         (application-arguments instr)))))))))
+		   (inst* (repeatedly-fork (named-operator "RY") (1- log-dimension))
+			  angles
+			  (append (subseq (application-arguments instr)
+					  0
+					  (- log-dimension d 1))
+				  (subseq (application-arguments instr)
+					  (- log-dimension d))
+				  (list (nth (- log-dimension d 1)
+                                             (application-arguments instr)))))
+		   (finish-compiler)))
        (give-up-compilation)))))

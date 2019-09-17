@@ -40,7 +40,7 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
   (push qubit qubits)
   (let* ((operator-adt
            (etypecase operator
-             (symbol (string operator))
+             (symbol (named-operator (string operator)))
              (string (named-operator operator))
              (operator-description operator)))
          (gate-def
@@ -65,11 +65,14 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
                    :gate (make-instance 'simple-gate :matrix matrix :name name)
                    :arguments (mapcar #'%capture-arg qubits))))
 
-(defun build-UCR (roll-name params qubit &rest qubits)
-  (loop :with op := (named-operator roll-name)
-        :repeat (length qubits)
+(defun repeatedly-fork (op n)
+  (loop :repeat n
         :do (setf op (forked-operator op))
-        :finally (return (apply #'build-gate op params qubit qubits))))
+        :finally (return op)))
+
+(defun build-UCR (roll-name params qubit &rest qubits)
+  (apply #'build-gate (repeatedly-fork (named-operator roll-name) (length qubits))
+         params qubit qubits))
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 
