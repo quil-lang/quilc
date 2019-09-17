@@ -24,3 +24,8 @@ Qubits not present in QUBITS-LIST are mapped to themselves."
                 (if p
                     (qubit (- length p 1))
                     logical-qubit))))))
+
+(defun minimal-standard-relabeling (instrs-a instrs-b)
+  "Create a qubit relabeling that maps the used qubits in INSTRS-B INSTRS-A into the smallest logical qubit collection."
+  (standard-qubit-relabeler (union (qubits-in-instr-list instrs-a)
+                                   (qubits-in-instr-list instrs-b))))
