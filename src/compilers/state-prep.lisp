@@ -305,12 +305,13 @@
         (target-wf (vector-scale
                     (/ (norm (coerce (state-prep-application-target-wf instr) 'list)))
                     (coerce (state-prep-application-target-wf instr) 'list))))
-    (append
-     ;; prepare source -> zero state
-     (state-prep-4q source-wf q0 q1 q2 q3
-                    :reversed t)
-     ;; prepare zero state -> target
-     (state-prep-4q target-wf q0 q1 q2 q3))))
+    (finish-compiler
+     (append
+      ;; prepare source -> zero state
+      (state-prep-4q source-wf q0 q1 q2 q3
+                     :reversed t)
+      ;; prepare zero state -> target
+      (state-prep-4q target-wf q0 q1 q2 q3)))))
 
 
 (define-compiler state-prep-trampolining-compiler
