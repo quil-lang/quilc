@@ -120,9 +120,16 @@
        (make-measure-binding :target (intern-if-string (gethash "target" gate-datum))
                              :qubit (intern-if-string (gethash "qubit" gate-datum))))
       (t
-       (make-gate-binding :operator (named-operator (gethash "operator" gate-datum))
-                          :parameters (map 'list #'intern-if-string (gethash "parameters" gate-datum))
-                          :arguments (map 'list #'intern-if-string (gethash "arguments" gate-datum)))))))
+       (multiple-value-bind (operator op-p) (gethash "operator" gate-datum)
+         (unless op-p (error 'missing-gates-default-value
+                             "A \"gates\" field was provided in its ISA, but no \"operator\" key was present in its dictionary."))
+         (multiple-value-bind (params params-p) (gethash "parameters" gate-datum)
+           (unless params-p (error "A \"gates\" field was provided in its ISA, but no \"parameters\" key was present in its dictionary."))
+           (multiple-value-bind (args args-p) (gethash "arguments" gate-datum)
+             (unless args-p (error "A \"gates\" field was provided in its ISA, but no \"arguments\" key was present in its dictionary."))
+             (make-gate-binding :operator (named-operator operator)
+                                :parameters (map 'list #'intern-if-string params)
+                                :arguments (map 'list #'intern-if-string args)))))))))
 
 (defun deforestify-fidelity (fidelity)
   "The fidelity values recorded in Forest DB are subject to various quirks. This \"parser\" un-quirks them."

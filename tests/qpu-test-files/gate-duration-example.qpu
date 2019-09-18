@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "name": "Gate duration example",
+    "version": 0.0,
+    "timestamp": ""
+  },
+  "isa": {
+    "1Q": {
+      "0": {},
+      "1": {}
+    },
+    "2Q": {
+      "0-1": {"type": "CZ", "gates": [{"operator": "CZ", "duration": 100, "fidelity": 0.9999, "parameters": [], "arguments": ["_", "_"]}]},
+    }
+  }
+}
