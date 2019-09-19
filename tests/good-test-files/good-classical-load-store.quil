@@ -1,0 +1,17 @@
+# test parsing good LOAD and STORE
+
+DECLARE ro BIT[4]
+DECLARE oct OCTET
+DECLARE x REAL[2]
+DECLARE int INTEGER
+DECLARE ri INTEGER[2]
+
+LOAD x x int
+LOAD ro ro int
+
+STORE ro int ro
+STORE ro int ro[2]
+STORE x int x
+STORE ri int int
+STORE x int 1.1
+STORE ri int 2

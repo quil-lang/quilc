@@ -14,6 +14,18 @@ LT ro[0] ro[1] ro[2]
 GE ro[0] ro[1] ro[2]
 GT ro[0] ro[1] ro[2]
 
+EQ ro[0] oct 1
+LE ro[0] oct 2
+LT ro[0] oct 3
+GE ro[0] oct 4
+GT ro[0] oct 5
+
+EQ ro[0] x 1.1
+LE ro[0] x 2.2
+LT ro[0] x 3.3
+GE ro[0] x 4.4
+GT ro[0] x 5.5
+
 ADD x[0] x[1]
 SUB x[0] x[1]
 MUL x[0] x[1]

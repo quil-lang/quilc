@@ -1342,13 +1342,10 @@ result of BODY, and the (possibly null) list of remaining lines.
                             :left (parse-memory-region-name left)
                             :right (parse-classical-argument right)))
             ((:STORE)
-             (unless (= 1 (length right))
-               (quil-parse-error "Malformed STORE. Expected a memory reference ~
-                                  as the third argument."))
              (make-instance 'classical-store
                             :target (parse-memory-region-name target)
-                            :left (parse-classical-argument (list left))
-                            :right (parse-memory-or-formal-token (first right))))
+                            :left (parse-memory-or-formal-token left)
+                            :right (parse-classical-argument right)))
             ((:EQ :GT :GE :LT :LE)
              (make-instance
               (ecase tok-type
