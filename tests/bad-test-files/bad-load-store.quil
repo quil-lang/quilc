@@ -1,0 +1,18 @@
+# test parsing invalid LOAD and STORE
+
+DECLARE ro BIT[4]
+DECLARE oct OCTET
+DECLARE x REAL[2]
+DECLARE int INTEGER[2]
+
+LOAD x x 1
+LOAD x x[1] oct
+LOAD ro ro x
+
+STORE ro int x
+STORE ro 0 ro
+STORE x int int
+STORE int int x
+STORE ro int 1.0
+STORE x int 1
+STORE int int 2.0

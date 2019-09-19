@@ -2,6 +2,7 @@
 DECLARE int INTEGER[4]
 DECLARE ro BIT[4]
 DECLARE b BIT
+DECLARE rr REAL
 
 NEG int[0]
 NOT ro[1]
@@ -10,11 +11,16 @@ EXCHANGE int[0] int[1]
 CONVERT ro[0] int[0]
 LOAD b b int[0]
 STORE b int[0] b
+STORE rr int rr
+STORE rr int 2.0
+STORE int int int
+STORE int int 11
 
 # Output
 DECLARE int INTEGER[4]
 DECLARE ro BIT[4]
 DECLARE b BIT
+DECLARE rr REAL
 
 NEG int[0]
 NOT ro[1]
@@ -23,4 +29,8 @@ EXCHANGE int[0] int[1]
 CONVERT ro[0] int[0]
 LOAD b[0] b int[0]
 STORE b int[0] b[0]
+STORE rr int[0] rr[0]
+STORE rr int[0] 2.0
+STORE int int[0] int[0]
+STORE int int[0] 11
 

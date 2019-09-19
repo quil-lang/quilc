@@ -30,6 +30,18 @@ LT ro[0] ro[1] ro[2]
 GE ro[0] ro[1] ro[2]
 GT ro[0] ro[1] ro[2]
 
+EQ ro[0] oct 1
+LE ro[0] oct 2
+LT ro[0] oct 3
+GE ro[0] oct 4
+GT ro[0] oct 5
+
+EQ ro[0] x 1.1
+LE ro[0] x 2.2
+LT ro[0] x 3.3
+GE ro[0] x 4.4
+GT ro[0] x 5.5
+
 ADD x[0] x[1]
 SUB x[0] x[1]
 MUL x[0] x[1]
@@ -49,6 +61,16 @@ LE ro[0] ro[1] ro[2]
 LT ro[0] ro[1] ro[2]
 GE ro[0] ro[1] ro[2]
 GT ro[0] ro[1] ro[2]
+EQ ro[0] oct[0] 1
+LE ro[0] oct[0] 2
+LT ro[0] oct[0] 3
+GE ro[0] oct[0] 4
+GT ro[0] oct[0] 5
+EQ ro[0] x[0] 1.1
+LE ro[0] x[0] 2.2
+LT ro[0] x[0] 3.3
+GE ro[0] x[0] 4.4
+GT ro[0] x[0] 5.5
 ADD x[0] x[1]
 SUB x[0] x[1]
 MUL x[0] x[1]
@@ -85,6 +107,42 @@ AND ro[0] ro[1]
 IOR ro[0] ro[1]
 MOVE ro[0] ro[1]
 EXCHANGE ro[0] ro[1]
+
+# Input
+# Plundered from ../../good-test-files/good-classical-load-store.quil
+# test parsing good LOAD and STORE
+
+DECLARE ro BIT[4]
+DECLARE oct OCTET
+DECLARE x REAL[2]
+DECLARE int INTEGER
+DECLARE ri INTEGER[2]
+
+LOAD x x int
+LOAD ro ro int
+
+STORE ro int ro
+STORE ro int ro[2]
+STORE x int x
+STORE ri int int
+STORE x int 1.1
+STORE ri int 2
+
+# Output
+DECLARE ro BIT[4]
+DECLARE oct OCTET
+DECLARE x REAL[2]
+DECLARE int INTEGER
+DECLARE ri INTEGER[2]
+
+LOAD x[0] x int[0]
+LOAD ro[0] ro int[0]
+STORE ro int[0] ro[0]
+STORE ro int[0] ro[2]
+STORE x int[0] x[0]
+STORE ri int[0] int[0]
+STORE x int[0] 1.1
+STORE ri int[0] 2
 
 # Input
 # Plundered from ../../good-test-files/good-classical-unaries.quil
