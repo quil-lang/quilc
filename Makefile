@@ -13,6 +13,7 @@ QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 UNAME_S=$(shell uname -s)
 ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 PREFIX ?= /usr/local
+THREADS ?= 2
 
 all: quilc
 
@@ -151,6 +152,14 @@ test-tweedledum:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil/tweedledum-tests)" \
 		--eval "(asdf:test-system :cl-quil/tweedledum-tests)"
+
+test-fast:
+	@echo "Running tests with tweedledum and $(THREADS) thread(s)."
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil-tests)" \
+		--eval "(ql:quickload :cl-quil/tweedledum)" \
+		--eval "(cl-quil.tweedledum:load-tweedledum)" \
+		--eval "(cl-quil-tests::run-cl-quil-tests :parallel $(THREADS))"
 
 test-ccl:
 	ccl -n --batch --load $(QUICKLISP_HOME)/setup.lisp \
