@@ -28,12 +28,13 @@
                                     (fiasco::*print-test-run-progress* nil)
                                     (fiasco::*pretty-log-verbose-p* nil)
                                     (fiasco::*test-run-standard-output* (make-broadcast-stream))
-                                    (*debug-io* (make-broadcast-stream))
-                                    )
+                                    (*debug-io* (make-broadcast-stream)))
                                 (funcall f)
-                                (format fiasco::*pretty-log-stream* ".")))
+                                (force-output)
+                                (format t ".")))
                             (loop :for test :being :the :hash-values :of tests
-                                  :collect (fiasco::name-of test))))))
+                                  :collect (fiasco::name-of test)))
+           (terpri))))
       ((null headless)
        (run-package-tests :package ':cl-quil-tests
                           :verbose verbose
