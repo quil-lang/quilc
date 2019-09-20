@@ -46,6 +46,10 @@ dump-version-info:
 		--eval '(print (ql-dist:find-system "rpcq"))' \
 		--eval '(terpri)' --quit
 
+install-deps:
+	@echo "Installing submodules"
+	git submodule update --init
+
 install-test-deps:
 ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
