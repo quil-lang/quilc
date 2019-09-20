@@ -62,6 +62,44 @@ CNOT 2 3
       (declare (ignore qc-complex))
       (every #'quil::double~ wf (quil::build-ground-state 1)))))
 
+(deftest test-state-prep-2Q-source-and-target ()
+  "Checks that STATE-PREP-APPLICATION (both with arbitrary and with adversarial SOURCE-WF and TARGET-WF) correctly compiles into native instructions."
+  (flet ((grab-row (m j)
+           (make-array 4
+                       :element-type '(complex double-float)
+                       :initial-contents (loop :for i :below 4
+                                               :collect (magicl:ref m i j))))
+         (build-state-prep (source-wf target-wf)
+           (make-instance 'quil::state-prep-application
+                          :operator (named-operator "STATE-PREP")
+                          :arguments (list (qubit 1) (qubit 0))
+                          :source-wf source-wf
+                          :target-wf target-wf)))
+    (let ((chip (quil::build-8q-chip)))
+      (dotimes (j 10)
+        (let* ((unentangled-matrix (quil::make-matrix-from-quil
+                                    (list (quil::anon-gate "U0" (quil::random-special-unitary 2) 0)
+                                          (quil::anon-gate "U1" (quil::random-special-unitary 2) 1))))
+               (entangled-matrix (quil::random-special-unitary 4)))
+          (loop :for (source-wf target-wf) :in (list ;; entangled-entangled
+                                                     (list (grab-row entangled-matrix 0)
+                                                           (grab-row entangled-matrix 1))
+                                                     ;; unentangled-entangled
+                                                     (list (grab-row unentangled-matrix 0)
+                                                           (grab-row entangled-matrix 2))
+                                                     ;; entangled-unentangled
+                                                     (list (grab-row entangled-matrix 3)
+                                                           (grab-row unentangled-matrix 1))
+                                                     ;; unentangled-unentangled
+                                                     (list (grab-row unentangled-matrix 2)
+                                                           (grab-row unentangled-matrix 3)))
+                :for state-instr := (build-state-prep source-wf target-wf)
+                :for state-circuit := (quil::expand-to-native-instructions
+                                       (quil::state-prep-2Q-compiler state-instr) chip)
+                :for circuit-result := (quil::nondestructively-apply-instrs-to-wf state-circuit source-wf
+                                                                                  (list 0 1))
+                :do (is (quil::collinearp target-wf circuit-result))))))))
+
 (deftest test-state-prep-1q-source-and-target ()
   "Checks that STATE-PREP-APPLICATION (with arbitrary SOURCE-WF and TARGET-WF) correctly compiles into native instructions."
   (let* ((source-wf (quil::random-wavefunction 1))

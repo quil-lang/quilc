@@ -96,7 +96,7 @@
      (* (aref vector 1) (aref vector 2))))
 
 (defun canonicalize-wf (vector)
-  "Calculates a special-orthogonal MATRIX that moves a unit-length VECTOR in C^4 into the form V = (a+bi c 0 0).  Returns (LIST MATRIX V)."
+  "Calculates a special-orthogonal MATRIX that moves a unit-length VECTOR in C^4 into the form V = (a+bi c 0 0).  Returns (VALUES MATRIX V)."
   (let ((matrix (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0)))
         (v (copy-seq vector)))
     ;; start by moving all of the imaginary components into the 0th position.
@@ -145,11 +145,195 @@
                                                       0 (- (sin theta)) 0 (cos theta)))))
         (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    (list matrix v)))
+    (values matrix v)))
 
+(adt:defdata tensor-factorization
+  (tensor-pair magicl:matrix magicl:matrix))
 
+(defun state-prep-within-local-equivalence-class (source-wf target-wf)
+  "Produces a circuit that carries a two-qubit wavefunction SOURCE-WF to a two-qubit target wavefunction TARGET-WF under the hypothesis that SOURCE-WF and TARGET-WF have the same Segre obstruction.
+
+Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-WF."
+  (let* ((phase-so-source (phase (segre-obstruction-2Q source-wf)))
+         (phase-so-target (phase (segre-obstruction-2Q target-wf)))
+         (multiplier (cis (/ (- phase-so-target phase-so-source) 2))))
+    ;; rotate the source into the target
+    (setf source-wf (map 'vector (a:curry '* multiplier) source-wf))
+    ;; find s, t in SO(4) that puts the source and target wfs expressed in the
+    ;; magic basis into a canonical form
+    (let ((source-matrix (canonicalize-wf (nondestructively-apply-matrix-to-vector +edag-basis+ source-wf)))
+          (target-matrix (canonicalize-wf (nondestructively-apply-matrix-to-vector +edag-basis+ target-wf))))
+      ;; write t^dag s as a member of SU(2) x SU(2)
+      (multiple-value-bind (c1 c0)
+          (convert-su4-to-su2x2
+           (m* +e-basis+
+               (magicl:conjugate-transpose target-matrix)
+               source-matrix
+               +edag-basis+))
+        (tensor-pair c0 c1))))) ;; first arg, second arg
+
+;; this method is due to Oscar Perdomo, and this implementation blindly follows his notes.
 ;; TODO: this should be made architecture-sensitive, with separate templates
 ;;       for ISWAP-based chips
+(define-compiler state-prep-2Q-compiler
+    ((instr (_ _ q1 q0)
+            :where (typep instr 'state-prep-application)))
+  "Exact, optimal compiler for STATE-PREP-APPLICATION instances that target a pair of qubits."
+  (flet ((orthogonal-vector (v)
+           (make-row-major-matrix 2 1 (list (- (conjugate (magicl:ref v 1 0)))
+                                            (conjugate (magicl:ref v 0 0)))))
+         (normalize-vector (v)
+           (let ((norm (sqrt (+ (expt (abs (magicl:ref v 0 0)) 2)
+                                (expt (abs (magicl:ref v 1 0)) 2)))))
+             (if (double= 0d0 norm) v (magicl:scale (/ norm) v))))
+         ;; this dodges a numerical stability bullet: the bad taylor expansion of
+         ;; arcsin at 1 makes input error on the order of e-17 blow up to output
+         ;; error on the order of e-8, which exceeds +double-comparison-threshold-strict+.
+         ;; more exactly, the output error gets too wild when the input error
+         ;; exceeds e-13 --- but this is blow the usual measure of +d-c-t-s+, so
+         ;; we clamp the value and pray.
+         (asin-nice (x)
+           (if (double= x 1d0)
+               pi/2
+               (asin x))))
+    (let* ((A (make-row-major-matrix 2 2 (coerce (state-prep-application-source-wf instr) 'list)))
+           (B (make-row-major-matrix 2 2 (coerce (state-prep-application-target-wf instr) 'list)))
+           (mA (m* (magicl:conjugate-transpose A) A))
+           (mB (m* (magicl:conjugate-transpose B) B)))
+      ;; this routine works requires the source to be entangled.
+      (cond
+        ;; if the source is unentangled and the target is entangled...
+        ((and (double= 0d0 (magicl:det mA))
+              (not (double= 0d0 (magicl:det mB))))
+         ;; rewrite unentangled wavefunction as |00>
+         (adt:with-data (tensor-pair cL cR)
+                        (state-prep-within-local-equivalence-class
+                         (state-prep-application-source-wf instr)
+                         (make-array 4 :element-type '(complex double-float)
+                                       :initial-contents (list #C(1d0 0d0) #C(0d0 0d0) #C(0d0 0d0) #C(0d0 0d0))))
+           (inst "cL" cL q1)
+           (inst "cR" cR q0))
+         ;; calculate the segre obstruction of the target wf
+         (let* ((so (abs (segre-obstruction-2Q (state-prep-application-target-wf instr))))
+                (so-angle (realpart (asin-nice (* 2 so))))
+                ;; NOTE: this is "duplicated" from the RY/CNOT pair below. it would
+                ;;       be better if we could programmatically calculate this!
+                (partial-wf (make-array 4 :element-type '(complex double-float)
+                                          :initial-contents (list (complex (cos (/ so-angle 2)))
+                                                                  #C(0d0 0d0)
+                                                                  #C(0d0 0d0)
+                                                                  (complex (sin (/ so-angle 2)))))))
+           ;; insert an RY and a CNOT which carries |00> to the same segre obstruction
+           (inst "RY" (list so-angle) q1)
+           (inst "CNOT" () q1 q0)
+           ;; calculate local gates witnessing the local equivalence
+           (adt:with-data (tensor-pair aL aR)
+                          (state-prep-within-local-equivalence-class
+                           partial-wf
+                           (state-prep-application-target-wf instr))
+             (inst "aL" aL q1)
+             (inst "aR" aR q0))))
+        ;; if the target is unentangled and the source is entangled, we flip
+        ;; their order and fall back on the previous branch.
+        ((and (not (double= 0d0 (magicl:det mA)))
+              (double= 0d0 (magicl:det mB)))
+         (dolist (instr (reverse
+                         (state-prep-2q-compiler
+                          (make-instance 'state-prep-application
+                                         :source-wf (state-prep-application-target-wf instr)
+                                         :target-wf (state-prep-application-source-wf instr)
+                                         :operator (named-operator "REV-STATE-PREP")
+                                         :arguments (application-arguments instr)))))
+           (adt:with-data (named-operator name) (application-operator instr)
+             (cond
+               ((string= "CNOT" name)
+                (inst instr))
+               ((string= "RY" name)
+                (inst* "RY"
+                       (list (- (constant-value (first (application-parameters instr)))))
+                       (application-arguments instr)))
+               (t
+                (inst* name
+                       (magicl:conjugate-transpose (gate-matrix (gate-application-gate instr)))
+                       (application-arguments instr)))))))
+        ;; if they're both unentangled, we calculate the factorization and
+        ;; compile them separately.
+        ((and (double= 0d0 (magicl:det mA))
+              (double= 0d0 (magicl:det mB)))
+         (destructuring-bind (source-0 source-1) (split-product-state-vector
+                                                  (state-prep-application-source-wf instr))
+           (destructuring-bind (target-0 target-1) (split-product-state-vector
+                                                    (state-prep-application-target-wf instr))
+             (inst (make-instance 'state-prep-application
+                                  :target-wf target-0
+                                  :source-wf source-0
+                                  :arguments (list (qubit q1))
+                                  :operator (named-operator "LEFT-STATE-PREP-FACTOR")))
+             (inst (make-instance 'state-prep-application
+                                  :target-wf target-1
+                                  :source-wf source-1
+                                  :arguments (list (qubit q0))
+                                  :operator (named-operator "RIGHT-STATE-PREP-FACTOR"))))))
+        ;; otherwise, we can proceed as perdomo prescribes.
+        (t
+         (multiple-value-bind (lambdas a-vectors) (magicl:eig mA)
+           (multiple-value-bind (deltas x-vectors) (magicl:eig mB)
+             (let* ((a-vector (make-row-major-matrix 2 1 (list (magicl:ref a-vectors 0 1)
+                                                               (magicl:ref a-vectors 1 1))))
+                    (x-vector (make-row-major-matrix 2 1 (list (magicl:ref x-vectors 0 1)
+                                                               (magicl:ref x-vectors 1 1))))
+                    (b-vector (orthogonal-vector a-vector))
+                    (y-vector (orthogonal-vector x-vector))
+                    (c (normalize-vector (m* A a-vector)))
+                    (d (normalize-vector (m* A b-vector)))
+                    (z (normalize-vector (m* B x-vector)))
+                    (u (normalize-vector (m* B y-vector)))
+                    (theta1 (- pi/2 (phase (+ (sqrt (first lambdas)) (* #C(0 1) (sqrt (second lambdas)))))))
+                    (theta2 (- pi/2 (phase (+ (sqrt (first deltas)) (* #C(0 1) (sqrt (second deltas)))))))
+                    (U1 (make-row-major-matrix 2 2 (list (magicl:ref c 0 0) (magicl:ref d 0 0)
+                                                         (magicl:ref c 1 0) (magicl:ref d 1 0))))
+                    (U2 (make-row-major-matrix 2 2 (list (magicl:ref z 0 0) (magicl:ref u 0 0)
+                                                         (magicl:ref z 1 0) (magicl:ref u 1 0))))
+                    (V1 (make-row-major-matrix 2 2 (mapcar #'conjugate
+                                                           (list (magicl:ref a-vector 0 0) (magicl:ref b-vector 0 0)
+                                                                 (magicl:ref a-vector 1 0) (magicl:ref b-vector 1 0)))))
+                    (V2 (make-row-major-matrix 2 2 (mapcar #'conjugate
+                                                           (list (magicl:ref x-vector 0 0) (magicl:ref y-vector 0 0)
+                                                                 (magicl:ref x-vector 1 0) (magicl:ref y-vector 1 0))))))
+               (let ((L1 (m* U1
+                             (gate-matrix (build-gate "RY" (list (*  2 theta2)) 0))
+                             (magicl:conjugate-transpose U1)))
+                     (L2 (m* U1
+                             (gate-matrix (build-gate "RY" (list (* -2 theta1)) 0))
+                             (magicl:conjugate-transpose U1))))
+                 ;; U1' L1 (x) V1'
+                 (inst "V1-DAG" (magicl:conjugate-transpose V1) q1)
+                 (inst "L1"     L1 q0)
+                 (inst "U1-DAG" (magicl:conjugate-transpose U1) q0)
+                 
+                 (inst "CNOT"   () q0 q1)
+                 
+                 ;; L2 U1 (x) V1
+                 (inst "V1"     V1 q1)
+                 (inst "U1"     U1 q0)
+                 (inst "L2"     L2 q0)
+                 
+                 ;; L3 = U2 U1' (x) V2 V1'
+                 (inst "V1-DAG" (magicl:conjugate-transpose V1) q1) ; begin L3
+                 (inst "V2"     V2 q1)
+                 (inst "U1-DAG" (magicl:conjugate-transpose U1) q0)
+                 (inst "U2"     U2 q0))))))))))
+
+;; here's a previous version of the 2Q compiler. it uses nelder-mead, so doesn't produce as
+;; pretty of results, but it does rely on this interesting bit of geometry where it
+;; "canonicalizes" the wavefunction through rotation into something of a very particular
+;; form. there's probably a meet between the geometry in this routine and the mysterious
+;; formulas in Oscar's. it would be nice to write out exactly what this meet is.
+;;
+;; some of the code in this has been pulled down to state-prep-within-local-equivalence-class
+;; below. if anyone wants to turn this routine back on, it's worth offloading some
+;; of the code in here to that subroutine.
+#+#:pedagogical-purposes-only
 (define-compiler state-prep-2Q-compiler
     ((instr (_ _ _ _)
             :where (typep instr 'state-prep-application))) 
