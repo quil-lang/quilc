@@ -9,6 +9,16 @@
 ;;; used to approximately decompose arbitrary unitaries using a finite
 ;;; set of basis gates.
 
+;;; Currently, the accuracy (a.k.a. depth, number of approximations)
+;;; of gates of approximations is not configurable at all, and base
+;;; approximations are calculated using simple brute force
+;;; generation. However, the output of (decompose) can consistently
+;;; produce approximations which have operator norm errors of <0.01
+;;; (verified using (decompress-and-multiply)). Running (decompress
+;;; (decompose ...)) currently only outputs a list of indices of gates
+;;; in the decomposer which should be applied, because I don't know
+;;; how inverse gates should be represented.
+
 ;;; In the rest of this file, d(x, y) refers to the function of
 ;;; operator distance defined in the above paper and is equal to ||X -
 ;;; Y||, the operator norm of (X - Y).
@@ -397,18 +407,19 @@
                          (log (/ 3 2)))))
     (brute-sk-iter decomposer unitary depth :epsilon0 epsilon0) #+ignore(sk-iter decomposer unitary depth)))
 
-;;; Note that this function will crash if any element of ITEM could
-;;; not be approximated, i.e. there is a NIL somewhere inside ITEM.
+;;; Doesn't convert indices to gates because I'm not yet sure exactly
+;;; how to represent inverses of gates provided by the user.
 (defun decompress (decomposer item)
   "Recursively expands the commutators in ITEM (which can be a commutator or a sequence of commutators and fixnums) and retrieves the appropriate gate for each parity-inverse index inside, returning the decompressed list of gates."
-  (if (typep item 'commutator)
-      (append (seq-dagger (decompress decomposer (commutator-w item)))
-              (seq-dagger (decompress decomposer (commutator-v item)))
-              (decompress decomposer (commutator-w item))
-              (decompress decomposer (commutator-v item)))
-      (if (typep (car item) 'list)
-          (append (decompress decomposer (car item)) (decompress decomposer (cadr item)))
-          item)))
+  (cond ((typep item 'commutator)
+         (append (seq-dagger (decompress decomposer (commutator-w item)))
+                 (seq-dagger (decompress decomposer (commutator-v item)))
+                 (decompress decomposer (commutator-w item))
+                 (decompress decomposer (commutator-v item))))
+        ((not item) NIL)
+        ((typep (car item) 'list)
+         (append (decompress decomposer (car item)) (decompress decomposer (cadr item))))
+        (t item)))
 
 (defun decompress-and-multiply (decomposer item)
   "Returns the matrix produced by expanding and multiplying together all the gates represented inside ITEM."
@@ -603,7 +614,7 @@
       (format t "~%Average error for eps0 = ~A: ~A" eps0 (/ avg-error trials)))))
 
 ;;; -----------------------------------------------------------------
-;;; Below are some functions which explore the characteristics of the
+;;; Below are some functions which explore the properties of the
 ;;; axis-angle ball representation of SU(2)
 ;;; -----------------------------------------------------------------
 (defun ball-op-distances ()
