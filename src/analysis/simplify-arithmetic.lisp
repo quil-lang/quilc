@@ -30,6 +30,69 @@
   ;; This builds a hash table with MEMORY-REFs as keys and their coefficients (of type NUMBER) as values
   (coefficients (make-hash-table :test #'equalp) :type hash-table))
 
+(defun combine-affine-representations (operator left right)
+  "Given an operator (e.g. +, -, *, /) and two operand expressions (LEFT and
+RIGHT, in AFFINE-REPRESENTATION form), combine them via the rules of arithmetic,
+enforcing the linearity of the output AFFINE-REPRESENTATION. When the OPERATOR
+is + or -, there are no restrictions on the contents of LEFT or RIGHT. If the
+OPERATOR is *, one of either LEFT or RIGHT must be simply a CONSTANT value,
+meaning that its COEFFICIENTS hash table is empty (otherwise an error is
+thrown). If the OPERATOR is /, the RIGHT operand must be a CONSTANT value,
+meaning that its COEFFICIENTS hash table must be empty (otherwise an error
+is thrown).
+"
+  (ecase operator
+    (+
+     (let ((rep (make-affine-representation)))
+       (setf (affine-representation-constant rep)
+             (+ (affine-representation-constant left)
+                (affine-representation-constant right)))
+       (dohash ((ref coefficient) (affine-representation-coefficients left))
+         (setf (gethash ref (affine-representation-coefficients rep)) coefficient))
+       (dohash ((ref coefficient) (affine-representation-coefficients right))
+         (if (gethash ref (affine-representation-coefficients rep))
+             (incf (gethash ref (affine-representation-coefficients rep)) coefficient)
+             (setf (gethash ref (affine-representation-coefficients rep)) coefficient)))
+       rep))
+    (-
+     (let ((rep (make-affine-representation)))
+       (setf (affine-representation-constant rep)
+             (- (affine-representation-constant left)
+                (affine-representation-constant right)))
+       (dohash ((ref coefficient) (affine-representation-coefficients left))
+         (setf (gethash ref (affine-representation-coefficients rep)) coefficient))
+       (dohash ((ref coefficient) (affine-representation-coefficients right))
+         (if (gethash ref (affine-representation-coefficients rep))
+             (decf (gethash ref (affine-representation-coefficients rep)) coefficient)
+             (setf (gethash ref (affine-representation-coefficients rep)) (- coefficient))))
+       rep))
+    (*
+     (let ((rep (make-affine-representation)))
+       (unless (or (zerop (hash-table-count (affine-representation-coefficients left)))
+                   (zerop (hash-table-count (affine-representation-coefficients right))))
+         (error 'expression-not-linear))
+       (setf (affine-representation-constant rep)
+             (* (affine-representation-constant left)
+                (affine-representation-constant right)))
+       (dohash ((ref coefficient) (affine-representation-coefficients left))
+         (setf (gethash ref (affine-representation-coefficients rep))
+               (* (affine-representation-constant right) coefficient)))
+       (dohash ((ref coefficient) (affine-representation-coefficients right))
+         (setf (gethash ref (affine-representation-coefficients rep))
+               (* (affine-representation-constant left) coefficient)))
+       rep))
+    (/
+     (let ((rep (make-affine-representation)))
+       (unless (zerop (hash-table-count (affine-representation-coefficients right)))
+         (error 'expression-not-linear))
+       (setf (affine-representation-constant rep)
+             (/ (affine-representation-constant left)
+                (affine-representation-constant right)))
+       (dohash ((ref coefficient) (affine-representation-coefficients left))
+         (setf (gethash ref (affine-representation-coefficients rep))
+               (/ coefficient (affine-representation-constant right))))
+       rep))))
+
 (defun expression->affine-representation (de)
   "Recursively construct an AFFINE-REPRESENTATION from an EXPRESSION (of type CONS)."
   (typecase de
@@ -42,57 +105,7 @@
     (cons
      (let ((left (expression->affine-representation (second de)))
            (right (expression->affine-representation (third de))))
-       (ecase (car de)
-         (+
-          (let ((rep (make-affine-representation)))
-            (setf (affine-representation-constant rep)
-                  (+ (affine-representation-constant left)
-                     (affine-representation-constant right)))
-            (dohash ((ref coefficient) (affine-representation-coefficients left))
-              (setf (gethash ref (affine-representation-coefficients rep)) coefficient))
-            (dohash ((ref coefficient) (affine-representation-coefficients right))
-              (if (gethash ref (affine-representation-coefficients rep))
-                  (incf (gethash ref (affine-representation-coefficients rep)) coefficient)
-                  (setf (gethash ref (affine-representation-coefficients rep)) coefficient)))
-            rep))
-         (-
-          (let ((rep (make-affine-representation)))
-            (setf (affine-representation-constant rep)
-                  (- (affine-representation-constant left)
-                     (affine-representation-constant right)))
-            (dohash ((ref coefficient) (affine-representation-coefficients left))
-              (setf (gethash ref (affine-representation-coefficients rep)) coefficient))
-            (dohash ((ref coefficient) (affine-representation-coefficients right))
-              (if (gethash ref (affine-representation-coefficients rep))
-                  (decf (gethash ref (affine-representation-coefficients rep)) coefficient)
-                  (setf (gethash ref (affine-representation-coefficients rep)) (- coefficient))))
-            rep))
-         (*
-          (let ((rep (make-affine-representation)))
-            (unless (or (zerop (hash-table-count (affine-representation-coefficients left)))
-                        (zerop (hash-table-count (affine-representation-coefficients right))))
-              (error 'expression-not-linear))
-            (setf (affine-representation-constant rep)
-                  (* (affine-representation-constant left)
-                     (affine-representation-constant right)))
-            (dohash ((ref coefficient) (affine-representation-coefficients left))
-              (setf (gethash ref (affine-representation-coefficients rep))
-                    (* (affine-representation-constant right) coefficient)))
-            (dohash ((ref coefficient) (affine-representation-coefficients right))
-              (setf (gethash ref (affine-representation-coefficients rep))
-                    (* (affine-representation-constant left) coefficient)))
-            rep))
-         (/
-          (let ((rep (make-affine-representation)))
-            (unless (zerop (hash-table-count (affine-representation-coefficients right)))
-              (error 'expression-not-linear))
-            (setf (affine-representation-constant rep)
-                  (/ (affine-representation-constant left)
-                     (affine-representation-constant right)))
-            (dohash ((ref coefficient) (affine-representation-coefficients left))
-              (setf (gethash ref (affine-representation-coefficients rep))
-                    (/ coefficient (affine-representation-constant right))))
-            rep)))))
+       (combine-affine-representations (car de) left right)))
     (otherwise (error 'expression-not-simplifiable))))
 
 (defun affine-representation->expression (rep)
@@ -127,7 +140,7 @@
                                                 (affine-representation->expression
                                                  (expression->affine-representation
                                                   (delayed-expression-expression param)))))
-                      (otherwise (error 'expression-not-simplifiable)))
+                      (otherwise param))
                   (expression-not-linear () param)
                   (expression-not-simplifiable () param)))
               (application-parameters thing))))
