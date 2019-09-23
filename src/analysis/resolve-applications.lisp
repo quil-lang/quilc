@@ -58,9 +58,11 @@ a list of conflicts CONFLICTS."
 
     4. List of calibration definitions.
 
-    5. List of memory descriptors.
+    5. List of frame definitions.
 
-    6. List of code to execute.
+    6. List of memory descriptors.
+
+    7. List of code to execute.
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: this preserves the order of definitions.
@@ -69,6 +71,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         (memory-defs nil)
         (wf-defs nil)
         (calib-defs nil)
+        (frame-defs nil)
         (exec-code nil)
         ;; The following maps definition signatures to a list of (filename . defn) pairs
         (all-seen-defns (make-hash-table :test 'equal)))
@@ -90,6 +93,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                (circuit-definition (push instr circ-defs))
                (waveform-definition (push instr wf-defs))
                (calibration-definition (push instr calib-defs))
+               (frame-definition (push instr frame-defs))
                (memory-descriptor (push instr memory-defs))
                (t (push instr exec-code)))))
       (mapc #'bin code)

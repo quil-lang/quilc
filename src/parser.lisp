@@ -15,7 +15,7 @@
     :DECLARE :SHARING :OFFSET :PRAGMA
     :AS :MATRIX :PERMUTATION
     :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
-    :DEFWAVEFORM :DEFCAL
+    :DEFWAVEFORM :DEFCAL :DEFFRAME
     :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
 
 (deftype token-type ()
@@ -113,7 +113,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|DEFFRAME|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -319,7 +319,7 @@ the immediately preceding line."
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
 
 (defun disappointing-token-error (found-token expected-msg)
-  (quil-parse-error "Expected ~A~@[ in A~], but observed a token ~A with value ~A"
+  (quil-parse-error "Expected ~A~@[ in ~A~], but observed a token ~A with value ~A"
                     expected-msg
                     *parse-context*
                     (token-type found-token)
@@ -454,6 +454,14 @@ the immediately preceding line."
        (let ((*definitions-allowed* nil)
              (*formal-arguments-allowed* t))
          (parse-calibration-definition tok-lines)))
+
+      ((:DEFFRAME)
+       (unless *definitions-allowed*
+         (quil-parse-error "Found DEFFRAME where it's not allowed."))
+
+       (let ((*definitions-allowed* nil)
+             (*formal-arguments-allowed* nil))
+         (parse-frame-definition tok-lines)))
 
       (otherwise
        (quil-parse-error "Got an unexpected token of type ~S ~
@@ -1473,13 +1481,18 @@ result of BODY, and the (possibly null) list of remaining lines.
 
 (defun parse-sample-rate (toks)
   "Parse a sample rate from TOKS, consuming all tokens and returning a constant."
+  (assert *parse-context*)
   (unless toks
-    (quil-parse-error "DEFWAVEFORM requires a sample rate, but none was given."))
+    (quil-parse-error "~A requires a sample rate, but none was given."
+                      *parse-context*))
   (when (< 1 (length toks))
-    (quil-parse-error "DEFWAVEFORM sample rate may not be a compound arithmetic expression."))
+    (quil-parse-error "~A sample rate may not be a compound arithmetic expression."
+                      *parse-context*))
   (let ((rate (parse-arithmetic-tokens toks)))
     (unless (realp rate)
-      (quil-parse-error "Expected a real number for DEFWAVEFORM sample rate, but got ~A instead." rate))
+      (quil-parse-error "Expected a real number for ~A sample rate, but got ~A instead."
+                        *parse-context*
+                        rate))
     (constant rate)))
 
 (defun parse-waveform-definition (tok-lines)
@@ -1644,7 +1657,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
         arguments)
     ;; Split off the header line from the body lines.
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
-      ;; Check that we have a well-formed header lGine.
+      ;; Check that we have a well-formed header line.
       (destructuring-bind (decal-tok . rest-line) parameter-line
         ;; We must be working with a DEFCAL
         (unless (eql ':DEFCAL (token-type decal-tok))
@@ -1725,6 +1738,79 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                                        :body parsed-body
                                        :context decal-tok)))
                  remaining-lines)))))))))
+
+(defun parse-frame-definition-body (lines &optional argument-plist)
+  "Parse the body of a frame definition from the given LINES. Returns a plist of property-value pairs, along with the remaining lines."
+  (when (endp lines)
+    (return-from parse-frame-definition-body
+      (values argument-plist lines)))
+  (let ((line (first lines)))
+    ;; we parse until DEDENT
+    (when (eql ':DEDENT (token-type (first line)))
+      (pop (first lines))
+      (return-from parse-frame-definition-body
+        (values argument-plist lines)))
+    (when (< 3 (length line))
+      (quil-parse-error "DEFFRAME body lines should be of the form <property>: <value>"))
+    (destructuring-bind (property-tok col-tok &rest value-toks) line
+      (unless (eql ':NAME (token-type property-tok))
+        (disappointing-token-error property-tok "an identifier"))
+      (unless (eql ':COLON (token-type col-tok))
+        (disappointing-token-error col-tok "a colon"))
+      (let* ((property-name (intern (token-payload property-tok)
+                                    ':keyword))
+             (property-value (case property-name
+                               ((:SAMPLE-RATE)
+                                (parse-sample-rate value-toks))
+                               ((:INITIAL-FREQUENCY
+                                 (parse-parameter-or-expression value-toks)))
+                               (otherwise
+                                (quil-parse-error "Unknown property ~A in DEFFRAME. Note: This is case sensitive."
+                                                  property-name)))))
+        (when (getf argument-plist property-name)
+          (quil-parse-error "Duplicate property ~A in DEFFRAME body" property-name))
+        (parse-frame-definition-body (rest lines)
+                                     (cons property-name
+                                           (cons property-value
+                                                 argument-plist)))))))
+
+(defun parse-frame-definition (tok-lines)
+  "Parse a frame definition from TOK-LINES."
+  (when (null tok-lines)
+    (quil-parse-error "EOF reached when frame definition was expected."))
+  (destructuring-bind (defframe-tok . frame-toks) (first tok-lines)
+      (unless (eql ':DEFFRAME (token-type defframe-tok))
+        (quil-parse-error "DEFFRAME exoected. Got ~A"
+                          (token-type defframe-tok)))
+
+      (when (null frame-toks)
+        (quil-parse-error "Expected a frame after DEFFRAME token."))
+
+      (multiple-value-bind (frame rest-line)
+          (parse-frame frame-toks)
+        ;; empty frame definition, no body
+        (when (endp rest-line)
+          (return-from parse-frame-definition
+            (values
+             (make-instance 'frame-definition
+                            :frame frame)
+             (rest tok-lines))))
+        ;; nonempty body, so we pull the parameters
+        (symbol-macrolet ((next-line (cadr tok-lines)))
+          (unless (and (= 1 (length rest-line))
+                       (eql ':COLON (token-type (first rest-line)))
+                       ;; next token is indentation
+                       (eql ':INDENT (token-type (first next-line))))
+            (quil-parse-error "Expected DEFFRAME line to be followed by a colon (:) and an indented body."))
+          ;; remove the indent token
+          (pop next-line))
+        (multiple-value-bind (plist rest-lines)
+            (parse-frame-definition-body (rest tok-lines))
+          (values
+           (apply #'make-instance 'frame-definition
+                  :frame frame
+                  plist)
+           rest-lines)))))
 
 (defun parse-waveform-ref (toks)
   "Parse a waveform reference from the tokens TOKS. Returns the refererence and the remaining tokens."

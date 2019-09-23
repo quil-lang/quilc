@@ -454,6 +454,18 @@ as a permutation."
                  :body body
                  :context context))
 
+;;; Frame Definitions (QuilT)
+
+(defclass frame-definition ()
+  ((frame :initarg :frame
+          :reader frame-definition-frame)
+   (sample-rate :initarg :sample-rate
+                :initform nil
+                :reader frame-definition-sample-rate)
+   (initial-frequency :initarg :initial-frequency
+                      :initform nil
+                      :reader frame-definition-initial-frequency)))
+
 ;;; Waveform Definitions (QuilT)
 
 (defclass waveform-definition ()
@@ -1692,6 +1704,16 @@ For example,
     (format stream "DEFGATE ~a AS PERMUTATION:~%    ~{~D~^, ~}~%"
             (gate-definition-name gate)
             (permutation-gate-definition-permutation gate)))
+
+  (:method ((thing frame-definition) (stream stream))
+    (format stream "DEFFRAME ~A:~%"
+            (print-instruction-generic (frame-definition-frame thing) nil))
+    (when (frame-definition-sample-rate thing)
+      (format stream "    SAMPLE-RATE: ~A"
+              (print-instruction-to-string (frame-definition-sample-rate thing))))
+    (when (frame-definition-initial-frequency thing)
+      (format stream "    INITIAL-FREQUENCY: ~A"
+              (print-instruction-to-string (frame-definition-initial-frequency thing)))))
 
   ;; TODO Should we really follow precedent and put these here?
   (:method ((thing waveform-definition) (stream stream))
