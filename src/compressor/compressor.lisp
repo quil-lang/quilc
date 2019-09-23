@@ -367,7 +367,7 @@ other's."
 
 (defun expand-to-native-instructions (instructions chip)
   "Expand INSTRUCTIONS into a list of instructions that are native for CHIP. Makes no attempt to perform rewiring or simplication."
-  (alexandria:mappend (a:rcurry #'expand-instruction-to-native-instructions chip) instructions))
+  (a:mappend (a:rcurry #'expand-instruction-to-native-instructions chip) instructions))
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
   "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
