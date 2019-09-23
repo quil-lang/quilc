@@ -127,6 +127,7 @@
                                                       (- (sin theta)) 0 0 (cos theta)))))
         (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
+    ;; now move the real components into the 1st position (except for 0)
     (unless (double= 0d0 (realpart (aref v 2)))
       (let* ((theta (- (atan (realpart (aref v 2))
                              (realpart (aref v 1)))))
@@ -145,6 +146,48 @@
                                                       0 (- (sin theta)) 0 (cos theta)))))
         (setf matrix (m* m matrix))
         (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
+    ;; we're concentrated in positions 0 and 1.
+    ;; if 0 and 1 are actually both real, combine them.
+    (unless (or (double= 0d0 (realpart (aref v 1)))
+                (not (double= 0d0 (imagpart (aref v 0)))))
+      (let* ((theta (- (atan (realpart (aref v 1))
+                             (realpart (aref v 0)))))
+             (m (magicl:make-complex-matrix 4 4 (list (cos theta) (sin theta) 0 0
+                                                      (- (sin theta)) (cos theta) 0 0
+                                                      0 0 1 0
+                                                      0 0 0 1))))
+        (setf matrix (m* m matrix))
+        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
+    ;; make sure |v0| > |v1|
+    (unless (> (abs (aref v 0)) (abs (aref v 1)))
+      (let* ((m (magicl:make-complex-matrix 4 4 (list 0 1 0 0
+                                                      -1 0 0 0
+                                                      0 0 1 0
+                                                      0 0 0 1))))
+        (setf matrix (m* m matrix))
+        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
+    ;; we're imagining v1 to be purely real (but it might be purely imaginary).
+    ;; constrain -pi/4 < phase v1 <= 3pi/4, which contains 0 and pi/2
+    (unless (<= (- (/ pi 4)) (phase (aref v 1)) (* 3/4 pi))
+      (let* ((m (magicl:make-complex-matrix 4 4 (list 1  0  0 0
+                                                      0 -1  0 0
+                                                      0  0 -1 0
+                                                      0  0  0 1))))
+        (setf matrix (m* m matrix))
+        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
+    ;; also constrain -pi/2 < phase v0 - phase v1 <= pi/2
+    (let* ((phase-difference (- (phase (aref v 0)) (phase (aref v 1))))
+           (centered-phase (- (mod (+ phase-difference pi) 2pi) pi)))
+      (when (and (not (double= centered-phase pi/2))
+                 (or (<= centered-phase -pi/2)
+                     (double= centered-phase -pi/2)
+                     (< pi/2 centered-phase)))
+        (let* ((m (magicl:make-complex-matrix 4 4 (list -1 0  0 0
+                                                        0 1  0 0
+                                                        0 0 -1 0
+                                                        0 0  0 1))))
+          (setf matrix (m* m matrix))
+          (setf v (nondestructively-apply-matrix-to-vector matrix vector)))))
     (values matrix v)))
 
 (adt:defdata tensor-factorization
@@ -190,7 +233,7 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
          ;; arcsin at 1 makes input error on the order of e-17 blow up to output
          ;; error on the order of e-8, which exceeds +double-comparison-threshold-strict+.
          ;; more exactly, the output error gets too wild when the input error
-         ;; exceeds e-13 --- but this is blow the usual measure of +d-c-t-s+, so
+         ;; exceeds e-13 --- but this is below the usual measure of +d-c-t-s+, so
          ;; we clamp the value and pray.
          (asin-nice (x)
            (if (double= x 1d0)
