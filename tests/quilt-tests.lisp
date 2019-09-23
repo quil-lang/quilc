@@ -2,6 +2,9 @@
 
 (deftest test-gate-calibration-matching ()
   (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+DEFFRAME 1 \"xy\"
+
 DEFCAL RZ(pi/2) 0:                      # 0
     SHIFT-PHASE 0 \"xy\" pi/2
 
@@ -35,6 +38,8 @@ MEASURE 1                               # 4
 
 (deftest test-modified-calibration-matching ()
   (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+
 DEFCAL RZ(pi/2) 0:                      # 0
     SHIFT-PHASE 0 \"xy\" pi/2
 
@@ -127,6 +132,8 @@ MEASURE 1 ro                            # 4
 
 (deftest test-strict-calibration-expansion ()
   (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+
 DEFCAL X 0:
     PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 
@@ -137,6 +144,8 @@ X 1"
 
 (deftest test-case-sensitive-calibration-expansion ()
   (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+
 DEFCAL x 0:
     PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 
@@ -145,9 +154,11 @@ X 0"
     (signals quil-parse-error
       (quil::expand-calibrations pp :strict t))))
 
-;;; TODO update package.lisp
 (deftest test-fence-expansion ()
   (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+DEFFRAME 1 \"xy\"
+
 DECLARE ro BIT
 PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 FENCE 0 1
@@ -162,7 +173,7 @@ CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
               (etypecase instr
                 (pulse (first (frame-qubits (pulse-frame instr))))
                 (capture (first (frame-qubits (capture-frame instr))))
-                (delay (delay-qubit instr))))))
+                (delay (first (delay-qubits instr)))))))
       (loop :for instr :across (parsed-program-executable-code pp)
             :do (let ((q (qubit instr)))
                   ;; We expect the CAPTURE instructions to start at 1
@@ -189,6 +200,8 @@ DEFWAVEFORM foo 4.0:
 
 (deftest test-quilt-duration ()
   (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+
 DEFWAVEFORM foo 4.0:
     1.0, 1.0, 1.0, 1.0
 

@@ -367,14 +367,24 @@ depending on whether TEST passes."
                      :duration duration
                      :memory-ref memory-ref)))
 
-  (:method ((instr delay) param-value arg-value)
-    (let ((qubit (funcall (transform-if #'is-formal arg-value)
-                          (delay-qubit instr)))
+  (:method ((instr delay-on-qubits) param-value arg-value)
+    (let ((qubits (mapcar (transform-if #'is-formal arg-value)
+                          (delay-qubits instr)))
           (duration (funcall (transform-if #'is-formal arg-value)
                              (delay-duration instr))))
-      (make-instance 'delay
-                     :qubit qubit
-                     :duration duration)))
+      (make-instance 'delay-on-qubits
+                     :duration duration
+                     :qubits qubits)))
+
+  (:method ((instr delay-on-frames) param-value arg-value)
+    (let ((frames (mapcar (lambda (f) (instantiate-frame f arg-value))
+                          (delay-frames instr)))
+          (duration (funcall (transform-if #'is-formal arg-value)
+                             (delay-duration instr))))
+      (make-instance 'delay-on-frames
+                     :duration duration
+                     :frames frames)))
+
   (:method ((instr fence) param-value arg-value)
     (let ((qubits (mapcar (transform-if #'is-formal arg-value)
                           (fence-qubits instr))))
