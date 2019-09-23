@@ -13,7 +13,7 @@ QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 UNAME_S=$(shell uname -s)
 ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 PREFIX ?= /usr/local
-THREADS ?= 2
+THREADS ?= 4
 
 all: quilc
 
