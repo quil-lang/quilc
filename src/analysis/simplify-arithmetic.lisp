@@ -22,18 +22,18 @@
 
    where
 
-      CONSTANT is the DOUBLE-FLOAT constant offset of the expression
-      COEFFICIENTS_i is the DOUBLE-FLOAT coefficient for MEMORY-REF_i
+      CONSTANT is the constant offset (of type NUMBER) of the expression
+      COEFFICIENTS_i is the coefficient (of type NUMBER) for MEMORY-REF_i
       MEMORY-REF_i is the MEMORY-REF with coefficient COEFFICIENTS_i
 "
-  (constant 0d0 :type double-float)
-  ;; This builds a hash table with MEMORY-REFs as keys and their DOUBLE-FLOAT coefficients as values
+  (constant 0 :type number)
+  ;; This builds a hash table with MEMORY-REFs as keys and their coefficients (of type NUMBER) as values
   (coefficients (make-hash-table :test #'equalp) :type hash-table))
 
 (defun expression->affine-representation (de)
   "Recursively construct an AFFINE-REPRESENTATION from an EXPRESSION (of type CONS)."
   (typecase de
-    (double-float
+    (number
      (make-affine-representation :constant de))
     (memory-ref
      (let ((rep (make-affine-representation)))
