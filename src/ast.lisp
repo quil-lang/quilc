@@ -136,7 +136,19 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defstruct (frame (:constructor frame (qubits name)))
   "A reference to a QuilT rotating frame, relative to which control or readout waveforms may be defined."
   (name nil :type string)
-  (qubits nil :type list))
+  (qubits nil :type list)
+  ;; Will later be resolved
+  (name-resolution nil :type (or null frame-definition)))
+
+(defun frame= (a b)
+  (and (string= (frame-name a) (frame-name b))
+       (equalp (frame-qubits a) (frame-qubits b))))
+
+(defun frame-hash (f)
+  #+sbcl
+  (sb-int:mix (sxhash (frame-name f)) (sxhash (frame-qubits f)))
+  #-sbcl
+  (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
 (defstruct (waveform-ref (:constructor %waveform-ref (name args)))
   "An reference to a (possibly parametric) QuilT waveform."
@@ -144,9 +156,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ;; A list of (name val) lists.
   ;; TODO args vs parameters?
   (args nil :read-only t :type list)
-  ;; NAME-RESOLUTION starts off as null be will later be resolved to either
-  ;; i) a built in waveform
-  ;; ii) a waveform definition
+  ;; Will later be resolved
   (name-resolution nil :type (or null
                                  standard-waveform
                                  waveform-definition)))
@@ -454,6 +464,21 @@ as a permutation."
                  :body body
                  :context context))
 
+;;; Frame Definitions (QuilT)
+
+(defclass frame-definition ()
+  ((frame :initarg :frame
+          :reader frame-definition-frame)
+   (sample-rate :initarg :sample-rate
+                :initform nil
+                :reader frame-definition-sample-rate)
+   (initial-frequency :initarg :initial-frequency
+                      :initform nil
+                      :reader frame-definition-initial-frequency)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context)))
+
 ;;; Waveform Definitions (QuilT)
 
 (defclass waveform-definition ()
@@ -715,11 +740,18 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   IQ values, to be stored in a region of classical memory."))
 
 (defclass delay (instruction)
-  ((qubit :initarg :qubit
-          :accessor delay-qubit)
-   (duration :initarg :duration
+  ((duration :initarg :duration
              :accessor delay-duration))
+  (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
+
+(defclass delay-on-frames (delay)
+  ((delayed-frames :initarg :frames
+                   :accessor delay-frames)))
+
+(defclass delay-on-qubits (delay)
+  ((qubits :initarg :qubits
+           :accessor delay-qubits)))
 
 (defclass fence (instruction)
   ((qubits :initarg :qubits
@@ -1593,10 +1625,22 @@ For example,
                                              (print-instruction-generic q nil))
                                            (fence-qubits instr))))
 
-  (:method ((instr delay) (stream stream))
-    (format stream "DELAY ~A ~A"
-            (print-instruction-to-string (delay-qubit instr))
+  (:method ((instr delay-on-qubits) (stream stream))
+    (format stream "DELAY~{ ~A~} ~A"
+            (mapcar #'print-instruction-to-string (delay-qubits instr))
             (print-instruction-to-string (delay-duration instr))))
+
+  (:method ((instr delay-on-frames) (stream stream))
+    (let* ((frames (delay-frames instr))
+           (qubits (frame-qubits (first frames))))
+      ;; This is just a sanity check -- all frames have the same qubits.
+      (assert (every (lambda (frame)
+                       (equalp qubits (frame-qubits frame)))
+                     frames))
+      (format stream "DELAY~{ ~A~} ~A~{ ~S~}"
+              (mapcar #'print-instruction-to-string qubits)
+              (print-instruction-to-string (delay-duration instr))
+              (mapcar #'frame-name (delay-frames instr)))))
 
   (:method ((instr classical-instruction) (stream stream))
     (format stream "~A"
@@ -1688,6 +1732,16 @@ For example,
             (gate-definition-name gate)
             (permutation-gate-definition-permutation gate)))
 
+  (:method ((thing frame-definition) (stream stream))
+    (format stream "DEFFRAME ~A:~%"
+            (print-instruction-generic (frame-definition-frame thing) nil))
+    (when (frame-definition-sample-rate thing)
+      (format stream "    SAMPLE-RATE: ~A"
+              (print-instruction-to-string (frame-definition-sample-rate thing))))
+    (when (frame-definition-initial-frequency thing)
+      (format stream "    INITIAL-FREQUENCY: ~A"
+              (print-instruction-to-string (frame-definition-initial-frequency thing)))))
+
   ;; TODO Should we really follow precedent and put these here?
   (:method ((thing waveform-definition) (stream stream))
     (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~]:~%"
@@ -1750,6 +1804,8 @@ For example,
                          :accessor parsed-program-waveform-definitions)
    (calibration-definitions :initarg :calibration-definitions
                             :accessor parsed-program-calibration-definitions)
+   (frame-definitions :initarg :frame-definitions
+                      :accessor parsed-program-frame-definitions)
    (memory-definitions :initarg :memory-definitions
                        :accessor parsed-program-memory-definitions)
    (executable-program :initarg :executable-code
@@ -1759,6 +1815,7 @@ For example,
    :circuit-definitions nil
    :waveform-definitions nil
    :calibration-definitions nil
+   :frame-definitions nil
    :memory-definitions nil
    :executable-code #()))
 
@@ -1862,6 +1919,10 @@ Examples:
   ;; write out calibration definitions
   (dolist (calibration-defn (parsed-program-calibration-definitions parsed-program))
     (print-instruction calibration-defn s))
+
+  ;; write out frame definitions
+  (dolist (frame-defn (parsed-program-frame-definitions parsed-program))
+    (print-instruction frame-defn s))
 
   ;; write out main block
   (print-instruction-sequence (parsed-program-executable-code parsed-program)

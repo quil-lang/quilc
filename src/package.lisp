@@ -339,8 +339,11 @@
    #:raw-capture-memory-ref             ; READER
 
    #:delay                              ; CLASS
-   #:delay-qubit                        ; READER
    #:delay-duration                     ; READER
+   #:delay-on-frames                    ; CLASS
+   #:delay-frames                       ; READER
+   #:delay-on-qubits                    ; READER
+   #:delay-qubits                       ; READER
 
    #:fence                              ; CLASS
    #:fence-qubits                       ; READER
@@ -396,6 +399,7 @@
    #:parsed-program-circuit-definitions ; READER
    #:parsed-program-waveform-definitions     ; READER
    #:parsed-program-calibration-definitions  ; READER
+   #:parsed-program-frame-definitions   ; READER
    #:parsed-program-memory-definitions  ; READER
    #:parsed-program-executable-code     ; READER
    #:print-parsed-program               ; FUNCTION
