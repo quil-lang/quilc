@@ -374,7 +374,8 @@ depending on whether TEST passes."
                              (delay-duration instr))))
       (make-instance 'delay
                      :qubit qubit
-                     :duration duration)))
+                     :duration duration
+                     :frame-names (delay-frame-names instr))))
   (:method ((instr fence) param-value arg-value)
     (let ((qubits (mapcar (transform-if #'is-formal arg-value)
                           (fence-qubits instr))))

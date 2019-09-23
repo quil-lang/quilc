@@ -718,7 +718,11 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   ((qubit :initarg :qubit
           :accessor delay-qubit)
    (duration :initarg :duration
-             :accessor delay-duration))
+             :accessor delay-duration)
+   ;; A list of frames to which the DELAY applies. If NIL,
+   ;; the DELAY applies to all frames /intersecting/ this qubit.
+   (frame-names :initarg :frame-names
+                :accessor delay-frame-names))
   (:documentation "A delay of a specific time on a specific qubit."))
 
 (defclass fence (instruction)
@@ -1594,9 +1598,10 @@ For example,
                                            (fence-qubits instr))))
 
   (:method ((instr delay) (stream stream))
-    (format stream "DELAY ~A ~A"
+    (format stream "DELAY ~A ~A~@[~{ ~S~}~]"
             (print-instruction-to-string (delay-qubit instr))
-            (print-instruction-to-string (delay-duration instr))))
+            (print-instruction-to-string (delay-duration instr))
+            (delay-frame-names instr)))
 
   (:method ((instr classical-instruction) (stream stream))
     (format stream "~A"

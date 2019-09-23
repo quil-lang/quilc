@@ -1370,12 +1370,20 @@ result of BODY, and the (possibly null) list of remaining lines.
                        :waveform waveform-ref)))))
 
 (defun parse-delay (tok-lines)
-  (match-line ((op :DELAY) qubit &rest duration-toks) tok-lines
-    (when (endp duration-toks)
-      (quil-parse-error "Expected a duration in DELAY instruction."))
-    (make-instance 'delay
-                   :qubit (parse-qubit qubit)
-                   :duration (parse-parameter-or-expression duration-toks))))
+  (match-line ((op :DELAY) qubit &rest rest-toks) tok-lines
+    (multiple-value-bind (duration-toks frame-name-toks)
+        (take-until (lambda (tok) (eql ':STRING (token-type tok)))
+                    rest-toks)
+      (when (endp duration-toks)
+        (quil-parse-error "Expected a duration in DELAY instruction."))
+      (dolist (tok frame-name-toks)
+        (unless (eql ':STRING (token-type tok))
+          (quil-parse-error "Expected a string frame names in DELAY, but received ~A"
+                            tok)))
+      (make-instance 'delay
+                     :qubit (parse-qubit qubit)
+                     :duration (parse-parameter-or-expression duration-toks)
+                     :frame-names (mapcar #'token-payload frame-name-toks)))))
 
 (defun parse-fence (tok-lines)
   (match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines
