@@ -348,7 +348,7 @@ other's."
 
 (defgeneric expand-instruction-to-native-instructions (instr chip)
   (:documentation "Expand INSTR into a list of instructions native for CHIP by applying nativization routines available on CHIP.")
-  (:method (instr chip)
+  (:method ((instr instruction) chip)
     (list instr))
 
   (:method ((instr no-operation) chip)
