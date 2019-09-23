@@ -109,26 +109,30 @@ JUMP @a")))
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  
-  (defmacro define-compiler-hook-tests ()
-    `(progn
-       ,@(loop :for test-file :in (uiop:directory-files (asdf:system-relative-pathname
-                                                         ':cl-quil-tests
-                                                         "tests/compiler-hook-test-files/") #P "*.quil")
-               :append (loop :for test-name :in (list
-                                                 (concatenate 'string "TEST-COMPILER-HOOK-"
-                                                              (string-upcase (pathname-name test-file)))
-                                                 (concatenate 'string "TEST-COMPILER-HOOK-"
-                                                              (string-upcase (pathname-name test-file))
-                                                              "-WITH-STATE-PREP-COMPRESSION"))
-                             :append
-                             (loop :for arch :in (list ':cz ':iswap ':cphase ':piswap ':cnot)
-                                   :for name := (concatenate 'string test-name "-" (string arch))
-                                   :collect
-                                   `(deftest ,(intern name) (&key print-stats)
-                                      (finish-output *debug-io*)
-                                      (compare-compiled ,test-file ,arch)))))))
+(macrolet
+    ((define-compiler-hook-tests ()
+       `(progn
+          ,@(loop :for test-file :in (uiop:directory-files (asdf:system-relative-pathname
+                                                            ':cl-quil-tests
+                                                            "tests/compiler-hook-test-files/") #P "*.quil")
+                  :append (loop :for test-name :in (list
+                                                    (concatenate 'string "TEST-COMPILER-HOOK-"
+                                                                 (string-upcase (pathname-name test-file)))
+                                                    (concatenate 'string "TEST-COMPILER-HOOK-"
+                                                                 (string-upcase (pathname-name test-file))
+                                                                 "-WITH-STATE-PREP-COMPRESSION"))
+                                :for state-prep :in (list nil t)
+                                :append
+                                (loop :for arch :in (list ':cz ':iswap ':cphase ':piswap ':cnot)
+                                      :for name := (concatenate 'string test-name "-" (string arch))
+                                      :collect
+                                      `(deftest ,(intern name) (&key print-stats)
+                                         (finish-output *debug-io*)
+                                         (let* ((cl-quil::*enable-state-prep-compression* ,state-prep)
+                                                (stats (compare-compiled ,test-file ,arch)))
+                                           (when print-stats
+                                             (format *debug-io* "~a" stats)))
+                                         (terpri))))))))
 
   (define-compiler-hook-tests))
 
