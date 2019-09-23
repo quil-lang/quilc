@@ -127,7 +127,7 @@
 ;; there are several such matrices; this one is just easy to write down.
 (a:define-constant
     +e-basis+
-    (let* ((sqrt2 (/ (sqrt 2) 2))
+    (let* ((sqrt2 (/ (sqrt 2d0) 2))
            (-sqrt2 (- sqrt2))
            (isqrt2 (complex 0 sqrt2))
            (-isqrt2 (complex 0 -sqrt2)))
@@ -141,7 +141,7 @@
 
 (a:define-constant
     +edag-basis+
-    (let* ((sqrt2 (/ (sqrt 2) 2))
+    (let* ((sqrt2 (/ (sqrt 2d0) 2))
            (-sqrt2 (- sqrt2))
            (isqrt2 (complex 0 sqrt2))
            (-isqrt2 (complex 0 -sqrt2)))
