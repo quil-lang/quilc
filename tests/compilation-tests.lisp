@@ -27,7 +27,7 @@
          (u (quil::make-matrix-from-quil compiled-list)))
     (fiasco-assert-matrices-are-equal m u)))
 
-(deftest QSD-on-4Q ()
+(deftest test-QSD-on-4Q ()
   "Tests Quantum Shannon Compilation on a random 4Q gate."
   (let* ((m (quil::random-special-unitary 16))
          (compiled-list (quil::qs-compiler (build-anonymous-gate m 3 2 1 0)))
