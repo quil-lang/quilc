@@ -250,7 +250,7 @@
 
 (deftest test-global-instruction-expansion ()
   "Tests the expansion of gate applications on non-adjacent qubits by comparing the matrix of the gate before and afte expansion."
-  (finish-output *debug-io*)
+  (finish-output fiasco::*test-run-standard-output*)
   (let ((chip-spec (cl-quil::build-8Q-chip)))
     (dolist (instr-type (list (list "CNOT"   nil #'cl-quil::CNOT-to-native-CNOTs)
                               (list "CZ"     nil #'cl-quil::CZ-to-native-CZs)
@@ -259,7 +259,7 @@
                               (list "CPHASE" (list (random 1.0d0)) #'cl-quil::CPHASE-to-native-CPHASEs)
                               (list "PISWAP" (list (random 1.0d0)) #'cl-quil::PISWAP-to-native-PISWAPs)))
       (destructuring-bind (operator params expander) instr-type
-        (format *debug-io* "~&    Testing global-to-local ~a expansion~%" operator)
+        (format fiasco::*test-run-standard-output* "~&    Testing global-to-local ~a expansion~%" operator)
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
                (mat (cl-quil::make-matrix-from-quil (funcall expander instr

@@ -127,12 +127,12 @@ JUMP @a")))
                                       :for name := (concatenate 'string test-name "-" (string arch))
                                       :collect
                                       `(deftest ,(intern name) (&key print-stats)
-                                         (finish-output *debug-io*)
+                                         (finish-output fiasco::*test-run-standard-output*)
                                          (let* ((cl-quil::*enable-state-prep-compression* ,state-prep)
                                                 (stats (compare-compiled ,test-file ,arch)))
                                            (when print-stats
-                                             (format *debug-io* "~a" stats)))
-                                         (terpri))))))))
+                                             (format fiasco::*test-run-standard-output* "~a" stats)))
+                                         (terpri fiasco::*test-run-standard-output*))))))))
 
   (define-compiler-hook-tests))
 
@@ -176,12 +176,12 @@ RX(pi) 2
               (shuffle-list l k))))
 
 (deftest test-compiler-hook-random-4Q ()
-  (finish-output *debug-io*)
+  (finish-output fiasco::*test-run-standard-output*)
   (dolist (state-prep '(nil t))
     (let ((quil::*enable-state-prep-compression* state-prep))
-      (format *debug-io* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
+      (format fiasco::*test-run-standard-output* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
       (dolist (architecture '(:cz :iswap :cphase :piswap :cnot))
-        (format *debug-io* "      Working on architecture ~a.~%" architecture)
+        (format fiasco::*test-run-standard-output* "      Working on architecture ~a.~%" architecture)
         (let* ((num-qubits 4)
                (v (quil::random-special-unitary (expt 2 num-qubits)))
                (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
