@@ -44,7 +44,9 @@ determining ambiguity. Otherwise, return NIL."
       (gate-calibration-definition (list 'gate-calibration-definition
                                          (calibration-definition-operator instr)))
       (measurement-calibration-definition (list 'measurement-calibration-definition))
-      ;; TODO (frame-definition (list 'frame-definition (frame-definition-frame instr)))
+      (frame-definition (list 'frame-definition
+                              (frame-name (frame-definition-frame instr))
+                              (frame-qubits (frame-definition-frame instr))))
       (memory-descriptor (cons 'memory-descriptor
                                (memory-descriptor-name instr))))))
 
@@ -57,7 +59,7 @@ a list of conflicts CONFLICTS."
       (circuit-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
       (waveform-definition (make-condition 'ambiguous-waveform-definition :conflicts combined))
       (calibration-definition (make-condition 'ambiguous-calibration-definition :conflicts combined))
-      ;; TODO frame definition
+      (frame-definition (make-condition 'ambiguous-frame-definition :conflicts combined))
       (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
 (defun raw-quil-to-unresolved-program (code)
@@ -73,7 +75,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         (frame-defs nil)
         (exec-code nil)
         ;; The following maps definition signatures to a list of (filename . defn) pairs
-        (all-seen-defns (make-hash-table :test 'equal)))
+        (all-seen-defns (make-hash-table :test 'equal))) ; TODO equality here
     (flet ((bin (instr)
              (a:when-let ((signature (definition-signature instr)))
                (let ((originating-file (typecase (lexical-context instr)
