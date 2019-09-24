@@ -1,0 +1,3 @@
+DEFFRAME 0 "xy"
+DEFFRAME 0 "xy":
+    SAMPLE-RATE: 1.0
