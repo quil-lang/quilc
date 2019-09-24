@@ -55,7 +55,7 @@ has simplified arithmetic expressions")
 "
   (constant 0 :type number)
   ;; This builds a hash table with MEMORY-REFs as keys and their coefficients (of type NUMBER) as values
-  (coefficients (make-hash-table :test #'equalp) :type hash-table))
+  (coefficients (make-hash-table :test 'memory-ref= :hash-function 'memory-ref-hash) :type hash-table))
 
 (defun make-affine-representation (constant &rest keyval)
   "Make an AFFINE-REPRESENTATION object from a CONSTANT and an optional collection of MEMORY-REF ->
@@ -69,7 +69,7 @@ which produces an AFFINE-REPRESENTATION with an empty COEFFICIENTS hash table, o
    (make-affine-representation CONSTANT MEMORY-REF_0 COEFFICIENTS_0 ... MEMORY-REF_N COEFFICIENTS_N)
 
 which fills in the COEFFICIENTS hash table with the memory references and their corresponding coefficients"
-  (let ((coefficients (make-hash-table :test #'equalp)))
+  (let ((coefficients (make-hash-table :test 'memory-ref= :hash-function 'memory-ref-hash)))
     (loop :for (ref coefficient) :on keyval :by #'cddr :do (setf (gethash ref coefficients) coefficient))
     (%affine-representation :constant constant
                             :coefficients coefficients)))
