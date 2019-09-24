@@ -1401,10 +1401,15 @@ result of BODY, and the (possibly null) list of remaining lines.
         (setf frame-names (mapcar #'token-payload frame-name-toks))
         (setf duration (parse-parameter-or-expression duration-toks)))
 
-      (make-instance 'delay
-                     :qubit qubits
-                     :duration duration
-                     :frame-names frame-names))))
+      (if frame-names
+          (make-instance 'delay-on-frames
+                         :duration duration
+                         :frames (mapcar (lambda (name)
+                                           (frame qubits name))
+                                         frame-names))
+          (make-instance 'delay-on-qubits
+                         :duration duration
+                         :qubits qubits)))))
 
 (defun parse-fence (tok-lines)
   (match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines

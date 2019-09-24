@@ -140,6 +140,13 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ;; Will later be resolved
   (name-resolution nil :type (or null frame-definition)))
 
+(defun frame-equals-p (a b)
+  "T if frames A and B are equal, otherwise NIL."
+  (and (frame-p a)
+       (frame-p b)
+       (string= (frame-name a) (frame-name b))
+       (equalp (frame-qubits a) (frame-qubits b))))
+
 (defstruct (waveform-ref (:constructor %waveform-ref (name args)))
   "An reference to a (possibly parametric) QuilT waveform."
   (name nil :read-only t :type string)
@@ -727,18 +734,18 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   IQ values, to be stored in a region of classical memory."))
 
 (defclass delay (instruction)
-  ((qubits :initarg :qubit
-           :accessor delay-qubits)
-   (duration :initarg :duration
-             :accessor delay-duration)
-   ;; A list of frames to which the DELAY applies. If NIL,
-   ;; the DELAY applies to all frames on this qubit.
-   (frame-names :initarg :frame-names
-                :accessor delay-frame-names)
-   ;; A list of delayed frames, which must be resolved.
-   (delayed-frames :initarg :delayed-frames
-                   :accessor delayed-frames))
+  ((duration :initarg :duration
+             :accessor delay-duration))
+  (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
+
+(defclass delay-on-frames (delay)
+  ((delayed-frames :initarg :frames
+                   :accessor delay-frames)))
+
+(defclass delay-on-qubits (delay)
+  ((qubits :initarg :qubits
+           :accessor delay-qubits)))
 
 (defclass fence (instruction)
   ((qubits :initarg :qubits
@@ -1612,11 +1619,22 @@ For example,
                                              (print-instruction-generic q nil))
                                            (fence-qubits instr))))
 
-  (:method ((instr delay) (stream stream))
-    (format stream "DELAY~{ ~A~} ~A~{ ~S~}"
+  (:method ((instr delay-on-qubits) (stream stream))
+    (format stream "DELAY~{ ~A~} ~A"
             (mapcar #'print-instruction-to-string (delay-qubits instr))
-            (print-instruction-to-string (delay-duration instr))
-            (delay-frame-names instr)))
+            (print-instruction-to-string (delay-duration instr))))
+
+  (:method ((instr delay-on-frames) (stream stream))
+    (let* ((frames (delay-frames instr))
+           (qubits (frame-qubits (first frames))))
+      ;; This is just a sanity check -- all frames have the same qubits.
+      (assert (every (lambda (frame)
+                       (equalp qubits (frame-qubits frame)))
+                     frames))
+      (format stream "DELAY~{ ~A~} ~A~{ ~S~}"
+              (mapcar #'print-instruction-to-string qubits)
+              (print-instruction-to-string (delay-duration instr))
+              (mapcar #'frame-name (delay-frames instr)))))
 
   (:method ((instr classical-instruction) (stream stream))
     (format stream "~A"
