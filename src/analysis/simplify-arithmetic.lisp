@@ -172,15 +172,15 @@ AFFINE-REPRESENTATION                                    (* 2.0 theta[0])
     (dohash ((ref coefficient) (affine-representation-coefficients rep))
       (unless (double= 0 coefficient)
         (setf expr (if expr
-                       (list '+ (list '* coefficient ref) expr)
-                       (list '* coefficient ref)))))
+                       `( + (* ,coefficient ,ref) ,expr)
+                       `(* ,coefficient ,ref)))))
     (cond
       ((null expr)
        (affine-representation-constant rep))
       ((double= 0 (affine-representation-constant rep))
        expr)
       (t
-       (list '+ (affine-representation-constant rep) expr)))))
+       `(+ ,(affine-representation-constant rep) ,expr)))))
 
 (defun canonicalize-expression (de)
   "Given DE (a DELAYED-EXPRESSION), canonicalize it by converting it into its AFFINE-REPRESENTATION
