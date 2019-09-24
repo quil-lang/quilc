@@ -13,7 +13,7 @@
 ;;;;
 ;;;; However, clearly some of the arithmetic in the parameters of the RX and RZ gates could be made
 ;;;; simpler. The SIMPLIFY-ARITHMETIC transform takes these expressions and stores them in their
-;;;; AFFINE-REPRESENTATIONs, which give a single unique form for equivalent linear arithmetic
+;;;; AFFINE-REPRESENTATIONs, which give a canonical form for equivalent linear arithmetic
 ;;;; expressions. Then, these structures can be unpacked once again into (potentially) simpler
 ;;;; arithmetic expressions. For example, after applying the transform to the above Quil program,
 ;;;; we get the following (simpler) program:
@@ -182,6 +182,16 @@ AFFINE-REPRESENTATION                                    (* 2.0 theta[0])
       (t
        (list '+ (affine-representation-constant rep) expr)))))
 
+(defun canonicalize-expression (de)
+  "Given DE (a DELAYED-EXPRESSION), canonicalize it by converting it into its AFFINE-REPRESENTATION
+form and back into a DELAYED-EXPRESSION once again. Refer to the detailed documentation for the
+expression->affine-representation and affine-representation->expression functions for more info."
+  (make-delayed-expression (delayed-expression-params de)
+                           (delayed-expression-lambda-params de)
+                           (affine-representation->expression
+                            (expression->affine-representation
+                             (delayed-expression-expression de)))))
+
 (defgeneric simplify-arithmetic (thing)
   (:method ((thing t))
     thing)
@@ -193,11 +203,7 @@ AFFINE-REPRESENTATION                                    (* 2.0 theta[0])
                       (constant
                        param)
                       (delayed-expression
-                       (make-delayed-expression (delayed-expression-params param)
-                                                (delayed-expression-lambda-params param)
-                                                (affine-representation->expression
-                                                 (expression->affine-representation
-                                                  (delayed-expression-expression param)))))
+                       (canonicalize-expression param))
                       (otherwise param))
                   (expression-not-linear () param)
                   (expression-not-simplifiable () param)))
