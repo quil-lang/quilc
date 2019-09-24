@@ -38,7 +38,7 @@ In general, a more specific conditionxs should be preferred over signalling this
   (:documentation "A condition that is signalled any time an expression cannot be simplified due to
 being non-linear."))
 
-(define-transform simplify-arithmetic (simplify-arithmetics)
+(define-transform simplify-arithmetic (simplify-arithmetic)
   "A transform which converts a parsed program with potentially complicated arithmetic to one that
 has simplified arithmetic expressions")
 
@@ -192,7 +192,13 @@ expression->affine-representation and affine-representation->expression function
                             (expression->affine-representation
                              (delayed-expression-expression de)))))
 
+
+
 (defgeneric simplify-arithmetic (thing)
+  (:documentation "Generic function that defines the underlying mechanics for the SIMPLIFY-ARITHMETIC
+transform. If this function is given a PARSED-PROGRAM, it recursively applies itself to the program's
+exectuable code. Otherwise, if this function is given a GATE-APPLICATION, it attempts to simplify
+the gate parameters by canonicalizing the arithmetic expressions they (potentially) contain.")
   (:method ((thing t))
     thing)
   (:method ((thing gate-application))
@@ -207,10 +213,7 @@ expression->affine-representation and affine-representation->expression function
                       (otherwise param))
                   (expression-not-linear () param)
                   (expression-not-simplifiable () param)))
-              (application-parameters thing))))
-
-(defun simplify-arithmetics (parsed-prog)
-  "Simplify the arithmetic in all of the EXPRESSIONs in the APPLICATION-PARAMETERS of the
-GATE-APPLICATIONs of the EXECUTABLE-CODE of a PARSED-PROGRAM."
-  (map nil #'simplify-arithmetic (parsed-program-executable-code parsed-prog))
-  parsed-prog)
+              (application-parameters thing)))
+  (:method ((thing parsed-program))
+    (map nil #'simplify-arithmetic (parsed-program-executable-code thing))
+    thing))
