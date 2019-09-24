@@ -37,7 +37,7 @@ signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HAN
        (ambiguous-waveform-definition #'continue))
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
-             (pp (resolve-applications
+             (pp (resolve-objects
                   (process-includes raw-quil originating-file))))
         (dolist (xform transforms pp)
           (setf pp (transform xform pp))))))

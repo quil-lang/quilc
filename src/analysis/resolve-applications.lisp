@@ -33,6 +33,7 @@ determining ambiguity. Otherwise, return NIL."
       (gate-calibration-definition (list 'gate-calibration-definition
                                          (calibration-definition-operator instr)))
       (measurement-calibration-definition (list 'measurement-calibration-definition))
+      ;; TODO (frame-definition (list 'frame-definition (frame-definition-frame instr)))
       (memory-descriptor (cons 'memory-descriptor
                                (memory-descriptor-name instr))))))
 
@@ -45,6 +46,7 @@ a list of conflicts CONFLICTS."
       (circuit-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
       (waveform-definition (make-condition 'ambiguous-waveform-definition :conflicts combined))
       (calibration-definition (make-condition 'ambiguous-calibration-definition :conflicts combined))
+      ;; TODO frame definition
       (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
 (defun raw-quil-to-unresolved-program (code)
@@ -94,17 +96,17 @@ This also signals ambiguous definitions, which may be handled as needed."
                                               'simple-vector)))))
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
-(defgeneric resolve-application (app &key gate-definitions circuit-definitions)
-  (:method ((app unresolved-application) &key gate-definitions circuit-definitions)
+(defgeneric resolve-instruction (instr &key gate-definitions circuit-definitions)
+  (:method ((instr unresolved-application) &key gate-definitions circuit-definitions)
     (macrolet
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
                     (format nil "Error in resolving ~/quil:instruction-fmt/: ~a"
-                            app
+                            instr
                             ,datum)
                     ,@arguments)))
-      (let* ((operator (application-operator app))
+      (let* ((operator (application-operator instr))
              (addl-qubits (operator-description-additional-qubits operator))
              (name (operator-description-root-name operator))
              (found-gate-defn (or (find name gate-definitions
@@ -118,7 +120,7 @@ This also signals ambiguous definitions, which may be handled as needed."
           ;; Gate application
           (found-gate-defn
            ;; Verify correct arguments
-           (let ((args (application-arguments app)))
+           (let ((args (application-arguments instr)))
              ;; Check that all arguments are qubits
              (assert-and-print-instruction (every (a:disjoin #'qubit-p
                                                              (if *in-circuit-body*
@@ -142,11 +144,11 @@ This also signals ambiguous definitions, which may be handled as needed."
                                              "Expected ~D qubit~:P, but ~D ~:*~[were~;was~:;were~] provided."
                                              expected-qubits num-qubits)))
            ;; Verification finished. Transform the application.
-           (change-class app 'gate-application :name-resolution found-gate-defn))
+           (change-class instr 'gate-application :name-resolution found-gate-defn))
 
           ;; Circuit application
           (found-circ-defn
-           (change-class app 'circuit-application :circuit-definition found-circ-defn))
+           (change-class instr 'circuit-application :circuit-definition found-circ-defn))
 
           ;; None of the above.
           (t
@@ -154,23 +156,28 @@ This also signals ambiguous definitions, which may be handled as needed."
              (cerror "Continue with application remaining unresolved."
                      "Unable to resolve operator ~S"
                      name))
-           app)))))
+           instr)))))
+
+  ;; Anything with a frame
+  ;; Anything with a waveform
 
   ;; Everything else, even non-applications, just resolve to
   ;; themselves.
-  (:method ((app t) &key gate-definitions circuit-definitions)
+  (:method ((instr t) &key gate-definitions circuit-definitions)
     (declare (ignore gate-definitions circuit-definitions))
-    app))
+    instr))
 
-(defun resolve-applications (raw-quil)
-  "Resolve all UNRESOLVED-APPLICATIONs within the list RAW-QUIL, returning a PARSED-PROGRAM."
+(defun resolve-objects (raw-quil)
+  "Perform all object resolution within the list RAW-QUIL, returning a PARSED-PROGRAM."
+  ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
+  ;; we need to also resolve waveform and frame references.
   (check-type raw-quil list)
   (let ((unresolved-program (raw-quil-to-unresolved-program raw-quil)))
     (with-slots (gate-definitions circuit-definitions calibration-definitions executable-program)
         unresolved-program
       (flet ((resolve-instruction-sequence (seq)
                (map nil (lambda (thing)
-                          (resolve-application thing
+                          (resolve-instruction thing
                                                :gate-definitions gate-definitions
                                                :circuit-definitions circuit-definitions))
                     seq)))
