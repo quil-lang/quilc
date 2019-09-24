@@ -6,8 +6,12 @@
 
 ;;; TODO: should quilt calibration expansion be standard?
 (defvar *standard-post-process-transforms*
-  '(expand-circuits expand-calibrations type-check)
+  '(expand-circuits type-check)
   "The standard transforms that are applied by PARSE-QUIL.")
+
+(defvar *standard-quilt-transforms*
+  '(expand-circuits expand-calibrations type-check)
+  "The standard transforms for using PARSE-QUIL with quilt code.")
 
 (defun error-on-ambiguous-memory-declaration  (condition)
   "Handler which signals an error in the presence of an AMBIGUOUS-MEMORY-DEFINITION."
