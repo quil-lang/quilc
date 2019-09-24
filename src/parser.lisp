@@ -1811,7 +1811,8 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
           (return-from parse-frame-definition
             (values
              (make-instance 'frame-definition
-                            :frame frame)
+                            :frame frame
+                            :context defframe-tok)
              (rest tok-lines))))
         ;; nonempty body, so we pull the parameters
         (symbol-macrolet ((next-line (cadr tok-lines)))
@@ -1827,6 +1828,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
           (values
            (apply #'make-instance 'frame-definition
                   :frame frame
+                  :context defframe-tok
                   plist)
            rest-lines)))))
 
@@ -2063,6 +2065,10 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
 (define-condition ambiguous-calibration-definition (ambiguous-definition)
   ()
   (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFCAL forms."))
+
+(define-condition ambiguous-frame-definition (ambiguous-definition)
+  ()
+  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFFRAME forms."))
 
 (defun parse-quil-into-raw-program (string)
   "Parse a string STRING into a list of raw Quil syntax objects."

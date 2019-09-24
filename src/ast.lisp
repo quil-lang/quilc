@@ -471,7 +471,10 @@ as a permutation."
                 :reader frame-definition-sample-rate)
    (initial-frequency :initarg :initial-frequency
                       :initform nil
-                      :reader frame-definition-initial-frequency)))
+                      :reader frame-definition-initial-frequency)
+   (context :initarg :context
+            :type lexical-context
+            :accessor lexical-context)))
 
 ;;; Waveform Definitions (QuilT)
 
