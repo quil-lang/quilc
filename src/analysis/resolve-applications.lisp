@@ -96,8 +96,8 @@ This also signals ambiguous definitions, which may be handled as needed."
                                               'simple-vector)))))
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
-(defgeneric resolve-instruction (instr &key gate-definitions circuit-definitions)
-  (:method ((instr unresolved-application) &key gate-definitions circuit-definitions)
+(defgeneric resolve-instruction (instr parsed-program)
+  (:method ((instr unresolved-application) parsed-program)
     (macrolet
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
@@ -109,11 +109,11 @@ This also signals ambiguous definitions, which may be handled as needed."
       (let* ((operator (application-operator instr))
              (addl-qubits (operator-description-additional-qubits operator))
              (name (operator-description-root-name operator))
-             (found-gate-defn (or (find name gate-definitions
+             (found-gate-defn (or (find name (parsed-program-gate-definitions parsed-program)
                                         :test #'string=
                                         :key #'gate-definition-name)
                                   (lookup-standard-gate name)))
-             (found-circ-defn (find name circuit-definitions
+             (found-circ-defn (find name (parsed-program-circuit-definitions parsed-program)
                                     :test #'string=
                                     :key #'circuit-definition-name)))
         (cond
@@ -163,8 +163,8 @@ This also signals ambiguous definitions, which may be handled as needed."
 
   ;; Everything else, even non-applications, just resolve to
   ;; themselves.
-  (:method ((instr t) &key gate-definitions circuit-definitions)
-    (declare (ignore gate-definitions circuit-definitions))
+  (:method ((instr t) parsed-program)
+    (declare (ignore parsed-program))
     instr))
 
 (defun resolve-objects (raw-quil)
@@ -173,25 +173,21 @@ This also signals ambiguous definitions, which may be handled as needed."
   ;; we need to also resolve waveform and frame references.
   (check-type raw-quil list)
   (let ((unresolved-program (raw-quil-to-unresolved-program raw-quil)))
-    (with-slots (gate-definitions circuit-definitions calibration-definitions executable-program)
-        unresolved-program
-      (flet ((resolve-instruction-sequence (seq)
-               (map nil (lambda (thing)
-                          (resolve-instruction thing
-                                               :gate-definitions gate-definitions
-                                               :circuit-definitions circuit-definitions))
-                    seq)))
-        (resolve-instruction-sequence executable-program)
-        ;; resolve circuit definitions
-        (map nil (lambda (cd)
-                   (let ((*in-circuit-body* t))
-                     (resolve-instruction-sequence
-                      (circuit-definition-body cd))))
-             circuit-definitions)
-        ;; resolve calibration definitions
-        (map nil (lambda (cd)
-                   (let ((*in-circuit-body* t)) ; TODO rename
-                     (resolve-instruction-sequence
-                      (calibration-definition-body cd))))
-             calibration-definitions)))
+    (flet ((resolve-instruction-sequence (seq)
+             (map nil (lambda (thing)
+                        (resolve-instruction thing unresolved-program))
+                  seq)))
+      (resolve-instruction-sequence (parsed-program-executable-code unresolved-program))
+      ;; resolve circuit definitions
+      (map nil (lambda (cd)
+                 (let ((*in-circuit-body* t))
+                   (resolve-instruction-sequence
+                    (circuit-definition-body cd))))
+           (parsed-program-circuit-definitions unresolved-program))
+      ;; resolve calibration definitions
+      (map nil (lambda (cd)
+                 (let ((*in-circuit-body* t)) ; TODO rename
+                   (resolve-instruction-sequence
+                    (calibration-definition-body cd))))
+           (parsed-program-calibration-definitions unresolved-program)))
     unresolved-program))
