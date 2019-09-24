@@ -140,12 +140,15 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ;; Will later be resolved
   (name-resolution nil :type (or null frame-definition)))
 
-(defun frame-equals-p (a b)
-  "T if frames A and B are equal, otherwise NIL."
-  (and (frame-p a)
-       (frame-p b)
-       (string= (frame-name a) (frame-name b))
+(defun frame= (a b)
+  (and (string= (frame-name a) (frame-name b))
        (equalp (frame-qubits a) (frame-qubits b))))
+
+(defun frame-hash (f)
+  #+sbcl
+  (sb-int:mix (sxhash (frame-name f)) (sxhash (frame-qubits f)))
+  #-sbcl
+  (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
 (defstruct (waveform-ref (:constructor %waveform-ref (name args)))
   "An reference to a (possibly parametric) QuilT waveform."

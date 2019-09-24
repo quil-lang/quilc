@@ -45,8 +45,7 @@ determining ambiguity. Otherwise, return NIL."
                                          (calibration-definition-operator instr)))
       (measurement-calibration-definition (list 'measurement-calibration-definition))
       (frame-definition (list 'frame-definition
-                              (frame-name (frame-definition-frame instr))
-                              (frame-qubits (frame-definition-frame instr))))
+                              (frame-hash (frame-definition-frame instr))))
       (memory-descriptor (cons 'memory-descriptor
                                (memory-descriptor-name instr))))))
 
@@ -123,6 +122,7 @@ signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HAN
        (ambiguous-gate-or-circuit-definition ambiguous-definition-handler)
        ;; TODO change these
        (ambiguous-calibration-definition #'continue)
+       (ambiguous-frame-definition #'continue)
        (ambiguous-waveform-definition #'continue))
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
