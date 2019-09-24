@@ -1,6 +1,30 @@
 ;;;; simplify-arithmetic.lisp
 ;;;;
 ;;;; Author: Peter Karalekas
+;;;;
+;;;; This file defines the SIMPLIFY-ARITHMETIC transform, which when applied to a PARSED-PROGRAM will
+;;;; iterate through all the instructions in its executable code, attempting to reduce the complexity
+;;;; of the arithmetic expressions contained in each instruction's set of parameters. For example,
+;;;; the following is a valid Quil program:
+;;;;
+;;;;    DECLARE theta REAL[2]
+;;;;    RX(2.0 + theta[0] - 2.0) 0
+;;;;    RZ(3.0*theta[1] - theta[1]/2.0 + 5.0) 1
+;;;;
+;;;; However, clearly some of the arithmetic in the parameters of the RX and RZ gates could be made
+;;;; simpler. The SIMPLIFY-ARITHMETIC transform takes these expressions and stores them in their
+;;;; AFFINE-REPRESENTATIONs, which give a single unique form for equivalent linear arithmetic
+;;;; expressions. Then, these structures can be unpacked once again into (potentially) simpler
+;;;; arithmetic expressions. For example, after applying the transform to the above Quil program,
+;;;; we get the following (simpler) program:
+;;;;
+;;;;    DECLARE theta REAL[2]
+;;;;    RX(theta[0]) 0
+;;;;    RZ(2.5*theta[1] + 5.0) 1
+;;;;
+;;;; This implementation is certainly not without its limitations. For example, we can only simplify
+;;;; a particular subset of arithmetic expressions (ones that are linear). However, for the majority
+;;;; of our use cases at this time, this subset is sufficient.
 
 (in-package #:cl-quil)
 
