@@ -136,7 +136,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 (defstruct (frame (:constructor frame (qubits name)))
   "A reference to a QuilT rotating frame, relative to which control or readout waveforms may be defined."
   (name nil :type string)
-  (qubits nil :type list))
+  (qubits nil :type list)
+  ;; Will later be resolved
+  (name-resolution nil :type (or null frame-definition)))
 
 (defstruct (waveform-ref (:constructor %waveform-ref (name args)))
   "An reference to a (possibly parametric) QuilT waveform."
@@ -144,9 +146,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ;; A list of (name val) lists.
   ;; TODO args vs parameters?
   (args nil :read-only t :type list)
-  ;; NAME-RESOLUTION starts off as null be will later be resolved to either
-  ;; i) a built in waveform
-  ;; ii) a waveform definition
+  ;; Will later be resolved
   (name-resolution nil :type (or null
                                  standard-waveform
                                  waveform-definition)))
@@ -734,7 +734,10 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
    ;; A list of frames to which the DELAY applies. If NIL,
    ;; the DELAY applies to all frames on this qubit.
    (frame-names :initarg :frame-names
-                :accessor delay-frame-names))
+                :accessor delay-frame-names)
+   ;; A list of delayed frames, which must be resolved.
+   (delayed-frames :initarg :delayed-frames
+                   :accessor delayed-frames))
   (:documentation "A delay of a specific time on a specific qubit."))
 
 (defclass fence (instruction)
