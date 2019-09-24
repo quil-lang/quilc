@@ -1,5 +1,8 @@
 DELAY 0 1.0 
 DELAY 0 1e-2
-DELAY 0 1e-2 "xy"
-DELAY 0 1e-2 "xy" "ff"
-DELAY 0 pi/2 "xy"
+DELAY 0 "xy" 1e-2
+DELAY 0 "xy" "ff" 1e-2 
+DELAY 0 "xy" pi/2
+DELAY 0 1 1.0
+DELAY 0 1 "cz" pi
+DELAY 0 1 "cz" "foo" 1.0

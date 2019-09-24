@@ -1378,20 +1378,33 @@ result of BODY, and the (possibly null) list of remaining lines.
                        :waveform waveform-ref)))))
 
 (defun parse-delay (tok-lines)
-  (match-line ((op :DELAY) qubit &rest rest-toks) tok-lines
-    (multiple-value-bind (duration-toks frame-name-toks)
-        (take-until (lambda (tok) (eql ':STRING (token-type tok)))
-                    rest-toks)
-      (when (endp duration-toks)
-        (quil-parse-error "Expected a duration in DELAY instruction."))
-      (dolist (tok frame-name-toks)
-        (unless (eql ':STRING (token-type tok))
-          (quil-parse-error "Expected a string frame names in DELAY, but received ~A"
-                            tok)))
+  (match-line ((op :DELAY) &rest rest-toks) tok-lines
+    (let (qubits
+          frame-names
+          duration)
+
+      (multiple-value-bind (qubit-toks remaining)
+          (take-until (lambda (tok)
+                        (not (member (token-type tok) '(:NAME :INTEGER))))
+                      rest-toks)
+        (when (endp qubit-toks)
+          (quil-parse-error "Expected one or more qubits specified in DELAY instruction."))
+        (setf qubits (mapcar #'parse-qubit qubit-toks))
+        (setf rest-toks remaining))
+
+      (multiple-value-bind (frame-name-toks duration-toks)
+          (take-until (lambda (tok)
+                        (not (eql ':STRING (token-type tok))))
+                      rest-toks)
+        (when (endp duration-toks)
+          (quil-parse-error "Expected a duration in DELAY instruction."))
+        (setf frame-names (mapcar #'token-payload frame-name-toks))
+        (setf duration (parse-parameter-or-expression duration-toks)))
+
       (make-instance 'delay
-                     :qubit (parse-qubit qubit)
-                     :duration (parse-parameter-or-expression duration-toks)
-                     :frame-names (mapcar #'token-payload frame-name-toks)))))
+                     :qubit qubits
+                     :duration duration
+                     :frame-names frame-names))))
 
 (defun parse-fence (tok-lines)
   (match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines

@@ -339,8 +339,9 @@
    #:raw-capture-memory-ref             ; READER
 
    #:delay                              ; CLASS
-   #:delay-qubit                        ; READER
+   #:delay-qubits                       ; READER
    #:delay-duration                     ; READER
+   #:delay-frame-names                  ; READER
 
    #:fence                              ; CLASS
    #:fence-qubits                       ; READER

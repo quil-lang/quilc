@@ -145,7 +145,6 @@ X 0"
     (signals quil-parse-error
       (quil::expand-calibrations pp :strict t))))
 
-;;; TODO update package.lisp
 (deftest test-fence-expansion ()
   (let ((pp (parse-quil "
 DECLARE ro BIT
@@ -162,7 +161,7 @@ CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
               (etypecase instr
                 (pulse (first (frame-qubits (pulse-frame instr))))
                 (capture (first (frame-qubits (capture-frame instr))))
-                (delay (delay-qubit instr))))))
+                (delay (first (delay-qubits instr)))))))
       (loop :for instr :across (parsed-program-executable-code pp)
             :do (let ((q (qubit instr)))
                   ;; We expect the CAPTURE instructions to start at 1
