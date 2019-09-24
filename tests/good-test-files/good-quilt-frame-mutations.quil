@@ -1,3 +1,6 @@
+DEFFRAME 0 "xy"
+DEFFRAME 0 1 "cz"
+
 SET-PHASE 0 "xy" pi/2
 
 SHIFT-PHASE 0 "xy" -pi

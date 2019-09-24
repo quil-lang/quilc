@@ -1,3 +1,4 @@
 # Simple capture of an IQ point
+DEFFRAME 0 "out"
 DECLARE iq REAL[2]
 CAPTURE 0 "out" flat(duration: 1e-6, iq: 2+3*i) iq

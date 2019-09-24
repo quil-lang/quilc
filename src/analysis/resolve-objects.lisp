@@ -47,8 +47,7 @@ conforming to the list of EXPECTED-PARAMETERS."
     waveform-defn))
 
 (defun resolve-waveform-reference (waveform-ref waveform-defns &key (use-defaults t))
-  "Destructively updates the waveform reference's resolution to an appropriate
-waveform or waveform definition."
+  "Destructively update WAVEFORM-REF's name resolution to an appropriate waveform or waveform definition."
   (assert (null (waveform-ref-name-resolution waveform-ref)))
   (let* ((name (waveform-ref-name waveform-ref))
          (resolution
@@ -64,6 +63,25 @@ waveform or waveform definition."
                                 any standard or user defined waveforms." name)))))
     (setf (waveform-ref-name-resolution waveform-ref) resolution)
     waveform-ref))
+
+(defun resolve-frame (frame frame-definitions)
+  "Destructively update FRAME's name resolution to an appropriate frame definition."
+  (assert (null (frame-name-resolution frame)))
+  ;; We do not resolve frames in calibration bodies, /even/ if we could (e.g. because
+  ;; they do not involve formal arguments). The motivation for this is twofold:
+  ;; i) it's sometimes convenient to parse calibrations separately from frame definitions
+  ;; ii) we prefer to handle this resolution uniformly at expansion time
+  (unless *in-circuit-body*
+    (a:if-let ((formal-qubit (find-if #'is-formal (frame-qubits frame))))
+      ;; time to get rowdy...
+      (quil-parse-error "Unable to resolve formal ~A outside of definition body." formal-qubit)
+      (a:if-let ((defn (find frame frame-definitions
+                             :key #'frame-definition-frame
+                             :test #'frame-equals-p)))
+        (setf (frame-name-resolution frame) defn)
+        (quil-parse-error "No frame definition found for referenced frame ~A."
+                          (print-instruction-to-string frame)))))
+  frame)
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
 (defgeneric resolve-instruction (instr parsed-program)
@@ -128,13 +146,45 @@ waveform or waveform definition."
                      name))
            instr)))))
 
+  (:method ((instr simple-frame-mutation) parsed-program)
+    (resolve-frame (frame-mutation-target-frame instr)
+                   (parsed-program-frame-definitions parsed-program))
+    instr)
+
+  (:method ((instr swap-phase) parsed-program)
+    (unless *in-circuit-body*
+      (let ((defns (parsed-program-frame-definitions parsed-program)))
+        (resolve-frame (swap-phase-left-frame instr) defns)
+        (resolve-frame (swap-phase-right-frame instr) defns)))
+    instr)
+
+  (:method ((instr delay) parsed-program)
+    ;; DELAY allows users to specify frames explicitly (by giving their names),
+    ;; or implicitly (by giving no names).
+    (declare (ignore parsed-program))
+    instr)
+
   (:method ((instr pulse) parsed-program)
+    (unless *in-circuit-body*
+      (resolve-frame (pulse-frame instr)
+                     (parsed-program-frame-definitions parsed-program)))
     (resolve-waveform-reference (pulse-waveform instr)
-                                (parsed-program-waveform-definitions parsed-program)))
+                                (parsed-program-waveform-definitions parsed-program))
+    instr)
 
   (:method ((instr capture) parsed-program)
+    (unless *in-circuit-body*
+      (resolve-frame (capture-frame instr)
+                     (parsed-program-frame-definitions parsed-program)))
     (resolve-waveform-reference (capture-waveform instr)
-                                (parsed-program-waveform-definitions parsed-program)))
+                                (parsed-program-waveform-definitions parsed-program))
+    instr)
+
+  (:method ((instr raw-capture) parsed-program)
+    (unless *in-circuit-body*
+      (resolve-frame (raw-capture-frame instr)
+                     (parsed-program-frame-definitions parsed-program)))
+    instr)
 
   (:method ((instr t) parsed-program)
     (declare (ignore parsed-program))
@@ -143,7 +193,9 @@ waveform or waveform definition."
 (defun resolve-objects (raw-quil)
   "Perform all object resolution within the list RAW-QUIL, returning a PARSED-PROGRAM."
   ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
-  ;; we need to also resolve waveform and frame references.
+  ;; we need to also resolve waveform and frame references. BUT... TODO
+  ;; we can't resolve frame references in calibration bodies until they themselves have been resolved.
+  ;; so...
   (check-type raw-quil list)
   (let ((unresolved-program (raw-quil-to-unresolved-program raw-quil)))
     (flet ((resolve-instruction-sequence (seq)
