@@ -192,8 +192,6 @@ expression->affine-representation and affine-representation->expression function
                             (expression->affine-representation
                              (delayed-expression-expression de)))))
 
-
-
 (defgeneric simplify-arithmetic (thing)
   (:documentation "Generic function that defines the underlying mechanics for the SIMPLIFY-ARITHMETIC
 transform. If this function is given a PARSED-PROGRAM, it recursively applies itself to the program's
@@ -202,18 +200,20 @@ the gate parameters by canonicalizing the arithmetic expressions they (potential
   (:method ((thing t))
     thing)
   (:method ((thing gate-application))
-    (map-into (application-parameters thing)
-              (lambda (param)
-                (handler-case
-                    (typecase param
-                      (constant
-                       param)
-                      (delayed-expression
-                       (canonicalize-expression param))
-                      (otherwise param))
-                  (expression-not-linear () param)
-                  (expression-not-simplifiable () param)))
-              (application-parameters thing)))
+    (let ((new-gate (copy-instance thing)))
+      (setf (application-parameters new-gate)
+            (map 'cons (lambda (de)
+                         (handler-case
+                             (typecase de
+                               (constant
+                                de)
+                               (delayed-expression
+                                (canonicalize-expression de))
+                               (otherwise de))
+                           (expression-not-linear () de)
+                           (expression-not-simplifiable () de)))
+                 (application-parameters new-gate)))
+      new-gate))
   (:method ((thing parsed-program))
-    (map nil #'simplify-arithmetic (parsed-program-executable-code thing))
+    (map-into (parsed-program-executable-code thing) #'simplify-arithmetic (parsed-program-executable-code thing))
     thing))
