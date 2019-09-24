@@ -40,7 +40,7 @@ being non-linear."))
 
 (define-transform simplify-arithmetic (simplify-arithmetic)
   "A transform which converts a parsed program with potentially complicated arithmetic to one that
-has simplified arithmetic expressions")
+has simplified arithmetic expressions.")
 
 (defstruct (affine-representation (:constructor %affine-representation))
   "This data structure represents linear arithmetic expressions of the form
@@ -68,7 +68,7 @@ which produces an AFFINE-REPRESENTATION with an empty COEFFICIENTS hash table, o
 
    (make-affine-representation CONSTANT MEMORY-REF_0 COEFFICIENTS_0 ... MEMORY-REF_N COEFFICIENTS_N)
 
-which fills in the COEFFICIENTS hash table with the memory references and their corresponding coefficients"
+which fills in the COEFFICIENTS hash table with the memory references and their corresponding coefficients."
   (let ((coefficients (make-hash-table :test 'memory-ref= :hash-function 'memory-ref-hash)))
     (loop :for (ref coefficient) :on keyval :by #'cddr :do (setf (gethash ref coefficients) coefficient))
     (%affine-representation :constant constant
@@ -172,7 +172,7 @@ AFFINE-REPRESENTATION                                    (* 2.0 theta[0])
     (dohash ((ref coefficient) (affine-representation-coefficients rep))
       (unless (double= 0 coefficient)
         (setf expr (if expr
-                       `( + (* ,coefficient ,ref) ,expr)
+                       `(+ (* ,coefficient ,ref) ,expr)
                        `(* ,coefficient ,ref)))))
     (cond
       ((null expr)
