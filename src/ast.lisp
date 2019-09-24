@@ -1777,6 +1777,8 @@ For example,
                          :accessor parsed-program-waveform-definitions)
    (calibration-definitions :initarg :calibration-definitions
                             :accessor parsed-program-calibration-definitions)
+   (frame-definitions :initarg :frame-definitions
+                      :accessor parsed-program-frame-definitions)
    (memory-definitions :initarg :memory-definitions
                        :accessor parsed-program-memory-definitions)
    (executable-program :initarg :executable-code
@@ -1786,6 +1788,7 @@ For example,
    :circuit-definitions nil
    :waveform-definitions nil
    :calibration-definitions nil
+   :frame-definitions nil
    :memory-definitions nil
    :executable-code #()))
 
@@ -1889,6 +1892,10 @@ Examples:
   ;; write out calibration definitions
   (dolist (calibration-defn (parsed-program-calibration-definitions parsed-program))
     (print-instruction calibration-defn s))
+
+  ;; write out frame definitions
+  (dolist (frame-defn (parsed-program-frame-definitions parsed-program))
+    (print-instruction frame-defn s))
 
   ;; write out main block
   (print-instruction-sequence (parsed-program-executable-code parsed-program)

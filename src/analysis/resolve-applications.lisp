@@ -47,22 +47,8 @@ a list of conflicts CONFLICTS."
       (calibration-definition (make-condition 'ambiguous-calibration-definition :conflicts combined))
       (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
-(defun extract-code-sections (code)
-  "Partition CODE into four values:
-
-    1. List of gate definitions.
-
-    2. List of circuit definitions.
-
-    3. List of waveform definitions.
-
-    4. List of calibration definitions.
-
-    5. List of frame definitions.
-
-    6. List of memory descriptors.
-
-    7. List of code to execute.
+(defun raw-quil-to-unresolved-program (code)
+  "This constructes a PARSED-PROGRAM object from the given quil CODE, without any resolution of applications.
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: this preserves the order of definitions.
@@ -97,12 +83,15 @@ This also signals ambiguous definitions, which may be handled as needed."
                (memory-descriptor (push instr memory-defs))
                (t (push instr exec-code)))))
       (mapc #'bin code)
-      (values (nreverse gate-defs)
-              (nreverse circ-defs)
-              (nreverse wf-defs)
-              (nreverse calib-defs)
-              (nreverse memory-defs)
-              (nreverse exec-code)))))
+      (make-instance 'parsed-program
+                     :gate-definitions (nreverse gate-defs)
+                     :circuit-definitions (nreverse circ-defs)
+                     :waveform-definitions (nreverse wf-defs)
+                     :calibration-definitions (nreverse calib-defs)
+                     :frame-definitions (nreverse frame-defs)
+                     :memory-definitions (nreverse memory-defs)
+                     :executable-code (coerce (nreverse exec-code)
+                                              'simple-vector)))))
 
 ;;; TODO: Factor out this gate arity computation to something nicer.
 (defgeneric resolve-application (app &key gate-definitions circuit-definitions)
@@ -176,29 +165,26 @@ This also signals ambiguous definitions, which may be handled as needed."
 (defun resolve-applications (raw-quil)
   "Resolve all UNRESOLVED-APPLICATIONs within the list RAW-QUIL, returning a PARSED-PROGRAM."
   (check-type raw-quil list)
-  (multiple-value-bind (gate-defs circ-defs wf-defs cal-defs memory-defs exec-code)
-      (extract-code-sections raw-quil)
-    (flet ((resolve-instruction-sequence (seq)
-             (map nil (lambda (thing)
-                        (resolve-application thing
-                                             :gate-definitions gate-defs
-                                             :circuit-definitions circ-defs))
-                  seq)))
-      (resolve-instruction-sequence exec-code)
-      (map nil (lambda (cd)
-                 (let ((*in-circuit-body* t))
-                   (resolve-instruction-sequence
-                    (circuit-definition-body cd))))
-           circ-defs)
-      (map nil (lambda (cd)
-                 (let ((*in-circuit-body* t)) ; TODO rename
-                   (resolve-instruction-sequence
-                    (calibration-definition-body cd))))
-           cal-defs)
-      (make-instance 'parsed-program
-                     :gate-definitions gate-defs
-                     :circuit-definitions circ-defs
-                     :waveform-definitions wf-defs
-                     :calibration-definitions cal-defs
-                     :memory-definitions memory-defs
-                     :executable-code (coerce exec-code 'simple-vector)))))
+  (let ((unresolved-program (raw-quil-to-unresolved-program raw-quil)))
+    (with-slots (gate-definitions circuit-definitions calibration-definitions executable-program)
+        unresolved-program
+      (flet ((resolve-instruction-sequence (seq)
+               (map nil (lambda (thing)
+                          (resolve-application thing
+                                               :gate-definitions gate-definitions
+                                               :circuit-definitions circuit-definitions))
+                    seq)))
+        (resolve-instruction-sequence executable-program)
+        ;; resolve circuit definitions
+        (map nil (lambda (cd)
+                   (let ((*in-circuit-body* t))
+                     (resolve-instruction-sequence
+                      (circuit-definition-body cd))))
+             circuit-definitions)
+        ;; resolve calibration definitions
+        (map nil (lambda (cd)
+                   (let ((*in-circuit-body* t)) ; TODO rename
+                     (resolve-instruction-sequence
+                      (calibration-definition-body cd))))
+             calibration-definitions)))
+    unresolved-program))
