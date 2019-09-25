@@ -38,22 +38,20 @@ synchronization in the form of DELAY instructions on the appropriate qubit lines
                 (capture (capture-waveform instr)))))
     (waveform-ref-name-resolution wf-ref)))
 
-(defun waveform-active-duration (wf-or-wf-defn &optional sample-rate)
+(defun waveform-active-duration (wf-or-wf-defn)
   "Get the active duration of the waveform or waveform definition, in seconds.
 If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   (etypecase wf-or-wf-defn
     (standard-waveform (constant-value (waveform-duration wf-or-wf-defn)))
     (waveform-definition
-     (unless sample-rate
-       (error "Duration of DEFWAVEFORM instance depends on the active sample rate."))
      (/ (length (waveform-definition-entries wf-or-wf-defn))
-        sample-rate))))
+        (waveform-definition-sample-rate wf-or-wf-defn)))))
 
-(defun quilt-instruction-duration (instr &optional sample-rate)
+(defun quilt-instruction-duration (instr)
   "Get the duration of the specified quilt instruction INSTR."
   (typecase instr
     ((or pulse capture)
-     (waveform-active-duration (resolved-waveform instr) sample-rate))
+     (waveform-active-duration (resolved-waveform instr)))
     (delay
       (constant-value (delay-duration instr)))
     (raw-capture
@@ -61,55 +59,71 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     ((or simple-frame-mutation swap-phase fence)
      0.0)))
 
-(defun quilt-instruction-qubits (instr)
-  "Get the list of qubits associated with the quilt instruction INSTR."
-  (typecase instr
-    (pulse (frame-qubits
-            (pulse-frame instr)))
-    (capture (frame-qubits
-              (capture-frame instr)))
-    (raw-capture (frame-qubits
-                  (raw-capture-frame instr)))
-    (delay (delay-qubits instr))
-    (simple-frame-mutation (frame-qubits
-                            (frame-mutation-target-frame instr)))
-    (swap-phase (append (frame-qubits (swap-phase-left-frame instr))
-                        (frame-qubits (swap-phase-right-frame instr))))
-    (fence (fence-qubits instr))))
+(defun quilt-instruction-frames (instr parsed-program)
+  (a:ensure-list
+   (typecase instr
+     (pulse (pulse-frame instr))
+     (capture (capture-frame instr))
+     (raw-capture (raw-capture-frame instr))
+     (delay-on-frames (delay-frames instr))
+     (simple-frame-mutation (frame-mutation-target-frame instr))
+     (swap-phase (swap-phase-left-frame instr) (swap-phase-right-frame instr))
+     ;; delay affects all frames on precisely the delay qubits
+     (delay-on-qubits
+      (loop :for defn :in (parsed-program-frame-definitions parsed-program)
+            :for frame := (frame-definition-frame defn)
+            :when (equalp (frame-qubits frame)
+                          (delay-qubits instr))
+              :collect frame))
+     (fence
+      (loop :for defn :in (parsed-program-frame-definitions parsed-program)
+            :for frame := (frame-definition-frame defn)
+            :when (intersection (frame-qubits frame)
+                                (fence-qubits instr)
+                                :test #'equalp)
+              :collect frame)))))
 
-
-(defun expand-fences-to-delays (parsed-program &optional sample-rate)
+(defun expand-fences-to-delays (parsed-program)
   "Expand FENCE instructions to corresponding DELAY instructions on each relevant
 qubit line. For custom waveform definitions, SAMPLE-RATE (in Hz) must be provided."
-  (let (;; Indexed by qubit indices i.e. nonnegative integers
-        (qubit-clocks (make-hash-table))
-        ;; Non-FENCE instructions
+  (let ((frame-clocks (make-hash-table :test #'frame=
+                                       :hash-function #'frame-hash))
         new-instrs)
+
+    ;; initialize clocks
+    (dolist (defn (parsed-program-frame-definitions parsed-program))
+      (setf (gethash (frame-definition-frame defn) frame-clocks)
+            0.0))
+
     (flet ((process-instr (instr)
              (unless (typep instr 'simple-quilt-instruction)
                (quil-parse-error "Cannot resolve timing information for non-quilt instruction ~A" instr))
-             (let* ((qubits (quilt-instruction-qubits instr))
-                    (latest (loop :for q :in qubits
-                                  :maximize (gethash (qubit-index q) qubit-clocks 0.0)))
-                    (duration (quilt-instruction-duration instr sample-rate)))
-               ;; We know the involved qubits, the latest time on any of these, and the duration
-               ;; of the next instruction. Here we add delay instructions on any qubit lines
-               ;; that are not at the latest time (thus synchronizing them), and then advance the clocks
-               ;; to account for the next instruction.
-               (loop :for q :in qubits
+             (let* ((frames (quilt-instruction-frames instr parsed-program))
+                    (latest (loop :for f :in frames
+                                  :maximize (gethash f frame-clocks)))
+                    (duration (quilt-instruction-duration instr)))
+               ;; We know the involved frames, the latest time on any of these,
+               ;; and the duration of the next instruction. Here we add delay
+               ;; instructions on any frames that are not at the latest time
+               ;; (thus synchronizing them), and then advance the clocks to
+               ;; account for the next instruction.
+               (loop :for f :in frames
                      :for lag := (- latest
-                                    (gethash (qubit-index q) qubit-clocks 0.0))
+                                    (gethash f frame-clocks))
                      ;; insert DELAY
                      :when (plusp lag)
-                       :do (push (make-instance 'delay :qubit q :duration (constant lag))
+                       :do (push (make-instance 'delay-on-frames
+                                                :frames (list f)
+                                                :duration (constant lag))
                                  new-instrs)
                            ;; advance clocks
-                     :do (setf (gethash (qubit-index q) qubit-clocks)
+                     :do (setf (gethash f frame-clocks)
                                (+ latest duration)))
                (unless (typep instr 'fence)
                  (push instr new-instrs)))))
       (loop :for instr :across (parsed-program-executable-code parsed-program)
             :do (process-instr instr)))
+
     (setf (parsed-program-executable-code parsed-program)
           (coerce (nreverse new-instrs) 'vector))
     parsed-program))
