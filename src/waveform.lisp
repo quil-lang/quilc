@@ -103,9 +103,9 @@ PARAMETERS:
    (second-order-hrm-coeff :quilt-name "hrm_coeff"
                            :type float
                            :documentation "Second order coefficient (see paper)"))
-  :documentation "Hermite-Gaussian shaped pulse. Reference: Effects of arbitrary laser
-or NMR pulse shapes on population inversion and coherence Warren S. Warren.
-81, (1984); doi: 10.1063/1.447644")
+  :documentation "Hermite-Gaussian shaped pulse.
+
+Reference: Effects of arbitrary laser or NMR pulse shapes on population inversion and coherence Warren S. Warren. 81, (1984); doi: 10.1063/1.447644")
 
 (define-standard-waveform erf-square-waveform "erfsquare"
   ((risetime :quilt-name "risetime"

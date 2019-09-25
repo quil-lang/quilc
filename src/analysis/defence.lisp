@@ -20,8 +20,7 @@
 ;;; use of control flow operations. See SIMPLE-QUILT-P below for more details.
 
 (define-transform expand-fences-to-delays (expand-fences-to-delays)
-  "This transform replaces explicit synchronization in the form of FENCE instructions with implicit
-synchronization in the form of DELAY instructions on the appropriate qubit lines."
+  "This transform replaces explicit synchronization in the form of FENCE instructions with implicit synchronization in the form of DELAY instructions on the appropriate qubit lines."
   expand-calibrations
   resolve-waveform-references)
 

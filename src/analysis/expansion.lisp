@@ -18,8 +18,7 @@
                     format-args))
 
 (defparameter *expansion-limit* 256
-  "Limit the number of recursive circuit or calibration expansions that can happen
-before erroring. Intended to avoid infinite loops.")
+  "Limit the number of recursive circuit or calibration expansions that can happen before erroring. Intended to avoid infinite loops.")
 
 (defvar *expansion-depth*)
 
@@ -141,10 +140,7 @@ before erroring. Intended to avoid infinite loops.")
 (defun unitary-instruction-p (instr)
   "Is the instruction INSTR unitary?
 
-An instruction is unitary if it is of type APPLICATION, whether that
-be INSTR itself or, if INSTR is a CIRCUIT-APPLICATION, the body of the
-circuit. With the caveat that UNRESOLVED-APPLICATIONS must be
-explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
+An instruction is unitary if it is of type APPLICATION, whether that be INSTR itself or, if INSTR is a CIRCUIT-APPLICATION, the body of the circuit. With the caveat that UNRESOLVED-APPLICATIONS must be explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
   (etypecase instr
     (gate-application
      t)
