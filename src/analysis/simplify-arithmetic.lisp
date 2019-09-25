@@ -75,12 +75,8 @@ which fills in the COEFFICIENTS hash table with the memory references and their 
                             :coefficients coefficients)))
 
 (defun combine-affine-representations (operator left right)
-  "Given an operator (e.g. +, -, *, /) and two operand expressions (LEFT and RIGHT, in AFFINE-REPRESENTATION
-form), combine them via the rules of arithmetic, enforcing the linearity of the output AFFINE-REPRESENTATION.
-When the OPERATOR is + or -, there are no restrictions on the contents of LEFT or RIGHT. If the OPERATOR
-is *, one of either LEFT or RIGHT must be simply a CONSTANT value, meaning that its COEFFICIENTS hash table
-is empty (otherwise we give up simplifying). If the OPERATOR is /, the RIGHT operand must be a CONSTANT
-value, meaning that its COEFFICIENTS hash table must be empty (otherwise we give up simplifying)."
+  "Given an operator (e.g. +, -, *, /) and two operand expressions (LEFT and RIGHT, in AFFINE-REPRESENTATION form), combine them via the rules of arithmetic, enforcing the linearity of the output AFFINE-REPRESENTATION.  When the OPERATOR is + or -, there are no restrictions on the contents of LEFT or RIGHT. If the OPERATOR is *, one of either LEFT or RIGHT must be simply a CONSTANT value, meaning that its COEFFICIENTS hash table is empty (otherwise we give up simplifying). If the OPERATOR is /, the RIGHT operand must be a CONSTANT value, meaning that its COEFFICIENTS hash table must be empty (otherwise we give up simplifying)."
+  (check-type operator (member + - * /))
   (let ((rep (make-affine-representation
               (funcall operator
                        (affine-representation-constant left)
