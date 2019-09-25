@@ -170,7 +170,11 @@ measurements for which a calibration is defined."
           (*expansion-depth* 0))
       (let ((expanded
               (loop :for instr :across (parsed-program-executable-code parsed-program)
-                    :append (recursively-expand-instruction instr))))
+                    :for expanded-instrs := (recursively-expand-instruction instr)
+                    ;; we need to resolve the new instructions (e.g. since frame
+                    ;; `0 q "cz"` might instantiate to to `0 1 "cz"`)
+                    :append (mapcar (lambda (i) (resolve-instruction i parsed-program))
+                                    expanded-instrs))))
         (setf (parsed-program-executable-code parsed-program)
               (coerce expanded 'vector)))))
   parsed-program)

@@ -48,7 +48,6 @@ conforming to the list of EXPECTED-PARAMETERS."
 
 (defun resolve-waveform-reference (waveform-ref waveform-defns &key (use-defaults t))
   "Destructively update WAVEFORM-REF's name resolution to an appropriate waveform or waveform definition."
-  (assert (null (waveform-ref-name-resolution waveform-ref)))
   (let* ((name (waveform-ref-name waveform-ref))
          (resolution
            (a:if-let ((default-binding (and use-defaults
@@ -66,7 +65,6 @@ conforming to the list of EXPECTED-PARAMETERS."
 
 (defun resolve-frame (frame frame-definitions)
   "Destructively update FRAME's name resolution to an appropriate frame definition."
-  (assert (null (frame-name-resolution frame)))
   ;; We do not resolve frames in calibration bodies, /even/ if we could (e.g. because
   ;; they do not involve formal arguments). The motivation for this is twofold:
   ;; i) it's sometimes convenient to parse calibrations separately from frame definitions
@@ -193,9 +191,11 @@ conforming to the list of EXPECTED-PARAMETERS."
 (defun resolve-objects (raw-quil)
   "Perform all object resolution within the list RAW-QUIL, returning a PARSED-PROGRAM."
   ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
-  ;; we need to also resolve waveform and frame references. BUT... TODO
-  ;; we can't resolve frame references in calibration bodies until they themselves have been resolved.
-  ;; so...
+  ;; we need to also resolve waveform and frame references.
+
+  ;; NOTE: Some frames within calibration bodies cannot be resolved here (e.g.
+  ;; where one of the qubits is a formal argument). We adopt the convention that
+  ;; all frames in calibration bodies are resolved at expansion time.
   (check-type raw-quil list)
   (let ((unresolved-program (raw-quil-to-unresolved-program raw-quil)))
     (flet ((resolve-instruction-sequence (seq)
