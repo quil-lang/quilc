@@ -238,9 +238,8 @@ DEFWAVEFORM foo 4.0:
 
 PULSE 0 \"xy\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)
 PULSE 0 \"xy\" foo
-"))
-        (sample-rate 2.0))
+")))
     (flet ((instr (i)
              (elt (parsed-program-executable-code pp) i)))
-      (is (= 1.0 (quil::quilt-instruction-duration (instr 0) sample-rate)))
-      (is (= 2.0 (quil::quilt-instruction-duration (instr 1) sample-rate))))))
+      (is (= 1.0 (quil::quilt-instruction-duration (instr 0))))
+      (is (= 2.0 (quil::quilt-instruction-duration (instr 1)))))))
