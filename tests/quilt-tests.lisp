@@ -70,18 +70,22 @@ DEFFRAME 0 \"xy\"
 DEFWAVEFORM foo 1.0:
     1.0, 1.0, 1.0
 
+DEFCAL X q:
+    PULSE q \"xy\" foo
+
 PULSE 0 \"xy\" foo")))
     (let ((frame-defn (first
                        (parsed-program-frame-definitions pp)))
           (waveform-defn (first
-                          (parsed-program-waveform-definitions pp)))
-          (instr (quil::nth-instr 0 pp)))
-      (is (eq frame-defn
-              (quil::frame-name-resolution
-               (pulse-frame instr))))
-      (is (eq waveform-defn
-              (quil::waveform-ref-name-resolution
-               (pulse-waveform instr)))))))
+                          (parsed-program-waveform-definitions pp))))
+      (loop :for instr :across (parsed-program-executable-code pp)
+            :do (progn
+                  (is (eq frame-defn
+                          (quil::frame-name-resolution
+                           (pulse-frame instr))))
+                  (is (eq waveform-defn
+                          (quil::waveform-ref-name-resolution
+                           (pulse-waveform instr)))))))))
 
 ;;; TODO: should we allow pulse etc in circuits?
 
