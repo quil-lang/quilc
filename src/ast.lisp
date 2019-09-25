@@ -1637,10 +1637,10 @@ For example,
       (assert (every (lambda (frame)
                        (equalp qubits (frame-qubits frame)))
                      frames))
-      (format stream "DELAY~{ ~A~} ~A~{ ~S~}"
+      (format stream "DELAY~{ ~A~}~{ ~S~} ~A"
               (mapcar #'print-instruction-to-string qubits)
-              (print-instruction-to-string (delay-duration instr))
-              (mapcar #'frame-name (delay-frames instr)))))
+              (mapcar #'frame-name (delay-frames instr))
+              (print-instruction-to-string (delay-duration instr)))))
 
   (:method ((instr classical-instruction) (stream stream))
     (format stream "~A"
@@ -1708,15 +1708,15 @@ For example,
 
   ;; The following are not actually instructions, but who cares.
 
-  (:method ((memory-defn memory-descriptor) (stream stream))
+  (:method ((defn memory-descriptor) (stream stream))
     (format stream "DECLARE ~a ~a"
-            (memory-descriptor-name memory-defn)
-            (quil-type-string (memory-descriptor-type memory-defn)))
-    (format stream "~[[0]~;~:;[~:*~a]~]" (memory-descriptor-length memory-defn))
-    (when (memory-descriptor-sharing-parent memory-defn)
+            (memory-descriptor-name defn)
+            (quil-type-string (memory-descriptor-type defn)))
+    (format stream "~[[0]~;~:;[~:*~a]~]" (memory-descriptor-length defn))
+    (when (memory-descriptor-sharing-parent defn)
       (format stream " SHARING ~a"
-              (memory-descriptor-sharing-parent memory-defn))
-      (a:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
+              (memory-descriptor-sharing-parent defn))
+      (a:when-let (x (memory-descriptor-sharing-offset-alist defn))
         (format stream " OFFSET")
         (loop :for (type . count) :in x
               :do (format stream " ~a ~a" count (quil-type-string type)))))
@@ -1748,37 +1748,42 @@ For example,
             (gate-definition-name gate)
             (permutation-gate-definition-permutation gate)))
 
-  (:method ((circuit-defn circuit-definition) (stream stream))
+  (:method ((defn circuit-definition) (stream stream))
     (format stream "DEFCIRCUIT ~a"
-            (circuit-definition-name circuit-defn))
-    (unless (endp (circuit-definition-parameters circuit-defn))
+            (circuit-definition-name defn))
+    (unless (endp (circuit-definition-parameters defn))
       (format stream "(~{~a~^, ~})" (mapcar #'print-instruction-to-string
-                                            (circuit-definition-parameters circuit-defn))))
-    (unless (endp (circuit-definition-arguments circuit-defn))
+                                            (circuit-definition-parameters defn))))
+    (unless (endp (circuit-definition-arguments defn))
       (format stream "~{ ~a~}" (mapcar #'print-instruction-to-string
-                                       (circuit-definition-arguments circuit-defn))))
+                                       (circuit-definition-arguments defn))))
     (format stream ":~%")
-    (print-instruction-sequence (circuit-definition-body circuit-defn)
+    (print-instruction-sequence (circuit-definition-body defn)
                                 :stream stream
                                 :prefix "    ")
     (terpri stream))
 
-  (:method ((thing frame-definition) (stream stream))
-    (format stream "DEFFRAME ~A:~%"
-            (print-instruction-generic (frame-definition-frame thing) nil))
-    (when (frame-definition-sample-rate thing)
-      (format stream "    SAMPLE-RATE: ~A"
-              (print-instruction-to-string (frame-definition-sample-rate thing))))
-    (when (frame-definition-initial-frequency thing)
-      (format stream "    INITIAL-FREQUENCY: ~A"
-              (print-instruction-to-string (frame-definition-initial-frequency thing)))))
+  (:method ((defn frame-definition) (stream stream))
+    (let ((sample-rate (frame-definition-sample-rate defn))
+          (frequency (frame-definition-initial-frequency defn)))
+      (format stream "DEFFRAME ~A"
+              (print-instruction-generic (frame-definition-frame defn) nil))
+      (when (or sample-rate frequency)
+        (format stream ":~%"))
+      (when sample-rate
+        (format stream "    SAMPLE-RATE: ~A"
+                (print-instruction-to-string sample-rate)))
+      (when frequency
+        (format stream "    INITIAL-FREQUENCY: ~A"
+                (print-instruction-to-string frequency)))
+      (terpri stream)))
 
-  (:method ((thing waveform-definition) (stream stream))
+  (:method ((defn waveform-definition) (stream stream))
     (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~]:~%"
-            (waveform-definition-name thing)
-            (if (typep thing 'static-waveform-definition)
+            (waveform-definition-name defn)
+            (if (typep defn 'static-waveform-definition)
                 nil
-                (waveform-definition-parameters thing)))
+                (waveform-definition-parameters defn)))
     (format stream "    ~{~a~^, ~}~%"
             (mapcar (lambda (z)
                       (with-output-to-string (s)
@@ -1787,7 +1792,7 @@ For example,
                            (format-complex z s))
                           ((or list symbol)
                            (print-instruction (make-delayed-expression nil nil z) s)))))
-                    (waveform-definition-entries thing))))
+                    (waveform-definition-entries defn))))
 
   (:method ((defn gate-calibration-definition) (stream stream))
     (format stream "DEFCAL ")
