@@ -391,6 +391,9 @@ depending on whether TEST passes."
       (make-instance 'fence :qubits qubits))))
 
 (defun instantiate-frame (frame arg-value)
-  (let ((qubits (mapcar (transform-if #'is-formal arg-value)
-                        (frame-qubits frame))))
-    (frame qubits (frame-name frame))))
+  (let* ((qubits (mapcar (transform-if #'is-formal arg-value)
+                         (frame-qubits frame)))
+         (instantiated (frame qubits (frame-name frame))))
+    (setf (frame-name-resolution instantiated)
+          (frame-name-resolution frame))
+    instantiated))

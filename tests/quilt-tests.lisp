@@ -64,6 +64,25 @@ DAGGER DAGGER RZ(pi/2) 0                # 2
                           (is result)
                           (is (not result))))))))))
 
+(deftest test-quilt-name-resolution ()
+  (let ((pp (parse-quil "
+DEFFRAME 0 \"xy\"
+DEFWAVEFORM foo 1.0:
+    1.0, 1.0, 1.0
+
+PULSE 0 \"xy\" foo")))
+    (let ((frame-defn (first
+                       (parsed-program-frame-definitions pp)))
+          (waveform-defn (first
+                          (parsed-program-waveform-definitions pp)))
+          (instr (quil::nth-instr 0 pp)))
+      (is (eq frame-defn
+              (quil::frame-name-resolution
+               (pulse-frame instr))))
+      (is (eq waveform-defn
+              (quil::waveform-ref-name-resolution
+               (pulse-waveform instr)))))))
+
 ;;; TODO: should we allow pulse etc in circuits?
 
 (deftest test-recursive-calibration ()
