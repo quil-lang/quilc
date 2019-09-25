@@ -148,9 +148,7 @@
    nil))
 
 (defun tokenization-failure-context (input-string condition)
-  "Given an ALEXA:LEXER-MATCH-ERROR in CONDITION, return as multiple
-values the individual line and individual character within
-INPUT-STRING that triggered the condition."
+  "Given an ALEXA:LEXER-MATCH-ERROR in CONDITION, return as multiple values the individual line and individual character within INPUT-STRING that triggered the condition."
   (flet ((alexa-failure-position (condition)
            ;; This parses the error string of ALEXA, which looks like
            ;; "Couldn't find match at position 42 ...". This is
@@ -473,19 +471,13 @@ the immediately preceding line."
 ;; number and type of tokens, destructuring the corresponding token list,
 ;; and returning a result along with the rest of the lines.
 (defmacro match-line (token-specs lines &body body)
-  "Bind the tokens in the first line of LINES according to the specified
-TOKEN-SPECS. These bindings are made available in the BODY.
+  "Bind the tokens in the first line of LINES according to the specified TOKEN-SPECS. These bindings are made available in the BODY.
 
-A TOKEN-SPEC looks like a lambda list. There is support for three sorts
-of bindings: required, optional, and rest. If specializers (for required)
-or default values (for optional) are provided, these symbols are used to enforce
-a given token type.
+A TOKEN-SPEC looks like a lambda list. There is support for three sorts of bindings: required, optional, and rest. If specializers (for required) or default values (for optional) are provided, these symbols are used to enforce a given token type.
 
-For example, the spec ((op :RESET) &optional q) would match a single RESET
-token, or a RESET token followed by a second token.
+For example, the spec ((op :RESET) &optional q) would match a single RESET token, or a RESET token followed by a second token.
 
-In accordance with the typical usage here, there are two values returned: the
-result of BODY, and the (possibly null) list of remaining lines.
+In accordance with the typical usage here, there are two values returned: the result of BODY, and the (possibly null) list of remaining lines.
 "
   ;; check that specified token types are valid
   (dolist (spec token-specs)
@@ -542,10 +534,11 @@ result of BODY, and the (possibly null) list of remaining lines.
                        (rest ,all-lines))))))))))
 
 (defun parse-qubit (qubit-tok)
+  "Parse a qubit, denoted by a formal argument or an integer index."
   (case (token-type qubit-tok)
     ((:NAME)
      (unless *formal-arguments-allowed*
-       (quil-parse-error "Unexpected formal parameter ~A~@[ in ~A~]."
+       (quil-parse-error "Unexpected formal argument ~A~@[ in ~A~]."
                          (token-payload qubit-tok)
                          *parse-context*))
      (formal (token-payload qubit-tok)))
@@ -553,7 +546,7 @@ result of BODY, and the (possibly null) list of remaining lines.
     (otherwise
      (disappointing-token-error qubit-tok
                                 (if *formal-arguments-allowed*
-                                    "a name or formal parameter"
+                                    "a name or formal argument"
                                     "a name")))))
 
 (defun parse-memory-or-formal-token (tok &key ensure-valid)
@@ -1578,8 +1571,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                         rest-lines)))))))))
 
 (defun parse-parameters (params-args &key allow-expressions)
-  "Parse a list of parameters, surrounded by a pair of parentheses. Returns the
-parsed parameters and the remaining tokens.
+  "Parse a list of parameters, surrounded by a pair of parentheses. Returns the parsed parameters and the remaining tokens.
 
 When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a parameter context."
   (unless (eql ':LEFT-PAREN (token-type (first params-args)))

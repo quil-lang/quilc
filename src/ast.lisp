@@ -398,9 +398,7 @@ If no exit rewiring is found, return NIL."
   (ilog2 (length (permutation-gate-definition-permutation gate))))
 
 (defun permutation-from-gate-entries (entries)
-  "Create the permutation (list of natural numbers) that represents
-the input matrix ENTRIES. Return nil if ENTRIES cannot be represented
-as a permutation."
+  "Create the permutation (list of natural numbers) that represents the input matrix ENTRIES. Return nil if ENTRIES cannot be represented as a permutation."
   (let* ((n (isqrt (length entries)))
          (perm (make-list n)))
      (dotimes (i n perm)
@@ -599,8 +597,7 @@ as a permutation."
 (defclass pragma (instruction)
   ((words :initarg :words
           :reader pragma-words
-          :documentation "A list of strings derived from identifiers or
-numbers. It must start with a string.")
+          :documentation "A list of strings derived from identifiers or numbers. It must start with a string.")
    (freeform-string :initarg :freeform-string
                     :reader pragma-freeform-string
                     :documentation "A freeform string."))
@@ -726,8 +723,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
              :accessor capture-waveform)
    (memory-ref :initarg :memory-ref
                :accessor capture-memory-ref))
-  (:documentation "An instruction expressing the readout and integration of raw
-  IQ values, to be stored in a region of classical memory."))
+  (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
 (defclass raw-capture (instruction)
   ((frame :initarg :frame
@@ -736,8 +732,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
              :accessor raw-capture-duration)
    (memory-ref :initarg :memory-ref
                :accessor raw-capture-memory-ref))
-  (:documentation "An instruction expressing the readout of raw
-  IQ values, to be stored in a region of classical memory."))
+  (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
 (defclass delay (instruction)
   ((duration :initarg :duration
@@ -756,8 +751,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defclass fence (instruction)
   ((qubits :initarg :qubits
            :accessor fence-qubits))
-  (:documentation "A synchronization barrier on a set of qubits, demarcating
-  preceding and succeeding instructions."))
+  (:documentation "A synchronization barrier on a set of qubits, demarcating preceding and succeeding instructions."))
 
 ;;; Classical Instructions
 
@@ -1235,8 +1229,7 @@ Each addressing mode will be a vector of symbols:
       "Describes a gate as the direct sum of two instances of some other specified gate G with input parameters either p_low or p_high, conditioned on whether a control bit is low or high.  In Quil code, this corresponds to the descriptor FORKED.")
 
 (defun involutive-dagger-operator (od)
-  "Instantiate a dagger operator on the operator description OD and
-reduce consecutive dagger operators.
+  "Instantiate a dagger operator on the operator description OD and reduce consecutive dagger operators.
 
 For example, `DAGGER DAGGER H 0` should produce `H 0`."
   (adt:match operator-description od

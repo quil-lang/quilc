@@ -12,8 +12,7 @@
 ;;;     multiple definitions are allowed, with match priority given to later definitions).
 
 (define-transform expand-calibrations (expand-calibrations)
-  "This transform applies all available calibrations. The result has no gate applications or
-measurements for which a calibration is defined."
+  "This transform applies all available calibrations. The result has no gate applications or measurements for which a calibration is defined."
   expand-circuits)
 
 (defvar *gate-calibrations*)
@@ -138,16 +137,15 @@ measurements for which a calibration is defined."
     nil))
 
 (defparameter *require-applicable-calibration* nil
-  "If T, an error will be signalled if an instruction fails to match an
-  applicable calibration during calibration expansion.")
+  "If T, an error will be signalled if an instruction fails to match an applicable calibration during calibration expansion.")
 
 (defun recursively-expand-instruction (instr)
   (let ((*expansion-depth* (1+ *expansion-depth*)))
     (unless (<= *expansion-depth* *expansion-limit*)
-      "Exceeded recursion limit of ~D for calibration expansion. ~
-      Current object being expanded is ~A."
-      *expansion-limit*
-      instr)
+      (quil-parse-error "Exceeded recursion limit of ~D for calibration expansion. ~
+                         Current object being expanded is ~A."
+                        *expansion-limit*
+                        instr))
     (a:if-let ((expanded (apply-calibration instr)))
       ;; Recursively expand the new instructions
       (a:mappend #'recursively-expand-instruction expanded)

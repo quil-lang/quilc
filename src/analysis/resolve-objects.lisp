@@ -12,8 +12,7 @@
 
 ;;; TODO check i) that values are constant, and ii) of the appropriate type
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
-  "Determines whether the waveform reference WAVEFORM-REF has parameter names
-conforming to the list of EXPECTED-PARAMETERS."
+  "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
   (let ((actual (mapcar (a:compose #'param-name #'first) (waveform-ref-args waveform-ref))))
     (a:when-let ((missing (set-difference expected-parameters actual :test #'equalp)))
       (quil-parse-error "Expected parameter ~A in waveform ~A."
