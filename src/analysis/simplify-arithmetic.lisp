@@ -134,9 +134,11 @@ which fills in the COEFFICIENTS hash table with the memory references and their 
     (memory-ref
      (make-affine-representation 0 de 1.0))
     (cons
-     (let ((left (expression->affine-representation (second de)))
-           (right (expression->affine-representation (third de))))
-       (combine-affine-representations (car de) left right)))
+     (destructuring-bind (op left &optional right) de
+       (combine-affine-representations
+        op
+        (expression->affine-representation left)
+        (expression->affine-representation right))))
     (otherwise (error 'expression-not-simplifiable))))
 
 (defun affine-representation->expression (rep)
