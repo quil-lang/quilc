@@ -155,31 +155,39 @@ X 0"
       (quil::expand-calibrations pp :strict t))))
 
 (deftest test-fence-expansion ()
-  (let ((pp (parse-quil "
+  (let ((pp
+          (parse-quil "
 DEFFRAME 0 \"xy\"
 DEFFRAME 1 \"xy\"
 
 DECLARE ro BIT
+
 PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 FENCE 0 1
 CAPTURE 0 \"xy\" flat(duration: 1, iq: 1) ro
 CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
-"))
-        (clocks (vector 0.0 0.0)))
+")))
     (quil::expand-fences-to-delays pp)
-    ;; Check whether the FENCE resolves to suitable DELAY instrs
-    (flet ((qubit (instr)
-             (qubit-index
-              (etypecase instr
-                (pulse (first (frame-qubits (pulse-frame instr))))
-                (capture (first (frame-qubits (capture-frame instr))))
-                (delay (first (delay-qubits instr)))))))
-      (loop :for instr :across (parsed-program-executable-code pp)
-            :do (let ((q (qubit instr)))
-                  ;; We expect the CAPTURE instructions to start at 1
-                  (when (typep instr 'capture)
-                    (is (= 1.0 (aref clocks q))))
-                  (incf (aref clocks q) (quil::quilt-instruction-duration instr)))))))
+    ;; no delays
+    (map nil
+         (lambda (instr)
+           (is (not (typep instr 'fence))))
+         (parsed-program-executable-code pp))
+    (let ((instr (quil::nth-instr 1 pp)))
+      (is (and (typep instr 'delay)
+               (= 1.0 (constant-value  (delay-duration instr)))
+               ;; we can't say which kind of delay is inserted,
+               ;; so we just check either
+               (typecase instr
+                 (delay-on-frames
+                  (every (lambda (f)
+                           (quil::frame= f
+                                         (frame (list (qubit 1)) "xy")))
+                         (delay-frames instr)))
+                 (delay-on-qubits
+                  (every (lambda (q)
+                           (= 1 (qubit-index q)))
+                         (delay-qubits instr)))))))))
 
 (deftest test-quilt-defwaveform-sample-rate ()
   (signals quil-parse-error

@@ -77,7 +77,7 @@ conforming to the list of EXPECTED-PARAMETERS."
       (quil-parse-error "Unable to resolve formal ~A outside of definition body." formal-qubit)
       (a:if-let ((defn (find frame frame-definitions
                              :key #'frame-definition-frame
-                             :test #'frame-equals-p)))
+                             :test #'frame=)))
         (setf (frame-name-resolution frame) defn)
         (quil-parse-error "No frame definition found for referenced frame ~A."
                           (print-instruction-to-string frame)))))
