@@ -1603,6 +1603,11 @@ For example,
             (mnemonic instr)
             (map 'list #'print-instruction-to-string (arguments instr))))
 
+  (:method ((instr swap-phase) (stream stream))
+    (format stream "SWAP-PHASE ~A ~A"
+            (print-instruction-to-string (swap-phase-left-frame instr))
+            (print-instruction-to-string (swap-phase-right-frame instr))))
+
   (:method ((instr pulse) (stream stream))
     (format stream "PULSE ~A ~A"
             (print-instruction-to-string (pulse-frame instr))
