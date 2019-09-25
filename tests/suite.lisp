@@ -9,11 +9,17 @@
   ;; Bug in Fiasco commit fe89c0e924c22c667cc11c6fc6e79419fc7c1a8b
   (setf fiasco::*test-run-standard-output* (make-broadcast-stream
                                             *standard-output*))
-  (let ((quil::*compress-carefully* t))
+  (let ((quil::*compress-carefully* t)
+        ;; Some tests make use of lparallel directly. If we don't set
+        ;; a kernel here, then the (non-parallel) test suite will
+        ;; pause and request that we create a kernel. To avoid that,
+        ;; we create a single thread kernel that ought to behave as if
+        ;; there was no parallelisation.
+        (lparallel:*kernel* (lparallel:make-kernel 1)))
     (cond
       (parallel
-       (setf lparallel:*kernel* (lparallel:make-kernel parallel))
-       (let ((fiasco::*debug-on-unexpected-error* nil)
+       (let ((lparallel:*kernel* (lparallel:make-kernel parallel))
+             (fiasco::*debug-on-unexpected-error* nil)
              (fiasco::*debug-on-assertion-failure* nil)
              (fiasco::*pretty-log-stream*
                (make-instance 'fiasco::column-counting-output-stream

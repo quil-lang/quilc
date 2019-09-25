@@ -99,42 +99,41 @@ JUMP @a")))
   (let* ((orig-prog (quil::transform 'quil::compress-qubits
                                      (cl-quil::read-quil-file file)))
          (proc-prog
-           (quil::compiler-hook (quil::transform 'quil::compress-qubits
-                                                 (cl-quil::read-quil-file file))
-                                (quil::build-nQ-linear-chip 5 :architecture architecture)
-                                :protoquil t)))
+          (quil::compiler-hook (quil::transform 'quil::compress-qubits
+                                                (cl-quil::read-quil-file file))
+                               (quil::build-nQ-linear-chip 5 :architecture architecture)
+                               :protoquil t)))
     (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
                                   (quil::parsed-program-to-logical-matrix proc-prog)))
     (list
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
 
-(macrolet
-    ((define-compiler-hook-tests ()
-       `(progn
-          ,@(loop :for test-file :in (uiop:directory-files (asdf:system-relative-pathname
-                                                            ':cl-quil-tests
-                                                            "tests/compiler-hook-test-files/") #P "*.quil")
-                  :append (loop :for test-name :in (list
-                                                    (concatenate 'string "TEST-COMPILER-HOOK-"
-                                                                 (string-upcase (pathname-name test-file)))
-                                                    (concatenate 'string "TEST-COMPILER-HOOK-"
-                                                                 (string-upcase (pathname-name test-file))
-                                                                 "-WITH-STATE-PREP-COMPRESSION"))
-                                :for state-prep :in (list nil t)
-                                :append
-                                (loop :for arch :in (list ':cz ':iswap ':cphase ':piswap ':cnot)
-                                      :for name := (concatenate 'string test-name "-" (string arch))
-                                      :collect
-                                      `(deftest ,(intern name) (&key print-stats)
-                                         (finish-output fiasco::*test-run-standard-output*)
-                                         (let* ((cl-quil::*enable-state-prep-compression* ,state-prep)
-                                                (stats (compare-compiled ,test-file ,arch)))
-                                           (when print-stats
-                                             (format fiasco::*test-run-standard-output* "~a" stats)))
-                                         (terpri fiasco::*test-run-standard-output*))))))))
+(defparameter *compiler-hook-test-file-directory*
+  (asdf:system-relative-pathname
+   ':cl-quil-tests
+   "tests/compiler-hook-test-files/"))
 
-  (define-compiler-hook-tests))
+(deftest test-compiler-hook (&key print-stats)
+  "Test whether the compiler hook preserves semantic equivalence for some test programs."
+  (finish-output fiasco::*test-run-standard-output*)
+  (lparallel:pmap nil
+                  (lambda (state-prep)
+                    (let ((quil::*enable-state-prep-compression* state-prep))
+                      (format fiasco::*test-run-standard-output* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
+                      (lparallel:pmap nil
+                                      (lambda (file)
+                                        (format fiasco::*test-run-standard-output* "      Testing file ~a:" (pathname-name file))
+                                        (lparallel:pmap nil
+                                                        (lambda (architecture)
+                                                          (format fiasco::*test-run-standard-output* " ~a" architecture)
+                                                          (let ((stats (compare-compiled file architecture)))
+                                                            (when print-stats
+                                                              (format fiasco::*test-run-standard-output* "~a" stats))))
+                                                        (list ':cz ':iswap ':cphase ':piswap ':cnot))
+                                        (terpri fiasco::*test-run-standard-output*))
+                                      (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))))
+                  '(nil t)))
 
 (deftest test-compression-bug-QUILC-152 ()
   "QUILC-152: A bug in state compression caused a failed assertion."
