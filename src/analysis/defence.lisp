@@ -45,7 +45,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     (standard-waveform (constant-value (waveform-duration wf-or-wf-defn)))
     (waveform-definition
      (/ (length (waveform-definition-entries wf-or-wf-defn))
-        (waveform-definition-sample-rate wf-or-wf-defn)))))
+        (constant-value (waveform-definition-sample-rate wf-or-wf-defn))))))
 
 (defun quilt-instruction-duration (instr)
   "Get the duration of the specified quilt instruction INSTR."
