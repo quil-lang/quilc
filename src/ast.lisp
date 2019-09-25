@@ -1720,7 +1720,7 @@ For example,
         (format stream " OFFSET")
         (loop :for (type . count) :in x
               :do (format stream " ~a ~a" count (quil-type-string type)))))
-    (format stream "~%"))
+    (terpri stream))
 
   (:method ((gate matrix-gate-definition) (stream stream))
     (let ((gate-size (isqrt (length (gate-definition-entries gate)))))
@@ -1917,7 +1917,7 @@ Examples:
 
     ;; write out memory definitions
     (dolist (memory-defn memory-definitions)
-      (print-instruction memory-defn s)
+      (print-instruction memory-defn s))
     (unless (endp memory-definitions)
       (terpri s))
 
@@ -1949,7 +1949,7 @@ Examples:
     (dolist (circuit-defn circuit-definitions)
       (print-instruction circuit-defn s))
     (unless (endp circuit-definitions)
-      (terpri s)))
+      (terpri s))
 
     ;; write out main block
     (print-instruction-sequence (parsed-program-executable-code parsed-program)
