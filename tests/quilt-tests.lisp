@@ -98,6 +98,7 @@ DEFCAL RX(%theta) q:
     NOP
 
 X 0")))
+    (quil::expand-calibrations pp)
     (is (= 1 (length (parsed-program-executable-code pp))))
     (is (typep (elt (parsed-program-executable-code pp) 0)
                'no-operation))))
@@ -233,7 +234,7 @@ DEFWAVEFORM foo 4.0:
   (let ((pp (parse-quil "
 DEFFRAME 0 \"xy\"
 
-DEFWAVEFORM foo 4.0:
+DEFWAVEFORM foo 2.0:
     1.0, 1.0, 1.0, 1.0
 
 PULSE 0 \"xy\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)

@@ -24,8 +24,7 @@
                           name file other-file)))))
 
 (defun definition-signature (instr)
-  "If INSTR is a definition or memory declaration, returns a signature used for
-determining ambiguity. Otherwise, return NIL."
+  "If INSTR is a definition or memory declaration, returns a signature used for determining ambiguity. Otherwise, return NIL."
   (flet ((gate-or-circuit-signature (name params args)
            ;; TODO in principle the signature should include the number of params and args
            ;; since e.g. we can tell the difference between FOO 1 and FOO 1 2. however,
@@ -54,8 +53,7 @@ determining ambiguity. Otherwise, return NIL."
                                (memory-descriptor-name instr))))))
 
 (defun ambiguous-definition-condition (instr file conflicts)
-  "Signal a condition indicating that the instruction INSTR parsed from FILE has
-a list of conflicts CONFLICTS."
+  "Signal a condition indicating that the instruction INSTR parsed from FILE has a list of conflicts CONFLICTS."
   (let ((combined (acons instr file conflicts)))
     (etypecase instr
       (gate-definition (make-condition 'ambiguous-gate-or-circuit-definition :conflicts combined))
@@ -114,10 +112,7 @@ This also signals ambiguous definitions, which may be handled as needed."
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)
                             (ambiguous-definition-handler #'continue))
-  "Parse and process the Quil string STRING, which originated from the file
-ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed
-Quil string. In the presence of multiple definitions with a common signature, a
-signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
+  "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string. In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
 "
   (handler-bind
       (;; We disallow multiple declarations of the same memory region (even if equivalent).

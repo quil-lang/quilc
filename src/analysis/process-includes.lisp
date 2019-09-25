@@ -5,8 +5,7 @@
 (in-package #:cl-quil)
 
 (defun process-includes (raw-quil &optional originating-file)
-  "Recursively process all INCLUDE instructions in the list RAW-QUIL. The
-result is a new sequence with the included quil instructions spliced in."
+  "Recursively process all INCLUDE instructions in the list RAW-QUIL. The result is a new sequence with the included quil instructions spliced in."
   (let* (;; We track the expanded list of instructions, and build it from its tail out
          (expanded (cons nil nil))
          (expanded-tail expanded)
