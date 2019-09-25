@@ -364,3 +364,21 @@ as needed so that they are the same size."
   (loop :for j :below (min (magicl:matrix-rows m)
                            (magicl:matrix-cols m))
         :collect (magicl:ref m j j)))
+
+;; TODO I have the feeling we have too many matrix comparison routines.
+(defun check-instructions-matrix-consistency (instrs-from instrs-to &key (relabeling (minimal-standard-relabeling instrs-from instrs-to)))
+  "Compare for equality (up to a phase) the matrix representations of INSTRS-TO and INSTRS-FROM (under the appropriate relabeling)."
+  (when (and *compress-carefully*
+             (not *enable-approximate-compilation*)
+             (notany (a:rcurry #'typep 'state-prep-application)
+                     (append instrs-from instrs-to)))
+    (let* ((ref-mat (make-matrix-from-quil instrs-from :relabeling relabeling))
+           (mat (make-matrix-from-quil instrs-to :relabeling relabeling))
+           (kron-size (max (ilog2 (magicl:matrix-rows ref-mat))
+                           (ilog2 (magicl:matrix-rows mat))))
+           (kroned-mat (kron-matrix-up mat kron-size))
+           (kroned-ref-mat (kron-matrix-up ref-mat kron-size)))
+      (assert
+       (matrix-equality
+        kroned-ref-mat
+        (scale-out-matrix-phases kroned-mat kroned-ref-mat))))))

@@ -346,61 +346,28 @@ other's."
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
+(defgeneric expand-instruction-to-native-instructions (instr chip)
+  (:documentation "Expand INSTR into a list of instructions native for CHIP by applying nativization routines available on CHIP.")
+  (:method ((instr instruction) chip)
+    (list instr))
+
+  (:method ((instr no-operation) chip)
+    ;; A NO-OPERATION is not native, and should be popped from the
+    ;; instruct list (i.e. does not expand into any instructions).
+    nil)
+
+  (:method ((instr gate-application) chip)
+    (let ((obj (lookup-hardware-object chip instr)))
+      (if (and obj (hardware-object-native-instruction-p obj instr))
+          (list instr)
+          (let ((instructions (apply-translation-compilers instr chip obj)))
+            (check-instructions-matrix-consistency (list instr) instructions)
+            (loop :for new-instruction :in instructions
+                  :nconc (expand-instruction-to-native-instructions new-instruction chip)))))))
+
 (defun expand-to-native-instructions (instructions chip)
-  "Repeatedly applies nativization routines to expand a list of addressed instructions into a list of addressed, native instructions. Makes no attempt to perform any kind of rewiring or any kind of simplification."
-  (do* ((processed nil)
-        (instructions instructions)
-        (instr (first instructions) (first instructions)))
-       ;; if we've exhausted the input, then return
-       ((endp instructions) (nreverse processed))
-    (cond
-      ;; discard any NOPs
-      ((typep instr 'no-operation)
-       (pop instructions))
-      ;; pass any classical instructions through
-      ((not (typep instr  'application))
-       (pop instructions)
-       (push instr processed))
-      ;; otherwise, we have a quantum instruction
-      (t
-       ;; try to locate it on hardware.
-       (let ((obj (lookup-hardware-object chip instr))
-             (translation-results nil))
-         (cond
-           ;; are we native? then stick this instruction onto the output.
-           ((and obj (hardware-object-native-instruction-p obj instr))
-            (pop instructions)
-            (push instr processed))
-           ;; apply a translation and use those instructions instead.
-           (t
-            (setf translation-results
-                  (apply-translation-compilers instr chip obj))
-            ;; elaborate assertion follows
-            (when (and *compress-carefully*
-                       (not *enable-approximate-compilation*)
-                       (notany (lambda (instr)
-                                 (typep instr 'state-prep-application))
-                               instructions))
-              (let* ((reassignment
-                      ;; the actual reassignment we use is unimportant. this is
-                      ;; more along the lines of COMPRESS-QUBITs, so that our
-                      ;; matrices don't take up quite so much space.
-                      (standard-qubit-relabeler (union (qubits-in-instr-list instructions)
-                                                       (qubits-in-instr-list translation-results))))
-                     (ref-mat (make-matrix-from-quil (list instr)
-                                                     :relabeling reassignment))
-                     (mat (make-matrix-from-quil translation-results
-                                                 :relabeling reassignment))
-                     (kron-size (max (ilog2 (magicl:matrix-rows ref-mat))
-                                     (ilog2 (magicl:matrix-rows mat))))
-                     (kroned-mat (kron-matrix-up mat kron-size))
-                     (kroned-ref-mat (kron-matrix-up ref-mat kron-size)))
-                (assert
-                 (matrix-equality
-                  kroned-ref-mat
-                  (scale-out-matrix-phases kroned-mat kroned-ref-mat)))))
-            ;; expand the set of instructions which need to be processed.
-            (setf instructions (append translation-results (rest instructions))))))))))
+  "Expand INSTRUCTIONS into a list of instructions that are native for CHIP. Makes no attempt to perform rewiring or simplication."
+  (a:mappend (a:rcurry #'expand-instruction-to-native-instructions chip) instructions))
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
   "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
