@@ -393,6 +393,10 @@
    #:measurement-calibration-qubit      ; READER
    #:measure-calibration-address        ; READER
 
+   #:frame-definition                   ; CLASS
+   #:frame-definition-frame             ; READER
+   #:frame-definition-sample-rate       ; READER
+   #:frame-definition-initial-frequency ; READER
 
    #:parsed-program                     ; CLASS
    #:parsed-program-gate-definitions    ; READER
