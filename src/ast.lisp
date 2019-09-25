@@ -1569,8 +1569,8 @@ For example,
       (print-delayed-expression (delayed-expression-expression thing) stream)))
 
   (:method ((thing frame) (stream stream))
-    (format stream "~{~A ~}\"~A\""
-            (mapcar #'print-instruction-to-string (frame-qubits thing))
+    (format stream "~{~/quil:instruction-fmt/ ~}\"~A\""
+            (mapcar #'print-instruction-to-string 
             (frame-name thing)))
 
   (:method ((thing waveform-ref) (stream stream))
@@ -1707,6 +1707,21 @@ For example,
             (application-arguments instr)))
 
   ;; The following are not actually instructions, but who cares.
+
+  (:method ((memory-defn memory-descriptor) (stream stream))
+    (format stream "DECLARE ~a ~a"
+            (memory-descriptor-name memory-defn)
+            (quil-type-string (memory-descriptor-type memory-defn)))
+    (format stream "~[[0]~;~:;[~:*~a]~]" (memory-descriptor-length memory-defn))
+    (when (memory-descriptor-sharing-parent memory-defn)
+      (format stream " SHARING ~a"
+              (memory-descriptor-sharing-parent memory-defn))
+      (a:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
+        (format stream " OFFSET")
+        (loop :for (type . count) :in x
+              :do (format stream " ~a ~a" count (quil-type-string type)))))
+    (format stream "~%"))
+
   (:method ((gate matrix-gate-definition) (stream stream))
     (let ((gate-size (isqrt (length (gate-definition-entries gate)))))
       (format stream "DEFGATE ~a~@[(~{%~a~^, ~})~]:~%"
@@ -1727,10 +1742,26 @@ For example,
                                 (* i gate-size)
                                 (* (1+ i) gate-size)))))
       (terpri stream)))
+
   (:method ((gate permutation-gate-definition) (stream stream))
     (format stream "DEFGATE ~a AS PERMUTATION:~%    ~{~D~^, ~}~%"
             (gate-definition-name gate)
             (permutation-gate-definition-permutation gate)))
+
+  (:method ((circuit-defn circuit-definition) (stream stream))
+    (format stream "DEFCIRCUIT ~a"
+            (circuit-definition-name circuit-defn))
+    (unless (endp (circuit-definition-parameters circuit-defn))
+      (format stream "(~{~a~^, ~})" (mapcar #'print-instruction-to-string
+                                            (circuit-definition-parameters circuit-defn))))
+    (unless (endp (circuit-definition-arguments circuit-defn))
+      (format stream "~{ ~a~}" (mapcar #'print-instruction-to-string
+                                       (circuit-definition-arguments circuit-defn))))
+    (format stream ":~%")
+    (print-instruction-sequence (circuit-definition-body circuit-defn)
+                                :stream stream
+                                :prefix "    ")
+    (terpri stream))
 
   (:method ((thing frame-definition) (stream stream))
     (format stream "DEFFRAME ~A:~%"
@@ -1742,7 +1773,6 @@ For example,
       (format stream "    INITIAL-FREQUENCY: ~A"
               (print-instruction-to-string (frame-definition-initial-frequency thing)))))
 
-  ;; TODO Should we really follow precedent and put these here?
   (:method ((thing waveform-definition) (stream stream))
     (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~]:~%"
             (waveform-definition-name thing)
@@ -1871,59 +1901,51 @@ Examples:
 
 (defun print-parsed-program (parsed-program &optional (s *standard-output*))
   ;; write out memory definitions
-  (dolist (memory-defn (parsed-program-memory-definitions parsed-program))
-    (format s "DECLARE ~a ~a"
-            (memory-descriptor-name memory-defn)
-            (quil-type-string (memory-descriptor-type memory-defn)))
-    (format s "~[[0]~;~:;[~:*~a]~]" (memory-descriptor-length memory-defn))
-    (when (memory-descriptor-sharing-parent memory-defn)
-      (format s " SHARING ~a"
-              (memory-descriptor-sharing-parent memory-defn))
-      (a:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
-        (format s " OFFSET")
-        (loop :for (type . count) :in x
-              :do (format s " ~a ~a" count (quil-type-string type)))))
-    (format s "~%"))
-  (unless (endp (parsed-program-memory-definitions parsed-program))
-    (format s "~%"))
+  (with-slots (memory-definitions
+               waveform-definitions
+               frame-definitions
+               calibration-definitions
+               gate-definitions
+               circuit-definitions
+               executable-code)
+      parsed-program
 
-  ;; write out gates
-  (dolist (gate-defn (parsed-program-gate-definitions parsed-program))
-    (print-instruction gate-defn s))
+    ;; write out memory definitions
+    (dolist (memory-defn memory-definitions)
+      (print-instruction memory-defn s)
+    (unless (endp memory-definitions)
+      (terpri s))
 
-  (unless (endp (parsed-program-gate-definitions parsed-program))
-    (format s "~%"))
+    ;; write out frame definitions
+    (dolist (frame-defn frame-definitions)
+      (print-instruction frame-defn s))
+    (unless (endp frame-definitions)
+      (terpri s))
 
-  ;; write out circuits  TODO why are we not using PRINT-INSTRUCTION?
-  (dolist (circuit-defn (parsed-program-circuit-definitions parsed-program))
-    (format s "DEFCIRCUIT ~a"
-            (circuit-definition-name circuit-defn))
-    (unless (endp (circuit-definition-parameters circuit-defn))
-      (format s "(~{~/quil:instruction-fmt/~^, ~})"
-              (circuit-definition-parameters circuit-defn)))
-    (unless (endp (circuit-definition-arguments circuit-defn))
-      (format s "~{ ~/quil:instruction-fmt/~}"
-              (circuit-definition-arguments circuit-defn)))
-    (format s ":~%")
-    (print-instruction-sequence (circuit-definition-body circuit-defn)
-                                :stream s
-                                :prefix "    ")
-    (terpri s))
-  (unless (endp (parsed-program-circuit-definitions parsed-program))
-    (terpri s))
+    ;; write out waveform definitions
+    (dolist (waveform-defn waveform-definitions)
+      (print-instruction waveform-defn s))
+    (unless (endp waveform-definitions)
+      (terpri s))
 
-  ;; write out waveform definitions
-  (dolist (waveform-defn (parsed-program-waveform-definitions parsed-program))
-    (print-instruction waveform-defn s))
+    ;; write out calibration definitions
+    (dolist (calibration-defn calibration-definitions)
+      (print-instruction calibration-defn s))
+    (unless (endp calibration-definitions)
+      (terpri s))
 
-  ;; write out calibration definitions
-  (dolist (calibration-defn (parsed-program-calibration-definitions parsed-program))
-    (print-instruction calibration-defn s))
+    ;; write out gates
+    (dolist (gate-defn gate-definitions)
+      (print-instruction gate-defn s))
+    (unless (endp gate-definitions)
+      (terpri s))
 
-  ;; write out frame definitions
-  (dolist (frame-defn (parsed-program-frame-definitions parsed-program))
-    (print-instruction frame-defn s))
+    ;; write out circuits
+    (dolist (circuit-defn circuit-definitions)
+      (print-instruction circuit-defn s))
+    (unless (endp circuit-definitions)
+      (terpri s)))
 
-  ;; write out main block
-  (print-instruction-sequence (parsed-program-executable-code parsed-program)
-                              :stream s))
+    ;; write out main block
+    (print-instruction-sequence (parsed-program-executable-code parsed-program)
+                                :stream s)))
