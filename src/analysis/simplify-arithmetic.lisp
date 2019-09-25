@@ -190,18 +190,20 @@ the gate parameters by canonicalizing the arithmetic expressions they (potential
   (:method ((thing gate-application))
     (let ((new-gate (copy-instance thing)))
       (setf (application-parameters new-gate)
-            (map 'cons (lambda (de)
-                         (handler-case
-                             (typecase de
-                               (constant
-                                de)
-                               (delayed-expression
-                                (canonicalize-expression de))
-                               (otherwise de))
-                           (expression-not-linear () de)
-                           (expression-not-simplifiable () de)))
-                 (application-parameters new-gate)))
+            (mapcar (lambda (de)
+                      (handler-case
+                          (typecase de
+                            (constant
+                             de)
+                            (delayed-expression
+                             (canonicalize-expression de))
+                            (otherwise de))
+                        (expression-not-linear () de)
+                        (expression-not-simplifiable () de)))
+                    (application-parameters new-gate)))
       new-gate))
   (:method ((thing parsed-program))
-    (map-into (parsed-program-executable-code thing) #'simplify-arithmetic (parsed-program-executable-code thing))
+    (map-into (parsed-program-executable-code thing)
+              #'simplify-arithmetic
+              (parsed-program-executable-code thing))
     thing))
