@@ -338,6 +338,8 @@
    #:raw-capture-duration               ; READER
    #:raw-capture-memory-ref             ; READER
 
+   #:nonblocking-p                      ; READER
+
    #:delay                              ; CLASS
    #:delay-duration                     ; READER
    #:delay-on-frames                    ; CLASS

@@ -351,7 +351,8 @@ depending on whether TEST passes."
           instr
           (make-instance 'pulse
                          :frame frame
-                         :waveform (pulse-waveform instr)))))
+                         :waveform (pulse-waveform instr)
+                         :nonblocking (nonblocking-p instr)))))
 
   (:method ((instr capture) param-value arg-value)
     (let ((frame (instantiate-frame (capture-frame instr)
@@ -365,7 +366,8 @@ depending on whether TEST passes."
           (make-instance 'capture
                          :frame frame
                          :waveform (capture-waveform instr)
-                         :memory-ref memory-ref))))
+                         :memory-ref memory-ref
+                         :nonblocking (nonblocking-p instr)))))
 
   (:method ((instr raw-capture) param-value arg-value)
     (let ((frame (instantiate-frame (raw-capture-frame instr)
@@ -382,7 +384,8 @@ depending on whether TEST passes."
           (make-instance 'raw-capture
                          :frame frame
                          :duration duration
-                         :memory-ref memory-ref))))
+                         :memory-ref memory-ref
+                         :nonblocking (nonblocking-p instr)))))
 
   (:method ((instr delay-on-qubits) param-value arg-value)
     (let ((duration (ensure-instantiated (delay-duration instr)

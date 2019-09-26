@@ -713,7 +713,10 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   ((frame :initarg :frame
           :accessor pulse-frame)
    (waveform :initarg :waveform
-             :accessor pulse-waveform))
+             :accessor pulse-waveform)
+   (nonblocking :initarg :nonblocking
+                :initform nil
+                :accessor nonblocking-p))
   (:documentation "A pulse instruction."))
 
 (defclass capture (instruction)
@@ -722,7 +725,10 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
    (waveform :initarg :waveform
              :accessor capture-waveform)
    (memory-ref :initarg :memory-ref
-               :accessor capture-memory-ref))
+               :accessor capture-memory-ref)
+   (nonblocking :initarg :nonblocking
+                :initform nil
+                :accessor nonblocking-p))
   (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
 (defclass raw-capture (instruction)
@@ -731,7 +737,10 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
    (duration :initarg :duration
              :accessor raw-capture-duration)
    (memory-ref :initarg :memory-ref
-               :accessor raw-capture-memory-ref))
+               :accessor raw-capture-memory-ref)
+   (nonblocking :initarg :nonblocking
+                :initform t
+                :accessor nonblocking-p))
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
 (defclass delay (instruction)
@@ -1602,18 +1611,21 @@ For example,
             (print-instruction-to-string (swap-phase-right-frame instr))))
 
   (:method ((instr pulse) (stream stream))
-    (format stream "PULSE ~A ~A"
+    (format stream "~@[NONBLOCKING ~]PULSE ~A ~A"
+            (nonblocking-p instr)
             (print-instruction-to-string (pulse-frame instr))
             (print-instruction-to-string (pulse-waveform instr))))
 
   (:method ((instr capture) (stream stream))
-    (format stream "CAPTURE ~A ~A ~A"
+    (format stream "~@[NONBLOCKING ~]CAPTURE ~A ~A ~A"
+            (nonblocking-p instr)
             (print-instruction-to-string (capture-frame instr))
             (print-instruction-to-string (capture-waveform instr))
             (print-instruction-to-string (capture-memory-ref instr))))
 
   (:method ((instr raw-capture) (stream stream))
-    (format stream "RAW-CAPTURE ~A ~A ~A"
+    (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~A ~A ~A"
+            (nonblocking-p instr)
             (print-instruction-to-string (raw-capture-frame instr))
             (print-instruction-to-string (raw-capture-duration instr))
             (print-instruction-to-string (raw-capture-memory-ref instr))))
