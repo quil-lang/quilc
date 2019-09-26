@@ -135,7 +135,7 @@ which fills in the COEFFICIENTS hash table with the memory references and their 
      (make-affine-representation 0 de 1.0))
     (cons
      (destructuring-bind (op left &optional right) de
-       (if (and (null right) (equalp op '-))
+       (if (and (null right) (eq op '-))
            ;; Special case for negative-prefixed memory references
            ;; e.g. RX(-theta[0] + theta[0] + 2.0) 0 -> RX(2.0) 0
            (expression->affine-representation `(* -1.0 ,left))
