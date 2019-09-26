@@ -15,6 +15,7 @@
     :DECLARE :SHARING :OFFSET :PRAGMA
     :AS :MATRIX :PERMUTATION
     :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
+    :NONBLOCKING
     :DEFWAVEFORM :DEFCAL :DEFFRAME
     :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
 
@@ -113,7 +114,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|DEFWAVEFORM|DEFCAL|DEFFRAME|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|NONBLOCKING|DEFWAVEFORM|DEFCAL|DEFFRAME|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -436,6 +437,9 @@ the immediately preceding line."
 
       ((:RAW-CAPTURE)
        (parse-raw-capture tok-lines))
+
+      ((:NONBLOCKING)
+       (parse-nonblocking-op tok-lines))
 
       ((:DEFWAVEFORM)
        (unless *definitions-allowed*
@@ -1449,6 +1453,26 @@ In accordance with the typical usage here, there are two values returned: the re
                        :frame frame
                        :duration duration
                        :memory-ref addr)))))
+
+(defun parse-nonblocking-op (tok-lines)
+  (let* ((line (first tok-lines))
+         (mod (first line))
+         (op (second line)))
+    (when (null op)
+      (quil-parse-error "Unexpected line format. NONBLOCKING should be followed by a pulse or capture operation."))
+
+    (unless (eq ':NONBLOCKING (token-type mod))
+      (disappointing-token-error mod "NONBLOCKING"))
+
+    (unless (member (token-type op) '(:PULSE :CAPTURE :RAW-CAPTURE))
+      (disappointing-token-error op "a pulse or capture operation"))
+
+    (multiple-value-bind (op-instr rest-lines)
+        (parse-program-lines (cons (rest line)
+                                   (rest tok-lines)))
+      (setf (nonblocking-p op-instr) t)
+      (values op-instr
+              rest-lines))))
 
 (defun parse-simple-frame-mutation (tok-type tok-lines)
   (match-line ((op tok-type) &rest rest-toks) tok-lines
