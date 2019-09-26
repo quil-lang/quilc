@@ -82,6 +82,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
                                 :test #'equalp)
               :collect frame)))))
 
+;;; TODO this needs to i) support NONBLOCKING ops and ii) actually work in a way compatible w/ PULSE-TRACING-QVM
 (defun expand-fences-to-delays (parsed-program)
   "Expand FENCE instructions to corresponding DELAY instructions on each relevant
 qubit line. For custom waveform definitions, SAMPLE-RATE (in Hz) must be provided."
