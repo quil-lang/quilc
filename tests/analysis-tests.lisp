@@ -359,3 +359,47 @@ B(b) 0 1
              '(e 0 1 2)
              '(f 0 1)
              '(g 0))))
+
+;;; Simplify arithmetic tests
+
+(deftest test-simplify-arithmetic-linear ()
+  "Test that a linear expression can simplified"
+  (let ((in-p (quil:parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+3.0*theta[0]-3.0*theta[0]/4.0-2.0) 0
+"))
+        (out-p (quil::parse-quil "
+DECLARE theta REAL[1]
+RX(2.25*theta[0]) 0
+")))
+    (quil::transform 'quil::simplify-arithmetic in-p)
+    (is (equalp (quil::application-parameters (quil::nth-instr 0 in-p))
+                (quil::application-parameters (quil::nth-instr 0 out-p))))))
+
+(deftest test-simplify-arithmetic-non-linear ()
+  "Test that a non-linear expression is left alone"
+  (let ((in-p (quil:parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+3.0*cos(theta[0])-3.0*theta[0]-2.0) 0
+"))
+        (out-p (quil:parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+3.0*cos(theta[0])-3.0*theta[0]-2.0) 0
+")))
+    (quil::transform 'quil::simplify-arithmetic in-p)
+    (is (equalp (quil::application-parameters (quil::nth-instr 0 in-p))
+                (quil::application-parameters (quil::nth-instr 0 out-p))))))
+
+(deftest test-simplify-arithmetic-negative-references ()
+  "Test that simplification works on negative-prefixed memory references e.g. RX(-theta[0] + 2.0*theta[0] + 2.0) 0 -> RX(2.0 + 1.0*theta[0]) 0"
+  (let ((in-p (quil:parse-quil "
+DECLARE theta REAL[1]
+RX(-theta[0]+2.0*theta[0]+2.0) 0
+"))
+        (out-p (quil:parse-quil "
+DECLARE theta REAL[1]
+RX(2.0+1.0*theta[0]) 0
+")))
+    (quil::transform 'quil::simplify-arithmetic in-p)
+    (is (equalp (quil::application-parameters (quil::nth-instr 0 in-p))
+                (quil::application-parameters (quil::nth-instr 0 out-p))))))
