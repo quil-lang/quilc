@@ -47,7 +47,7 @@
 
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
-(defun quil-to-native-quil-handler (request &key protoquil)
+(defun quil-to-native-quil-handler (request &key protoquil state-prep-compression)
   "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA."
   (check-type request rpcq::|NativeQuilRequest|)
   (let* ((quil-program (quil::parse-quil (rpcq::|NativeQuilRequest-quil| request)))
@@ -57,10 +57,16 @@
                                        :test #'equal))
          (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
          ;; Allow endpoint to override server's -P
-         (protoquil (ecase protoquil
-                      ((nil) *protoquil*)
-                      (:false nil)
-                      (t t))))
+         (protoquil
+          (ecase protoquil
+            ((nil) *protoquil*)
+            (:false nil)
+            (t t)))
+         (quil::*enable-state-prep-compression*
+          (ecase state-prep-compression
+            ((nil) quil::*enable-state-prep-compression*)
+            (:false nil)
+            (t t))))
     (multiple-value-bind (processed-program statistics-dict)
         (process-program quil-program chip-specification :protoquil protoquil)
       (when protoquil
