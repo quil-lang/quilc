@@ -386,6 +386,20 @@ If no exit rewiring is found, return NIL."
                 :reader permutation-gate-definition-permutation))
   (:documentation "A gate definition whose entries can be represented by a permutation of natural numbers."))
 
+(defclass pauli-sum-gate-definition (gate-definition)
+  ((terms :initarg :terms
+          :reader pauli-sum-gate-definition-terms
+          :documentation "")            ; XXX
+   (parameters :initarg :parameters
+               :reader pauli-sum-gate-definition-parameters
+               :documentation "")       ; XXX
+   (arguments :initarg :arguments
+              :reader pauli-sum-gate-definition-arguments
+              :documentation "")))      ; XXX
+
+(defmethod gate-definition-qubits-needed ((gate pauli-sum-gate-definition))
+  (length (pauli-sum-gate-definition-arguments gate)))
+
 (defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
   (ilog2 (length (permutation-gate-definition-permutation gate))))
 
@@ -1528,7 +1542,22 @@ For example,
     (format stream ":~%")
     (print-instruction-sequence (circuit-definition-body defn)
                                 :stream stream
-                                :prefix "    ")))
+                                :prefix "    "))
+
+  (:method ((gate pauli-sum-gate-definition) (stream stream))
+    (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS PAULI-SUM:~%"
+            (gate-definition-name gate)
+            (mapcar #'param-name (pauli-sum-gate-definition-parameters gate))
+            (mapcar #'formal-name (pauli-sum-gate-definition-arguments gate)))
+    (dolist (pauli-term (pauli-sum-gate-definition-terms gate))
+      (with-slots (pauli-word prefactor arguments) pauli-term
+        (format stream "    ~a(" pauli-word)
+        (print-instruction prefactor stream)
+        (format stream ")")
+        (dolist (arg arguments)
+          (format stream " ")
+          (print-instruction arg stream))
+        (terpri stream)))))
 
 (defmethod print-object ((object instruction) stream)
   (print-unreadable-object (object stream :type nil :identity nil)

@@ -38,7 +38,7 @@
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
     :DECLARE :SHARING :OFFSET :PRAGMA
-    :AS :MATRIX :PERMUTATION))
+    :AS :MATRIX :PERMUTATION :PAULI-SUM))
 
 (deftype token-type ()
   '(or
@@ -148,7 +148,7 @@ Each lexer extension is a function mapping strings to tokens. They are used to h
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -844,6 +844,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 
 (defun parse-gate-definition (tok-lines)
   "Parse a gate definition from the token lines TOK-LINES."
+  (declare (optimize (debug 3) (speed 0) (space 0)))
   ;; Check that we have tokens left
   (when (null tok-lines)
     (quil-parse-error "EOF reached when gate definition expected"))
@@ -870,21 +871,119 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
         (setf name (token-payload (pop params-args)))
 
         (multiple-value-bind (params rest-line) (parse-parameters params-args)
+          (multiple-value-bind (args rest-line) (parse-arguments rest-line)
           (when (eql ':AS (token-type (first rest-line)))
             (pop rest-line)
             (let* ((parsed-gate-tok (first rest-line))
                    (parsed-gate-type (token-type parsed-gate-tok)))
-              (unless (find parsed-gate-type '(:MATRIX :PERMUTATION))
+              (unless (find parsed-gate-type '(:MATRIX :PERMUTATION :PAULI-SUM))
                 (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
               (setf gate-type parsed-gate-type)))
 
           (ecase gate-type
             (:MATRIX
+             (when args
+              (quil-parse-error "DEFGATE AS MATRIX cannot carry formal qubit arguments."))
              (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
             (:PERMUTATION
+             (when args
+              (quil-parse-error "DEFGATE AS PERMUTATION cannot carry formal qubit arguments."))
              (when params
                (quil-parse-error "Permutation gate definitions do not support parameters."))
-             (parse-gate-entries-as-permutation body-lines name :lexical-context op))))))))
+             (parse-gate-entries-as-permutation body-lines name :lexical-context op))
+            (:PAULI-SUM
+             (parse-gate-definition-body-into-pauli-sum body-lines name
+                                                     :lexical-context op
+                                                     :legal-arguments args
+                                                     :legal-parameters params)))))))))
+
+(defun parse-gate-definition-body-into-pauli-sum (body-lines name &key lexical-context legal-arguments legal-parameters)
+  ;; is the immediate next line indented? if not, error.
+  (multiple-value-bind (indented? modified-line)
+      (indented-line (first body-lines))
+    (unless indented?
+      (quil-parse-error "Declaration DEFGATE ~a ... AS PAULI-SUM has empty body."
+                        name))
+    ;; strip off the indentation.
+    (setf body-lines (list* modified-line (rest body-lines)))
+    ;; otherwise, iterate til we hit a dedent token.
+    (loop :for line :in body-lines
+          :for rest-lines := (rest body-lines) :then (rest rest-lines)
+          :with parsed-entries := nil
+          :do (multiple-value-bind (dedented? modified-line)
+                  (dedented-line-p line)
+                ;; if we're done, return the gate definition (and the rest of the lines)
+                (when dedented?
+                  (return-from parse-gate-definition-body-into-pauli-sum
+                    (values (make-instance 'pauli-sum-gate-definition
+                                           :name name
+                                           :terms (nreverse parsed-entries)
+                                           :context lexical-context
+                                           :arguments legal-arguments
+                                           :parameters legal-parameters)
+                            (list* modified-line rest-lines))))
+                ;; store this word/qubits pair as part of the gate definition
+                (let ((app (parse-application (list line))))
+                  (unless (= 1 (length (application-parameters app)))
+                    (quil-parse-error "Pauli term requires a parenthesized scalar factor, but found ~a of them."
+                                      (length (application-parameters app))))
+                  (setf parsed-entries (list* (make-pauli-term :pauli-word (adt:with-data (named-operator name) (application-operator app) name)
+                                                               :prefactor (first (application-parameters app))
+                                                               :arguments (application-arguments app))
+                                              parsed-entries)))))))
+
+(defstruct (pauli-term)
+  pauli-word
+  prefactor
+  arguments)
+
+(defun parse-pauli-sum-line (line &key lexical-context legal-arguments legal-parameters)
+  "Parses a line inside of a DEFGATE ... AS PAULI-SUM body."
+  (declare (ignore lexical-context))
+  (let ((*arithmetic-parameters* nil)
+        pauli-word param qubit-list)
+    (when (null line)
+      (quil-parse-error "Empty line found in DEFGATE AS PAULI-SUM body."))
+    ;; PAULI-WORD
+    (unless (eql ':NAME (token-type (first line)))
+      (quil-parse-error "DEFGATE AS PAULI-SUM body line begins with something other than a Pauli word: ~a" (first line)))
+    (setf pauli-word (token-payload (pop line)))
+    ;; LPAREN
+    (unless (eql ':LEFT-PAREN (token-type (first line)))
+      (quil-parse-error "Pauli term requires a parenthesized scalar factor, but found ~a instead of LPAREN" (first line)))
+    (pop line)
+    ;; PARAMETER
+    (multiple-value-bind (param-tokens line)
+        (take-until (lambda (x)
+                      (pop line)
+                      (eql ':RIGHT-PAREN (token-type x)))
+                    line)
+      (when (null line)
+        (quil-parse-error "Pauli term has unmatched left-parenthesis."))
+      (setf param (parse-arithmetic-tokens param-tokens :eval t))
+      ;; RPAREN
+      (unless (eql ':RIGHT-PAREN (token-type (first line)))
+        )
+      (pop line)
+      ;; QUBIT ... QUBIT
+      (setf qubit-list (mapcar (lambda (tok)
+                                 (unless (eql ':NAME (token-type tok))
+                                   (quil-parse-error "Expected a formal qubit argument, but got ~a" tok))
+                                 (let ((ret (parse-argument tok)))
+                                   (unless (member ret legal-arguments :test #'equalp)
+                                     (quil-parse-error "Found formal qubit argument ~a not present in the argument list."))
+                                   ret))
+                               line))
+      ;; some further Sanity Chex:
+      ;; there are as many paulis as qubits
+      (unless (= (length qubit-list) (length pauli-word))
+        (quil-parse-error "Pauli word ~a expected ~a qubit arguments, but got ~a: ~a"
+                          pauli-word (length pauli-word) (length qubit-list) qubit-list))
+      ;; the parameter body only refers to defined terms
+      ;; XXX
+      (make-pauli-term :pauli-word pauli-word
+                       :prefactor param
+                       :arguments qubit-list))))
 
 (defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)
   (multiple-value-bind (parsed-entries rest-lines)
@@ -1410,6 +1509,26 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                   (parse-parameter (first toks))))))
       (values (mapcar parse-op entries)
               rest-line))))
+
+(defun parse-arguments (params-args)
+  ;; Parse out until we hit :AS or :COLON.
+  (multiple-value-bind (found-args rest-line)
+      (take-until (lambda (x)
+                    (or (eql ':AS (token-type x))
+                        (eql ':COLON (token-type x))
+                        ;; do this pop last
+                        (not (pop params-args))))
+                  params-args)
+    ;; Make sure we have tokens left over: the line can't end in this state.
+    (when (null rest-line)
+      (quil-parse-error "Unterminated argument list in DEFGATE."))
+    
+    ;; All the intermediate tokens in found-args should be formal qubit names
+    (setf args (loop :for a :in found-args
+                     :unless (eql ':NAME (token-type a))
+                       :do (quil-parse-error "Found something other than a formal qubit name in a DEFGATE argument list: ~A" a)
+                     :collect (parse-argument a)))
+    (values args rest-line)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
