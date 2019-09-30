@@ -990,17 +990,21 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
   (let* ((prefactor-fn
            (typecase (pauli-term-prefactor term)
              (number (lambda (&rest args) (declare (ignore args)) (pauli-term-prefactor term)))
-             (cons (compile nil
-                            (print `(lambda ,parameter-names
-                                      ,@(pauli-term-prefactor term)))))))
-         (size (expt 2 (length arguments)))
+             (symbol (compile nil `(lambda ,parameter-names
+                                     (declare (ignorable ,@parameter-names))
+                                     ,(pauli-term-prefactor term))))
+             (cons (compile nil `(lambda ,parameter-names
+                                   (declare (ignorable ,@parameter-names))
+                                   ,@(pauli-term-prefactor term))))))
+         (arg-count (length arguments))
+         (size (expt 2 arg-count))
          (m (magicl:make-zero-matrix size size)))
     (dotimes (col size)
       (let ((row col)
             (entry (apply prefactor-fn parameters)))
         (loop :for letter :across (pauli-term-pauli-word term)
               :for arg :in (pauli-term-arguments term)
-              :for arg-position := (position arg arguments :test #'equalp)
+              :for arg-position := (- arg-count 1 (position arg arguments :test #'equalp))
               :for row-toggle := (ldb (byte 1 arg-position) col)
               :do (ecase letter
                     (#\X
