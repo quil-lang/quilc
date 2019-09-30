@@ -189,6 +189,17 @@
 (defmethod gate-matrix ((gate parameterized-gate) &rest parameters)
   (apply (parameterized-gate-matrix-function gate) parameters))
 
+(defclass pauli-sum-gate (parameterized-gate)
+  ((dimension :initarg :dimension
+              :reader gate-dimension)
+   (parameters :initarg :parameters
+               :reader pauli-sum-gate-parameters)
+   (arguments :initarg :arguments
+              :reader pauli-sum-gate-arguments)
+   (terms :initarg :terms
+          :reader pauli-sum-gate-terms))
+  (:documentation "A gate specified by a Pauli sum."))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;; Gate Operators ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Controlled Gates
@@ -356,6 +367,42 @@
                      :dimension dim
                      :arity (length params)
                      :matrix-function (compile nil (lambda-form params dim entries))))))
+
+(defmethod gate-definition-to-gate ((gate-def pauli-sum-gate-definition))
+  (declare (optimize (debug 3) (speed 0)))
+  (with-slots (arguments parameters terms) gate-def
+    (let ((size (expt 2 (length (pauli-sum-gate-definition-arguments gate-def)))))
+      (flet ((matrix-function (&optional params)
+               (let ((m (magicl:make-zero-matrix size size)))
+                 (dolist (term terms)
+                   (dotimes (col size)
+                     (let ((row col)
+                           ;; XXX: this needs to be evaluated against PARAMS
+                           (entry (constant-value (pauli-term-prefactor term))))
+                       (loop :for letter :across (pauli-term-pauli-word term)
+                             :for arg :in (pauli-term-arguments term)
+                             :for arg-position := (position arg arguments :test #'equalp)
+                             :for row-toggle := (ldb (byte 1 arg-position) col)
+                             :do (ecase letter
+                                   (#\X
+                                    (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
+                                    (setf entry (- entry)))
+                                   (#\Y
+                                    (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
+                                    (setf entry (* entry (if (zerop row-toggle) (complex 0 1) (complex 0 -1)))))
+                                   (#\Z
+                                    (setf entry (* entry (if (zerop row-toggle) 1 -1))))
+                                   (#\I
+                                    nil)))
+                       (incf (magicl:ref m row col) entry))))
+                 (matrix-expt m (complex 0d0 -1d0)))))
+        (make-instance 'pauli-sum-gate
+                       :arguments (pauli-sum-gate-definition-arguments gate-def)
+                       :parameters (pauli-sum-gate-definition-parameters gate-def)
+                       :terms (pauli-sum-gate-definition-terms gate-def)
+                       :dimension size
+                       :arity (length (pauli-sum-gate-definition-arguments gate-def))
+                       :matrix-function #'matrix-function)))))
 
 ;;;; some leftover stuff from standard-gates.lisp and elsewhere
 
