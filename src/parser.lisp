@@ -985,6 +985,31 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                        :prefactor param
                        :arguments qubit-list))))
 
+(defun pauli-term->matrix (term arguments parameters)
+  (let* ((size (expt 2 (length arguments)))
+         (m (magicl:make-zero-matrix size size)))
+    (dotimes (col size)
+      (let ((row col)
+            ;; XXX: this needs to be evaluated against PARAMS
+            (entry (constant-value (pauli-term-prefactor term))))
+        (loop :for letter :across (pauli-term-pauli-word term)
+              :for arg :in (pauli-term-arguments term)
+              :for arg-position := (position arg arguments :test #'equalp)
+              :for row-toggle := (ldb (byte 1 arg-position) col)
+              :do (ecase letter
+                    (#\X
+                     (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
+                     (setf entry (- entry)))
+                    (#\Y
+                     (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
+                     (setf entry (* entry (if (zerop row-toggle) (complex 0 1) (complex 0 -1)))))
+                    (#\Z
+                     (setf entry (* entry (if (zerop row-toggle) 1 -1))))
+                    (#\I
+                     nil)))
+        (incf (magicl:ref m row col) entry)))
+    m))
+
 (defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)
   (multiple-value-bind (parsed-entries rest-lines)
       (parse-permutation-gate-entries body-lines)

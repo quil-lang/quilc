@@ -373,29 +373,12 @@
   (with-slots (arguments parameters terms) gate-def
     (let ((size (expt 2 (length (pauli-sum-gate-definition-arguments gate-def)))))
       (flet ((matrix-function (&optional params)
-               (let ((m (magicl:make-zero-matrix size size)))
-                 (dolist (term terms)
-                   (dotimes (col size)
-                     (let ((row col)
-                           ;; XXX: this needs to be evaluated against PARAMS
-                           (entry (constant-value (pauli-term-prefactor term))))
-                       (loop :for letter :across (pauli-term-pauli-word term)
-                             :for arg :in (pauli-term-arguments term)
-                             :for arg-position := (position arg arguments :test #'equalp)
-                             :for row-toggle := (ldb (byte 1 arg-position) col)
-                             :do (ecase letter
-                                   (#\X
-                                    (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
-                                    (setf entry (- entry)))
-                                   (#\Y
-                                    (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
-                                    (setf entry (* entry (if (zerop row-toggle) (complex 0 1) (complex 0 -1)))))
-                                   (#\Z
-                                    (setf entry (* entry (if (zerop row-toggle) 1 -1))))
-                                   (#\I
-                                    nil)))
-                       (incf (magicl:ref m row col) entry))))
-                 (matrix-expt m (complex 0d0 -1d0)))))
+               (assert (= (length parameters) (length params)))
+               (matrix-expt (reduce (lambda (m term)
+                                      (m+ m (pauli-term->matrix term arguments params)))
+                                    terms
+                                    :initial-value (magicl:make-zero-matrix size size))
+                            (complex 0d0 -1d0))))
         (make-instance 'pauli-sum-gate
                        :arguments (pauli-sum-gate-definition-arguments gate-def)
                        :parameters (pauli-sum-gate-definition-parameters gate-def)
