@@ -191,8 +191,8 @@ FENCE 0 1
 CAPTURE 0 \"xy\" flat(duration: 1, iq: 1) ro
 CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
 ")))
-    (quil::expand-fences-to-delays pp)
-    ;; no delays
+    (quil::fill-delays pp)
+    ;; no fences
     (map nil
          (lambda (instr)
            (is (not (typep instr 'fence))))
@@ -244,3 +244,5 @@ PULSE 0 \"xy\" foo
              (elt (parsed-program-executable-code pp) i)))
       (is (= 1.0 (quil::quilt-instruction-duration (instr 0))))
       (is (= 2.0 (quil::quilt-instruction-duration (instr 1)))))))
+
+(deftest test-)

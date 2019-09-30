@@ -93,7 +93,7 @@
                              (:file "expansion")
                              (:file "expand-circuits")
                              (:file "expand-calibrations")
-                             (:file "defence")
+                             (:file "fill-delays")
                              (:file "rewrite-arithmetic")
                              (:file "fusion")
                              (:file "simplify-arithmetic")))
