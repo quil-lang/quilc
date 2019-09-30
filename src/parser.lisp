@@ -899,37 +899,39 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 
 (defun parse-gate-definition-body-into-pauli-sum (body-lines name &key lexical-context legal-arguments legal-parameters)
   ;; is the immediate next line indented? if not, error.
-  (multiple-value-bind (indented? modified-line)
-      (indented-line (first body-lines))
-    (unless indented?
-      (quil-parse-error "Declaration DEFGATE ~a ... AS PAULI-SUM has empty body."
-                        name))
-    ;; strip off the indentation.
-    (setf body-lines (list* modified-line (rest body-lines)))
-    ;; otherwise, iterate til we hit a dedent token.
-    (loop :for line :in body-lines
-          :for rest-lines := (rest body-lines) :then (rest rest-lines)
-          :with parsed-entries := nil
-          :do (multiple-value-bind (dedented? modified-line)
-                  (dedented-line-p line)
-                ;; if we're done, return the gate definition (and the rest of the lines)
-                (when dedented?
-                  (return-from parse-gate-definition-body-into-pauli-sum
-                    (values (make-instance 'pauli-sum-gate-definition
-                                           :name name
-                                           :terms (nreverse parsed-entries)
-                                           :context lexical-context
-                                           :arguments legal-arguments
-                                           :parameters legal-parameters)
-                            (list* modified-line rest-lines))))
-                ;; store this word/qubits pair as part of the gate definition
-                (let ((app (parse-application (list line))))
-                  (unless (= 1 (length (application-parameters app)))
-                    (quil-parse-error "Pauli term requires a parenthesized scalar factor, but found ~a of them."
-                                      (length (application-parameters app))))
-                  (setf parsed-entries (list* (make-pauli-term :pauli-word (adt:with-data (named-operator name) (application-operator app) name)
-                                                               :prefactor (first (application-parameters app))
-                                                               :arguments (application-arguments app))
+  (let ((*segment-encountered* nil)
+        (*arithmetic-parameters* nil))
+    (multiple-value-bind (indented? modified-line)
+        (indented-line (first body-lines))
+      (unless indented?
+        (quil-parse-error "Declaration DEFGATE ~a ... AS PAULI-SUM has empty body."
+                          name))
+      ;; strip off the indentation.
+      (setf body-lines (list* modified-line (rest body-lines)))
+      ;; otherwise, iterate til we hit a dedent token.
+      (loop :for line :in body-lines
+            :for rest-lines := (rest body-lines) :then (rest rest-lines)
+            :with parsed-entries := nil
+            :do (multiple-value-bind (dedented? modified-line)
+                    (dedented-line-p line)
+                  ;; if we're done, return the gate definition (and the rest of the lines)
+                  (when dedented?
+                    (return-from parse-gate-definition-body-into-pauli-sum
+                      (values (make-instance 'pauli-sum-gate-definition
+                                             :name name
+                                             :terms (nreverse parsed-entries)
+                                             :context lexical-context
+                                             :arguments legal-arguments
+                                             :parameters (mapcar (lambda (p)
+                                                                   (or (cadr (assoc p *arithmetic-parameters* :test #'equalp))
+                                                                       (make-symbol (format nil "~a-UNUSED" (param-name p)))))
+                                                                 legal-parameters))
+                              (list* modified-line rest-lines))))
+                  ;; store this word/qubits pair as part of the gate definition
+                  (setf parsed-entries (list* (parse-pauli-sum-line line
+                                                                    :lexical-context lexical-context
+                                                                    :legal-parameters legal-parameters
+                                                                    :legal-arguments legal-arguments)
                                               parsed-entries)))))))
 
 (defstruct (pauli-term)
@@ -939,9 +941,8 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 
 (defun parse-pauli-sum-line (line &key lexical-context legal-arguments legal-parameters)
   "Parses a line inside of a DEFGATE ... AS PAULI-SUM body."
-  (declare (ignore lexical-context))
-  (let ((*arithmetic-parameters* nil)
-        pauli-word param qubit-list)
+  (declare (ignore lexical-context legal-parameters))
+  (let (pauli-word param qubit-list)
     (when (null line)
       (quil-parse-error "Empty line found in DEFGATE AS PAULI-SUM body."))
     ;; PAULI-WORD
@@ -985,13 +986,18 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                        :prefactor param
                        :arguments qubit-list))))
 
-(defun pauli-term->matrix (term arguments parameters)
-  (let* ((size (expt 2 (length arguments)))
+(defun pauli-term->matrix (term arguments parameters parameter-names)
+  (let* ((prefactor-fn
+           (typecase (pauli-term-prefactor term)
+             (number (lambda (&rest args) (declare (ignore args)) (pauli-term-prefactor term)))
+             (cons (compile nil
+                            (print `(lambda ,parameter-names
+                                      ,@(pauli-term-prefactor term)))))))
+         (size (expt 2 (length arguments)))
          (m (magicl:make-zero-matrix size size)))
     (dotimes (col size)
       (let ((row col)
-            ;; XXX: this needs to be evaluated against PARAMS
-            (entry (constant-value (pauli-term-prefactor term))))
+            (entry (apply prefactor-fn parameters)))
         (loop :for letter :across (pauli-term-pauli-word term)
               :for arg :in (pauli-term-arguments term)
               :for arg-position := (position arg arguments :test #'equalp)
