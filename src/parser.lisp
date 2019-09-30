@@ -963,7 +963,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
       (setf param (parse-arithmetic-tokens param-tokens :eval t))
       ;; RPAREN
       (unless (eql ':RIGHT-PAREN (token-type (first line)))
-        )
+        (quil-parse-error "Expected a right parenthesis in parsing this Pauli term, but got ~a" (first line)))
       (pop line)
       ;; QUBIT ... QUBIT
       (setf qubit-list (mapcar (lambda (tok)
