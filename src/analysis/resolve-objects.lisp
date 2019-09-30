@@ -1,12 +1,13 @@
-;;;; resolve-applications.lisp
+;;;; resolve-objects.lisp
 ;;;;
-;;;; Author: Robert Smith
+;;;; Authors: Robert Smith
+;;;;          Erik Davis
 
 (in-package #:cl-quil)
 
-;;; Used solely for application resolution to detect if we are resolving things
-;;; inside of a circuit.
-(defvar *in-circuit-body* nil)
+;;; Used solely for object resolution to detect if we are resolving things
+;;; inside of a circuit or calibration.
+(defvar *in-definition-body* nil)
 
 ;;; TODO frames have a fixed sample-rate
 
@@ -68,7 +69,7 @@
   ;; they do not involve formal arguments). The motivation for this is twofold:
   ;; i) it's sometimes convenient to parse calibrations separately from frame definitions
   ;; ii) we prefer to handle this resolution uniformly at expansion time
-  (unless *in-circuit-body*
+  (unless *in-definition-body*
     (a:if-let ((formal-qubit (find-if #'is-formal (frame-qubits frame))))
       ;; time to get rowdy...
       (quil-parse-error "Unable to resolve formal ~A outside of definition body." formal-qubit)
@@ -108,7 +109,7 @@
            (let ((args (application-arguments instr)))
              ;; Check that all arguments are qubits
              (assert-and-print-instruction (every (a:disjoin #'qubit-p
-                                                             (if *in-circuit-body*
+                                                             (if *in-definition-body*
                                                                  #'is-formal
                                                                  (constantly nil)))
                                                   args)
@@ -149,7 +150,7 @@
     instr)
 
   (:method ((instr swap-phase) parsed-program)
-    (unless *in-circuit-body*
+    (unless *in-definition-body*
       (let ((defns (parsed-program-frame-definitions parsed-program)))
         (resolve-frame (swap-phase-left-frame instr) defns)
         (resolve-frame (swap-phase-right-frame instr) defns)))
@@ -162,7 +163,7 @@
     instr)
 
   (:method ((instr pulse) parsed-program)
-    (unless *in-circuit-body*
+    (unless *in-definition-body*
       (resolve-frame (pulse-frame instr)
                      (parsed-program-frame-definitions parsed-program)))
     (resolve-waveform-reference (pulse-waveform instr)
@@ -170,7 +171,7 @@
     instr)
 
   (:method ((instr capture) parsed-program)
-    (unless *in-circuit-body*
+    (unless *in-definition-body*
       (resolve-frame (capture-frame instr)
                      (parsed-program-frame-definitions parsed-program)))
     (resolve-waveform-reference (capture-waveform instr)
@@ -178,7 +179,7 @@
     instr)
 
   (:method ((instr raw-capture) parsed-program)
-    (unless *in-circuit-body*
+    (unless *in-definition-body*
       (resolve-frame (raw-capture-frame instr)
                      (parsed-program-frame-definitions parsed-program)))
     instr)
@@ -204,13 +205,13 @@
       (resolve-instruction-sequence (parsed-program-executable-code unresolved-program))
       ;; resolve circuit definitions
       (map nil (lambda (cd)
-                 (let ((*in-circuit-body* t))
+                 (let ((*in-definition-body* t))
                    (resolve-instruction-sequence
                     (circuit-definition-body cd))))
            (parsed-program-circuit-definitions unresolved-program))
       ;; resolve calibration definitions
       (map nil (lambda (cd)
-                 (let ((*in-circuit-body* t)) ; TODO rename
+                 (let ((*in-definition-body* t))
                    (resolve-instruction-sequence
                     (calibration-definition-body cd))))
            (parsed-program-calibration-definitions unresolved-program)))
