@@ -372,10 +372,10 @@
   (declare (optimize (debug 3) (speed 0)))
   (with-slots (arguments parameters terms) gate-def
     (let ((size (expt 2 (length (pauli-sum-gate-definition-arguments gate-def)))))
-      (flet ((matrix-function (&optional params)
+      (flet ((matrix-function (&rest params)
                (assert (= (length parameters) (length params)))
                (matrix-expt (reduce (lambda (m term)
-                                      (m+ m (pauli-term->matrix term arguments params)))
+                                      (m+ m (pauli-term->matrix term arguments params parameters)))
                                     terms
                                     :initial-value (magicl:make-zero-matrix size size))
                             (complex 0d0 -1d0))))

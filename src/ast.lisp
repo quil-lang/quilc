@@ -1546,12 +1546,16 @@ For example,
   (:method ((gate pauli-sum-gate-definition) (stream stream))
     (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS PAULI-SUM:~%"
             (gate-definition-name gate)
-            (mapcar #'param-name (pauli-sum-gate-definition-parameters gate))
+            (mapcar #'string (pauli-sum-gate-definition-parameters gate))
             (mapcar #'formal-name (pauli-sum-gate-definition-arguments gate)))
     (dolist (pauli-term (pauli-sum-gate-definition-terms gate))
       (with-slots (pauli-word prefactor arguments) pauli-term
         (format stream "    ~a(" pauli-word)
-        (print-instruction prefactor stream)
+        (typecase prefactor
+          (number
+           (format stream "~a" prefactor))
+          (cons
+           (print-instruction (make-delayed-expression nil nil prefactor) stream)))
         (format stream ")")
         (dolist (arg arguments)
           (format stream " ")
