@@ -95,8 +95,10 @@
                              (:file "simplify-arithmetic")))
                (:file "cfg")
                (:file "compilation-methods")
-               (:file "chip-specification")
-               (:file "chip-reader")
+               (:module "chip"
+                :serial t
+                :components ((:file "chip-specification")
+                             (:file "chip-reader")))
                (:module "addresser"
                 :serial t
                 :components ((:file "rewiring")

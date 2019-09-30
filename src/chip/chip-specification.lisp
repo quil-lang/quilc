@@ -747,6 +747,18 @@ Compilers are listed in descending precedence.")
   "Create a full 72-qubit Bristlecone CHIP-SPECIFICATION."
   (build-bristlecone-chip-pattern 12 6))
 
+(defun build-chip-from-digraph (digraph &key (architecture ':cz))
+  "Build a CHIP-SPECIFICATION from the directed graph DIGRAPH. DIGRAPH is a list of pairs (qa, qb) which implies there is a (directed) two-qubit gate from qubit qa to qubit qb."
+  (let ((nqubits (1+ (reduce #'max (a:flatten digraph))))
+        (chip-spec (make-chip-specification
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
+    (install-generic-compilers chip-spec architecture)
+    (loop :for q :below nqubits :do
+      (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (loop :for (control target) :in digraph :do
+      (install-link-onto-chip chip-spec control target :architecture architecture))
+    (warm-hardware-objects chip-spec)))
+
 (defun build-ibm-qx5 ()
   "Create a CHIP-SPECIFICATION matching IBM's qx5 chip."
   ;; From "16-qubit IBM universal quantum computer can be fully entangled" by Wang, Li, Yin, & Zeng.
@@ -758,15 +770,7 @@ Compilers are listed in descending precedence.")
   ;; https://www.research.ibm.com/ibm-q/technology/devices/
   ;;
   ;; accessed 11 Jan 2019.
-  (let ((chip-spec (make-chip-specification
-                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector)))
-        (nqubits 16)
-        (links '((1 2)  (2 3)   (3 4)   (5 4)   (6 5)   (6 7)   (8 7)
-                 (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
-                 (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
-    (install-generic-compilers chip-spec ':cnot)
-    (loop :for q :below nqubits
-          :do (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
-    (loop :for (control target) :in links :do
-      (install-link-onto-chip chip-spec control target :architecture '(:CNOT)))
-    (warm-hardware-objects chip-spec)))
+  (let ((digraph '((1 2) (2 3) (3 4) (5 4) (6 5) (6 7) (8 7)
+               (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
+               (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
+    (build-chip-from-digraph digraph :architecture ':cnot)))
