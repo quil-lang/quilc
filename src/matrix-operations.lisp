@@ -391,3 +391,11 @@ as needed so that they are the same size."
        (matrix-equality
         kroned-ref-mat
         (scale-out-matrix-phases kroned-mat kroned-ref-mat))))))
+
+(defun matrix-expt (m s)
+  "Computes EXP(M*S).  Only works for unitarily diagonalizable matrices M."
+  (multiple-value-bind (d u) (magicl:eig m)
+    (let* ((size (length d))
+           (dd (magicl:diag size size
+                            (mapcar (lambda (z) (exp (* z s))) d))))
+      (m* u dd (magicl:conjugate-transpose u)))))
