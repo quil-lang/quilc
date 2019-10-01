@@ -146,7 +146,8 @@ In the presence of multiple definitions with a common signature, a signal is rai
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
              (pp (resolve-objects
-                  (process-includes raw-quil originating-file))))
+                  (raw-quil-to-unresolved-program
+                   (process-includes raw-quil originating-file)))))
         (dolist (xform transforms pp)
           (setf pp (transform xform pp))))))
 
