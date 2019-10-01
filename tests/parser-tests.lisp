@@ -146,28 +146,6 @@
     (is (equalp (reset-qubit-target (aref code 1))
                 (qubit 5)))))
 
-;;; TODO It's unclear to me whether the parser should be doing this sort of
-;;;      reduction. We wouldn't, for example, reduce DAGGER RX(pi) to RX(-pi).
-;;;      Likewise there are other idenities out there: CONTROLLED DAGGER <->
-;;;      DAGGER CONTROLLED. And there's hardly any gain afaict. Regardless, the
-;;;      thing needed to make this pass is to change DAGGER-OPERATOR to
-;;;      INVOLUTIVE-DAGGER-OPERATOR in APPLY-MODIFIERS-TO-OPERATOR.
-;; (deftest test-parse-dagger-dagger ()
-;;   (let* ((p (with-output-to-quil
-;;               "DAGGER H 0"
-;;               "DAGGER DAGGER H 0"
-;;               "DAGGER DAGGER DAGGER H 0"))
-;;          (code (parsed-program-executable-code p)))
-;;     (destructuring-bind (instr-dagger^1
-;;                          instr-dagger^2
-;;                          instr-dagger^3)
-;;         (mapcar (a:compose #'quil::operator-description-string
-;;                            #'quil:application-operator)
-;;                 (coerce code 'list))
-;;       (is (string= "DAGGER H" instr-dagger^1))
-;;       (is (string= "H" instr-dagger^2))
-;;       (is (string= "DAGGER H" instr-dagger^3)))))
-
 (deftest test-defgate-as-matrix ()
   (let* ((quil "
 DEFGATE TEST AS MATRIX:
@@ -239,7 +217,7 @@ DEFGATE FOO(%a):
     1/sqrt(2), 1/sqrt(2)
     1/sqrt(2), -1/sqrt(2)
 
-DEFCIRCUIT FOO(%a) q v:
+DEFCIRCUIT FOO(%a) q:
     X q
 "))
     (signals quil::ambiguous-gate-or-circuit-definition
