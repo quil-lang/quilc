@@ -15,7 +15,7 @@
   "This transform applies all available calibrations. The result has no gate applications or measurements for which a calibration is defined."
   expand-circuits)
 
-(defparameter *require-applicable-calibration* nil
+(defparameter *require-applicable-calibration* T
   "If T, an error will be signalled if an instruction fails to match an applicable calibration during calibration expansion.")
 
 (defgeneric calibration-matches-p (defn instr)

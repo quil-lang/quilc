@@ -161,8 +161,7 @@ DEFFRAME 0 \"xy\"
 DEFCAL X 0:
     PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 
-X 1"
-                        :transforms nil)))
+X 1")))
     (signals quil-parse-error
       (quil::expand-calibrations pp))))
 
@@ -173,8 +172,7 @@ DEFFRAME 0 \"xy\"
 DEFCAL x 0:
     PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 
-X 0"
-                        :transforms nil)))
+X 0")))
     (signals quil-parse-error
       (quil::expand-calibrations pp))))
 
