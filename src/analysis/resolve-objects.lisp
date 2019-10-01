@@ -9,12 +9,10 @@
 ;;; inside of a circuit or calibration.
 (defvar *in-definition-body* nil)
 
-;;; TODO frames have a fixed sample-rate
-
-;;; TODO check i) that values are constant, and ii) of the appropriate type
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
-  (let ((actual (mapcar (a:compose #'param-name #'first) (waveform-ref-args waveform-ref))))
+  (let ((actual (mapcar (a:compose #'param-name #'first)
+                        (waveform-ref-parameters waveform-ref))))
     (a:when-let ((missing (set-difference expected-parameters actual :test #'equalp)))
       (quil-parse-error "Expected parameter ~A in waveform ~A."
                         (first missing)
@@ -32,7 +30,7 @@
     (validate-waveform-parameters waveform-ref
                                   (mapcar #'first param-map))
     (let ((obj (make-instance waveform-class)))
-      (loop :for (param  val) :in (waveform-ref-args waveform-ref)
+      (loop :for (param  val) :in (waveform-ref-parameters waveform-ref)
             :for slot-name := (second (assoc (param-name param) param-map :test #'string=))
             :do (setf (slot-value obj slot-name) val))
       obj)))
