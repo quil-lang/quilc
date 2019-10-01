@@ -193,6 +193,10 @@ This function is non-destructive."
       ;; Return the nodes.
       (a:hash-table-keys nodes))))
 
+(defun find-node (pg tag)
+  (let ((nodes (program-grid-nodes pg)))
+    (find tag nodes :key #'grid-node-tag)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Fusion ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun subsumed-ahead-p (node)
@@ -216,6 +220,29 @@ This function is non-destructive."
               :unless (eq x (aref back i))
                 :do (return (values nil nil))
               :finally (return (values t x))))))
+
+(defun trivial-path-p (from to)
+  (or (eq from to)
+      (find to (grid-node-forward from))))
+
+(defun non-trivial-forward-path-existsp (from to)
+  ""
+  (labels ((dfs (from)
+             (and (not (null from))
+                  (or (eq from to)
+                      (some #'dfs (grid-node-forward from))))))
+    (and (not (trivial-path-p from to))
+         (dfs from))))
+
+;; TODO Make it efficient
+(defun fuseable-partners (grid node)
+  (remove-if (lambda (to) (non-trivial-forward-path-existsp node to))
+             (program-grid-nodes grid)))
+
+;; (setf grid-a (build-grid '((a 1) (b 2))))
+;; (setf grid-b (build-grid '((a 1) (b 2) (c 1 2) (d 1) (e 2))))
+;; (setf grid-c (build-grid '((a 4) (b 3 4) (c 2) (d 1 2))))
+;; (setf grid-d (build-grid '((a 3) (b 1 2) (c 2 3) (d 1 2))))
 
 (defun jam-node-in (node)
   "Whatever NODE is connected to, rewire the connected nodes to connect back to NODE. For instance, suppose we have
