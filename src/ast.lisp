@@ -150,21 +150,21 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   #-sbcl
   (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
-(defstruct (waveform-ref (:constructor %waveform-ref (name args)))
+(defstruct (waveform-ref (:constructor %waveform-ref (name parameters)))
   "An reference to a (possibly parametric) QuilT waveform."
   (name nil :read-only t :type string)
   ;; A list of (name val) lists.
-  (args nil :read-only t :type list)
+  (parameters nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null
                                  standard-waveform
                                  waveform-definition)))
 
-(defun waveform-ref (name &rest args)
+(defun waveform-ref (name &rest plist)
   "Construct a waveform reference with keyword-value pairs given by ARGS."
-  (assert (evenp (length args)))
+  (assert (evenp (length plist)))
   (%waveform-ref name
-                 (loop :for (name val) :on args :by #'cddr :while val
+                 (loop :for (name val) :on plist :by #'cddr :while val
                        :collect (list name val))))
 
 
@@ -1585,9 +1585,9 @@ For example,
             (waveform-ref-name thing)
             (mapcar (lambda (name-and-value)
                       (format nil "~A: ~A"
-                              (param-name (first name-and-value))  ; TODO: do we want to print %arg or arg
+                              (param-name (first name-and-value))
                               (print-instruction-to-string (second name-and-value))))
-                    (waveform-ref-args thing))))
+                    (waveform-ref-parameters thing))))
 
   ;; Actual instructions
   (:method ((instr halt) (stream stream))
