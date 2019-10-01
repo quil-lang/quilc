@@ -239,7 +239,7 @@ DEFGATE FOO(%a):
     1/sqrt(2), 1/sqrt(2)
     1/sqrt(2), -1/sqrt(2)
 
-DEFCIRCUIT FOO(%a) q v:
+DEFCIRCUIT FOO(%a) q:
     X q
 "))
     (signals quil::ambiguous-gate-or-circuit-definition

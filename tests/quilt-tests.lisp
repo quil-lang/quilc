@@ -164,7 +164,7 @@ DEFCAL X 0:
 X 1"
                         :transforms nil)))
     (signals quil-parse-error
-      (quil::expand-calibrations pp :strict t))))
+      (quil::expand-calibrations pp))))
 
 (deftest test-case-sensitive-calibration-expansion ()
   (let ((pp (parse-quil "
@@ -176,7 +176,7 @@ DEFCAL x 0:
 X 0"
                         :transforms nil)))
     (signals quil-parse-error
-      (quil::expand-calibrations pp :strict t))))
+      (quil::expand-calibrations pp))))
 
 (deftest test-fence-expansion ()
   (let ((pp
@@ -284,3 +284,50 @@ RAW-CAPTURE 0 \"xy\" 1.0 iqs"))
              (parse-quil raw :transforms quil::*standard-quilt-transforms*)))
       (signals quil-type-error (parse bad))
       (is (parse good)))))
+
+(deftest test-definition-signature ()
+  (flet ((signature (raw-quil &rest args)
+           (let ((pp (parse-quil (apply #'format nil raw-quil args))))
+             (quil::definition-signature
+              (first (append (parsed-program-gate-definitions pp)
+                             (parsed-program-circuit-definitions pp)
+                             (parsed-program-waveform-definitions pp)
+                             (parsed-program-calibration-definitions pp)
+                             (parsed-program-frame-definitions pp)
+                             (parsed-program-memory-definitions pp)))))))
+    (is (equalp (signature "DEFFRAME 0 \"foo\"")
+                (signature "DEFFRAME 0 \"foo\"")))
+    (is (not (equalp (signature "DEFFRAME 0 \"foo\"")
+                     (signature "DEFFRAME 0 \"Foo\""))))
+    (is (equalp (signature "DEFWAVEFORM foo 1.0:~%    1.0, 1.0")
+                (signature "DEFWAVEFORM foo 1.0:~%    1.0, 1.0")))
+    (is (not (equalp (signature "DEFWAVEFORM foo 1.0:~%    1.0, 1.0")
+                     (signature "DEFWAVEFORM Foo 1.0:~%    1.0, 1.0"))))
+    (is (equalp (signature "DEFCAL RX(%theta) q:~%    NOP")
+                (signature "DEFCAL RX(%theta) q:~%    NOP")))
+    (is (equalp (signature "DEFCAL RX(0) 0:~%    NOP")
+                (signature "DEFCAL RX(0) 0:~%    NOP")))
+    ;; argument names don't matter
+    (is (equalp (signature "DEFCAL RX(0) s:~%    NOP")
+                (signature "DEFCAL RX(0) s:~%    NOP")))
+    ;; parameter names don't matter
+    (is (equalp (signature "DEFCAL RX(%theta) q:~%    NOP")
+                (signature "DEFCAL RX(%foo) q:~%    NOP")))
+    (is (not (equalp (signature "DEFCAL RX(%theta) q:~%    NOP")
+                     (signature "DEFCAL RX(%theta) 0:~%    NOP"))))
+    ;; measure
+    (is (not (equalp (signature "DEFCAL MEASURE q ro:~%    NOP")
+                     (signature "DEFCAL MEASURE 0 ro:~%    NOP"))))
+    (is (equalp (signature "DEFCAL MEASURE 0 ro:~%    NOP")
+                (signature "DEFCAL MEASURE 0 foo:~%    NOP")))
+    ;; meaure discard
+    (is (equalp (signature "DEFCAL MEASURE q:~%    NOP")
+                (signature "DEFCAL MEASURE q:~%    NOP")))
+    (is (equalp (signature "DEFCAL MEASURE 0:~%    NOP")
+                (signature "DEFCAL MEASURE 0:~%    NOP")))
+    (is (not (equalp (signature "DEFCAL MEASURE q:~%    NOP")
+                     (signature "DEFCAL MEASURE 0:~%    NOP"))))
+    ;; measure vs measure discard
+    (is (not (equalp (signature "DEFCAL MEASURE q:~%    NOP")
+                     (signature "DEFCAL MEASURE q ro:~%    NOP"))))))
+
