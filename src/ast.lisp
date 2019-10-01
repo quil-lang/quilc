@@ -739,7 +739,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
    (memory-ref :initarg :memory-ref
                :accessor raw-capture-memory-ref)
    (nonblocking :initarg :nonblocking
-                :initform t
+                :initform nil
                 :accessor nonblocking-p))
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
