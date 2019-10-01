@@ -100,13 +100,13 @@ JUMP @a")))
   (let* ((orig-prog (quil::transform 'quil::compress-qubits
                                      (cl-quil::read-quil-file file)))
          (proc-prog
-          (quil::compiler-hook (quil::transform 'quil::compress-qubits
-                                                (cl-quil::read-quil-file file))
-                               (quil::build-nQ-linear-chip 5 :architecture architecture)
-                               :protoquil t)))
-    (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                  (quil::parsed-program-to-logical-matrix proc-prog)))
-    (list
+           (quil::compiler-hook (quil::transform 'quil::compress-qubits
+                                                 (cl-quil::read-quil-file file))
+                                (quil::build-nQ-linear-chip 5 :architecture architecture)
+                                :protoquil t)))
+    (values
+     (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
+                               (quil::parsed-program-to-logical-matrix proc-prog))
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
 
@@ -116,25 +116,27 @@ JUMP @a")))
    "tests/compiler-hook-test-files/"))
 
 (deftest test-compiler-hook (&key print-stats)
-  "Test whether the compiler hook preserves semantic equivalence for some test programs."
-  (finish-output fiasco::*test-run-standard-output*)
-  (lparallel:pmap nil
-                  (lambda (state-prep)
-                    (let ((quil::*enable-state-prep-compression* state-prep))
-                      (format fiasco::*test-run-standard-output* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
-                      (lparallel:pmap nil
-                                      (lambda (file)
-                                        (format fiasco::*test-run-standard-output* "      Testing file ~a:" (pathname-name file))
-                                        (lparallel:pmap nil
-                                                        (lambda (architecture)
-                                                          (format fiasco::*test-run-standard-output* " ~a" architecture)
-                                                          (let ((stats (compare-compiled file architecture)))
-                                                            (when print-stats
-                                                              (format fiasco::*test-run-standard-output* "~a" stats))))
-                                                        (list ':cz ':iswap ':cphase ':piswap ':cnot))
-                                        (terpri fiasco::*test-run-standard-output*))
-                                      (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))))
-                  '(nil t)))
+  (let ((num-tasks 0)
+        (tasks-lock (bt:make-lock)))
+    (flet ((create-task (state-prep file arch)
+             ;; Better safe than sorry.
+             (bt:with-lock-held (tasks-lock)
+               (incf num-tasks))
+             (lambda ()
+               (let ((quil::*enable-state-prep-compression* state-prep))
+                 (format fiasco::*test-run-standard-output*
+                         "    Testing file ~a (~a, with~:[out~;~] state prep)~%"
+                         (pathname-name file) arch state-prep)
+                 (compare-compiled file arch)))))
+      (let ((ch (lparallel:make-channel)))
+        (dolist (state-prep (list nil t))
+          (dolist (file (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))
+            (dolist (arch (list ':cz ':iswap ':cphase ':piswap ':cnot))
+              (lparallel:submit-task ch (create-task state-prep file arch)))))
+        (loop :repeat num-tasks :do
+          (let ((fiasco::*print-test-run-progress* nil))
+            (is (lparallel:receive-result ch))))))
+    (print num-tasks)))
 
 (deftest test-compression-bug-QUILC-152 ()
   "QUILC-152: A bug in state compression caused a failed assertion."

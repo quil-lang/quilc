@@ -7,6 +7,7 @@
 (defun run-cl-quil-tests (&key (verbose nil) (headless nil) (parallel nil))
   "Run all CL-QUIL tests. If VERBOSE is T, print out lots of test info. If HEADLESS is T, disable interactive debugging and quit on completion. If PARALLEL is non-nil, it is the number of threads to use."
   ;; Bug in Fiasco commit fe89c0e924c22c667cc11c6fc6e79419fc7c1a8b
+  (check-type parallel (or null (integer 1)))
   (setf fiasco::*test-run-standard-output* (make-broadcast-stream
                                             *standard-output*))
   (let ((quil::*compress-carefully* t)
