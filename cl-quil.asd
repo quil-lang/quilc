@@ -78,8 +78,8 @@
                              (:file "approx")
                              (:file "state-prep")
                              (:file "translators")
+                             ;; attic'd files / pedagogical purposes only
                              (:file "optimal-2q")
-                             ;; attic'd file / pedagogical purposes only
                              (:static-file "cs-compile")))
                (:module "analysis"
                 :serial t
