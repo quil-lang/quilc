@@ -184,12 +184,12 @@ X 0"
 DEFFRAME 0 \"xy\"
 DEFFRAME 1 \"xy\"
 
-DECLARE ro BIT
+DECLARE iq REAL[2]
 
 PULSE 0 \"xy\" flat(duration: 1, iq: 1)
 FENCE 0 1
-CAPTURE 0 \"xy\" flat(duration: 1, iq: 1) ro
-CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) ro
+CAPTURE 0 \"xy\" flat(duration: 1, iq: 1) iq
+CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) iq
 ")))
     (quil::fill-delays pp)
     ;; no fences
@@ -245,4 +245,42 @@ PULSE 0 \"xy\" foo
       (is (= 1.0 (quil::quilt-instruction-duration (instr 0))))
       (is (= 2.0 (quil::quilt-instruction-duration (instr 1)))))))
 
-(deftest test-)
+(deftest test-capture-type-safety ()
+  (let ((bit-prog "
+DECLARE b BIT
+DEFFRAME 0 \"xy\"
+CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) b")
+        (real-prog "
+DECLARE r REAL
+DEFFRAME 0 \"xy\"
+CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) r")
+        (valid-prog "
+DECLARE iqs REAL[4]
+DEFFRAME 0 \"xy\"
+CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) iqs[2]")
+        (overshoot-prog "
+DECLARE iqs REAL[4]
+DEFFRAME 0 \"xy\"
+CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) iqs[3]"))
+    (flet ((parse (raw)
+             (parse-quil raw :transforms quil::*standard-quilt-transforms*)))
+      (signals quil-type-error (parse bit-prog))
+      (signals quil-type-error (parse real-prog))
+      (is (parse valid-prog))
+      (signals quil-type-error (parse overshoot-prog)))))
+
+(deftest test-raw-capture-type-safety ()
+  (let ((bad "
+DECLARE iqs REAL[10]
+DEFFRAME 0 \"xy\":
+    SAMPLE-RATE: 4.0
+RAW-CAPTURE 0 \"xy\" 2.0 iqs")              ; 8 iq values = 16 reals
+        (good "
+DECLARE iqs REAL[10]
+DEFFRAME 0 \"xy\":
+    SAMPLE-RATE: 4.0
+RAW-CAPTURE 0 \"xy\" 1.0 iqs"))
+    (flet ((parse (raw)
+             (parse-quil raw :transforms quil::*standard-quilt-transforms*)))
+      (signals quil-type-error (parse bad))
+      (is (parse good)))))
