@@ -186,7 +186,7 @@
     (declare (ignore parsed-program))
     instr))
 
-(defun resolve-objects (raw-quil)
+(defun resolve-objects (unresolved-program)
   "Perform all object resolution within the list RAW-QUIL, returning a PARSED-PROGRAM."
   ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
   ;; we need to also resolve waveform and frame references.
@@ -194,23 +194,21 @@
   ;; NOTE: Some frames within calibration bodies cannot be resolved here (e.g.
   ;; where one of the qubits is a formal argument). We adopt the convention that
   ;; all frames in calibration bodies are resolved at expansion time.
-  (check-type raw-quil list)
-  (let ((unresolved-program (raw-quil-to-unresolved-program raw-quil)))
-    (flet ((resolve-instruction-sequence (seq)
-             (map nil (lambda (thing)
-                        (resolve-instruction thing unresolved-program))
-                  seq)))
-      (resolve-instruction-sequence (parsed-program-executable-code unresolved-program))
-      ;; resolve circuit definitions
-      (map nil (lambda (cd)
-                 (let ((*in-definition-body* t))
-                   (resolve-instruction-sequence
-                    (circuit-definition-body cd))))
-           (parsed-program-circuit-definitions unresolved-program))
-      ;; resolve calibration definitions
-      (map nil (lambda (cd)
-                 (let ((*in-definition-body* t))
-                   (resolve-instruction-sequence
-                    (calibration-definition-body cd))))
-           (parsed-program-calibration-definitions unresolved-program)))
+  (flet ((resolve-instruction-sequence (seq)
+           (map nil (lambda (thing)
+                      (resolve-instruction thing unresolved-program))
+                seq)))
+    (resolve-instruction-sequence (parsed-program-executable-code unresolved-program))
+    ;; resolve circuit definitions
+    (map nil (lambda (cd)
+               (let ((*in-definition-body* t))
+                 (resolve-instruction-sequence
+                  (circuit-definition-body cd))))
+         (parsed-program-circuit-definitions unresolved-program))
+    ;; resolve calibration definitions
+    (map nil (lambda (cd)
+               (let ((*in-definition-body* t))
+                 (resolve-instruction-sequence
+                  (calibration-definition-body cd))))
+         (parsed-program-calibration-definitions unresolved-program))
     unresolved-program))
