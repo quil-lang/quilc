@@ -87,8 +87,6 @@ PULSE 0 \"xy\" foo")))
                           (quil::waveform-ref-name-resolution
                            (pulse-waveform instr)))))))))
 
-;;; TODO: should we allow pulse etc in circuits?
-
 (deftest test-recursive-calibration ()
   (let ((pp (parse-quil "
 DEFCAL X 0:
