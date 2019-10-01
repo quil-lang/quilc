@@ -96,6 +96,7 @@ JUMP @a")))
       (not-signals error (quil::compiler-hook pp (quil::build-8Q-chip))))))
 
 (defun compare-compiled (file architecture)
+  "Compares the matrix representation of the (uncompiled) program in FILE against the compiled version. Compilation uses a linear chip topology with architecture ARCHITECTURE."
   (let* ((orig-prog (quil::transform 'quil::compress-qubits
                                      (cl-quil::read-quil-file file)))
          (proc-prog
