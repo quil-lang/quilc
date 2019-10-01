@@ -1543,8 +1543,7 @@ In accordance with the typical usage here, there are two values returned: the re
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFWAVEFORM.
         (unless (eql ':DEFWAVEFORM (token-type op))
-          (quil-parse-error "DEFWAVEFORM expected. Got ~S"
-                            (token-type op)))
+          (disappointing-token-error op "DEFWAVEFORM"))
 
         ;; Check that something is following the DEFWAVEFORM.
         (when (null params-args)
