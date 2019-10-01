@@ -227,6 +227,49 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
       (declare (ignore distances))
       (path prev))))
 
+(setq graph '((0 (1 . 1))
+              (1 (2 . 2) (3 . 4))
+              (2 (3 . 1))
+              (3 (1 . 2) (4 . 2) (5 . 2))
+              (4 (5 . 4))
+              (5 (6 . 1))
+              (6 ())))
+
+(defun dgraph (v e &optional (d 1) p)
+  (list v e d p))
+(defun v (dgraph) (first dgraph))
+(defun e (dgraph) (second dgraph))
+(defun d (dgraph) (third dgraph))
+(defun (setf d) (new-val graph) (setf (elt graph 2) new-val))
+(defun p (dgraph) (fourth dgraph))
+(defun (setf p) (new-val graph) (setf (elt graph 3) new-val))
+
+(defun dijkstra (graph source)
+  (let* ((dgraph (loop :for (v . e) :in graph
+                       :collect (dgraph v e (if (= v source) 0 most-positive-fixnum) nil)))
+         (pqueue (queues:make-queue ':priority-queue :compare (lambda (a b) (<= (d a) (d b))))))
+    (loop :for v :in dgraph :do
+      (queues:qpush pqueue v))
+    (loop :while (plusp (queues:qsize pqueue))
+          :for u := (queues:qpop pqueue) :do
+            (loop :for (v . c) :in (e u)
+                  :for vn := (queues:queue-find pqueue (lambda (i) (= (v i) v)))
+                  :for vd := (and vn (queues::node-value vn))
+                  :when vn :do
+                    (cond
+                      ;; No predecessor, or the cost of traveling onto
+                      ;; next node from this node is cheaper than any
+                      ;; previously seen path.
+                      ((or (null (p vd))
+                           (> (d vd) (+ (d u) c)))
+                       (setf (d vd) (+ (d u) c))
+                       (queues::queue-decrease pqueue vn vd)
+                       (setf (p vd) u)))))
+    dgraph))
+
+;; relax(u, v) means if d(v) > (d(u) + c(u, v)) then set d(v) = (d(u)
+;; + c(u, v)) and set p(v) = u
+
 (defun SWAP-to-native-SWAPs (chip-spec swap-gate)
   (operator-match
     (((("SWAP" () q0 q1) swap-gate))
