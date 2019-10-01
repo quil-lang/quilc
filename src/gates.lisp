@@ -369,7 +369,6 @@
                      :matrix-function (compile nil (lambda-form params dim entries))))))
 
 (defmethod gate-definition-to-gate ((gate-def pauli-sum-gate-definition))
-  (declare (optimize (debug 3) (speed 0)))
   (with-slots (arguments parameters terms) gate-def
     (let ((size (expt 2 (length (pauli-sum-gate-definition-arguments gate-def)))))
       (flet ((matrix-function (&rest params)
