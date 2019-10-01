@@ -90,9 +90,7 @@
     (assert (= (length args)
                (length defn-args)))
 
-    (let ((*expansion-depth* (if (boundp '*expansion-depth*)
-                                 (1+ *expansion-depth*)
-                                 1)))
+    (let ((*expansion-depth* (1+ *expansion-depth*)))
       (unless (<= *expansion-depth* *expansion-limit*)
         (expansion-error
          "Exceeded recursion limit of ~D. Current object being expanded is ~A."
