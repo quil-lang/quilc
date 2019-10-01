@@ -1,10 +1,10 @@
 ;;;; src/cl-quil.lisp
 ;;;;
-;;;; Author: Robert Smith
+;;;; Authors: Robert Smith
+;;;           Erik Davis
 
 (in-package #:cl-quil)
 
-;;; TODO: should quilt calibration expansion be standard?
 (defvar *standard-post-process-transforms*
   '(expand-circuits type-check)
   "The standard transforms that are applied by PARSE-QUIL.")
@@ -12,6 +12,54 @@
 (defvar *standard-quilt-transforms*
   '(expand-circuits expand-calibrations type-check)
   "The standard transforms for using PARSE-QUIL with quilt code.")
+
+;;; As part of parsing, we need to handle the case when two definitions seem to
+;;; conflict. The approach taken here is to map definitions to signatures, with
+;;; two signatures EQUALP if there is a context in which both definitions would
+;;; be applicable. This ranges from quite simple in the case of memory
+;;; definitions (where the basic check is whether the region names are equal),
+;;; to a bit more involved for quilt calibrations (where applicability is
+;;; generally determined by a pattern matching system, and so we have to
+;;; consider the arity and values of parameters and arguments).
+
+(defun definition-signature (instr)
+  "Computes a signature for a quil definition such that if two definitions are equivalent for the purposes of name resolution, then their signatures are EQUALP."
+  (flet ((canonicalize-params-args (obj)
+           (cond ((is-param obj)
+                  'param)
+                 ((is-formal obj)
+                  'formal)
+                 (t obj))))
+    (typecase instr
+      (gate-definition
+       (list 'gate-or-circuit-definition
+             (intern (gate-definition-name instr))
+             (if (typep instr 'parameterized-gate-definition)
+                 (length (gate-definition-parameters instr))
+                 0)
+             (gate-definition-qubits-needed instr)))
+      (circuit-definition
+       (list 'gate-or-circuit-definition
+             (intern (circuit-definition-name instr))
+             (length (circuit-definition-parameters instr))
+             (length (circuit-definition-arguments instr))))
+      (waveform-definition
+       (cons 'waveform-definition
+             (intern (waveform-definition-name instr))))
+      (gate-calibration-definition
+       (list 'gate-calibration-definition
+             (intern (operator-description-string
+                      (calibration-definition-operator instr)))
+             (mapcar #'canonicalize-params-args (calibration-definition-arguments instr))
+             (mapcar #'canonicalize-params-args (calibration-definition-parameters instr))))
+      (measurement-calibration-definition
+       (list 'measurement-calibration-definition
+             (measurement-calibration-qubit instr)
+             (typep instr 'measure-calibration-definition)))
+      (frame-definition (list 'frame-definition
+                              (frame-hash (frame-definition-frame instr))))
+      (memory-descriptor (list 'memory-descriptor
+                               (intern (memory-descriptor-name instr)))))))
 
 (defun error-on-ambiguous-memory-declaration  (condition)
   "Handler which signals an error in the presence of an AMBIGUOUS-MEMORY-DEFINITION."
@@ -22,35 +70,6 @@
       (let* ((name (memory-descriptor-name mem)))
         (quil-parse-error "Memory region ~A~@[ (in ~A)~] has already been DECLAREd~@[ (in ~A)~]."
                           name file other-file)))))
-
-(defun definition-signature (instr)
-  "If INSTR is a definition or memory declaration, returns a signature used for determining ambiguity. Otherwise, return NIL."
-  (flet ((gate-or-circuit-signature (name params args)
-           ;; TODO in principle the signature should include the number of params and args
-           ;; since e.g. we can tell the difference between FOO 1 and FOO 1 2. however,
-           ;; for now we follow the convention of not discriminating between these.
-           (declare (ignore params args))
-           (list 'gate-or-circuit-definition
-                 name)))
-    (typecase instr
-      (gate-definition (gate-or-circuit-signature (gate-definition-name instr)
-                                                  (if (typep instr 'parameterized-gate-definition)
-                                                      (gate-definition-parameters instr)
-                                                      nil)
-                                                  (gate-definition-qubits-needed instr)) )
-      (circuit-definition (gate-or-circuit-signature (circuit-definition-name instr)
-                                                     (circuit-definition-parameters instr)
-                                                     (circuit-definition-arguments instr)))
-      (waveform-definition (cons 'waveform-definition
-                                 (waveform-definition-name instr)))
-      ;; TODO actually think through what these signatures should be like
-      (gate-calibration-definition (list 'gate-calibration-definition
-                                         (calibration-definition-operator instr)))
-      (measurement-calibration-definition (list 'measurement-calibration-definition))
-      (frame-definition (list 'frame-definition
-                              (frame-hash (frame-definition-frame instr))))
-      (memory-descriptor (cons 'memory-descriptor
-                               (memory-descriptor-name instr))))))
 
 (defun ambiguous-definition-condition (instr file conflicts)
   "Signal a condition indicating that the instruction INSTR parsed from FILE has a list of conflicts CONFLICTS."
@@ -67,7 +86,7 @@
   "This constructes a PARSED-PROGRAM object from the given quil CODE, without any resolution of applications.
 
 This also signals ambiguous definitions, which may be handled as needed."
-  ;; Note: this preserves the order of definitions.
+  ;; Note: the processing below preserves the order of definitions.
   (let ((gate-defs nil)
         (circ-defs nil)
         (memory-defs nil)
@@ -76,7 +95,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         (frame-defs nil)
         (exec-code nil)
         ;; The following maps definition signatures to a list of (filename . defn) pairs
-        (all-seen-defns (make-hash-table :test 'equal))) ; TODO equality here
+        (all-seen-defns (make-hash-table :test 'equalp)))
     (flet ((bin (instr)
              (a:when-let ((signature (definition-signature instr)))
                (let ((originating-file (typecase (lexical-context instr)
@@ -112,17 +131,18 @@ This also signals ambiguous definitions, which may be handled as needed."
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)
                             (ambiguous-definition-handler #'continue))
-  "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string. In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
+  "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string.
+
+In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
 "
   (handler-bind
       (;; We disallow multiple declarations of the same memory region (even if equivalent).
        (ambiguous-memory-declaration #'error-on-ambiguous-memory-declaration)
        ;; For gate or circuit definitions, the default choice is to "accept the mystery."
        (ambiguous-gate-or-circuit-definition ambiguous-definition-handler)
-       ;; TODO change these
-       (ambiguous-calibration-definition #'continue)
-       (ambiguous-frame-definition #'continue)
-       (ambiguous-waveform-definition #'continue))
+       (ambiguous-calibration-definition ambiguous-definition-handler)
+       (ambiguous-frame-definition ambiguous-definition-handler)
+       (ambiguous-waveform-definition ambiguous-definition-handler))
       (let* ((*current-file* originating-file)
              (raw-quil (parse-quil-into-raw-program string))
              (pp (resolve-objects

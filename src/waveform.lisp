@@ -21,7 +21,6 @@
 (defgeneric quilt-waveform-parameter-alist (class-name)
   (:documentation "An association list mapping quilt parameter names to their corresponding slot names on the standard waveform class CLASS-NAME.")) ; e.g. '(("first_param" first-param) ("foo" foo))
 
-;;; TODO rpcq can generate a message spec from this + a bit more metadata
 (defmacro define-standard-waveform (class-name quilt-name slot-specs &key (documentation nil))
   "Define a standard waveform.
 
@@ -59,7 +58,7 @@ PARAMETERS:
 
        nil)))
 
-;;; TODO should we actually allow for defaults?
+;;; These are produced from the similar definitions in RPCQ.
 
 (define-standard-waveform gaussian-waveform "gaussian"
   ((fwhm :quilt-name "fwhm"

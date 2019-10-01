@@ -1446,7 +1446,7 @@ In accordance with the typical usage here, there are two values returned: the re
       (let ((duration (parse-argument (first rest-toks)))
             (addr (parse-memory-or-formal-token (second rest-toks) :ensure-valid t)))
         (unless (or (and (is-constant duration)
-                         (realp (constant-value duration))) ; TODO do we enforce rationality?
+                         (realp (constant-value duration)))
                     (is-formal duration))
           (quil-parse-error "Expected RAW-CAPTURE duration to be a real number or formal argument."))
         (make-instance 'raw-capture

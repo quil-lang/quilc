@@ -154,7 +154,6 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   "An reference to a (possibly parametric) QuilT waveform."
   (name nil :read-only t :type string)
   ;; A list of (name val) lists.
-  ;; TODO args vs parameters?
   (args nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null
