@@ -176,6 +176,7 @@
               :documentation "The minimal dimension of the space the gate acts on.")
    (matrix-function :initarg :matrix-function
                     :reader parameterized-gate-matrix-function
+                    :writer (setf %parameterized-gate-matrix-function)
                     :documentation "Function mapping ARITY complex numbers to a DIMENSION x DIMENSION MAGICL matrix."))
   (:documentation "A gate parameterized by complex numbers."))
 
@@ -190,15 +191,26 @@
   (apply (parameterized-gate-matrix-function gate) parameters))
 
 (defclass pauli-sum-gate (parameterized-gate)
-  ((dimension :initarg :dimension
-              :reader gate-dimension)
-   (parameters :initarg :parameters
+  ((parameters :initarg :parameters
                :reader pauli-sum-gate-parameters)
    (arguments :initarg :arguments
               :reader pauli-sum-gate-arguments)
    (terms :initarg :terms
           :reader pauli-sum-gate-terms))
   (:documentation "A gate specified by a Pauli sum."))
+
+(defmethod initialize-instance :after ((gate pauli-sum-gate) &key)
+  (with-slots (parameters arguments terms) gate
+    (let ((size (expt 2 (length arguments))))
+      (flet ((matrix-function (&rest params)
+               (assert (= (length parameters) (length params)))
+               (matrix-expt (reduce (lambda (m term)
+                                      (m+ m (pauli-term->matrix term arguments params parameters)))
+                                    terms
+                                    :initial-value (magicl:make-zero-matrix size size))
+                            (complex 0d0 -1d0))))
+        (setf (%parameterized-gate-matrix-function gate)
+              #'matrix-function)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;; Gate Operators ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -370,21 +382,12 @@
 
 (defmethod gate-definition-to-gate ((gate-def pauli-sum-gate-definition))
   (with-slots (arguments parameters terms) gate-def
-    (let ((size (expt 2 (length (pauli-sum-gate-definition-arguments gate-def)))))
-      (flet ((matrix-function (&rest params)
-               (assert (= (length parameters) (length params)))
-               (matrix-expt (reduce (lambda (m term)
-                                      (m+ m (pauli-term->matrix term arguments params parameters)))
-                                    terms
-                                    :initial-value (magicl:make-zero-matrix size size))
-                            (complex 0d0 -1d0))))
-        (make-instance 'pauli-sum-gate
-                       :arguments (pauli-sum-gate-definition-arguments gate-def)
-                       :parameters (pauli-sum-gate-definition-parameters gate-def)
-                       :terms (pauli-sum-gate-definition-terms gate-def)
-                       :dimension size
-                       :arity (length (pauli-sum-gate-definition-arguments gate-def))
-                       :matrix-function #'matrix-function)))))
+    (make-instance 'pauli-sum-gate
+                   :arguments arguments
+                   :parameters parameters
+                   :terms terms
+                   :dimension (expt 2 (length arguments))
+                   :arity (length arguments))))
 
 ;;;; some leftover stuff from standard-gates.lisp and elsewhere
 
