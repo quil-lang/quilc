@@ -904,7 +904,8 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                          (setf ,x (apply #'build-gate ,xs)))
                         ;; check for an anon-gate signature
                         ((and (<= 3 (length ,xs))
-                              (typep (cadr ,xs) 'magicl:matrix))
+                              (or (typep (cadr ,xs) 'magicl:matrix)
+                                  (typep (cadr ,xs) 'gate)))
                          (setf ,x (apply #'anon-gate ,xs)))
                         (t
                          (error "INST argument pattern not recognized: ~A" ,xs)))

@@ -54,15 +54,18 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
 
 (define-global-counter **anonymous-gate-counter** get-anonymous-gate-counter)
 
-(defun anon-gate (operator matrix qubit &rest qubits)
+(defun anon-gate (operator gate qubit &rest qubits)
   "Variant of BUILD-GATE for constructing anonymous gate applications."
   (check-type operator string)
-  (check-type matrix magicl:matrix)
   (push qubit qubits)
-  (let ((name (format nil "~A-~A" operator (get-anonymous-gate-counter))))
+  (let* ((name (format nil "~A-~A" operator (get-anonymous-gate-counter)))
+         (gate
+           (etypecase gate
+             (gate gate)
+             (magicl:matrix (make-instance 'simple-gate :matrix gate :name name)))))
     (make-instance 'gate-application
                    :operator (named-operator name)
-                   :gate (make-instance 'simple-gate :matrix matrix :name name)
+                   :gate gate
                    :arguments (mapcar #'%capture-arg qubits))))
 
 (defun repeatedly-fork (op n)
@@ -73,6 +76,8 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
 (defun build-UCR (roll-name params qubit &rest qubits)
   (apply #'build-gate (repeatedly-fork (named-operator roll-name) (length qubits))
          params qubit qubits))
+
+(defun pauli-gate (operator &rest pauli-))
 
 ;;; functions for dealing with mixed constant vs delayed-expression types
 
