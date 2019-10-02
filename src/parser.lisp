@@ -989,13 +989,12 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 (defun pauli-term->matrix (term arguments parameters parameter-names)
   (let* ((prefactor-fn
            (typecase (pauli-term-prefactor term)
-             (number (lambda (&rest args) (declare (ignore args)) (pauli-term-prefactor term)))
-             (symbol (compile nil `(lambda ,parameter-names
-                                     (declare (ignorable ,@parameter-names))
-                                     ,(pauli-term-prefactor term))))
-             (cons (compile nil `(lambda ,parameter-names
-                                   (declare (ignorable ,@parameter-names))
-                                   ,@(pauli-term-prefactor term))))))
+             (number
+              (lambda (&rest args) (declare (ignore args)) (pauli-term-prefactor term)))
+             ((or symbol cons)
+              (compile nil `(lambda ,parameter-names
+                              (declare (ignorable ,@parameter-names))
+                              ,(pauli-term-prefactor term))))))
          (arg-count (length arguments))
          (size (expt 2 arg-count))
          (m (magicl:make-zero-matrix size size)))
