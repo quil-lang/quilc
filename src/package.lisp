@@ -121,9 +121,9 @@
    #:memory-name                        ; TYPE (STRUCTURE)
    #:memory-name-region-name            ; READER
 
-   #:frame
-   #:frame-name
-   #:frame-qubits
+   #:frame                              ; STRUCTURE
+   #:frame-name                         ; READER
+   #:frame-qubits                       ; READER
 
    #:waveform-ref                       ; STRUCTURE
    #:waveform-ref-name                  ; READER
@@ -507,6 +507,11 @@
   ;; matrix-operations.lisp
   (:export
    #:parsed-program-to-logical-matrix   ; FUNCTION
+   )
+
+  ;; expansion.lisp
+  (:export
+   #:quil-expansion-error               ; CONDITION
    )
 
   ;; type-safety.lisp

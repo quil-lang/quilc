@@ -39,7 +39,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     (raw-capture
      (constant-value (raw-capture-duration instr)))
     ((or simple-frame-mutation swap-phase fence)
-     0.0)))
+     0.0d0)))
 
 (defun quilt-instruction-frames (instr parsed-program)
   (a:ensure-list
@@ -76,10 +76,11 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   "Does the FRAME involve any of the specified QUBITS?"
   (intersection qubits
                 (frame-qubits frame)
-                :test #'equalp))
+                :test #'eql
+                :key #'qubit-index))
 
 (defun frame-on-p (frame qubits)
-  "Does FRAME involve exactly the specified QUBITS?"
+  "Does FRAME involve exactly the specified QUBITS in the specified order?"
   (equalp qubits (frame-qubits frame)))
 
 ;;; Frame Clocks
@@ -103,7 +104,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   (setf (gethash frame frame-clocks) new-value))
 
 (defun latest-time (frame-clocks frames)
-  (loop :for frame :in frames :maximizing (local-time frame-clocks frame)))
+  (loop :for frame :in frames :maximize (local-time frame-clocks frame)))
 
 (defgeneric emit-delays (instr clocks)
   (:documentation "Update the local times on CLOCKS according to the specified INSTR, returning a list of implicit DELAYs.")

@@ -7,17 +7,22 @@
 (deftype expansion-context ()
   '(member nil :DEFCIRCUIT :DEFCAL))
 
-(defparameter *expansion-context* nil
-  "The context for expansion, mainly used for error messages.")
+(defvar *expansion-context*)
+(setf (documentation '*expansion-context* 'variable)
+      "The context for expansion, mainly used for error messages.")
 
-(defun expansion-error (format-control &rest format-args)
-  "Signal a QUIL-PARSE-ERROR, incorporating information about the expansion context."
-  (quil-parse-error "While expanding ~A: ~?"
-                    (or *expansion-context* "circuit or calibration")
-                    format-control
-                    format-args))
+(define-condition quil-expansion-error (simple-error)
+  ()
+  (:documentation "Representation of an error arising in Quil circuit or calibration expansion."))
 
-(defparameter *expansion-limit* 256
+(defun quil-expansion-error (format-control &rest format-args)
+  "Signal a QUIL-EXPANSION-ERROR, incorporating information about the expansion context."
+  (error 'quil-expansion-error :format-control (format nil "While expanding ~A: ~A"
+                                                       (or *expansion-context* "circuit or calibration")
+                                                       format-control)
+                               :format-arguments format-args))
+
+(defvar *expansion-limit* 256
   "Limit the number of recursive circuit or calibration expansions that can happen before erroring. Intended to avoid infinite loops.")
 
 (defvar *expansion-depth*)
@@ -31,7 +36,7 @@
                 :when (jump-target-p instr)
                   :collect (let ((name (label-name (jump-target-label instr))))
                              (when (assoc name alist :test #'string=)
-                               (expansion-error "Duplicate label ~S" name))
+                               (quil-expansion-error "Duplicate label ~S" name))
                              (list name (genlabel name)))
                     :into alist
                 :finally (return alist))))
@@ -92,7 +97,7 @@
 
     (let ((*expansion-depth* (1+ *expansion-depth*)))
       (unless (<= *expansion-depth* *expansion-limit*)
-        (expansion-error
+        (quil-expansion-error
          "Exceeded recursion limit of ~D. Current object being expanded is ~A."
          *expansion-limit*
          defn))
@@ -104,7 +109,7 @@
                                       :key #'param-name
                                       :test #'string-equal)))
                    (when (null pos)
-                     (expansion-error "No defined parameter named ~S" param))
+                     (quil-expansion-error "No defined parameter named ~S" param))
                    (elt params pos))))
            (arg-value (arg)
              (if (not (is-formal arg))
@@ -113,7 +118,7 @@
                                       :key #'formal-name
                                       :test #'string-equal)))
                    (when (null pos)
-                     (expansion-error "No argument named ~S" (formal-name arg)))
+                     (quil-expansion-error "No argument named ~S" (formal-name arg)))
                    (elt args pos))))
            (instantiate (instr)
              (let ((x (instantiate-instruction instr #'param-value #'arg-value)))
