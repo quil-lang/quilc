@@ -377,8 +377,8 @@
                                  vector of length no less than ~A."
                                 (print-instruction-to-string mref)
                                 samples))
-           (warn "RAW-CAPTURE on frame ~A with unknown sample rate." (frame-definition-frame frame-defn))
-           ))
+           (warn "RAW-CAPTURE on frame ~A with unknown sample rate."
+                 (frame-definition-frame frame-defn))))
         (_
          (quil-type-error "RAW-CAPTURE instruction target must be of type ~
                            REAL, but got ~A of type ~A"

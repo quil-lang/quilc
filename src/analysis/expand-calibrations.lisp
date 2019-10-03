@@ -15,7 +15,7 @@
   "This transform applies all available calibrations. The result has no gate applications or measurements for which a calibration is defined."
   expand-circuits)
 
-(defparameter *require-applicable-calibration* T
+(defvar *require-applicable-calibration* t
   "If T, an error will be signalled if an instruction fails to match an applicable calibration during calibration expansion.")
 
 (defgeneric calibration-matches-p (defn instr)
@@ -25,36 +25,30 @@
     nil)
 
   (:method ((defn gate-calibration-definition) (instr gate-application))
-    (with-slots (operator parameters arguments) instr
-      ;; Check INSTR matches DEFN name and modifiers
-      (unless (operator-description-equalp operator
-                                           (calibration-definition-operator defn))
-        (return-from calibration-matches-p))
-
-      ;; Check that the parameters match.
-      (unless (and (= (length parameters)
-                      (length (calibration-definition-parameters defn)))
-                   ;; For each calibration parameter, there are two cases:
-                   ;; constant values or formal parameters
-                   (every (lambda (app-param cal-param)
-                            (if (is-constant cal-param)
-                                (equalp app-param cal-param)
-                                (is-param cal-param)))
-                          parameters
-                          (calibration-definition-parameters defn)))
-        (return-from calibration-matches-p))
-
-      ;; Check that the arguments match.
-      (unless (and (= (length arguments)
-                      (length (calibration-definition-arguments defn)))
-                   (every (lambda (app-arg cal-arg)
-                            (if (qubit-p cal-arg)
-                                (equalp app-arg cal-arg)
-                                (is-formal cal-arg)))
-                          arguments
-                          (calibration-definition-arguments defn)))
-        (return-from calibration-matches-p))
-      t))
+    (flet ((params-match (app-params cal-params)
+               (and (= (length app-params)
+                       (length cal-params))
+                    (every (lambda (app-param cal-param)
+                             (if (is-constant cal-param)
+                                 (equalp app-param cal-param)
+                                 (is-param cal-param)))
+                           app-params
+                           cal-params)))
+             (args-match (app-args cal-args)
+               (and (= (length app-args)
+                       (length cal-args))
+                    (every (lambda (app-arg cal-arg)
+                             (if (qubit-p cal-arg)
+                                 (equalp app-arg cal-arg)
+                                 (is-formal cal-arg)))
+                           app-args
+                           cal-args))))
+      (and (operator-description-equalp (application-operator instr)
+                                        (calibration-definition-operator defn))
+           (params-match (application-parameters instr)
+                         (calibration-definition-parameters defn))
+           (args-match (application-arguments instr)
+                       (calibration-definition-arguments defn)))))
 
   (:method ((defn measure-calibration-definition) (instr measure))
     ;; Check that the measurement qubit matches, and the address matches.
@@ -72,15 +66,16 @@
 (defun compute-calibration-tables (parsed-program)
   "Extract the calibration definitions from PARSED-PROGRAM. Returns three values:
 
-1. a hash table of gate calibrations (keyed by name),
+1. a hash table of gate calibrations (keyed by OPERATOR-DESCRIPTION),
 
 2. a list of measure calibrations,
 
 3. a list of measure discard calibrations."
   (let ((gate-calibrations
-          (make-hash-table :test 'equalp)) ; EQUALP b/c this table is keyed by OPERATOR-DESCRIPTIONs
-        measure-calibrations
-        measure-discard-calibrations)
+          (make-hash-table :test #'operator-description-equalp
+                           :hash-function #'operator-description-hash))
+        (measure-calibrations nil)
+        (measure-discard-calibrations nil))
     (dolist (defn (parsed-program-calibration-definitions parsed-program))
       ;; Assuming that the calibration definitions are in the same order
       ;; as their position in the quilt program, this will put them in
@@ -97,14 +92,14 @@
             measure-calibrations
             measure-discard-calibrations)))
 
-(defgeneric apply-calibration (instr gate-cals measure-cals measure-discard-cals)
+(defgeneric instantiate-applicable-calibration (instr gate-cals measure-cals measure-discard-cals)
   (:documentation "If INSTR has an associated calibration, return a list of instructions instantiated from the body of the calibration definition. Otherwise, return NIL.")
 
   (:method ((instr gate-application) gate-cals measure-cals measure-discard-cals)
     (declare (ignore measure-cals measure-discard-cals))
     (let ((op (application-operator instr)))
       (unless (plain-operator-p op)
-        (return-from apply-calibration))
+        (return-from instantiate-applicable-calibration nil))
 
       (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                                 (gethash op gate-cals))))
@@ -132,7 +127,7 @@
                               (list (measurement-qubit instr)))
       nil))
 
-  (:method ((instr t) gate-cals measure-cals measure-discard-cals)
+  (:method (instr gate-cals measure-cals measure-discard-cals)
     nil))
 
 (defun recursively-expand-instruction (instr gate-cals measure-cals measure-discard-cals)
@@ -142,7 +137,7 @@
                          Current object being expanded is ~A."
                         *expansion-limit*
                         instr))
-    (a:if-let ((expanded (apply-calibration instr gate-cals measure-cals measure-discard-cals)))
+    (a:if-let ((expanded (instantiate-applicable-calibration instr gate-cals measure-cals measure-discard-cals)))
       ;; Recursively expand the new instructions
       (a:mappend (lambda (instr)
                    (recursively-expand-instruction instr
@@ -152,17 +147,14 @@
                  expanded)
       ;; Otherwise, handle the base case.
       (if (and *require-applicable-calibration*
-               (null expanded)
-               (typep instr '(or gate-application measure measure-discard)))
-          (expansion-error "Expected a calibration definition associated with ~A, but none was found."
-                           instr)
+               (typep instr '(or gate-application measurement)))
+          (quil-expansion-error "Expected a calibration definition associated with ~A, but none was found."
+                                instr)
           (list instr)))))
 
 (defun expand-calibrations (parsed-program)
   "Expand all gate applications and measurements in PARSED-PROGRAM for which there is a corresponding calibration definition."
-  (multiple-value-bind (gate-cals
-                        measure-cals
-                        measure-discard-cals)
+  (multiple-value-bind (gate-cals measure-cals measure-discard-cals)
       (compute-calibration-tables parsed-program)
     (let ((*expansion-context* ':DEFCAL)
           (*expansion-depth* 0))

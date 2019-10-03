@@ -7,17 +7,24 @@
 (deftype expansion-context ()
   '(member nil :DEFCIRCUIT :DEFCAL))
 
-(defparameter *expansion-context* nil
-  "The context for expansion, mainly used for error messages.")
+(defvar *expansion-context*)
+(setf (documentation '*expansion-context* 'variable)
+      "The context for expansion, mainly used for error messages.")
 
-(defun expansion-error (format-control &rest format-args)
-  "Signal a QUIL-PARSE-ERROR, incorporating information about the expansion context."
-  (quil-parse-error "While expanding ~A: ~?"
-                    (or *expansion-context* "circuit or calibration")
-                    format-control
-                    format-args))
+(define-condition quil-expansion-error (simple-error)
+  ()
+  (:documentation "Representation of an error arising in Quil circuit or calibration expansion."))
 
-(defparameter *expansion-limit* 256
+(defun quil-expansion-error (format-control &rest format-args)
+  "Signal a QUIL-EXPANSION-ERROR, incorporating information about the expansion context."
+  (error 'quil-expansion-error
+         :format-control "While expanding ~:[circuit or calibration~;~:*~A~]: ~?"
+         :format-arguments (list (and (boundp '*expansion-context*)
+                                      *expansion-context*)
+                                 format-control
+                                 format-args)))
+
+(defvar *expansion-limit* 256
   "Limit the number of recursive circuit or calibration expansions that can happen before erroring. Intended to avoid infinite loops.")
 
 (defvar *expansion-depth*)
@@ -31,19 +38,17 @@
                 :when (jump-target-p instr)
                   :collect (let ((name (label-name (jump-target-label instr))))
                              (when (assoc name alist :test #'string=)
-                               (expansion-error "Duplicate label ~S" name))
-                             (list name (genlabel name)))
+                               (quil-expansion-error "Duplicate label ~S" name))
+                             (cons name (genlabel name)))
                     :into alist
                 :finally (return alist))))
     ;; REPLACEMENT is a way to access RELABELINGS, and
     ;; RELABEL-INSTRUCTION will actually relabel the relevant
     ;; (pseudo-)instructions.
     (labels ((replacement (label)
-               ;; ASSOC may return NIL. Using SECOND is intentional
-               ;; since (SECOND NIL) => NIL.
-               (second (assoc (label-name label)
-                              relabelings
-                              :test #'string=)))
+               (cdr (assoc (label-name label)
+                           relabelings
+                           :test #'string=)))
 
              (relabel-instruction (instr)
                (cond
@@ -92,7 +97,7 @@
 
     (let ((*expansion-depth* (1+ *expansion-depth*)))
       (unless (<= *expansion-depth* *expansion-limit*)
-        (expansion-error
+        (quil-expansion-error
          "Exceeded recursion limit of ~D. Current object being expanded is ~A."
          *expansion-limit*
          defn))
@@ -104,7 +109,7 @@
                                       :key #'param-name
                                       :test #'string-equal)))
                    (when (null pos)
-                     (expansion-error "No defined parameter named ~S" param))
+                     (quil-expansion-error "No defined parameter named ~S" param))
                    (elt params pos))))
            (arg-value (arg)
              (if (not (is-formal arg))
@@ -113,11 +118,11 @@
                                       :key #'formal-name
                                       :test #'string-equal)))
                    (when (null pos)
-                     (expansion-error "No argument named ~S" (formal-name arg)))
+                     (quil-expansion-error "No argument named ~S" (formal-name arg)))
                    (elt args pos))))
            (instantiate (instr)
-             (let ((x (instantiate-instruction instr #'param-value #'arg-value)))
-               (a:ensure-list x))))
+             (a:ensure-list
+              (instantiate-instruction instr #'param-value #'arg-value))))
         (mapcan #'instantiate
                 (relabel-block-labels-uniquely defn-body))))))
 
@@ -147,7 +152,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
             (circuit-definition-body (circuit-application-definition instr))))
     (unresolved-application
      (unless *allow-unresolved-applications*
-       (error "Unable to determine if the unresolved application is unitary:~%    ~/quil:instruction-fmt/"
+       (error "Unable to determine if the unresolved application is unitary:~%    ~/cl-quil:instruction-fmt/"
               instr))
      t)))
 
@@ -158,6 +163,27 @@ depending on whether TEST passes."
     (if (funcall test obj)
         (funcall transform obj)
         obj)))
+
+;;; To REMAKE or not to REMAKE
+;;; that is the question....
+;;;
+;;; Basically, in circuit or calibration bodies some instructions might depend
+;;; on circuit parameters or arguments. For those, instantiation necessarily
+;;; must make a new instruction (since this may happen more than once). However,
+;;; in the absence of this we can avoid allocation and just return the original.
+;;; Thus in INSTANTIATE-INSTRUCTION below that we keep careful track of when
+;;; substition has actually occurred.
+
+;;; The macro FLAG-ON-UPDATE is just a helper for the kind of bookkeeping involved.
+(defmacro flag-on-update (flag op)
+  "Given a unary function OP, lift to a function which applies OP and sets FLAG to T if the result differs from the input."
+  (let ((x (gensym))
+        (new-x (gensym)))
+    `(lambda (,x)
+       (let ((,new-x (funcall ,op ,x)))
+         (unless (eq ,x ,new-x)
+           (setf ,flag t))
+         ,new-x))))
 
 (defgeneric instantiate-instruction (instr param-value arg-value)
   (:documentation "Given an instruction INSTR possibly with formal parameters/variables, instantiate it with the proper parameter/argument values provided by the unary functions PARAM-VALUE and ARG-VALUE, which take PARAM and FORMAL objects respectively as arguments. Return the instruction or a list of instructions as a result.")
@@ -190,11 +216,12 @@ depending on whether TEST passes."
 
   (:method ((instr application) param-value arg-value)
     (let ((remake nil))
-      (let ((params (mapcar (transform-if (constantly t) (substitute-parameter param-value))
+      (let ((params (mapcar (flag-on-update remake
+                                            (substitute-parameter param-value))
                             (application-parameters instr)))
-            (args (mapcar (transform-if #'is-formal arg-value)
+            (args (mapcar (flag-on-update remake
+                                          (transform-if #'is-formal arg-value))
                           (application-arguments instr))))
-        (setf remake t)
         (map-into params
                   (transform-if #'delayed-expression-p #'evaluate-delayed-expression)
                   params)
@@ -397,14 +424,11 @@ depending on whether TEST passes."
                                          (delay-qubits instr))))))
 
   (:method ((instr delay-on-frames) param-value arg-value)
-    (let* (remake
+    (let* ((remake nil)
            (duration (ensure-instantiated (delay-duration instr)
                                           arg-value))
-           (frames (mapcar (lambda (f)
-                             (let ((frame (instantiate-frame f arg-value)))
-                               (unless (eq f frame)
-                                 (setf remake t))
-                               frame))
+           (frames (mapcar (flag-on-update remake
+                                           (lambda (f) (instantiate-frame f arg-value))) 
                            (delay-frames instr))))
       (if (and (eq duration (delay-duration instr))
                (not remake))
@@ -414,12 +438,9 @@ depending on whether TEST passes."
                          :frames frames))))
 
   (:method ((instr fence) param-value arg-value)
-    (let* (remake
-           (qubits (mapcar (lambda (q)
-                             (let ((qubit (ensure-instantiated q arg-value)))
-                               (unless (eq qubit q)
-                                 (setf remake t))
-                               q))
+    (let* ((remake nil)
+           (qubits (mapcar (flag-on-update remake
+                                           (lambda (q) (ensure-instantiated q arg-value))) 
                            (fence-qubits instr))))
       (if remake
           (make-instance 'fence :qubits qubits)
@@ -432,12 +453,9 @@ depending on whether TEST passes."
 
 (defun instantiate-frame (frame arg-value)
   "Instantiate FRAME with respect to the unary function ARG-VALUE, constructing a new frame if needed."
-  (let* (remake
-         (qubits (mapcar (lambda (q)
-                           (let ((qubit (ensure-instantiated q arg-value)))
-                             (unless (eq q qubit)
-                               (setf remake t))
-                             qubit))
+  (let* ((remake nil)
+         (qubits (mapcar (flag-on-update remake
+                                         (lambda (q) (ensure-instantiated q arg-value)))
                          (frame-qubits frame))))
     (if remake
         (let ((instantiated (frame qubits (frame-name frame))))
