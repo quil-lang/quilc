@@ -1256,25 +1256,27 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
                 (operator-description-root-name od2))))
 
 (defun operator-description-hash (od)
-  (flet ((combine-hash (a b)
-           #+sbcl
-           (sb-int:mix a b)
-           #-sbcl
-           (logxor a b)))
-    (adt:match operator-description od
-      ((named-operator name) (sxhash name))
-      ((controlled-operator inner-od)
-       (combine-hash
-        (sxhash 'controlled)
-        (operator-description-hash inner-od)))
-      ((dagger-operator inner-od)
-       (combine-hash
-        (sxhash 'dagger)
-        (operator-description-hash inner-od)))
-      ((forked-operator inner-od)
-       (combine-hash
-        (sxhash 'forked)
-        (operator-description-hash inner-od))))))
+  "Hash function for OPERATOR-DESCRIPTIONs."
+  ;; If we have a convenient way of combining hashed values,
+  ;; e.g. with SB-INT:MIX, use this explicitly. Otherwise,
+  ;; fall back to hashing the string representation.
+  #+sbcl
+  (adt:match operator-description od
+    ((named-operator name) (sxhash name))
+    ((controlled-operator inner-od)
+     (sb-int:mix
+      (sxhash 'controlled)
+      (operator-description-hash inner-od)))
+    ((dagger-operator inner-od)
+     (sb-int:mix
+      (sxhash 'dagger)
+      (operator-description-hash inner-od)))
+    ((forked-operator inner-od)
+     (sb-int:mix
+      (sxhash 'forked)
+      (operator-description-hash inner-od))))
+  #-sbcl
+  (sxhash (operator-description-string od)))
 
 (defun operator-description-root-name (od)
   "The \"root name\" that the operator description represents. This is usually going to name a gate that said description modifies."
