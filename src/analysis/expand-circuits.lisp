@@ -17,10 +17,7 @@
       (let ((flat-instrs
               (loop :for instr :across (parsed-program-executable-code parsed-program)
                     :for instantiated := (instantiate-instruction instr #'always-error #'always-error)
-                    :if (listp instantiated)
-                      :append instantiated
-                    :else
-                      :collect instantiated)))
+                    :append (a:ensure-list instantiated))))
         (setf (parsed-program-executable-code parsed-program)
               (coerce flat-instrs 'vector)))))
   parsed-program)

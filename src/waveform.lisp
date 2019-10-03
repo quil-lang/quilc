@@ -18,8 +18,16 @@
 (defparameter *quilt-to-waveform-class* (make-hash-table :test 'equal)
   "A mapping from quilt name (a string) to the corresponding waveform class name.")
 
-(defgeneric quilt-waveform-parameter-alist (class-name)
-  (:documentation "An association list mapping quilt parameter names to their corresponding slot names on the standard waveform class CLASS-NAME.")) ; e.g. '(("first_param" first-param) ("foo" foo))
+(defun default-waveform-class (waveform-ref)
+  "Return the built-in waveform class named by the given WAVEFORM-REF."
+  (gethash (waveform-ref-name waveform-ref) *quilt-to-waveform-class*))
+
+(defparameter *waveform-class-parameter-alists* (make-hash-table :test 'equal)
+  "This is keyed by the built-in waveform CLASS-NAMEs, and maintains for each an association list mapping quilt parameter names to their corresponding slot names.")
+
+(defun quilt-waveform-parameter-alist (class-name)
+  "Given the CLASS-NAME of a built-in quilt waveform, return an association list mapping quilt waveform parameter names and their corresponding slot names on the waveform class."
+  (gethash class-name *waveform-class-parameter-alists*))
 
 (defmacro define-standard-waveform (class-name quilt-name slot-specs &key (documentation nil))
   "Define a standard waveform.
@@ -52,9 +60,7 @@ PARAMETERS:
             `((:documentation ,documentation))))
 
        (setf (gethash ,quilt-name *quilt-to-waveform-class*) ',class-name)
-
-       (defmethod quilt-waveform-parameter-alist ((class-name (eql ',class-name)))
-         ',quilt-param-alist)
+       (setf (gethash ',class-name *waveform-class-parameter-alists*) ',quilt-param-alist)
 
        nil)))
 
@@ -66,8 +72,7 @@ PARAMETERS:
          :documentation "Full Width Half Max shape parameter, in seconds.")
    (t0 :quilt-name "t0"
        :type float
-       :documentation "Center time coordinate of the shape in seconds. Defaults
-       to mid-point of pulse.")))
+       :documentation "Center time coordinate of the shape in seconds. Defaults to mid-point of pulse.")))
 
 (define-standard-waveform drag-gaussian-waveform "draggaussian"
   ((fwhm :quilt-name "fwhm"

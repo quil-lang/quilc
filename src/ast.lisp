@@ -1255,6 +1255,29 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
        (string= (operator-description-root-name od1)
                 (operator-description-root-name od2))))
 
+(defun operator-description-hash (od)
+  "Hash function for OPERATOR-DESCRIPTIONs."
+  ;; If we have a convenient way of combining hashed values,
+  ;; e.g. with SB-INT:MIX, use this explicitly. Otherwise,
+  ;; fall back to hashing the string representation.
+  #+sbcl
+  (adt:match operator-description od
+    ((named-operator name) (sxhash name))
+    ((controlled-operator inner-od)
+     (sb-int:mix
+      (sxhash 'controlled)
+      (operator-description-hash inner-od)))
+    ((dagger-operator inner-od)
+     (sb-int:mix
+      (sxhash 'dagger)
+      (operator-description-hash inner-od)))
+    ((forked-operator inner-od)
+     (sb-int:mix
+      (sxhash 'forked)
+      (operator-description-hash inner-od))))
+  #-sbcl
+  (sxhash (operator-description-string od)))
+
 (defun operator-description-root-name (od)
   "The \"root name\" that the operator description represents. This is usually going to name a gate that said description modifies."
   (adt:match operator-description od
@@ -1636,9 +1659,9 @@ For example,
             (print-instruction-to-string (raw-capture-memory-ref instr))))
 
   (:method ((instr fence) (stream stream))
-    (format stream "FENCE ~{~A ~}" (mapcar (lambda (q)
-                                             (print-instruction-generic q nil))
-                                           (fence-qubits instr))))
+    (format stream "FENCE ~{~A ~}"
+            (mapcar #'print-instruction-to-string
+                    (fence-qubits instr))))
 
   (:method ((instr delay-on-qubits) (stream stream))
     (format stream "DELAY~{ ~A~} ~A"
@@ -1781,8 +1804,8 @@ For example,
   (:method ((defn frame-definition) (stream stream))
     (let ((sample-rate (frame-definition-sample-rate defn))
           (frequency (frame-definition-initial-frequency defn)))
-      (format stream "DEFFRAME ~A"
-              (print-instruction-generic (frame-definition-frame defn) nil))
+      (format stream "DEFFRAME ~/cl-quil:instruction-fmt/"
+              (frame-definition-frame defn))
       (when (or sample-rate frequency)
         (format stream ":~%"))
       (when sample-rate
