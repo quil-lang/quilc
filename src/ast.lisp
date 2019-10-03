@@ -1657,9 +1657,9 @@ For example,
             (print-instruction-to-string (raw-capture-memory-ref instr))))
 
   (:method ((instr fence) (stream stream))
-    (format stream "FENCE ~{~A ~}" (mapcar (lambda (q)
-                                             (print-instruction-generic q nil))
-                                           (fence-qubits instr))))
+    (format stream "FENCE ~{~A ~}"
+            (mapcar #'print-instruction-to-string
+                    (fence-qubits instr))))
 
   (:method ((instr delay-on-qubits) (stream stream))
     (format stream "DELAY~{ ~A~} ~A"
@@ -1802,8 +1802,8 @@ For example,
   (:method ((defn frame-definition) (stream stream))
     (let ((sample-rate (frame-definition-sample-rate defn))
           (frequency (frame-definition-initial-frequency defn)))
-      (format stream "DEFFRAME ~A"
-              (print-instruction-generic (frame-definition-frame defn) nil))
+      (format stream "DEFFRAME ~/cl-quil:instruction-fmt/"
+              (frame-definition-frame defn))
       (when (or sample-rate frequency)
         (format stream ":~%"))
       (when sample-rate

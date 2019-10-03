@@ -152,7 +152,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
             (circuit-definition-body (circuit-application-definition instr))))
     (unresolved-application
      (unless *allow-unresolved-applications*
-       (error "Unable to determine if the unresolved application is unitary:~%    ~/quil:instruction-fmt/"
+       (error "Unable to determine if the unresolved application is unitary:~%    ~/cl-quil:instruction-fmt/"
               instr))
      t)))
 
