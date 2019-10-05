@@ -54,15 +54,23 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
 
 (define-global-counter **anonymous-gate-counter** get-anonymous-gate-counter)
 
-(defun anon-gate (operator gate qubit &rest qubits)
+(defun anon-gate (operator-or-gate gate-or-parameters qubit &rest qubits)
   "Variant of BUILD-GATE for constructing anonymous gate applications."
-  (check-type operator string)
   (push qubit qubits)
-  (let* ((name (format nil "~A-~A" operator (get-anonymous-gate-counter)))
+  (let* ((name
+           (etypecase operator-or-gate
+             (string
+              (format nil "~A-~A" operator-or-gate (get-anonymous-gate-counter)))
+             (gate
+              (format nil "~A-~A" (gate-name operator-or-gate) (get-anonymous-gate-counter)))))
          (gate
-           (etypecase gate
-             (gate gate)
-             (magicl:matrix (make-instance 'simple-gate :matrix gate :name name)))))
+           (cond
+             ((typep operator-or-gate 'gate)
+              operator-or-gate)
+             ((typep gate-or-parameters 'magicl:matrix)
+              (make-instance 'simple-gate :matrix gate-or-parameters :name name))
+             (t
+              (error "Cannot find gate definition.")))))
     (make-instance 'gate-application
                    :operator (named-operator name)
                    :gate gate
