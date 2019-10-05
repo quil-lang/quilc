@@ -828,7 +828,8 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
   (assert (listp source))
   (multiple-value-bind (source options) (cleave-options source)
     (cond
-      ((endp (cdr source))
+      ((or (endp (cdr source))
+           (wildcard-pattern-p (second source)))
        (make-wildcard-binding :name (first source)
                               :options options))
       (t
