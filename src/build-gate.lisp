@@ -70,11 +70,16 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
              ((typep gate-or-parameters 'magicl:matrix)
               (make-instance 'simple-gate :matrix gate-or-parameters :name name))
              (t
-              (error "Cannot find gate definition.")))))
+              (error "Cannot find gate definition."))))
+         (parameters
+           (typecase gate-or-parameters
+             (cons gate-or-parameters)
+             (otherwise nil))))
     (make-instance 'gate-application
                    :operator (named-operator name)
                    :gate gate
-                   :arguments (mapcar #'%capture-arg qubits))))
+                   :arguments (mapcar #'%capture-arg qubits)
+                   :parameters parameters)))
 
 (defun repeatedly-fork (op n)
   (loop :repeat n
