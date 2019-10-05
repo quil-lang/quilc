@@ -209,8 +209,7 @@
                                     terms
                                     :initial-value (magicl:make-zero-matrix size size))
                             (complex 0d0 -1d0))))
-        (setf (%parameterized-gate-matrix-function gate)
-              #'matrix-function)))))
+        (setf (%parameterized-gate-matrix-function gate) #'matrix-function)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;; Gate Operators ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
