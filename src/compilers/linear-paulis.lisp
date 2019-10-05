@@ -1,4 +1,4 @@
-;;;; pauli-pair.lisp
+;;;; linear-paulis.lisp
 ;;;;
 ;;;; Author: Eric Peterson
 ;;;;
