@@ -81,6 +81,7 @@
                              (:file "translators")
                              (:file "modifiers")
                              (:file "pauli-pair")
+                             (:file "linear-paulis")
                              ;; attic'd files / pedagogical purposes only
                              (:file "optimal-2q")
                              (:static-file "cs-compile")))
