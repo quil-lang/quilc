@@ -6,8 +6,13 @@
 
 (defun run-cl-quil-tests (&key (verbose nil) (headless nil) (parallel nil))
   "Run all CL-QUIL tests. If VERBOSE is T, print out lots of test info. If HEADLESS is T, disable interactive debugging and quit on completion. If PARALLEL is non-nil, it is the number of threads to use."
+  ;; Since each test is run in its own thread *and* each test may try
+  ;; to spin up subthreads, the minimum number of threads required is
+  ;; two. If we allow just a single thread, then any test which tries
+  ;; to run a subthread will block because there are no more threads
+  ;; available.
+  (check-type parallel (or null (integer 2)))
   ;; Bug in Fiasco commit fe89c0e924c22c667cc11c6fc6e79419fc7c1a8b
-  (check-type parallel (or null (integer 1)))
   (setf fiasco::*test-run-standard-output* (make-broadcast-stream
                                             *standard-output*))
   (let ((quil::*compress-carefully* t)
@@ -16,7 +21,7 @@
         ;; pause and request that we create a kernel. To avoid that,
         ;; we create a single thread kernel that ought to behave as if
         ;; there was no parallelisation.
-        (lparallel:*kernel* (lparallel:make-kernel 1)))
+        (lparallel:*kernel* (lparallel:make-kernel 2)))
     (cond
       (parallel
        (let ((lparallel:*kernel* (lparallel:make-kernel parallel))
