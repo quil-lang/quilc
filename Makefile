@@ -48,7 +48,6 @@ dump-version-info:
 install-test-deps:
 ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
-	echo "deb http://http.us.debian.org/debian/ testing non-free contrib main" >> /etc/apt/sources.list
 	apt update
 	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
 	curl $(ZMQ_REPO)/Release.key | apt-key add -
