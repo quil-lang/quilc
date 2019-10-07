@@ -115,7 +115,7 @@ JUMP @a")))
    ':cl-quil-tests
    "tests/compiler-hook-test-files/"))
 
-(deftest test-compiler-hook (&key print-stats)
+(deftest test-compiler-hook ()
   (let ((num-tasks 0)
         (tasks-lock (bt:make-lock)))
     (flet ((create-task (state-prep file arch)
@@ -178,28 +178,41 @@ RX(pi) 2
 
 (deftest test-compiler-hook-random-4Q ()
   (finish-output fiasco::*test-run-standard-output*)
-  (dolist (state-prep '(nil t))
-    (let ((quil::*enable-state-prep-compression* state-prep))
-      (format fiasco::*test-run-standard-output* "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~a~%" quil::*enable-state-prep-compression*)
-      (dolist (architecture '(:cz :iswap :cphase :piswap :cnot))
-        (format fiasco::*test-run-standard-output* "      Working on architecture ~a.~%" architecture)
-        (let* ((num-qubits 4)
-               (v (quil::random-special-unitary (expt 2 num-qubits)))
-               (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
-               (parsed-prog (make-instance
-                             'quil::parsed-program
-                             :executable-code (make-array 1
-                                                          :initial-element (make-instance
-                                                                            'quil::gate-application
-                                                                            :operator (named-operator "RANDO-GATE")
-                                                                            :gate v
-                                                                            :arguments (mapcar #'qubit args)))))
-               (processed-program
-                 (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
-                                                                              :architecture architecture))))
-          (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
-                                        (quil::parsed-program-to-logical-matrix processed-program))))))))
-
+  (let ((num-tasks 0)
+        (tasks-lock (bt:make-lock)))
+    (flet ((create-task (state-prep arch)
+             ;; Better safe than sorry.
+             (bt:with-lock-held (tasks-lock)
+               (incf num-tasks))
+             (lambda ()
+               (let ((quil::*enable-state-prep-compression* state-prep))
+                 (format fiasco::*test-run-standard-output*
+                         "    Testing architecture ~a, with~:[out~;~] state prep~%"
+                         arch state-prep)
+                 (let* ((num-qubits 4)
+                        (v (quil::random-special-unitary (expt 2 num-qubits)))
+                        (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
+                        (parsed-prog
+                          (make-instance
+                           'quil::parsed-program
+                           :executable-code (make-array 1
+                                                        :initial-element (make-instance
+                                                                          'quil::gate-application
+                                                                          :operator (named-operator "RANDO-GATE")
+                                                                          :gate v
+                                                                          :arguments (mapcar #'qubit args)))))
+                        (processed-program
+                          (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
+                                                                                       :architecture arch))))
+                   (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
+                                             (quil::parsed-program-to-logical-matrix processed-program)))))))
+      (let ((ch (lparallel:make-channel)))
+        (dolist (state-prep (list nil t))
+          (dolist (arch (list ':cz ':iswap ':cphase ':piswap ':cnot))
+            (lparallel:submit-task ch (create-task state-prep arch))))
+        (loop :repeat num-tasks :do
+          (let ((fiasco::*print-test-run-progress* nil))
+            (is (lparallel:receive-result ch))))))))
 
 (deftest test-compiler-hook-preserves-RESETs ()
   (let* ((pp (quil::parse-quil "
