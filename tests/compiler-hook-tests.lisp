@@ -135,8 +135,7 @@ JUMP @a")))
               (lparallel:submit-task ch (create-task state-prep file arch)))))
         (loop :repeat num-tasks :do
           (let ((fiasco::*print-test-run-progress* nil))
-            (is (lparallel:receive-result ch))))))
-    (print num-tasks)))
+            (is (lparallel:receive-result ch))))))))
 
 (deftest test-compression-bug-QUILC-152 ()
   "QUILC-152: A bug in state compression caused a failed assertion."
