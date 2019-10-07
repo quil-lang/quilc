@@ -124,7 +124,7 @@ JUMP @a")))
                (incf num-tasks))
              (lambda ()
                (let ((quil::*enable-state-prep-compression* state-prep))
-                 (format fiasco::*test-run-standard-output*
+                 (format *standard-output*
                          "    Testing file ~a (~a, with~:[out~;~] state prep)~%"
                          (pathname-name file) arch state-prep)
                  (compare-compiled file arch)))))
@@ -177,7 +177,7 @@ RX(pi) 2
               (shuffle-list l k))))
 
 (deftest test-compiler-hook-random-4Q ()
-  (finish-output fiasco::*test-run-standard-output*)
+  (finish-output *standard-output*)
   (let ((num-tasks 0)
         (tasks-lock (bt:make-lock)))
     (flet ((create-task (state-prep arch)
@@ -186,7 +186,7 @@ RX(pi) 2
                (incf num-tasks))
              (lambda ()
                (let ((quil::*enable-state-prep-compression* state-prep))
-                 (format fiasco::*test-run-standard-output*
+                 (format *standard-output*
                          "    Testing architecture ~a, with~:[out~;~] state prep~%"
                          arch state-prep)
                  (let* ((num-qubits 4)
