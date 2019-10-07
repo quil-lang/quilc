@@ -306,7 +306,7 @@ RAW-CAPTURE 0 \"xy\" 1.0 iqs"))
                 (signature "DEFCAL RX(0) 0:~%    NOP")))
     ;; argument names don't matter
     (is (equalp (signature "DEFCAL RX(0) s:~%    NOP")
-                (signature "DEFCAL RX(0) s:~%    NOP")))
+                (signature "DEFCAL RX(0) t:~%    NOP")))
     ;; parameter names don't matter
     (is (equalp (signature "DEFCAL RX(%theta) q:~%    NOP")
                 (signature "DEFCAL RX(%foo) q:~%    NOP")))
