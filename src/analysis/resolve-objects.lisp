@@ -46,18 +46,19 @@
 
 (defun resolve-waveform-reference (waveform-ref waveform-defns &key (use-defaults t))
   "Destructively update WAVEFORM-REF's name resolution to an appropriate waveform or waveform definition."
-  (let* ((name (waveform-ref-name waveform-ref))
-         (resolution
+  (let* ((resolution
            (a:if-let ((default-binding (and use-defaults
-                                            (gethash name *quilt-to-waveform-class*))))
+                                            (default-waveform-class waveform-ref))))
              (resolve-standard-waveform waveform-ref default-binding)
              (a:if-let ((defwaveform
-                            (find name waveform-defns
+                            (find (waveform-ref-name waveform-ref)
+                                  waveform-defns
                                   :key #'waveform-definition-name
                                   :test #'string=)))
                (resolve-custom-waveform waveform-ref defwaveform)
                (quil-parse-error "Waveform reference ~A does not match ~
-                                any standard or user defined waveforms." name)))))
+                                  any standard or user defined waveforms."
+                                 (waveform-ref-name waveform-ref))))))
     (setf (waveform-ref-name-resolution waveform-ref) resolution)
     waveform-ref))
 
