@@ -11,7 +11,6 @@ QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
 	--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)"
 QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
 UNAME_S=$(shell uname -s)
-ZMQ_REPO=https://download.opensuse.org/repositories/network:/messaging:/zeromq:/release-stable/xUbuntu_16.04/
 PREFIX ?= /usr/local
 
 all: quilc
@@ -48,10 +47,7 @@ dump-version-info:
 install-test-deps:
 ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
-	apt update
-	echo "deb $(ZMQ_REPO) ./" >> /etc/apt/sources.list
-	curl $(ZMQ_REPO)/Release.key | apt-key add -
-	apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev clang-7
+	apt update && apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev clang-7
 else
 	echo "Centos-based platforms unsupported"
 endif
