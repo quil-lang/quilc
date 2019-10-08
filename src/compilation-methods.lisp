@@ -248,7 +248,7 @@ Returns a value list: (processed-program, of type parsed-program
 
          (touch-unpreserved-block (blk registrant)
            ;; actually process this block
-           (multiple-value-bind (initial-l2p chip-schedule final-l2p)
+           (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-temporal-addressing
                    (coerce (basic-block-code blk) 'list)
                  chip-specification
@@ -276,7 +276,7 @@ Returns a value list: (processed-program, of type parsed-program
 
          (touch-reset-block (blk)
            ;; actually process this block
-           (multiple-value-bind (initial-l2p chip-schedule final-l2p)
+           (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-temporal-addressing
                  (coerce (basic-block-code blk) 'list)
                  chip-specification

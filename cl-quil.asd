@@ -106,6 +106,8 @@
                              (:file "cost-function")
                              (:file "astar-rewiring-search")
                              (:file "path-heuristic")
+                             (:file "addresser-common")
+                             (:file "embed-swap")
                              (:file "temporal-addresser")))
                (:module "compressor"
                 :serial t
