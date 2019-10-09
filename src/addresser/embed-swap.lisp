@@ -35,7 +35,7 @@ the qubit-qubit distance array QQ-DISTANCES."
 (defun cost-lowering-candidates (rewiring cost-function rewirings-tried chip-spec depth)
   "Given a rewiring and a cost function, returns a list of swap links for which
 the cost of the rewiring is reduced."
-  (let ((best-cost-so-far most-positive-fixnum)
+  (let ((best-cost-so-far nil)
         potential-first-links)
     (labels ((depth-first-traversal (depth topmost-link)
                (when (plusp depth)
@@ -52,9 +52,11 @@ the cost of the rewiring is reduced."
                            ;; compute the cost for this rewiring
                            (let ((new-cost (funcall cost-function rewiring)))
                              (cond
-                               ((double= new-cost best-cost-so-far)
+                               ((and best-cost-so-far
+                                     (cost-= new-cost best-cost-so-far))
                                 (push topmost-link potential-first-links))
-                               ((< new-cost best-cost-so-far)
+                               ((or (not best-cost-so-far)
+                                    (cost-< new-cost best-cost-so-far))
                                 (setf best-cost-so-far new-cost)
                                 (setf potential-first-links (list topmost-link)))
                                (t nil)))
@@ -90,15 +92,14 @@ indicated by LINK-INDEX, relative to the given schedule CHIP-SCHED."
         (t
          horizon-increment)))))
 
-(defun select-cost-lowering-swap (rewiring chip-spec chip-sched use-free-swaps cost-function rewirings-tried
+(defun select-cost-lowering-swap (rewiring chip-spec cost-function rewirings-tried
                                   &optional
                                     (depth *addresser-swap-lookahead-depth*))
   "Seaches for a 'SWAP' instruction that lowers the objective COST-FUNCTION. Returns such an
 instruction if it exists, and errors otherwise."
   (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Entrance.~%")
   (let* ((current-cost (funcall cost-function rewiring))
-         (shortest-horizon most-positive-fixnum)
-         (best-cost-so-far most-positive-fixnum)
+         (best-cost-so-far nil)
          (link-index nil)
          (potential-first-links (cost-lowering-candidates rewiring
                                                           cost-function
@@ -106,30 +107,26 @@ instruction if it exists, and errors otherwise."
                                                           chip-spec
                                                           depth)))
     (dolist (index potential-first-links)
-      ;; TODO: this assumes only SWAPs exist in the permutation list
-      (let ((new-horizon (swap-horizon index chip-sched chip-spec use-free-swaps)))
-        (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Considering ~d: this ~,3f vs best ~,3f.~%"
-                (chip-spec-qubits-on-link chip-spec index)
-                new-horizon
-                shortest-horizon)
-        ;; what does swapping this link do to our time horizon? if it
-        ;; pushes it out, we do *nothing*, but if it's within our
-        ;; horizon then we look at it.
-        (when (<= new-horizon shortest-horizon)
-          (let ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
-            (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
-              ;; compute the new cost value
-              (let ((new-cost (funcall cost-function rewiring)))
-                (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: New cost ~a vs best cost ~a vs current cost ~a.~%"
-                        new-cost best-cost-so-far current-cost)
-                ;; if it's lower than the best cost we've seen OR if it's the shortest acting swap and it's at least better than nothing...
-                (when (or (and (< new-cost best-cost-so-far) (not (zerop new-horizon)))
-                          (and (< (+ new-cost +double-comparison-threshold-loose+) current-cost) (< new-horizon shortest-horizon)))
-                  ;; ... then we prefer this link to all others.
-                  (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: We prefer this SWAP.~%")
-                  (setf best-cost-so-far new-cost)
-                  (setf link-index index)
-                  (setf shortest-horizon new-horizon))))))))
+      (let ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
+        (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
+          ;; TODO: "swap-horizon" used to live around here, and it takes care of free swaps and recombination.
+          ;;       where do we put those things now?
+          ;; compute the new cost value
+          (let ((new-cost (funcall cost-function rewiring)))
+            ;; TODO: this assumes only SWAPs exist in the permutation list
+            (format *compiler-noise-stream*
+                    "SELECT-COST-LOWERING-SWAP: Considering ~a. New cost ~a vs best cost ~a vs current cost ~a.~%"
+                    swapped-qubits new-cost best-cost-so-far current-cost)
+            ;; if it's lower than the best cost we've seen OR if it's the shortest acting swap and it's at least better than nothing...
+            ;; TODO: there used to be a "(not (zerop new-horizon))" here. why?
+            (when (or (null best-cost-so-far) ; we have to make progress.
+                      (cost-< new-cost best-cost-so-far)
+                      (and (cost-< new-cost current-cost)
+                           (not (cost-= new-cost current-cost))))
+              ;; ... then we prefer this link to all others.
+              (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: We prefer this SWAP.~%")
+              (setf best-cost-so-far new-cost)
+              (setf link-index index))))))
     ;; if we have a nil swap, the greedy scheduler has failed to operate. scary!
     (assert link-index
             nil
@@ -178,9 +175,7 @@ rewiring REWIRING to the TARGET-REWIRING."
                                          rewirings-tried rewiring)))
         (:greedy-qubit
          (push (copy-rewiring rewiring) rewirings-tried)
-         (embed (select-cost-lowering-swap rewiring chip-spec chip-sched use-free-swaps
-                                           #'cost-function
-                                           rewirings-tried)))
+         (embed (select-cost-lowering-swap rewiring chip-spec #'cost-function rewirings-tried)))
         (:a*
          (dolist (link-index (search-rewiring chip-spec rewiring
                                               (chip-schedule-qubit-times chip-sched)

@@ -365,7 +365,7 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]
 ")))
-    (multiple-value-bind (initial code final)
+    (multiple-value-bind (code initial final)
         (quil::do-greedy-temporal-addressing
             (coerce (parsed-program-executable-code pp) 'list)
           (quil::qpu-hash-table-to-chip-specification

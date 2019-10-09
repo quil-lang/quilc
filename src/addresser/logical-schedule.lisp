@@ -534,57 +534,6 @@ mapping instructions to their tags. "
       (walk-graph-with-candidates (lscheduler-topmost-instructions lschedule))
       (values max-distance distance-hash-table))))
 
-(defun lscheduler-2q-tiers-with-1q-instructions (lschedule)
-  (flet
-      ((2q-application-p (instr)
-         (and (typep instr 'application)
-              (= 2 (length (application-arguments instr))))))
-    (multiple-value-bind (max-value value-hash)
-        (lscheduler-walk-graph lschedule
-                               :base-value 0
-                               :bump-value (lambda (instr value)
-                                             (if (2q-application-p instr) (1+ value) value))
-                               :test-values #'max)
-      (when value-hash
-        (let ((tier-array (make-array max-value :initial-element nil)))
-          (dohash ((key val) value-hash)
-            (push key (aref tier-array val)))
-          (coerce tier-array 'list))))))
-
-(defun lscheduler-2q-tiers (lschedule)
-  (flet
-      ((2q-application-p (instr)
-         (and (typep instr 'application)
-              (= 2 (length (application-arguments instr))))))
-    (multiple-value-bind (max-value value-hash)
-        (lscheduler-walk-graph lschedule
-                               :base-value 0
-                               :bump-value (lambda (instr value)
-                                             (if (2q-application-p instr) (1+ value) value))
-                               :test-values #'max)
-      (when value-hash
-        (let ((tier-array (make-array max-value :initial-element nil)))
-          (dohash ((key val) value-hash)
-            (when (2q-application-p key)
-              (push key (aref tier-array val))))
-          (coerce tier-array 'list))))))
-
-;; TODO: it might be nice to supply a max-depth optional argument. this will
-;;       necessitate modifying LSCHEDULER-WALK-GRAPH above to support early termination.
-(defun lscheduler-instruction-tiers (lschedule)
-  (multiple-value-bind (max-value value-hash)
-      (lscheduler-walk-graph lschedule
-                             :base-value 0
-                             :bump-value (lambda (instr value)
-                                           (declare (ignore instr))
-                                           (1+ value))
-                             :test-values #'max)
-    (when value-hash
-      (let ((tier-array (make-array max-value :initial-element nil)))
-        (dohash ((key val) value-hash)
-          (push key (aref tier-array val)))
-        (coerce tier-array 'list)))))
-
 (defun lscheduler-calculate-duration (lschedule chip-spec)
   (flet ((duration-bumper (instr value)
            (multiple-value-bind (order address obj)
