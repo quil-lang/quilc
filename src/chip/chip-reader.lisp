@@ -189,6 +189,7 @@
              (setf qubit (build-qubit i :gate-information (parse-gates-field (gethash "gates" qubit-hash)))))
             ;; there's no "gates" field, but there is a "type" field, and it's supported
             ((and (string= "Xhalves" (gethash "type" qubit-hash)))
+             (warn "The ISA \"type\" field is deprecated and will be removed in favor of the \"gates\" field.")
              (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE))))
             ;; there's no "gates" field, but there is a "type" field, but it isn't supported
             ((gethash "type" qubit-hash)
@@ -234,6 +235,7 @@
                (setf link (build-link q0 q1 :gate-information (parse-gates-field (gethash "gates" link-hash)))))
               ;; there's no "gates" field, but there is a "type" field
               ((gethash "type" link-hash)
+               (warn "The ISA \"type\" field is deprecated and will be removed in favor of the \"gates\" field.")
                (labels ((individual-target-parser (string)
                           (cond
                             ((null string) nil)

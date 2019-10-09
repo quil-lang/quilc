@@ -771,6 +771,6 @@ Compilers are listed in descending precedence.")
   ;;
   ;; accessed 11 Jan 2019.
   (let ((digraph '((1 2) (2 3) (3 4) (5 4) (6 5) (6 7) (8 7)
-               (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
-               (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
+                   (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
+                   (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
     (build-chip-from-digraph digraph :architecture ':cnot)))
