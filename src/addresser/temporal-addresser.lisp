@@ -909,8 +909,10 @@ are ready to be scheduled."
       t)))
 
 (defun lscheduler-tiers (lschedule)
+  ;; TODO: maybe change global variable to pass function
   (if *addresser-use-2q-tiers*
-      (lscheduler-2q-tiers lschedule)
+      (lscheduler-2q-tiers-with-1q-instructions lschedule)
+      ;; (lscheduler-2q-tiers lschedule)
       (lscheduler-instruction-tiers lschedule)))
 
 (defun assign-gate (inst gates-in-waiting)
