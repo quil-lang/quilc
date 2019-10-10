@@ -98,8 +98,7 @@ indicated by LINK-INDEX, relative to the given schedule CHIP-SCHED."
   "Seaches for a 'SWAP' instruction that lowers the objective COST-FUNCTION. Returns such an
 instruction if it exists, and errors otherwise."
   (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Entrance.~%")
-  (let* ((current-cost (funcall cost-function rewiring))
-         (best-cost-so-far nil)
+  (let* ((best-cost-so-far nil)
          (link-index nil)
          (potential-first-links (cost-lowering-candidates rewiring
                                                           cost-function
@@ -109,21 +108,16 @@ instruction if it exists, and errors otherwise."
     (dolist (index potential-first-links)
       (let ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
         (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
-          ;; TODO: "swap-horizon" used to live around here, and it takes care of free swaps and recombination.
-          ;;       where do we put those things now?
           ;; compute the new cost value
-          (let ((new-cost (funcall cost-function rewiring)))
+          (let ((new-cost (funcall cost-function rewiring
+                                   :instr (build-gate "SWAP" () (aref swapped-qubits 0) (aref swapped-qubits 1)))))
             ;; TODO: this assumes only SWAPs exist in the permutation list
             (format *compiler-noise-stream*
-                    "SELECT-COST-LOWERING-SWAP: Considering ~a. New cost ~a vs best cost ~a vs current cost ~a.~%"
-                    swapped-qubits new-cost best-cost-so-far current-cost)
-            ;; if it's lower than the best cost we've seen OR if it's the shortest acting swap and it's at least better than nothing...
+                    "SELECT-COST-LOWERING-SWAP: Considering ~a. New cost ~a vs best cost ~a.~%"
+                    swapped-qubits new-cost best-cost-so-far)
             ;; TODO: there used to be a "(not (zerop new-horizon))" here. why?
             (when (or (null best-cost-so-far) ; we have to make progress.
-                      (cost-< new-cost best-cost-so-far)
-                      (and (cost-< new-cost current-cost)
-                           (not (cost-= new-cost current-cost))))
-              ;; ... then we prefer this link to all others.
+                      (cost-< new-cost best-cost-so-far))
               (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: We prefer this SWAP.~%")
               (setf best-cost-so-far new-cost)
               (setf link-index index))))))
@@ -135,7 +129,7 @@ instruction if it exists, and errors otherwise."
             "SELECT-COST-LOWERING-SWAP: SWAP ~d ~d is best, lowering cost from ~d to ~d.~%"
             (vnth 0 (chip-spec-qubits-on-link chip-spec link-index))
             (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))
-            current-cost
+            (funcall cost-function rewiring)
             best-cost-so-far)
     link-index))
 
@@ -146,7 +140,8 @@ instruction if it exists, and errors otherwise."
 rewiring REWIRING to the TARGET-REWIRING."
   (format *compiler-noise-stream* "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a~%"
           rewiring target-rewiring)
-  (flet ((cost-function (rewiring)
+  (flet ((cost-function (rewiring &key instr gate-weights)
+           (declare (ignore instr gate-weights))
            (rewiring-distance rewiring target-rewiring qq-distances))
          (done-moving (rewiring)
            (zerop (rewiring-distance rewiring target-rewiring qq-distances))))

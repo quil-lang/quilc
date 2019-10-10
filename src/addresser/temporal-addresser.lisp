@@ -51,14 +51,42 @@
 ;;     ...? steps from now?)  (+ more to come?)
 ;;
 ;; NOTE: THIS FUNCTION IS WILDLY INAPPROPRIATE (AND SO IS AT LEAST THE WEIGHTING
-;; SCHEME IN THE FLOYD-WARSHALL MATRIX) WHEN WORKING WITH NATIVE n-Q GATES, n >
-;; 2.
+;; SCHEME IN THE FLOYD-WARSHALL MATRIX) WHEN WORKING WITH NATIVE n-Q GATES, n > 2.
 (defmethod cost-function ((state temporal-addresser-state) &key gate-weights instr)
-  (let ((start-time 0) (actual-cost 0))
-    (when instr
-      (setf start-time (chip-schedule-resource-end-time (addresser-state-chip-schedule state)
-                                                        (apply #'make-qubit-resource 
-                                                               (mapcar #'qubit-index (application-arguments instr))))))
+  (let ((time 0) (actual-cost 0))
+    (when (and instr (typep instr 'gate-application))
+      ;; first compute a naive cost
+      (let* ((chip-spec (addresser-state-chip-specification state))
+             (naive-start-time (chip-schedule-resource-end-time
+                                (addresser-state-chip-schedule state)
+                                (apply #'make-qubit-resource 
+                                       (mapcar #'qubit-index (application-arguments instr)))))
+             (instruction-expansion
+               (let ((*compress-carefully* nil))
+                 (expand-to-native-instructions (list instr) chip-spec)))
+             (lschedule (make-lscheduler)))
+        (append-instructions-to-lschedule lschedule instruction-expansion)
+        (setf time (+ naive-start-time
+                      (lscheduler-calculate-duration lschedule chip-spec)))
+        
+        ;; then, see if there's a non-naive cost available
+        (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
+                      (cost-bound
+                       (gethash "cost-bound"
+                                (hardware-object-misc-data hardware-object)))
+                      (intelligent-bound
+                       (+ cost-bound
+                          (chip-schedule-resource-carving-point
+                           (addresser-state-chip-schedule state)
+                           (apply #'make-qubit-resource
+                                  (coerce (hardware-object-cxns hardware-object) 'list))))))
+          (setf time (min time intelligent-bound)))
+        
+        ;; finally, we have a special case for early SWAPs
+        (when (and *addresser-use-free-swaps*
+                   (swap-application-p instr)
+                   (double= 0d0 naive-start-time))
+          (setf time 0))))
     
     (when gate-weights
       (let ((qq-distances (addresser-state-qq-distances state))
@@ -75,10 +103,8 @@
                 (unless p0 (rotatef p0 p1) (rotatef q0 q1))
                 ;; if both are unassigned, then we gain nothing by changing the
                 ;; rewiring, so ignore this gate
-
                 (when p0
                   ;; otherwise at least one is assigned
-
                   (unless p1
                     ;; find a position for the other qubit
                     (setf p1
@@ -93,7 +119,6 @@
                                 :finally (return min-p)))
                     (push q1 assigned-qubits)
                     (rewiring-assign rewiring q1 p1))
-
                   (let ((qq-distance (aref qq-distances p0 p1)))
                     ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
                     ;; qubits exert weaker forces than nearby ones, encouraging
@@ -112,7 +137,7 @@
         ;; normalize actual-cost
         (setf actual-cost (if (zerop gate-count) 0d0 (/ actual-cost gate-count)))))
     
-    (make-temporal-cost :start-time start-time
+    (make-temporal-cost :start-time time
                         :heuristic-value actual-cost)))
 
 (defmethod cost-< ((val1 temporal-cost) (val2 temporal-cost))

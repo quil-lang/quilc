@@ -213,7 +213,19 @@ CHIP-SPEC and an initial logical-to-physical rewirign INITIAL-REWIRING."
   (:documentation "Generic method for assigning weights to gates, for consumption by COST-FUNCTION."))
 
 (defgeneric cost-function (state &key gate-weights instr)
-  (:documentation "Generic method for extracting a heuristic value from gate-weights, a hash mapping instructions to weights, and instr, an active instruction."))
+  (:documentation "Generic method for extracting a heuristic value.
+
+STATE is an ADDRESSER-STATE, which in particular carries an LSCHEDULER of gates yet to be scheduled.
+
+GATE-WEIGHTS is a hash mapping instructions in STATE->LSCHEDULER to (numerical) weights.  These can be used to precompute values across different runs of COST-FUNCTION (e.g., the depth of an instruction).
+
+INSTR is the \"active instruction\".
+
+- Neither is specified: COST-FUNCTION will return the \"best possible value\".
+- GATE-WEIGHTS is specified, INSTR is not: COST-FUNCTION will return a heuristic value suitable for comparing different rewirings, based on the future of instructions to be scheduled.
+- INSTR is specified, GATE-WEIGHTS is not: COST-FUNCTION will return a heuristic value suitable for comparing different instructions yet to be scheduled, based on the history of instructions already scheduled.
+- GATE-WEIGHTS and INSTR are both specified: COST-FUNCTION will return a heuristic value suitable for comparing different instructions INSTR to be injected (i.e., INSTR is assumed not to participate in LSCHEDULER).
+"))
 
 (defgeneric cost-< (val1 val2)
   (:documentation "Generic comparison function for heuristic values.")
@@ -264,10 +276,12 @@ cost-function associated to the current lschedule.")
                            chip-sched
                            :use-free-swaps *addresser-use-free-swaps*))))
           (:greedy-qubit
-           (flet ((cost-function (rewiring)
+           (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
                     (let ((modified-state (copy-instance state)))
                       (setf (addresser-state-working-l2p modified-state) rewiring)
-                      (cost-function modified-state :gate-weights gates-in-waiting))))
+                      (cost-function modified-state
+                                     :gate-weights gate-weights
+                                     :instr instr))))
              (push (copy-rewiring working-l2p) rewirings-tried)
              (embed-swap (select-cost-lowering-swap working-l2p chip-spec #'cost-function rewirings-tried)
                          initial-l2p
