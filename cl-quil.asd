@@ -108,7 +108,8 @@
                              (:file "path-heuristic")
                              (:file "addresser-common")
                              (:file "embed-swap")
-                             (:file "temporal-addresser")))
+                             (:file "temporal-addresser")
+                             (:file "fidelity-addresser")))
                (:module "compressor"
                 :serial t
                 :components ((:file "compressor-configuration")

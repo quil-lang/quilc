@@ -388,7 +388,7 @@ instruction, adding to logical queue.~%"
 
 ;; initialize the 1Q queues
 (defun initial-temporal-addresser-working-state (chip-spec initial-rewiring)
-  (let* ((state (initial-addresser-working-state chip-spec initial-rewiring)))
+  (let ((state (initial-addresser-working-state chip-spec initial-rewiring)))
     (change-class state 'temporal-addresser-state)
     (setf (temporal-addresser-state-1q-queues state)
           (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))
