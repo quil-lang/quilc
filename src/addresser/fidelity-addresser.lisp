@@ -53,7 +53,7 @@
           (when (<= cost-bound (+ preceding-fidelity instr-cost))
             (setf instr-cost (- cost-bound preceding-fidelity))))))
     
-    ;; conglomerate the log-infidelities in GATE-WEIGHTS, decayed by some decay factor
+    ;; conglomerate the log-infidelities in GATE-WEIGHTS, depressed by some decay factor
     (when gate-weights
       (let ((qq-distances (addresser-state-qq-distances state)) ; populated with log-infidelities
             (rewiring (addresser-state-working-l2p state))
@@ -72,7 +72,14 @@
                    (a:when-let* ((chip-spec (addresser-state-chip-specification state))
                                  (hardware-object (lookup-hardware-object chip-spec gate))
                                  (instrs (expand-to-native-instructions (list gate) chip-spec))
-                                 (fidelity (calculate-instructions-fidelity instrs chip-spec)))
+                                 (rewired-instrs
+                                  (loop :for instr :in instrs
+                                        :for rewired-instr := (copy-instance instr)
+                                        :do (setf (application-arguments rewired-instr)
+                                                  (mapcar (constantly (qubit (first physical-qubits)))
+                                                          (application-arguments rewired-instr)))
+                                        :collect rewired-instr))
+                                 (fidelity (calculate-instructions-fidelity rewired-instrs chip-spec)))
                      (incf gate-count)
                      (incf gate-weights-cost (- (log fidelity))))))
                 (2
