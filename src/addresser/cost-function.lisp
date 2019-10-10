@@ -97,46 +97,81 @@
     :for tier :in instruction-tiers
     :for tier-index :below 3
     :do (dolist (gate tier)
-          (when (and (typep gate 'application)
-                     (= 2 (length (application-arguments gate))))
-            (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
-              (let* ((p0 (apply-rewiring-l2p rewiring q0))
-                     (p1 (apply-rewiring-l2p rewiring q1)))
-                (unless p0 (rotatef p0 p1) (rotatef q0 q1))
-                ;; if both are unassigned, then we gain nothing by changing the
-                ;; rewiring, so ignore this gate
+          (cond
+            #+ignore((and (typep gate 'application)
+                  (= 1 (length (application-arguments gate))))
+             (destructuring-bind (q0) (mapcar #'qubit-index (application-arguments gate))
+               (let* ((p1 (apply-rewiring-l2p rewiring q0)))
+                 (unless p1
+                   ;; find a position for the qubit
+                   (setf p1
+                         (loop :with min-p    := nil
+                               :with min-dist := double-float-positive-infinity
+                               :for p :below (rewiring-length rewiring)
+                               :unless (apply-rewiring-p2l rewiring p)
+                                 :do (let ((new-dist (aref qq-distances p0 p)))
+                                       (when (< new-dist min-dist)
+                                         (setf min-p    p
+                                               min-dist new-dist)))
+                               :finally (return min-p)))
+                   (push q1 assigned-qubits)
+                   (rewiring-assign rewiring q1 p1))
 
-                (when p0
-                  ;; otherwise at least one is assigned
+                 (let ((qq-distance (aref qq-distances p0 p1)))
+                   ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
+                   ;; qubits exert weaker forces than nearby ones, encouraging
+                   ;; us to execute more quickly accomplishable gates sooner.
+                   ;; it's totally possible that dist alone is a good cost fn
+                   ;; on its own, and we should experiment with this.
+                   (assert (not (= qq-distance most-positive-fixnum)) ()
+                           "Multiqubit instruction requested between ~
+                                   disconnected components of the QPU graph: ~
+                                   ~A ."
+                           (print-instruction gate nil))
+                   (incf gate-count)
+                   (incf sum
+                         (* (expt *cost-fn-tier-decay* tier-index) qq-distance)))))
+             )
+            ((and (typep gate 'application)
+                  (= 2 (length (application-arguments gate))))
+             (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
+               (let* ((p0 (apply-rewiring-l2p rewiring q0))
+                      (p1 (apply-rewiring-l2p rewiring q1)))
+                 (unless p0 (rotatef p0 p1) (rotatef q0 q1))
+                 ;; if both are unassigned, then we gain nothing by changing the
+                 ;; rewiring, so ignore this gate
 
-                  (unless p1
-                    ;; find a position for the other qubit
-                    (setf p1
-                          (loop :with min-p    := nil
-                                :with min-dist := double-float-positive-infinity
-                                :for p :below (rewiring-length rewiring)
-                                :unless (apply-rewiring-p2l rewiring p)
-                                  :do (let ((new-dist (aref qq-distances p0 p)))
-                                        (when (< new-dist min-dist)
-                                          (setf min-p    p
-                                                min-dist new-dist)))
-                                :finally (return min-p)))
-                    (push q1 assigned-qubits)
-                    (rewiring-assign rewiring q1 p1))
+                 (when p0
+                   ;; otherwise at least one is assigned
 
-                  (let ((qq-distance (aref qq-distances p0 p1)))
-                    ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
-                    ;; qubits exert weaker forces than nearby ones, encouraging
-                    ;; us to execute more quickly accomplishable gates sooner.
-                    ;; it's totally possible that dist alone is a good cost fn
-                    ;; on its own, and we should experiment with this.
-                    (assert (not (= qq-distance most-positive-fixnum)) ()
+                   (unless p1
+                     ;; find a position for the other qubit
+                     (setf p1
+                           (loop :with min-p    := nil
+                                 :with min-dist := double-float-positive-infinity
+                                 :for p :below (rewiring-length rewiring)
+                                 :unless (apply-rewiring-p2l rewiring p)
+                                   :do (let ((new-dist (aref qq-distances p0 p)))
+                                         (when (< new-dist min-dist)
+                                           (setf min-p    p
+                                                 min-dist new-dist)))
+                                 :finally (return min-p)))
+                     (push q1 assigned-qubits)
+                     (rewiring-assign rewiring q1 p1))
+                   
+                   (let ((qq-distance (aref qq-distances p0 p1)))
+                     ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
+                     ;; qubits exert weaker forces than nearby ones, encouraging
+                     ;; us to execute more quickly accomplishable gates sooner.
+                     ;; it's totally possible that dist alone is a good cost fn
+                     ;; on its own, and we should experiment with this.
+                     (assert (not (= qq-distance most-positive-fixnum)) ()
                             "Multiqubit instruction requested between ~
                              disconnected components of the QPU graph: ~
                              ~/quil:instruction-fmt/."
                             gate)
-                    (incf gate-count)
-                    (incf sum
-                          (* (expt *cost-fn-tier-decay* tier-index) qq-distance))))))))
+                     (incf gate-count)
+                     (incf sum
+                           (* (expt *cost-fn-tier-decay* tier-index) qq-distance)))))))))
     :finally (dolist (qubit assigned-qubits) (rewiring-unassign rewiring qubit))
              (return (if (zerop gate-count) 0d0 (/ sum gate-count)))))
