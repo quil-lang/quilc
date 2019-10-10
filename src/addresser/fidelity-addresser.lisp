@@ -22,12 +22,98 @@
   value)
 
 (defmethod cost-function ((state fidelity-addresser-state) &key gate-weights instr)
-  ;; conglomerate the infidelities in GATE-WEIGHTS, decayed by some decay factor
-  ;; add in the infidelity coming from INSTR, using recombination:
-  ;;   + calculate the cut point
-  ;;   + calculate the infidelity of instructions since the cut point
-  ;;   + use only the additional infidelity penalty
-  )
+  (let ((instr-cost 0d0)
+        (gate-weights-cost 0d0))
+    
+    ;; calculate log-infidelity coming from INSTR, using recombination:
+    ;;   + calculate the cut point
+    ;;   + calculate the infidelity of instructions since the cut point
+    ;;   + use only the additional infidelity penalty
+    (when (and instr (typep instr 'gate-application))
+      (let* ((chip-spec (addresser-state-chip-specification state))
+             (instruction-expansion
+               (let ((*compress-carefully* nil))
+                 (expand-to-native-instructions (list instr) chip-spec))))
+        (setf instr-cost (- (log (calculate-instructions-fidelity instruction-expansion chip-spec))))
+        
+        ;; then, see if there's a non-naive cost available
+        (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
+                      (cost-bound (gethash "cost-bound"
+                                           (hardware-object-misc-data hardware-object)))
+                      (resource (apply #'make-qubit-resource
+                                       (coerce (hardware-object-cxns hardware-object) 'list)))
+                      (carving-point (chip-schedule-resource-carving-point
+                                      (addresser-state-chip-schedule state)
+                                      resource))
+                      (subschedule (chip-schedule-from-carving-point
+                                    (addresser-state-chip-schedule state) resource carving-point))
+                      (preceding-fidelity
+                       (calculate-instructions-fidelity subschedule
+                                                        (addresser-state-chip-specification state))))
+          (when (<= cost-bound (+ preceding-fidelity instr-cost))
+            (setf instr-cost (- cost-bound preceding-fidelity))))))
+    
+    ;; conglomerate the log-infidelities in GATE-WEIGHTS, decayed by some decay factor
+    (when gate-weights
+      (let ((qq-distances (addresser-state-qq-distances state)) ; populated with log-infidelities
+            (rewiring (addresser-state-working-l2p state))
+            (assigned-qubits nil)
+            (gate-count 0))
+        (dohash ((gate tier-index) gate-weights)
+          (when (and (<= tier-index 3)
+                     (typep gate 'application))
+            (let* ((logical-qubits (mapcar #'qubit-index (application-arguments gate)))
+                   (physical-qubits (mapcar (a:curry #'apply-rewiring-l2p rewiring) logical-qubits))
+                   (any-assigned? (some #'identity physical-qubits))
+                   (all-assigned? (every #'identity physical-qubits)))
+              (case (length (application-arguments gate))
+                (1
+                 (when all-assigned?
+                   (a:when-let* ((chip-spec (addresser-state-chip-specification state))
+                                 (hardware-object (lookup-hardware-object chip-spec gate))
+                                 (instrs (expand-to-native-instructions (list gate) chip-spec))
+                                 (fidelity (calculate-instructions-fidelity instrs chip-spec)))
+                     (incf gate-count)
+                     (incf gate-weights-cost (- (log fidelity))))))
+                (2
+                 (destructuring-bind ((q0 q1) (p0 p1)) (list logical-qubits physical-qubits)
+                   ;; if both are unassigned, then we gain nothing by changing the
+                   ;; rewiring, so ignore this gate
+                   (when any-assigned?
+                     ;; ensure p0 is present
+                     (unless p0 (rotatef p0 p1) (rotatef q0 q1))
+                     ;; if p1 is missing, find a position for it
+                     (unless p1
+                       (setf p1
+                             (loop :with min-p    := nil
+                                   :with min-dist := double-float-positive-infinity
+                                   :for p :below (rewiring-length rewiring)
+                                   :unless (apply-rewiring-p2l rewiring p)
+                                     :do (let ((new-dist (aref qq-distances p0 p)))
+                                           (when (< new-dist min-dist)
+                                             (setf min-p    p
+                                                   min-dist new-dist)))
+                                   :finally (return min-p)))
+                       (push q1 assigned-qubits)
+                       (rewiring-assign rewiring q1 p1))
+                     (let ((qq-distance (aref qq-distances p0 p1)))
+                       ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
+                       ;; qubits exert weaker forces than nearby ones, encouraging
+                       ;; us to execute more quickly accomplishable gates sooner.
+                       ;; it's totally possible that dist alone is a good cost fn
+                       ;; on its own, and we should experiment with this.
+                       (assert (not (= qq-distance most-positive-fixnum)) ()
+                               "Multiqubit instruction requested between ~
+                                   disconnected components of the QPU graph: ~
+                                   ~A ."
+                               (print-instruction gate nil))
+                       (incf gate-count)
+                       (incf gate-weights-cost (* (expt *cost-fn-tier-decay* tier-index) qq-distance))))))))))
+        ;; clean up the rewiring
+        (dolist (qubit assigned-qubits) (rewiring-unassign rewiring qubit))
+        ;; normalize actual-cost
+        (setf gate-weights-cost (if (zerop gate-count) 0d0 (/ gate-weights-cost gate-count)))))
+    (make-fidelity-cost :value (+ instr-cost gate-weights-cost))))
 
 (defmethod cost-< ((val1 fidelity-cost) (val2 fidelity-cost))
   (< (- (fidelity-cost-value val1) +double-comparison-threshold-strict+)
@@ -40,15 +126,32 @@
   (make-fidelity-cost :value most-positive-fixnum))
 
 (defmethod assign-weights-to-gates ((state fidelity-addresser-state))
-  (nth-value 1 (addresser-state-logical-schedule state)))
+  (multiple-value-bind (max-value value-hash)
+      (lscheduler-walk-graph (addresser-state-logical-schedule state)
+                             :base-value 0
+                             :bump-value (lambda (instr value)
+                                           (cond
+                                             ((typep instr 'gate-application)
+                                              (case (length (application-arguments instr))
+                                                (1
+                                                 (+ 1/10 value))
+                                                (2
+                                                 (+ 1 value))
+                                                (otherwise
+                                                 value)))
+                                             (t
+                                              value)))
+                             :test-values #'max)
+    (declare (ignore max-value))
+    value-hash))
 
 (defun initial-fidelity-addresser-working-state (chip-spec initial-rewiring)
-  (let (;; bind the fidelity version of compute-qq-distances or whatever here.
-        (state (initial-addresser-working-state chip-spec initial-rewiring)))
+  (let* ((*cost-fn-weight-style* ':fidelity)
+         (state (initial-addresser-working-state chip-spec initial-rewiring)))
     (change-class state 'fidelity-addresser-state)
     state))
 
-(defun do-fidelity-addressing (instrs
+(defun do-greedy-fidelity-addressing (instrs
                                chip-spec
                                &key
                                  (initial-rewiring nil)
