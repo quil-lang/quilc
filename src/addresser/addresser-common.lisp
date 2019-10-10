@@ -160,8 +160,7 @@ SWAPping qubits into place.")
              ; this is guaranteed to be the only 2Q permutation anyway.
             (weight (ecase *cost-fn-weight-style*
                       (:duration (permutation-record-duration (vnth 0 (hardware-object-permutation-gates (chip-spec-nth-link chip-spec link-index)))))
-                      (:fidelity (* (permutation-record-duration (vnth 0 (hardware-object-permutation-gates (chip-spec-nth-link chip-spec link-index))))
-                                    (- (log (swap-fidelity chip-spec link-index)))))))
+                      (:fidelity (- (log (swap-fidelity chip-spec link-index))))))
             (left-vertex (vnth 0 (chip-spec-qubits-on-link chip-spec link-index)))
             (right-vertex (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))))
         (setf (aref dist right-vertex left-vertex) weight)
@@ -548,6 +547,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         (next-best-instruction state
                                instrs-ready-for-scheduling
                                instrs-partially-assigned)
+      (declare (ignore link-line))
 
       ;; if we didn't find any instructions, then return unsuccessful
       (unless instr (return-from dequeue-best-instr nil))
@@ -584,7 +584,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
               ;; will fall into the bucket of instructions that are
               ;; ready-2-go.
               (format *compiler-noise-stream*
-                      "DEQUEUE-BEST-INSTR: Couldn't rewire ~/quil:instruction-fmt/ because assignment is missing"
+                      "DEQUEUE-BEST-INSTR: Couldn't rewire ~/quil:instruction-fmt/ because assignment is missing~%"
                       instr)
               (loop
                 :for (logical physical) :in qubit-assignments
@@ -603,8 +603,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         ;; or if we can add it to the schedule.
         (cond
           ;; if we found a link and the instruction is native...
-          ((hardware-object-native-instruction-p (chip-spec-nth-link chip-spec link-line)
-                                                 rewired-instr)
+          ((hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr)
            (format *compiler-noise-stream*
                    "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"
                    instr
@@ -649,7 +648,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
            (let ((compiled-seq (apply-translation-compilers
                                 instr
                                 chip-spec
-                                (chip-spec-nth-link chip-spec link-line))))
+                                (lookup-hardware-object chip-spec rewired-instr))))
              (lscheduler-replace-instruction lschedule instr compiled-seq)))))
       t)))
 
@@ -679,8 +678,10 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
          (p (or current-layout
                 (best-qubit-position state gates-in-waiting q
                                      :locations (set-difference locations dont-use)))))
+    (format *compiler-noise-stream* "BEST-QUBIT-POSITIONS: Processing ~a, " q)
     (cond
       (current-layout
+       (format *compiler-noise-stream* "already placed at ~a.~%" current-layout)
        (list* current-layout (best-qubit-positions state gates-in-waiting rest
                                                    :locations (union locations
                                                                      (chip-spec-adj-qubits
@@ -688,6 +689,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
                                                                       current-layout))
                                                    :dont-use (list* current-layout dont-use))))
       (p
+       (format *compiler-noise-stream* "decided to put it at ~a.~%" p)
        (with-rewiring-assign (addresser-state-working-l2p state) q p
          (list* p
                 (best-qubit-positions state gates-in-waiting rest
@@ -696,6 +698,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
                                                          (addresser-state-chip-specification state) p))
                                       :dont-use (list* p dont-use)))))
       (t
+       (format *compiler-noise-stream* "nowhere to put it, break.~%")
        (list* nil
               (best-qubit-positions state gates-in-waiting rest
                                     :locations locations
