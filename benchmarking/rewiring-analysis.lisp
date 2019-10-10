@@ -202,6 +202,7 @@
    'parsed-program
    :executable-code (concatenate
                      'vector
+                     (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
                      (list (make-instance 'quil::pragma-commuting-blocks))
                      (loop :for i :below n-qubits
                                   :nconc (loop :for j :below i
