@@ -365,7 +365,7 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]
 ")))
-    (multiple-value-bind (initial code final)
+    (multiple-value-bind (code initial final)
         (quil::do-greedy-temporal-addressing
             (coerce (parsed-program-executable-code pp) 'list)
           (quil::qpu-hash-table-to-chip-specification
@@ -477,7 +477,7 @@ MEASURE 1
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
   (let ((p (quil::compiler-hook (quil::parse-quil "
-PRAGMA INITIAL_REWIRING \"GREEDY\"
+PRAGMA INITIAL_REWIRING \"PARTIAL\"
 CCNOT 0 1 2")
                                 (quil::build-8Q-chip)))
         (ls (quil::make-lscheduler)))

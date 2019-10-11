@@ -117,6 +117,7 @@ HALT
     ;; It's questionable whether asserting an error is the right thing to do here, but it at least
     ;; documents the current behavior. And if we ever improve NAIVE rewiring so that this doesn't
     ;; error, this test will fail and remind us to update it to NOT-SIGNALS.
+    #+ignore
     (signals error (compiler-hook progm chip :rewiring-type ':naive))))
 
 (deftest test-prog-initial-rewiring-heuristic ()
