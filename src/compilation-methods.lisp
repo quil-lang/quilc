@@ -252,8 +252,9 @@ Returns a value list: (processed-program, of type parsed-program
 
          (touch-unpreserved-block (blk registrant)
            ;; actually process this block
-           (multiple-value-bind (initial-l2p chip-schedule final-l2p)
-               (do-greedy-temporal-addressing
+           (multiple-value-bind (chip-schedule initial-l2p final-l2p)
+               ;; TODO: here, and below, we need to find a way to not hard-code this method call
+               (do-greedy-fidelity-addressing
                    (coerce (basic-block-code blk) 'list)
                  chip-specification
                  :initial-rewiring (if registrant
@@ -280,9 +281,9 @@ Returns a value list: (processed-program, of type parsed-program
 
          (touch-reset-block (blk)
            ;; actually process this block
-           (multiple-value-bind (initial-l2p chip-schedule final-l2p)
-               (do-greedy-temporal-addressing
-                   (coerce (basic-block-code blk) 'list)
+           (multiple-value-bind (chip-schedule initial-l2p final-l2p)
+               (do-greedy-fidelity-addressing
+                 (coerce (basic-block-code blk) 'list)
                  chip-specification
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))

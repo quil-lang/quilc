@@ -104,6 +104,12 @@ BEFORE-INST to make use of RESOURCE."
                  (not (resource-subsetp (instruction-resources instr) resource)))
         :maximize (chip-schedule-end-time schedule instr)))
 
+(defun chip-schedule-from-carving-point (schedule resource point)
+  (loop :for instr :being :the :hash-keys :of (chip-schedule-times schedule)
+        :when (and (<= point (chip-schedule-start-time schedule instr))
+                   (resources-intersect-p resource (instruction-resources instr)))
+          :collect instr))
+
 (defun chip-schedule-qubit-times (schedule)
   "Find the first time a qubit is available, for each qubit in the schedule."
   (map 'vector
