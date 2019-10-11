@@ -8,7 +8,7 @@
 ;;; SWAP into a schedule, usually as part of migrating an active addresser
 ;;; instance from one state to another.
 
-(defparameter *addresser-swap-search-type* :greedy-qubit
+(defparameter *addresser-swap-search-type* ':greedy-qubit
   "The type of swap search the addresser should use.
 
 GREEDY-PATH: Assign links values based on whether they are on the shortest path
@@ -17,7 +17,7 @@ A*: Use A* search algorithm using the cost function as a heuristic
 GREEDY-QUBIT: Greedily choose the best link to swap according to the cost function.")
 
 (defparameter *addresser-move-to-rewiring-swap-search-type* :a*
-  "The type of swap search the addresser should use when doing move-to-rewiring. ")
+  "The type of swap search the addresser should use when doing move-to-rewiring.")
 
 ;;; This stuff is all at the service of SELECT-AND-EMBED-A-PERMUTATION below.
 ;;;
@@ -36,7 +36,7 @@ the qubit-qubit distance array QQ-DISTANCES."
   "Given a rewiring and a cost function, returns a list of swap links for which
 the cost of the rewiring is reduced."
   (let ((best-cost-so-far nil)
-        potential-first-links)
+        (potential-first-links nil))
     (labels ((depth-first-traversal (depth topmost-link)
                (when (plusp depth)
                  (let ((links-to-search

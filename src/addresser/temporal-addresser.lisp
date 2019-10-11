@@ -316,37 +316,37 @@ following swaps."
 (defmethod dequeue-classical-instruction :before
     ((state temporal-addresser-state) instr &optional dry-run-escape)
   ;; handle our 1Q queues
-  (when dry-run-escape  ; every classical instruction can be handled
-      (funcall dry-run-escape))
-    (with-slots (lschedule chip-spec chip-sched working-l2p) state
-      (cond
-        ;; is it maximally resourceful?
-        ((global-instruction-p instr)
-         ;; unload the 1Q queues, dequeue the instruction,
-         ;; and set the dirty flag
+  (when dry-run-escape    ; every classical instruction can be handled
+    (funcall dry-run-escape))
+  (with-slots (lschedule chip-spec chip-sched working-l2p) state
+    (cond
+      ;; is it maximally resourceful?
+      ((global-instruction-p instr)
+       ;; unload the 1Q queues, dequeue the instruction,
+       ;; and set the dirty flag
+       (dotimes (qubit (chip-spec-n-qubits chip-spec))
+         (flush-1q-instructions-after-wiring state qubit)))
+
+      ;; is it a pure classical instruction?
+      ((local-classical-instruction-p instr)
+       ;; clear relevant 1Q queues, dequeue the instruction
+       ;; and set the dirty flag
+       (partially-flush-1Q-queues state (instruction-resources instr)))
+
+      ;; is it a local mixed pure/classical instruction?
+      ;;
+      ;; TODO: this currently does not do the clever 'threading'
+      ;; that happens with other 1Q instructions. it probably isn't
+      ;; worth it, since MEASUREs are slow instructions.
+      ((or (local-classical-quantum-instruction-p instr)
+           (typep instr 'measure-discard)
+           (typep instr 'reset-qubit))
+       (let ((resources (instruction-resources instr)))
+         ;; flush the 1Q queues
          (dotimes (qubit (chip-spec-n-qubits chip-spec))
-           (flush-1q-instructions-after-wiring state qubit)))
-
-        ;; is it a pure classical instruction?
-        ((local-classical-instruction-p instr)
-         ;; clear relevant 1Q queues, dequeue the instruction
-         ;; and set the dirty flag
-         (partially-flush-1Q-queues state (instruction-resources instr)))
-
-        ;; is it a local mixed pure/classical instruction?
-        ;;
-        ;; TODO: this currently does not do the clever 'threading'
-        ;; that happens with other 1Q instructions. it probably isn't
-        ;; worth it, since MEASUREs are slow instructions.
-        ((or (local-classical-quantum-instruction-p instr)
-             (typep instr 'measure-discard)
-             (typep instr 'reset-qubit))
-         (let ((resources (instruction-resources instr)))
-           ;; flush the 1Q queues
-           (dotimes (qubit (chip-spec-n-qubits chip-spec))
-             (when (resource-subsetp (make-qubit-resource qubit)
-                                     resources)
-               (flush-1q-instructions-after-wiring state qubit))))))))
+           (when (resource-subsetp (make-qubit-resource qubit)
+                                   resources)
+             (flush-1q-instructions-after-wiring state qubit))))))))
 
 ;; defer picking rewiring for single-qubit instructions
 (defmethod dequeue-gate-application

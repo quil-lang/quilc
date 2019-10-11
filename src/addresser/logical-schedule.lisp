@@ -565,7 +565,6 @@ mapping instructions to their tags. "
      (hash-table-count (lscheduler-earlier-instrs lschedule))))
 
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
-  (declare (optimize (debug 3)))
   (labels ((fidelity-combinator (val1 val2)
              (min val1 val2))
            (fidelity-bumper (instr value)
@@ -609,8 +608,7 @@ mapping instructions to their tags. "
             :do (setf fidelity
                       (fidelity-combinator (fidelity-bumper instr 1d0)
                                            (* fidelity (gethash instr value-hash)))) 
-            :finally (return (values (exp (- (sqrt (- (log fidelity)))))
-                                     value-hash))))))
+            :finally (return (exp (- (sqrt (- (log fidelity))))))))))
 
 (defun lscheduler-all-instructions (lschedule)
   (a:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))

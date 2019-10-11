@@ -112,8 +112,8 @@
                        (assert (not (= qq-distance most-positive-fixnum)) ()
                                "Multiqubit instruction requested between ~
                                    disconnected components of the QPU graph: ~
-                                   ~A ."
-                               (print-instruction gate nil))
+                                   ~/cl-quil::instruction-fmt/."
+                               gate)
                        (incf gate-count)
                        (incf gate-weights-cost (* (expt *cost-fn-tier-decay* tier-index) qq-distance))))))))))
         ;; clean up the rewiring
@@ -132,7 +132,7 @@
 (defmethod build-worst-cost ((state fidelity-addresser-state))
   (make-fidelity-cost :value most-positive-fixnum))
 
-(defmethod assign-weights-to-gates ((state fidelity-addresser-state))
+(defmethod assign-weights-to-gates ((state fidelity-addresser-state) &optional (1q-descaling 1/10))
   (multiple-value-bind (max-value value-hash)
       (lscheduler-walk-graph (addresser-state-logical-schedule state)
                              :base-value 0
@@ -141,7 +141,7 @@
                                              ((typep instr 'gate-application)
                                               (case (length (application-arguments instr))
                                                 (1
-                                                 (+ 1/10 value))
+                                                 (+ 1q-descaling value))
                                                 (2
                                                  (+ 1 value))
                                                 (otherwise
