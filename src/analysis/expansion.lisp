@@ -70,7 +70,7 @@
       (mapcar #'relabel-instruction quil-block))))
 
 (defun destructure-definition (defn)
-  "Given a quilt definition DEFN, return three values: a list of the parameters, a list of the formal arguments, and the definition body."
+  "Given a Quilt definition DEFN, return three values: a list of the parameters, a list of the formal arguments, and the definition body."
   (etypecase defn
     (circuit-definition (values (circuit-definition-parameters defn)
                                 (circuit-definition-arguments defn)
@@ -83,7 +83,7 @@
                                                   (measure-calibration-address defn))
                                             (calibration-definition-body defn)))
     (measure-discard-calibration-definition (values nil
-                                                    (list (measurement-calibration-qubit defn))1
+                                                    (list (measurement-calibration-qubit defn))
                                                     (calibration-definition-body defn)))))
 
 (defun instantiate-definition (defn params args)
@@ -157,8 +157,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
      t)))
 
 (defun transform-if (test transform)
-  "Given a unary function TRANSFORM, return a new function which either applies TRANSFORM or does not,
-depending on whether TEST passes."
+  "Given a unary function TRANSFORM, return a new function which either applies TRANSFORM or does not, depending on whether TEST passes."
   (lambda (obj)
     (if (funcall test obj)
         (funcall transform obj)
@@ -205,7 +204,7 @@ depending on whether TEST passes."
                    (involutive-dagger-operator (application-operator instr))))
            ;; The Hermitian transpose reverses the order of operator
            ;; applications
-           (setf instrs (reverse instrs))))
+           (setf instrs (nreverse instrs))))
         ((plain-operator-p (application-operator instr))
          (instantiate-definition (circuit-application-definition instr)
                                  params

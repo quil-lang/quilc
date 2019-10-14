@@ -1,3 +1,5 @@
 DEFFRAME 0 1 "xy":
     SAMPLE-RATE: 1.0
     SAMPLE-RATE: 2.0
+
+HALT

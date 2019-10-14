@@ -116,6 +116,13 @@
    #:is-param                           ; FUNCTION (PREDICATE)
    #:param=                             ; FUNCTION
 
+   #:formal                             ; STRUCTURE
+   #:formal-name                        ; READER
+   #:is-formal                          ; FUNCTION (PREDICATE)
+   #:formal=                            ; FUNCTION
+
+   #:argument=                          ; FUNCTION
+
    #:memory-ref                         ; TYPE (STRUCTURE)
    #:mref                               ; FUNCTION (CONSTRUCTOR)
    #:memory-ref-position                ; READER
@@ -317,6 +324,7 @@
    #:controlled-operator                ; ADT CONSTRUCTOR
    #:dagger-operator                    ; ADT CONSTRUCTOR
    #:operator-description-root-name     ; FUNCTION
+   #:operator-description=              ; FUNCTION
 
    #:application                        ; ABSTRACT CLASS
    #:application-operator               ; READER

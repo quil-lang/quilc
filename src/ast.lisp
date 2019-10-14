@@ -1,6 +1,11 @@
 ;;;; src/ast.lisp
 ;;;;
-;;;; Author: Robert Smith
+;;;; Authors: Robert Smith
+;;;           Erik Davis
+
+;;; NOTE: In what follows, Quilt objects, or routines for manipulating them,
+;;; will be marked as such by a comment preceding their definition. If a
+;;; definition is unmarked, it is associated with "vanilla" Quil. Yum!
 
 (in-package #:cl-quil)
 
@@ -83,6 +88,18 @@
   "A formal argument. Represents a placeholder for a qubit or a memory reference."
   (name nil :read-only t :type string))
 
+(defun formal= (x y)
+  "Do formal argumentx X and Y have the same name?"
+  (string= (formal-name x) (formal-name y)))
+
+(defun argument= (x y)
+  "Are the (qubit or formal) arguments X and Y equal?"
+  (cond ((and (qubit-p x) (qubit-p y))
+         (qubit= x y))
+        ((and (is-formal x) (is-formal y))
+         (formal= x y))
+        (t nil)))
+
 ;;; Memory descriptors are a part of the parsing process, but are
 ;;; defined in classical-memory.lisp.
 
@@ -149,43 +166,48 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (setf (delayed-expression-params c) (mapcar f (delayed-expression-params de)))
     c))
 
+;;; Quilt
 (defstruct (frame (:constructor frame (qubits name)))
-  "A reference to a QuilT rotating frame, relative to which control or readout waveforms may be defined."
-  (name nil :type string)
-  (qubits nil :type list)
+  "A reference to a Quilt rotating frame, relative to which control or readout waveforms may be defined."
+  (name nil :read-only t :type string)
+  (qubits nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null frame-definition)))
 
+;;; Quilt
 (defun frame= (a b)
   (and (string= (frame-name a) (frame-name b))
-       (list= (frame-qubits a) (frame-qubits b) :key #'qubit=)))
+       (list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
+;;; Quilt
 (defun frame-hash (f)
   #+sbcl
   (sb-int:mix (sxhash (frame-name f)) (sxhash (frame-qubits f)))
   #-sbcl
   (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
-(defstruct (waveform-ref (:constructor %waveform-ref (name parameters)))
-  "An reference to a (possibly parametric) QuilT waveform."
+;;; Quilt
+(defstruct (waveform-ref (:constructor %waveform-ref (name parameter-alist)))
+  "An reference to a (possibly parametric) Quilt waveform."
   (name nil :read-only t :type string)
-  ;; A list of (name val) lists.
-  (parameters nil :read-only t :type list)
+  ;; An alist of parameters and their values.
+  (parameter-alist nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null
                                  standard-waveform
                                  waveform-definition)))
 
+;;; Quilt
 (defun waveform-ref (name &rest plist)
-  "Construct a waveform reference with keyword-value pairs given by ARGS."
-  (assert (evenp (length plist)))
+  "Construct a waveform reference with keyword-value pairs given by PLIST."
+  (unless (evenp (length plist))
+    (error "WAVEFORM-REF takes an odd number of arguments: first a name, and then alternating keyword-value pairs."))
   (%waveform-ref name
-                 (loop :for (name val) :on plist :by #'cddr :while val
-                       :collect (list name val))))
+                 (loop :for (name val) :on plist :by #'cddr
+                       :while val
+                       :collect (cons name val))))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; QuilT Waveforms ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;;; Quilt
 (defclass standard-waveform ()
   ((duration :initarg :duration
              :reader waveform-duration
@@ -416,7 +438,7 @@ If no exit rewiring is found, return NIL."
   "Create the permutation (list of natural numbers) that represents the input matrix ENTRIES. Return nil if ENTRIES cannot be represented as a permutation."
   (let* ((n (isqrt (length entries)))
          (perm (make-list n)))
-     (dotimes (i n perm)
+    (dotimes (i n perm)
       (let ((found-one nil))
         (dotimes (j n)
           (case (pop entries)
@@ -437,10 +459,10 @@ If no exit rewiring is found, return NIL."
   (check-type parameters symbol-list)
   (if parameters
       (make-instance 'parameterized-gate-definition
-                    :name name
-                    :parameters parameters
-                    :entries entries
-                    :context context)
+                     :name name
+                     :parameters parameters
+                     :entries entries
+                     :context context)
       (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name
@@ -477,50 +499,67 @@ If no exit rewiring is found, return NIL."
                  :body body
                  :context context))
 
-;;; Frame Definitions (QuilT)
+;;; Frame Definitions (Quilt)
 
 (defclass frame-definition ()
   ((frame :initarg :frame
-          :reader frame-definition-frame)
+          :reader frame-definition-frame
+          :type frame
+          :documentation "The frame being defined.")
    (sample-rate :initarg :sample-rate
                 :initform nil
-                :reader frame-definition-sample-rate)
+                :reader frame-definition-sample-rate
+                :type (or null constant)
+                :documentation "The sample rate associated with the frame. If specified, this should be a positive constant.")
    (initial-frequency :initarg :initial-frequency
                       :initform nil
-                      :reader frame-definition-initial-frequency)
+                      :reader frame-definition-initial-frequency
+                      :type (or null constant)
+                      :documentation "The initial frequency of the frame. If specified, this should be a positive constant.")
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context)))
+            :accessor lexical-context
+            :documentation "The lexical context of the frame definition, used for error messages in subsequent analysis.")))
 
-;;; Waveform Definitions (QuilT)
+;;; Waveform Definitions (Quilt)
 
 (defclass waveform-definition ()
   ((name :initarg :name
-         :reader waveform-definition-name)
+         :reader waveform-definition-name
+         :type string
+         :documentation "The name of the waveform being defined.")
    (entries :initarg :entries
-            :reader waveform-definition-entries)
+            :reader waveform-definition-entries
+            :type list
+            :documentation "The raw IQ values of the waveform being defined.")
+   (sample-rate :initarg :sample-rate
+                :reader waveform-definition-sample-rate
+                :type constant
+                :documentation "The sample rate for which the waveform is applicable.")
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context)
-   (sample-rate :initarg :sample-rate
-                :reader waveform-definition-sample-rate))
+            :accessor lexical-context
+            :documentation "The lexical context of the waveform definition, used for error messages in subsequent analysis."))
   (:metaclass abstract-class)
-  (:documentation "A representation of a user-specified QuilT waveform definition."))
+  (:documentation "A representation of a user-specified Quilt waveform definition."))
 
+;;; Quilt
 (defclass static-waveform-definition (waveform-definition)
   ()
   (:documentation "A waveform definition that has no parameters."))
 
+;;; Quilt
 (defclass parameterized-waveform-definition (waveform-definition)
   ((parameters :initarg :parameters
                :reader waveform-definition-parameters
                :documentation "A list of symbol parameter names."))
   (:documentation "A waveform definition that has named parameters."))
 
+;;; Quilt
 (defun make-waveform-definition (name parameters entries sample-rate &key context)
   (check-type name string)
   (check-type parameters symbol-list)
-  (if parameters
+  (if (not (endp parameters))
       (make-instance 'parameterized-waveform-definition
                      :name name
                      :parameters parameters
@@ -533,38 +572,54 @@ If no exit rewiring is found, return NIL."
                      :sample-rate sample-rate
                      :context context)))
 
-;;; Calibration Definitions (QuilT)
+;;; Calibration Definitions (Quilt)
 
 (defclass calibration-definition ()
   ((body :initarg :body
-         :reader calibration-definition-body)
+         :reader calibration-definition-body
+         :type list
+         :documentation "A list of Quilt instructions in the body of the calibration definition.")
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context))
+            :accessor lexical-context
+            :documentation "The lexical context of the calibration definition, used for error messages in subsequent analysis."))
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified calibration."))
 
+;;; Quilt
 (defclass gate-calibration-definition (calibration-definition)
   ((operator :initarg :operator
+             :reader calibration-definition-operator
              :type operator-description
-             :reader calibration-definition-operator)
+             :documentation "The operator for which the defined calibration is applicable.")
    (parameters :initarg :parameters
-               :reader calibration-definition-parameters)
+               :reader calibration-definition-parameters
+               :type list
+               :documentation "The parameters of the gate calibration.")
    (arguments :initarg :arguments
-              :reader calibration-definition-arguments))
+              :reader calibration-definition-arguments
+              :type list
+              :documentation "The arguments of the gate calibration."))
   (:documentation "A representation of a user-specified gate calibration."))
 
+;;; Quilt
 (defclass measurement-calibration-definition (calibration-definition)
   ((qubit :initarg :qubit
-          :reader measurement-calibration-qubit))
+          :reader measurement-calibration-qubit
+          :type qubit
+          :documentation "The qubit being measured."))
   (:metaclass abstract-class)
   (:documentation "Superclass to measurement calibration definitions."))
 
+;;; Quilt
 (defclass measure-calibration-definition (measurement-calibration-definition)
   ((address :initarg :address
-             :reader measure-calibration-address))
+            :reader measure-calibration-address
+            :type memory-ref
+            :documentation "The classical memory destination for measured values."))
   (:documentation "A representation of a user-specified MEASURE calibration."))
 
+;;; Quilt
 (defclass measure-discard-calibration-definition (measurement-calibration-definition)
   ()
   (:documentation "A representation of a user-specifieed MEASURE (discard) calibration."))
@@ -673,7 +728,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defmethod arguments ((instruction wait)) #())
 (defmethod mnemonic  ((instruction wait)) (values "WAIT" 'wait))
 
-;;; Frame Mutations (QuilT)
+;;; Frame Mutations (Quilt)
 
 (defclass simple-frame-mutation (instruction)
   ((frame :initarg :frame
@@ -683,6 +738,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   (:documentation "An instruction representing the mutation of a frame attribute.")
   (:metaclass abstract-class))
 
+;;; Quilt
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun expand-simple-frame-mutation-definition (name mnemonic docstring)
     (check-type name symbol)
@@ -694,27 +750,34 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 
        (defmethod mnemonic ((inst ,name)) (values ,mnemonic ',name)))))
 
+;;; Quilt
 (defmethod arguments ((instr simple-frame-mutation))
   (with-slots (qubits frame value)
       instr
     (vector frame value)))
 
+;;; Quilt
 (defmacro define-simple-frame-mutation (name mnemonic &body body)
   (assert (= 1 (length body)))
   (expand-simple-frame-mutation-definition name mnemonic (first body)))
 
+;;; Quilt
 (define-simple-frame-mutation set-frequency "SET-FREQUENCY"
   "An instruction setting the frequency of a frame.")
 
+;;; Quilt
 (define-simple-frame-mutation set-phase "SET-PHASE"
   "An instruction setting the phase of a frame.")
 
+;;; Quilt
 (define-simple-frame-mutation shift-phase "SHIFT-PHASE"
   "An instruction performing an additive shift of the phase of a frame.")
 
+;;; Quilt
 (define-simple-frame-mutation set-scale "SET-SCALE"
   "An instruction setting the scale of a frame.")
 
+;;; Quilt
 (defclass swap-phase (instruction)
   ((left-frame :initarg :left-frame
                :accessor swap-phase-left-frame)
@@ -722,59 +785,94 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
                 :accessor swap-phase-right-frame))
   (:documentation "An instruction representing a phase swap between two frames."))
 
-;;; QuilT Operators
+;;; Quilt Operators
 
 (defclass pulse (instruction)
   ((frame :initarg :frame
-          :accessor pulse-frame)
+          :accessor pulse-frame
+          :type frame
+          :documentation "The frame on which the pulse will be applied.")
    (waveform :initarg :waveform
-             :accessor pulse-waveform)
+             :accessor pulse-waveform
+             :type waveform-ref
+             :documentation "The waveform to be applied.")
    (nonblocking :initarg :nonblocking
                 :initform nil
-                :accessor nonblocking-p))
+                :accessor nonblocking-p
+                :type boolean
+                :documentation "A flag indicating whether the pulse blocks frames sharing a qubit with the PULSE-FRAME."))
   (:documentation "A pulse instruction."))
 
+;;; Quilt
 (defclass capture (instruction)
   ((frame :initarg :frame
-          :accessor capture-frame)
+          :accessor capture-frame
+          :type frame
+          :documentation "The frame from which a value is to be captured.")
    (waveform :initarg :waveform
-             :accessor capture-waveform)
+             :accessor capture-waveform
+             :type waveform-ref
+             :documentation "A waveform, used as an integration kernel for the capture operation.")
    (memory-ref :initarg :memory-ref
-               :accessor capture-memory-ref)
+               :accessor capture-memory-ref
+               :documentation "The location in memory to store the captured IQ value.")
    (nonblocking :initarg :nonblocking
                 :initform nil
-                :accessor nonblocking-p))
+                :accessor nonblocking-p
+                :type boolean
+                :documentation "A flag indicating whether the capture blocks frames sharing a qubit with the CAPTURE-FRAME."))
   (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
+;;; Quil
 (defclass raw-capture (instruction)
   ((frame :initarg :frame
-          :accessor raw-capture-frame)
+          :accessor raw-capture-frame
+          :type frame
+          :documentation "The frame from which a value is to be captured.")
    (duration :initarg :duration
-             :accessor raw-capture-duration)
+             :accessor raw-capture-duration
+             :type constant
+             :documentation "The duration for which IQ values will be recorded.")
    (memory-ref :initarg :memory-ref
-               :accessor raw-capture-memory-ref)
+               :accessor raw-capture-memory-ref
+               :type memory-ref
+               :documentation "The location in memory to store captured IQ values.")
    (nonblocking :initarg :nonblocking
                 :initform nil
-                :accessor nonblocking-p))
+                :accessor nonblocking-p
+                :type boolean
+                :documentation "A flag indicating whether the raw capture blocks frames sharing a qubit with the RAW-CAPTURE-FRAME."))
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
+;;; Quilt
 (defclass delay (instruction)
   ((duration :initarg :duration
-             :accessor delay-duration))
+             :accessor delay-duration
+             :type constant
+             :documentation "The duration (in seconds) of the DELAY instruction."))
   (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
 
+;;; Quilt
 (defclass delay-on-frames (delay)
   ((delayed-frames :initarg :frames
-                   :accessor delay-frames)))
+                   :accessor delay-frames
+                   :type list
+                   :documentation "A list of frames which should be delayed.")))
 
+;;; Quilt
 (defclass delay-on-qubits (delay)
   ((qubits :initarg :qubits
-           :accessor delay-qubits)))
+           :accessor delay-qubits
+           :type list
+           :documentation "A list of qubits. Any frame on these qubits will be delayed.")))
 
+;;; Quilt
 (defclass fence (instruction)
   ((qubits :initarg :qubits
-           :accessor fence-qubits))
+           :accessor fence-qubits
+           :type list
+           :documentation "A list of qubits. Any frame intersecting these qubits will be synchronized to a common time."))
   (:documentation "A synchronization barrier on a set of qubits, demarcating preceding and succeeding instructions."))
 
 ;;; Classical Instructions
@@ -1265,7 +1363,7 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
     ((named-operator name)   name)
     (_ (error "The application doesn't have a canonical name."))))
 
-(defun operator-description-equalp (od1 od2)
+(defun operator-description= (od1 od2)
   "Check whether two operator descriptions have the same structure and the same names."
   (and (equalp od1 od2)                 ; case insensitive
        (string= (operator-description-root-name od1)
@@ -1614,19 +1712,22 @@ For example,
                   (print-instruction expr stream)))))
       (print-delayed-expression (delayed-expression-expression thing) stream)))
 
+  ;;; Quilt
   (:method ((thing frame) (stream stream))
     (format stream "~{~/quil:instruction-fmt/ ~}\"~A\""
-            (mapcar #'print-instruction-to-string 
+            (frame-qubits thing)
             (frame-name thing)))
 
+  ;;; Quilt
   (:method ((thing waveform-ref) (stream stream))
-    (format stream "~A~@[(~{~A~^, ~})~]"
-            (waveform-ref-name thing)
-            (mapcar (lambda (name-and-value)
-                      (format nil "~A: ~A"
-                              (param-name (first name-and-value))
-                              (print-instruction-to-string (second name-and-value))))
-                    (waveform-ref-parameters thing))))
+    (format stream "~A" (waveform-ref-name thing))
+    (when (not (endp (waveform-ref-parameter-alist thing)))
+      (format stream "(")
+      (loop :for (param . value) :in (waveform-ref-parameter-alist thing)
+            :do (format stream "~A: ~/quil:instruction-fmt/"
+                        (param-name param) ; we do not want to print the leading %
+                        value))
+      (format stream ")")))
 
   ;; Actual instructions
   (:method ((instr halt) (stream stream))
@@ -1644,46 +1745,53 @@ For example,
   (:method ((instr no-operation) (stream stream))
     (format stream "NOP"))
 
+  ;;; Quilt
   (:method  ((instr simple-frame-mutation) (stream stream))
-    (format stream "~A~{ ~A~}"
-            (mnemonic instr)
-            (map 'list #'print-instruction-to-string (arguments instr))))
+    (format stream "~A" (mnemonic instr))
+    (loop :for arg :across (arguments instr)
+          :do (format stream " ~/quil:instruction-fmt/" arg)))
 
+  ;;; Quilt
   (:method ((instr swap-phase) (stream stream))
-    (format stream "SWAP-PHASE ~A ~A"
-            (print-instruction-to-string (swap-phase-left-frame instr))
-            (print-instruction-to-string (swap-phase-right-frame instr))))
+    (format stream "SWAP-PHASE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+            (swap-phase-left-frame instr)
+            (swap-phase-right-frame instr)))
 
+  ;;; Quilt
   (:method ((instr pulse) (stream stream))
-    (format stream "~@[NONBLOCKING ~]PULSE ~A ~A"
+    (format stream "~@[NONBLOCKING ~]PULSE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
-            (print-instruction-to-string (pulse-frame instr))
-            (print-instruction-to-string (pulse-waveform instr))))
+            (pulse-frame instr)
+            (pulse-waveform instr)))
 
+  ;;; Quilt
   (:method ((instr capture) (stream stream))
-    (format stream "~@[NONBLOCKING ~]CAPTURE ~A ~A ~A"
+    (format stream "~@[NONBLOCKING ~]CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
-            (print-instruction-to-string (capture-frame instr))
-            (print-instruction-to-string (capture-waveform instr))
-            (print-instruction-to-string (capture-memory-ref instr))))
+            (capture-frame instr)
+            (capture-waveform instr)
+            (capture-memory-ref instr)))
 
+  ;;; Quilt
   (:method ((instr raw-capture) (stream stream))
-    (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~A ~A ~A"
+    (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
-            (print-instruction-to-string (raw-capture-frame instr))
-            (print-instruction-to-string (raw-capture-duration instr))
-            (print-instruction-to-string (raw-capture-memory-ref instr))))
+            (raw-capture-frame instr)
+            (raw-capture-duration instr)
+            (raw-capture-memory-ref instr)))
 
+  ;;; Quilt
   (:method ((instr fence) (stream stream))
-    (format stream "FENCE ~{~A ~}"
-            (mapcar #'print-instruction-to-string
-                    (fence-qubits instr))))
+    (format stream "FENCE~{ ~/quil:instruction-fmt/~}"
+            (fence-qubits instr)))
 
+  ;;; Quilt
   (:method ((instr delay-on-qubits) (stream stream))
-    (format stream "DELAY~{ ~A~} ~A"
-            (mapcar #'print-instruction-to-string (delay-qubits instr))
-            (print-instruction-to-string (delay-duration instr))))
+    (format stream "DELAY~{ ~/quil:instruction-fmt/~} ~/quil:instruction-fmt/"
+            (delay-qubits instr)
+            (delay-duration instr)))
 
+  ;;; Quilt
   (:method ((instr delay-on-frames) (stream stream))
     (let* ((frames (delay-frames instr))
            (qubits (frame-qubits (first frames))))
@@ -1691,14 +1799,13 @@ For example,
       (assert (every (lambda (frame)
                        (equalp qubits (frame-qubits frame)))
                      frames))
-      (format stream "DELAY~{ ~A~}~{ ~S~} ~A"
-              (mapcar #'print-instruction-to-string qubits)
+      (format stream "DELAY~{ ~/quil:instruction-fmt/~}~{ ~S~} ~/quil:instruction-fmt/"
+              qubits
               (mapcar #'frame-name (delay-frames instr))
-              (print-instruction-to-string (delay-duration instr)))))
+              (delay-duration instr))))
 
   (:method ((instr classical-instruction) (stream stream))
-    (format stream "~A"
-            (mnemonic instr))
+    (format stream "~A" (mnemonic instr))
     (loop :for arg :across (arguments instr)
           :do (format stream " ~/quil:instruction-fmt/" arg)))
 
@@ -1806,17 +1913,18 @@ For example,
     (format stream "DEFCIRCUIT ~a"
             (circuit-definition-name defn))
     (unless (endp (circuit-definition-parameters defn))
-      (format stream "(~{~a~^, ~})" (mapcar #'print-instruction-to-string
-                                            (circuit-definition-parameters defn))))
+      (format stream "(~{~/quil:instruction-fmt/~^, ~})"
+              (circuit-definition-parameters defn)))
     (unless (endp (circuit-definition-arguments defn))
-      (format stream "~{ ~a~}" (mapcar #'print-instruction-to-string
-                                       (circuit-definition-arguments defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (circuit-definition-arguments defn)))
     (format stream ":~%")
     (print-instruction-sequence (circuit-definition-body defn)
                                 :stream stream
                                 :prefix "    ")
     (terpri stream))
 
+  ;;; Quilt
   (:method ((defn frame-definition) (stream stream))
     (let ((sample-rate (frame-definition-sample-rate defn))
           (frequency (frame-definition-initial-frequency defn)))
@@ -1825,13 +1933,14 @@ For example,
       (when (or sample-rate frequency)
         (format stream ":~%"))
       (when sample-rate
-        (format stream "    SAMPLE-RATE: ~A"
-                (print-instruction-to-string sample-rate)))
+        (format stream "    SAMPLE-RATE: ~/quil:instruction-fmt/"
+                sample-rate))
       (when frequency
-        (format stream "    INITIAL-FREQUENCY: ~A"
-                (print-instruction-to-string frequency)))
+        (format stream "    INITIAL-FREQUENCY: ~/quil:instruction-fmt/"
+                frequency))
       (terpri stream)))
 
+  ;;; Quilt
   (:method ((defn waveform-definition) (stream stream))
     (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~]:~%"
             (waveform-definition-name defn)
@@ -1848,29 +1957,31 @@ For example,
                            (print-instruction (make-delayed-expression nil nil z) s)))))
                     (waveform-definition-entries defn))))
 
+  ;;; Quilt
   (:method ((defn gate-calibration-definition) (stream stream))
     (format stream "DEFCAL ")
     (print-operator-description (calibration-definition-operator defn) stream)
     (unless (endp (calibration-definition-parameters defn))
-      (format stream "(~{~a~^, ~})"
-              (mapcar #'print-instruction-to-string (calibration-definition-parameters defn))))
+      (format stream "(~{~/quil:instruction-fmt/~^, ~})"
+              (calibration-definition-parameters defn)))
     (unless (endp (calibration-definition-arguments defn))
-      (format stream "~{ ~a~}"
-              (mapcar #'print-instruction-to-string (calibration-definition-arguments defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (calibration-definition-arguments defn)))
     (format stream ":~%")
     (print-instruction-sequence (calibration-definition-body defn)
                                 :stream stream
                                 :prefix "    ")
     (terpri stream))
 
+  ;;; Quilt
   (:method ((defn measure-calibration-definition) (stream stream))
     (format stream "DEFCAL MEASURE")
     (unless (endp (calibration-definition-arguments defn))
-      (format stream "~{ ~a~}"
-              (mapcar #'print-instruction-to-string (calibration-definition-arguments defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (calibration-definition-arguments defn)))
     (unless (endp (calibration-definition-parameters defn))
-      (format stream "~{ ~a~}"
-              (mapcar #'print-instruction-to-string (calibration-definition-parameters defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (calibration-definition-parameters defn)))
     (format stream ":~%")
     (print-instruction-sequence (calibration-definition-body defn)
                                 :stream stream
@@ -1884,29 +1995,55 @@ For example,
 
 ;;;;;;;;;;;;;;;;;;;;;; Program Representations ;;;;;;;;;;;;;;;;;;;;;;;
 
+;;; There are two primary representations used here. The most common is the
+;;; PARSED-PROGRAM representation, which is produced by PARSE-QUIL. In almost
+;;; all cases, the instructions in a PARSED-PROGRAM are resolved (e.g.
+;;; applications are associated with the corresponding definition of the gate or
+;;; circuit which is to be applied, cf. RESOLVE-OBJECTS for more info). The one
+;;; exception to this is in the object resolution pass itself, where it is
+;;; convenient to work with PARSED-PROGRAM objects.
+;;;
+;;; The other representation, used only by the frontend, is "raw quil", which is
+;;; simply a list of AST objects.
+
 (defclass parsed-program (transformable)
   ((gate-definitions :initarg :gate-definitions
-                     :accessor parsed-program-gate-definitions)
+                     :accessor parsed-program-gate-definitions
+                     :type list
+                     :documentation "The gate definitions introduced by DEFGATE.")
    (circuit-definitions :initarg :circuit-definitions
-                        :accessor parsed-program-circuit-definitions)
+                        :accessor parsed-program-circuit-definitions
+                        :type list
+                        :documentation "The circuit definitions introduced by DEFCIRCUIT.")
    (waveform-definitions :initarg :waveform-definitions
-                         :accessor parsed-program-waveform-definitions)
+                         :accessor parsed-program-waveform-definitions
+                         :type list
+                         :documentation "The waveform definitions introduced by DEFWAVEFORM.")
    (calibration-definitions :initarg :calibration-definitions
-                            :accessor parsed-program-calibration-definitions)
+                            :accessor parsed-program-calibration-definitions
+                            :type list
+                            :documentation "The calibration definitions introduced by DEFCAL.")
    (frame-definitions :initarg :frame-definitions
-                      :accessor parsed-program-frame-definitions)
+                      :accessor parsed-program-frame-definitions
+                      :type list
+                      :documentation "The frame definitions introduced by DEFFRAME.")
    (memory-definitions :initarg :memory-definitions
-                       :accessor parsed-program-memory-definitions)
+                       :accessor parsed-program-memory-definitions
+                       :type list
+                       :documentation "The memory definitions introduced by DECLARE.")
    (executable-program :initarg :executable-code
-                       :accessor parsed-program-executable-code))
+                       :accessor parsed-program-executable-code
+                       :type (vector instruction)
+                       :documentation "A vector of executable Quil instructions."))
   (:default-initargs
-   :gate-definitions nil
-   :circuit-definitions nil
-   :waveform-definitions nil
-   :calibration-definitions nil
-   :frame-definitions nil
-   :memory-definitions nil
-   :executable-code #()))
+   :gate-definitions '()
+   :circuit-definitions '()
+   :waveform-definitions '()
+   :calibration-definitions '()
+   :frame-definitions '()
+   :memory-definitions '()
+   :executable-code #())
+  (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes

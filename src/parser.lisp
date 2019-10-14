@@ -318,7 +318,7 @@ the immediately preceding line."
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
 
 (defun disappointing-token-error (found-token expected-msg)
-  (quil-parse-error "Expected ~A~@[ in ~A~], but observed a token ~A with value ~A"
+  (quil-parse-error "Expected ~A~@[ in ~A~], but observed a token ~A with value ~A."
                     expected-msg
                     *parse-context*
                     (token-type found-token)
@@ -412,35 +412,39 @@ the immediately preceding line."
       ((:LOAD :STORE :EQ :GT :GE :LT :LE)
        (parse-trinary-classical tok-type tok-lines))
 
-      ;; QuilT Frame Mutation
+      ;; Quilt frame mutation
       ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
        (parse-simple-frame-mutation tok-type tok-lines))
 
-      ;; QuilT phase swap
+      ;; Quilt phase swap
       ((:SWAP-PHASE)
        (parse-swap-phase tok-lines))
 
-      ;; QuilT pulse
+      ;; Quilt pulse
       ((:PULSE)
        (parse-pulse tok-lines))
 
+      ;; Quilt delay
       ((:DELAY)
        (parse-delay tok-lines))
 
-      ;; QuilT fence
+      ;; Quilt fence
       ((:FENCE)
        (parse-fence tok-lines))
 
-      ;; QuilT capture
+      ;; Quilt capture
       ((:CAPTURE)
        (parse-capture tok-lines))
 
+      ;; Quilt raw capture
       ((:RAW-CAPTURE)
        (parse-raw-capture tok-lines))
 
+      ;; Nonblocking modifier for Quilt op
       ((:NONBLOCKING)
        (parse-nonblocking-op tok-lines))
 
+      ;; Quilt waveform definition
       ((:DEFWAVEFORM)
        (unless *definitions-allowed*
          (quil-parse-error "Found DEFWAVEFORM where it's not allowed."))
@@ -449,6 +453,7 @@ the immediately preceding line."
              (*formal-arguments-allowed* t))
          (parse-waveform-definition tok-lines)))
 
+      ;; Quilt calibration definition
       ((:DEFCAL)
        (unless *definitions-allowed*
          (quil-parse-error "Found DEFCAL where it's not allowed."))
@@ -457,6 +462,7 @@ the immediately preceding line."
              (*formal-arguments-allowed* t))
          (parse-calibration-definition tok-lines)))
 
+      ;; Quilt frame definition
       ((:DEFFRAME)
        (unless *definitions-allowed*
          (quil-parse-error "Found DEFFRAME where it's not allowed."))
@@ -1339,7 +1345,8 @@ In accordance with the typical usage here, there are two values returned: the re
   (loop :with parsed-body := nil :do
     ;; Reached EOF
     (when (null tok-lines)
-      (warn "Reached end of file when parsing indented body.")
+      ;; EOF is implicit :DEDENT. This is useful for, say, concatenating on
+      ;; DEFCALs at the end of a program
       (return-from parse-indented-body
         (values (make-body (nreverse parsed-body))
                 tok-lines)))
@@ -1528,6 +1535,10 @@ In accordance with the typical usage here, there are two values returned: the re
       (quil-parse-error "Expected a real number for ~A sample rate, but got ~A instead."
                         *parse-context*
                         rate))
+    (unless (plusp rate)
+      (quil-parse-error "Expected sample rate for ~A to be strictly positive, but got ~A instead."
+                        *parse-context*
+                        rate))
     (constant rate)))
 
 (defun parse-waveform-definition (tok-lines)
@@ -1637,7 +1648,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
       (values (mapcar parse-op entries)
               rest-line))))
 
-(defun parse-waveform-parameter (toks)
+(defun parse-waveform-parameter-and-value (toks)
   (let ((name (first toks))
         (colon (second toks))
         (value-expr (rest (rest toks))))
@@ -1647,13 +1658,13 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                  (eql ':NAME (token-type name))
                  (eql ':COLON (token-type colon)))
       (quil-parse-error "Waveform parameters must be provided by name. Exected <name>: <value>."))
-    (list
+    (cons
      (param (token-payload name))
      (parse-parameter-or-expression value-expr))))
 
-(defun parse-waveform-parameters (params-args)
+(defun parse-waveform-parameter-alist (params-args)
   (unless (eql ':LEFT-PAREN (token-type (first params-args)))
-    (return-from parse-waveform-parameters (values nil params-args)))
+    (return-from parse-waveform-parameter-alist (values nil params-args)))
 
   ;; Remove :LEFT-PAREN
   (pop params-args)
@@ -1676,7 +1687,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
              (lambda (tok)
                (eq ':COMMA (token-type tok)))
              found-params)))
-      (values (mapcar #'parse-waveform-parameter entries)
+      (values (mapcar #'parse-waveform-parameter-and-value entries)
               rest-line))))
 
 (defun parse-calibration-definition (tok-lines)
@@ -1796,7 +1807,12 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                                ((:SAMPLE-RATE)
                                 (parse-sample-rate value-toks))
                                ((:INITIAL-FREQUENCY
-                                 (parse-parameter-or-expression value-toks)))
+                                 (let ((freq (parse-parameter-or-expression value-toks)))
+                                   (unless (and (constantp freq)
+                                                (plusp (constant-value freq)))
+                                     (quil-parse-error "Expected INITIAL-FREQUENCY to be a positive real, but got ~/quil:instruction-fmt/."
+                                                       freq))
+                                   freq)))
                                (otherwise
                                 (quil-parse-error "Unknown property ~A in DEFFRAME. Note: This is case sensitive."
                                                   property-name)))))
@@ -1858,10 +1874,10 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                         name-tok))
     (if (endp rest-toks)
         (waveform-ref (token-payload name-tok))
-        (multiple-value-bind (params rest)
-            (parse-waveform-parameters rest-toks)
+        (multiple-value-bind (param-alist rest)
+            (parse-waveform-parameter-alist rest-toks)
           (values
-           (%waveform-ref (token-payload name-tok) params)
+           (%waveform-ref (token-payload name-tok) param-alist)
            rest)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;

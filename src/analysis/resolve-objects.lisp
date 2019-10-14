@@ -11,13 +11,13 @@
 
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
-  (let ((actual (mapcar (a:compose #'param-name #'first)
-                        (waveform-ref-parameters waveform-ref))))
-    (a:when-let ((missing (set-difference expected-parameters actual :test #'param=)))
+  (let ((actual (mapcar (a:compose #'param-name #'car)
+                        (waveform-ref-parameter-alist waveform-ref))))
+    (a:when-let ((missing (set-difference expected-parameters actual :test #'string=)))
       (quil-parse-error "Expected parameter ~A in waveform ~A."
                         (first missing)
                         (waveform-ref-name waveform-ref)))
-    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'param=)))
+    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'string=)))
       (quil-parse-error "Unexpected parameter ~A in waveform ~A. ~@
                         Expected parameters are: ~{~A~^, ~}."
                         (first unexpected)
@@ -26,11 +26,12 @@
     t))
 
 (defun resolve-standard-waveform (waveform-ref waveform-class)
+  ;; pull the alist mapping param objects to their class slot names
   (let ((param-map (quilt-waveform-parameter-alist waveform-class)))
     (validate-waveform-parameters waveform-ref
-                                  (mapcar #'first param-map))
+                                  (mapcar #'car param-map))
     (let ((obj (make-instance waveform-class)))
-      (loop :for (param  val) :in (waveform-ref-parameters waveform-ref)
+      (loop :for (param . val) :in (waveform-ref-parameter-alist waveform-ref)
             :for slot-name := (second (assoc (param-name param) param-map :test #'string=))
             :do (setf (slot-value obj slot-name) val))
       obj)))
@@ -46,19 +47,19 @@
 
 (defun resolve-waveform-reference (waveform-ref waveform-defns &key (use-defaults t))
   "Destructively update WAVEFORM-REF's name resolution to an appropriate waveform or waveform definition."
-  (let* ((resolution
-           (a:if-let ((default-binding (and use-defaults
-                                            (default-waveform-class waveform-ref))))
-             (resolve-standard-waveform waveform-ref default-binding)
-             (a:if-let ((defwaveform
-                            (find (waveform-ref-name waveform-ref)
-                                  waveform-defns
-                                  :key #'waveform-definition-name
-                                  :test #'string=)))
-               (resolve-custom-waveform waveform-ref defwaveform)
-               (quil-parse-error "Waveform reference ~A does not match ~
-                                  any standard or user defined waveforms."
-                                 (waveform-ref-name waveform-ref))))))
+  (let ((resolution
+          (a:if-let ((default-binding (and use-defaults
+                                           (default-waveform-class waveform-ref))))
+            (resolve-standard-waveform waveform-ref default-binding)
+            (a:if-let ((defwaveform
+                           (find (waveform-ref-name waveform-ref)
+                                 waveform-defns
+                                 :key #'waveform-definition-name
+                                 :test #'string=)))
+              (resolve-custom-waveform waveform-ref defwaveform)
+              (quil-parse-error "Waveform reference ~A does not match ~
+                                 any standard or user defined waveforms."
+                                (waveform-ref-name waveform-ref))))))
     (setf (waveform-ref-name-resolution waveform-ref) resolution)
     waveform-ref))
 
@@ -114,11 +115,12 @@
                                                   args)
                                            ()
                                            "All arguments must be qubits. Check type of args: ~S." args)
-             (let* ((num-qubits (length args))
-                    (distinct-args (remove-duplicates args :test #'qubit=))
-                    (expected-qubits
-                      (+ addl-qubits
-                         (gate-definition-qubits-needed found-gate-defn))))
+             (let ((num-qubits (length args))
+                   ;; args can be either qubit or formal arguments
+                   (distinct-args (remove-duplicates args :test #'argument=))
+                   (expected-qubits
+                     (+ addl-qubits
+                        (gate-definition-qubits-needed found-gate-defn))))
                ;; Check that all arguments are distinct
                (assert-and-print-instruction (= (length args) (length distinct-args))
                                              ()
@@ -188,8 +190,8 @@
     instr))
 
 (defun resolve-objects (unresolved-program)
-  "Perform all object resolution within the list RAW-QUIL, returning a PARSED-PROGRAM."
-  ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
+  "Perform all object resolution within UNRESOLVED-PROGRAM, returning a PARSED-PROGRAM."
+  ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For Quilt,
   ;; we need to also resolve waveform and frame references.
 
   ;; NOTE: Some frames within calibration bodies cannot be resolved here (e.g.
