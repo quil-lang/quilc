@@ -134,7 +134,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     c))
 
 (defstruct (frame (:constructor frame (qubits name)))
-  "A reference to a QuilT rotating frame, relative to which control or readout waveforms may be defined."
+  "A reference to a Quilt rotating frame, relative to which control or readout waveforms may be defined."
   (name nil :type string)
   (qubits nil :type list)
   ;; Will later be resolved
@@ -151,7 +151,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
 (defstruct (waveform-ref (:constructor %waveform-ref (name parameters)))
-  "An reference to a (possibly parametric) QuilT waveform."
+  "An reference to a (possibly parametric) Quilt waveform."
   (name nil :read-only t :type string)
   ;; A list of (name val) lists.
   (parameters nil :read-only t :type list)

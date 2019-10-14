@@ -412,35 +412,39 @@ the immediately preceding line."
       ((:LOAD :STORE :EQ :GT :GE :LT :LE)
        (parse-trinary-classical tok-type tok-lines))
 
-      ;; QuilT Frame Mutation
+      ;; Quilt frame mutation
       ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
        (parse-simple-frame-mutation tok-type tok-lines))
 
-      ;; QuilT phase swap
+      ;; Quilt phase swap
       ((:SWAP-PHASE)
        (parse-swap-phase tok-lines))
 
-      ;; QuilT pulse
+      ;; Quilt pulse
       ((:PULSE)
        (parse-pulse tok-lines))
 
+      ;; Quilt delay
       ((:DELAY)
        (parse-delay tok-lines))
 
-      ;; QuilT fence
+      ;; Quilt fence
       ((:FENCE)
        (parse-fence tok-lines))
 
-      ;; QuilT capture
+      ;; Quilt capture
       ((:CAPTURE)
        (parse-capture tok-lines))
 
+      ;; Quilt raw capture
       ((:RAW-CAPTURE)
        (parse-raw-capture tok-lines))
 
+      ;; Nonblocking modifier for Quilt op
       ((:NONBLOCKING)
        (parse-nonblocking-op tok-lines))
 
+      ;; Quilt waveform definition
       ((:DEFWAVEFORM)
        (unless *definitions-allowed*
          (quil-parse-error "Found DEFWAVEFORM where it's not allowed."))
@@ -449,6 +453,7 @@ the immediately preceding line."
              (*formal-arguments-allowed* t))
          (parse-waveform-definition tok-lines)))
 
+      ;; Quilt calibration definition
       ((:DEFCAL)
        (unless *definitions-allowed*
          (quil-parse-error "Found DEFCAL where it's not allowed."))
@@ -457,6 +462,7 @@ the immediately preceding line."
              (*formal-arguments-allowed* t))
          (parse-calibration-definition tok-lines)))
 
+      ;; Quilt frame definition
       ((:DEFFRAME)
        (unless *definitions-allowed*
          (quil-parse-error "Found DEFFRAME where it's not allowed."))
