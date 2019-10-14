@@ -163,8 +163,8 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defstruct (frame (:constructor frame (qubits name)))
   "A reference to a Quilt rotating frame, relative to which control or readout waveforms may be defined."
-  (name nil :type string)
-  (qubits nil :type list)
+  (name nil :read-only t :type string)
+  (qubits nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null frame-definition)))
 
