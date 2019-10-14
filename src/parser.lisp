@@ -1806,7 +1806,12 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                                ((:SAMPLE-RATE)
                                 (parse-sample-rate value-toks))
                                ((:INITIAL-FREQUENCY
-                                 (parse-parameter-or-expression value-toks)))
+                                 (let ((freq (parse-parameter-or-expression value-toks)))
+                                   (unless (and (constantp freq)
+                                                (plusp (constant-value freq)))
+                                     (quil-parse-error "Expected INITIAL-FREQUENCY to be a positive real, but got ~/quil:instruction-fmt/."
+                                                       freq))
+                                   freq)))
                                (otherwise
                                 (quil-parse-error "Unknown property ~A in DEFFRAME. Note: This is case sensitive."
                                                   property-name)))))

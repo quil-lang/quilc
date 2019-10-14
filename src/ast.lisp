@@ -495,29 +495,43 @@ If no exit rewiring is found, return NIL."
 
 (defclass frame-definition ()
   ((frame :initarg :frame
-          :reader frame-definition-frame)
+          :reader frame-definition-frame
+          :type frame
+          :documentation "The frame being defined.")
    (sample-rate :initarg :sample-rate
                 :initform nil
-                :reader frame-definition-sample-rate)
+                :reader frame-definition-sample-rate
+                :type '(or null constant)
+                :documentation "The sample rate associated with the frame. If specified, this should be a positive constant.")
    (initial-frequency :initarg :initial-frequency
                       :initform nil
-                      :reader frame-definition-initial-frequency)
+                      :reader frame-definition-initial-frequency
+                      :type '(or null constant)
+                      :documentation "The initial frequency of the frame. If specified, this should be a positive constant.")
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context)))
+            :accessor lexical-context
+            :documentation "The lexical context of the frame definition, used for error messages in subsequent analysis.")))
 
 ;;; Waveform Definitions (Quilt)
 
 (defclass waveform-definition ()
   ((name :initarg :name
-         :reader waveform-definition-name)
+         :reader waveform-definition-name
+         :type string
+         :documentation "The name of the waveform being defined.")
    (entries :initarg :entries
-            :reader waveform-definition-entries)
+            :reader waveform-definition-entries
+            :type list
+            :documentation "The raw IQ values of the waveform being defined.")
+   (sample-rate :initarg :sample-rate
+                :reader waveform-definition-sample-rate
+                :type constant
+                :documentation "The sample rate for which the waveform is applicable.")
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context)
-   (sample-rate :initarg :sample-rate
-                :reader waveform-definition-sample-rate))
+            :accessor lexical-context
+            :documentation "The lexical context of the waveform definition, used for error messages in subsequent analysis."))
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified Quilt waveform definition."))
 
@@ -534,7 +548,7 @@ If no exit rewiring is found, return NIL."
 (defun make-waveform-definition (name parameters entries sample-rate &key context)
   (check-type name string)
   (check-type parameters symbol-list)
-  (if parameters
+  (if (not (endp parameters))
       (make-instance 'parameterized-waveform-definition
                      :name name
                      :parameters parameters
@@ -551,32 +565,44 @@ If no exit rewiring is found, return NIL."
 
 (defclass calibration-definition ()
   ((body :initarg :body
-         :reader calibration-definition-body)
+         :reader calibration-definition-body
+         :type list
+         :documentation "A list of Quilt instructions in the body of the calibration definition.")
    (context :initarg :context
             :type lexical-context
-            :accessor lexical-context))
+            :accessor lexical-context
+            :documentation "The lexical context of the calibration definition, used for error messages in subsequent analysis."))
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified calibration."))
 
 (defclass gate-calibration-definition (calibration-definition)
   ((operator :initarg :operator
+             :reader calibration-definition-operator
              :type operator-description
-             :reader calibration-definition-operator)
+             :documentation "The operator for which the defined calibration is applicable.")
    (parameters :initarg :parameters
-               :reader calibration-definition-parameters)
+               :reader calibration-definition-parameters
+               :type list
+               :documentation "The parameters of the gate calibration.")
    (arguments :initarg :arguments
-              :reader calibration-definition-arguments))
+              :reader calibration-definition-arguments
+              :type list
+              :documentation "The arguments of the gate calibration."))
   (:documentation "A representation of a user-specified gate calibration."))
 
 (defclass measurement-calibration-definition (calibration-definition)
   ((qubit :initarg :qubit
-          :reader measurement-calibration-qubit))
+          :reader measurement-calibration-qubit
+          :type qubit
+          :documentation "The qubit being measured."))
   (:metaclass abstract-class)
   (:documentation "Superclass to measurement calibration definitions."))
 
 (defclass measure-calibration-definition (measurement-calibration-definition)
   ((address :initarg :address
-             :reader measure-calibration-address))
+            :reader measure-calibration-address
+            :type memory-ref
+            :documentation "The classical memory destination for measured values."))
   (:documentation "A representation of a user-specified MEASURE calibration."))
 
 (defclass measure-discard-calibration-definition (measurement-calibration-definition)
@@ -740,55 +766,84 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 
 (defclass pulse (instruction)
   ((frame :initarg :frame
-          :accessor pulse-frame)
+          :accessor pulse-frame
+          :type frame
+          :documentation "The frame on which the pulse will be applied.")
    (waveform :initarg :waveform
-             :accessor pulse-waveform)
+             :accessor pulse-waveform
+             :type waveform-ref
+             :documentation "The waveform to be applied.")
    (nonblocking :initarg :nonblocking
                 :initform nil
-                :accessor nonblocking-p))
+                :accessor nonblocking-p
+                :type boolean
+                :documentation "A flag indicating whether the pulse blocks frames sharing a qubit with the PULSE-FRAME."))
   (:documentation "A pulse instruction."))
 
 (defclass capture (instruction)
   ((frame :initarg :frame
-          :accessor capture-frame)
+          :accessor capture-frame
+          :type frame
+          :documentation "The frame from which a value is to be captured.")
    (waveform :initarg :waveform
-             :accessor capture-waveform)
+             :accessor capture-waveform
+             :type waveform-ref
+             :documentation "A waveform, used as an integration kernel for the capture operation.")
    (memory-ref :initarg :memory-ref
-               :accessor capture-memory-ref)
+               :accessor capture-memory-ref
+               :documentation "The location in memory to store the captured IQ value.")
    (nonblocking :initarg :nonblocking
                 :initform nil
-                :accessor nonblocking-p))
+                :accessor nonblocking-p
+                :type boolean
+                :documentation "A flag indicating whether the capture blocks frames sharing a qubit with the CAPTURE-FRAME."))
   (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
 (defclass raw-capture (instruction)
   ((frame :initarg :frame
-          :accessor raw-capture-frame)
+          :accessor raw-capture-frame
+          :type frame
+          :documentation "The frame from which a value is to be captured.")
    (duration :initarg :duration
-             :accessor raw-capture-duration)
+             :accessor raw-capture-duration
+             :type constant
+             :documentation "The duration for which IQ values will be recorded.")
    (memory-ref :initarg :memory-ref
-               :accessor raw-capture-memory-ref)
+               :accessor raw-capture-memory-ref
+               :type memory-ref
+               :documentation "The location in memory to store captured IQ values.")
    (nonblocking :initarg :nonblocking
                 :initform nil
-                :accessor nonblocking-p))
+                :accessor nonblocking-p
+                :type boolean
+                :documentation "A flag indicating whether the raw capture blocks frames sharing a qubit with the RAW-CAPTURE-FRAME."))
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
 (defclass delay (instruction)
   ((duration :initarg :duration
-             :accessor delay-duration))
+             :accessor delay-duration
+             :type constant
+             :documentation "The duration (in seconds) of the DELAY instruction."))
   (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
 
 (defclass delay-on-frames (delay)
   ((delayed-frames :initarg :frames
-                   :accessor delay-frames)))
+                   :accessor delay-frames
+                   :type list
+                   :documentation "A list of frames which should be delayed.")))
 
 (defclass delay-on-qubits (delay)
   ((qubits :initarg :qubits
-           :accessor delay-qubits)))
+           :accessor delay-qubits
+           :type list
+           :documentation "A list of qubits. Any frame on these qubits will be delayed.")))
 
 (defclass fence (instruction)
   ((qubits :initarg :qubits
-           :accessor fence-qubits))
+           :accessor fence-qubits
+           :type list
+           :documentation "A list of qubits. Any frame intersecting these qubits will be synchronized to a common time."))
   (:documentation "A synchronization barrier on a set of qubits, demarcating preceding and succeeding instructions."))
 
 ;;; Classical Instructions
