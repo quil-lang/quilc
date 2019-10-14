@@ -1334,7 +1334,7 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
     ((named-operator name)   name)
     (_ (error "The application doesn't have a canonical name."))))
 
-(defun operator-description-equalp (od1 od2)
+(defun operator-description= (od1 od2)
   "Check whether two operator descriptions have the same structure and the same names."
   (and (equalp od1 od2)                 ; case insensitive
        (string= (operator-description-root-name od1)

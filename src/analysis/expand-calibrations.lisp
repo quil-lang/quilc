@@ -43,8 +43,8 @@
                                  (is-formal cal-arg)))
                            app-args
                            cal-args))))
-      (and (operator-description-equalp (application-operator instr)
-                                        (calibration-definition-operator defn))
+      (and (operator-description= (application-operator instr)
+                                  (calibration-definition-operator defn))
            (params-match (application-parameters instr)
                          (calibration-definition-parameters defn))
            (args-match (application-arguments instr)
@@ -72,7 +72,7 @@
 
 3. a list of measure discard calibrations."
   (let ((gate-calibrations
-          (make-hash-table :test #'operator-description-equalp
+          (make-hash-table :test #'operator-description=
                            :hash-function #'operator-description-hash))
         (measure-calibrations nil)
         (measure-discard-calibrations nil))

@@ -324,6 +324,7 @@
    #:controlled-operator                ; ADT CONSTRUCTOR
    #:dagger-operator                    ; ADT CONSTRUCTOR
    #:operator-description-root-name     ; FUNCTION
+   #:operator-description=              ; FUNCTION
 
    #:application                        ; ABSTRACT CLASS
    #:application-operator               ; READER
