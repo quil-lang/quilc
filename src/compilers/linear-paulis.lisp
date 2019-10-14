@@ -23,6 +23,16 @@
     (t
      big-tree)))
 
+(defun array-argmax (arr)
+  (loop :with pos := 0
+        :with current-max := (aref arr 0)
+        :for j :from 0
+        :for item :across arr
+        :when (< current-max item)
+          :do (setf current-max item
+                    pos j)
+        :finally (return pos)))
+
 ;; WARNING: i don't know where this method has been considered before, and i
 ;;          myself haven't worked out a proof that it's correct. caveat compiler
 (define-compiler parametric-diagonal-compiler
@@ -32,7 +42,6 @@
                                                      (pauli-term-pauli-word term)))
                                (pauli-sum-gate-terms (gate-application-gate instr))))))
   "Decomposes a diagonal Pauli gate by a single step."
-  (declare (optimize (debug 3) (speed 0)))
   (with-slots (arguments parameters terms arity dimension) (gate-application-gate instr)
     (let ((nonlocal-terms nil))
       ;; first, deal with the words with a zero Zs / one Z: they're local gates
@@ -66,7 +75,8 @@
             (otherwise
              (push term nonlocal-terms)))))
       (let ((votes (make-array (length arguments) :initial-element 0))
-            vote)
+            vote
+            control-qubit)
         ;; we can break nonlocal terms into two collections: those with Zs in
         ;; some spot and those without Zs in that spot. the result will be to
         ;; conjugate the first collection by CNOT, which flips those Zs to Is.
@@ -78,17 +88,11 @@
                 :for argument :in (pauli-term-arguments term)
                 :when (eql #\Z letter)
                   :do (incf (aref votes (position argument arguments :test #'equalp)))))
-        (loop :with pos := 0
-              :with current-max := (aref votes 0)
-              :for j :from 0
-              :for item :across votes
-              :when (< current-max item)
-                :do (setf current-max item
-                          pos j)
-              :finally (setf vote current-max))
+        (setf vote (array-argmax votes)
+              control-qubit (nth vote (application-arguments instr)))
         ;; now we re-sort the nonlocal terms into two buckets: those with a Z in
         ;; the voted-upon location, and those without
-        (let ((Is nil) (Zs nil))
+        (let* ((Is nil) (Zs nil))
           (dolist (term nonlocal-terms)
             (let ((Z-pos (loop :for letter :across (pauli-term-pauli-word term)
                                :for arg :in (pauli-term-arguments term)
@@ -114,38 +118,55 @@
                      (application-parameters instr)
                      (application-arguments instr))))
           ;; emit the Zs
-          (unless (endp Zs)
-            (let* ((localized-terms
-                     (loop :for (term Z-pos) :in Zs
-                           :collect (make-pauli-term
-                                     :prefactor (pauli-term-prefactor term)
-                                     :arguments (pauli-term-arguments term)
-                                     :pauli-word (coerce (loop :for letter :across (pauli-term-pauli-word term)
-                                                               :for j :from 0
-                                                               :if (eql j Z-pos)
-                                                                 :collect #\I
-                                                               :else
-                                                                 :collect letter)
-                                                         'string))))
-                   (Z-gate (make-instance 'pauli-sum-gate
-                                          :arguments arguments
-                                          :parameters parameters
-                                          :arity arity
-                                          :dimension dimension
-                                          :terms localized-terms
-                                          :name "Zs-GATE"))
-                   (control-qubit (nth vote (application-arguments instr)))
-                   ;; TODO: there's room here to make an intelligent choice of
-                   ;; target qubit. they all act the same, so it'd be best to pick
-                   ;; that one that's topologically nearest the control.
-                   (target-qubit (if (zerop vote)
-                                     (second (application-arguments instr))
-                                     (first (application-arguments instr)))))
-              (inst "CNOT" () control-qubit target-qubit)
-              (inst* Z-gate
-                     (application-parameters instr)
-                     (application-arguments instr))
-              (inst "CNOT" () control-qubit target-qubit))))))))
+          (labels
+              ((collect-by-target (term-pairs)
+                 (when (endp term-pairs)
+                   (return-from collect-by-target nil))
+                 (let ((subvotes (make-array (length arguments))))
+                   (loop :for (term Z-pos) :in term-pairs
+                         :do (loop :for letter :across (pauli-term-pauli-word term)
+                                   :for j :from 0
+                                   :for arg :in (pauli-term-arguments term)
+                                   :when (and (not (eql j Z-pos))
+                                              (eql #\Z letter))
+                                     :do (incf (aref subvotes (position arg arguments :test #'equalp)))))
+                   (let* ((subvote-position (array-argmax subvotes))
+                          (subvote-formal (nth subvote-position arguments))
+                          (subvote-literal (nth subvote-position (application-arguments instr)))
+                          ZZs ZIs)
+                     (dolist (term-pair term-pairs)
+                       (let ((term (car term-pair)))
+                         (cond
+                           ((position subvote-formal (pauli-term-arguments term) :test #'equalp)
+                            (push term-pair ZZs))
+                           (t
+                            (push term-pair ZIs)))))
+                     (let* ((ZZ-terms
+                              (loop :for (term Z-pos) :in ZZs
+                                    :collect (make-pauli-term
+                                              :prefactor (pauli-term-prefactor term)
+                                              :arguments (pauli-term-arguments term)
+                                              :pauli-word (coerce (loop :for letter :across (pauli-term-pauli-word term)
+                                                                        :for j :from 0
+                                                                        :if (eql j Z-pos)
+                                                                          :collect #\I
+                                                                        :else
+                                                                          :collect letter)
+                                                                  'string))))
+                            (Z-gate (make-instance 'pauli-sum-gate
+                                                   :arguments arguments
+                                                   :parameters parameters
+                                                   :arity arity
+                                                   :dimension dimension
+                                                   :terms ZZ-terms
+                                                   :name "ZZ-GATE")))
+                       (inst "CNOT" () control-qubit subvote-literal)
+                       (inst* Z-gate
+                              (application-parameters instr)
+                              (application-arguments instr))
+                       (inst "CNOT" () control-qubit subvote-literal))
+                     (collect-by-target ZIs)))))
+            (collect-by-target Zs)))))))
 
 
 ;; TODO: also write an orthogonal gate compiler somewhere? approx.lisp will take
@@ -166,41 +187,42 @@
         (dolist (term terms)
           (setf H (m+ H (pauli-term->matrix term arguments (list 1d0) parameters))))
         ;; orthogonally diagonalize it: H = O D O^T
-        (multiple-value-bind (diagonal O) (magicl:eig H)
-          ;; convert diagonal into a sum of Z paulis
-          (let ((pauli-prefactors (make-array dimension :initial-element 0d0))
-                terms diagonal-gate)
-            (loop :for d :in diagonal
-                  :for i :from 0
-                  :do (dotimes (j dimension)
-                        (incf (aref pauli-prefactors j)
-                              (if (evenp (logcount (logand i j)))
-                                  (/    d  dimension)
-                                  (/ (- d) dimension)))))
-            (setf terms (loop :for prefactor :across pauli-prefactors
-                              :for j :from 0
-                              :unless (double= 0d0 prefactor)
-                                :collect (let ((term-arguments
-                                                 (loop :for i :below (length arguments)
-                                                       :for arg :in arguments
-                                                       :when (logbitp (- (length arguments) i 1) j)
-                                                         :collect arg)))
-                                           (make-pauli-term
-                                            :prefactor (param-* (realpart prefactor)
-                                                                (make-delayed-expression
-                                                                 nil nil (first parameters)))
-                                            :arguments term-arguments
-                                            :pauli-word (coerce (make-array (length term-arguments)
-                                                                            :initial-element #\Z)
-                                                                'string))))
-                  diagonal-gate (make-instance 'pauli-sum-gate
-                                               :arguments arguments
-                                               :parameters parameters
-                                               :terms terms
-                                               :arity 1
-                                               :dimension dimension
-                                               :name (string (gensym "DIAG-PAULI-"))))
-            ;; emit the instructions
-            (inst* "RIGHT-O-T"   (magicl:conjugate-transpose O) (application-arguments instr))
-            (inst* diagonal-gate (application-parameters instr) (application-arguments instr))
-            (inst* "LEFT-O"      O                              (application-arguments instr))))))))
+        (multiple-value-bind (diagonal O) (magicl:hermitian-eig H)
+          (let ((O (orthonormalize-matrix O)))
+            ;; convert diagonal into a sum of Z paulis
+            (let ((pauli-prefactors (make-array dimension :initial-element 0d0))
+                  terms diagonal-gate)
+              (loop :for d :in diagonal
+                    :for i :from 0
+                    :do (dotimes (j dimension)
+                          (incf (aref pauli-prefactors j)
+                                (if (evenp (logcount (logand i j)))
+                                    (/    d  dimension)
+                                    (/ (- d) dimension)))))
+              (setf terms (loop :for prefactor :across pauli-prefactors
+                                :for j :from 0
+                                :unless (double= 0d0 prefactor)
+                                  :collect (let ((term-arguments
+                                                   (loop :for i :below (length arguments)
+                                                         :for arg :in arguments
+                                                         :when (logbitp (- (length arguments) i 1) j)
+                                                           :collect arg)))
+                                             (make-pauli-term
+                                              :prefactor (param-* (realpart prefactor)
+                                                                  (make-delayed-expression
+                                                                   nil nil (first parameters)))
+                                              :arguments term-arguments
+                                              :pauli-word (coerce (make-array (length term-arguments)
+                                                                              :initial-element #\Z)
+                                                                  'string))))
+                    diagonal-gate (make-instance 'pauli-sum-gate
+                                                 :arguments arguments
+                                                 :parameters parameters
+                                                 :terms terms
+                                                 :arity 1
+                                                 :dimension dimension
+                                                 :name (string (gensym "DIAG-PAULI-"))))
+              ;; emit the instructions
+              (inst* "RIGHT-O-T"   (magicl:conjugate-transpose O) (application-arguments instr))
+              (inst* diagonal-gate (application-parameters instr) (application-arguments instr))
+              (inst* "LEFT-O"      O                              (application-arguments instr)))))))))

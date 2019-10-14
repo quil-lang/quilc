@@ -208,7 +208,8 @@
                                       (m+ m (pauli-term->matrix term arguments params parameters)))
                                     terms
                                     :initial-value (magicl:make-zero-matrix size size))
-                            (complex 0d0 -1d0))))
+                            (complex 0d0 -1d0)
+                            :hermitian? t)))
         (setf (%parameterized-gate-matrix-function gate) #'matrix-function)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;; Gate Operators ;;;;;;;;;;;;;;;;;;;;;;;;;;;
