@@ -54,15 +54,12 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
      (delay-on-qubits
       (loop :for defn :in (parsed-program-frame-definitions parsed-program)
             :for frame := (frame-definition-frame defn)
-            :when (equalp (frame-qubits frame)
-                          (delay-qubits instr))
+            :when (frame-on-p frame (delay-qubits qubits))
               :collect frame))
      (fence
       (loop :for defn :in (parsed-program-frame-definitions parsed-program)
             :for frame := (frame-definition-frame defn)
-            :when (intersection (frame-qubits frame)
-                                (fence-qubits instr)
-                                :test #'equalp)
+            :when (frame-intersects-p frame (fence-qubits instr))
               :collect frame)))))
 
 (defun pulse-operation-frame (instr)
@@ -136,10 +133,9 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
             ;; handle implicit delays
             :when (plusp lag)
                   :do (incf (local-time clocks f) lag)
-            :when (plusp lag)
-              :collect (make-instance 'delay-on-frames
-                                      :frames (list f)
-                                      :duration (constant lag)))))
+                  :and :collect (make-instance 'delay-on-frames
+                                               :frames (list f)
+                                               :duration (constant lag)))))
 
   (:method ((instr swap-phase) clocks)
     (with-slots (left-frame right-frame) instr
@@ -149,7 +145,9 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
               :for lag := (- latest (local-time clocks f))
               :when (plusp lag)
                 :do (incf (local-time clocks f) lag)
-                :and :collect (make-instance 'delay-on-frames )))))
+                :and :collect (make-instance 'delay-on-frames
+                                             :frames (list f)
+                                             :duration (constant lag))))))
 
   (:method (instr clocks)
     ;; we handle pulse/capture/raw-capture together here. the default case is
