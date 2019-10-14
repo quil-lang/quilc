@@ -383,10 +383,33 @@ as needed so that they are the same size."
         kroned-ref-mat
         (scale-out-matrix-phases kroned-mat kroned-ref-mat))))))
 
-(defun matrix-expt (m s)
+(defun matrix-expt (m s &key hermitian?)
   "Computes EXP(M*S).  Only works for unitarily diagonalizable matrices M."
-  (multiple-value-bind (d u) (magicl:eig m)
+  (multiple-value-bind (d u)
+      (if hermitian? (magicl:hermitian-eig m) (magicl:eig m))
+    (assert (matrix-equality m
+                             (m* u
+                                 (magicl:diag (length d) (length d) d)
+                                 (magicl:conjugate-transpose u)))
+            ()
+            "MATRIX-EXPT failed to diagonalize its input.")
     (let* ((size (length d))
            (dd (magicl:diag size size
                             (mapcar (lambda (z) (exp (* z s))) d))))
       (m* u dd (magicl:conjugate-transpose u)))))
+
+(defun print-polar-matrix (m &optional (stream *standard-output*))
+  (let ((*print-fractional-radians* nil)
+        (*print-polar-form* t)
+        (height (magicl::matrix-rows m))
+        (width (magicl::matrix-cols m)))
+    (format stream "~&")
+    (dotimes (i height)
+      (dotimes (j width)
+        (let* ((z (magicl:ref m i j))
+               (abs (if (double= 0d0 (abs z)) 0d0 (abs z)))
+               (phase (if (zerop abs) 0d0 (mod (phase z) (* 2 pi)))))
+          (format stream "~6,4F∠~6,4F" abs phase))
+        (when (< j (1- width))
+          (format stream ", ")))
+      (format stream "~%"))))
