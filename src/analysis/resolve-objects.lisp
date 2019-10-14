@@ -11,13 +11,13 @@
 
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
-  (let ((actual (mapcar (a:compose #'param-name #'first)
-                        (waveform-ref-parameters waveform-ref))))
-    (a:when-let ((missing (set-difference expected-parameters actual :test #'param=)))
+  (let ((actual (mapcar (a:compose #'param-name #'car)
+                        (waveform-ref-parameter-alist waveform-ref))))
+    (a:when-let ((missing (set-difference expected-parameters actual :test #'string=)))
       (quil-parse-error "Expected parameter ~A in waveform ~A."
                         (first missing)
                         (waveform-ref-name waveform-ref)))
-    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'param=)))
+    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'string=)))
       (quil-parse-error "Unexpected parameter ~A in waveform ~A. ~@
                         Expected parameters are: ~{~A~^, ~}."
                         (first unexpected)
@@ -26,11 +26,12 @@
     t))
 
 (defun resolve-standard-waveform (waveform-ref waveform-class)
+  ;; pull the alist mapping param objects to their class slot names
   (let ((param-map (quilt-waveform-parameter-alist waveform-class)))
     (validate-waveform-parameters waveform-ref
-                                  (mapcar #'first param-map))
+                                  (mapcar #'car param-map))
     (let ((obj (make-instance waveform-class)))
-      (loop :for (param  val) :in (waveform-ref-parameters waveform-ref)
+      (loop :for (param . val) :in (waveform-ref-parameter-alist waveform-ref)
             :for slot-name := (second (assoc (param-name param) param-map :test #'string=))
             :do (setf (slot-value obj slot-name) val))
       obj)))
@@ -115,7 +116,8 @@
                                            ()
                                            "All arguments must be qubits. Check type of args: ~S." args)
              (let* ((num-qubits (length args))
-                    (distinct-args (remove-duplicates args :test #'qubit=))
+                    ;; args can be either qubit or formal arguments
+                    (distinct-args (remove-duplicates args :test #'argument=))
                     (expected-qubits
                       (+ addl-qubits
                          (gate-definition-qubits-needed found-gate-defn))))

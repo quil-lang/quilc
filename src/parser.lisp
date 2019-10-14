@@ -1643,7 +1643,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
       (values (mapcar parse-op entries)
               rest-line))))
 
-(defun parse-waveform-parameter (toks)
+(defun parse-waveform-parameter-and-value (toks)
   (let ((name (first toks))
         (colon (second toks))
         (value-expr (rest (rest toks))))
@@ -1653,13 +1653,13 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                  (eql ':NAME (token-type name))
                  (eql ':COLON (token-type colon)))
       (quil-parse-error "Waveform parameters must be provided by name. Exected <name>: <value>."))
-    (list
+    (cons
      (param (token-payload name))
      (parse-parameter-or-expression value-expr))))
 
-(defun parse-waveform-parameters (params-args)
+(defun parse-waveform-parameter-alist (params-args)
   (unless (eql ':LEFT-PAREN (token-type (first params-args)))
-    (return-from parse-waveform-parameters (values nil params-args)))
+    (return-from parse-waveform-parameter-alist (values nil params-args)))
 
   ;; Remove :LEFT-PAREN
   (pop params-args)
@@ -1682,7 +1682,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
              (lambda (tok)
                (eq ':COMMA (token-type tok)))
              found-params)))
-      (values (mapcar #'parse-waveform-parameter entries)
+      (values (mapcar #'parse-waveform-parameter-and-value entries)
               rest-line))))
 
 (defun parse-calibration-definition (tok-lines)
@@ -1864,10 +1864,10 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                         name-tok))
     (if (endp rest-toks)
         (waveform-ref (token-payload name-tok))
-        (multiple-value-bind (params rest)
-            (parse-waveform-parameters rest-toks)
+        (multiple-value-bind (param-alist rest)
+            (parse-waveform-parameter-alist rest-toks)
           (values
-           (%waveform-ref (token-payload name-tok) params)
+           (%waveform-ref (token-payload name-tok) param-alist)
            rest)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;

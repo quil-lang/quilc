@@ -116,6 +116,13 @@
    #:is-param                           ; FUNCTION (PREDICATE)
    #:param=                             ; FUNCTION
 
+   #:formal                             ; STRUCTURE
+   #:formal-name                        ; READER
+   #:is-formal                          ; FUNCTION (PREDICATE)
+   #:formal=                            ; FUNCTION
+
+   #:argument=                          ; FUNCTION
+
    #:memory-ref                         ; TYPE (STRUCTURE)
    #:mref                               ; FUNCTION (CONSTRUCTOR)
    #:memory-ref-position                ; READER

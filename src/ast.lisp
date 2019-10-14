@@ -83,6 +83,18 @@
   "A formal argument. Represents a placeholder for a qubit or a memory reference."
   (name nil :read-only t :type string))
 
+(defun formal= (x y)
+  "Do formal argumentx X and Y have the same name?"
+  (string= (formal-name x) (formal-name y)))
+
+(defun argument= (x y)
+  "Are the (qubit or formal) arguments X and Y equal?"
+  (cond ((and (qubit-p x) (qubit-p y))
+         (qubit= x y))
+        ((and (is-formal x) (is-formal y))
+         (formal= x y))
+        (t nil)))
+
 ;;; Memory descriptors are a part of the parsing process, but are
 ;;; defined in classical-memory.lisp.
 
@@ -166,11 +178,11 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   #-sbcl
   (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
-(defstruct (waveform-ref (:constructor %waveform-ref (name parameters)))
+(defstruct (waveform-ref (:constructor %waveform-ref (name parameter-alist)))
   "An reference to a (possibly parametric) Quilt waveform."
   (name nil :read-only t :type string)
-  ;; A list of (name val) lists.
-  (parameters nil :read-only t :type list)
+  ;; An alist of parameters and their values.
+  (parameter-alist nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null
                                  standard-waveform
@@ -1624,9 +1636,9 @@ For example,
             (waveform-ref-name thing)
             (mapcar (lambda (name-and-value)
                       (format nil "~A: ~A"
-                              (param-name (first name-and-value))
-                              (print-instruction-to-string (second name-and-value))))
-                    (waveform-ref-parameters thing))))
+                              (param-name (car name-and-value))
+                              (print-instruction-to-string (cdr name-and-value))))
+                    (waveform-ref-parameter-alist thing))))
 
   ;; Actual instructions
   (:method ((instr halt) (stream stream))
