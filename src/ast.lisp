@@ -189,10 +189,12 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                                  waveform-definition)))
 
 (defun waveform-ref (name &rest plist)
-  "Construct a waveform reference with keyword-value pairs given by ARGS."
-  (assert (evenp (length plist)))
+  "Construct a waveform reference with keyword-value pairs given by PLIST."
+  (unless (evenp (length plist))
+    (error "WAVEFORM-REF takes an odd number of arguments: first a name, and then alternating keyword-value pairs."))
   (%waveform-ref name
-                 (loop :for (name val) :on plist :by #'cddr :while val
+                 (loop :for (name val) :on plist :by #'cddr
+                       :while val
                        :collect (list name val))))
 
 
