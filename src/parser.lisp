@@ -1534,6 +1534,10 @@ In accordance with the typical usage here, there are two values returned: the re
       (quil-parse-error "Expected a real number for ~A sample rate, but got ~A instead."
                         *parse-context*
                         rate))
+    (unless (plusp rate)
+      (quil-parse-error "Expected sample rate for ~A to be strictly positive, but got ~A instead."
+                        *parse-context*
+                        rate))
     (constant rate)))
 
 (defun parse-waveform-definition (tok-lines)
