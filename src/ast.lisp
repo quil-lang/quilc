@@ -158,7 +158,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defun frame= (a b)
   (and (string= (frame-name a) (frame-name b))
-       (list= (frame-qubits a) (frame-qubits b) :key #'qubit=)))
+       (list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
 (defun frame-hash (f)
   #+sbcl
@@ -477,7 +477,7 @@ If no exit rewiring is found, return NIL."
                  :body body
                  :context context))
 
-;;; Frame Definitions (QuilT)
+;;; Frame Definitions (Quilt)
 
 (defclass frame-definition ()
   ((frame :initarg :frame
@@ -492,7 +492,7 @@ If no exit rewiring is found, return NIL."
             :type lexical-context
             :accessor lexical-context)))
 
-;;; Waveform Definitions (QuilT)
+;;; Waveform Definitions (Quilt)
 
 (defclass waveform-definition ()
   ((name :initarg :name
@@ -505,7 +505,7 @@ If no exit rewiring is found, return NIL."
    (sample-rate :initarg :sample-rate
                 :reader waveform-definition-sample-rate))
   (:metaclass abstract-class)
-  (:documentation "A representation of a user-specified QuilT waveform definition."))
+  (:documentation "A representation of a user-specified Quilt waveform definition."))
 
 (defclass static-waveform-definition (waveform-definition)
   ()
@@ -533,7 +533,7 @@ If no exit rewiring is found, return NIL."
                      :sample-rate sample-rate
                      :context context)))
 
-;;; Calibration Definitions (QuilT)
+;;; Calibration Definitions (Quilt)
 
 (defclass calibration-definition ()
   ((body :initarg :body
@@ -673,7 +673,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 (defmethod arguments ((instruction wait)) #())
 (defmethod mnemonic  ((instruction wait)) (values "WAIT" 'wait))
 
-;;; Frame Mutations (QuilT)
+;;; Frame Mutations (Quilt)
 
 (defclass simple-frame-mutation (instruction)
   ((frame :initarg :frame
@@ -722,7 +722,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
                 :accessor swap-phase-right-frame))
   (:documentation "An instruction representing a phase swap between two frames."))
 
-;;; QuilT Operators
+;;; Quilt Operators
 
 (defclass pulse (instruction)
   ((frame :initarg :frame
