@@ -10,6 +10,10 @@
   "A qubit address."
   (index nil :type unsigned-byte))
 
+(defun qubit= (x y)
+  "Do the qubits X and Y have equal indices?"
+  (= (qubit-index x) (qubit-index y)))
+
 (defstruct (memory-name (:constructor memory-name (region-name &optional descriptor)))
   "A bare name of a memory region, used for LOAD and STORE operands."
   (region-name nil :read-only t :type string)
@@ -51,6 +55,13 @@
   (value nil :type number)
   (value-type quil-real :type quil-type))
 
+(defun constant= (x y)
+  "Do the constants X and Y have equal types and values?"
+  (and (equal (constant-value-type x)
+              (constant-value-type y))
+       (= (constant-value x)
+          (constant-value y))))
+
 (defstruct (label (:constructor label (name)))
   "A label name. Corresponds to names prepended with `@' in Quil."
   ;; We allow an UNSIGNED-BYTE so that we can jump to absolute
@@ -61,6 +72,11 @@
                   (:predicate is-param))
   "A formal parameter. Corresponds to names prepended with `%' in Quil. Represents a numerical value or a classical memory reference."
   (name nil :read-only t :type string))
+
+(defun param= (x y)
+  "Do parameters X and Y have the same name?"
+  (string= (param-name x)
+           (param-name y)))
 
 (defstruct (formal (:constructor formal (name))
                    (:predicate is-formal))
@@ -142,7 +158,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
 
 (defun frame= (a b)
   (and (string= (frame-name a) (frame-name b))
-       (equalp (frame-qubits a) (frame-qubits b))))
+       (list= (frame-qubits a) (frame-qubits b) :key #'qubit=)))
 
 (defun frame-hash (f)
   #+sbcl

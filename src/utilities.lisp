@@ -90,6 +90,14 @@ appropriate method of comparison."
       (first-column-operator= mat1 mat2)
       (operator= mat1 mat2)))
 
+(defun list= (xs ys &key (key #'identity) (test #'equal))
+  "Checks whether lists XS and YS are equal, element-by-element."
+  (loop :for x :in xs
+        :for y :in ys
+        :always (funcall test
+                         (funcall key x)
+                         (funcall key y))))
+
 (defun reduce-append (lists)
   "Append all of the lists of LISTS together. Called 'concat' in some other languages. Equivalent to (REDUCE #'APPEND LISTS)."
   ;; We could LOAD-TIME-VALUE this CONS but then the function wouldn't

@@ -30,7 +30,7 @@
                        (length cal-params))
                     (every (lambda (app-param cal-param)
                              (if (is-constant cal-param)
-                                 (equalp app-param cal-param)
+                                 (constant= app-param cal-param)
                                  (is-param cal-param)))
                            app-params
                            cal-params)))
@@ -39,7 +39,7 @@
                        (length cal-args))
                     (every (lambda (app-arg cal-arg)
                              (if (qubit-p cal-arg)
-                                 (equalp app-arg cal-arg)
+                                 (qubit= app-arg cal-arg)
                                  (is-formal cal-arg)))
                            app-args
                            cal-args))))
@@ -53,14 +53,14 @@
   (:method ((defn measure-calibration-definition) (instr measure))
     ;; Check that the measurement qubit matches, and the address matches.
     (and (if (qubit-p (measurement-calibration-qubit defn))
-             (equalp (measurement-qubit instr) (measurement-calibration-qubit defn))
+             (qubit= (measurement-qubit instr) (measurement-calibration-qubit defn))
              (is-formal (measurement-calibration-qubit defn)))
          (is-formal (measure-calibration-address defn))))
 
   (:method ((defn measure-discard-calibration-definition) (instr measure-discard))
     ;; Just check that the measurement qubit matches.
     (if (qubit-p (measurement-calibration-qubit defn))
-        (equalp (measurement-qubit instr) (measurement-calibration-qubit defn))
+        (qubit= (measurement-qubit instr) (measurement-calibration-qubit defn))
         (is-formal (measurement-calibration-qubit defn)))))
 
 (defun compute-calibration-tables (parsed-program)
