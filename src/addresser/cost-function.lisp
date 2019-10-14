@@ -120,8 +120,8 @@
                     (assert (not (= qq-distance most-positive-fixnum)) ()
                             "Multiqubit instruction requested between ~
                                    disconnected components of the QPU graph: ~
-                                   ~A ."
-                            (print-instruction gate nil))
+                                   ~/quil:instruction-fmt/ ."
+                            gate)
                     (incf gate-count)
                     (incf sum
                           (* (expt *cost-fn-tier-decay* tier-index) qq-distance))))))))

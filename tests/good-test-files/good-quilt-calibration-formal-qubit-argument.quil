@@ -1,2 +1,4 @@
 DEFCAL RZ(%theta) qubit:
     SHIFT-PHASE qubit "xy" %theta
+
+HALT

@@ -1,2 +1,4 @@
 DEFCAL X 0:
     PULSE 0 "xy" gaussian(duration: 1, fwhm: 2, t0: 3)
+
+HALT
