@@ -7,8 +7,16 @@
 
 ;;; Syntactic conveniences
 
+;;; For the purposes of this (or related) analyses, "simple Quilt" is the subset
+;;; of straight-line Quilt involving only pulse operations (including captures),
+;;; explicit control of timing/synchronization, and frame updates. These are the
+;;; basic operations which must be supported by any control hardware which may
+;;; be targeted by Quilt, and also reflect a minimal coherent subset of
+;;; instructions for which time-related program analyses may be performed.
+
 (deftype simple-quilt-instruction ()
-  '(or pulse capture raw-capture
+  '(or
+    pulse capture raw-capture
     delay fence
     simple-frame-mutation swap-phase))
 
@@ -29,8 +37,11 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
      (/ (length (waveform-definition-entries wf-or-wf-defn))
         (constant-value (waveform-definition-sample-rate wf-or-wf-defn))))))
 
+(defparameter *quilt-seemingly-instantenous-duration* 0.0d0
+  "A numerical value representing the duration of seemingly instantenous operations, in seconds. This might be zero, and it might not be!")
+
 (defun quilt-instruction-duration (instr)
-  "Get the duration of the specified quilt instruction INSTR."
+  "Get the duration of the specified quilt instruction INSTR if it is well defined, or NIL otherwise."
   (typecase instr
     ((or pulse capture)
      (waveform-active-duration (resolved-waveform instr)))
@@ -38,8 +49,11 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
       (constant-value (delay-duration instr)))
     (raw-capture
      (constant-value (raw-capture-duration instr)))
-    ((or simple-frame-mutation swap-phase fence)
-     0.0d0)))
+    (simple-frame-mutation
+     *quilt-seemingly-instantenous-duration*)
+    ;; FENCE and SWAP-PHASE both impose synchronization, and hence only have a duration that is meaningful on a frame-by-frame basis.
+    ((or fence swap-phase)
+     nil)))
 
 (defun quilt-instruction-frames (instr parsed-program)
   (a:ensure-list
@@ -195,8 +209,8 @@ If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so t
             :do (process-instr instr))
       (when synchronize-at-end
         (let ((all-qubits (reduce #'union
-                                  (mapcar #'frame-qubits
-                                          (tracked-frames frame-clocks)))))
+                                  (tracked-frames frame-clocks)
+                                  :key #'frame-qubits)))
           (process-instr (make-instance 'fence :qubits all-qubits)))))
 
     (setf (parsed-program-executable-code parsed-program)
