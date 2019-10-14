@@ -15,24 +15,24 @@
 ;;; information to construct an appropriate instance from a  quilt waveform reference.
 
 
-(defparameter *quilt-to-waveform-class* (make-hash-table :test 'equal)
+(defvar *quilt-to-waveform-class* (make-hash-table :test 'equal)
   "A mapping from quilt name (a string) to the corresponding waveform class name.")
 
 (defun default-waveform-class (waveform-ref)
   "Return the built-in waveform class named by the given WAVEFORM-REF."
   (gethash (waveform-ref-name waveform-ref) *quilt-to-waveform-class*))
 
-(defparameter *waveform-class-parameter-alists* (make-hash-table :test 'equal)
+(defvar *waveform-class-parameter-alists* (make-hash-table :test 'equal)
   "This is keyed by the built-in waveform CLASS-NAMEs, and maintains for each an association list mapping quilt parameter names to their corresponding slot names.")
 
 (defun quilt-waveform-parameter-alist (class-name)
   "Given the CLASS-NAME of a built-in quilt waveform, return an association list mapping quilt waveform parameter names and their corresponding slot names on the waveform class."
   (gethash class-name *waveform-class-parameter-alists*))
 
-(defmacro define-standard-waveform (class-name quilt-name slot-specs &key (documentation nil))
+(defmacro define-standard-waveform (class-name quilt-name slot-specs &key documentation)
   "Define a standard waveform.
 
-PARAMETERS:
+Parameters:
   * CLASS-NAME: The name of the standard waveform type.
   * QUILT-NAME: A string indicating the waveform name as exposed to QuilT.
   * SLOT-SPECS: A list of slot specifications. An entry is a name followed by a plist with the following keys:
@@ -42,6 +42,7 @@ PARAMETERS:
 
   (check-type quilt-name string)
   (check-type class-name symbol)
+  (check-type documentation (or null string))
   (let ((quilt-param-alist
           (loop :for spec :in slot-specs
                 :for (slot-name . slot-plist) := spec
