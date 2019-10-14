@@ -362,8 +362,8 @@ depending on whether TEST passes."
                                     arg-value))
           (value (ensure-instantiated (frame-mutation-value instr)
                                       arg-value)))
-      (if (and (eq frame (frame-mutation-target-frame instr))
-               (eq value (frame-mutation-value instr)))
+      (if (and (frame= frame (frame-mutation-target-frame instr))
+               (constant= value (frame-mutation-value instr)))
           instr
           (make-instance (class-of instr)
                          :frame frame
@@ -372,7 +372,7 @@ depending on whether TEST passes."
   (:method ((instr pulse) param-value arg-value)
     (let ((frame (instantiate-frame (pulse-frame instr)
                                     arg-value)))
-      (if (eq frame (pulse-frame instr))
+      (if (frame= frame (pulse-frame instr))
           instr
           (make-instance 'pulse
                          :frame frame
@@ -385,8 +385,8 @@ depending on whether TEST passes."
           (memory-ref (ensure-instantiated (capture-memory-ref instr)
                                            arg-value)))
       (check-mref memory-ref)
-      (if (and (eq frame (capture-frame instr))
-               (eq memory-ref (capture-memory-ref instr)))
+      (if (and (frame= frame (capture-frame instr))
+               (memory-ref= memory-ref (capture-memory-ref instr)))
           instr
           (make-instance 'capture
                          :frame frame
@@ -402,9 +402,9 @@ depending on whether TEST passes."
           (duration (ensure-instantiated (raw-capture-duration instr)
                                          arg-value)))
       (check-mref memory-ref)
-      (if (and (eq frame (raw-capture-frame instr))
-               (eq memory-ref (raw-capture-memory-ref instr))
-               (eq duration (raw-capture-duration instr)))
+      (if (and (frame= frame (raw-capture-frame instr))
+               (memory-ref= memory-ref (raw-capture-memory-ref instr))
+               (constant= duration (raw-capture-duration instr)))
           instr
           (make-instance 'raw-capture
                          :frame frame
@@ -415,7 +415,7 @@ depending on whether TEST passes."
   (:method ((instr delay-on-qubits) param-value arg-value)
     (let ((duration (ensure-instantiated (delay-duration instr)
                                          arg-value)))
-      (if (and (eq duration (delay-duration instr))
+      (if (and (constant= duration (delay-duration instr))
                (not (some #'is-formal (delay-qubits instr))))
           instr
           (make-instance 'delay-on-qubits
@@ -428,9 +428,9 @@ depending on whether TEST passes."
            (duration (ensure-instantiated (delay-duration instr)
                                           arg-value))
            (frames (mapcar (flag-on-update remake
-                                           (lambda (f) (instantiate-frame f arg-value))) 
+                                           (lambda (f) (instantiate-frame f arg-value)))
                            (delay-frames instr))))
-      (if (and (eq duration (delay-duration instr))
+      (if (and (constant= duration (delay-duration instr))
                (not remake))
           instr
           (make-instance 'delay-on-frames
