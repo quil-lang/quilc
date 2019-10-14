@@ -102,9 +102,11 @@
 
    #:qubit                              ; STRUCTURE
    #:qubit-index                        ; READER
+   #:qubit=                             ; FUNCTION
 
    #:constant                           ; STRUCTURE
    #:constant-value                     ; READER
+   #:constant=                          ; FUNCTION
 
    #:label                              ; STRUCTURE
    #:label-name                         ; ACCESSOR
@@ -112,6 +114,7 @@
    #:param                              ; STRUCTURE
    #:param-name                         ; READER
    #:is-param                           ; FUNCTION (PREDICATE)
+   #:param=                             ; FUNCTION
 
    #:memory-ref                         ; TYPE (STRUCTURE)
    #:mref                               ; FUNCTION (CONSTRUCTOR)
@@ -124,6 +127,7 @@
    #:frame                              ; STRUCTURE
    #:frame-name                         ; READER
    #:frame-qubits                       ; READER
+   #:frame=                             ; FUNCTION
 
    #:waveform-ref                       ; STRUCTURE
    #:waveform-ref-name                  ; READER

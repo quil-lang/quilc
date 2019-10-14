@@ -13,11 +13,11 @@
   "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
   (let ((actual (mapcar (a:compose #'param-name #'first)
                         (waveform-ref-parameters waveform-ref))))
-    (a:when-let ((missing (set-difference expected-parameters actual :test #'equalp)))
+    (a:when-let ((missing (set-difference expected-parameters actual :test #'param=)))
       (quil-parse-error "Expected parameter ~A in waveform ~A."
                         (first missing)
                         (waveform-ref-name waveform-ref)))
-    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'equalp)))
+    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'param=)))
       (quil-parse-error "Unexpected parameter ~A in waveform ~A. ~@
                         Expected parameters are: ~{~A~^, ~}."
                         (first unexpected)
@@ -115,7 +115,7 @@
                                            ()
                                            "All arguments must be qubits. Check type of args: ~S." args)
              (let* ((num-qubits (length args))
-                    (distinct-args (remove-duplicates args :test 'equalp))
+                    (distinct-args (remove-duplicates args :test #'qubit=))
                     (expected-qubits
                       (+ addl-qubits
                          (gate-definition-qubits-needed found-gate-defn))))
