@@ -501,12 +501,12 @@ If no exit rewiring is found, return NIL."
    (sample-rate :initarg :sample-rate
                 :initform nil
                 :reader frame-definition-sample-rate
-                :type '(or null constant)
+                :type (or null constant)
                 :documentation "The sample rate associated with the frame. If specified, this should be a positive constant.")
    (initial-frequency :initarg :initial-frequency
                       :initform nil
                       :reader frame-definition-initial-frequency
-                      :type '(or null constant)
+                      :type (or null constant)
                       :documentation "The initial frequency of the frame. If specified, this should be a positive constant.")
    (context :initarg :context
             :type lexical-context
@@ -1953,21 +1953,46 @@ For example,
 
 ;;;;;;;;;;;;;;;;;;;;;; Program Representations ;;;;;;;;;;;;;;;;;;;;;;;
 
+;;; There are two primary representations used here. The most common is the
+;;; PARSED-PROGRAM representation, which is produced by PARSE-QUIL. In almost
+;;; all cases, the instructions in a PARSED-PROGRAM are resolved (e.g.
+;;; applications are associated with the corresponding definition of the gate or
+;;; circuit which is to be applied, cf. RESOLVE-OBJECTS for more info). The one
+;;; exception to this is in the object resolution pass itself, where it is
+;;; convenient to work with PARSED-PROGRAM objects.
+;;;
+;;; The other representation, used only by the frontend, is "raw quil", which is
+;;; simply a list of AST objects.
+
 (defclass parsed-program (transformable)
   ((gate-definitions :initarg :gate-definitions
-                     :accessor parsed-program-gate-definitions)
+                     :accessor parsed-program-gate-definitions
+                     :type list
+                     :documentation "The gate definitions introduced by DEFGATE.")
    (circuit-definitions :initarg :circuit-definitions
-                        :accessor parsed-program-circuit-definitions)
+                        :accessor parsed-program-circuit-definitions
+                        :type list
+                        :documentation "The circuit definitions introduced by DEFCIRCUIT.")
    (waveform-definitions :initarg :waveform-definitions
-                         :accessor parsed-program-waveform-definitions)
+                         :accessor parsed-program-waveform-definitions
+                         :type list
+                         :documentation "The waveform definitions introduced by DEFWAVEFORM.")
    (calibration-definitions :initarg :calibration-definitions
-                            :accessor parsed-program-calibration-definitions)
+                            :accessor parsed-program-calibration-definitions
+                            :type list
+                            :documentation "The calibration definitions introduced by DEFCAL.")
    (frame-definitions :initarg :frame-definitions
-                      :accessor parsed-program-frame-definitions)
+                      :accessor parsed-program-frame-definitions
+                      :type list
+                      :documentation "The frame definitions introduced by DEFFRAME.")
    (memory-definitions :initarg :memory-definitions
-                       :accessor parsed-program-memory-definitions)
+                       :accessor parsed-program-memory-definitions
+                       :type list
+                       :documentation "The memory definitions introduced by DECLARE.")
    (executable-program :initarg :executable-code
-                       :accessor parsed-program-executable-code))
+                       :accessor parsed-program-executable-code
+                       :type (vector instruction)
+                       :documentation "A vector of executable Quil instructions."))
   (:default-initargs
    :gate-definitions nil
    :circuit-definitions nil
@@ -1975,7 +2000,8 @@ For example,
    :calibration-definitions nil
    :frame-definitions nil
    :memory-definitions nil
-   :executable-code #()))
+   :executable-code #())
+  (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
