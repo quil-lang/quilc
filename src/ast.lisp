@@ -1,6 +1,11 @@
 ;;;; src/ast.lisp
 ;;;;
-;;;; Author: Robert Smith
+;;;; Authors: Robert Smith
+;;;           Erik Davis
+
+;;; NOTE: In what follows, Quilt objects, or routines for manipulating them,
+;;; will be marked as such by a comment preceding their definition. If a
+;;; definition is unmarked, it is associated with "vanilla" Quil. Yum!
 
 (in-package #:cl-quil)
 
@@ -161,6 +166,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
     (setf (delayed-expression-params c) (mapcar f (delayed-expression-params de)))
     c))
 
+;;; Quilt
 (defstruct (frame (:constructor frame (qubits name)))
   "A reference to a Quilt rotating frame, relative to which control or readout waveforms may be defined."
   (name nil :read-only t :type string)
@@ -168,16 +174,19 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   ;; Will later be resolved
   (name-resolution nil :type (or null frame-definition)))
 
+;;; Quilt
 (defun frame= (a b)
   (and (string= (frame-name a) (frame-name b))
        (list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
+;;; Quilt
 (defun frame-hash (f)
   #+sbcl
   (sb-int:mix (sxhash (frame-name f)) (sxhash (frame-qubits f)))
   #-sbcl
   (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
 
+;;; Quilt
 (defstruct (waveform-ref (:constructor %waveform-ref (name parameter-alist)))
   "An reference to a (possibly parametric) Quilt waveform."
   (name nil :read-only t :type string)
@@ -188,6 +197,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                                  standard-waveform
                                  waveform-definition)))
 
+;;; Quilt
 (defun waveform-ref (name &rest plist)
   "Construct a waveform reference with keyword-value pairs given by PLIST."
   (unless (evenp (length plist))
@@ -197,9 +207,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                        :while val
                        :collect (list name val))))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; QuilT Waveforms ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;;; Quilt
 (defclass standard-waveform ()
   ((duration :initarg :duration
              :reader waveform-duration
@@ -535,16 +543,19 @@ If no exit rewiring is found, return NIL."
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified Quilt waveform definition."))
 
+;;; Quilt
 (defclass static-waveform-definition (waveform-definition)
   ()
   (:documentation "A waveform definition that has no parameters."))
 
+;;; Quilt
 (defclass parameterized-waveform-definition (waveform-definition)
   ((parameters :initarg :parameters
                :reader waveform-definition-parameters
                :documentation "A list of symbol parameter names."))
   (:documentation "A waveform definition that has named parameters."))
 
+;;; Quilt
 (defun make-waveform-definition (name parameters entries sample-rate &key context)
   (check-type name string)
   (check-type parameters symbol-list)
@@ -575,6 +586,7 @@ If no exit rewiring is found, return NIL."
   (:metaclass abstract-class)
   (:documentation "A representation of a user-specified calibration."))
 
+;;; Quilt
 (defclass gate-calibration-definition (calibration-definition)
   ((operator :initarg :operator
              :reader calibration-definition-operator
@@ -590,6 +602,7 @@ If no exit rewiring is found, return NIL."
               :documentation "The arguments of the gate calibration."))
   (:documentation "A representation of a user-specified gate calibration."))
 
+;;; Quilt
 (defclass measurement-calibration-definition (calibration-definition)
   ((qubit :initarg :qubit
           :reader measurement-calibration-qubit
@@ -598,6 +611,7 @@ If no exit rewiring is found, return NIL."
   (:metaclass abstract-class)
   (:documentation "Superclass to measurement calibration definitions."))
 
+;;; Quilt
 (defclass measure-calibration-definition (measurement-calibration-definition)
   ((address :initarg :address
             :reader measure-calibration-address
@@ -605,6 +619,7 @@ If no exit rewiring is found, return NIL."
             :documentation "The classical memory destination for measured values."))
   (:documentation "A representation of a user-specified MEASURE calibration."))
 
+;;; Quilt
 (defclass measure-discard-calibration-definition (measurement-calibration-definition)
   ()
   (:documentation "A representation of a user-specifieed MEASURE (discard) calibration."))
@@ -723,6 +738,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   (:documentation "An instruction representing the mutation of a frame attribute.")
   (:metaclass abstract-class))
 
+;;; Quilt
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun expand-simple-frame-mutation-definition (name mnemonic docstring)
     (check-type name symbol)
@@ -734,27 +750,34 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 
        (defmethod mnemonic ((inst ,name)) (values ,mnemonic ',name)))))
 
+;;; Quilt
 (defmethod arguments ((instr simple-frame-mutation))
   (with-slots (qubits frame value)
       instr
     (vector frame value)))
 
+;;; Quilt
 (defmacro define-simple-frame-mutation (name mnemonic &body body)
   (assert (= 1 (length body)))
   (expand-simple-frame-mutation-definition name mnemonic (first body)))
 
+;;; Quilt
 (define-simple-frame-mutation set-frequency "SET-FREQUENCY"
   "An instruction setting the frequency of a frame.")
 
+;;; Quilt
 (define-simple-frame-mutation set-phase "SET-PHASE"
   "An instruction setting the phase of a frame.")
 
+;;; Quilt
 (define-simple-frame-mutation shift-phase "SHIFT-PHASE"
   "An instruction performing an additive shift of the phase of a frame.")
 
+;;; Quilt
 (define-simple-frame-mutation set-scale "SET-SCALE"
   "An instruction setting the scale of a frame.")
 
+;;; Quilt
 (defclass swap-phase (instruction)
   ((left-frame :initarg :left-frame
                :accessor swap-phase-left-frame)
@@ -780,6 +803,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
                 :documentation "A flag indicating whether the pulse blocks frames sharing a qubit with the PULSE-FRAME."))
   (:documentation "A pulse instruction."))
 
+;;; Quilt
 (defclass capture (instruction)
   ((frame :initarg :frame
           :accessor capture-frame
@@ -799,6 +823,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
                 :documentation "A flag indicating whether the capture blocks frames sharing a qubit with the CAPTURE-FRAME."))
   (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
+;;; Quil
 (defclass raw-capture (instruction)
   ((frame :initarg :frame
           :accessor raw-capture-frame
@@ -819,6 +844,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
                 :documentation "A flag indicating whether the raw capture blocks frames sharing a qubit with the RAW-CAPTURE-FRAME."))
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
+;;; Quilt
 (defclass delay (instruction)
   ((duration :initarg :duration
              :accessor delay-duration
@@ -827,18 +853,21 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
   (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
 
+;;; Quilt
 (defclass delay-on-frames (delay)
   ((delayed-frames :initarg :frames
                    :accessor delay-frames
                    :type list
                    :documentation "A list of frames which should be delayed.")))
 
+;;; Quilt
 (defclass delay-on-qubits (delay)
   ((qubits :initarg :qubits
            :accessor delay-qubits
            :type list
            :documentation "A list of qubits. Any frame on these qubits will be delayed.")))
 
+;;; Quilt
 (defclass fence (instruction)
   ((qubits :initarg :qubits
            :accessor fence-qubits
@@ -1683,11 +1712,13 @@ For example,
                   (print-instruction expr stream)))))
       (print-delayed-expression (delayed-expression-expression thing) stream)))
 
+  ;;; Quilt
   (:method ((thing frame) (stream stream))
     (format stream "~{~/quil:instruction-fmt/ ~}\"~A\""
             (frame-qubits thing)
             (frame-name thing)))
 
+  ;;; Quilt
   (:method ((thing waveform-ref) (stream stream))
     (format stream "~A~@[(~{~A~^, ~})~]"
             (waveform-ref-name thing))
@@ -1715,22 +1746,26 @@ For example,
   (:method ((instr no-operation) (stream stream))
     (format stream "NOP"))
 
+  ;;; Quilt
   (:method  ((instr simple-frame-mutation) (stream stream))
     (format stream "~A" (mnemonic instr))
     (loop :for arg :across (arguments instr)
           :do (format stream " ~/quil:instruction-fmt/" arg)))
 
+  ;;; Quilt
   (:method ((instr swap-phase) (stream stream))
     (format stream "SWAP-PHASE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (swap-phase-left-frame instr)
             (swap-phase-right-frame instr)))
 
+  ;;; Quilt
   (:method ((instr pulse) (stream stream))
     (format stream "~@[NONBLOCKING ~]PULSE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
             (pulse-frame instr)
             (pulse-waveform instr)))
 
+  ;;; Quilt
   (:method ((instr capture) (stream stream))
     (format stream "~@[NONBLOCKING ~]CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
@@ -1738,6 +1773,7 @@ For example,
             (capture-waveform instr)
             (capture-memory-ref instr)))
 
+  ;;; Quilt
   (:method ((instr raw-capture) (stream stream))
     (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
@@ -1745,15 +1781,18 @@ For example,
             (raw-capture-duration instr)
             (raw-capture-memory-ref instr)))
 
+  ;;; Quilt
   (:method ((instr fence) (stream stream))
     (format stream "FENCE~{ ~/quil:instruction-fmt/~}"
             (fence-qubits instr)))
 
+  ;;; Quilt
   (:method ((instr delay-on-qubits) (stream stream))
     (format stream "DELAY~{ ~/quil:instruction-fmt/~} ~/quil:instruction-fmt/"
             (delay-qubits instr)
             (delay-duration instr)))
 
+  ;;; Quilt
   (:method ((instr delay-on-frames) (stream stream))
     (let* ((frames (delay-frames instr))
            (qubits (frame-qubits (first frames))))
@@ -1886,6 +1925,7 @@ For example,
                                 :prefix "    ")
     (terpri stream))
 
+  ;;; Quilt
   (:method ((defn frame-definition) (stream stream))
     (let ((sample-rate (frame-definition-sample-rate defn))
           (frequency (frame-definition-initial-frequency defn)))
@@ -1901,6 +1941,7 @@ For example,
                 frequency))
       (terpri stream)))
 
+  ;;; Quilt
   (:method ((defn waveform-definition) (stream stream))
     (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~]:~%"
             (waveform-definition-name defn)
@@ -1917,6 +1958,7 @@ For example,
                            (print-instruction (make-delayed-expression nil nil z) s)))))
                     (waveform-definition-entries defn))))
 
+  ;;; Quilt
   (:method ((defn gate-calibration-definition) (stream stream))
     (format stream "DEFCAL ")
     (print-operator-description (calibration-definition-operator defn) stream)
@@ -1932,6 +1974,7 @@ For example,
                                 :prefix "    ")
     (terpri stream))
 
+  ;;; Quilt
   (:method ((defn measure-calibration-definition) (stream stream))
     (format stream "DEFCAL MEASURE")
     (unless (endp (calibration-definition-arguments defn))
