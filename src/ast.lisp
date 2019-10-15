@@ -1720,8 +1720,7 @@ For example,
 
   ;;; Quilt
   (:method ((thing waveform-ref) (stream stream))
-    (format stream "~A~@[(~{~A~^, ~})~]"
-            (waveform-ref-name thing))
+    (format stream "~A" (waveform-ref-name thing))
     (when (not (endp (waveform-ref-parameter-alist thing)))
       (format stream "(")
       (loop :for (param . value) :in param-alist
