@@ -1,2 +1,4 @@
 DEFCAL RZ(%theta) 1:
     SHIFT-PHASE 1 "xy" %theta
+
+HALT
