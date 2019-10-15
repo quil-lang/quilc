@@ -1345,7 +1345,8 @@ In accordance with the typical usage here, there are two values returned: the re
   (loop :with parsed-body := nil :do
     ;; Reached EOF
     (when (null tok-lines)
-      (warn "Reached end of file when parsing indented body.")
+      ;; EOF is implicit :DEDENT. This is useful for, say, concatenating on
+      ;; DEFCALs at the end of a program
       (return-from parse-indented-body
         (values (make-body (nreverse parsed-body))
                 tok-lines)))
