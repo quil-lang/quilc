@@ -430,7 +430,7 @@ If no exit rewiring is found, return NIL."
   "Create the permutation (list of natural numbers) that represents the input matrix ENTRIES. Return nil if ENTRIES cannot be represented as a permutation."
   (let* ((n (isqrt (length entries)))
          (perm (make-list n)))
-     (dotimes (i n perm)
+    (dotimes (i n perm)
       (let ((found-one nil))
         (dotimes (j n)
           (case (pop entries)
@@ -451,10 +451,10 @@ If no exit rewiring is found, return NIL."
   (check-type parameters symbol-list)
   (if parameters
       (make-instance 'parameterized-gate-definition
-                    :name name
-                    :parameters parameters
-                    :entries entries
-                    :context context)
+                     :name name
+                     :parameters parameters
+                     :entries entries
+                     :context context)
       (a:if-let ((perm (permutation-from-gate-entries entries)))
         (make-instance 'permutation-gate-definition
                        :name name

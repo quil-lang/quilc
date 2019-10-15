@@ -318,7 +318,7 @@ the immediately preceding line."
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
 
 (defun disappointing-token-error (found-token expected-msg)
-  (quil-parse-error "Expected ~A~@[ in ~A~], but observed a token ~A with value ~A"
+  (quil-parse-error "Expected ~A~@[ in ~A~], but observed a token ~A with value ~A."
                     expected-msg
                     *parse-context*
                     (token-type found-token)

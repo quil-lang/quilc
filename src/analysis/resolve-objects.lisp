@@ -88,7 +88,7 @@
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
-                    (format nil "Error in resolving ~/quil:instruction-fmt/: ~a"
+                    (format nil "Error in resolving ~/quil:instruction-fmt/: ~a."
                             instr
                             ,datum)
                     ,@arguments)))
@@ -190,7 +190,7 @@
     instr))
 
 (defun resolve-objects (unresolved-program)
-  "Perform all object resolution within the list RAW-QUIL, returning a PARSED-PROGRAM."
+  "Perform all object resolution within UNRESOLVED-PROGRAM, returning a PARSED-PROGRAM."
   ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
   ;; we need to also resolve waveform and frame references.
 

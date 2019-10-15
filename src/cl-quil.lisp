@@ -83,7 +83,7 @@
       (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
 (defun raw-quil-to-unresolved-program (code)
-  "This constructes a PARSED-PROGRAM object from the given quil CODE, without any resolution of applications.
+  "This constructs a PARSED-PROGRAM object from the given quil CODE, without any resolution of applications.
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: the processing below preserves the order of definitions.

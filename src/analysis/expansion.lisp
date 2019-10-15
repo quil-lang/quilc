@@ -83,7 +83,7 @@
                                                   (measure-calibration-address defn))
                                             (calibration-definition-body defn)))
     (measure-discard-calibration-definition (values nil
-                                                    (list (measurement-calibration-qubit defn))1
+                                                    (list (measurement-calibration-qubit defn))
                                                     (calibration-definition-body defn)))))
 
 (defun instantiate-definition (defn params args)
@@ -157,8 +157,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
      t)))
 
 (defun transform-if (test transform)
-  "Given a unary function TRANSFORM, return a new function which either applies TRANSFORM or does not,
-depending on whether TEST passes."
+  "Given a unary function TRANSFORM, return a new function which either applies TRANSFORM or does not, depending on whether TEST passes."
   (lambda (obj)
     (if (funcall test obj)
         (funcall transform obj)

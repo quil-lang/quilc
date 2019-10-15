@@ -38,7 +38,7 @@
   (when (and (typep mref 'memory-ref)
              (not (plusp (mref-available-length mref
                                                 memory-descriptor))))
-    (quil-type-error "Memory ref \"~/quil:instruction-fmt/\" exceeds region size ~A"
+    (quil-type-error "Memory ref \"~/quil:instruction-fmt/\" exceeds region size ~A."
                      mref
                      (memory-descriptor-length memory-descriptor))))
 
@@ -358,7 +358,7 @@
              t))
         (_
          (quil-type-error "CAPTURE instruction target must be of type ~
-                           REAL, but got ~/quil:instruction-fmt/ of type ~A"
+                           REAL, but got ~/quil:instruction-fmt/ of type ~A."
                           mref
                           (quil-type-string (memory-descriptor-type mdesc)))))))
 
@@ -381,7 +381,7 @@
                  (frame-definition-frame frame-defn))))
         (_
          (quil-type-error "RAW-CAPTURE instruction target must be of type ~
-                           REAL, but got ~/quil:instruction-fmt/ of type ~A"
+                           REAL, but got ~/quil:instruction-fmt/ of type ~A."
                           mref
                           (quil-type-string (memory-descriptor-type mdesc)))))))
 

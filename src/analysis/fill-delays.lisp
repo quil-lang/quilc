@@ -46,7 +46,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     ((or pulse capture)
      (waveform-active-duration (resolved-waveform instr)))
     (delay
-      (constant-value (delay-duration instr)))
+     (constant-value (delay-duration instr)))
     (raw-capture
      (constant-value (raw-capture-duration instr)))
     (simple-frame-mutation
@@ -63,7 +63,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
      (raw-capture (raw-capture-frame instr))
      (delay-on-frames (delay-frames instr))
      (simple-frame-mutation (frame-mutation-target-frame instr))
-     (swap-phase (swap-phase-left-frame instr) (swap-phase-right-frame instr))
+     (swap-phase (list (swap-phase-left-frame instr) (swap-phase-right-frame instr)))
      ;; delay affects all frames on precisely the delay qubits
      (delay-on-qubits
       (loop :for defn :in (parsed-program-frame-definitions parsed-program)
@@ -200,7 +200,7 @@ If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so t
 
     (flet ((process-instr (instr)
              (unless (typep instr 'simple-quilt-instruction)
-               (quil-parse-error "Cannot resolve timing information for non-quilt instruction ~A" instr))
+               (quil-parse-error "Cannot resolve timing information for non-quilt instruction ~A." instr))
              ;; Synchronization is not needed with DELAYs
              (unless (and omit-fences (typep instr 'fence))
                (push instr new-instrs))
