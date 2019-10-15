@@ -619,7 +619,7 @@ Return the following values:
     (when (slot-boundp blk 'outgoing)
       (adt:match outgoing-edge (outgoing blk)
         ((conditional-edge instr _ _)
-         (format s "\\nConditioned on ~a" (print-instruction instr nil))
+         (format s "\\nConditioned on ~/quil:instruction-fmt/" instr)
          (format s "\\l"))
         (_ nil)))))
 

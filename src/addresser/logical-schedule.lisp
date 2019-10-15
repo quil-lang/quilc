@@ -193,18 +193,18 @@
 (defun print-lschedule (lschedule &optional (stream *standard-output*))
   (format stream "First instructions:~%")
   (dolist (instr (lscheduler-first-instrs lschedule))
-    (format stream "    ~a~%"
-            (print-instruction instr nil)))
+    (format stream "    ~/quil:instruction-fmt/~%" instr))
   (format stream "Last instructions:~%")
   (dolist (instr (lscheduler-last-instrs lschedule))
-    (format stream "    ~a~%"
-            (print-instruction instr nil)))
+    (format stream "    ~/quil:instruction-fmt/~%" instr))
   (dohash ((key val) (lscheduler-later-instrs lschedule))
-    (format stream "Instrs beneath ~a: ~{~a~^, ~}~%" (print-instruction key nil)
-            (mapcar (lambda (i) (print-instruction i nil)) val)))
+    (format stream "Instrs beneath ~/quil:instruction-fmt/: ~{~/quil:instruction-fmt/~^, ~}~%"
+            key
+            val))
   (dohash ((key val) (lscheduler-earlier-instrs lschedule))
-    (format stream "Instrs above ~a: ~{~a~^, ~}~%" (print-instruction key nil)
-            (mapcar (lambda (i) (print-instruction i nil)) val))))
+    (format stream "Instrs above ~/quil:instruction-fmt/: ~{~/quil:instruction-fmt/~^, ~}~%"
+            key
+            val)))
 
 ;;;
 ;;; routines for incrementally forming a logical-scheduler object
@@ -604,8 +604,8 @@ mapping instructions to their tags. "
            (fidelity-bumper (instr value)
              (flet ((warn-and-skip (instr)
                       (format *compiler-noise-stream*
-                              "Fidelity not known for the following gate: ~a. Assuming ideal.~%"
-                              (print-instruction instr nil))
+                              "Fidelity not known for the following gate: ~/quil:instruction-fmt/. Assuming ideal.~%"
+                              instr)
                       (return-from fidelity-bumper value)))
                (let (fidelity)
                  (typecase instr

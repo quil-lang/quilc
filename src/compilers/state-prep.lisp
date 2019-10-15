@@ -25,11 +25,10 @@
   nil)
 
 (defmethod print-instruction-generic ((thing state-prep-application) (s stream))
-  (format s "STATE-PREP[(~{~5$~^, ~}) -> (~{~5$~^, ~})] ~{~a~^ ~}"
+  (format s "STATE-PREP[(~{~5$~^, ~}) -> (~{~5$~^, ~})] ~{~/quil:instruction-fmt/~^ ~}"
           (coerce (state-prep-application-source-wf thing) 'list)
           (coerce (state-prep-application-target-wf thing) 'list)
-          (mapcar (lambda (arg) (print-instruction arg nil))
-                  (application-arguments thing))))
+          (application-arguments thing)))
 
 
 ;; first we do base case work.

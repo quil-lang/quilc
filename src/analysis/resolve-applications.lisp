@@ -88,8 +88,8 @@ This also signals ambiguous definitions, which may be handled as needed."
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
-                    (format nil "Error in resolving ~s: ~a"
-                            (print-instruction app nil)
+                    (format nil "Error in resolving ~/quil:instruction-fmt/: ~a"
+                            app
                             ,datum)
                     ,@arguments)))
       (let* ((operator (application-operator app))
