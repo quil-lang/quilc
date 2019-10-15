@@ -419,6 +419,6 @@ touch any qubits marked as dead in CHIP-SPECIFICATION."
                                                        dead-qubits)))
                   (assert (endp instr-dead-qubits)
                           nil
-                          "Program instruction '~A' attempts to use illegal qubits: ~{~A~^, ~}. Illegal qubits on this QPU: ~{~A~^, ~}."
-                          (print-instruction instr nil) instr-dead-qubits dead-qubits))))))
+                          "Program instruction '~/quil:instruction-fmt/' attempts to use illegal qubits: ~{~A~^, ~}. Illegal qubits on this QPU: ~{~A~^, ~}."
+                          instr instr-dead-qubits dead-qubits))))))
 

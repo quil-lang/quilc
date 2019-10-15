@@ -1334,7 +1334,7 @@ For example,
     (format stream "RESET"))
 
   (:method ((instr reset-qubit) stream)
-    (format stream "RESET ~a" (print-instruction (reset-qubit-target instr) nil)))
+    (format stream "RESET ~/quil:instruction-fmt/" (reset-qubit-target instr)))
 
   (:method ((instr wait) (stream stream))
     (format stream "WAIT"))
@@ -1343,9 +1343,10 @@ For example,
     (format stream "NOP"))
 
   (:method ((instr classical-instruction) (stream stream))
-    (format stream "~A~{ ~A~}"
-            (mnemonic instr)
-            (map 'list #'print-instruction-to-string (arguments instr))))
+    (format stream "~A"
+            (mnemonic instr))
+    (loop :for arg :across (arguments instr)
+          :do (format stream " ~/quil:instruction-fmt/" arg)))
 
   (:method ((instr pragma) (stream stream))
     (format stream "PRAGMA ~{~A~^ ~}~@[ ~S~]"
@@ -1353,8 +1354,8 @@ For example,
             (pragma-freeform-string instr)))
 
   (:method ((instr jump-target) (stream stream))
-    (format stream "LABEL ~a"
-            (print-instruction (jump-target-label instr) nil)))
+    (format stream "LABEL ~/quil:instruction-fmt/"
+            (jump-target-label instr)))
 
   (:method ((instr jump) (stream stream))
     (let ((l (jump-label instr)))
@@ -1362,49 +1363,47 @@ For example,
         ((integerp l)
          (format stream "JUMP {absolute address ~D}" l))
         (t
-         (format stream "JUMP ~a"
-                 (print-instruction (jump-label instr) nil))))))
+         (format stream "JUMP ~/quil:instruction-fmt/"
+                 (jump-label instr))))))
 
   (:method ((instr jump-when) (stream stream))
     (let ((l (jump-label instr)))
       (cond
         ((integerp l)
-         (format stream "JUMP-WHEN {absolute address ~D} ~a"
+         (format stream "JUMP-WHEN {absolute address ~D} ~/quil:instruction-fmt/"
                  l
-                 (print-instruction (conditional-jump-address instr) nil)))
+                 (conditional-jump-address instr)))
         (t
-         (format stream "JUMP-WHEN ~a ~a"
-                 (print-instruction (jump-label instr) nil)
-                 (print-instruction (conditional-jump-address instr) nil))))))
+         (format stream "JUMP-WHEN ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+                 (jump-label instr)
+                 (conditional-jump-address instr))))))
 
   (:method ((instr jump-unless) (stream stream))
     (let ((l (jump-label instr)))
       (cond
         ((integerp l)
-         (format stream "JUMP-UNLESS {absolute address ~D} ~a"
+         (format stream "JUMP-UNLESS {absolute address ~D} ~/quil:instruction-fmt/"
                  l
-                 (print-instruction (conditional-jump-address instr) nil)))
+                 (conditional-jump-address instr)))
         (t
-         (format stream "JUMP-UNLESS ~a ~a"
-                 (print-instruction (jump-label instr) nil)
-                 (print-instruction (conditional-jump-address instr) nil))))))
+         (format stream "JUMP-UNLESS ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+                 (jump-label instr)
+                 (conditional-jump-address instr))))))
 
   (:method ((instr measure) (stream stream))
-    (format stream "MEASURE ~a ~a"
-            (print-instruction (measurement-qubit instr) nil)
-            (print-instruction (measure-address instr) nil)))
+    (format stream "MEASURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+            (measurement-qubit instr)
+            (measure-address instr)))
 
   (:method ((instr measure-discard) (stream stream))
-    (format stream "MEASURE ~a"
-            (print-instruction (measurement-qubit instr) nil)))
+    (format stream "MEASURE ~/quil:instruction-fmt/"
+            (measurement-qubit instr)))
 
   (:method ((instr application) (stream stream))
     (print-operator-description (application-operator instr) stream)
-    (format stream "~@[(~{~a~^, ~})~]~{ ~a~}"
-            (mapcar (lambda (thing) (print-instruction thing nil))
-                    (application-parameters instr))
-            (mapcar (lambda (thing) (print-instruction thing nil))
-                    (application-arguments instr))))
+    (format stream "~@[(~{~/quil:instruction-fmt/~^, ~})~]~{ ~/quil:instruction-fmt/~}"
+            (application-parameters instr)
+            (application-arguments instr)))
 
   ;; The following are not actually instructions, but who cares.
   (:method ((gate matrix-gate-definition) (stream stream))
@@ -1533,11 +1532,11 @@ Examples:
     (format s "DEFCIRCUIT ~a"
             (circuit-definition-name circuit-defn))
     (unless (endp (circuit-definition-parameters circuit-defn))
-      (format s "(~{~a~^, ~})" (mapcar (lambda (thing) (print-instruction thing nil))
-                                       (circuit-definition-parameters circuit-defn))))
+      (format s "(~{~/quil:instruction-fmt/~^, ~})"
+              (circuit-definition-parameters circuit-defn)))
     (unless (endp (circuit-definition-arguments circuit-defn))
-      (format s "~{ ~a~}" (mapcar (lambda (thing) (print-instruction thing nil))
-                                  (circuit-definition-arguments circuit-defn))))
+      (format s "~{ ~/quil:instruction-fmt/~}"
+              (circuit-definition-arguments circuit-defn)))
     (format s ":~%")
     (print-instruction-sequence (circuit-definition-body circuit-defn)
                                 :stream s

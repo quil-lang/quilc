@@ -127,8 +127,8 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
             (circuit-definition-body (circuit-application-definition instr))))
     (unresolved-application
      (unless *allow-unresolved-applications*
-       (error "Unable to determine if the unresolved application is unitary:~%    ~A"
-              (print-instruction instr nil)))
+       (error "Unable to determine if the unresolved application is unitary:~%    ~/quil:instruction-fmt/"
+              instr))
      t)))
 
 (defgeneric instantiate-instruction (instr param-value arg-value)
@@ -149,8 +149,8 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
                                               args)))
              (dolist (instr instrs)
                (unless (unitary-instruction-p instr)
-                 (error "DAGGER cannot be applied to the impure instruction ~S"
-                        (print-instruction instr nil)))
+                 (error "DAGGER cannot be applied to the impure instruction ~/quil:instruction-fmt/"
+                        instr))
                (setf (application-operator instr)
                      (involutive-dagger-operator (application-operator instr))))
              ;; The Hermitian transpose reverses the order of operator
@@ -161,8 +161,8 @@ explicitly allowed by setting *ALLOW-UNRESOLVED-APPLICATIONS* to T."
                                 params
                                 args))
           (t
-           (error "Unable to instantiate the modifiers in the complex instruction ~S."
-                  (print-instruction instr nil)))))))
+           (error "Unable to instantiate the modifiers in the complex instruction ~/quil:instruction-fmt/."
+                  instr))))))
 
   (:method ((instr application) param-value arg-value)
     (let ((remake nil))
