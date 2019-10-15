@@ -70,7 +70,7 @@
       (mapcar #'relabel-instruction quil-block))))
 
 (defun destructure-definition (defn)
-  "Given a quilt definition DEFN, return three values: a list of the parameters, a list of the formal arguments, and the definition body."
+  "Given a Quilt definition DEFN, return three values: a list of the parameters, a list of the formal arguments, and the definition body."
   (etypecase defn
     (circuit-definition (values (circuit-definition-parameters defn)
                                 (circuit-definition-arguments defn)

@@ -78,7 +78,7 @@
         (measure-discard-calibrations nil))
     (dolist (defn (parsed-program-calibration-definitions parsed-program))
       ;; Assuming that the calibration definitions are in the same order
-      ;; as their position in the quilt program, this will put them in
+      ;; as their position in the Quilt program, this will put them in
       ;; reverse order.
       (etypecase defn
         (gate-calibration-definition

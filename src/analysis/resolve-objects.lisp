@@ -191,7 +191,7 @@
 
 (defun resolve-objects (unresolved-program)
   "Perform all object resolution within UNRESOLVED-PROGRAM, returning a PARSED-PROGRAM."
-  ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For quilt,
+  ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For Quilt,
   ;; we need to also resolve waveform and frame references.
 
   ;; NOTE: Some frames within calibration bodies cannot be resolved here (e.g.

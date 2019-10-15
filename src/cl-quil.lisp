@@ -11,19 +11,19 @@
 
 (defvar *standard-quilt-transforms*
   '(expand-circuits expand-calibrations type-check)
-  "The standard transforms for using PARSE-QUIL with quilt code.")
+  "The standard transforms for using PARSE-QUIL with Quilt code.")
 
 ;;; As part of parsing, we need to handle the case when two definitions seem to
 ;;; conflict. The approach taken here is to map definitions to signatures, with
 ;;; two signatures EQUALP if there is a context in which both definitions would
 ;;; be applicable. This ranges from quite simple in the case of memory
 ;;; definitions (where the basic check is whether the region names are equal),
-;;; to a bit more involved for quilt calibrations (where applicability is
+;;; to a bit more involved for Quilt calibrations (where applicability is
 ;;; generally determined by a pattern matching system, and so we have to
 ;;; consider the arity and values of parameters and arguments).
 
 (defun definition-signature (instr)
-  "Computes a signature for a quil definition such that if two definitions are equivalent for the purposes of name resolution, then their signatures are EQUALP."
+  "Computes a signature for a Quil definition such that if two definitions are equivalent for the purposes of name resolution, then their signatures are EQUALP."
   (flet ((canonicalize-params-args (obj)
            (cond ((is-param obj)
                   'param)
@@ -83,7 +83,7 @@
       (memory-descriptor (make-condition 'ambiguous-memory-declaration :conflicts combined)))))
 
 (defun raw-quil-to-unresolved-program (code)
-  "This constructs a PARSED-PROGRAM object from the given quil CODE, without any resolution of applications.
+  "This constructs a PARSED-PROGRAM object from the given Quil CODE, without any resolution of applications.
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: the processing below preserves the order of definitions.

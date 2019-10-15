@@ -1,7 +1,7 @@
 (in-package :cl-quil)
 
 (define-transform fill-delays (fill-delays)
-  "This transform fills empty time on quilt frames with explicit DELAY instructions in a greedy fashion."
+  "This transform fills empty time on Quilt frames with explicit DELAY instructions in a greedy fashion."
   expand-calibrations
   resolve-waveform-references)
 
@@ -41,7 +41,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   "A numerical value representing the duration of seemingly instantenous operations, in seconds. This might be zero, and it might not be!")
 
 (defun quilt-instruction-duration (instr)
-  "Get the duration of the specified quilt instruction INSTR if it is well defined, or NIL otherwise."
+  "Get the duration of the specified Quilt instruction INSTR if it is well defined, or NIL otherwise."
   (typecase instr
     ((or pulse capture)
      (waveform-active-duration (resolved-waveform instr)))
@@ -187,7 +187,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
                                                  :duration (constant lag))))))))
 
 (defun fill-delays (parsed-program &key (omit-fences t) (synchronize-at-end t))
-  "Introduce any implicit DELAY instructions in the quilt program PARSED-PROGRAM.
+  "Introduce any implicit DELAY instructions in the Quilt program PARSED-PROGRAM.
 
 If OMIT-FENCE is T, then FENCE instructions will be removed from the resulting program.
 If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so that each frame has the same total duration."
@@ -200,7 +200,7 @@ If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so t
 
     (flet ((process-instr (instr)
              (unless (typep instr 'simple-quilt-instruction)
-               (quil-parse-error "Cannot resolve timing information for non-quilt instruction ~A." instr))
+               (quil-parse-error "Cannot resolve timing information for non-Quilt instruction ~/quil:instruction-fmt/." instr))
              ;; Synchronization is not needed with DELAYs
              (unless (and omit-fences (typep instr 'fence))
                (push instr new-instrs))
