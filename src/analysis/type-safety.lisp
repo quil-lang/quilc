@@ -352,14 +352,14 @@
       (adt:match quil-type (memory-descriptor-type mdesc)
         (quil-real
          (if (> 2 (mref-available-length mref mdesc))
-             (quil-type-error "CAPTURE instruction target ~A must be a REAL ~
+             (quil-type-error "CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
                                vector of length no less than 2."
-                              (print-instruction-to-string mref))
+                              mref)
              t))
         (_
          (quil-type-error "CAPTURE instruction target must be of type ~
-                           REAL, but got ~A of type ~A"
-                          (print-instruction-to-string mref)
+                           REAL, but got ~/quil:instruction-fmt/ of type ~A"
+                          mref
                           (quil-type-string (memory-descriptor-type mdesc)))))))
 
   ;; RAW-CAPTURE must target a REAL[n] where n is 2*(the number of iq values)
@@ -373,16 +373,16 @@
         (quil-real
          (a:if-let ((samples (raw-capture-num-real-samples instr)))
            (if (> samples (mref-available-length mref mdesc))
-               (quil-type-error "RAW-CAPTURE instruction target ~A must be a REAL ~
+               (quil-type-error "RAW-CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
                                  vector of length no less than ~A."
-                                (print-instruction-to-string mref)
+                                mref
                                 samples))
-           (warn "RAW-CAPTURE on frame ~A with unknown sample rate."
+           (warn "RAW-CAPTURE on frame ~/quil:instruction-fmt/ with unknown sample rate."
                  (frame-definition-frame frame-defn))))
         (_
          (quil-type-error "RAW-CAPTURE instruction target must be of type ~
-                           REAL, but got ~A of type ~A"
-                          (print-instruction-to-string mref)
+                           REAL, but got ~/quil:instruction-fmt/ of type ~A"
+                          mref
                           (quil-type-string (memory-descriptor-type mdesc)))))))
 
   ;; gate parameters must be REAL

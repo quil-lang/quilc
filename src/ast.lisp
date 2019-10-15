@@ -1685,17 +1685,19 @@ For example,
 
   (:method ((thing frame) (stream stream))
     (format stream "~{~/quil:instruction-fmt/ ~}\"~A\""
-            (mapcar #'print-instruction-to-string 
+            (frame-qubits thing)
             (frame-name thing)))
 
   (:method ((thing waveform-ref) (stream stream))
     (format stream "~A~@[(~{~A~^, ~})~]"
-            (waveform-ref-name thing)
-            (mapcar (lambda (name-and-value)
-                      (format nil "~A: ~A"
-                              (param-name (car name-and-value))
-                              (print-instruction-to-string (cdr name-and-value))))
-                    (waveform-ref-parameter-alist thing))))
+            (waveform-ref-name thing))
+    (when (not (endp (waveform-ref-parameter-alist thing)))
+      (format stream "(")
+      (loop :for (param . value) :in param-alist
+            :do (format stream "~A: ~/quil:instruction-fmt/"
+                        (param-name param) ; we do not want to print the leading %
+                        value))
+      (format stream ")")))
 
   ;; Actual instructions
   (:method ((instr halt) (stream stream))
@@ -1714,44 +1716,43 @@ For example,
     (format stream "NOP"))
 
   (:method  ((instr simple-frame-mutation) (stream stream))
-    (format stream "~A~{ ~A~}"
-            (mnemonic instr)
-            (map 'list #'print-instruction-to-string (arguments instr))))
+    (format stream "~A" (mnemonic instr))
+    (loop :for arg :across (arguments instr)
+          :do (format stream " ~/quil:instruction-fmt/" arg)))
 
   (:method ((instr swap-phase) (stream stream))
-    (format stream "SWAP-PHASE ~A ~A"
-            (print-instruction-to-string (swap-phase-left-frame instr))
-            (print-instruction-to-string (swap-phase-right-frame instr))))
+    (format stream "SWAP-PHASE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+            (swap-phase-left-frame instr)
+            (swap-phase-right-frame instr)))
 
   (:method ((instr pulse) (stream stream))
-    (format stream "~@[NONBLOCKING ~]PULSE ~A ~A"
+    (format stream "~@[NONBLOCKING ~]PULSE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
-            (print-instruction-to-string (pulse-frame instr))
-            (print-instruction-to-string (pulse-waveform instr))))
+            (pulse-frame instr)
+            (pulse-waveform instr)))
 
   (:method ((instr capture) (stream stream))
-    (format stream "~@[NONBLOCKING ~]CAPTURE ~A ~A ~A"
+    (format stream "~@[NONBLOCKING ~]CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
-            (print-instruction-to-string (capture-frame instr))
-            (print-instruction-to-string (capture-waveform instr))
-            (print-instruction-to-string (capture-memory-ref instr))))
+            (capture-frame instr)
+            (capture-waveform instr)
+            (capture-memory-ref instr)))
 
   (:method ((instr raw-capture) (stream stream))
-    (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~A ~A ~A"
+    (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
             (nonblocking-p instr)
-            (print-instruction-to-string (raw-capture-frame instr))
-            (print-instruction-to-string (raw-capture-duration instr))
-            (print-instruction-to-string (raw-capture-memory-ref instr))))
+            (raw-capture-frame instr)
+            (raw-capture-duration instr)
+            (raw-capture-memory-ref instr)))
 
   (:method ((instr fence) (stream stream))
-    (format stream "FENCE ~{~A ~}"
-            (mapcar #'print-instruction-to-string
-                    (fence-qubits instr))))
+    (format stream "FENCE~{ ~/quil:instruction-fmt/~}"
+            (fence-qubits instr)))
 
   (:method ((instr delay-on-qubits) (stream stream))
-    (format stream "DELAY~{ ~A~} ~A"
-            (mapcar #'print-instruction-to-string (delay-qubits instr))
-            (print-instruction-to-string (delay-duration instr))))
+    (format stream "DELAY~{ ~/quil:instruction-fmt/~} ~/quil:instruction-fmt/"
+            (delay-qubits instr)
+            (delay-duration instr)))
 
   (:method ((instr delay-on-frames) (stream stream))
     (let* ((frames (delay-frames instr))
@@ -1760,14 +1761,13 @@ For example,
       (assert (every (lambda (frame)
                        (equalp qubits (frame-qubits frame)))
                      frames))
-      (format stream "DELAY~{ ~A~}~{ ~S~} ~A"
-              (mapcar #'print-instruction-to-string qubits)
+      (format stream "DELAY~{ ~/quil:instruction-fmt/~}~{ ~S~} ~/quil:instruction-fmt/"
+              qubits
               (mapcar #'frame-name (delay-frames instr))
-              (print-instruction-to-string (delay-duration instr)))))
+              (delay-duration instr))))
 
   (:method ((instr classical-instruction) (stream stream))
-    (format stream "~A"
-            (mnemonic instr))
+    (format stream "~A" (mnemonic instr))
     (loop :for arg :across (arguments instr)
           :do (format stream " ~/quil:instruction-fmt/" arg)))
 
@@ -1875,11 +1875,11 @@ For example,
     (format stream "DEFCIRCUIT ~a"
             (circuit-definition-name defn))
     (unless (endp (circuit-definition-parameters defn))
-      (format stream "(~{~a~^, ~})" (mapcar #'print-instruction-to-string
-                                            (circuit-definition-parameters defn))))
+      (format stream "(~{~/quil:instruction-fmt/~^, ~})"
+              (circuit-definition-parameters defn)))
     (unless (endp (circuit-definition-arguments defn))
-      (format stream "~{ ~a~}" (mapcar #'print-instruction-to-string
-                                       (circuit-definition-arguments defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (circuit-definition-arguments defn)))
     (format stream ":~%")
     (print-instruction-sequence (circuit-definition-body defn)
                                 :stream stream
@@ -1894,11 +1894,11 @@ For example,
       (when (or sample-rate frequency)
         (format stream ":~%"))
       (when sample-rate
-        (format stream "    SAMPLE-RATE: ~A"
-                (print-instruction-to-string sample-rate)))
+        (format stream "    SAMPLE-RATE: ~/quil:instruction-fmt/"
+                sample-rate))
       (when frequency
-        (format stream "    INITIAL-FREQUENCY: ~A"
-                (print-instruction-to-string frequency)))
+        (format stream "    INITIAL-FREQUENCY: ~/quil:instruction-fmt/"
+                frequency))
       (terpri stream)))
 
   (:method ((defn waveform-definition) (stream stream))
@@ -1921,11 +1921,11 @@ For example,
     (format stream "DEFCAL ")
     (print-operator-description (calibration-definition-operator defn) stream)
     (unless (endp (calibration-definition-parameters defn))
-      (format stream "(~{~a~^, ~})"
-              (mapcar #'print-instruction-to-string (calibration-definition-parameters defn))))
+      (format stream "(~{~/quil:instruction-fmt/~^, ~})"
+              (calibration-definition-parameters defn)))
     (unless (endp (calibration-definition-arguments defn))
-      (format stream "~{ ~a~}"
-              (mapcar #'print-instruction-to-string (calibration-definition-arguments defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (calibration-definition-arguments defn)))
     (format stream ":~%")
     (print-instruction-sequence (calibration-definition-body defn)
                                 :stream stream
@@ -1935,11 +1935,11 @@ For example,
   (:method ((defn measure-calibration-definition) (stream stream))
     (format stream "DEFCAL MEASURE")
     (unless (endp (calibration-definition-arguments defn))
-      (format stream "~{ ~a~}"
-              (mapcar #'print-instruction-to-string (calibration-definition-arguments defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (calibration-definition-arguments defn)))
     (unless (endp (calibration-definition-parameters defn))
-      (format stream "~{ ~a~}"
-              (mapcar #'print-instruction-to-string (calibration-definition-parameters defn))))
+      (format stream "~{ ~/quil:instruction-fmt/~}"
+              (calibration-definition-parameters defn)))
     (format stream ":~%")
     (print-instruction-sequence (calibration-definition-body defn)
                                 :stream stream
