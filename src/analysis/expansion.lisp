@@ -205,7 +205,7 @@ depending on whether TEST passes."
                    (involutive-dagger-operator (application-operator instr))))
            ;; The Hermitian transpose reverses the order of operator
            ;; applications
-           (setf instrs (reverse instrs))))
+           (setf instrs (nreverse instrs))))
         ((plain-operator-p (application-operator instr))
          (instantiate-definition (circuit-application-definition instr)
                                  params
