@@ -63,21 +63,21 @@ elements to ELT-TYPE.
 "
   (when (zerop (length operator-def))
     (quil-parse-error "Malformed element list: ~
-                       Received empty string"))
+                       Received empty string."))
   (unless (char= (char operator-def 0) #\()
-    (quil-parse-error "Malformed element list: missing open parenthesis"))
+    (quil-parse-error "Malformed element list: missing open parenthesis."))
   (unless (char= (char operator-def (1- (length operator-def))) #\))
-    (quil-parse-error "Malformed element list: missing close parenthesis"))
+    (quil-parse-error "Malformed element list: missing close parenthesis."))
   (handler-case
       (let ((raw-elements (tokenize-line #'element-list-lexer operator-def)))
         (unless (= (length raw-elements) num-elements)
           (quil-parse-error "Malformed element list: ~
-			     expected ~D matrix element~:P, got ~D"
+			     expected ~D matrix element~:P, got ~D."
                             num-elements
                             (length raw-elements)))
         (mapcar (lambda (raw) (coerce raw elt-type)) raw-elements))
     (alexa:lexer-match-error (c)
-      (quil-parse-error "Lexer failure: ~A" c))))
+      (quil-parse-error "Lexer failure: ~A." c))))
 
 
 ;;;;;;;;;;;;;;;;;;;; Macroexpansion-time checking ;;;;;;;;;;;;;;;;;;;;
@@ -99,12 +99,12 @@ contains no duplicates."
          (unknown-options (set-difference provided-options
                                           *defpragma-option-keywords*)))
     (when unknown-options
-      (error "Unknown defpragma option~P:~{ ~S~}"
+      (error "Unknown defpragma option~P:~{ ~S~}."
              (length unknown-options)
              unknown-options))
     (maplist (lambda (s)
                (when (member (first s) (rest s))
-                 (error "Duplicate defpragma option: ~S" (first s))))
+                 (error "Duplicate defpragma option: ~S." (first s))))
              provided-options)
     t))
 
@@ -118,7 +118,7 @@ contains no duplicates."
                     lambda-list))
         (rest (position '&rest lambda-list)))
     (when forbidden
-      (error "Forbidden lambda list keyword~P in pragma lambda list: ~{~S~^ ~}"
+      (error "Forbidden lambda list keyword~P in pragma lambda list: ~{~S~^ ~}."
              (length forbidden) forbidden))
     (when rest
       (unless (= rest (- (length lambda-list) 2))
@@ -130,7 +130,7 @@ contains no duplicates."
   (let ((bad-names (intersection slot-names  (cons freeform-string-name
                                                    word-names))))
     (when bad-names
-      (error "Cannot share names between slots and words/freeform-string -- ~S"
+      (error "Cannot share names between slots and words/freeform-string -- ~S."
              bad-names))))
 
 
@@ -144,7 +144,7 @@ contains no duplicates."
          (name (pdef-name pdef))
          (pragma-class (pdef-class-name pdef )))
     (flet ((error-form (message)
-             `(error ,(format nil "Malformed pragma ~A -- ~A"
+             `(error ,(format nil "Malformed pragma ~A -- ~A."
                               name message))))
       (a:with-gensyms (class words freeform-string)
         `(defmethod check-pragma-arguments ((,class (eql ',pragma-class))

@@ -68,7 +68,7 @@
 
 If any of its predecessors have not been performed, return NIL and the first one found that hasn't been performed."
   (let ((descr (find-transform xform)))
-    (assert (not (null descr)) (xform) "Unknown transform ~S" xform)
+    (assert (not (null descr)) (xform) "Unknown transform ~S." xform)
     (dolist (pred (transform-description-predecessors descr)
              ;; Return T on success
              (values t nil))

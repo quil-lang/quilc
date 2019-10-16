@@ -91,7 +91,7 @@ and J-th (target) qubit."
   ((cliffords :initarg :cliffords :reader cliffords)
    (names :initarg :names :reader names)
    (inverse-names :initarg :inverse-names :reader inverse-names))
-  (:documentation "Store a gateset definition"))
+  (:documentation "Store a gateset definition."))
 
 (defun gateset= (g1 g2)
   ;; The names and other things don't matter.

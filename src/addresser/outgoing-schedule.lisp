@@ -60,7 +60,7 @@ permutation record duration."
      (chip-schedule-start-time schedule inst)))
 
 (defun chip-schedule-append (schedule inst)
-  "Append an instruction INST to the chip SCHEDULE"
+  "Append an instruction INST to the chip SCHEDULE."
   (append-instruction-to-lschedule (chip-schedule-data schedule) inst)
   (setf (chip-schedule-start-time schedule inst)
         (loop
@@ -135,5 +135,5 @@ BEFORE-INST to make use of RESOURCE."
           :while inst
           :do (remhash inst needed))
         (assert (zerop (hash-table-count needed)) ()
-                "Qubit ~a did not have a single line in ~a. Missing ~a"
+                "Qubit ~a did not have a single line in ~a. Missing ~a."
                 qubit chip-sched (a:hash-table-keys needed))))))

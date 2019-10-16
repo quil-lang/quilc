@@ -73,7 +73,7 @@ rewiring."
              (return (select-swap-by-values chip-spec link-values rewirings-tried rewiring))))
 
 (defun select-swap-path-gates (chip-spec qq-distances gates-in-waiting rewirings-tried rewiring)
-  "Search for a usable rewiring by assigning values to links"
+  "Search for a usable rewiring by assigning values to links."
   (loop
     :with n-links := (chip-spec-n-links chip-spec)
     :with link-values := (make-array n-links :initial-element 0d0)

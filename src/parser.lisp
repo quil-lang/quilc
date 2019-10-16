@@ -178,7 +178,7 @@ INPUT-STRING that triggered the condition."
       (alexa:lexer-match-error (c)
         (multiple-value-bind (context-line failing-char)
             (tokenization-failure-context string c)
-          (quil-parse-error "unexpected input text ~S in ~S"
+          (quil-parse-error "Unexpected input text ~S in ~S."
                             (string failing-char)
                             context-line))))))
 
@@ -534,7 +534,7 @@ result of BODY, and the (possibly null) list of remaining lines.
     (number (constant arg-tok))
     (param
      (unless *formal-arguments-allowed*
-       (quil-parse-error "Found formal parameter where not allowed: ~S"
+       (quil-parse-error "Found formal parameter where not allowed: ~S."
                          arg-tok))
      arg-tok)
     (token
@@ -542,7 +542,7 @@ result of BODY, and the (possibly null) list of remaining lines.
        (case type
          ((:PARAMETER)
           (unless *formal-arguments-allowed*
-            (quil-parse-error "Found formal parameter where not allowed: ~S"
+            (quil-parse-error "Found formal parameter where not allowed: ~S."
                               (token-payload arg-tok)))
           (token-payload arg-tok))
          ((:COMPLEX)
@@ -550,8 +550,8 @@ result of BODY, and the (possibly null) list of remaining lines.
          ((:INTEGER)
           (constant (coerce (token-payload arg-tok) 'double-float)))
          (otherwise
-          (quil-parse-error "Token doesn't represent a parameter where expected: ~S" arg-tok)))))
-    (t (quil-parse-error "Unexpected token type ~S: ~S"
+          (quil-parse-error "Token doesn't represent a parameter where expected: ~S." arg-tok)))))
+    (t (quil-parse-error "Unexpected token type ~S: ~S."
                          (type-of arg-tok)
                          arg-tok))))
 
@@ -564,7 +564,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                                         :test #'string=)))
        (unless (or names-memory-region-p
                    *formal-arguments-allowed*)
-         (quil-parse-error "Found formal argument where not allowed: ~S"
+         (quil-parse-error "Found formal argument where not allowed: ~S."
                            (token-payload arg-tok)))
        (if names-memory-region-p
            (mref (token-payload arg-tok) 0)
@@ -577,7 +577,7 @@ result of BODY, and the (possibly null) list of remaining lines.
      (mref (car (token-payload arg-tok))
            (cdr (token-payload arg-tok))))
     (otherwise
-     (quil-parse-error "Token doesn't represent an argument where expected: ~S" arg-tok))))
+     (quil-parse-error "Token doesn't represent an argument where expected: ~S." arg-tok))))
 
 ;; Dear reader:
 ;;
@@ -660,7 +660,7 @@ result of BODY, and the (possibly null) list of remaining lines.
       ;; Check that we are starting out with a :NAME, representing the
       ;; name of the gate or circuit.
       (unless (eql ':NAME (token-type op))
-        (quil-parse-error "Gate/circuit application needs a name. Got ~S"
+        (quil-parse-error "Gate/circuit application needs a name. Got ~S."
                           (token-type op)))
 
       ;; Check for anything following the name.
@@ -761,7 +761,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                   ;; Actual address to measure into.
                   ((eql ':AREF (token-type address))
                    (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
-                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction" (car (token-payload address))))
+                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction." (car (token-payload address))))
                    (mref (car (token-payload address))
                          (cdr (token-payload address))))
 
@@ -777,7 +777,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                    (formal (token-payload address)))
 
                   (t
-                   (quil-parse-error "Expected address after MEASURE")))))
+                   (quil-parse-error "Expected address after MEASURE.")))))
           (make-instance 'measure
                          :qubit qubit
                          :address address-obj)))))
@@ -843,16 +843,16 @@ result of BODY, and the (possibly null) list of remaining lines.
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFGATE.
         (unless (eql ':DEFGATE (token-type op))
-          (quil-parse-error "DEFGATE expected. Got ~S"
+          (quil-parse-error "DEFGATE expected. Got ~S."
                             (token-type op)))
 
         ;; Check that something is following the DEFGATE.
         (when (null params-args)
-          (quil-parse-error "Expected more after DEFGATE token"))
+          (quil-parse-error "Expected more after DEFGATE token."))
 
         ;; Check for a name.
         (unless (eql ':NAME (token-type (first params-args)))
-          (quil-parse-error "Expected a name for the DEFGATE"))
+          (quil-parse-error "Expected a name for the DEFGATE."))
 
         ;; We have a name. Stash it away.
         (setf name (token-payload (pop params-args)))
@@ -871,7 +871,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                           params-args)
             ;; ... or error if it doesn't exist.
             (when (null rest-line)
-              (quil-parse-error "No matching right paren in DEFGATE params"))
+              (quil-parse-error "No matching right paren in DEFGATE params."))
 
             ;; Remove right paren.
             (pop rest-line)
@@ -882,12 +882,12 @@ result of BODY, and the (possibly null) list of remaining lines.
                          (loop :for c :in (rest found-params) :by #'cddr
                                :always (eql ':COMMA (token-type c))))
               ;; TODO Some printer for tokens?
-              (quil-parse-error "Malformed parameter list in DEFGATE: ~A" found-params))
+              (quil-parse-error "Malformed parameter list in DEFGATE: ~A." found-params))
             ;; Go through the supposed parameters, checking that they
             ;; are, and parsing them out.
             (setf params (loop :for p :in (remove ':comma found-params :key #'token-type)
                                :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list. ~A" p)
+                                 :do (quil-parse-error "Found something other than a parameter in a DEFGATE parameter list: ~A." p)
                                :collect (parse-parameter p)))))
 
         (when (eql ':AS (token-type (first params-args)))
@@ -1030,7 +1030,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                                  modified-line)))
         (unless (every (lambda (tok) (eql ':INTEGER (token-type tok)))
                        entries)
-          (quil-parse-error "Expected integers"))
+          (quil-parse-error "Expected integers."))
         ;; Be careful to continue parsing only when a (by definition) dedented
         ;; line follows
         (values (mapcar #'token-payload entries)
@@ -1068,7 +1068,7 @@ result of BODY, and the (possibly null) list of remaining lines.
 
   ;; Check that we have tokens left to parse.
   (when (null tok-lines)
-    (quil-parse-error "EOF reached when circuit definition expected"))
+    (quil-parse-error "EOF reached when circuit definition expected."))
 
   (let (name params args)
     ;; Split off the header line from the body lines.
@@ -1077,16 +1077,16 @@ result of BODY, and the (possibly null) list of remaining lines.
       (destructuring-bind (op . params-args) parameter-line
         ;; We must be working with a DEFCIRCUIT.
         (unless (eql ':DEFCIRCUIT (token-type op))
-          (quil-parse-error "DEFCIRCUIT expected. Got ~S"
+          (quil-parse-error "DEFCIRCUIT expected. Got ~S."
                             (token-type op)))
 
         ;; Check that there are tokens following DEFCIRCUIT.
         (when (null params-args)
-          (quil-parse-error "Expected more after DEFCIRCUIT token"))
+          (quil-parse-error "Expected more after DEFCIRCUIT token."))
 
         ;; Check for name.
         (unless (eql ':NAME (token-type (first params-args)))
-          (quil-parse-error "Expected a name for the DEFCIRCUIT"))
+          (quil-parse-error "Expected a name for the DEFCIRCUIT."))
 
         ;; Stash it away.
         (setf name (token-payload (pop params-args)))
@@ -1104,7 +1104,7 @@ result of BODY, and the (possibly null) list of remaining lines.
 
             ;; Error if we didn't find a right parenthesis.
             (when (null rest-line)
-              (quil-parse-error "No matching right paren in DEFCIRCUIT params"))
+              (quil-parse-error "No matching right paren in DEFCIRCUIT params."))
 
             ;; Remove right paren and stash away params.
             (pop rest-line)
@@ -1115,11 +1115,11 @@ result of BODY, and the (possibly null) list of remaining lines.
                          (loop :for c :in (rest found-params) :by #'cddr
                                :always (eql ':COMMA (token-type c))))
               ;; TODO Some printer for tokens?
-              (quil-parse-error "Malformed parameter list in DEFCIRCUIT: ~A" found-params))
+              (quil-parse-error "Malformed parameter list in DEFCIRCUIT: ~A." found-params))
             ;; Parse out the parameters.
             (setf params (loop :for p :in (remove ':COMMA found-params :key #'token-type)
                                :when (not (eql ':PARAMETER (token-type p)))
-                                 :do (quil-parse-error "Found something other than a parameter in a DEFCIRCUIT parameter list: ~A" p)
+                                 :do (quil-parse-error "Found something other than a parameter in a DEFCIRCUIT parameter list: ~A." p)
                                :collect (parse-parameter p))
                   params-args rest-line)))
 
@@ -1127,7 +1127,7 @@ result of BODY, and the (possibly null) list of remaining lines.
         (let ((maybe-colon (last params-args)))
           (when (or (null maybe-colon)
                     (not (eql ':COLON (token-type (first maybe-colon)))))
-            (quil-parse-error "Expected a colon in DEFCIRCUIT"))
+            (quil-parse-error "Expected a colon in DEFCIRCUIT."))
           (setf params-args (butlast params-args)))
 
         ;; Collect arguments and stash them away.
@@ -1157,7 +1157,7 @@ result of BODY, and the (possibly null) list of remaining lines.
 (defun parse-memory-descriptor (tok-lines)
   "Parse a memory location declaration out of the lines of tokens TOK-LINES."
   (when (null tok-lines)
-    (quil-parse-error "Expected DECLARE, reached EOF"))
+    (quil-parse-error "Expected DECLARE, reached EOF."))
 
   (let ((line (rest (first tok-lines)))
         name
@@ -1191,7 +1191,7 @@ result of BODY, and the (possibly null) list of remaining lines.
       ;; Get the parent.
       (let ((parent-name (token-payload (pop line))))
         (unless (member parent-name *memory-region-names* :test #'string=)
-          (quil-parse-error "Unknown parent ~a of ~a" parent-name name))
+          (quil-parse-error "Unknown parent ~a of ~a." parent-name name))
         (setf sharing-parent parent-name))
       ;; Check if there's an OFFSET.
       (unless (endp line)
@@ -1250,7 +1250,7 @@ result of BODY, and the (possibly null) list of remaining lines.
           *formal-arguments-allowed*)
      (formal (token-payload tok)))
     (t
-     (quil-parse-error "Expected an address~:[~; or formal argument~], got ~S"
+     (quil-parse-error "Expected an address~:[~; or formal argument~], got ~S."
                        *formal-arguments-allowed*
                        (token-type tok)))))
 
@@ -1270,7 +1270,7 @@ result of BODY, and the (possibly null) list of remaining lines.
         (etypecase result
           (integer (constant result quil-integer))
           (real (constant result quil-real))
-          (complex (quil-parse-error "Unexpected complex number: ~A" result))))))
+          (complex (quil-parse-error "Unexpected complex number: ~A." result))))))
 
 (defun parse-memory-offset (tok)
   (cond
@@ -1283,7 +1283,7 @@ result of BODY, and the (possibly null) list of remaining lines.
   (match-line ((jump jump-type) (label :LABEL-NAME) addr) tok-lines
     (unless (or (eql ':AREF (token-type addr))
                 (eql ':NAME (token-type addr)))
-      (quil-parse-error "Expected an address~:[~; or formal argument~] for conditional jump, got ~S" *formal-arguments-allowed* (token-type addr)))
+      (quil-parse-error "Expected an address~:[~; or formal argument~] for conditional jump, got ~S." *formal-arguments-allowed* (token-type addr)))
     (make-instance (ecase jump-type
                      ((:JUMP-WHEN) 'jump-when)
                      ((:JUMP-UNLESS) 'jump-unless))
@@ -1307,7 +1307,7 @@ result of BODY, and the (possibly null) list of remaining lines.
       (when (and (member (token-type instr) '(:EXCHANGE :CONVERT))
                  (not (or (typep right 'memory-ref)
                           (typep right 'formal))))
-        (quil-parse-error "Second argument of EXCHANGE/CONVERT command expected to be a memory address, but got ~S"
+        (quil-parse-error "Second argument of EXCHANGE/CONVERT command expected to be a memory address, but got ~S."
                           (type-of right)))
       (ecase tok-type
         (:AND (make-instance 'classical-and :left left :right right))
@@ -1327,10 +1327,10 @@ result of BODY, and the (possibly null) list of remaining lines.
     (setf right (cons right rest))
     (flet ((parse-memory-region-name (tok)
                (unless (eql ':NAME (token-type tok))
-                 (quil-parse-error "Expected a memory region name, but got token of type ~S"
+                 (quil-parse-error "Expected a memory region name, but got token of type ~S."
                                    (token-type tok)))
                (unless (find (token-payload tok) *memory-region-names* :test #'string=)
-                 (quil-parse-error "Unknown memory region name ~S"
+                 (quil-parse-error "Unknown memory region name ~S."
                                    (token-payload tok)))
              (memory-name (token-payload tok))))
       (ecase tok-type
@@ -1543,7 +1543,7 @@ result of BODY, and the (possibly null) list of remaining lines.
   (defun validate-function (func-name)
     "Return the lisp symbol that corresponds to the Quil function named FUNC-NAME, or signal a QUIL-PARSE-ERROR if FUNC-NAME is invalid."
     (or (quil-function->lisp-symbol func-name)
-        (quil-parse-error "Invalid function name: ~A" func-name)))
+        (quil-parse-error "Invalid function name: ~A." func-name)))
 
   (defun find-or-make-parameter-symbol (param)
     (let ((found (assoc (param-name param)
@@ -1561,7 +1561,7 @@ result of BODY, and the (possibly null) list of remaining lines.
     (let ((region-name (car aref))
           (region-position (cdr aref)))
       (unless (find region-name *memory-region-names* :test #'string=)
-        (error "Reference to unknown memory region ~a" region-name))
+        (error "Reference to unknown memory region ~a." region-name))
       (setf *segment-encountered* t)
       (mref region-name region-position))))
 

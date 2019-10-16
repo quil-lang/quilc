@@ -348,7 +348,7 @@ rewiring REWIRING to the TARGET-REWIRING."
           :do (rewiring-assign rewiring logical physical))
       (return-from move-to-expected-rewiring))
     (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
-            "Too many rewirings tried: ~a" (length rewirings-tried))
+            "Too many rewirings tried: ~a." (length rewirings-tried))
     ;; otherwise, pick a SWAP
     (flet ((embed (link-index)
              (embed-swap link-index
@@ -625,7 +625,7 @@ list of partially-rewired 2Q instructions for later scheduling."
          (assert (every (lambda (q) (< -1 (qubit-index q) (length 1q-queues)))
                         (application-arguments instr))
                  nil
-                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/."
                  instr)
          (destructuring-bind (p0 p1)
              (mapcar (lambda (q) (apply-rewiring-l2p working-l2p (qubit-index q)))
@@ -662,7 +662,7 @@ list of partially-rewired 2Q instructions for later scheduling."
          (assert (every (lambda (q) (< -1 (qubit-index q) (length 1q-queues)))
                         (application-arguments instr))
                  nil
-                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/."
                  instr)
          (when dry-run-escape
            (funcall dry-run-escape))
@@ -683,7 +683,7 @@ list of partially-rewired 2Q instructions for later scheduling."
          (assert (every (lambda (q) (< -1 (qubit-index q) (length 1q-queues)))
                         (application-arguments instr))
                  nil
-                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/."
                  instr)
          (format *compiler-noise-stream*
                  "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling.~%"
@@ -833,19 +833,19 @@ are ready to be scheduled."
                 ;; will fall into the bucket of instructions that are
                 ;; ready-2-go.
                 (format *compiler-noise-stream*
-                        "DEQUEUE-SOONEST-2Q-FROM-LIST: Couldn't rewire ~/quil:instruction-fmt/ because assignment is missing"
+                        "DEQUEUE-SOONEST-2Q-FROM-LIST: Couldn't rewire ~/quil:instruction-fmt/ because assignment is missing."
                         instr)
                 (loop
                   :for (logical physical) :in qubit-assignments
                   :unless (apply-rewiring-l2p working-l2p logical)
                     :do (format *compiler-noise-stream*
-                                "DEQUEUE-SOONEST-2Q-FROM-LIST: assigning logical qubit ~a to physical qubit ~a~%"
+                                "DEQUEUE-SOONEST-2Q-FROM-LIST: assigning logical qubit ~a to physical qubit ~a.~%"
                                 logical physical)
                         (rewiring-assign working-l2p logical physical))
                 (return-from dequeue-soonest-2q-from-list t))))
 
           (format *compiler-noise-stream*
-                  "DEQUEUE-SOONEST-2Q-FROM-LIST: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring~%"
+                  "DEQUEUE-SOONEST-2Q-FROM-LIST: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring.~%"
                   instr rewired-instr)
 
           ;; Figure out if we need to compile the instruction,
@@ -917,7 +917,7 @@ are ready to be scheduled."
   "Given a gate application that is unassigned or partially assigned by
 the addresser's working logical-to-physical rewiring, compute a best physical qubit
 assignment."
-  (assert (= 2 (length (application-arguments inst))) () "Expected 2-qubit gate")
+  (assert (= 2 (length (application-arguments inst))) () "Expected 2-qubit gate.")
   (with-slots (working-l2p chip-spec) *temporal-addresser-state-variables*
     (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments inst))
       (let ((p0 (apply-rewiring-l2p working-l2p q0))
@@ -934,7 +934,7 @@ assignment."
   (with-slots (working-l2p chip-spec qq-distances qubit-cc) *temporal-addresser-state-variables*
     (let ((locations (or locations qubit-cc)))
       (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
-              "Qubit ~a already assigned" logical)
+              "Qubit ~a already assigned." logical)
       (a:extremum
        (remove-if (lambda (p)
                     (or (apply-rewiring-p2l working-l2p p)
@@ -1043,7 +1043,7 @@ Optional arguments:
                      :do (format *compiler-noise-stream*
                                  "TEMPORAL-ADDRESSER-FSM: LSCHED unchanged, selecting a permutation.~%")
                          (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
-                                 "Too many SWAP instructions selected in a row: ~a" (length rewirings-tried))
+                                 "Too many SWAP instructions selected in a row: ~a." (length rewirings-tried))
                          (setf rewirings-tried (select-and-embed-a-permutation rewirings-tried)))))
 
           ;; build the logically parallelized schedule

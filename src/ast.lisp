@@ -244,7 +244,7 @@ If both ENTERING and EXITING are null, signal an error."
            (format nil "~A~A" +entering-rewiring-prefix+ entering))
           ((not (null exiting))
            (format nil "~A~A" +exiting-rewiring-prefix+ exiting))
-          (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL")))))
+          (t (error "MAKE-REWIRING-COMMENT: Both ENTERING and EXITING cannot be NULL.")))))
 
 (defun instruction-rewirings (instruction)
   "Return the pair of entering and exiting rewirings associated with instruction.
