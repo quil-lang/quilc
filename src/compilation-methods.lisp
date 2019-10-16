@@ -147,6 +147,8 @@
 ;; Forward declaration from compressor.lisp
 (declaim (special *compressor-passes*))
 
+(defparameter *addresser-state-constructor* 'initial-fidelity-addresser-working-state)
+
 ;; TODO: deal with classical control and basic-blocks
 (defun compiler-hook (parsed-program
                       chip-specification
@@ -253,10 +255,11 @@ Returns a value list: (processed-program, of type parsed-program
          (touch-unpreserved-block (blk registrant)
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
-               ;; TODO: here, and below, we need to find a way to not hard-code this method call
-               (do-greedy-fidelity-addressing
-                   (coerce (basic-block-code blk) 'list)
-                 chip-specification
+               (do-greedy-addressing
+                   (funcall *addresser-state-constructor* chip-specification (if registrant
+                                                                                 (basic-block-in-rewiring blk)
+                                                                                 initial-rewiring))
+                 (coerce (basic-block-code blk) 'list)
                  :initial-rewiring (if registrant
                                        (basic-block-in-rewiring blk)
                                        initial-rewiring)
@@ -283,8 +286,10 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-fidelity-addressing
+                   (funcall *addresser-state-constructor* chip-specification
+                            (prog-initial-rewiring parsed-program chip-specification
+                                                   :type rewiring-type))
                  (coerce (basic-block-code blk) 'list)
-                 chip-specification
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))
              (let* ((duration (chip-schedule-duration chip-schedule))

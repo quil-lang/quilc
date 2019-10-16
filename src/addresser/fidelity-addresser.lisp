@@ -159,13 +159,3 @@
          (state (initial-addresser-working-state chip-spec initial-rewiring)))
     (change-class state 'fidelity-addresser-state)
     state))
-
-(defun do-greedy-fidelity-addressing (instrs
-                               chip-spec
-                               &key
-                                 (initial-rewiring nil)
-                                 (use-free-swaps nil))
-  (let ((state (initial-fidelity-addresser-working-state chip-spec initial-rewiring)))
-    (do-greedy-addressing state instrs
-      :initial-rewiring initial-rewiring
-      :use-free-swaps use-free-swaps)))
