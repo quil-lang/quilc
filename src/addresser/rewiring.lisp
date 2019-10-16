@@ -305,7 +305,7 @@ BODY as an implicit PROGN."
               nil
               "Malformed rewiring pair string: length of rewirings don't match. ~@
                first:  ~A~@
-               second: ~A."
+               second: ~A"
               first-rewiring-string second-rewiring-string)
       (values (make-rewiring-from-string first-rewiring-string)
               (make-rewiring-from-string second-rewiring-string)))))
