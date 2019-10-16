@@ -342,3 +342,14 @@
       :duration   (:duration)
       :fidelity   (:fidelity)
       ))
+
+(defvar *addresser-style-assn*
+    (make-assignments
+        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
+                         #+ecl  (make-random-state 1)
+                         #-(or sbcl ecl) (error "don't know how to seed random state"))
+         (quil::*compressor-passes* 1))
+        (quil::*addresser-state-constructor*)
+      :duration   ('quil::initial-temporal-addresser-working-state)
+      :fidelity   ('quil::initial-fidelity-addresser-working-state)
+      ))
