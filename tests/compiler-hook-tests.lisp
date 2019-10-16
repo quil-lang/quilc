@@ -134,8 +134,7 @@ JUMP @a")))
             (dolist (arch '(:cz :iswap :cphase :piswap :cnot))
               (lparallel:submit-task ch (create-task state-prep file arch)))))
         (loop :repeat num-tasks :do
-          (let ((fiasco::*print-test-run-progress* nil))
-            (is (lparallel:receive-result ch))))))))
+          (is (lparallel:receive-result ch)))))))
 
 (deftest test-compression-bug-QUILC-152 ()
   "QUILC-152: A bug in state compression caused a failed assertion."
@@ -211,8 +210,7 @@ RX(pi) 2
           (dolist (arch '(:cz :iswap :cphase :piswap :cnot))
             (lparallel:submit-task ch (create-task state-prep arch))))
         (loop :repeat num-tasks :do
-          (let ((fiasco::*print-test-run-progress* nil))
-            (is (lparallel:receive-result ch))))))))
+          (is (lparallel:receive-result ch)))))))
 
 (deftest test-compiler-hook-preserves-RESETs ()
   (let* ((pp (quil::parse-quil "
