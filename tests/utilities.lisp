@@ -193,7 +193,7 @@ If SUFFIX-P is non-nil, suffix the returned string with DELIMITER."
 ;;; other means. Just keep in mind the above comments about trailing newlines.
 ;;;
 ;;;
-;;; ADDING NEW INPUT/OUTPUT pairs
+;;; ADDING NEW INPUT/OUTPUT PAIRS
 ;;;
 ;;; You can also use UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS to add new outputs to a golden file without
 ;;; the need to copy/paste or fiddle with trailing-newline matching. For example, if you add the

@@ -25,17 +25,11 @@
     (funcall printer (funcall parser input) s)))
 
 (defun update-print-parsed-program-golden-files (&key skip-prompt)
-  "Call UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES on all the files in the gold-standard subdirectory
-of *PRINTER-TEST-FILES-DIRECTORY*.
+  "Call UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS on all the files in the gold-standard subdirectory of *PRINTER-TEST-FILES-DIRECTORY*.
 
-We limit updating of golden files to the gold-standard directory because they are the only ones that
-can be easily updated in an automated fashion. The files in the gold-regex directory make use of
-regexes in their output sections, which makes automated update complicated. The number of
-regex-enabled tests is small, so updating them by hand shouldn't be too tedious. You can always call
-UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS on them manually, then re-instate any required regexes.
+We limit updating of golden files to the gold-standard directory because they are the only ones that can be easily updated in an automated fashion. The files in the gold-regex directory make use of regexes in their output sections, which makes automated update complicated. The number of regex-enabled tests is small, so updating them by hand shouldn't be too tedious. You can always call UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS on them manually, then re-instate any required regexes.
 
-See the documentation string for UPDATE-PRINT-PARSED-PROGRAM-GOLDEN-FILES for more info and an
-admonition against carelessness."
+See the documentation string for UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS for more info and an admonition against carelessness."
   (update-golden-file-output-sections
    (uiop:directory-files *printer-test-files-gold-standard-directory* #P"*.quil")
    #'parse-and-print-quil-to-string
@@ -43,8 +37,7 @@ admonition against carelessness."
 
 
 (defun %golden-parse-print-tester (check-output)
-  "Return a function that can be passed to MAP-GOLDEN-FILES-AND-TEST-CASES which uses CHECK-OUTPUT
-to compare output sections.
+  "Return a function that can be passed to MAP-GOLDEN-FILES-AND-TEST-CASES which uses CHECK-OUTPUT to compare output sections.
 
 %GOLDEN-PARSE-PRINT-TESTER is a helper function for TEST-PRINT-PARSED-PROGRAM-GOLDEN-FILES."
   (check-type check-output function)
