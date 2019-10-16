@@ -77,7 +77,7 @@ elements to ELT-TYPE.
                             (length raw-elements)))
         (mapcar (lambda (raw) (coerce raw elt-type)) raw-elements))
     (alexa:lexer-match-error (c)
-      (quil-parse-error "Lexer failure: ~A." c))))
+      (quil-parse-error "Lexer failure: ~A" c))))
 
 
 ;;;;;;;;;;;;;;;;;;;; Macroexpansion-time checking ;;;;;;;;;;;;;;;;;;;;
