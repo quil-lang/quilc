@@ -710,13 +710,14 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 ;;       operations should be handled identically. for instance, we should add
 ;;       queues for the 2Q operations, and they should also be written out by a
 ;;       flushing call.
-(defun do-greedy-addressing (state  ; initial addresser state
-                             instrs ; list of instructions to schedule
-                             &key
-                               (initial-rewiring nil) ; optionally provide an initial rewiring
-                               (use-free-swaps nil) ; treat the initial rewiring as virtual
-                               )
-  "Schedules INSTRS for execution on a QPU specified by CHIP-SPEC. Returns a
+(defgeneric do-greedy-addressing (state ; initial addresser state
+                                  instrs ; list of instructions to schedule
+                                  &key
+                                    initial-rewiring ; optionally provide an initial rewiring
+                                    use-free-swaps ; treat the initial rewiring as virtual
+                                    )
+  (:documentation
+   "Schedules INSTRS for execution on a QPU specified by CHIP-SPEC. Returns a
 values triple (initial-rewiring chip-schedule final-rewiring).
 
 Optional arguments:
@@ -724,65 +725,66 @@ Optional arguments:
    permutation.
  + USE-FREE-SWAPS treats the initial rewiring as virtual (able to be changed).
    If INITIAL-REWIRING is not provided this option has no effect.
-"
-  (format *compiler-noise-stream*
-          "DO-GREEDY-ADDRESSING: entrance.~%")
-  (let ((*addresser-use-free-swaps* (or use-free-swaps (not initial-rewiring))))
-    (with-slots (lschedule working-l2p chip-sched initial-l2p) state
-      ;; This is governed by an FSM of the shape
-      ;;
-      ;; [ do-greedy-addressing ]
-      ;; [ initialization       ]
-      ;;    |
-      ;;    v
-      ;; [ dequeue-logical-to-physical     and      ]
-      ;; [ dequeue-soonest-2q-instruction-from-list ]
-      ;; [ inserts available logical instructions   ]
-      ;;   |        ^         ^
-      ;;   |        |         |
-      ;;   |        |        yes
-      ;;   v        |         |
-      ;; < did we dequeue any instructions? >
-      ;;   |        |
-      ;;   no       |
-      ;;   |        |
-      ;;   v        |
-      ;; < is the logical schedule empty? > --yes-> [ do-greedy-temporal-addressing ]
-      ;;   |        |                               [ flush / cleanup ]
-      ;;   no       |
-      ;;   |        |
-      ;;   v        |
-      ;; [ select-and-embed-a-permutation                                   ]
-      ;; [ finds a permutation that lowers the cost-function and inserts it ]
-      ;;
-      ;; These chunks are defined as functions above.
-      (flet ((addresser-FSM ()
-               (loop
-                 :with rewirings-tried := nil
-                 :while (lscheduler-first-instrs lschedule)
-                 :do (format *compiler-noise-stream* "ADDRESSER-FSM: New pass.~%")
-                 :when (dequeue-logical-to-physical state)
-                   :do (format *compiler-noise-stream* "ADDRESSER-FSM: LSCHED changed, retrying.~%")
-                       (setf rewirings-tried nil)
-                 :else
-                   :do (format *compiler-noise-stream*
-                               "ADDRESSER-FSM: LSCHED unchanged, selecting a permutation.~%")
-                       (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
-                               "Too many SWAP instructions selected in a row: ~a" (length rewirings-tried))
-                       (setf rewirings-tried (select-and-embed-a-permutation state rewirings-tried)))))
+")
+  (:method (state instrs &key (initial-rewiring nil) (use-free-swaps nil))
+    (format *compiler-noise-stream*
+            "DO-GREEDY-ADDRESSING: entrance.~%")
+    (let ((*addresser-use-free-swaps* (or use-free-swaps (not initial-rewiring))))
+      (with-slots (lschedule working-l2p chip-sched initial-l2p) state
+        ;; This is governed by an FSM of the shape
+        ;;
+        ;; [ do-greedy-addressing ]
+        ;; [ initialization       ]
+        ;;    |
+        ;;    v
+        ;; [ dequeue-logical-to-physical     and      ]
+        ;; [ dequeue-soonest-2q-instruction-from-list ]
+        ;; [ inserts available logical instructions   ]
+        ;;   |        ^         ^
+        ;;   |        |         |
+        ;;   |        |        yes
+        ;;   v        |         |
+        ;; < did we dequeue any instructions? >
+        ;;   |        |
+        ;;   no       |
+        ;;   |        |
+        ;;   v        |
+        ;; < is the logical schedule empty? > --yes-> [ do-greedy-temporal-addressing ]
+        ;;   |        |                               [ flush / cleanup ]
+        ;;   no       |
+        ;;   |        |
+        ;;   v        |
+        ;; [ select-and-embed-a-permutation                                   ]
+        ;; [ finds a permutation that lowers the cost-function and inserts it ]
+        ;;
+        ;; These chunks are defined as functions above.
+        (flet ((addresser-FSM ()
+                 (loop
+                   :with rewirings-tried := nil
+                   :while (lscheduler-first-instrs lschedule)
+                   :do (format *compiler-noise-stream* "ADDRESSER-FSM: New pass.~%")
+                   :when (dequeue-logical-to-physical state)
+                     :do (format *compiler-noise-stream* "ADDRESSER-FSM: LSCHED changed, retrying.~%")
+                         (setf rewirings-tried nil)
+                   :else
+                     :do (format *compiler-noise-stream*
+                                 "ADDRESSER-FSM: LSCHED unchanged, selecting a permutation.~%")
+                         (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
+                                 "Too many SWAP instructions selected in a row: ~a" (length rewirings-tried))
+                         (setf rewirings-tried (select-and-embed-a-permutation state rewirings-tried)))))
 
-        ;; build the logically parallelized schedule
-        (append-instructions-to-lschedule lschedule instrs)
-        ;; actually invoke the FSM
-        (addresser-FSM)
-        ;; TODO: Consider what happens when initial-l2p has a different logical coverage than final l2p
-        ;; TODO: Don't always fully assign the l2p
-        ;; XXX: consider how this intertwines with the temporal-addressing finish
-        (fill-rewiring working-l2p)
-        (setf initial-l2p (copy-rewiring working-l2p))
-        (dolist (instr (nreverse (chip-schedule-to-straight-quil chip-sched)))
-          (when (swap-application-p instr)
-            (apply #'update-rewiring initial-l2p (mapcar #'qubit-index (application-arguments instr)))))
-        (format *compiler-noise-stream* "DO-GREEDY-ADDRESSING: departure.~%")
-        ;; finally, return what we've constructed
-        (values chip-sched initial-l2p working-l2p)))))
+          ;; build the logically parallelized schedule
+          (append-instructions-to-lschedule lschedule instrs)
+          ;; actually invoke the FSM
+          (addresser-FSM)
+          ;; TODO: Consider what happens when initial-l2p has a different logical coverage than final l2p
+          ;; TODO: Don't always fully assign the l2p
+          ;; XXX: consider how this intertwines with the temporal-addressing finish
+          (fill-rewiring working-l2p)
+          (setf initial-l2p (copy-rewiring working-l2p))
+          (dolist (instr (nreverse (chip-schedule-to-straight-quil chip-sched)))
+            (when (swap-application-p instr)
+              (apply #'update-rewiring initial-l2p (mapcar #'qubit-index (application-arguments instr)))))
+          (format *compiler-noise-stream* "DO-GREEDY-ADDRESSING: departure.~%")
+          ;; finally, return what we've constructed
+          (values chip-sched initial-l2p working-l2p))))))

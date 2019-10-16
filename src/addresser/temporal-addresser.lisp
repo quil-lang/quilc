@@ -400,20 +400,18 @@ instruction, adding to logical queue.~%"
         (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
     (call-next-method)))
 
-(defun do-greedy-temporal-addressing (instrs
-                                      chip-spec
-                                      &key
-                                        (initial-rewiring nil)
-                                        (use-free-swaps nil))
-  (let ((state (initial-temporal-addresser-working-state chip-spec initial-rewiring)))
-    (multiple-value-bind (chip-sched initial-l2p working-l2p)
-        (do-greedy-addressing state instrs
-          :initial-rewiring initial-rewiring
-          :use-free-swaps use-free-swaps)
+(defmethod do-greedy-addressing ((state temporal-addresser-state)
+                                 instrs
+                                 &key
+                                   (initial-rewiring nil)
+                                   (use-free-swaps nil))
+  (declare (ignore initial-rewiring use-free-swaps))
+  (multiple-value-bind (chip-sched initial-l2p working-l2p)
+      (call-next-method)
       
-      ;; now flush the 1Q queues in preparation for writing out
-      (dotimes (qubit (chip-spec-n-qubits chip-spec))
-        (unless (endp (aref (temporal-addresser-state-1q-queues state) qubit))
-          (flush-1q-instructions-after-wiring state qubit)))
+    ;; now flush the 1Q queues in preparation for writing out
+    (dotimes (qubit (chip-spec-n-qubits (addresser-state-chip-specification state)))
+      (unless (endp (aref (temporal-addresser-state-1q-queues state) qubit))
+        (flush-1q-instructions-after-wiring state qubit)))
       
-      (values chip-sched initial-l2p working-l2p))))
+    (values chip-sched initial-l2p working-l2p)))
