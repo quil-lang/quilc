@@ -38,7 +38,7 @@ impossible using that rewiring.")
 (defun chip-spec-live-qubit-bfs (chip-spec qubit-index &optional seen)
   "From a given initial qubit, find the distance to every other qubit in the connected component. SEEN is an array of T/NIL for each qubit, indicating whether that qubit has been visited yet."
   (assert (not (chip-spec-qubit-dead? chip-spec qubit-index)) (qubit-index)
-          "Cannot BFS from dead qubit ~a"
+          "Cannot BFS from dead qubit ~a."
           qubit-index)
   (loop
     :with level := 0
@@ -67,7 +67,7 @@ impossible using that rewiring.")
     :finally (return (values distances seen))))
 
 (defun chip-spec-live-qubit-cc (chip-spec)
-  "Get a list of lists of live qubits that are in the same connected component on the chip"
+  "Get a list of lists of live qubits that are in the same connected component on the chip."
   (loop
     :with n-qubits := (chip-spec-n-qubits chip-spec)
     :with seen := (make-array n-qubits :initial-element nil)
@@ -95,7 +95,7 @@ impossible using that rewiring.")
           :and :collect idx)))
 
 (defun containing-indices (list-of-lists)
-  "Given a list of lists, return a table mapping elements to the index of the last list in which they appear"
+  "Given a list of lists, return a table mapping elements to the index of the last list in which they appear."
   (let ((tbl (make-hash-table)))
     (loop
       :for i :from 0
@@ -123,7 +123,7 @@ impossible using that rewiring.")
     mapping))
 
 (defun assign-arbitrarily (source dest mapping)
-  "Assign all elements of the set source to elements of the set dest in the mapping"
+  "Assign all elements of the set source to elements of the set dest in the mapping."
   (loop
     :for logical :in source
     :for physical :in dest
@@ -131,14 +131,14 @@ impossible using that rewiring.")
   mapping)
 
 (defparameter *rewiring-adjacency-weight-decay* 2.0
-  "Rate of decay on the weight of instruction value for closeness")
+  "Rate of decay on the weight of instruction value for closeness.")
 
 (defparameter *rewiring-distance-offset* 0.0
-  "How much we should shift the distances before weighting. High values means small differences in distance have smaller effect")
+  "How much we should shift the distances before weighting. High values means small differences in distance have smaller effect.")
 
 (defun compute-adjacency-weights (n-qubits order)
   "Given the order in which to expect qubits, compute the relative benefit of
-being close to each of the n qubits"
+being close to each of the n qubits."
   (loop
     :with weights-by-qubit := (make-array n-qubits :initial-element 0d0)
     :for adj :in order
@@ -154,7 +154,7 @@ If no
 
     PRAGMA INITIAL_REWIRING \"...\"
 
-is found, then return NIL"
+is found, then return NIL."
   (loop :for inst :across (parsed-program-executable-code parsed-prog) :do
     (cond
       ((typep inst 'pragma)
@@ -212,7 +212,7 @@ NEEDED."
 
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
   "Find an initial rewiring for a program that ensures that all used qubits
-appear in the same connected component of the qpu"
+appear in the same connected component of the qpu."
   (let* ((n-qubits (chip-spec-n-qubits chip-spec))
          (connected-components (chip-spec-live-qubit-cc chip-spec))
          (indices (containing-indices connected-components))
@@ -221,7 +221,7 @@ appear in the same connected component of the qpu"
     (assert (or (endp needed)
                 (<= (apply #'max needed) n-qubits))
             ()
-            "User program incompatible with chip: qubit index ~a used and ~a available"
+            "User program incompatible with chip: qubit index ~a used and ~a available."
             (apply #'max needed) n-qubits)
 
     (when (eql type ':naive)
@@ -232,11 +232,11 @@ appear in the same connected component of the qpu"
                 :when (not component)
                   :do (setf component index)
                 :always (and index (= index component)))
-        (error "User program incompatible with chip: naive rewiring crosses chip component boundaries"))
+        (error "User program incompatible with chip: naive rewiring crosses chip component boundaries."))
       (return-from prog-initial-rewiring (make-rewiring n-qubits)))
 
     (assert (<= (length needed) (length cc)) ()
-            "User program used too many qubits: ~a used and ~a available in the largest connected component"
+            "User program used too many qubits: ~a used and ~a available in the largest connected component."
             (length needed) (length cc))
 
     (when (eql type ':partial)
@@ -247,7 +247,7 @@ appear in the same connected component of the qpu"
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
 
     (assert (eql type ':greedy) (type)
-            "Unexpected rewiring type: ~a" type)
+            "Unexpected rewiring type: ~a." type)
 
     ;; TODO: this assumes that the program is sequential
     (let* ((per-qubit-ins (prog-qubit-pair-order n-qubits parsed-prog))

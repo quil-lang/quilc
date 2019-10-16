@@ -34,7 +34,7 @@
   (when (and (typep mref 'memory-ref)
              (<= (memory-descriptor-length memory-descriptor)
                  (memory-ref-position mref)))
-    (quil-type-error "Memory ref \"~/quil:instruction-fmt/\" exceeds region size ~A"
+    (quil-type-error "Memory ref \"~/quil:instruction-fmt/\" exceeds region size ~A."
                      mref
                      (memory-descriptor-length memory-descriptor))))
 
@@ -48,7 +48,7 @@
 
 (defun check-mref (obj)
   (unless (typep obj 'memory-ref)
-    (quil-type-error "Argument expected to be a memory reference, but got ~/quil:instruction-fmt/"
+    (quil-type-error "Argument expected to be a memory reference, but got ~/quil:instruction-fmt/."
                      obj)))
 
 ;;; helper functions for type-check-instr ;;;
@@ -59,7 +59,7 @@
   (let ((mdesc (find-descriptor-for-mref (classical-left-operand instr) memory-regions)))
     (when (and object-to-type
                (equalp object-to-type (memory-descriptor-type mdesc)))
-      (quil-type-error "Argument should be a binary memory reference, but got real ~/quil:instruction-fmt/"
+      (quil-type-error "Argument should be a binary memory reference, but got real ~/quil:instruction-fmt/."
                        (classical-left-operand instr)))
     (adt:match quil-type (memory-descriptor-type mdesc)
       (quil-real
@@ -73,7 +73,7 @@
                                    quil-real
                                    memory-regions)
            t
-           (quil-type-error "Expected REAL assignment based on ~/quil:instruction-fmt/, but got ~/quil:instruction-fmt/"
+           (quil-type-error "Expected REAL assignment based on ~/quil:instruction-fmt/, but got ~/quil:instruction-fmt/."
                             (classical-left-operand instr)
                             (classical-right-operand instr))))
       (quil-octet
@@ -83,7 +83,7 @@
                (and (typep (classical-right-operand instr) 'constant)
                     (equal quil-integer (constant-value-type (classical-right-operand instr)))))
            t
-           (quil-type-error "Expected OCTET assignment based on ~/quil:instruction-fmt/, but got ~/quil:instruction-fmt/"
+           (quil-type-error "Expected OCTET assignment based on ~/quil:instruction-fmt/, but got ~/quil:instruction-fmt/."
                             (classical-left-operand instr)
                             (classical-right-operand instr))))
       (quil-bit
@@ -94,24 +94,24 @@
                   (constant (coerce (constant-value (classical-right-operand instr)) 'bit)
                             quil-bit)))
            (otherwise
-            (quil-type-error "Assignment to BIT field from non-BIT literal ~A"
+            (quil-type-error "Assignment to BIT field from non-BIT literal ~A."
                              (constant-value (classical-right-operand instr))))))
        (unless (constant-or-mref-typep (classical-right-operand instr)
                                        quil-bit
                                        memory-regions)
-         (quil-type-error "Assignment to BIT field from non-BIT ~A"
+         (quil-type-error "Assignment to BIT field from non-BIT ~A."
                           (classical-right-operand instr))))
       (quil-integer
        (unless (constant-or-mref-typep (classical-right-operand instr)
                                        quil-integer
                                        memory-regions)
-         (quil-type-error "Assignment to INTEGER field from non-INTEGER ~A"
+         (quil-type-error "Assignment to INTEGER field from non-INTEGER ~A."
                           (classical-right-operand instr)))))))
 
 (defun typecheck-conditional-instruction (instr memory-regions)
   (check-mref (classical-target instr))
   (unless (constant-or-mref-typep (classical-target instr) quil-bit memory-regions)
-    (quil-type-error "Conditional tests write to BIT memory, but got ~/quil:instruction-fmt/ instead"
+    (quil-type-error "Conditional tests write to BIT memory, but got ~/quil:instruction-fmt/ instead."
                      (classical-target instr)))
   (check-mref (classical-left-operand instr))
   (let ((mdesc (find-descriptor-for-mref (classical-left-operand instr)
@@ -123,7 +123,7 @@
                      (constant-or-mref-typep (classical-right-operand instr)
                                              quil-integer
                                              memory-regions)))
-      (quil-type-error "Conditional tests require type agreement in last two terms, but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/"
+      (quil-type-error "Conditional tests require type agreement in last two terms, but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/."
                        (classical-left-operand instr)
                        (classical-right-operand instr)))))
 
@@ -148,7 +148,7 @@
      (let ((mdesc (find-descriptor-for-mref param memory-regions)))
        (setf (memory-ref-descriptor param) mdesc)
        (unless (equal quil-real (memory-descriptor-type mdesc))
-         (quil-type-error "Memory reference ~/quil:instruction-fmt/ is used as a gate parameter but is not a REAL value"
+         (quil-type-error "Memory reference ~/quil:instruction-fmt/ is used as a gate parameter but is not a REAL value."
                           param))))))
 
 ;;; real deal ;;;
@@ -194,7 +194,7 @@
       (adt:match quil-type (memory-descriptor-type mdesc)
         (quil-real    (call-next-method))
         (quil-integer (call-next-method))
-        (_            (quil-type-error "NEG argument should be a signed memory reference, but got ~/quil:instruction-fmt/"
+        (_            (quil-type-error "NEG argument should be a signed memory reference, but got ~/quil:instruction-fmt/."
                                        (classical-target instr))))))
 
   ;; NOT can't be REAL
@@ -203,7 +203,7 @@
     (let ((mdesc (find-descriptor-for-mref (classical-target instr) memory-regions)))
       (adt:match quil-type (memory-descriptor-type mdesc)
         (quil-real
-         (quil-type-error "NOT argument should be a binary memory reference, but got ~/quil:instruction-fmt/"
+         (quil-type-error "NOT argument should be a binary memory reference, but got ~/quil:instruction-fmt/."
                           (classical-target instr)))
         (_
          (call-next-method)))))
@@ -260,18 +260,18 @@
             (find-descriptor-for-mref (mref (memory-name-region-name (classical-left-operand instr)) 0)
                                       memory-regions)))
       (unless mdesc
-        (quil-type-error "Memory region named ~A not found"
+        (quil-type-error "Memory region named ~A not found."
                          (memory-name-region-name (classical-left-operand instr))))
       (unless (constant-or-mref-typep (classical-target instr)
                                       (memory-descriptor-type mdesc)
                                       memory-regions)
-        (quil-type-error "Memory region types do not match for ~A and ~/quil:instruction-fmt/"
+        (quil-type-error "Memory region types do not match for ~A and ~/quil:instruction-fmt/."
                          (memory-name-region-name (classical-left-operand instr))
                          (classical-target instr)))
       (unless (constant-or-mref-typep (classical-right-operand instr)
                                       quil-integer
                                       memory-regions)
-        (quil-type-error "LOAD right operand must be an integer, but got ~A"
+        (quil-type-error "LOAD right operand must be an integer, but got ~A."
                          (classical-right-operand instr)))))
 
   ;; STORE requires agreement in outer two, INT in middle
@@ -289,13 +289,13 @@
                        (constant-or-mref-typep (classical-right-operand instr)
                                                quil-integer
                                                memory-regions)))
-        (quil-type-error "Memory region types do not match for ~A and ~/quil:instruction-fmt/"
+        (quil-type-error "Memory region types do not match for ~A and ~/quil:instruction-fmt/."
                          (memory-name-region-name (classical-target instr))
                          (classical-right-operand instr)))
       (unless (constant-or-mref-typep (classical-left-operand instr)
                                       quil-integer
                                       memory-regions)
-        (quil-type-error "STORE middle operand must be an INTEGER, but got ~/quil:instruction-fmt/"
+        (quil-type-error "STORE middle operand must be an INTEGER, but got ~/quil:instruction-fmt/."
                          (classical-left-operand instr)))))
 
   ;; comparison operators require bit target in first, agreement in last two
@@ -326,7 +326,7 @@
          t)
         (_
          (quil-type-error "MEASURE instruction target must be of type ~
-                           BIT or INTEGER, but got ~/quil:instruction-fmt/ of type ~A"
+                           BIT or INTEGER, but got ~/quil:instruction-fmt/ of type ~A."
                           (measure-address instr)
                           (quil-type-string (memory-descriptor-type mdesc)))))))
 

@@ -63,7 +63,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                                          (token
                                           (token-pathname (lexical-context instr)))
                                          (t
-                                          (quil-parse-error "Unable to resolve definition context ~A" instr)))))
+                                          (quil-parse-error "Unable to resolve definition context ~A." instr)))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."
@@ -88,7 +88,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
-                    (format nil "Error in resolving ~/quil:instruction-fmt/: ~a"
+                    (format nil "Error in resolving ~/quil:instruction-fmt/: ~a."
                             app
                             ,datum)
                     ,@arguments)))

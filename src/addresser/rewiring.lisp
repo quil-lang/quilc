@@ -84,10 +84,10 @@ INVERSE."
   (let ((old-physical (aref (rewiring-l2p rewiring) logical))
         (old-logical (aref (rewiring-p2l rewiring) physical)))
     (assert (or (not old-physical) (= old-physical physical)) ()
-            "Cannot re-assign logical qubit ~A to different physical qubit ~A"
+            "Cannot re-assign logical qubit ~A to different physical qubit ~A."
             logical physical)
     (assert (or (not old-logical) (= old-logical logical)) ()
-            "Cannot assign logical qubit ~A to occupied physical qubit ~A"
+            "Cannot assign logical qubit ~A to occupied physical qubit ~A."
             logical physical)
     (setf (aref (rewiring-l2p rewiring) logical) physical
           (aref (rewiring-p2l rewiring) physical) logical)
@@ -96,7 +96,7 @@ INVERSE."
 (defun rewiring-unassign (rewiring logical)
   "Remove an assignment of the logical qubit in the rewiring."
   (assert (aref (rewiring-l2p rewiring) logical) (logical)
-          "Logical qubit ~A not assigned" logical)
+          "Logical qubit ~A not assigned." logical)
   (let ((physical (aref (rewiring-l2p rewiring) logical)))
     (setf (aref (rewiring-p2l rewiring) physical) nil
           (aref (rewiring-l2p rewiring) logical) nil)
@@ -111,7 +111,7 @@ INVERSE."
          :documentation "The wire whose assignment doesn't exist."))
   (:report (lambda (condition stream)
              (let ((*print-pretty* nil))
-               (format stream "Rewiring missing assignment for qubit ~A in rewiring ~A"
+               (format stream "Rewiring missing assignment for qubit ~A in rewiring ~A."
                        (missing-rewiring-assignment-wire condition)
                        (missing-rewiring-assignment-rewiring condition)))))
   (:documentation "An error signaled if a rewiring is being applied but an assignment is missing."))
@@ -218,9 +218,9 @@ Returns NIL. This mutates the instruction."
       (let ((loc (aref l2p j)))
         (when loc
           (assert (and (< -1 loc (length p2l))) ()
-                  "Malformed rewiring string: value ~a at position ~a is out of range" loc j)
+                  "Malformed rewiring string: value ~a at position ~a is out of range." loc j)
           (assert (null (aref p2l loc)) ()
-                  "Malformed rewiring string: repeated value ~a at position ~a" loc j)
+                  "Malformed rewiring string: repeated value ~a at position ~a." loc j)
           (setf (aref p2l loc) j))))
     (init-rewiring :l2p l2p :p2l p2l)))
 
@@ -256,7 +256,7 @@ BODY as an implicit PROGN."
                (eql #\( (aref str 1))
                (eql #\) (aref str (1- (length str)))))
           nil
-          "Malformed rewiring string: input ~a is not of the form #(...)" str)
+          "Malformed rewiring string: input ~a is not of the form #(...)." str)
   (let* ((stripped-string (string-trim "#()" str))
          (tokens (first (tokenize stripped-string)))
          (integer-vec
@@ -268,7 +268,7 @@ BODY as an implicit PROGN."
                     ((eql (token-type token) :integer)
                      (token-payload token))
                     (t
-                     (error "Malformed rewiring string: unexpected token ~a" token))))
+                     (error "Malformed rewiring string: unexpected token ~a." token))))
                 tokens)))
     (make-rewiring-from-l2p integer-vec)))
 
@@ -305,7 +305,7 @@ BODY as an implicit PROGN."
               nil
               "Malformed rewiring pair string: length of rewirings don't match. ~@
                first:  ~A~@
-               second: ~A"
+               second: ~A."
               first-rewiring-string second-rewiring-string)
       (values (make-rewiring-from-string first-rewiring-string)
               (make-rewiring-from-string second-rewiring-string)))))

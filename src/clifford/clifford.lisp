@@ -195,7 +195,7 @@ NOTE: THERE IS NO CHECKING OF THE VALIDITY OF THE MAP. ANTICOMMUTATIVITY IS NOT 
                   (assert (string= "->" arrow))
                   (assert (pauli-string-p from-name)
                           ()
-                          "The symbol ~S is not a Pauli basis element" from)
+                          "The symbol ~S is not a Pauli basis element." from)
                   ;; Get the max dimension
                   (a:maxf num-qubits (dimension from-name) (dimension to-name))
                   ;; Record the map.

@@ -980,7 +980,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                               (expand-arguments binding env
                                                                 (expand-options binding env body)))))
                (t
-                (error "Malformed binding in compiler form: ~a" binding))))
+                (error "Malformed binding in compiler form: ~a." binding))))
            
            (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name elt-accessor elt-type test)
              (let* ((target-length (length seq))

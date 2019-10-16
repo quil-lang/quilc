@@ -69,7 +69,7 @@
     (typep b 'base4))
 
   (defun pack-base4 (x y)
-    "Bit pack X and Y (Y must be base 4)"
+    "Bit pack X and Y (Y must be base 4)."
     (check-type y base4)
     (logxor (ash x 2) y)))
 
