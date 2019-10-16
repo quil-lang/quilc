@@ -132,7 +132,9 @@
 (defmethod build-worst-cost ((state fidelity-addresser-state))
   (make-fidelity-cost :value most-positive-fixnum))
 
-(defmethod assign-weights-to-gates ((state fidelity-addresser-state) &optional (1q-descaling 1/10))
+(defparameter *fidelity-1q-descaling* 1/10)
+
+(defmethod assign-weights-to-gates ((state fidelity-addresser-state))
   (multiple-value-bind (max-value value-hash)
       (lscheduler-walk-graph (addresser-state-logical-schedule state)
                              :base-value 0
@@ -141,7 +143,7 @@
                                              ((typep instr 'gate-application)
                                               (case (length (application-arguments instr))
                                                 (1
-                                                 (+ 1q-descaling value))
+                                                 (+ *fidelity-1q-descaling* value))
                                                 (2
                                                  (+ 1 value))
                                                 (otherwise
