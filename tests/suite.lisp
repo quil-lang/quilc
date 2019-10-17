@@ -4,49 +4,32 @@
 
 (in-package #:cl-quil-tests)
 
-(defun run-cl-quil-tests (&key (verbose nil) (headless nil) (parallel nil))
-  "Run all CL-QUIL tests. If VERBOSE is T, print out lots of test info. If HEADLESS is T, disable interactive debugging and quit on completion. If PARALLEL is non-nil, it is the number of threads to use."
-  ;; Since each test is run in its own thread *and* each test may try
-  ;; to spin up subthreads, the minimum number of threads required is
-  ;; two. If we allow just a single thread, then any test which tries
-  ;; to run a subthread will block because there are no more threads
-  ;; available.
-  (check-type parallel (or null (integer 2)))
+(defun run-cl-quil-tests (&key (verbose nil) (headless nil) (num-threads 1))
+  "Run all CL-QUIL tests. If VERBOSE is T, print out lots of test info. If HEADLESS is T, disable interactive debugging and quit on completion. If NUM-THREADS is non-nil, it is the number of threads to use. "
+  (check-type num-threads (integer 1))
   ;; Bug in Fiasco commit fe89c0e924c22c667cc11c6fc6e79419fc7c1a8b
   (setf fiasco::*test-run-standard-output* (make-broadcast-stream
                                             *standard-output*))
   (let ((quil::*compress-carefully* t)
-        ;; Some tests make use of lparallel directly. If we don't set
-        ;; a kernel here, then the (non-parallel) test suite will
-        ;; pause and request that we create a kernel. To avoid that,
-        ;; we create a single thread kernel that ought to behave as if
-        ;; there was no parallelisation.
-        (lparallel:*kernel* (lparallel:make-kernel 2)))
+        ;; At least two threads will always be created. Tests, within
+        ;; their own threads, may request more threads to run
+        ;; sub-tests. If there were only one thread available, the
+        ;; sub-test's thread would wait for its parent thread
+        ;; (i.e. the parent test) to complete before it could
+        ;; start. Thus causing a deadlock.
+        (lparallel:*kernel* (lparallel:make-kernel (max 2 num-threads))))
     (cond
-      (parallel
-       (let ((lparallel:*kernel* (lparallel:make-kernel parallel))
-             (fiasco::*debug-on-unexpected-error* nil)
-             (fiasco::*debug-on-assertion-failure* nil)
-             (fiasco::*pretty-log-stream*
-               (make-instance 'fiasco::column-counting-output-stream
-                              :understream *standard-output*))
-             (fiasco::*run-test-function* #'pretty-run-test)
-             (fiasco::*context* nil))
-         (let ((tests (fiasco::children-of
-                       (fiasco::find-suite-for-package
-                        (fiasco::find-package ':cl-quil-tests)))))
-           (lparallel:pmapc (lambda (f)
-                              (let ((fiasco::*pretty-log-stream* nil)
-                                    (fiasco::*print-test-run-progress* nil)
-                                    (fiasco::*pretty-log-verbose-p* nil)
-                                    (fiasco::*test-run-standard-output* (make-broadcast-stream))
-                                    (*debug-io* (make-broadcast-stream)))
-                                (funcall f)
-                                (force-output)
-                                (format t ".")))
-                            (loop :for test :being :the :hash-values :of tests
-                                  :collect (fiasco::name-of test)))
-           (terpri))))
+      ((< 1 num-threads)
+       (let ((tests (fiasco::children-of
+                     (fiasco::find-suite-for-package
+                      (fiasco::find-package ':cl-quil-tests)))))
+         (lparallel:pmapc (lambda (f)
+                            (funcall f)
+                            (force-output)
+                            (format t "."))
+                          (loop :for test :being :the :hash-values :of tests
+                                :collect (fiasco::name-of test)))
+         (terpri)))
       ((null headless)
        (run-package-tests :package ':cl-quil-tests
                           :verbose verbose

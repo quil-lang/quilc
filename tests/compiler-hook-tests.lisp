@@ -194,12 +194,11 @@ RX(pi) 2
                         (parsed-prog
                           (make-instance
                            'quil::parsed-program
-                           :executable-code (make-array 1
-                                                        :initial-element (make-instance
-                                                                          'quil::gate-application
-                                                                          :operator (named-operator "RANDO-GATE")
-                                                                          :gate v
-                                                                          :arguments (mapcar #'qubit args)))))
+                           :executable-code (vector (make-instance
+                                                     'quil::gate-application
+                                                     :operator (named-operator "RANDO-GATE")
+                                                     :gate v
+                                                     :arguments (mapcar #'qubit args)))))
                         (processed-program
                           (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
                                                                                        :architecture arch))))
