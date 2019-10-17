@@ -602,7 +602,7 @@ mapping instructions to their tags. "
     (multiple-value-bind (max-value value-hash)
         (lscheduler-walk-graph lschedule
                                :base-value 1d0
-                               :bump-value (lambda (instr value) (let ((fid (fidelity-bumper instr value))) (format t "~/cl-quil:instruction-fmt/ -> ~a~%" instr fid) fid))
+                               :bump-value (lambda (instr value) (fidelity-bumper instr value))
                                :test-values #'fidelity-combinator)
       (declare (ignore max-value))
       (loop :with fidelity := 1d0
