@@ -603,7 +603,8 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         ;; or if we can add it to the schedule.
         (cond
           ;; if we found a link and the instruction is native...
-          ((hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr)
+          ((and (not (typep instr 'application-thread-invocation)) ; threads always need expansion
+                (hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr))
            (format *compiler-noise-stream*
                    "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"
                    instr
