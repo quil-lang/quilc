@@ -277,6 +277,8 @@
   "Helper function for APPEND-INSTRUCTIONS-TO-LSCHEDULE, called when the top instruction of INSTRS is an instance of PRAGMA COMMUTING_BLOCKS. Consumes items from INSTRS until PRAGMA END_COMMUTING_BLOCKS is encountered, and inserts the intervening BLOCKs into LSCHEDULE as instances of APPLICATION-THREAD-INVOCATION."
   (labels ((process-blocks-into-lists (instrs acc)
              (cond
+               ((endp instrs)
+                (error "Unexpected end inside of PRAGMA COMMUTING_BLOCKS."))
                ((typep (first instrs) 'pragma-commuting-blocks)
                 nil)
                ((typep (first instrs) 'pragma-end-commuting-blocks)
