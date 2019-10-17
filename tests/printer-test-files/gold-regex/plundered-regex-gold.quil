@@ -22,7 +22,6 @@ DEFGATE H1:
     0\.707\d+, 0\.707\d+
     0\.707\d+, -0\.707\d+
 
-
 H0 0
 H1 1
 
@@ -120,7 +119,6 @@ DEFCIRCUIT TELEPORT A q B:
     Z B
     LABEL @END
 
-
 H 0
 CNOT 0 5
 CNOT 1 0
@@ -153,7 +151,6 @@ DEFGATE FOO(%a):
 DEFGATE FOO\(%a(-UNUSED\d+){1,2}\):
     1\.0, 0\.0
     0\.0, 1\.0
-
 
 
 # Input

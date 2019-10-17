@@ -1,9 +1,13 @@
-(in-package :cl-quil)
+;;;; fill-delays.lisp
+;;;;
+;;;; Author: Erik Davis
+
+(in-package :cl-quil/quilt)
 
 (define-transform fill-delays (fill-delays)
   "This transform fills empty time on Quilt frames with explicit DELAY instructions in a greedy fashion."
   expand-calibrations
-  resolve-waveform-references)
+  quil::resolve-objects)
 
 ;;; Syntactic conveniences
 
@@ -46,7 +50,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     ((or pulse capture)
      (waveform-active-duration (resolved-waveform instr)))
     (delay
-     (constant-value (delay-duration instr)))
+      (constant-value (delay-duration instr)))
     (raw-capture
      (constant-value (raw-capture-duration instr)))
     (simple-frame-mutation
@@ -68,7 +72,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
      (delay-on-qubits
       (loop :for defn :in (parsed-program-frame-definitions parsed-program)
             :for frame := (frame-definition-frame defn)
-            :when (frame-on-p frame (delay-qubits qubits))
+            :when (frame-on-p frame (delay-qubits instr))
               :collect frame))
      (fence
       (loop :for defn :in (parsed-program-frame-definitions parsed-program)
@@ -91,9 +95,9 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 
 (defun frame-on-p (frame qubits)
   "Does FRAME involve exactly the specified QUBITS in the specified order?"
-  (list= (frame-qubits frame)
-         qubits
-         :test #'qubit=))
+  (quil::list= (frame-qubits frame)
+               qubits
+               :test #'qubit=))
 
 ;;; Frame Clocks
 ;;;
@@ -130,8 +134,8 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 
   (:method ((instr delay-on-qubits) clocks)
     (let ((frames (remove-if-not (lambda (f)
-                                    (frame-on-p f (delay-qubits instr)))
-                                  (tracked-frames clocks)))
+                                   (frame-on-p f (delay-qubits instr)))
+                                 (tracked-frames clocks)))
           (duration (quilt-instruction-duration instr)))
       (dolist (f frames)
         (incf (local-time clocks f) duration)))
@@ -147,10 +151,10 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
             :for lag := (- latest (local-time clocks f))
             ;; handle implicit delays
             :when (plusp lag)
-                  :do (incf (local-time clocks f) lag)
-                  :and :collect (make-instance 'delay-on-frames
-                                               :frames (list f)
-                                               :duration (constant lag)))))
+              :do (incf (local-time clocks f) lag)
+              :and :collect (make-instance 'delay-on-frames
+                                           :frames (list f)
+                                           :duration (constant lag)))))
 
   (:method ((instr swap-phase) clocks)
     (with-slots (left-frame right-frame) instr
@@ -201,11 +205,11 @@ If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so t
     (flet ((process-instr (instr)
              (unless (typep instr 'simple-quilt-instruction)
                (quil-parse-error "Cannot resolve timing information for non-Quilt instruction ~/quil:instruction-fmt/." instr))
-             ;; Synchronization is not needed with DELAYs
-             (unless (and omit-fences (typep instr 'fence))
-               (push instr new-instrs))
+             ;; Add delays before the instruction
              (dolist (delay (emit-delays instr frame-clocks))
-               (push delay new-instrs))))
+               (push delay new-instrs))
+             (unless (and omit-fences (typep instr 'fence))
+               (push instr new-instrs))))
       (loop :for instr :across (parsed-program-executable-code parsed-program)
             :do (process-instr instr))
       (when synchronize-at-end

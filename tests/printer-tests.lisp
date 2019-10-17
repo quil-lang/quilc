@@ -129,7 +129,6 @@ DEFCIRCUIT TEST(%a) b c:
     RZ(%a) b
     RZ(%a) c
 
-
 TEST(0.5) 0 1
 ")
          (after (parse-and-print-quil-to-string before :parser (lambda (string)

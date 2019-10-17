@@ -208,7 +208,7 @@ DEFGATE FOO:
     1/sqrt(2), -1/sqrt(2)
 
 INCLUDE \"~A\"" path)))
-      (signals quil::ambiguous-gate-or-circuit-definition
+      (signals quil::ambiguous-definition-condition
         (parse-quil test-quil :ambiguous-definition-handler #'identity)))))
 
 (deftest test-parsing-defgate-defcircuit-ambiguity ()
@@ -220,7 +220,7 @@ DEFGATE FOO(%a):
 DEFCIRCUIT FOO(%a) q:
     X q
 "))
-    (signals quil::ambiguous-gate-or-circuit-definition
+    (signals quil::ambiguous-definition-condition
       (parse-quil test-quil :ambiguous-definition-handler #'identity))))
 
 (deftest test-parsing-multiple-includes-good ()

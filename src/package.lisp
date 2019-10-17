@@ -103,10 +103,12 @@
    #:qubit                              ; STRUCTURE
    #:qubit-index                        ; READER
    #:qubit=                             ; FUNCTION
+   #:qubit-p                            ; FUNCTION
 
    #:constant                           ; STRUCTURE
    #:constant-value                     ; READER
    #:constant=                          ; FUNCTION
+   #:is-constant                        ; FUNCTION
 
    #:label                              ; STRUCTURE
    #:label-name                         ; ACCESSOR
@@ -127,18 +129,10 @@
    #:mref                               ; FUNCTION (CONSTRUCTOR)
    #:memory-ref-position                ; READER
    #:memory-ref-name                    ; READER
+   #:memory-ref=                        ; FUNCTION
    #:is-mref                            ; FUNCTION (PREDICATE)
    #:memory-name                        ; TYPE (STRUCTURE)
    #:memory-name-region-name            ; READER
-
-   #:frame                              ; STRUCTURE
-   #:frame-name                         ; READER
-   #:frame-qubits                       ; READER
-   #:frame=                             ; FUNCTION
-
-   #:waveform-ref                       ; STRUCTURE
-   #:waveform-ref-name                  ; READER
-   #:waveform-ref-args                  ; READER
 
    #:jump-target                        ; CLASS
    #:jump-target-p                      ; FUNCTION
@@ -325,6 +319,9 @@
    #:dagger-operator                    ; ADT CONSTRUCTOR
    #:operator-description-root-name     ; FUNCTION
    #:operator-description=              ; FUNCTION
+   #:operator-description-hash          ; FUNCTION
+   #:plain-operator-p                   ; FUNCTION
+   #:print-operator-description         ; FUNCTION
 
    #:application                        ; ABSTRACT CLASS
    #:application-operator               ; READER
@@ -336,50 +333,20 @@
    #:gate-application                   ; CLASS
    #:gate-application-gate              ; GENERIC, METHOD
 
-   #:pulse                              ; CLASS
-   #:pulse-frame                        ; READER
-   #:pulse-waveform                     ; READER
+   #:lexical-context                    ; GENERIC
 
-   #:capture                            ; CLASS
-   #:capture-frame                      ; READER
-   #:capture-waveform                   ; READER
-   #:capture-memory-ref                 ; READER
-
-   #:raw-capture                        ; CLASS
-   #:raw-capture-frame                  ; READER
-   #:raw-capture-duration               ; READER
-   #:raw-capture-memory-ref             ; READER
-
-   #:nonblocking-p                      ; READER
-
-   #:delay                              ; CLASS
-   #:delay-duration                     ; READER
-   #:delay-on-frames                    ; CLASS
-   #:delay-frames                       ; READER
-   #:delay-on-qubits                    ; READER
-   #:delay-qubits                       ; READER
-
-   #:fence                              ; CLASS
-   #:fence-qubits                       ; READER
-
-   #:simple-frame-mutation              ; ABSTRACT CLASS
-   #:set-frequency                      ; CLASS
-   #:set-phase                          ; CLASS
-   #:shift-phase                        ; CLASS
-   #:set-scale                          ; CLASS
-   #:frame-mutation-target-frame        ; READER
-   #:frame-mutation-value               ; READER
-
-   #:swap-phase                         ; CLASS
-   #:swap-phase-left-frame              ; READER
-   #:swap-phase-right-frame             ; READER
-
-   #:gate-definition                    ; CLASS
-   #:static-gate-definition             ; CLASS
-   #:parameterized-gate-definition      ; CLASS
+   #:gate-definition                    ; ABSTRACT CLASS
    #:gate-definition-name               ; READER
    #:gate-definition-entries            ; READER
+
+   #:matrix-gate-definition             ; CLASS
+   #:gate-definition-entries            ; READER
+
+   #:parameterized-gate-definition      ; CLASS
    #:gate-definition-parameters         ; READER
+
+   #:permutation-gate-definition            ; CLASS
+   #:permutation-gate-definition-parameters ; READER
 
    #:circuit-definition                 ; CLASS
    #:circuit-definition-name            ; READER
@@ -387,40 +354,15 @@
    #:circuit-definition-arguments       ; READER
    #:circuit-definition-body            ; READER
 
-   #:waveform-definition                ; ABSTRACT CLASS
-   #:static-waveform-definition         ; CLASS
-   #:parameterized-waveform-definition  ; CLASS
-   #:waveform-definition-name           ; READER
-   #:waveform-definition-entries        ; READER
-   #:waveform-definition-parameters     ; READER
-   #:waveform-definition-sample-rate    ; READER
-
-   #:calibration-definition             ; ABSTRACT CLASS
-   #:gate-calibration-definition        ; CLASS
-   #:measurement-calibration-definition ; ABSTRACT CLASS
-   #:measure-calibration-definition     ; CLASS
-   #:measure-discard-calibration-definition ; CLASS
-   #:calibration-definition-body        ; READER
-   #:calibration-definition-operator    ; READER
-   #:calibration-definition-parameters  ; READER
-   #:calibration-definition-arguments   ; READER
-   #:measurement-calibration-qubit      ; READER
-   #:measure-calibration-address        ; READER
-
-   #:frame-definition                   ; CLASS
-   #:frame-definition-frame             ; READER
-   #:frame-definition-sample-rate       ; READER
-   #:frame-definition-initial-frequency ; READER
-
-   #:parsed-program                     ; CLASS
-   #:parsed-program-gate-definitions    ; READER
-   #:parsed-program-circuit-definitions ; READER
-   #:parsed-program-waveform-definitions     ; READER
-   #:parsed-program-calibration-definitions  ; READER
-   #:parsed-program-frame-definitions   ; READER
-   #:parsed-program-memory-definitions  ; READER
-   #:parsed-program-executable-code     ; READER
-   #:print-parsed-program               ; FUNCTION
+   #:parsed-program                         ; CLASS
+   #:parsed-program-gate-definitions        ; READER
+   #:parsed-program-circuit-definitions     ; READER
+   #:parsed-program-waveform-definitions    ; READER
+   #:parsed-program-calibration-definitions ; READER
+   #:parsed-program-frame-definitions       ; READER
+   #:parsed-program-memory-definitions      ; READER
+   #:parsed-program-executable-code         ; READER
+   #:print-parsed-program                   ; FUNCTION
 
    #:*print-fractional-radians*         ; PARAMETER
    #:print-instruction                  ; FUNCTION
@@ -542,6 +484,7 @@
   (:export
    #:standard-qubit-relabeler           ; FUNCTION
    )
+
   (:shadow
    #:pi))
 

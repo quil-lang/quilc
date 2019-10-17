@@ -1,4 +1,8 @@
-(in-package :cl-quil)
+;;;; src/quilt/waveform.lisp
+;;;;
+;;;; Author: Erik Davis
+
+(in-package :cl-quil/quilt)
 
 ;;; Standard Waveform Definitions
 ;;;
@@ -59,7 +63,7 @@ Parameters:
        (defclass ,class-name (standard-waveform)
          ,slot-specs
          ,@(when documentation
-            `((:documentation ,documentation))))
+             `((:documentation ,documentation))))
 
        (setf (gethash ,quilt-name *quilt-to-waveform-class*) ',class-name)
        (setf (gethash ',class-name *waveform-class-parameter-alists*) ',quilt-param-alist)

@@ -155,16 +155,6 @@
          (quil-type-error "Memory reference ~/quil:instruction-fmt/ is used as a gate parameter but is not a REAL value."
                           param))))))
 
-(defun raw-capture-num-real-samples (instr)
-  (check-type instr raw-capture)
-  (let ((frame-defn (frame-name-resolution
-                     (raw-capture-frame instr))))
-    (if (frame-definition-sample-rate frame-defn)
-        (* 2                            ; real, imag
-           (constant-value (raw-capture-duration instr))
-           (constant-value (frame-definition-sample-rate frame-defn)))
-        nil)))
-
 ;;; real deal ;;;
 
 (defgeneric type-check-instr (instr memory-regions)
@@ -342,47 +332,6 @@
          (quil-type-error "MEASURE instruction target must be of type ~
                            BIT or INTEGER, but got ~/quil:instruction-fmt/ of type ~A."
                           (measure-address instr)
-                          (quil-type-string (memory-descriptor-type mdesc)))))))
-
-  ;; CAPTURE must target a REAL[2]
-  (:method ((instr capture) memory-regions)
-    (let* ((mref (capture-memory-ref instr))
-           (mdesc (find-descriptor-for-mref mref memory-regions)))
-      (enforce-mref-bounds mref mdesc)
-      (adt:match quil-type (memory-descriptor-type mdesc)
-        (quil-real
-         (if (> 2 (mref-available-length mref mdesc))
-             (quil-type-error "CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
-                               vector of length no less than 2."
-                              mref)
-             t))
-        (_
-         (quil-type-error "CAPTURE instruction target must be of type ~
-                           REAL, but got ~/quil:instruction-fmt/ of type ~A."
-                          mref
-                          (quil-type-string (memory-descriptor-type mdesc)))))))
-
-  ;; RAW-CAPTURE must target a REAL[n] where n is 2*(the number of iq values)
-  (:method ((instr raw-capture) memory-regions)
-    (let* ((mref (raw-capture-memory-ref instr))
-           (mdesc (find-descriptor-for-mref mref memory-regions))
-           (frame-defn (frame-name-resolution
-                        (raw-capture-frame instr))))
-      (enforce-mref-bounds mref mdesc)
-      (adt:match quil-type (memory-descriptor-type mdesc)
-        (quil-real
-         (a:if-let ((samples (raw-capture-num-real-samples instr)))
-           (if (> samples (mref-available-length mref mdesc))
-               (quil-type-error "RAW-CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
-                                 vector of length no less than ~A."
-                                mref
-                                samples))
-           (warn "RAW-CAPTURE on frame ~/quil:instruction-fmt/ with unknown sample rate."
-                 (frame-definition-frame frame-defn))))
-        (_
-         (quil-type-error "RAW-CAPTURE instruction target must be of type ~
-                           REAL, but got ~/quil:instruction-fmt/ of type ~A."
-                          mref
                           (quil-type-string (memory-descriptor-type mdesc)))))))
 
   ;; gate parameters must be REAL
