@@ -69,28 +69,9 @@
                   instr))))
       (mapcar #'relabel-instruction quil-block))))
 
-(defun destructure-definition (defn)
-  "Given a Quilt definition DEFN, return three values: a list of the parameters, a list of the formal arguments, and the definition body."
-  (etypecase defn
-    (circuit-definition (values (circuit-definition-parameters defn)
-                                (circuit-definition-arguments defn)
-                                (circuit-definition-body defn)))
-    (gate-calibration-definition (values (calibration-definition-parameters defn)
-                                         (calibration-definition-arguments defn)
-                                         (calibration-definition-body defn)))
-    (measure-calibration-definition (values nil
-                                            (list (measurement-calibration-qubit defn)
-                                                  (measure-calibration-address defn))
-                                            (calibration-definition-body defn)))
-    (measure-discard-calibration-definition (values nil
-                                                    (list (measurement-calibration-qubit defn))
-                                                    (calibration-definition-body defn)))))
-
-(defun instantiate-definition (defn params args)
-  "Fill in the given definition DEFN with the list of parameter and argument values PARAMS and ARGS."
-  (multiple-value-bind (defn-params defn-args defn-body)
-      (destructure-definition defn)
-    (assert (= (length params)
+(defun instantiate-definition-body (defn body defn-params params defn-args args)
+  "Fill in the body BODY of a definition DEFN, binding DEFN-PARAMS to PARAMS and DEFN-ARGS to ARGS."
+  (assert (= (length params)
                (length defn-params)))
     (assert (= (length args)
                (length defn-args)))
@@ -124,7 +105,7 @@
              (a:ensure-list
               (instantiate-instruction instr #'param-value #'arg-value))))
         (mapcan #'instantiate
-                (relabel-block-labels-uniquely defn-body))))))
+                (relabel-block-labels-uniquely body)))))
 
 (defun substitute-parameter (param-value)
   "Given a function PARAM-VALUE to compute the value of a PARAM object, return a function which takes either a PARAM, DELAYED-EXPRESSION, or CONSTANT and computes it's numerical value. Should always"
@@ -193,9 +174,9 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
                         (application-arguments instr))))
       (cond
         ((simple-dagger-operator-p (application-operator instr))
-         (let ((instrs (instantiate-definition (circuit-application-definition instr)
-                                               params
-                                               args)))
+         (let ((instrs (instantiate-instruction (circuit-application-definition instr)
+                                                params
+                                                args)))
            (dolist (instr instrs)
              (unless (unitary-instruction-p instr)
                (error "DAGGER cannot be applied to the impure instruction ~/quil:instruction-fmt/"
@@ -206,9 +187,9 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
            ;; applications
            (setf instrs (nreverse instrs))))
         ((plain-operator-p (application-operator instr))
-         (instantiate-definition (circuit-application-definition instr)
-                                 params
-                                 args))
+         (instantiate-instruction (circuit-application-definition instr)
+                                  params
+                                  args))
         (t
          (error "Unable to instantiate the modifiers in the complex instruction ~/quil:instruction-fmt/."
                 instr)))))
@@ -356,109 +337,16 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
           instr
           (make-instance 'measure :address addr :qubit q))))
 
-  (:method ((instr simple-frame-mutation) param-value arg-value)
-    (let ((frame (instantiate-frame (frame-mutation-target-frame instr)
-                                    arg-value))
-          (value (ensure-instantiated (frame-mutation-value instr)
-                                      arg-value)))
-      (if (and (frame= frame (frame-mutation-target-frame instr))
-               (constant= value (frame-mutation-value instr)))
-          instr
-          (make-instance (class-of instr)
-                         :frame frame
-                         :value value))))
-
-  (:method ((instr pulse) param-value arg-value)
-    (let ((frame (instantiate-frame (pulse-frame instr)
-                                    arg-value)))
-      (if (frame= frame (pulse-frame instr))
-          instr
-          (make-instance 'pulse
-                         :frame frame
-                         :waveform (pulse-waveform instr)
-                         :nonblocking (nonblocking-p instr)))))
-
-  (:method ((instr capture) param-value arg-value)
-    (let ((frame (instantiate-frame (capture-frame instr)
-                                    arg-value))
-          (memory-ref (ensure-instantiated (capture-memory-ref instr)
-                                           arg-value)))
-      (check-mref memory-ref)
-      (if (and (frame= frame (capture-frame instr))
-               (memory-ref= memory-ref (capture-memory-ref instr)))
-          instr
-          (make-instance 'capture
-                         :frame frame
-                         :waveform (capture-waveform instr)
-                         :memory-ref memory-ref
-                         :nonblocking (nonblocking-p instr)))))
-
-  (:method ((instr raw-capture) param-value arg-value)
-    (let ((frame (instantiate-frame (raw-capture-frame instr)
-                                    arg-value))
-          (memory-ref (ensure-instantiated (raw-capture-memory-ref instr)
-                                           arg-value))
-          (duration (ensure-instantiated (raw-capture-duration instr)
-                                         arg-value)))
-      (check-mref memory-ref)
-      (if (and (frame= frame (raw-capture-frame instr))
-               (memory-ref= memory-ref (raw-capture-memory-ref instr))
-               (constant= duration (raw-capture-duration instr)))
-          instr
-          (make-instance 'raw-capture
-                         :frame frame
-                         :duration duration
-                         :memory-ref memory-ref
-                         :nonblocking (nonblocking-p instr)))))
-
-  (:method ((instr delay-on-qubits) param-value arg-value)
-    (let ((duration (ensure-instantiated (delay-duration instr)
-                                         arg-value)))
-      (if (and (constant= duration (delay-duration instr))
-               (not (some #'is-formal (delay-qubits instr))))
-          instr
-          (make-instance 'delay-on-qubits
-                         :duration duration
-                         :qubits (mapcar (transform-if #'is-formal arg-value)
-                                         (delay-qubits instr))))))
-
-  (:method ((instr delay-on-frames) param-value arg-value)
-    (let* ((remake nil)
-           (duration (ensure-instantiated (delay-duration instr)
-                                          arg-value))
-           (frames (mapcar (flag-on-update remake
-                                           (lambda (f) (instantiate-frame f arg-value)))
-                           (delay-frames instr))))
-      (if (and (constant= duration (delay-duration instr))
-               (not remake))
-          instr
-          (make-instance 'delay-on-frames
-                         :duration duration
-                         :frames frames))))
-
-  (:method ((instr fence) param-value arg-value)
-    (let* ((remake nil)
-           (qubits (mapcar (flag-on-update remake
-                                           (lambda (q) (ensure-instantiated q arg-value))) 
-                           (fence-qubits instr))))
-      (if remake
-          (make-instance 'fence :qubits qubits)
-          instr))))
+  ;; Returns the definition body with parameters and arguments applied.
+  (:method ((instr circuit-definition) param-value arg-value)
+    (instantiate-definition-body instr
+                                 (circuit-definition-body instr)
+                                 (circuit-definition-parameters instr)
+                                 param-value
+                                 (circuit-definition-arguments instr)
+                                 arg-value)))
 
 (defun ensure-instantiated (obj arg-value)
   (if (is-formal obj)
       (funcall arg-value obj)
       obj))
-
-(defun instantiate-frame (frame arg-value)
-  "Instantiate FRAME with respect to the unary function ARG-VALUE, constructing a new frame if needed."
-  (let* ((remake nil)
-         (qubits (mapcar (flag-on-update remake
-                                         (lambda (q) (ensure-instantiated q arg-value)))
-                         (frame-qubits frame))))
-    (if remake
-        (let ((instantiated (frame qubits (frame-name frame))))
-          (setf (frame-name-resolution instantiated)
-                (frame-name-resolution frame))
-          instantiated)
-        frame)))

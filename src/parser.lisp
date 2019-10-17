@@ -13,7 +13,10 @@
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
     :DECLARE :SHARING :OFFSET :PRAGMA
-    :AS :MATRIX :PERMUTATION
+    :AS :MATRIX :PERMUTATION))
+
+(deftype quilt-keyword ()
+  '(member
     :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
     :NONBLOCKING
     :DEFWAVEFORM :DEFCAL :DEFFRAME
@@ -22,6 +25,7 @@
 (deftype token-type ()
   '(or
     quil-keyword
+    quilt-keyword
     (member
      :COLON :LEFT-PAREN :RIGHT-PAREN :COMMA :LABEL-NAME :PARAMETER
      :STRING :INDENTATION :INDENT :DEDENT :COMPLEX :PLUS
@@ -114,6 +118,7 @@
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
+  ;; both Quil and Quilt keywords are handled here
   ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|NONBLOCKING|DEFWAVEFORM|DEFCAL|DEFFRAME|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
@@ -314,6 +319,9 @@ the immediately preceding line."
 (defvar *formal-arguments-allowed* nil
   "Dynamic variable to control whether formal parameters and arguments are allowed in the current parsing context.")
 
+(defvar *parser-extensions* '()
+  "A list of parsers which may be invoked when PARSE-PROGRAM-LINES encounters tokens beyond vanilla-quil.")
+
 (defparameter *parse-context* nil
   "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
 
@@ -412,66 +420,12 @@ the immediately preceding line."
       ((:LOAD :STORE :EQ :GT :GE :LT :LE)
        (parse-trinary-classical tok-type tok-lines))
 
-      ;; Quilt frame mutation
-      ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
-       (parse-simple-frame-mutation tok-type tok-lines))
-
-      ;; Quilt phase swap
-      ((:SWAP-PHASE)
-       (parse-swap-phase tok-lines))
-
-      ;; Quilt pulse
-      ((:PULSE)
-       (parse-pulse tok-lines))
-
-      ;; Quilt delay
-      ((:DELAY)
-       (parse-delay tok-lines))
-
-      ;; Quilt fence
-      ((:FENCE)
-       (parse-fence tok-lines))
-
-      ;; Quilt capture
-      ((:CAPTURE)
-       (parse-capture tok-lines))
-
-      ;; Quilt raw capture
-      ((:RAW-CAPTURE)
-       (parse-raw-capture tok-lines))
-
-      ;; Nonblocking modifier for Quilt op
-      ((:NONBLOCKING)
-       (parse-nonblocking-op tok-lines))
-
-      ;; Quilt waveform definition
-      ((:DEFWAVEFORM)
-       (unless *definitions-allowed*
-         (quil-parse-error "Found DEFWAVEFORM where it's not allowed."))
-
-       (let ((*definitions-allowed* nil)
-             (*formal-arguments-allowed* t))
-         (parse-waveform-definition tok-lines)))
-
-      ;; Quilt calibration definition
-      ((:DEFCAL)
-       (unless *definitions-allowed*
-         (quil-parse-error "Found DEFCAL where it's not allowed."))
-
-       (let ((*definitions-allowed* nil)
-             (*formal-arguments-allowed* t))
-         (parse-calibration-definition tok-lines)))
-
-      ;; Quilt frame definition
-      ((:DEFFRAME)
-       (unless *definitions-allowed*
-         (quil-parse-error "Found DEFFRAME where it's not allowed."))
-
-       (let ((*definitions-allowed* nil)
-             (*formal-arguments-allowed* nil))
-         (parse-frame-definition tok-lines)))
-
       (otherwise
+       (dolist (parser *parser-extensions*)
+         (multiple-value-bind (obj rest-lines)
+             (funcall parser tok-lines)
+             (when obj
+               (return-from parse-program-lines (values obj rest-lines)))))
        (quil-parse-error "Got an unexpected token of type ~S ~
                           when trying to parse a program." tok-type)))))
 
@@ -560,6 +514,10 @@ In accordance with the typical usage here, there are two values returned: the re
                                     "a name")))))
 
 (defun parse-memory-or-formal-token (tok &key ensure-valid)
+  "Parse the token TOK as a memory reference or formal argument.
+
+If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an error unless 'foo' has been DECLAREd."
+  (declare (special *memory-region-names*)) ; Forward declaration
   (cond
     ;; Actual address to measure into.
     ((eql ':AREF (token-type tok))
@@ -947,6 +905,7 @@ In accordance with the typical usage here, there are two values returned: the re
              (parse-arithmetic-tokens entry :eval t)))
     (mapcar #'simplify entries)))
 
+;;; This is used for both Quil and Quilt
 (defun parse-gate-or-waveform-entries (tok-lines &key require-indent)
   "Parse comma separated gate or waveform entries from TOK-LINES. Returns the the parsed entries as well as the remaining lines. If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly indented."
   ;; Do we have any lines to parse?
@@ -1369,241 +1328,6 @@ In accordance with the typical usage here, there are two values returned: the re
            (push parsed parsed-body)
            (setf tok-lines rest-lines)))))))
 
-(defun parse-pulse (tok-lines)
-  (match-line ((op :PULSE) &rest rest-toks) tok-lines
-    (multiple-value-bind (frame rest-toks)
-        (parse-frame rest-toks)
-      (multiple-value-bind (waveform-ref rest)
-          (parse-waveform-ref rest-toks)
-        (unless (endp rest)
-          (quil-parse-error "Unexpected token ~A at end of PULSE instruction." (first rest)))
-        (make-instance 'pulse
-                       :frame frame
-                       :waveform waveform-ref)))))
-
-(defun parse-delay (tok-lines)
-  (match-line ((op :DELAY) &rest rest-toks) tok-lines
-    (let (qubits
-          frame-names
-          duration)
-
-      (multiple-value-bind (qubit-toks remaining)
-          (take-until (lambda (tok)
-                        (not (member (token-type tok) '(:NAME :INTEGER))))
-                      rest-toks)
-        (when (endp qubit-toks)
-          (quil-parse-error "Expected one or more qubits specified in DELAY instruction."))
-        (setf qubits (mapcar #'parse-qubit qubit-toks))
-        (setf rest-toks remaining))
-
-      (multiple-value-bind (frame-name-toks duration-toks)
-          (take-until (lambda (tok)
-                        (not (eql ':STRING (token-type tok))))
-                      rest-toks)
-        (when (endp duration-toks)
-          (quil-parse-error "Expected a duration in DELAY instruction."))
-        (setf frame-names (mapcar #'token-payload frame-name-toks))
-        (setf duration (parse-parameter-or-expression duration-toks)))
-
-      (if frame-names
-          (make-instance 'delay-on-frames
-                         :duration duration
-                         :frames (mapcar (lambda (name)
-                                           (frame qubits name))
-                                         frame-names))
-          (make-instance 'delay-on-qubits
-                         :duration duration
-                         :qubits qubits)))))
-
-(defun parse-fence (tok-lines)
-  (match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines
-    (make-instance 'fence
-                   :qubits (mapcar #'parse-qubit (cons qubit other-qubit-toks)))))
-
-(defun parse-capture (tok-lines)
-  (match-line ((op :CAPTURE) &rest rest-toks) tok-lines
-    (multiple-value-bind (frame rest-toks)
-        (parse-frame rest-toks)
-      (unless (= 1 (length (frame-qubits frame)))
-        (quil-parse-error "CAPTURE instruction is only applicable to single-qubit frames."))
-      (when (endp rest-toks)
-        (quil-parse-error "CAPTURE instruction is missing waveform reference."))
-      (multiple-value-bind (waveform-ref rest-toks)
-          (parse-waveform-ref rest-toks)
-        (when (endp rest-toks)
-          (quil-parse-error "CAPTURE instruction is missing memory reference."))
-        (unless (endp (rest rest-toks))
-          (quil-parse-error "Unexpected token ~A in CAPTURE" (cadr rest-toks)))
-        (let ((address-obj (parse-memory-or-formal-token (first rest-toks)
-                                                         :ensure-valid t)))
-          (make-instance 'capture
-                         :frame frame
-                         :waveform waveform-ref
-                         :memory-ref address-obj))))))
-
-
-(defun parse-raw-capture (tok-lines)
-  (match-line ((op :RAW-CAPTURE) &rest rest-toks) tok-lines
-    (multiple-value-bind (frame rest-toks)
-        (parse-frame rest-toks)
-      (unless (= 1 (length (frame-qubits frame)))
-        (quil-parse-error "RAW-CAPTURE instruction is only applicable to single-qubit frames."))
-      (unless (= 2 (length rest-toks))
-        (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
-      (let ((duration (parse-argument (first rest-toks)))
-            (addr (parse-memory-or-formal-token (second rest-toks) :ensure-valid t)))
-        (unless (or (and (is-constant duration)
-                         (realp (constant-value duration)))
-                    (is-formal duration))
-          (quil-parse-error "Expected RAW-CAPTURE duration to be a real number or formal argument."))
-        (make-instance 'raw-capture
-                       :frame frame
-                       :duration duration
-                       :memory-ref addr)))))
-
-(defun parse-nonblocking-op (tok-lines)
-  (let* ((line (first tok-lines))
-         (mod (first line))
-         (op (second line)))
-    (when (null op)
-      (quil-parse-error "Unexpected line format. NONBLOCKING should be followed by a pulse or capture operation."))
-
-    (unless (eq ':NONBLOCKING (token-type mod))
-      (disappointing-token-error mod "NONBLOCKING"))
-
-    (unless (member (token-type op) '(:PULSE :CAPTURE :RAW-CAPTURE))
-      (disappointing-token-error op "a pulse or capture operation"))
-
-    (multiple-value-bind (op-instr rest-lines)
-        (parse-program-lines (cons (rest line)
-                                   (rest tok-lines)))
-      (setf (nonblocking-p op-instr) t)
-      (values op-instr
-              rest-lines))))
-
-(defun parse-simple-frame-mutation (tok-type tok-lines)
-  (match-line ((op tok-type) &rest rest-toks) tok-lines
-    (multiple-value-bind (frame value-toks)
-        (parse-frame rest-toks)
-      (let ((result (parse-parameter-or-expression value-toks)))
-        (make-instance
-         (ecase tok-type
-           ((:SET-FREQUENCY) 'set-frequency)
-           ((:SET-PHASE)     'set-phase)
-           ((:SHIFT-PHASE)   'shift-phase)
-           ((:SET-SCALE)     'set-scale))
-         :frame frame
-         :value result)))))
-
-(defun parse-swap-phase (tok-lines)
-  (match-line ((op :SWAP-PHASE) &rest rest-toks) tok-lines
-      (multiple-value-bind (left-frame rest-toks)
-          (parse-frame rest-toks)
-        (multiple-value-bind (right-frame rest-toks)
-            (parse-frame rest-toks)
-          (unless (endp rest-toks)
-            (quil-parse-error "Unexpected token ~A in SWAP-PHASE"
-                              (token-type (first rest-toks))))
-          (make-instance 'swap-phase
-                         :left-frame left-frame
-                         :right-frame right-frame)))))
-
-(defun parse-frame (toks)
-  "Parse a frame from the list of tokens TOKS. Returns the frame and the remaining tokens."
-  (multiple-value-bind (qubit-toks rest-toks)
-      (take-until (lambda (tok) (eql ':STRING (token-type tok)))
-                  toks)
-    (let ((qubits (mapcar #'parse-qubit qubit-toks)))
-      (when (endp rest-toks)
-        (quil-parse-error "Expected a frame name in ~A, but none were found (did you forget quotes?)"
-                          *parse-context*))
-      (values
-       (frame qubits (token-payload (first rest-toks))) ; frame name
-       (rest rest-toks)))))
-
-(defun parse-sample-rate (toks)
-  "Parse a sample rate from TOKS, consuming all tokens and returning a constant."
-  (assert *parse-context*)
-  (unless toks
-    (quil-parse-error "~A requires a sample rate, but none was given."
-                      *parse-context*))
-  (when (< 1 (length toks))
-    (quil-parse-error "~A sample rate may not be a compound arithmetic expression."
-                      *parse-context*))
-  (let ((rate (parse-arithmetic-tokens toks)))
-    (unless (realp rate)
-      (quil-parse-error "Expected a real number for ~A sample rate, but got ~A instead."
-                        *parse-context*
-                        rate))
-    (unless (plusp rate)
-      (quil-parse-error "Expected sample rate for ~A to be strictly positive, but got ~A instead."
-                        *parse-context*
-                        rate))
-    (constant rate)))
-
-(defun parse-waveform-definition (tok-lines)
-  "Parse a waveform definition from the token lines TOK-LINES."
-  ;; Check that we have tokens left
-  (when (null tok-lines)
-    (quil-parse-error "EOF reached when waveform definition expected"))
-
-  ;; Get the parameter and body lines
-  (let (name
-        sample-rate)
-    (destructuring-bind (parameter-line &rest body-lines) tok-lines
-      (destructuring-bind (op . params-args) parameter-line
-        ;; Check that we are dealing with a DEFWAVEFORM.
-        (unless (eql ':DEFWAVEFORM (token-type op))
-          (disappointing-token-error op "DEFWAVEFORM"))
-
-        ;; Check that something is following the DEFWAVEFORM.
-        (when (null params-args)
-          (quil-parse-error "Expected more after DEFWAVEFORM token"))
-
-        ;; Check for a name.
-        (unless (eql ':NAME (token-type (first params-args)))
-          (disappointing-token-error (first params-args) "a name"))
-
-        ;; We have a name. Stash it away.
-        (setf name (token-payload (pop params-args)))
-
-        (multiple-value-bind (params rest-line) (parse-parameters params-args)
-
-          (setf sample-rate (parse-sample-rate (butlast rest-line)))
-
-          ;; Check for colon and incise it.
-          (let ((maybe-colon (last rest-line)))
-            (when (or (null maybe-colon)
-                      (not (eql ':COLON (token-type (first maybe-colon)))))
-              (quil-parse-error "Expected a colon terminating the first line of DEFWAVEFORM.")))
-
-          (let ((*arithmetic-parameters* nil)
-                (*segment-encountered* nil))
-            (multiple-value-bind (parsed-entries rest-lines)
-                (parse-gate-or-waveform-entries body-lines :require-indent t)
-              ;; Check that we only refered to parameters in our param list.
-              (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
-                    :unless (find (param-name body-p) params :key #'param-name
-                                                             :test #'string=)
-                      :do (quil-parse-error
-                           "The parameter ~A was found in the body of the waveform definition of ~
-                           ~A but wasn't in the declared parameter list."
-                           (param-name body-p)
-                           name))
-              (let ((param-symbols
-                      ;; Make sure we have symbols for everything. Collect
-                      ;; a list of them in the same order as PARAMS.
-                      (loop :for p :in params
-                            :for found-p := (assoc (param-name p) *arithmetic-parameters*
-                                                   :key #'param-name
-                                                   :test #'string=)
-                            :if (null found-p)
-                              :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
-                            :else
-                              :collect (second found-p))))
-                (values (make-waveform-definition name param-symbols parsed-entries sample-rate :context op)
-                        rest-lines)))))))))
-
 (defun parse-parameters (params-args &key allow-expressions)
   "Parse a list of parameters, surrounded by a pair of parentheses. Returns the parsed parameters and the remaining tokens.
 
@@ -1647,238 +1371,6 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                   (parse-parameter (first toks))))))
       (values (mapcar parse-op entries)
               rest-line))))
-
-(defun parse-waveform-parameter-and-value (toks)
-  (let ((name (first toks))
-        (colon (second toks))
-        (value-expr (rest (rest toks))))
-    (unless (and name
-                 colon
-                 value-expr
-                 (eql ':NAME (token-type name))
-                 (eql ':COLON (token-type colon)))
-      (quil-parse-error "Waveform parameters must be provided by name. Exected <name>: <value>."))
-    (cons
-     (param (token-payload name))
-     (parse-parameter-or-expression value-expr))))
-
-(defun parse-waveform-parameter-alist (params-args)
-  (unless (eql ':LEFT-PAREN (token-type (first params-args)))
-    (return-from parse-waveform-parameter-alist (values nil params-args)))
-
-  ;; Remove :LEFT-PAREN
-  (pop params-args)
-
-  ;; Parse out the parameters enclosed.
-  (multiple-value-bind (found-params rest-line)
-      (take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (token-type x)))
-                           params-args)
-
-    ;; Error if we didn't find a right parenthesis.
-    (when (endp rest-line)
-      (quil-parse-error "No matching right paren in~@[ ~A~] parameters" *parse-context*))
-
-    ;; Remove right paren and stash away params.
-    (pop rest-line)
-
-    ;; Parse out the parameters.
-    (let ((entries
-            (split-sequence:split-sequence-if
-             (lambda (tok)
-               (eq ':COMMA (token-type tok)))
-             found-params)))
-      (values (mapcar #'parse-waveform-parameter-and-value entries)
-              rest-line))))
-
-(defun parse-calibration-definition (tok-lines)
-  "Parse out a calibration definition from the lines of tokens TOK-LINES."
-
-  ;; Check that we have tokens left to parse.
-  (when (null tok-lines)
-    (quil-parse-error "EOF reached when calibration definition expected"))
-
-  (let (operator
-        arguments)
-    ;; Split off the header line from the body lines.
-    (destructuring-bind (parameter-line &rest body-lines) tok-lines
-      ;; Check that we have a well-formed header line.
-      (destructuring-bind (decal-tok . rest-line) parameter-line
-        ;; We must be working with a DEFCAL
-        (unless (eql ':DEFCAL (token-type decal-tok))
-          (quil-parse-error "DEFCAL expected. Got ~S"
-                            (token-type decal-tok)))
-
-        ;; Check that there are tokens following DEFCAL.
-        (when (null rest-line)
-          (quil-parse-error "Expected more after DEFCAL token"))
-
-        (let ((is-measure-calibration (eql ':MEASURE (token-type (first rest-line)))))
-
-          (cond (is-measure-calibration (pop rest-line))
-                (t
-                 ;; Build an operator description, consuming tokens from REST-LINE
-                 (multiple-value-bind (modifiers remaining)
-                     (take-until (complement #'gate-modifier-token-p) rest-line)
-
-                   (setf rest-line remaining)
-
-                   ;; Check for name.
-                   (unless (eql ':NAME (token-type (first rest-line)))
-                     (quil-parse-error "Expected a name for the gate calibration."))
-
-                   (let ((name (token-payload (pop rest-line))))
-                     (setf operator (apply-modifiers-to-operator
-                                     (mapcar (lambda (tok)
-                                               (list (token-type tok)))
-                                             (reverse modifiers))
-                                     (named-operator name)))))))
-
-          (let ((*formal-arguments-allowed* t))
-            (multiple-value-bind (params rest-line) (parse-parameters rest-line :allow-expressions t)
-              (when (and is-measure-calibration
-                         (not (null params)))
-                (quil-parse-error "MEASURE calibrations do not support parameters."))
-
-              (dolist (param params)
-                (unless (or (is-constant param)
-                            (is-param param))
-                  (quil-parse-error "Unexpected parameter type ~A in DEFCAL."
-                                    (type-of param))))
-
-              ;; Check for colon and incise it.
-              (let ((maybe-colon (last rest-line)))
-                (when (or (null maybe-colon)
-                          (not (eql ':COLON (token-type (first maybe-colon)))))
-                  (quil-parse-error "Expected a colon in DEFCAL"))
-                (setf rest-line (butlast rest-line)))
-
-              ;; Collect arguments and stash them away.
-              (setf arguments (mapcar #'parse-qubit rest-line))
-
-              (when (and is-measure-calibration
-                         (> (length arguments) 2))
-                (quil-parse-error "Too many arguments for DEFCAL MEASURE."))
-
-              (multiple-value-bind (parsed-body remaining-lines)
-                  (parse-indented-body body-lines)
-                (values
-                 (cond ((and is-measure-calibration
-                             (null (second arguments)))
-                        (make-instance 'measure-discard-calibration-definition
-                                       :qubit (first arguments)
-                                       :body parsed-body
-                                       :context decal-tok))
-                       (is-measure-calibration
-                        (make-instance 'measure-calibration-definition
-                                       :qubit (first arguments)
-                                       :address (second arguments)
-                                       :body parsed-body
-                                       :context decal-tok))
-                       (t
-                        (make-instance 'gate-calibration-definition
-                                       :operator operator
-                                       :parameters params
-                                       :arguments arguments
-                                       :body parsed-body
-                                       :context decal-tok)))
-                 remaining-lines)))))))))
-
-(defun parse-frame-definition-body (lines &optional argument-plist)
-  "Parse the body of a frame definition from the given LINES. Returns a plist of property-value pairs, along with the remaining lines."
-  (when (endp lines)
-    (return-from parse-frame-definition-body
-      (values argument-plist lines)))
-  (let ((line (first lines)))
-    ;; we parse until DEDENT
-    (when (eql ':DEDENT (token-type (first line)))
-      (pop (first lines))
-      (return-from parse-frame-definition-body
-        (values argument-plist lines)))
-    (when (< 3 (length line))
-      (quil-parse-error "DEFFRAME body lines should be of the form <property>: <value>"))
-    (destructuring-bind (property-tok col-tok &rest value-toks) line
-      (unless (eql ':NAME (token-type property-tok))
-        (disappointing-token-error property-tok "an identifier"))
-      (unless (eql ':COLON (token-type col-tok))
-        (disappointing-token-error col-tok "a colon"))
-      (let* ((property-name (intern (token-payload property-tok)
-                                    ':keyword))
-             (property-value (case property-name
-                               ((:SAMPLE-RATE)
-                                (parse-sample-rate value-toks))
-                               ((:INITIAL-FREQUENCY
-                                 (let ((freq (parse-parameter-or-expression value-toks)))
-                                   (unless (and (constantp freq)
-                                                (plusp (constant-value freq)))
-                                     (quil-parse-error "Expected INITIAL-FREQUENCY to be a positive real, but got ~/quil:instruction-fmt/."
-                                                       freq))
-                                   freq)))
-                               (otherwise
-                                (quil-parse-error "Unknown property ~A in DEFFRAME. Note: This is case sensitive."
-                                                  property-name)))))
-        (when (getf argument-plist property-name)
-          (quil-parse-error "Duplicate property ~A in DEFFRAME body" property-name))
-        (parse-frame-definition-body (rest lines)
-                                     (cons property-name
-                                           (cons property-value
-                                                 argument-plist)))))))
-
-(defun parse-frame-definition (tok-lines)
-  "Parse a frame definition from TOK-LINES."
-  (when (null tok-lines)
-    (quil-parse-error "EOF reached when frame definition was expected."))
-  (destructuring-bind (defframe-tok . frame-toks) (first tok-lines)
-      (unless (eql ':DEFFRAME (token-type defframe-tok))
-        (quil-parse-error "DEFFRAME exoected. Got ~A"
-                          (token-type defframe-tok)))
-
-      (when (null frame-toks)
-        (quil-parse-error "Expected a frame after DEFFRAME token."))
-
-      (multiple-value-bind (frame rest-line)
-          (parse-frame frame-toks)
-        ;; empty frame definition, no body
-        (when (endp rest-line)
-          (return-from parse-frame-definition
-            (values
-             (make-instance 'frame-definition
-                            :frame frame
-                            :context defframe-tok)
-             (rest tok-lines))))
-        ;; nonempty body, so we pull the parameters
-        (symbol-macrolet ((next-line (cadr tok-lines)))
-          (unless (and (= 1 (length rest-line))
-                       (eql ':COLON (token-type (first rest-line)))
-                       ;; next token is indentation
-                       (eql ':INDENT (token-type (first next-line))))
-            (quil-parse-error "Expected DEFFRAME line to be followed by a colon (:) and an indented body."))
-          ;; remove the indent token
-          (pop next-line))
-        (multiple-value-bind (plist rest-lines)
-            (parse-frame-definition-body (rest tok-lines))
-          (values
-           (apply #'make-instance 'frame-definition
-                  :frame frame
-                  :context defframe-tok
-                  plist)
-           rest-lines)))))
-
-(defun parse-waveform-ref (toks)
-  "Parse a waveform reference from the tokens TOKS. Returns the refererence and the remaining tokens."
-  (when (endp toks)
-    (quil-parse-error "Expected a waveform reference."))
-  (let ((name-tok (first toks))
-        (rest-toks (rest toks)))
-    (unless (eql :NAME (token-type name-tok))
-      (quil-parse-error "Expected a NAME when parsing waveform reference~@[ in ~A~]."
-                        name-tok))
-    (if (endp rest-toks)
-        (waveform-ref (token-payload name-tok))
-        (multiple-value-bind (param-alist rest)
-            (parse-waveform-parameter-alist rest-toks)
-          (values
-           (%waveform-ref (token-payload name-tok) param-alist)
-           rest)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -2074,32 +1566,6 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; Entry Point ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(define-condition ambiguous-definition ()
-  ((conflicts :initarg :conflicts :reader ambiguous-definition-conflicts
-              :documentation "A list of (filename . definition) pairs which conflict."))
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) definitions."))
-
-(define-condition ambiguous-memory-declaration (ambiguous-definition)
-  ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DECLARE forms."))
-
-(define-condition ambiguous-gate-or-circuit-definition (ambiguous-definition)
-  ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFGATE or DEFCIRCUIT forms."))
-
-(define-condition ambiguous-waveform-definition (ambiguous-definition)
-  ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFWAVEFORM forms."))
-
-(define-condition ambiguous-calibration-definition (ambiguous-definition)
-  ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFCAL forms."))
-
-(define-condition ambiguous-frame-definition (ambiguous-definition)
-  ()
-  (:documentation "A condition indicating the presence of multiple (possibly conflicting) DEFFRAME forms."))
 
 (defun parse-quil-into-raw-program (string)
   "Parse a string STRING into a list of raw Quil syntax objects."

@@ -92,11 +92,12 @@ appropriate method of comparison."
 
 (defun list= (xs ys &key (key #'identity) (test #'equal))
   "Checks whether lists XS and YS are equal, element-by-element."
-  (loop :for x :in xs
-        :for y :in ys
-        :always (funcall test
-                         (funcall key x)
-                         (funcall key y))))
+  (if (or (endp xs) (endp ys))
+      (and (endp xs) (endp ys))         ; if one is empty, both should be empty
+      (and (funcall test
+                    (funcall key (car xs))
+                    (funcall key (car ys)))
+           (list= (cdr xs) (cdr ys) :key key :test test))))
 
 (defun reduce-append (lists)
   "Append all of the lists of LISTS together. Called 'concat' in some other languages. Equivalent to (REDUCE #'APPEND LISTS)."

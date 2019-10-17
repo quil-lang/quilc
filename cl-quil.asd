@@ -49,7 +49,6 @@
                (:file "transformable-mixin")
                (:file "classical-memory")
                (:file "ast")
-               (:file "waveform")
                (:file "resource")
                (:file "define-pragma")
                (:file "pragmas")
@@ -92,8 +91,6 @@
                              (:file "compress-qubits")
                              (:file "expansion")
                              (:file "expand-circuits")
-                             (:file "expand-calibrations")
-                             (:file "fill-delays")
                              (:file "rewrite-arithmetic")
                              (:file "fusion")
                              (:file "simplify-arithmetic")))
@@ -198,3 +195,44 @@
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':cl-quil.tweedledum
                                            '#:run-tweedledum-tests)))
+
+(asdf:defsystem #:cl-quil/quilt
+  :description "Quil language extensions for pulse level quantum control."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :maintainer "Rigetti Computing"
+  :author "Rigetti Computing"
+  :depends-on (#:cl-quil)
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/quilt-tests)))
+  :around-compile (lambda (compile)
+                    (let (#+sbcl(sb-ext:*derive-function-types* t))
+                      (funcall compile)))
+  :pathname "src/quilt/"
+  :serial t
+  :components ((:file "package")
+               (:file "ast")
+               (:file "parser")
+               (:file "waveform")
+               (:module "analysis"
+                :serial t
+                :components ((:file "resolve-objects")
+                             (:file "expand-calibrations")
+                             (:file "type-safety")
+                             (:file "fill-delays")))
+               (:file "cl-quilt")))
+
+(asdf:defsystem #:cl-quil/quilt-tests
+  :description "Regression tests for Quilt language extensions to CL-QUIL."
+  :author "Rigetti Computing"
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil-tests
+               #:cl-quil/quilt)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil/quilt-tests
+                                           '#:run-quilt-tests))
+  :pathname "tests/quilt/"
+  :serial t
+  :components ((:file "package")
+               (:file "suite")
+               (:file "parser-tests")
+               (:file "calibration-tests")
+               (:file "analysis-tests")))

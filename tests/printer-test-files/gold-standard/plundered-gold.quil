@@ -101,7 +101,6 @@ DEFCIRCUIT TEST a b:
     MOVE a b
     EXCHANGE a b
 
-
 NOT ro[0]
 AND ro[0] ro[1]
 IOR ro[0] ro[1]
@@ -212,7 +211,6 @@ DEFGATE CPHASE(%theta):
     0.0, 0.0, 1.0, 0.0
     0.0, 0.0, 0.0, CIS(((pi)+%theta))
 
-
 CPHASE(1.0) 0 1
 
 # Input
@@ -228,7 +226,6 @@ BASIC(1.0) 1
 DEFGATE BASIC(%alpha):
     1.0, 0.0
     0.0, %alpha
-
 
 BASIC(1.0) 1
 
@@ -248,7 +245,6 @@ DEFCIRCUIT EULER(%alpha, %beta, %gamma) q:
     RY(%beta) q
     RZ(%gamma) q
 
-
 RX(pi) 0
 RY(2*pi) 0
 RZ(3*pi/2) 0
@@ -266,7 +262,6 @@ GEN-GATE(0,1,2,3) 0
 DEFGATE GEN-GATE(%a, %b, %c, %d):
     %a, %b
     %c, %d
-
 
 GEN-GATE(0.0, 1.0, 2.0, 3.0) 0
 
@@ -1205,7 +1200,6 @@ DEFGATE CY(%theta):
     0.0, 1.0, 0.0, 0.0
     0.0, 0.0, COS(%theta), -(SIN(%theta))
     0.0, 0.0, SIN(%theta), COS(%theta)
-
 
 CY(pi/4) 1 0
 
