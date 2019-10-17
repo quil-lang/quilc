@@ -151,7 +151,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
         (when (and
                program-depth-limit
                (< program-depth-limit
-                  (let ((lschedule (make-instance 'quil::lscheduler-empty)))
+                  (let ((lschedule (quil::make-lscheduler)))
                     (quil::append-instructions-to-lschedule lschedule instruction-list)
                     (quil::lscheduler-calculate-depth lschedule))))
           (pop instruction-list)

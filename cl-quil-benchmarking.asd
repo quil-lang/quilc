@@ -5,4 +5,5 @@
   :serial t
   :components ((:file "package")
                (:file "rewiring-analysis")
+               (:file "program-size")
                (:file "suite")))
