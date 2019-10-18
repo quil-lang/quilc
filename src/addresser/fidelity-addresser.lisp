@@ -34,7 +34,7 @@
              (instruction-expansion
                (let ((*compress-carefully* nil))
                  (expand-to-native-instructions (list instr) chip-spec))))
-        (setf instr-cost (- (log (calculate-instructions-fidelity instruction-expansion chip-spec))))
+        (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
         
         ;; then, see if there's a non-naive cost available
         (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
@@ -48,8 +48,8 @@
                       (subschedule (chip-schedule-from-carving-point
                                     (addresser-state-chip-schedule state) resource carving-point))
                       (preceding-fidelity
-                       (calculate-instructions-fidelity subschedule
-                                                        (addresser-state-chip-specification state))))
+                       (calculate-instructions-log-fidelity subschedule
+                                                            (addresser-state-chip-specification state))))
           (when (<= cost-bound (+ preceding-fidelity instr-cost))
             (setf instr-cost (- cost-bound preceding-fidelity))))))
     

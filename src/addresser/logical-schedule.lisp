@@ -566,51 +566,48 @@ mapping instructions to their tags. "
   (+ (length (lscheduler-topmost-instructions lschedule))
      (hash-table-count (lscheduler-earlier-instrs lschedule))))
 
+(defun lscheduler-calculate-log-fidelity (lschedule chip-spec)
+  (labels
+      ((get-fidelity (instr)
+         (labels ((warn-and-skip (instr)
+                    (format *compiler-noise-stream* "Unknown fidelity for ~/cl-quil::instruction-fmt/. Skipping." instr)
+                    (return-from get-fidelity 0d0)))
+           (let (fidelity)
+             (typecase instr
+               (measure
+                (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
+                       (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
+                                           (hardware-object-gate-information qubit-obj))))
+                  (unless specs-obj
+                    (warn-and-skip instr))
+                  (setf fidelity (gate-record-fidelity specs-obj))))
+               (application
+                (let ((obj (lookup-hardware-object chip-spec instr)))
+                  (unless obj
+                    (warn-and-skip instr))
+                  (let ((specs-hash (hardware-object-gate-information obj)))
+                    (unless specs-hash (warn-and-skip instr))
+                    (dohash ((key val) specs-hash)
+                      (when (binding-subsumes-p key (get-binding-from-instr instr))
+                        (setf fidelity (gate-record-fidelity val))))
+                    (unless fidelity (warn-and-skip instr)))))
+               (otherwise
+                (warn-and-skip instr)))
+             (expt (log fidelity) 2)))))
+    (let ((running-fidelity 0d0))
+      (dolist (instr (lscheduler-first-instrs lschedule))
+        (unless (gethash instr (lscheduler-earlier-instrs lschedule))
+          (incf running-fidelity (get-fidelity instr))))
+      (maphash (lambda (instr val)
+                 (declare (ignore val))
+                 (incf running-fidelity (get-fidelity instr)))
+               (lscheduler-earlier-instrs lschedule))
+      (sqrt running-fidelity))))
+
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
-  (labels ((fidelity-combinator (val1 val2)
-             (min val1 val2))
-           (fidelity-bumper (instr value)
-             (flet ((warn-and-skip (instr)
-                      (format *compiler-noise-stream*
-                              "Fidelity not known for the following gate: ~/quil:instruction-fmt/. Assuming ideal.~%"
-                              instr)
-                      (return-from fidelity-bumper value)))
-               (let (fidelity)
-                 (typecase instr
-                   (measure
-                    (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                           (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
-                                               (hardware-object-gate-information qubit-obj))))
-                      (unless specs-obj
-                        (warn-and-skip instr))
-                      (setf fidelity (gate-record-fidelity specs-obj))))
-                   (application
-                    (let ((obj (lookup-hardware-object chip-spec instr)))
-                      (unless obj
-                        (warn-and-skip instr))
-                      (let ((specs-hash (hardware-object-gate-information obj)))
-                        (unless specs-hash (warn-and-skip instr))
-                        (dohash ((key val) specs-hash)
-                          (when (binding-subsumes-p key (get-binding-from-instr instr))
-                            (setf fidelity (gate-record-fidelity val))))
-                        (unless fidelity (warn-and-skip instr)))))
-                   (otherwise
-                    (warn-and-skip instr)))
-                 (* value
-                    (exp (- (* (log fidelity) (log fidelity)))))))))
-    ;; actual entry point
-    (multiple-value-bind (max-value value-hash)
-        (lscheduler-walk-graph lschedule
-                               :base-value 1d0
-                               :bump-value (lambda (instr value) (fidelity-bumper instr value))
-                               :test-values #'fidelity-combinator)
-      (declare (ignore max-value))
-      (loop :with fidelity := 1d0
-            :for instr :in (lscheduler-last-instrs lschedule)
-            :do (setf fidelity
-                      (fidelity-combinator (fidelity-bumper instr 1d0)
-                                           (* fidelity (gethash instr value-hash)))) 
-            :finally (return (exp (- (sqrt (- (log fidelity))))))))))
+  (multiple-value-bind (max-value value-hash)
+      (lscheduler-calculate-log-fidelity lschedule chip-spec)
+    (values (exp (- (sqrt max-value))) value-hash)))
 
 (defun lscheduler-all-instructions (lschedule)
   (a:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))
