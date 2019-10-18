@@ -243,7 +243,8 @@
   (apply 'measure-performance assn
          :progs (loop
                   :for i :below trials
-                  :collect (lambda () (generate-handshake-prog n-qubits 0)))
+                  :nconc (loop :for j :from 2 :to n-qubits
+                               :collect (let ((j j)) (lambda () (generate-handshake-prog j 0)))))
          args))
 
 (defvar *basic-swap-search-assn*
