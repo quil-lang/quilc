@@ -10,7 +10,10 @@
 (defclass temporal-addresser-state (addresser-state)
   ((1q-queues :accessor temporal-addresser-state-1q-queues
               :initarg :1q-queues
-              :documentation "The family of queues where not-yet-scheduled 1Q instructions live, while we get them out of the way to process 2Q instructions.")))
+              :documentation "The family of queues where not-yet-scheduled 1Q instructions live, while we get them out of the way to process 2Q instructions.")
+   (cost-bounds :accessor temporal-addresser-state-cost-bounds
+                :initform (make-hash-table :test #'eql)
+                :documentation "Mapping from HARDWARE-OBJECTs to the maximal cost of a program exercising that object.")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Cost function ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -71,15 +74,13 @@
         
         ;; then, see if there's a non-naive cost available
         (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
-                      (cost-bound
-                       (gethash "cost-bound"
-                                (hardware-object-misc-data hardware-object)))
+                      (cost-bound (gethash hardware-object (temporal-addresser-state-cost-bounds state)))
                       (intelligent-bound
                        (+ cost-bound
                           (chip-schedule-resource-carving-point
                            (addresser-state-chip-schedule state)
                            (apply #'make-qubit-resource
-                                  (coerce (hardware-object-cxns hardware-object) 'list))))))
+                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))))
           (setf time (min time intelligent-bound)))
         
         ;; finally, we have a special case for early SWAPs
@@ -392,6 +393,27 @@ instruction, adding to logical queue.~%"
     (change-class state 'temporal-addresser-state)
     (setf (temporal-addresser-state-1q-queues state)
           (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))
+    ;; warm the cost-bounds slot
+    (loop :for order-list :across (chip-specification-objects chip-spec)
+          :for qubits :from 1
+          :do (loop :for hw :across order-list
+                    :for j :from 0
+                    :for instr := (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
+                                         (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
+                                             (list j)))
+                    :for instrs-decomposed := (expand-to-native-instructions (list instr) chip-spec)
+                    :for instrs-compressed := (compress-instructions instrs-decomposed chip-spec)
+                    :for lschedule := (make-lscheduler)
+                    :for fake-state := (make-instance 'temporal-addresser-state
+                                                      :chip-spec chip-spec
+                                                      :lschedule lschedule
+                                                      :qq-distances (addresser-state-qq-distances state)
+                                                      :initial-l2p (make-rewiring (chip-spec-n-qubits chip-spec))
+                                                      :working-l2p (make-rewiring (chip-spec-n-qubits chip-spec)))
+                    :do (append-instructions-to-lschedule lschedule instrs-compressed)
+                        (setf (gethash hw (temporal-addresser-state-cost-bounds state))
+                              (temporal-cost-heuristic-value
+                               (cost-function fake-state :gate-weights (assign-weights-to-gates fake-state))))))
     state))
 
 ;; also, we randomize the cost function weights during select-and-embed-a-permutation
