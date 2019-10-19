@@ -16,7 +16,9 @@
 ;;; See DO-FIDELITY-ADDRESSING below for the main entry point.
 
 (defclass fidelity-addresser-state (addresser-state)
-  ())
+  ((cost-bounds :initform (make-hash-table :test #'eql)
+                :accessor fidelity-addresser-state-cost-bounds
+                :documentation "Table of maximum costs for a program exercising this hardware object.")))
 
 (defstruct fidelity-cost
   value)
@@ -38,10 +40,9 @@
         
         ;; then, see if there's a non-naive cost available
         (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
-                      (cost-bound (gethash "cost-bound"
-                                           (hardware-object-misc-data hardware-object)))
+                      (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state)))
                       (resource (apply #'make-qubit-resource
-                                       (coerce (hardware-object-cxns hardware-object) 'list)))
+                                       (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list)))
                       (carving-point (chip-schedule-resource-carving-point
                                       (addresser-state-chip-schedule state)
                                       resource))
@@ -158,4 +159,25 @@
   (let* ((*cost-fn-weight-style* ':fidelity)
          (state (initial-addresser-working-state chip-spec initial-rewiring)))
     (change-class state 'fidelity-addresser-state)
+    ;; warm the cost-bounds slot
+    (loop :for order-list :across (chip-specification-objects chip-spec)
+          :for qubits :from 1
+          :do (loop :for hw :across order-list
+                    :for j :from 0
+                    :for instr := (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
+                                         (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
+                                             (list j)))
+                    :for instrs-decomposed := (expand-to-native-instructions (list instr) chip-spec)
+                    :for instrs-compressed := (compress-instructions instrs-decomposed chip-spec)
+                    :for lschedule := (make-lscheduler)
+                    :for fake-state := (make-instance 'fidelity-addresser-state
+                                                      :chip-spec chip-spec
+                                                      :lschedule lschedule
+                                                      :qq-distances (addresser-state-qq-distances state)
+                                                      :initial-l2p (make-rewiring (chip-spec-n-qubits chip-spec))
+                                                      :working-l2p (make-rewiring (chip-spec-n-qubits chip-spec)))
+                    :do (append-instructions-to-lschedule lschedule instrs-compressed)
+                        (setf (gethash hw (fidelity-addresser-state-cost-bounds state))
+                              (fidelity-cost-value (cost-function fake-state
+                                                                  :gate-weights (assign-weights-to-gates fake-state))))))
     state))

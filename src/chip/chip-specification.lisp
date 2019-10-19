@@ -304,15 +304,6 @@ used to specify CHIP-SPEC."
     (when (member ':cnot type)
       (vector-push-extend #'CNOT-to-flipped-CNOT
                           (hardware-object-compilation-methods obj)))
-    
-    ;; based on the optimal 2Q compiler, tag this hardware object with the
-    ;; longest duration any compiled sequence of instructions could possibly
-    ;; take to run on it.
-    (when (or (member ':cz type)
-              (member ':iswap type))
-      ;; TODO: compute this based on duration data
-      (setf (gethash "time-bound" (hardware-object-misc-data obj))
-            #.(+ (* 3 150) (* 6 9)))) ; this is the maximum amt of time that a 2Q program might take
     ;; return the link
     obj))
 
