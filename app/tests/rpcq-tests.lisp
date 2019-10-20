@@ -7,7 +7,7 @@
 (defmacro with-random-rpc-client ((client) &body body)
   "Bind CLIENT to an RPCQ client object for the duration of BODY."
   (let* ((protocol "inproc")
-         (host (format nil "~a" (uuid:make-v4-uuid)))
+         (host (format nil "~A" (uuid:make-v4-uuid)))
          (endpoint (concatenate 'string protocol "://" host)))
     `(let* ((server-function (lambda ()
                                (quilc::start-rpc-server :protocol ,protocol

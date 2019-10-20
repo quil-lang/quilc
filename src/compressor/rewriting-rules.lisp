@@ -109,7 +109,7 @@
   `(progn
      ,@(a:map-product
         (lambda (sign1 sign2 sign3)
-          (let ((name (intern (format nil "REWRITE-~a~a~a-AS-~a~a~a-~a"
+          (let ((name (intern (format nil "REWRITE-~A~A~A-AS-~A~A~A-~A"
                                       g h g h g h
                                       (+ (if (plusp sign1) 4 0)
                                          (if (plusp sign2) 2 0)

@@ -87,7 +87,7 @@ BEFORE-INST to make use of RESOURCE."
 
 (defun print-chip-schedule (schedule &optional (stream *standard-output*))
   (dolist (inst (chip-schedule-to-straight-quil schedule))
-    (format stream "~10,2f - ~10,2f: " (chip-schedule-start-time schedule inst) (chip-schedule-end-time schedule inst))
+    (format stream "~10,2F - ~10,2F: " (chip-schedule-start-time schedule inst) (chip-schedule-end-time schedule inst))
     (print-instruction inst stream)
     (format stream "~%")))
 
@@ -135,5 +135,5 @@ BEFORE-INST to make use of RESOURCE."
           :while inst
           :do (remhash inst needed))
         (assert (zerop (hash-table-count needed)) ()
-                "Qubit ~a did not have a single line in ~a. Missing ~a."
+                "Qubit ~A did not have a single line in ~A. Missing ~A."
                 qubit chip-sched (a:hash-table-keys needed))))))

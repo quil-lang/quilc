@@ -44,7 +44,7 @@ int main (int argc, char **argv) {
   call_the_function(test_error, "Test input!", &foobar);
   /* empty program */
   call_the_function(parse_quil_from_string, "", &foobar);
-  
+
   printf("\n");
   printf(";;; Shutting down ECL.\n");
   cl_shutdown();
@@ -75,7 +75,7 @@ int parse_quil_from_string(char *string, char **out_code_ptr) {
   cl_object parse_quil_fun = ecl_make_symbol("PARSE-QUIL", "QUIL");
   cl_object result = cl_funcall(2, parse_quil_fun, input_code);
   /* function does not return a string, for sake of example we make it so. */
-  result = cl_format(3, ECL_NIL, ecl_make_simple_base_string("result: ~s", -1), result);
+  result = cl_format(3, ECL_NIL, ecl_make_simple_base_string("result: ~S", -1), result);
   result = ecl_null_terminated_base_string(result);
   *out_code_ptr = ecl_base_string_pointer_safe(result);
   return 0;

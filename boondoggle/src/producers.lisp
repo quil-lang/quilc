@@ -94,7 +94,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
              (gate-name
                (cond
                  (random-gate-flag
-                  (format nil "RANDOM-GATE-~d" random-gate-count))
+                  (format nil "RANDOM-GATE-~D" random-gate-count))
                  (t
                   (gate-set-record-operator gate-record))))
              (gate-order

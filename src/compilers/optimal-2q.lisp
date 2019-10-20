@@ -385,7 +385,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
                                (build-gate "Z"     '()              q1)
                                (optimal-2q-compiler
                                 (make-instance 'gate-application
-                                               :operator (named-operator (format nil "2Q-TWIST-~d" tag))
+                                               :operator (named-operator (format nil "2Q-TWIST-~D" tag))
                                                :arguments (application-arguments instr)
                                                :gate mprime)
                                 :target target)))))
@@ -450,22 +450,22 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
                                                              :gate atb1
                                                              :arguments (list (qubit q1))
                                                              :operator (named-operator
-                                                                        (format nil "ATB1-~d" tag)))))
+                                                                        (format nil "ATB1-~D" tag)))))
                   (atb0instrs (euler-compiler (make-instance 'gate-application
                                                              :gate atb0
                                                              :arguments (list (qubit q0))
                                                              :operator (named-operator
-                                                                        (format nil "ATB0-~d" tag)))))
+                                                                        (format nil "ATB0-~D" tag)))))
                   (c1instrs (euler-compiler (make-instance 'gate-application
                                                            :gate c1
                                                            :arguments (list (qubit q1))
                                                            :operator (named-operator
-                                                                      (format nil "C1-~d" tag)))))
+                                                                      (format nil "C1-~D" tag)))))
                   (c0instrs (euler-compiler (make-instance 'gate-application
                                                            :gate c0
                                                            :arguments (list (qubit q0))
                                                            :operator (named-operator
-                                                                      (format nil "C0-~d" tag))))))
+                                                                      (format nil "C0-~D" tag))))))
               ;; ... and concatenate.
               (concatenate 'list
                            c1instrs

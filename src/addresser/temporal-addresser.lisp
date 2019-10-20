@@ -294,7 +294,7 @@ instruction if it exists, and errors otherwise."
     (dolist (index potential-first-links)
       ;; TODO: this assumes only SWAPs exist in the permutation list
       (let ((new-horizon (swap-horizon index chip-sched chip-spec use-free-swaps)))
-        (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Considering ~d: this ~,3f vs best ~,3f.~%"
+        (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Considering ~D: this ~,3F vs best ~,3F.~%"
                 (chip-spec-qubits-on-link chip-spec index)
                 new-horizon
                 shortest-horizon)
@@ -306,7 +306,7 @@ instruction if it exists, and errors otherwise."
             (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
               ;; compute the new cost value
               (let ((new-cost (funcall cost-function rewiring)))
-                (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: New cost ~a vs best cost ~a vs current cost ~a.~%"
+                (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: New cost ~A vs best cost ~A vs current cost ~A.~%"
                         new-cost best-cost-so-far current-cost)
                 ;; if it's lower than the best cost we've seen OR if it's the shortest acting swap and it's at least better than nothing...
                 (when (or (and (< new-cost best-cost-so-far) (not (zerop new-horizon)))
@@ -321,7 +321,7 @@ instruction if it exists, and errors otherwise."
             nil
             "Failed to select a SWAP instruction. This can be caused by a disconnected qubit graph, a program with a lot of symmetry, or even random chance. You might simply try again, or you might try requesting a different addressing strategy.")
     (format *compiler-noise-stream*
-            "SELECT-COST-LOWERING-SWAP: SWAP ~d ~d is best, lowering cost from ~d to ~d.~%"
+            "SELECT-COST-LOWERING-SWAP: SWAP ~D ~D is best, lowering cost from ~D to ~D.~%"
             (vnth 0 (chip-spec-qubits-on-link chip-spec link-index))
             (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))
             current-cost
@@ -333,7 +333,7 @@ instruction if it exists, and errors otherwise."
                                     (rewirings-tried nil))
   "This function inserts the necessary SWAP instructions to move from the working logical-to-physical
 rewiring REWIRING to the TARGET-REWIRING."
-  (format *compiler-noise-stream* "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a~%"
+  (format *compiler-noise-stream* "MOVE-TO-EXPECTED-REWIRING: Moving~%~A~%~A~%"
           rewiring target-rewiring)
   (flet ((cost-function (rewiring)
            (rewiring-distance rewiring target-rewiring qq-distances))
@@ -348,7 +348,7 @@ rewiring REWIRING to the TARGET-REWIRING."
           :do (rewiring-assign rewiring logical physical))
       (return-from move-to-expected-rewiring))
     (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
-            "Too many rewirings tried: ~a." (length rewirings-tried))
+            "Too many rewirings tried: ~A." (length rewirings-tried))
     ;; otherwise, pick a SWAP
     (flet ((embed (link-index)
              (embed-swap link-index
@@ -392,15 +392,15 @@ rewiring REWIRING to the TARGET-REWIRING."
       (update-rewiring working-l2p q0 q1)
       (format *compiler-noise-stream*
               "EMBED-SWAP: This is a free swap. :)~%~
-               EMBED-SWAP: New rewiring: ~a~%~
-               EMBED-SWAP: New initial rewiring: ~a~%"
+               EMBED-SWAP: New rewiring: ~A~%~
+               EMBED-SWAP: New initial rewiring: ~A~%"
               working-l2p initial-l2p))
      (t
       ;; in this case, this swap has to be performed by the QPU.
       ;; apply the link swap to working-l2p
       (update-rewiring working-l2p q0 q1)
       (format *compiler-noise-stream*
-              "EMBED-SWAP: New rewiring: ~a~%"
+              "EMBED-SWAP: New rewiring: ~A~%"
               working-l2p)
       ;; insert the relevant 2q instruction
       ;;
@@ -686,7 +686,7 @@ list of partially-rewired 2Q instructions for later scheduling."
                  "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/."
                  instr)
          (format *compiler-noise-stream*
-                 "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling.~%"
+                 "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~DQ>2Q instruction, compiling.~%"
                  instr
                  (length (application-arguments instr)))
          ;; then we know we can't find a hardware object to support
@@ -839,7 +839,7 @@ are ready to be scheduled."
                   :for (logical physical) :in qubit-assignments
                   :unless (apply-rewiring-l2p working-l2p logical)
                     :do (format *compiler-noise-stream*
-                                "DEQUEUE-SOONEST-2Q-FROM-LIST: assigning logical qubit ~a to physical qubit ~a.~%"
+                                "DEQUEUE-SOONEST-2Q-FROM-LIST: assigning logical qubit ~A to physical qubit ~A.~%"
                                 logical physical)
                         (rewiring-assign working-l2p logical physical))
                 (return-from dequeue-soonest-2q-from-list t))))
@@ -934,7 +934,7 @@ assignment."
   (with-slots (working-l2p chip-spec qq-distances qubit-cc) *temporal-addresser-state-variables*
     (let ((locations (or locations qubit-cc)))
       (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
-              "Qubit ~a already assigned." logical)
+              "Qubit ~A already assigned." logical)
       (a:extremum
        (remove-if (lambda (p)
                     (or (apply-rewiring-p2l working-l2p p)
@@ -1043,7 +1043,7 @@ Optional arguments:
                      :do (format *compiler-noise-stream*
                                  "TEMPORAL-ADDRESSER-FSM: LSCHED unchanged, selecting a permutation.~%")
                          (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
-                                 "Too many SWAP instructions selected in a row: ~a." (length rewirings-tried))
+                                 "Too many SWAP instructions selected in a row: ~A." (length rewirings-tried))
                          (setf rewirings-tried (select-and-embed-a-permutation rewirings-tried)))))
 
           ;; build the logically parallelized schedule

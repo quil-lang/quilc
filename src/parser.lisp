@@ -761,7 +761,7 @@ result of BODY, and the (possibly null) list of remaining lines.
                   ;; Actual address to measure into.
                   ((eql ':AREF (token-type address))
                    (unless (find (car (token-payload address)) *memory-region-names* :test #'string=)
-                     (quil-parse-error "Bad memory region name ~a in MEASURE instruction." (car (token-payload address))))
+                     (quil-parse-error "Bad memory region name ~A in MEASURE instruction." (car (token-payload address))))
                    (mref (car (token-payload address))
                          (cdr (token-payload address))))
 
@@ -1191,7 +1191,7 @@ result of BODY, and the (possibly null) list of remaining lines.
       ;; Get the parent.
       (let ((parent-name (token-payload (pop line))))
         (unless (member parent-name *memory-region-names* :test #'string=)
-          (quil-parse-error "Unknown parent ~a of ~a." parent-name name))
+          (quil-parse-error "Unknown parent ~A of ~A." parent-name name))
         (setf sharing-parent parent-name))
       ;; Check if there's an OFFSET.
       (unless (endp line)
@@ -1561,7 +1561,7 @@ result of BODY, and the (possibly null) list of remaining lines.
     (let ((region-name (car aref))
           (region-position (cdr aref)))
       (unless (find region-name *memory-region-names* :test #'string=)
-        (error "Reference to unknown memory region ~a." region-name))
+        (error "Reference to unknown memory region ~A." region-name))
       (setf *segment-encountered* t)
       (mref region-name region-position))))
 

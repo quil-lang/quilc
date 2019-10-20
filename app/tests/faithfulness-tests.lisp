@@ -18,7 +18,7 @@
     (is (not (null test-files)))
     (fresh-line)
     (dolist (file test-files)
-      (format t "    Testing file ~a~%" (pathname-name file))
+      (format t "    Testing file ~A~%" (pathname-name file))
       (let ((*standard-output* (make-broadcast-stream)))
         (is (search "#Matrices are equal"
                     (with-open-file (*standard-input* file :direction :input)

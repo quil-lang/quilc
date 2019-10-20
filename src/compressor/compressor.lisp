@@ -216,7 +216,7 @@ other's."
   "Pretty-prints a list of peephole rewriter nodes, beginning with NODE, together with the structure as a doubly-linked list."
   (unless node
     (return-from print-node-list nil))
-  (format t "~30a <-- ~30a --> ~30a~%"
+  (format t "~30A <-- ~30A --> ~30A~%"
           (a:when-let ((prev (peephole-rewriter-node-prev node)))
             (peephole-rewriter-node-instr prev))
           (peephole-rewriter-node-instr node)
@@ -265,7 +265,7 @@ other's."
                                                     (peephole-rewriter-node-prev
                                                      (first relevant-nodes-for-inspection))))))))
                      (format *compiler-noise-stream*
-                             "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~a.~%"
+                             "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~A.~%"
                              (compiler-name rule))
                      ;; if the rule was triggered, splice it in and remove
                      ;; all of the instructions that the rule touched.
@@ -1110,7 +1110,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
   (dotimes (order (length governors))
     (dotimes (address (length (nth order governors)))
       (let ((governor (nth address (nth order governors))))
-        (format *standard-output* "(~a, ~a) : ~a / ~a / ~a~%" order address
+        (format *standard-output* "(~A, ~A) : ~A / ~A / ~A~%" order address
                 (governed-queue-resources governor)
                 (governed-queue-state governor)
                 (if (typep (first (governed-queue-contents governor)) 'application)
@@ -1119,7 +1119,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                         (terpri s)
                         (print-instruction instr s)))
                     (governed-queue-contents governor))))))
-  (format *standard-output* "(~a, ~a) : ~a / ~a / ~a ~%" ':global ':global
+  (format *standard-output* "(~A, ~A) : ~A / ~A / ~A ~%" ':global ':global
           (governed-queue-resources global-governor)
           (governed-queue-state global-governor)
           (if (typep (first (governed-queue-contents global-governor)) 'application)

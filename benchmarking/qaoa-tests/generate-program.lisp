@@ -75,7 +75,7 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
     
     (assert (>= (length biggest-cc) qubit-count)
             ()
-            "Too many qubits requested: chip has ~a in its largest connected component, but asked for ~a."
+            "Too many qubits requested: chip has ~A in its largest connected component, but asked for ~A."
             (length biggest-cc) qubit-count)
     (assert (plusp qubit-count)
             ()

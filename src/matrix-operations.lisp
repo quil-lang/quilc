@@ -138,7 +138,7 @@ as needed so that they are the same size."
                      (pragma
                       t)
                      (otherwise
-                      (error "Instruction ~a is not a gate application." instr)))))
+                      (error "Instruction ~A is not a gate application." instr)))))
 
             (multiple-value-bind (entering-rewiring exiting-rewiring) (instruction-rewirings instr)
               (when (not (null entering-rewiring))

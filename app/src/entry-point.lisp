@@ -195,7 +195,7 @@
         (cffi:load-foreign-library 'magicl.foreign-libraries::liblapack))))
 
 (defun print-matrix-with-comment-hashes (matrix &optional (stream *standard-output*))
-  (format stream "~d"
+  (format stream "~D"
           (cl-ppcre:regex-replace-all
            (coerce #(#\Newline) 'string)
            (with-output-to-string (s)

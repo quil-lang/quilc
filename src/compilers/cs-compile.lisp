@@ -59,7 +59,7 @@
     (unless m
       (give-up-compilation))
     (setf m (magicl:scale (expt (magicl:det m) (/ -1 (magicl:matrix-rows m))) m))
-    
+
     ;; first, a utility function.
     (let ((n (/ (magicl:matrix-rows m) 2)))
       (multiple-value-bind (u0 u1 v0 v1 thetas) (magicl:lapack-csd m n n)
@@ -79,22 +79,22 @@
                (Rphi (realpart (/ (log (magicl:det v0)) #C(0 1) n)))
                ;; do the left recursion
                (lstring0 (cs-compiler (make-instance 'gate-application
-                                                     :operator (named-operator (format nil "CSC-U0-~d" tag))
+                                                     :operator (named-operator (format nil "CSC-U0-~D" tag))
                                                      :arguments (rest (application-arguments instr))
                                                      :gate (magicl:scale (exp (* #C(0 -1) Lphi)) u0))))
                (lstring1 (cs-compiler (make-instance 'gate-application
-                                                     :operator (named-operator (format nil "CSC-U1-~d" tag))
+                                                     :operator (named-operator (format nil "CSC-U1-~D" tag))
                                                      :arguments (rest (application-arguments instr))
                                                      :gate (magicl:scale (exp (* #C(0 1) Lphi)) u1))))
                ;; zip up the left-side results
                (lstring (ucr-zipper lstring0 lstring1 control-qubit))
                ;; do the right recursion
                (rstring0 (cs-compiler (make-instance 'gate-application
-                                                     :operator (named-operator (format nil "CSC-V0-~d" tag))
+                                                     :operator (named-operator (format nil "CSC-V0-~D" tag))
                                                      :arguments (rest (application-arguments instr))
                                                      :gate (magicl:scale (exp (* #C(0 -1) Rphi)) v0))))
                (rstring1 (cs-compiler (make-instance 'gate-application
-                                                     :operator (named-operator (format nil "CSC-V1-~d" tag))
+                                                     :operator (named-operator (format nil "CSC-V1-~D" tag))
                                                      :arguments (rest (application-arguments instr))
                                                      :gate (magicl:scale (exp (* #C(0 1) Rphi)) v1))))
                ;; zip up the right-side results

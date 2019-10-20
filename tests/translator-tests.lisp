@@ -10,7 +10,7 @@
       (let ((z (magicl:ref mat i j)))
         (when (= j 0)
           (format stream "# "))
-        (format stream "~6,3f+~6,3fj" (realpart z) (imagpart z))
+        (format stream "~6,3F+~6,3Fj" (realpart z) (imagpart z))
         (when (= j (1- (magicl:matrix-cols mat)))
           (format stream "~%")
           (format stream ", "))))))
@@ -38,7 +38,7 @@
                                         (build-anonymous-gate master-matrix 0)))
              (compiled-matrix (quil::make-matrix-from-quil compiled-program)))
         (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
-            "Euler translation test failed: ~a~%" compiler)))))
+            "Euler translation test failed: ~A~%" compiler)))))
 
 (define-condition test-case-too-complicated (error)
   ((reason :initarg :reason :reader test-case-too-complicated-reason))
@@ -210,7 +210,7 @@
                (setf compiled-output (mapcar (a:rcurry #'%patch-mref-values table)
                                              (apply compiler test-case)))
                (setf output-matrix (quil::make-matrix-from-quil compiled-output))
-               (format t "~&    Testing simple compiler ~a" (quil::compiler-name compiler))
+               (format t "~&    Testing simple compiler ~A" (quil::compiler-name compiler))
                (is (quil::matrix-equals-dwim input-matrix output-matrix))
                t)))
     (loop :for compiler :in (remove-if (a:rcurry #'typep 'quil::approximate-compiler)
@@ -218,7 +218,7 @@
           :count t :into compiler-count
           :count (do-compilation compiler) :into hit-count
           :finally (let ((hit-rate (/ hit-count compiler-count)))
-                     (format t "~&  Tested ~2,2f% of all compilers." (* 100 hit-rate))
+                     (format t "~&  Tested ~2,2F% of all compilers." (* 100 hit-rate))
                      (is (< 1/10 hit-rate))))))
 
 
@@ -259,7 +259,7 @@
                               (list "CPHASE" (list (random 1.0d0)) #'cl-quil::CPHASE-to-native-CPHASEs)
                               (list "PISWAP" (list (random 1.0d0)) #'cl-quil::PISWAP-to-native-PISWAPs)))
       (destructuring-bind (operator params expander) instr-type
-        (format *debug-io* "~&    Testing global-to-local ~a expansion~%" operator)
+        (format *debug-io* "~&    Testing global-to-local ~A expansion~%" operator)
         (let* ((instr (quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
                (mat (cl-quil::make-matrix-from-quil (funcall expander instr

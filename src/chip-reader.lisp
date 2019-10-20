@@ -81,7 +81,7 @@
          ((every #'<= unsorted-list (rest unsorted-list))
           unsorted-list)
          (t
-          (warn "Encountered an unsorted ISA key: ~a" unsorted-list)
+          (warn "Encountered an unsorted ISA key: ~A" unsorted-list)
           (sort unsorted-list #'<)))))
     (integer-list
      key)))
@@ -135,13 +135,13 @@
   "The fidelity values recorded in Forest DB are subject to various quirks. This \"parser\" un-quirks them."
   (cond 
     ((double= fidelity +forest-error-sentinel+)
-     (warn "Chip specification contains a fidelity field populated by the Forest error sentinel. Replacing it with the default ~a." +totally-awful-fidelity+)
+     (warn "Chip specification contains a fidelity field populated by the Forest error sentinel. Replacing it with the default ~A." +totally-awful-fidelity+)
      +totally-awful-fidelity+)
     ((> fidelity +near-perfect-fidelity+)
-     (warn "Chip specification contained fidelity ~a > ~a~:*. Truncating to ~a." fidelity +near-perfect-fidelity+)
+     (warn "Chip specification contained fidelity ~A > ~A~:*. Truncating to ~A." fidelity +near-perfect-fidelity+)
      +near-perfect-fidelity+)
     ((minusp fidelity)
-     (error "Chip specification contained negative fidelity ~a. I don't know what to do with this value." fidelity))
+     (error "Chip specification contained negative fidelity ~A. I don't know what to do with this value." fidelity))
     (t
      fidelity)))
 
@@ -179,7 +179,7 @@
       (destructuring-bind (i) key
         (assert (< i qubit-count)
                 nil
-                "ISA contains a 1Q descriptor of index ~a, but there are only ~a qubit(s) altogether."
+                "ISA contains a 1Q descriptor of index ~A, but there are only ~A qubit(s) altogether."
                 i (1- qubit-count))
         ;; form a qubit
         (let (qubit)
@@ -192,7 +192,7 @@
              (setf qubit (build-qubit i :type '(:RZ :X/2 :MEASURE))))
             ;; there's no "gates" field, but there is a "type" field, but it isn't supported
             ((gethash "type" qubit-hash)
-             (error "On qubit ~a, unknown qubit type field in QPU descriptor: ~a."
+             (error "On qubit ~A, unknown qubit type field in QPU descriptor: ~A."
                     i (gethash "type" qubit-hash)))
             ;; there's neither a "gates" nor a "type" field. install a default.
             (t
@@ -209,12 +209,12 @@
           ;; check that the link is ordered
           (assert (< q0 q1)
                   nil
-                  "Link descriptor found with edge label \"~{~a~^-~}\". Edge labels are required to be sorted ascending; use \"~{~a~^-~}\" instead."
+                  "Link descriptor found with edge label \"~{~A~^-~}\". Edge labels are required to be sorted ascending; use \"~{~A~^-~}\" instead."
                   (list q0 q1) (list q1 q0))
           ;; check that the link lies on reasonable qubits
           (assert (< q0 q1 qubit-count)
                   nil
-                  "ISA contains a 2Q hardware descriptor attached to qubits ~a, but there are only ~a qubit(s) altogether."
+                  "ISA contains a 2Q hardware descriptor attached to qubits ~A, but there are only ~A qubit(s) altogether."
                   (list q0 q1) qubit-count)
           (let (link
                 (link-index (chip-spec-n-links chip-spec)))
@@ -241,7 +241,7 @@
                             ((string= "ISWAP" string) ':iswap)
                             ((string= "CPHASE" string) ':cphase)
                             ((string= "PISWAP" string) ':piswap)
-                            (t (error "Unknown link type in QPU descriptor on link ~a: ~a."
+                            (t (error "Unknown link type in QPU descriptor on link ~A: ~A."
                                       (list q0 q1) string)))))
                  (setf link (build-link q0 q1
                                         :type (mapcar #'individual-target-parser
@@ -280,7 +280,7 @@
                                (equalp (named-operator "RX") (gate-binding-operator binding))
                                (not (double= 0d0 (first (gate-binding-parameters binding)))))
                       (unless (double= 0d0 (mod (first (gate-binding-parameters binding)) pi/2))
-                        (warn "Qubit ~a: applying f1QRB spec to unusual native gate RX(~a)" i (first (gate-binding-parameters binding))))
+                        (warn "Qubit ~A: applying f1QRB spec to unusual native gate RX(~A)" i (first (gate-binding-parameters binding))))
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity))))))))
   (when (gethash "2Q" specs-hash)
@@ -291,7 +291,7 @@
           :for gate-info := (and link (hardware-object-gate-information link))
           :when gate-info
             :do (flet ((stash-fidelity (gate-name parameters)
-                         (a:when-let* ((fidelity (gethash (format nil "f~a" gate-name) spec))
+                         (a:when-let* ((fidelity (gethash (format nil "f~A" gate-name) spec))
                                        (binding (make-gate-binding :operator (named-operator gate-name)
                                                                    :parameters parameters
                                                                    :arguments '(_ _)))

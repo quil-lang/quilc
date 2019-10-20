@@ -38,7 +38,7 @@ impossible using that rewiring.")
 (defun chip-spec-live-qubit-bfs (chip-spec qubit-index &optional seen)
   "From a given initial qubit, find the distance to every other qubit in the connected component. SEEN is an array of T/NIL for each qubit, indicating whether that qubit has been visited yet."
   (assert (not (chip-spec-qubit-dead? chip-spec qubit-index)) (qubit-index)
-          "Cannot BFS from dead qubit ~a."
+          "Cannot BFS from dead qubit ~A."
           qubit-index)
   (loop
     :with level := 0
@@ -221,7 +221,7 @@ appear in the same connected component of the qpu."
     (assert (or (endp needed)
                 (<= (apply #'max needed) n-qubits))
             ()
-            "User program incompatible with chip: qubit index ~a used and ~a available."
+            "User program incompatible with chip: qubit index ~A used and ~A available."
             (apply #'max needed) n-qubits)
 
     (when (eql type ':naive)
@@ -236,7 +236,7 @@ appear in the same connected component of the qpu."
       (return-from prog-initial-rewiring (make-rewiring n-qubits)))
 
     (assert (<= (length needed) (length cc)) ()
-            "User program used too many qubits: ~a used and ~a available in the largest connected component."
+            "User program used too many qubits: ~A used and ~A available in the largest connected component."
             (length needed) (length cc))
 
     (when (eql type ':partial)
@@ -247,7 +247,7 @@ appear in the same connected component of the qpu."
       (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
 
     (assert (eql type ':greedy) (type)
-            "Unexpected rewiring type: ~a." type)
+            "Unexpected rewiring type: ~A." type)
 
     ;; TODO: this assumes that the program is sequential
     (let* ((per-qubit-ins (prog-qubit-pair-order n-qubits parsed-prog))
