@@ -59,7 +59,7 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
   (check-type operator string)
   (check-type matrix magicl:matrix)
   (push qubit qubits)
-  (let ((name (format nil "~a-~a" operator (get-anonymous-gate-counter))))
+  (let ((name (format nil "~A-~A" operator (get-anonymous-gate-counter))))
     (make-instance 'gate-application
                    :operator (named-operator name)
                    :gate (make-instance 'simple-gate :matrix matrix :name name)
@@ -102,7 +102,7 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
                 :for head :in params-zipped
                 :do (setf zipped-tail (rest zipped-tail))
                 :when (find (second head) zipped-tail :key #'second :test #'equal)
-                  :do (error "Duplicate definition of lambda-param: ~a" (second head)))
+                  :do (error "Duplicate definition of lambda-param: ~A" (second head)))
           (if (or delayedp-1 delayedp-2)
               (make-delayed-expression (mapcar #'first params-zipped)
                                        (mapcar #'second params-zipped)

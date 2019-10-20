@@ -127,7 +127,7 @@
     (is (plusp diff))))
 
 (deftest test-clifford-from-quil ()
-  (let ((clifford-quil (format nil "~{~a~%~}" (list "CNOT 0 1" "H 5" "CNOT 0 5" "X 3" "Y 1"))))
+  (let ((clifford-quil (format nil "~{~A~%~}" (list "CNOT 0 1" "H 5" "CNOT 0 5" "X 3" "Y 1"))))
     (is (not (null (cl-quil.clifford:clifford-from-quil clifford-quil)))))
   ;; Check to make sure the indices are being parsed correctly (big endian)
   (let ((clifford-quil "CZ 0 5"))
@@ -143,9 +143,9 @@
 	(ZX (cl-quil.clifford:pauli-from-string "ZX"))
 	(-YY (cl-quil.clifford:pauli-from-string "-YY"))
 	(XX (cl-quil.clifford:pauli-from-string "XX"))
-	(CN0T01H0-quil (format nil "~{~a~%~}" (list "CNOT 0 1" "H 0")))
+	(CN0T01H0-quil (format nil "~{~A~%~}" (list "CNOT 0 1" "H 0")))
 	(CN0T01H0 (cl-quil.clifford:clifford-from-quil CN0T01H0-quil))
-	(H0CNOT01-quil (format nil "~{~a~%~}" (list "H 0" "CNOT 0 1")))
+	(H0CNOT01-quil (format nil "~{~A~%~}" (list "H 0" "CNOT 0 1")))
 	(H0CNOT01 (cl-quil.clifford:clifford-from-quil H0CNOT01-quil)))
     (loop
        :for pauli-in :in `(,ZI ,IZ ,ZZ)

@@ -104,14 +104,14 @@
                    :for inst :across instrs
                      :thereis (and (typep inst 'application)
                                    (< 1 (length (application-arguments inst)))))))
-    (format nil "~4,'0dq-~7,'0di-~:[s~;m~]"
+    (format nil "~4,'0Dq-~7,'0Di-~:[s~;m~]"
             (1+ (reduce #'max used-q))
             (length instrs)
             multiq)))
 
 (defun chip-spec-file-prefix (file)
   (let ((chip-spec (quil::read-chip-spec-file file)))
-    (format nil "~4,'0dq-~4,'0dL"
+    (format nil "~4,'0Dq-~4,'0DL"
             (quil::chip-spec-n-qubits chip-spec)
             (quil::chip-spec-n-links chip-spec))))
 
@@ -138,7 +138,7 @@
              ((simple-error
                (lambda (e)
                  (when break-on-error
-                   (break "~a" e))
+                   (break "~A" e))
                  (return-from by-assignment (list nil nil 1)))))
            (funcall assn (lambda ()
                            (rest (multiple-value-list (compiler-hook (get-prog prog-source) chip)))))))
@@ -169,7 +169,7 @@
         :with args-sym := (gensym)
         :for (label values) :on assignments :by #'cddr
         :do (assert (= (length changing-vars) (length values)) (values)
-                    "Different number of assignment variables and values: ~a /= ~a"
+                    "Different number of assignment variables and values: ~A /= ~A"
                     changing-vars
                     values)
         :collect label

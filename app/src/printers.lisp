@@ -43,13 +43,13 @@
           "~@[# Compiled gate volume: ~D~%~]"
           (gethash "gate_volume" statistics))
   (format stream
-          "~@[# Unused qubit list: ~{~a~^, ~}~%~]"
+          "~@[# Unused qubit list: ~{~A~^, ~}~%~]"
           (gethash "unused_qubits" statistics))
   (format stream
-          "~@[# Estimated compiled program fidelity: ~5d~%~]"
+          "~@[# Estimated compiled program fidelity: ~5D~%~]"
           (gethash "program_fidelity" statistics))
   (format stream
-          "~@[# SWAPs incurred by topological considerations: ~d~%~]"
+          "~@[# SWAPs incurred by topological considerations: ~D~%~]"
           (gethash "topological_swaps" statistics))
   (a:when-let ((duration (gethash "program_duration" statistics)))
     (let* ((duration-picos (* duration 1000))
@@ -59,5 +59,5 @@
            (nanos    (floor duration 1))
            (picos    (mod duration-picos 1000)))
       (format stream
-              "# Compiled program duration: ~4Ds ~4Dms ~4Dus ~4Dns ~4Dps    (= ~a ps total)~%"
+              "# Compiled program duration: ~4Ds ~4Dms ~4Dus ~4Dns ~4Dps    (= ~A ps total)~%"
               seconds millis micros nanos picos duration-picos))))

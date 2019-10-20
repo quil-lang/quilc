@@ -241,7 +241,7 @@ should stop with the given rewiring and false otherwise."
 
         ;; the successful termination point: did we find a good-enough rewiring?
     :when (active-state-done active-state done-fn)
-      :do (format *compiler-noise-stream* "SEARCH-REWIRING: Iterations ~a~%" iterations)
+      :do (format *compiler-noise-stream* "SEARCH-REWIRING: Iterations ~A~%" iterations)
           (return (values (active-state-swaps active-state) t))
 
     :when (or (not best-state) (active-state< active-state best-state))

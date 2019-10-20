@@ -211,6 +211,6 @@
     (rpcq:dispatch-table-add-handler dt 'rewrite-arithmetic-handler :name "rewrite-arithmetic")
     (rpcq:dispatch-table-add-handler dt 'get-version-info-handler :name "get-version-info")
     (rpcq:start-server :dispatch-table dt
-                       :listen-addresses (list (format nil "~a://~a~@[:~a~]" protocol host port))
+                       :listen-addresses (list (format nil "~A://~A~@[:~A~]" protocol host port))
                        :logger logger
                        :timeout time-limit)))

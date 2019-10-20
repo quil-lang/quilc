@@ -94,7 +94,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (labels ((lookup-function (expr)
              (if (valid-quil-function-or-operator-p expr)
                  expr
-                 (error "Illegal function in arithmetic expression: ~a." expr)))
+                 (error "Illegal function in arithmetic expression: ~A." expr)))
            (evaluate-parameter (param)
              (etypecase param
                (constant (constant-value param))
@@ -117,7 +117,7 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
                    (evaluate-parameter (nth (position expression lambda-params)
                                             params)))
                   (t
-                   (error "Bad symbol ~a in delayed expression." expression))))
+                   (error "Bad symbol ~A in delayed expression." expression))))
                (number
                 expression))))
     (let ((eval-attempt (evaluate-expr (delayed-expression-params de)
@@ -1197,7 +1197,7 @@ N.B., The fractions of pi will be printed up to a certain precision!")
            :for denom := (denominator rr)
            :when (double~ r-abs (/ (* pi numer) denom)) :do
              ;; Pretty-print "reasonable" integer and fractional multiples of pi.
-             (format stream "~:[~;-~]~:[~d*~;~*~]pi~:[/~d~;~*~]"
+             (format stream "~:[~;-~]~:[~D*~;~*~]pi~:[/~D~;~*~]"
                      (minusp r) (= 1 numer) numer (= 1 denom) denom)
              (return-from format-real))
      ;; If we cannot find a nice fraction of pi, just print the real number.
@@ -1227,7 +1227,7 @@ For example,
         (format stream "~F∠" (abs z))
         (format-real (mod (phase z) (* 2 pi)) stream))
        (t
-        (format stream "~a~a~a"
+        (format stream "~A~A~A"
                 (if (zerop (realpart z))
                     ""
                     (format nil "~F" (realpart z)))
@@ -1276,7 +1276,7 @@ For example,
     (format stream "~D" (qubit-index thing)))
 
   (:method ((thing memory-ref) (stream stream))
-    (format stream "~a[~a]"
+    (format stream "~A[~A]"
             (memory-ref-name thing)
             (memory-ref-position thing)))
 
@@ -1291,9 +1291,9 @@ For example,
 
   (:method ((thing constant) (stream stream))
     (adt:match quil-type (constant-value-type thing)
-      (quil-bit (format stream "~a" (constant-value thing)))
-      (quil-octet (format stream "~a" (constant-value thing)))
-      (quil-integer (format stream "~a" (constant-value thing)))
+      (quil-bit (format stream "~A" (constant-value thing)))
+      (quil-octet (format stream "~A" (constant-value thing)))
+      (quil-integer (format stream "~A" (constant-value thing)))
       (quil-real (format-complex (constant-value thing) stream))))
 
   (:method ((thing param) (stream stream))
@@ -1308,20 +1308,20 @@ For example,
                  (cons
                   (cond
                     ((eql 'mref (first expr))
-                     (format stream "~a[~a]" (second expr) (third expr)))
+                     (format stream "~A[~A]" (second expr) (third expr)))
                     ((= (length expr) 3)
-                     (format stream "(~a~a~a)"
+                     (format stream "(~A~A~A)"
                              (print-delayed-expression (second expr) nil)
                              (lisp-symbol->quil-infix-operator (first expr))
                              (print-delayed-expression (third expr) nil)))
                     ((= (length expr) 2)
-                     (format stream "~a(~a)"
+                     (format stream "~A(~A)"
                              (lisp-symbol->quil-function-or-prefix-operator (first expr))
                              (print-delayed-expression (second expr) nil)))))
                  (number
                   (format stream "(~/cl-quil:complex-fmt/)" expr))
                  (symbol
-                  (format stream "%~a" expr))
+                  (format stream "%~A" expr))
                  (otherwise
                   (print-instruction expr stream)))))
       (print-delayed-expression (delayed-expression-expression thing) stream)))
@@ -1408,13 +1408,13 @@ For example,
   ;; The following are not actually instructions, but who cares.
   (:method ((gate matrix-gate-definition) (stream stream))
     (let ((gate-size (isqrt (length (gate-definition-entries gate)))))
-      (format stream "DEFGATE ~a~@[(~{%~a~^, ~})~]:~%"
+      (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]:~%"
               (gate-definition-name gate)
               (if (typep gate 'static-gate-definition)
                   nil
                   (gate-definition-parameters gate)))
       (dotimes (i gate-size)
-        (format stream "    ~{~a~^, ~}~%"
+        (format stream "    ~{~A~^, ~}~%"
                 (mapcar (lambda (z)
                           (with-output-to-string (s)
                             (etypecase z
@@ -1427,7 +1427,7 @@ For example,
                                 (* (1+ i) gate-size)))))
       (terpri stream)))
   (:method ((gate permutation-gate-definition) (stream stream))
-    (format stream "DEFGATE ~a AS PERMUTATION:~%    ~{~D~^, ~}~%"
+    (format stream "DEFGATE ~A AS PERMUTATION:~%    ~{~D~^, ~}~%"
             (gate-definition-name gate)
             (permutation-gate-definition-permutation gate))))
 
@@ -1499,24 +1499,24 @@ Examples:
              (write-string prefix stream)
              (print-instruction instr stream)
              (a:when-let ((c (comment instr)))
-               (format stream "~40T# ~a" c))
+               (format stream "~40T# ~A" c))
              (terpri stream)))
       (map nil #'print-one-line seq))))
 
 (defun print-parsed-program (parsed-program &optional (s *standard-output*))
   ;; write out memory definitions
   (dolist (memory-defn (parsed-program-memory-definitions parsed-program))
-    (format s "DECLARE ~a ~a"
+    (format s "DECLARE ~A ~A"
             (memory-descriptor-name memory-defn)
             (quil-type-string (memory-descriptor-type memory-defn)))
-    (format s "~[[0]~;~:;[~:*~a]~]" (memory-descriptor-length memory-defn))
+    (format s "~[[0]~;~:;[~:*~A]~]" (memory-descriptor-length memory-defn))
     (when (memory-descriptor-sharing-parent memory-defn)
-      (format s " SHARING ~a"
+      (format s " SHARING ~A"
               (memory-descriptor-sharing-parent memory-defn))
       (a:when-let (x (memory-descriptor-sharing-offset-alist memory-defn))
         (format s " OFFSET")
         (loop :for (type . count) :in x
-              :do (format s " ~a ~a" count (quil-type-string type)))))
+              :do (format s " ~A ~A" count (quil-type-string type)))))
     (format s "~%"))
   (unless (endp (parsed-program-memory-definitions parsed-program))
     (format s "~%"))
@@ -1529,7 +1529,7 @@ Examples:
     (format s "~%"))
   ;; write out circuits
   (dolist (circuit-defn (parsed-program-circuit-definitions parsed-program))
-    (format s "DEFCIRCUIT ~a"
+    (format s "DEFCIRCUIT ~A"
             (circuit-definition-name circuit-defn))
     (unless (endp (circuit-definition-parameters circuit-defn))
       (format s "(~{~/quil:instruction-fmt/~^, ~})"

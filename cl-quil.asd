@@ -157,11 +157,11 @@
                               "-shared"
                               "-fPIC"
                               "-DFMT_HEADER_ONLY"
-                              (format nil "-I~a" (merge-pathnames "libs/fmt" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "libs/easy" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "libs/glucose" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "libs/kitty" tweedlelibdir))
-                              (format nil "-I~a" (merge-pathnames "include" tweedlelibdir))
+                              (format nil "-I~A" (merge-pathnames "libs/fmt" tweedlelibdir))
+                              (format nil "-I~A" (merge-pathnames "libs/easy" tweedlelibdir))
+                              (format nil "-I~A" (merge-pathnames "libs/glucose" tweedlelibdir))
+                              (format nil "-I~A" (merge-pathnames "libs/kitty" tweedlelibdir))
+                              (format nil "-I~A" (merge-pathnames "include" tweedlelibdir))
                               "-o" (nn shared-object)
                               (nn c-file))))
         (restart-case

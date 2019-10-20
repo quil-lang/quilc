@@ -69,7 +69,7 @@
                          (sb-ext:call-with-timing #'process-timing-info #'thing-to-time)
                          (format t "~D " (1+ count)) (finish-output))
                    :finally (progn
-                              (format t "Completed run on ~a qubits with valency ~a.~%" qubits valency)
+                              (format t "Completed run on ~A qubits with valency ~A.~%" qubits valency)
                               (print-stats "Time   " runtime)
                               (print-stats "GC     " gc-time)
                               (print-stats "Consing" bytes))))))))

@@ -397,7 +397,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
             ((test option-2) option-2)
             ((test option-3) option-3)
             ((test option-4) option-4)
-            (t (error "Failed to put the canonical coordinates ~a into the preferred Weyl chamber." (list first second third)))))))))
+            (t (error "Failed to put the canonical coordinates ~A into the preferred Weyl chamber." (list first second third)))))))))
 
 (defun build-canonical-gate-in-magic-basis (coord)
   "Given a canonical coordinate, construct the associated canonical gate at that coordinate."
@@ -710,7 +710,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
         (unless (and (first candidate-pairs)
                      (double= 1d0 (car (first candidate-pairs))))
           (format *compiler-noise-stream*
-                  "~&APPROXIMATE-2Q-COMPILER: Trying ~a on ~a...~%"
+                  "~&APPROXIMATE-2Q-COMPILER: Trying ~A on ~A...~%"
                   circuit-crafter
                   (with-output-to-string (s) (print-instruction instr s)))
           (handler-case
@@ -728,7 +728,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                    (get-canonical-coords-from-diagonal
                                     (nth-value 1 (orthogonal-decomposition m))))))
                   (format *compiler-noise-stream*
-                          " for infidelity ~a.~%" infidelity)
+                          " for infidelity ~A.~%" infidelity)
                   (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
                         candidate-pairs)))
             (compiler-does-not-apply () nil))))

@@ -72,7 +72,7 @@
       (bit-set-element bit-set-element -> bit-set)
     "Returns a bit set representing the range [LO,HI)."
     (assert (<= lo hi) ()
-            "The lower bound must be below the upper bound: ~a </= ~a" lo hi)
+            "The lower bound must be below the upper bound: ~A </= ~A" lo hi)
     (dpb +full+
          (byte (- hi lo) lo)
          +empty+)))
@@ -138,7 +138,7 @@ classical memory regions. "
     (declare (type bit-set qubits))
     (dolist (i indices)
       (declare (type bit-set-element i))
-      (setf qubits (integer-bits-adjoin i qubits)))    
+      (setf qubits (integer-bits-adjoin i qubits)))
     (make-resource-collection :qubits qubits)))
 
 (defun make-null-resource ()
@@ -152,7 +152,7 @@ classical memory regions. "
   "Make a resource collection consisting of the memory region named by
 NAME with an inclusive lower bound LO and exclusive upper bound HI."
   (assert (<= lo hi) (lo hi)
-          "The lower bound must be below the upper bound: ~a </= ~a" lo hi)
+          "The lower bound must be below the upper bound: ~A </= ~A" lo hi)
   (if (= lo hi)
       (make-null-resource)
       (make-resource-collection :memory-regions (list (cons name (list (cons lo hi)))))))
@@ -165,7 +165,7 @@ NAME with an inclusive lower bound LO and exclusive upper bound HI."
 (defmethod print-object ((r resource-collection) stream)
   (print-unreadable-object (r stream :type t :identity nil)
     (let ((qs (resource-collection-qubits r)))
-      (format stream ":QUBITS {~{~D~^, ~}}~:[~;*~]~% :MEMORY-REGIONS ~w"
+      (format stream ":QUBITS {~{~D~^, ~}}~:[~;*~]~% :MEMORY-REGIONS ~W"
               (bit-set-to-list
                (if (infinite-integer-set-p qs)
                    (integer-bits-complement qs)

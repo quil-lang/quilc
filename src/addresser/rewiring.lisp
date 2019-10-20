@@ -218,9 +218,9 @@ Returns NIL. This mutates the instruction."
       (let ((loc (aref l2p j)))
         (when loc
           (assert (and (< -1 loc (length p2l))) ()
-                  "Malformed rewiring string: value ~a at position ~a is out of range." loc j)
+                  "Malformed rewiring string: value ~A at position ~A is out of range." loc j)
           (assert (null (aref p2l loc)) ()
-                  "Malformed rewiring string: repeated value ~a at position ~a." loc j)
+                  "Malformed rewiring string: repeated value ~A at position ~A." loc j)
           (setf (aref p2l loc) j))))
     (init-rewiring :l2p l2p :p2l p2l)))
 
@@ -256,7 +256,7 @@ BODY as an implicit PROGN."
                (eql #\( (aref str 1))
                (eql #\) (aref str (1- (length str)))))
           nil
-          "Malformed rewiring string: input ~a is not of the form #(...)." str)
+          "Malformed rewiring string: input ~A is not of the form #(...)." str)
   (let* ((stripped-string (string-trim "#()" str))
          (tokens (first (tokenize stripped-string)))
          (integer-vec
@@ -268,7 +268,7 @@ BODY as an implicit PROGN."
                     ((eql (token-type token) :integer)
                      (token-payload token))
                     (t
-                     (error "Malformed rewiring string: unexpected token ~a." token))))
+                     (error "Malformed rewiring string: unexpected token ~A." token))))
                 tokens)))
     (make-rewiring-from-l2p integer-vec)))
 

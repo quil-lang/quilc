@@ -18,7 +18,7 @@
            (handler-bind ((simple-error
                             (lambda (e)
                               (when break-on-error
-                                (break "~a" e))
+                                (break "~A" e))
                               (setq failed t)
                               (return-from morf-nruter))))
              (funcall assn (lambda () (compiler-hook quil-file chip))))))

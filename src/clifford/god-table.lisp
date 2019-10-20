@@ -243,7 +243,7 @@ allows to compute a minimal length sequence of generators to invert it."))
                                                   (not (< (third entry) depth)))
                                          ))))))
                (iddfs 1 root)
-               (format t "Depth ~2D: ~v,' D (~3,1F%)~%"
+               (format t "Depth ~2D: ~V,' D (~3,1F%)~%"
                        max-depth
                        num-digits
                        (hash-table-count gt)
@@ -279,7 +279,7 @@ allows to compute a minimal length sequence of generators to invert it."))
                                        (iddfs (1+ depth) next-s (cons s-idx collected)))))))
                  (setf explored 0)
                  (iddfs 1 root nil)
-                 (format t "Depth ~2D: ~v,' D~%"
+                 (format t "Depth ~2D: ~V,' D~%"
                          max-depth
                          num-digits
                          explored))))))

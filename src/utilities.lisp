@@ -212,7 +212,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 (defun print-hash (hash &optional (stream *standard-output*))
   (fresh-line stream)
   (dohash ((key val) hash)
-    (format stream "~a -> ~a~%" key val)))
+    (format stream "~A -> ~A~%" key val)))
 
 ;;; Cribbed from QVM-TESTS
 (defmacro with-output-to-quil (&body body)

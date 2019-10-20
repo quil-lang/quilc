@@ -90,9 +90,9 @@ OPTIONS: plist of options governing applicability of the compiler binding."
   (declare (ignore colon-modifier at-modifier))
   (typecase obj
     (measure-binding
-     (format stream "MEASURE ~a" (measure-binding-qubit obj))
+     (format stream "MEASURE ~A" (measure-binding-qubit obj))
      (when (measure-binding-target obj)
-       (format stream " ~a" (measure-binding-target obj))))
+       (format stream " ~A" (measure-binding-target obj))))
     (gate-binding
      (typecase (gate-binding-operator obj)
        (operator-description
@@ -102,11 +102,11 @@ OPTIONS: plist of options governing applicability of the compiler binding."
      (a:when-let ((params (gate-binding-parameters obj)))
        (typecase params
          (symbol
-          (format stream " ~a" params))
+          (format stream " ~A" params))
          (list
-          (format stream " (~{~a~^ ~})" params))))
+          (format stream " (~{~A~^ ~})" params))))
      (a:when-let ((arguments (gate-binding-arguments obj)))
-       (format stream "~{ ~a~}" arguments)))))
+       (format stream "~{ ~A~}" arguments)))))
 
 (defun get-binding-from-instr (instr)
   "Constructs a COMPILER-BINDING object from an INSTRUCTION object, in such a way that if some auxiliary COMPILER-BINDING subsumes the output of this routine, then it will match when applied to the original INSTRUCTION object."
@@ -402,7 +402,7 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 
 (defmethod print-object ((obj compiler) stream)
   (print-unreadable-object (obj stream :type t :identity t)
-    (format stream "~a" (compiler-name obj))))
+    (format stream "~A" (compiler-name obj))))
 
 (defun compiler-gateset-reducer-p (compiler)
   (getf (compiler-options compiler) ':gateset-reducer t))
@@ -420,11 +420,11 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 
 (defmethod describe-object ((obj compiler) stream)
   (call-next-method)
-  (format stream "~%  NAME: ~a~%~%  INPUT:~%~{    ~/cl-quil::binding-fmt/~%~}~%  OUTPUT FREQUENCY:~%"
+  (format stream "~%  NAME: ~A~%~%  INPUT:~%~{    ~/cl-quil::binding-fmt/~%~}~%  OUTPUT FREQUENCY:~%"
           (compiler-name obj)
           (compiler-bindings obj))
   (dohash ((binding count) (compiler-output-gates obj))
-    (format stream "    ~/cl-quil::binding-fmt/: ~a~%" binding count)))
+    (format stream "    ~/cl-quil::binding-fmt/: ~A~%" binding count)))
 
 (defun record-compiler (name)
   "Record (possibly overwriting) the existence of the compiler named by NAME."
@@ -582,10 +582,10 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
   "Pretty-prints the output of FIND-SHORTEST-COMPILER-PATH. Useful for debugging."
   (dolist (item path)
     (typecase item
-      (compiler (format t "~&is the output from applying ~a, coming from...~%" item))
+      (compiler (format t "~&is the output from applying ~A, coming from...~%" item))
       (hash-table
        (dohash ((key val) item)
-         (format t "~/cl-quil::binding-fmt/ -> ~a~%" key val))))))
+         (format t "~/cl-quil::binding-fmt/ -> ~A~%" key val))))))
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
@@ -903,7 +903,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                               (typep (cadr ,xs) 'magicl:matrix))
                          (setf ,x (apply #'anon-gate ,xs)))
                         (t
-                         (error "INST argument pattern not recognized: ~a" ,xs)))
+                         (error "INST argument pattern not recognized: ~A" ,xs)))
                       (rplacd ,tail (cons ,x nil))
                       (setf ,tail (cdr ,tail))
                       (values)))
@@ -980,11 +980,11 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                               (expand-arguments binding env
                                                                 (expand-options binding env body)))))
                (t
-                (error "Malformed binding in compiler form: ~a." binding))))
+                (error "Malformed binding in compiler form: ~A." binding))))
            
            (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name elt-accessor elt-type test)
              (let* ((target-length (length seq))
-                    (seq-var (gensym (format nil "~aS" gensym-name)))
+                    (seq-var (gensym (format nil "~AS" gensym-name)))
                     (elt-vars (loop :repeat target-length
                                     :collect (gensym gensym-name)))
                     (dead-vars (loop :for v :in elt-vars
@@ -1090,7 +1090,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                     `(unpack-wf ,(compiler-binding-name binding) context (,wf ,qc)
                                        ,rest)))
                                  (otherwise
-                                  (error "Illegal OPERATOR-BIND option: ~a" key)))))
+                                  (error "Illegal OPERATOR-BIND option: ~A" key)))))
                rest))
            
            (expand-op (binding env body)
@@ -1142,7 +1142,7 @@ OUTPUT-GATESET: A plist keyed on arguments to MAKE-GATE-BINDING with values in f
       ((:gateset-reducer :class :permit-binding-mismatches-when :output-gateset)
        (enact-compiler-options remaining-options body))
       (otherwise
-       (error "Unknown compiler option: ~a." (first options))))))
+       (error "Unknown compiler option: ~A." (first options))))))
 
 (defmacro define-compiler (name (&rest bindings) &body body)
   "Defines and registers a COMPILER object.  For detailed options information, see ENACT-COMPILER-OPTIONS."
@@ -1151,7 +1151,7 @@ OUTPUT-GATESET: A plist keyed on arguments to MAKE-GATE-BINDING with values in f
       (let* ((parsed-bindings (mapcar #'make-binding-from-source bindings))
              (variable-names (mapcar #'compiler-binding-name parsed-bindings)))
         (alexandria:when-let (pos (position "CONTEXT" variable-names :test #'string=))
-          (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~dth binding of ~a has that name."
+          (warn "DEFINE-COMPILER reserves the variable name CONTEXT, but the ~Dth binding of ~A has that name."
                 (1+ pos) (string name)))
         (alexandria:with-gensyms (ret-val ret-bool)
           ;; TODO: do the alexandria destructuring to catch the docstring or whatever
