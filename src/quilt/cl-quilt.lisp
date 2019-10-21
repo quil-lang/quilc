@@ -4,16 +4,21 @@
 
 (in-package #:cl-quil/quilt)
 
+(defmethod definition-signature ((instr waveform-definition))
+  (cons 'waveform-definition
+        (intern (waveform-definition-name instr))))
+
+;;; When computing signatures for calibrations, we must account for the fact
+;;; that parrameter and argument names don't matter (e.g. `DEFCAL MEASURE q` is
+;;; the same as `DEFCAL MEASURE v`). Our approach here is just to replace all
+;;; parameters by the symbol 'PARAM, and all arguments by the symbol 'FORMAL.
 (defun canonicalize-params-args (obj)
+  "For a parameter or formal argument OBJ, return the canonical form to be used for signatures."
   (cond ((is-param obj)
          'param)
         ((is-formal obj)
          'formal)
         (t obj)))
-
-(defmethod definition-signature ((instr waveform-definition))
-  (cons 'waveform-definition
-        (intern (waveform-definition-name instr))))
 
 (defmethod definition-signature ((instr gate-calibration-definition))
   (list 'gate-calibration-definition
@@ -51,7 +56,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                                          (quil::token
                                           (quil::token-pathname (lexical-context instr)))
                                          (t
-                                          (quil-parse-error "Unable to resolve definition context ~A" instr)))))
+                                          (quil-parse-error "Unable to resolve definition context ~/quil:instruction-fmt/" instr)))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."

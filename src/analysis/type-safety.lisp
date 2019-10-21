@@ -36,8 +36,7 @@
 
 (defun enforce-mref-bounds (mref memory-descriptor)
   (when (and (typep mref 'memory-ref)
-             (not (plusp (mref-available-length mref
-                                                memory-descriptor))))
+             (not (plusp (mref-available-length mref memory-descriptor))))
     (quil-type-error "Memory ref \"~/quil:instruction-fmt/\" exceeds region size ~A."
                      mref
                      (memory-descriptor-length memory-descriptor))))

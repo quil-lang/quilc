@@ -86,14 +86,13 @@ Parameters:
          :documentation "Full Width Half Max shape parameter, in seconds.")
    (t0 :quilt-name "t0"
        :type float
-       :documentation "Center time coordinate of the shape in seconds. Defaults
-       to mid-point of pulse.")
+       :documentation "Center time coordinate of the shape in seconds. Defaults to mid-point of pulse.")
    (anh :quilt-name "anh"
         :type float
-        :documentation "Anharmonicity of the qubit, f01-f12 in (Hz)")
+        :documentation "Anharmonicity of the qubit, f01-f12 in (Hz).")
    (alpha :quilt-name "alpha"
           :type float
-          :documentation "Dimensionless DRAG parameter"))
+          :documentation "Dimensionless DRAG parameter."))
   :documentation "A DRAG Gaussian shaped waveform envelope defined for a specific frame.")
 
 (define-standard-waveform hermite-gaussian-waveform "hermitegaussian"
@@ -102,14 +101,13 @@ Parameters:
          :documentation "Full Width Half Max shape parameter, in seconds.")
    (t0 :quilt-name "t0"
        :type float
-       :documentation "Center time coordinate of the shape in seconds. Defaults
-       to mid-point of pulse.")
+       :documentation "Center time coordinate of the shape in seconds. Defaults to mid-point of pulse.")
    (anh :quilt-name "anh"
         :type float
-        :documentation "Anharmonicity of the qubit, f01-f12 in (Hz)")
+        :documentation "Anharmonicity of the qubit, f01-f12 in (Hz).")
    (alpha :quilt-name "alpha"
           :type float
-          :documentation "Dimensionless DRAG parameter")
+          :documentation "Dimensionless DRAG parameter.")
    (second-order-hrm-coeff :quilt-name "hrm_coeff"
                            :type float
                            :documentation "Second order coefficient (see paper)"))
@@ -129,10 +127,10 @@ Reference: Effects of arbitrary laser or NMR pulse shapes on population inversio
    (pad-right :quilt-name "pad_right"
               :documentation "Length of zero-amplitude padding after the pulse in seconds."
               :type :float))
-  :documentation "Pulse with a flat top and rounded shoulders given by error functions")
+  :documentation "Pulse with a flat top and rounded shoulders given by error functions.")
 
 (define-standard-waveform flat-waveform "flat"
   ((iq :quilt-name "iq"
        :type complex
-       :documentation "Individual IQ point to hold constant"))
+       :documentation "Individual IQ point to hold constant."))
   :documentation "Flat pulse.")

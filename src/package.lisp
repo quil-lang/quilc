@@ -338,13 +338,10 @@
    #:gate-definition                    ; ABSTRACT CLASS
    #:gate-definition-name               ; READER
    #:gate-definition-entries            ; READER
-
    #:matrix-gate-definition             ; CLASS
-   #:gate-definition-entries            ; READER
-
+   #:static-gate-definition             ; CLASS
    #:parameterized-gate-definition      ; CLASS
    #:gate-definition-parameters         ; READER
-
    #:permutation-gate-definition            ; CLASS
    #:permutation-gate-definition-parameters ; READER
 

@@ -4,12 +4,9 @@
 ;;; we would like error messages to be as specific as possible, we choose to
 ;;; explicitly track an "expansion context".
 
-(deftype expansion-context ()
-  '(member nil :DEFCIRCUIT :DEFCAL))
-
 (defvar *expansion-context*)
 (setf (documentation '*expansion-context* 'variable)
-      "The context for expansion, mainly used for error messages.")
+      "The the context for expansion, mainly used for error messages (cf. QUIL-EXPANSION-ERROR).")
 
 (define-condition quil-expansion-error (simple-error)
   ()
@@ -72,40 +69,40 @@
 (defun instantiate-definition-body (defn body defn-params params defn-args args)
   "Fill in the body BODY of a definition DEFN, binding DEFN-PARAMS to PARAMS and DEFN-ARGS to ARGS."
   (assert (= (length params)
-               (length defn-params)))
-    (assert (= (length args)
-               (length defn-args)))
+             (length defn-params)))
+  (assert (= (length args)
+             (length defn-args)))
 
-    (let ((*expansion-depth* (1+ *expansion-depth*)))
-      (unless (<= *expansion-depth* *expansion-limit*)
-        (quil-expansion-error
-         "Exceeded recursion limit of ~D. Current object being expanded is ~A."
-         *expansion-limit*
-         defn))
-      (labels
-          ((param-value (param)
-             (if (not (is-param param))
-                 param
-                 (let ((pos (position (param-name param) defn-params
-                                      :key #'param-name
-                                      :test #'string-equal)))
-                   (when (null pos)
-                     (quil-expansion-error "No defined parameter named ~S" param))
-                   (elt params pos))))
-           (arg-value (arg)
-             (if (not (is-formal arg))
-                 arg
-                 (let ((pos (position (formal-name arg) defn-args
-                                      :key #'formal-name
-                                      :test #'string-equal)))
-                   (when (null pos)
-                     (quil-expansion-error "No argument named ~S" (formal-name arg)))
-                   (elt args pos))))
-           (instantiate (instr)
-             (a:ensure-list
-              (instantiate-instruction instr #'param-value #'arg-value))))
-        (mapcan #'instantiate
-                (relabel-block-labels-uniquely body)))))
+  (let ((*expansion-depth* (1+ *expansion-depth*)))
+    (unless (<= *expansion-depth* *expansion-limit*)
+      (quil-expansion-error
+       "Exceeded recursion limit of ~D. Current object being expanded is ~A."
+       *expansion-limit*
+       defn))
+    (labels
+        ((param-value (param)
+           (if (not (is-param param))
+               param
+               (let ((pos (position (param-name param) defn-params
+                                    :key #'param-name
+                                    :test #'string-equal)))
+                 (when (null pos)
+                   (quil-expansion-error "No defined parameter named ~S" param))
+                 (elt params pos))))
+         (arg-value (arg)
+           (if (not (is-formal arg))
+               arg
+               (let ((pos (position (formal-name arg) defn-args
+                                    :key #'formal-name
+                                    :test #'string-equal)))
+                 (when (null pos)
+                   (quil-expansion-error "No argument named ~S" (formal-name arg)))
+                 (elt args pos))))
+         (instantiate (instr)
+           (a:ensure-list
+            (instantiate-instruction instr #'param-value #'arg-value))))
+      (mapcan #'instantiate
+              (relabel-block-labels-uniquely body)))))
 
 (defun substitute-parameter (param-value)
   "Given a function PARAM-VALUE to compute the value of a PARAM object, return a function which takes either a PARAM, DELAYED-EXPRESSION, or CONSTANT and computes it's numerical value. Should always"
