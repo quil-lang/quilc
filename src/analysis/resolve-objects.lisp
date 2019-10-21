@@ -14,9 +14,9 @@
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
-                    (format nil "Error in resolving ~/quil:instruction-fmt/: ~A."
-                            instr
-                            ,datum)
+                    "Error in resolving ~/quil:instruction-fmt/: ~@?"
+                    instr
+                    ,datum
                     ,@arguments)))
       (let* ((operator (application-operator instr))
              (addl-qubits (operator-description-additional-qubits operator))

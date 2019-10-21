@@ -320,10 +320,11 @@ the immediately preceding line."
   "Dynamic variable to control whether formal parameters and arguments are allowed in the current parsing context.")
 
 (defvar *parser-extensions* '()
-  "A list of parsers which may be invoked when PARSE-PROGRAM-LINES encounters tokens beyond vanilla-quil.")
+  "A list of parsers which may be invoked when PARSE-PROGRAM-LINES encounters tokens beyond vanilla Quil.")
 
-(defparameter *parse-context* nil
-  "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
+(defvar *parse-context*)
+(setf (documentation '*parse-context* 'variable)
+      "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
 
 (defun disappointing-token-error (found-token expected-msg)
   (quil-parse-error "Expected ~A~@[ in ~A~], but observed a token ~A with value ~A."

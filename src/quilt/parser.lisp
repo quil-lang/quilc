@@ -130,8 +130,7 @@
       (if frame-names
           (make-instance 'delay-on-frames
                          :duration duration
-                         :frames (mapcar (lambda (name)
-                                           (frame qubits name))
+                         :frames (mapcar (lambda (name) (frame qubits name))
                                          frame-names))
           (make-instance 'delay-on-qubits
                          :duration duration
@@ -246,7 +245,7 @@
     (quil-parse-error "EOF reached when frame definition was expected."))
   (destructuring-bind (defframe-tok . frame-toks) (first tok-lines)
     (unless (eql ':DEFFRAME (quil::token-type defframe-tok))
-      (quil-parse-error "DEFFRAME exoected. Got ~A"
+      (quil-parse-error "DEFFRAME exoected. Got ~A."
                         (quil::token-type defframe-tok)))
 
     (when (null frame-toks)

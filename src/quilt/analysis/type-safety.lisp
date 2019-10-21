@@ -23,12 +23,12 @@
       (quil-real
        (if (> 2 (quil::mref-available-length mref mdesc))
            (quil-type-error "CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
-                               vector of length no less than 2."
+                            vector of length no less than 2."
                             mref)
            t))
       (_
        (quil-type-error "CAPTURE instruction target must be of type ~
-                           REAL, but got ~/quil:instruction-fmt/ of type ~A."
+                        REAL, but got ~/quil:instruction-fmt/ of type ~A."
                         mref
                         (quil::quil-type-string (memory-descriptor-type mdesc)))))))
 
@@ -51,6 +51,6 @@
                (frame-definition-frame frame-defn))))
       (_
        (quil-type-error "RAW-CAPTURE instruction target must be of type ~
-                           REAL, but got ~/quil:instruction-fmt/ of type ~A."
+                        REAL, but got ~/quil:instruction-fmt/ of type ~A."
                         mref
                         (quil::quil-type-string (memory-descriptor-type mdesc)))))))

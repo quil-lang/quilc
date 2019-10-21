@@ -119,8 +119,8 @@
                     ;; on its own, and we should experiment with this.
                     (assert (not (= qq-distance most-positive-fixnum)) ()
                             "Multiqubit instruction requested between ~
-                                   disconnected components of the QPU graph: ~
-                                   ~/quil:instruction-fmt/ ."
+                             disconnected components of the QPU graph: ~
+                             ~/quil:instruction-fmt/."
                             gate)
                     (incf gate-count)
                     (incf sum
