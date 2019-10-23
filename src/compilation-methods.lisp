@@ -285,7 +285,7 @@ Returns a value list: (processed-program, of type parsed-program
          (touch-reset-block (blk)
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
-               (do-greedy-fidelity-addressing
+               (do-greedy-addressing
                    (funcall *addresser-state-constructor* chip-specification
                             (prog-initial-rewiring parsed-program chip-specification
                                                    :type rewiring-type))

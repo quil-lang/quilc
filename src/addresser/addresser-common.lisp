@@ -482,23 +482,32 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
         ;; if we didn't dirty up the schedule, see if we collected any
         ;; 2Q gates along the way
-        (when (dequeue-best-instr state
-                                  instrs-ready-for-scheduling
-                                  instrs-partially-assigned
-                                  :dry-run dry-run)
-          (return-from dequeue-logical-to-physical t))
+        (cond
+          ((dequeue-best-instr state
+                               instrs-ready-for-scheduling
+                               :dry-run dry-run)
+           t)
+          ((try-to-assign-qubits state instrs-partially-assigned)
+           t)
+          (t
+           nil))))))
 
-        nil))))
+(defun state-with-additional-assignments (state logicals physicals)
+  (let ((new-state (copy-instance state))
+        (new-l2p (copy-rewiring (addresser-state-working-l2p state))))
+    (loop :for l :in logicals
+          :for p :in physicals
+          :do (rewiring-assign new-l2p l p))
+    (setf (addresser-state-working-l2p new-state) new-l2p)
+    new-state))
 
-(defun next-best-instruction (state instrs partially-assigned-instrs)
-  "Find the instruction from the given INSTRS and PARTIALLY-ASSIGNED-INSTRS which has the best COST-FUNCTION valuatiuon. Returns three values: the instruction, the index of the hardware object it lies on, and the optional qubit assignments if the selected instruction was only partially assigned."
+(defun next-best-instruction (state instrs)
+  "Find the instruction from the given INSTRS which has the best COST-FUNCTION valuatiuon. Returns three values: the instruction, the index of the hardware object it lies on, and the optional qubit assignments if the selected instruction was only partially assigned."
   (with-slots (chip-spec chip-sched lschedule) state
     (let ((best-cost (build-worst-cost state))
           instr
-          qubit-assignments
           hardware-index)
       
-      ;; process all the fully-assigned instructions
       (loop
         :for (candidate-hardware-index candidate-instr) :in instrs
         :for physical-qubits := (coerce (vnth 0
@@ -514,39 +523,18 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
           :do (setf best-cost candidate-cost
                     instr candidate-instr
                     hardware-index candidate-hardware-index))
-
-      (when partially-assigned-instrs
-        (loop
-          :with gates-in-waiting := (assign-weights-to-gates state)
-          :for candidate-instr :in partially-assigned-instrs
-          :for logical-positions := (mapcar #'qubit-index (application-arguments candidate-instr))
-          :for physical-positions := (best-qubit-positions state gates-in-waiting logical-positions)
-          :when (and (not (endp physical-positions))
-                     (every #'identity physical-positions))
-            :do (a:when-let*
-                    ((candidate-hardware-index
-                      (nth-value 1 (lookup-hardware-address-by-qubits chip-spec physical-positions)))
-                     (candidate-cost
-                      (cost-function state :instr candidate-instr)))
-                  (when (cost-< candidate-cost best-cost)
-                    (setf best-cost candidate-cost
-                          hardware-index candidate-hardware-index
-                          instr candidate-instr
-                          qubit-assignments (mapcar #'list logical-positions physical-positions))))))
-      (values instr hardware-index qubit-assignments))))
+      (values instr hardware-index))))
 
 (defgeneric append-instr-to-chip-schedule (state instr)
   (:documentation "Appends INSTR to the CHIP-SCHEDULE housed within STATE.")
   (:method (state instr)
     (chip-schedule-append (addresser-state-chip-schedule state) instr)))
 
-(defun dequeue-best-instr (state instrs-ready-for-scheduling instrs-partially-assigned &key dry-run)
+(defun dequeue-best-instr (state instrs-ready-for-scheduling &key dry-run)
   "Dispatches pure instruction scheduling from a list of instructions that are ready to be scheduled."
   (with-slots (chip-sched chip-spec working-l2p lschedule) state
-    (multiple-value-bind (instr link-line qubit-assignments)
-        (next-best-instruction state
-                               instrs-ready-for-scheduling
-                               instrs-partially-assigned)
+    (multiple-value-bind (instr link-line)
+        (next-best-instruction state instrs-ready-for-scheduling)
       (declare (ignore link-line))
 
       ;; if we didn't find any instructions, then return unsuccessful
@@ -554,47 +542,21 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
       ;; from now on, we would schedule something, so bail if on a dry run
       (when dry-run (return-from dequeue-best-instr t))
+      
+      ;; threads always need expansion
+      (when (typep instr 'application-thread-invocation)
+        (lscheduler-replace-instruction lschedule instr (apply-translation-compilers
+                                                         instr
+                                                         chip-spec
+                                                         (lookup-hardware-object chip-spec instr)))
+        (return-from dequeue-best-instr t))
 
       ;; ... and dispatch it.
       (format *compiler-noise-stream*
               "DEQUEUE-BEST-INSTR: Elected to schedule ~/quil:instruction-fmt/.~%"
               instr)
       (let ((rewired-instr (copy-instance instr)))
-        ;; If a rewiring fails, which it may in e.g. a PARTIAL
-        ;; rewiring scheme, then we need to know about it,
-        ;; because the gate is native up to remapping, and
-        ;; therefore it is gate-native and can be
-        ;; instruction-native.
-        ;;
-        ;; We only want to attempt to rewire gates; other
-        ;; objects like circuits (which shouldn't exist), or
-        ;; APPLICATION-THREAD-INVOCATION (which can exist)
-        ;; shouldn't attempt to be rewired, because they're not
-        ;; native anyway. It's an ugly type check, but it is
-        ;; what it is.
-        (when (or (typep rewired-instr 'gate-application)
-                  (and *allow-unresolved-applications*
-                       (typep rewired-instr 'unresolved-application)))
-          (handler-case (rewire-l2p-instruction working-l2p rewired-instr)
-            (missing-rewiring-assignment (c)
-              (declare (ignore c))
-              ;; the instruction is only partially wired, but remember
-              ;; that we already found a putative link. let's do the
-              ;; rewiring now, so that on the next pass this instruction
-              ;; will fall into the bucket of instructions that are
-              ;; ready-2-go.
-              (format *compiler-noise-stream*
-                      "DEQUEUE-BEST-INSTR: Couldn't rewire ~/quil:instruction-fmt/ because assignment is missing~%"
-                      instr)
-              (loop
-                :for (logical physical) :in qubit-assignments
-                :unless (apply-rewiring-l2p working-l2p logical)
-                  :do (format *compiler-noise-stream*
-                              "DEQUEUE-BEST-INSTR: assigning logical qubit ~a to physical qubit ~a~%"
-                              logical physical)
-                      (rewiring-assign working-l2p logical physical))
-              (return-from dequeue-best-instr t))))
-
+        (rewire-l2p-instruction working-l2p rewired-instr)
         (format *compiler-noise-stream*
                 "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring~%"
                 instr rewired-instr)
@@ -603,8 +565,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         ;; or if we can add it to the schedule.
         (cond
           ;; if we found a link and the instruction is native...
-          ((and (not (typep instr 'application-thread-invocation)) ; threads always need expansion
-                (hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr))
+          ((hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr)
            (format *compiler-noise-stream*
                    "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"
                    instr
@@ -659,6 +620,19 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
     (let ((locations (or locations qubit-cc)))
       (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
               "Qubit ~a already assigned" logical)
+      
+      (let ((best-cost (build-worst-cost state))
+            (best-physical nil))
+        (dolist (physical locations)
+          (unless (or (apply-rewiring-p2l working-l2p physical)
+                      (chip-spec-qubit-dead? chip-spec physical))
+            (let ((cost (with-rewiring-assign working-l2p logical physical
+                          (cost-function state :gate-weights gates-in-waiting))))
+              (when (cost-< cost best-cost)
+                (setf best-cost cost
+                      best-physical physical)))))
+        (values best-physical best-cost))
+      #+ignore
       (a:extremum
        (remove-if (lambda (p)
                     (or (apply-rewiring-p2l working-l2p p)
@@ -669,41 +643,35 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
               (with-rewiring-assign working-l2p logical physical
                 (cost-function state :gate-weights gates-in-waiting)))))))
 
-(defun best-qubit-positions (state gates-in-waiting qubits &key locations dont-use)
-  "Find the best locations for QUBITS."
-  (when (endp qubits)
-    (return-from best-qubit-positions nil))
-  (let* ((q (first qubits))
-         (rest (rest qubits))
-         (current-layout (apply-rewiring-l2p (addresser-state-working-l2p state) q))
-         (p (or current-layout
-                (best-qubit-position state gates-in-waiting q
-                                     :locations (set-difference locations dont-use)))))
-    (format *compiler-noise-stream* "BEST-QUBIT-POSITIONS: Processing ~a, " q)
-    (cond
-      (current-layout
-       (format *compiler-noise-stream* "already placed at ~a.~%" current-layout)
-       (list* current-layout (best-qubit-positions state gates-in-waiting rest
-                                                   :locations (union locations
-                                                                     (chip-spec-adj-qubits
-                                                                      (addresser-state-chip-specification state)
-                                                                      current-layout))
-                                                   :dont-use (list* current-layout dont-use))))
-      (p
-       (format *compiler-noise-stream* "decided to put it at ~a.~%" p)
-       (with-rewiring-assign (addresser-state-working-l2p state) q p
-         (list* p
-                (best-qubit-positions state gates-in-waiting rest
-                                      :locations (union locations
-                                                        (chip-spec-adj-qubits
-                                                         (addresser-state-chip-specification state) p))
-                                      :dont-use (list* p dont-use)))))
-      (t
-       (format *compiler-noise-stream* "nowhere to put it, break.~%")
-       (list* nil
-              (best-qubit-positions state gates-in-waiting rest
-                                    :locations locations
-                                    :dont-use dont-use))))))
+(defun try-to-assign-qubits (state instrs-partially-assigned)
+  (with-slots (working-l2p) state
+    (let ((unassigned-qubits nil)
+          (gate-weights (assign-weights-to-gates state)))
+      ;; gather unassigned qubits
+      (dolist (instr instrs-partially-assigned)
+        (dolist (qubit (application-arguments instr))
+          (unless (or (apply-rewiring-l2p working-l2p (qubit-index qubit))
+                      (member (qubit-index qubit) unassigned-qubits))
+            (push (qubit-index qubit) unassigned-qubits))))
+      
+      ;; maximize over best-qubit-position
+      (let (best-logical-qubit
+            best-physical-qubit
+            (best-cost (build-worst-cost state)))
+        (dolist (logical-qubit unassigned-qubits)
+          (multiple-value-bind (physical-qubit cost)
+              (best-qubit-position state gate-weights logical-qubit)
+            (when (cost-< cost best-cost)
+              (setf best-logical-qubit logical-qubit
+                    best-physical-qubit physical-qubit
+                    best-cost cost))))
+        
+        (cond
+          (best-logical-qubit
+           (rewiring-assign working-l2p best-logical-qubit best-physical-qubit)
+           t)
+          (nil
+           nil))))))
 
 ;; todo: eventually we want to modify parts of this to incorporate multi-qubit
 ;;       hardware objects. a lot of this is already correctly set up for that

@@ -57,7 +57,7 @@
 ;; SCHEME IN THE FLOYD-WARSHALL MATRIX) WHEN WORKING WITH NATIVE n-Q GATES, n > 2.
 (defmethod cost-function ((state temporal-addresser-state) &key gate-weights instr)
   (let ((time 0) (actual-cost 0))
-    (when (and instr (typep instr 'gate-application))
+    (when (and instr (typep instr 'application))
       ;; first compute a naive cost
       (let* ((chip-spec (addresser-state-chip-specification state))
              (naive-start-time (chip-schedule-resource-end-time

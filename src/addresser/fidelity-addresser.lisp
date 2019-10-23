@@ -155,6 +155,11 @@
     (declare (ignore max-value))
     value-hash))
 
+(defmethod select-and-embed-a-permutation ((state fidelity-addresser-state) rewiring-tried)
+  (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
+        (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
+    (call-next-method)))
+
 (defun initial-fidelity-addresser-working-state (chip-spec initial-rewiring)
   (let* ((*cost-fn-weight-style* ':fidelity)
          (state (initial-addresser-working-state chip-spec initial-rewiring)))
