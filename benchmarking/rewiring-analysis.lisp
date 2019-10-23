@@ -125,42 +125,46 @@
                             &key (progs (rewiring-test-files))
                                  (chips (rewiring-test-chips))
                                  (break-on-error t))
-  (labels
-      ((get-prog (prog-source)
-         (typecase prog-source
-           (function
-            (funcall prog-source))
-           (otherwise
-            (read-quil-file prog-source))))
+  (let ((counter 0))
+    (labels
+        ((get-prog (prog-source)
+           (typecase prog-source
+             (function
+              (funcall prog-source))
+             (otherwise
+              (read-quil-file prog-source))))
 
-       (by-assignment (prog-source chip assn)
-         (handler-bind
-             ((simple-error
-               (lambda (e)
-                 (when break-on-error
-                   (break "~a" e))
-                 (return-from by-assignment (list nil nil 1)))))
-           (funcall assn (lambda ()
-                           (multiple-value-list (compiler-hook (get-prog prog-source) chip))))))
+         (by-assignment (prog-source chip assn)
+           (handler-bind
+               ((simple-error
+                  (lambda (e)
+                    (when break-on-error
+                      (break "~a" e))
+                    (return-from by-assignment (list nil nil 1)))))
+             (funcall assn (lambda ()
+                             #+ignore
+                             (format t "Tick! ~a~%" (incf counter))
+                             (multiple-value-list (compiler-hook (get-prog prog-source) chip))))))
 
-       (by-chip (prog-source chip)
-         (loop
-           :for (label assn) :on assignments :by #'cddr
-           :for (compiled-program swaps duration elapsed) := (by-assignment prog-source chip assn)
-           :for fidelity := (quil::calculate-instructions-fidelity (coerce (quil::parsed-program-executable-code compiled-program) 'list) chip)
-           :nconc (list label (list swaps duration elapsed fidelity))))
+         (by-chip (prog-source chip)
+           (loop
+             :for (label assn) :on assignments :by #'cddr
+             :for (compiled-program swaps duration elapsed) := (by-assignment prog-source chip assn)
+             :for fidelity := (when compiled-program
+                                (quil::calculate-instructions-fidelity (coerce (quil::parsed-program-executable-code compiled-program) 'list) chip))
+             :nconc (list label (list swaps duration elapsed fidelity))))
 
-       (by-prog (prog-source)
-         (loop
-           :with max-needed := (apply #'max (quil::prog-used-qubits (get-prog prog-source)))
-           :for (label . chip) :in chips
-           :for n-qubits := (quil::chip-spec-n-qubits chip)
-           :when (< max-needed (quil::chip-spec-n-qubits chip))
-             :nconc (list label (by-chip prog-source chip)))))
+         (by-prog (prog-source)
+           (loop
+             :with max-needed := (apply #'max (quil::prog-used-qubits (get-prog prog-source)))
+             :for (label . chip) :in chips
+             :for n-qubits := (quil::chip-spec-n-qubits chip)
+             :when (< max-needed (quil::chip-spec-n-qubits chip))
+               :nconc (list label (by-chip prog-source chip)))))
 
-    (loop
-      :for prog-source :in progs
-      :collect (list prog-source (by-prog prog-source)))))
+      (loop
+        :for prog-source :in progs
+        :collect (list prog-source (by-prog prog-source))))))
 
 (defmacro make-assignments (fixed-vars changing-vars &body assignments)
   "Create a plist of functions that each act like apply with an additional scope. The scope will contain all bindings from fixed-vars in addition to a binding each variable in changing-vars to the corresponding value in the current assignment. "
