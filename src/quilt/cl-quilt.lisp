@@ -103,7 +103,8 @@ In the presence of multiple definitions with a common signature, a signal is rai
                      :originating-file originating-file
                      :transforms transforms
                      :ambiguous-definition-handler ambiguous-definition-handler
-                     :parser-extensions (list #'parse-quilt-program-lines)))
+                     :parser-extensions (list #'parse-quilt-program-lines)
+                     :lexer-extensions (list #'quilt-keyword-lexer)))
 
 (defun read-quilt-file (filespec)
   "Read the Quilt file designated by FILESPEC, and parse it as if by PARSE-QUIL."

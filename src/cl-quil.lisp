@@ -110,11 +110,13 @@ This also signals ambiguous definitions, which may be handled as needed."
 (defun %parse-quil (string build-parsed-program &key originating-file
                                                   transforms
                                                   (ambiguous-definition-handler #'continue)
+                                                  (lexer-extensions '())
                                                   (parser-extensions '()))
-  "The actual parsing code. Arguments are as in PARSE-QUIL, except we now have two new ones:
+  "The actual parsing code. Arguments are as in PARSE-QUIL, except we now have three new ones:
 
 1. BUILD-PARSED-PROGRAM is a function which translates a list of raw ast objects to a PARSED-PROGRAM object,
-2. PARSER-EXTENSIONS is a list of parser functions which PARSE-PROGRAM-LINES may dispatch to."
+2. PARSER-EXTENSIONS is a list of parser functions which PARSE-PROGRAM-LINES may dispatch to.
+3. LEXER-EXTENSIONS is a list of lexer functions which LINE-LEXER may dispatch to."
   (handler-bind
       ;; We disallow multiple declarations of the same memory region (even if equivalent).
       ;; Otherwise, for gate or circuit definitions, the default choice is to "accept the mystery."
@@ -122,7 +124,8 @@ This also signals ambiguous definitions, which may be handled as needed."
                                         #'error-on-ambiguous-memory-declaration
                                         ambiguous-definition-handler)))
     (let ((*current-file* originating-file)
-          (*parser-extensions* parser-extensions))
+          (*parser-extensions* parser-extensions)
+          (*lexer-extensions* lexer-extensions))
       (let* ((raw-quil (parse-quil-into-raw-program string))
              (pp (resolve-objects
                   (funcall build-parsed-program

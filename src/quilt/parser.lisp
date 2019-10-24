@@ -4,11 +4,40 @@
 
 (in-package #:cl-quil/quilt)
 
-;;; Most of the actual parsing logic for Quilt is in here. However, there is
-;;; some that is necessarily tethered to the parsing code in src/parser.lisp.
-;;; Specifically,
-;;;   - the actual token definitions and tokenization machinery
-;;;   - some shared code in QUIL::PARSE-GATE-OR-WAVEFORM-ENTRIES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Tokenization ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(deftype quilt-keyword ()
+  '(member
+    :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
+    :NONBLOCKING
+    :DEFWAVEFORM :DEFCAL :DEFFRAME
+    :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
+
+(deftype quilt-token-type ()
+  '(or
+    quilt-keyword
+    quil::token-type))
+
+(defun quilt-keyword-lexer (str)
+  "Lexer extension for Quilt keywords. If the string STR is a Quilt keyword, a corresponding token will be returned. Otherwise, returns NIL."
+  (let ((quilt-token-strings '("PULSE"
+                               "CAPTURE"
+                               "RAW-CAPTURE"
+                               "DELAY"
+                               "FENCE"
+                               "NONBLOCKING"
+                               "DEFWAVEFORM"
+                               "DEFCAL"
+                               "DEFFRAME"
+                               "SET-FREQUENCY"
+                               "SET-PHASE"
+                               "SHIFT-PHASE"
+                               "SET-SCALE"
+                               "SWAP-PHASE")))
+    (if (member str quilt-token-strings :test #'string=)
+        (quil::tok (intern str :keyword))
+        nil)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Objects ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -385,7 +414,7 @@
           (let ((quil::*arithmetic-parameters* nil)
                 (quil::*segment-encountered* nil))
             (multiple-value-bind (parsed-entries rest-lines)
-                (quil::parse-gate-or-waveform-entries body-lines :require-indent t)
+                (quil::parse-indented-entries body-lines :require-indent t)
               ;; Check that we only refered to parameters in our param list.
               (loop :for body-p :in (mapcar #'first quil::*arithmetic-parameters*)
                     :unless (find (param-name body-p) params :key #'param-name
