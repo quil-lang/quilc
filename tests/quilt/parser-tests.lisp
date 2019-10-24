@@ -37,6 +37,11 @@
             (declare (ignore c))
             (error 'quil:quil-parse-error)))))))
 
+(deftest test-parser-fail-without-extensions ()
+  "Test that Quilt parsing fails with PARSE-QUIL."
+  (signals quil::quil-parse-error
+    (parse-quil "DEFFRAME 0 \"foo\"")))
+
 (deftest test-quilt-defwaveform-sample-rate ()
   (signals quil-parse-error
     (parse-quilt "
@@ -140,9 +145,6 @@ DEFWAVEFORM wf 1.0:
       (verify-definitions frame-defns #'quil:parsed-program-frame-definitions)
       (verify-definitions waveform-defns #'quil:parsed-program-waveform-definitions)
       (verify-definitions calibration-defns #'quil:parsed-program-calibration-definitions))))
-
-;;; TODO MEASURE 0 iq[0] with calibration definition
-
 
 (deftest test-definition-signature ()
   (flet ((signature (raw-quil &rest args)

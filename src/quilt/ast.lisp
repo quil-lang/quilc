@@ -333,8 +333,6 @@
                      :sample-rate sample-rate
                      :context context)))
 
-;;; TODO static vs parametric?
-
 (defmethod print-instruction-generic ((defn waveform-definition) (stream stream))
   (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~] ~/quil:instruction-fmt/:"
           (waveform-definition-name defn)

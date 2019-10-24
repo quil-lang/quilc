@@ -94,6 +94,7 @@ X 0" :transforms nil)))
 (deftest test-measurement-calibration-matching ()
   (let ((pp (parse-quilt "
 DECLARE ro BIT
+DECLARE foo BIT[2]
 
 DEFCAL MEASURE 0:                       # 0
     NOP
@@ -112,13 +113,15 @@ MEASURE 0                               # 1
 MEASURE 1                               # 2
 MEASURE 0 ro                            # 3
 MEASURE 1 ro                            # 4
+MEASURE 0 ro[0]                         # 5
+MEASURE 0 foo[1]                        # 6
 "
                         :transforms nil)))
     ;; We want to check whether definition i matches instruction j
     (let ((matches '((0 (1))            ; def 0 vs instruction 1
-                     (1 (3))
+                     (1 (3 5 6))
                      (2 (1 2))
-                     (3 (3 4)))))
+                     (3 (3 4 5 6)))))
       (dolist (calib matches)
         (destructuring-bind (defn-index match-indices) calib
           (let ((defn (elt (parsed-program-calibration-definitions pp)
