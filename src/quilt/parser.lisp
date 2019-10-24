@@ -202,11 +202,11 @@
         (quil-parse-error "RAW-CAPTURE instruction is only applicable to single-qubit frames."))
       (unless (= 2 (length rest-toks))
         (quil-parse-error "Unexpected format for RAW-CAPTURE. Expected duration followed by a memory reference."))
-      (let ((duration (quil::parse-argument (first rest-toks)))
-            (addr (quil::parse-memory-or-formal-token (second rest-toks) :ensure-valid t)))
+      (let ((duration (quil::parse-parameter-or-expression (butlast rest-toks)))
+            (addr (quil::parse-memory-or-formal-token (car (last rest-toks)) :ensure-valid t)))
         (unless (or (and (quil::is-constant duration)
                          (realp (constant-value duration)))
-                    (is-formal duration))
+                    (is-param duration))
           (quil-parse-error "Expected RAW-CAPTURE duration to be a real number or formal argument."))
         (make-instance 'raw-capture
                        :frame frame

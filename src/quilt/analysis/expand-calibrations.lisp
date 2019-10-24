@@ -118,8 +118,8 @@
                                   arg-value))
         (value (quil::ensure-instantiated (frame-mutation-value instr)
                                           arg-value)))
-    (if (and (frame= frame (frame-mutation-target-frame instr))
-             (constant= value (frame-mutation-value instr)))
+    (if (and (eq frame (frame-mutation-target-frame instr))
+             (eq value (frame-mutation-value instr)))
         instr
         (make-instance (class-of instr)
                        :frame frame
@@ -130,8 +130,8 @@
                                        arg-value))
         (right-frame (instantiate-frame (swap-phase-right-frame instr)
                                         arg-value)))
-    (if (and (frame= left-frame (swap-phase-left-frame instr))
-             (frame= right-frame (swap-phase-right-frame instr)))
+    (if (and (eq left-frame (swap-phase-left-frame instr))
+             (eq right-frame (swap-phase-right-frame instr)))
         instr
         (make-instance 'swap-phase
                        :left-frame left-frame
@@ -140,7 +140,7 @@
 (defmethod instantiate-instruction ((instr pulse) param-value arg-value)
   (let ((frame (instantiate-frame (pulse-frame instr)
                                   arg-value)))
-    (if (frame= frame (pulse-frame instr))
+    (if (eq frame (pulse-frame instr))
         instr
         (make-instance 'pulse
                        :frame frame
@@ -153,8 +153,8 @@
         (memory-ref (quil::ensure-instantiated (capture-memory-ref instr)
                                                arg-value)))
     (quil::check-mref memory-ref)
-    (if (and (frame= frame (capture-frame instr))
-             (memory-ref= memory-ref (capture-memory-ref instr)))
+    (if (and (eq frame (capture-frame instr))
+             (eq memory-ref (capture-memory-ref instr)))
         instr
         (make-instance 'capture
                        :frame frame
@@ -170,9 +170,9 @@
         (duration (quil::ensure-instantiated (raw-capture-duration instr)
                                              arg-value)))
     (quil::check-mref memory-ref)
-    (if (and (frame= frame (raw-capture-frame instr))
-             (memory-ref= memory-ref (raw-capture-memory-ref instr))
-             (constant= duration (raw-capture-duration instr)))
+    (if (and (eq frame (raw-capture-frame instr))
+             (eq memory-ref (raw-capture-memory-ref instr))
+             (eq duration (raw-capture-duration instr)))
         instr
         (make-instance 'raw-capture
                        :frame frame
@@ -182,8 +182,8 @@
 
 (defmethod instantiate-instruction ((instr delay-on-qubits) param-value arg-value)
   (let ((duration (quil::ensure-instantiated (delay-duration instr)
-                                             arg-value)))
-    (if (and (constant= duration (delay-duration instr))
+                                             param-value)))
+    (if (and (eq duration (delay-duration instr))
              (not (some #'is-formal (delay-qubits instr))))
         instr
         (make-instance 'delay-on-qubits
@@ -194,11 +194,11 @@
 (defmethod instantiate-instruction ((instr delay-on-frames) param-value arg-value)
   (let* ((remake nil)
          (duration (quil::ensure-instantiated (delay-duration instr)
-                                              arg-value))
+                                              param-value))
          (frames (mapcar (quil::flag-on-update remake
                                                (lambda (f) (instantiate-frame f arg-value)))
                          (delay-frames instr))))
-    (if (and (constant= duration (delay-duration instr))
+    (if (and (eq duration (delay-duration instr))
              (not remake))
         instr
         (make-instance 'delay-on-frames
@@ -208,7 +208,7 @@
 (defmethod instantiate-instruction ((instr fence) param-value arg-value)
   (let* ((remake nil)
          (qubits (mapcar (quil::flag-on-update remake
-                                               (lambda (q) (quil::ensure-instantiated q arg-value))) 
+                                               (lambda (q) (quil::ensure-instantiated q arg-value)))
                          (fence-qubits instr))))
     (if remake
         (make-instance 'fence :qubits qubits)

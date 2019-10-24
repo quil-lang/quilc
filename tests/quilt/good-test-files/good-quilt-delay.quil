@@ -1,4 +1,5 @@
 DEFFRAME 0 "xy"
+DEFFRAME 0 "ff"
 DEFFRAME 0 1 "cz"
 DEFFRAME 0 1 "foo"
 

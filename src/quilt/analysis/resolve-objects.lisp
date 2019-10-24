@@ -95,8 +95,9 @@
 
 (defmethod resolve-instruction ((instr delay-on-frames) parsed-program)
   (unless quil::*in-definition-body*
-    (dolist (frame (delay-frames delay))
-      (resolve-frame frame (parsed-program-frame-definitions parsed-program)))))
+    (dolist (frame (delay-frames instr))
+      (resolve-frame frame (parsed-program-frame-definitions parsed-program))))
+  instr)
 
 (defmethod resolve-instruction ((instr pulse) parsed-program)
   (unless quil::*in-definition-body*

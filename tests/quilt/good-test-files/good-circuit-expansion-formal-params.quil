@@ -1,0 +1,16 @@
+DEFFRAME 0 "xy"
+DEFFRAME 0 "ff"
+
+DECLARE iq REAL[1000]
+
+DEFCIRCUIT FOO(%theta) q:
+    SET-PHASE q "xy" %theta
+    SWAP-PHASE q "xy" q "ff"
+    PULSE q "xy" flat(iq: 1.0, duration: %theta)
+    CAPTURE q "xy" flat(iq: 1.0, duration: %theta) iq
+    RAW-CAPTURE q "xy" %theta iq
+    DELAY q %theta
+    DELAY q "xy" %theta
+    FENCE q
+
+FOO(1.0) 0
