@@ -48,7 +48,7 @@
   (:documentation "Computes a signature for a Quil definition such that if two definitions are equivalent for the purposes of name resolution, then their signatures are EQUALP.")
   (:method ((instr gate-definition))
     (list 'gate-or-circuit-definition
-          (intern (gate-definition-name instr))
+          (intern (gate-definition-name instr) :keyword)
           (if (typep instr 'parameterized-gate-definition)
               (length (gate-definition-parameters instr))
               0)
@@ -56,13 +56,13 @@
 
   (:method ((instr circuit-definition))
     (list 'gate-or-circuit-definition
-          (intern (circuit-definition-name instr))
+          (intern (circuit-definition-name instr) :keyword)
           (length (circuit-definition-parameters instr))
           (length (circuit-definition-arguments instr))))
 
   (:method ((instr memory-descriptor))
     (list 'memory-descriptor
-          (intern (memory-descriptor-name instr))))
+          (intern (memory-descriptor-name instr) :keyword)))
 
   (:method ((instr t))
     nil))
