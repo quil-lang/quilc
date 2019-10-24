@@ -6,7 +6,7 @@
 
 (defmethod definition-signature ((instr waveform-definition))
   (cons 'waveform-definition
-        (intern (waveform-definition-name instr))))
+        (intern (waveform-definition-name instr) :keyword)))
 
 ;;; When computing signatures for calibrations, we must account for the fact
 ;;; that parrameter and argument names don't matter (e.g. `DEFCAL MEASURE q` is
@@ -23,7 +23,8 @@
 (defmethod definition-signature ((instr gate-calibration-definition))
   (list 'gate-calibration-definition
         (intern (quil::operator-description-string
-                 (calibration-definition-operator instr)))
+                 (calibration-definition-operator instr))
+                :keyword)
         (mapcar #'canonicalize-params-args (calibration-definition-arguments instr))
         (mapcar #'canonicalize-params-args (calibration-definition-parameters instr))))
 
