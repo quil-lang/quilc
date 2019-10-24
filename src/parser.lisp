@@ -15,17 +15,9 @@
     :DECLARE :SHARING :OFFSET :PRAGMA
     :AS :MATRIX :PERMUTATION))
 
-(deftype quilt-keyword ()
-  '(member
-    :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
-    :NONBLOCKING
-    :DEFWAVEFORM :DEFCAL :DEFFRAME
-    :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
-
 (deftype token-type ()
   '(or
     quil-keyword
-    quilt-keyword
     (member
      :COLON :LEFT-PAREN :RIGHT-PAREN :COMMA :LABEL-NAME :PARAMETER
      :STRING :INDENTATION :INDENT :DEDENT :COMPLEX :PLUS
@@ -42,7 +34,9 @@
             :read-only t)
   (pathname nil :type (or null string pathname)
                 :read-only t)
-  (type nil :type token-type
+  (type nil :type symbol                ; For vanilla Quil this will be
+                                        ; TOKEN-TYPE, but for extensions the set
+                                        ; of valid symbols may be larger.
             :read-only t)
   (payload nil :read-only t))
 
@@ -77,6 +71,17 @@
       (if (zerop im)
           re
           (complex re im)))))
+
+(defvar *lexer-extensions* '()
+  "A list of lexer extensions.
+
+Each lexer extension is a function mapping strings to tokens. They are used to handle keywords in Quil language extensions.")
+
+(defun match-lexer-extension (str)
+  "Given a string STR, check whether a lexer extension matches this string, and if so return the corresponding token."
+  (dolist (ext *lexer-extensions* nil)
+    (a:when-let ((kw (funcall ext str)))
+      (return-from match-lexer-extension kw))))
 
 (alexa:define-string-lexer line-lexer
   "A lexical analyzer for lines of Quil."
@@ -119,7 +124,7 @@
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
   ;; both Quil and Quilt keywords are handled here
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PULSE|CAPTURE|RAW\\-CAPTURE|DELAY|FENCE|NONBLOCKING|DEFWAVEFORM|DEFCAL|DEFFRAME|SET\\-FREQUENCY|SET\\-PHASE|SHIFT\\-PHASE|SET\\-SCALE|SWAP\\-PHASE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -144,7 +149,9 @@
      (cond
        ((string= "pi" $@) (tok :COMPLEX (constant pi)))
        ((string= "i" $@)  (tok :COMPLEX (constant #C(0.0d0 1.0d0))))
-       (t                 (tok :NAME $@)))))
+       (t (a:if-let ((kw (match-lexer-extension $@)))
+            kw
+            (tok :NAME $@))))))
   ((eager "(?:    |\\t)+")
    (when (= *line-start-position* $<)
      (return (tok :INDENTATION (parse-indent-string $@)))))
@@ -180,8 +187,8 @@
     (handler-case
         (let ((f (funcall lexer string)))
           (loop :for tok := (funcall f)
-            :until (null tok)
-            :collect tok))
+                :until (null tok)
+                :collect tok))
       (alexa:lexer-match-error (c)
         (multiple-value-bind (context-line failing-char)
             (tokenization-failure-context string c)
@@ -223,10 +230,7 @@
 (defun split-lines (tokens)
   "Split TOKENS into non-empty sublists representing logical lines.
 
-A logical line may be introduced either as the result of a :NEWLINE or a
-:SEMICOLON token. In the case of a :NEWLINE, the lines are split as written. In
-the case of :SEMICOLON, the following line is prefixed with the indentation of
-the immediately preceding line."
+A logical line may be introduced either as the result of a :NEWLINE or a :SEMICOLON token. In the case of a :NEWLINE, the lines are split as written. In the case of :SEMICOLON, the following line is prefixed with the indentation of the immediately preceding line."
   ;; note: something like "H 0 ; X 1" will produce two lines for internal processing,
   ;; but the tokens themselves maintain their original line numbers for error reporting.
   (declare (type list tokens)
@@ -319,9 +323,6 @@ the immediately preceding line."
 (defvar *formal-arguments-allowed* nil
   "Dynamic variable to control whether formal parameters and arguments are allowed in the current parsing context.")
 
-(defvar *parser-extensions* '()
-  "A list of parsers which may be invoked when PARSE-PROGRAM-LINES encounters tokens beyond vanilla Quil.")
-
 (defvar *parse-context*)
 (setf (documentation '*parse-context* 'variable)
       "A Quil keyword (e.g. :DEFGATE) indicating the context in which a portion of a Quil instruction is being parsed.")
@@ -333,12 +334,29 @@ the immediately preceding line."
                     (token-type found-token)
                     (token-payload found-token)))
 
+(defvar *parser-extensions* '()
+  "A list of parsers which may be invoked when PARSE-PROGRAM-LINES encounters tokens beyond vanilla Quil.
+
+Each parser is a function mapping a list of lines of tokens to a pair,
+
+1. The next AST object.
+2. A list of lines that remain unparsed.
+
+If the parser does not match, then it should return NIL.")
+
+(defun match-parser-extension (tok-lines)
+  "Apply any parsers defined in *PARSER-EXTENSIONS* to the list of lines of tokens, TOK-LINES."
+  (dolist (parser *parser-extensions* (values nil tok-lines))
+    (multiple-value-bind (obj rest-lines)
+        (funcall parser tok-lines)
+      (when obj
+        (return-from match-parser-extension (values obj rest-lines))))))
+
 (defun parse-program-lines (tok-lines)
   "Parse the next AST object from the list of token lists. Returns two values:
 
 1. The next AST object.
-2. A list of lines that remain unparsed.
-"
+2. A list of lines that remain unparsed."
   (let* ((line (first tok-lines))
          (tok (first line))
          (tok-type (token-type tok))
@@ -422,13 +440,12 @@ the immediately preceding line."
        (parse-trinary-classical tok-type tok-lines))
 
       (otherwise
-       (dolist (parser *parser-extensions*)
-         (multiple-value-bind (obj rest-lines)
-             (funcall parser tok-lines)
-             (when obj
-               (return-from parse-program-lines (values obj rest-lines)))))
-       (quil-parse-error "Got an unexpected token of type ~S ~
-                          when trying to parse a program." tok-type)))))
+       (multiple-value-bind (obj rest-lines)
+           (match-parser-extension tok-lines)
+         (if obj
+             (values obj rest-lines)
+             (quil-parse-error "Got an unexpected token of type ~S ~
+                               when trying to parse a program." tok-type)))))))
 
 ;; Many instructions are given by a single line of a few tokens. The
 ;; MATCH-LINE macro below just captures some boilerplate common to the
@@ -444,12 +461,6 @@ For example, the spec ((op :RESET) &optional q) would match a single RESET token
 
 In accordance with the typical usage here, there are two values returned: the result of BODY, and the (possibly null) list of remaining lines.
 "
-  ;; check that specified token types are valid
-  (dolist (spec token-specs)
-    (when (and (listp spec)
-               (keywordp (second spec))
-               (not (typep (second spec) 'token-type)))
-      (error "Invalid token type ~S" (second spec))))
   (let ((all-lines (gensym))
         (first-line (gensym)))
     (flet ((token-typecheck-clause (spec opt)
@@ -467,36 +478,36 @@ In accordance with the typical usage here, there are two values returned: the re
                              (format nil "Expected ~S token, but got ~~S." spec-type)
                              `(format nil "Expected ~S token, but got ~~S." ,spec-type))
                         (token-type ,spec-name)))))))))
-    (multiple-value-bind (required optional rest)
-        (a:parse-ordinary-lambda-list token-specs
-                                               :allow-specializers t)
-      (let ((stripped-lambda-list (mapcar #'a:ensure-car
-                                          token-specs))
-            (first-type (second (first required))))
-        `(let ((,all-lines ,lines))
-           ;; Check that we have a line to consume
-           (when (endp ,all-lines)
-             (quil-parse-error "Unexpectedly reached end of program~@[ (expected ~A instruction)~]." ,first-type))
-           (let ((,first-line (first ,all-lines)))
-             ;; Check that we have the right number of tokens
-             ,(let ((min-tokens (length required))
-                    (max-tokens (unless rest
-                                  (+ (length required) (length optional)))))
-                 `(unless (<= ,min-tokens
-                             (length ,first-line)
-                             . ,(when max-tokens (list max-tokens)))
-                    (quil-parse-error "Expected at least ~A ~@[ and at most ~A~] tokens~@[ for instruction ~A~]."
-                                     ,min-tokens
-                                     ,max-tokens
-                                     ,first-type)))
-             (destructuring-bind ,stripped-lambda-list ,first-line
-               ;; Check the various token types
-               ,@(mapcan (lambda (s) (token-typecheck-clause s nil))
-                         required)
-               ,@(mapcan (lambda (s) (token-typecheck-clause s t))
-                         optional)
-               (values (progn ,@body)
-                       (rest ,all-lines))))))))))
+      (multiple-value-bind (required optional rest)
+          (a:parse-ordinary-lambda-list token-specs
+                                        :allow-specializers t)
+        (let ((stripped-lambda-list (mapcar #'a:ensure-car
+                                            token-specs))
+              (first-type (second (first required))))
+          `(let ((,all-lines ,lines))
+             ;; Check that we have a line to consume
+             (when (endp ,all-lines)
+               (quil-parse-error "Unexpectedly reached end of program~@[ (expected ~A instruction)~]." ,first-type))
+             (let ((,first-line (first ,all-lines)))
+               ;; Check that we have the right number of tokens
+               ,(let ((min-tokens (length required))
+                      (max-tokens (unless rest
+                                    (+ (length required) (length optional)))))
+                  `(unless (<= ,min-tokens
+                               (length ,first-line)
+                               . ,(when max-tokens (list max-tokens)))
+                     (quil-parse-error "Expected at least ~A ~@[ and at most ~A~] tokens~@[ for instruction ~A~]."
+                                       ,min-tokens
+                                       ,max-tokens
+                                       ,first-type)))
+               (destructuring-bind ,stripped-lambda-list ,first-line
+                 ;; Check the various token types
+                 ,@(mapcan (lambda (s) (token-typecheck-clause s nil))
+                           required)
+                 ,@(mapcan (lambda (s) (token-typecheck-clause s t))
+                           optional)
+                 (values (progn ,@body)
+                         (rest ,all-lines))))))))))
 
 (defun parse-qubit (qubit-tok)
   "Parse a qubit, denoted by a formal argument or an integer index."
@@ -739,17 +750,17 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 (defun parse-application (tok-lines)
   "Parse a gate or circuit application out of the lines of tokens TOK-LINES, returning an UNRESOLVED-APPLICATION."
   (match-line ((op :NAME) &rest rest-toks) tok-lines
-      (if (endp rest-toks)
-          (make-instance 'unresolved-application
-                         :operator (named-operator (token-payload op)))
-          (multiple-value-bind (params args)
-              (parse-parameters rest-toks :allow-expressions t)
+    (if (endp rest-toks)
+        (make-instance 'unresolved-application
+                       :operator (named-operator (token-payload op)))
+        (multiple-value-bind (params args)
+            (parse-parameters rest-toks :allow-expressions t)
 
-            ;; Parse out the rest of the arguments and return.
-            (make-instance 'unresolved-application
-                           :operator (named-operator (token-payload op))
-                           :parameters params
-                           :arguments (mapcar #'parse-argument args))))))
+          ;; Parse out the rest of the arguments and return.
+          (make-instance 'unresolved-application
+                         :operator (named-operator (token-payload op))
+                         :parameters params
+                         :arguments (mapcar #'parse-argument args))))))
 
 (defun parse-measurement (tok-lines)
   "Parse a measurement out of the lines of tokens TOK-LINES."
@@ -870,7 +881,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
   (let ((*arithmetic-parameters* nil)
         (*segment-encountered* nil))
     (multiple-value-bind (parsed-entries rest-lines)
-        (parse-gate-or-waveform-entries body-lines)
+        (parse-indented-entries body-lines)
       ;; Check that we only refered to parameters in our param list.
       (loop :for body-p :in (mapcar #'first *arithmetic-parameters*)
             :unless (find (param-name body-p) params :key #'param-name
@@ -907,12 +918,14 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
     (mapcar #'simplify entries)))
 
 ;;; This is used for both Quil and Quilt
-(defun parse-gate-or-waveform-entries (tok-lines &key require-indent)
-  "Parse comma separated gate or waveform entries from TOK-LINES. Returns the the parsed entries as well as the remaining lines. If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly indented."
+(defun parse-indented-entries (tok-lines &key require-indent)
+  "Parse indented, comma separated entries from TOK-LINES. Returns the the parsed entries as well as the remaining lines.
+
+If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly indented."
   ;; Do we have any lines to parse?
   (when (null tok-lines)
     (warn "End of program each when indented gate or waveform entries was expected.")
-    (return-from parse-gate-or-waveform-entries (values nil nil)))
+    (return-from parse-indented-entries (values nil nil)))
 
   ;; Check for indentation.
   (multiple-value-bind (indented? modified-line)
@@ -920,9 +933,11 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
     ;; Is the first line indented?
     (unless indented?
       (when require-indent
-        (quil-parse-error "Expected indented gate or waveform entries, but alas, they weren't found. (Did you indent properly?)"))
+        (quil-parse-error "Expected indented entries when parsing ~A, but alas, ~
+                          they weren't found. (Did you indent properly?)"
+                          *parse-context*))
       (warn "Expected indented gate or waveform entries but alas, they weren't found.")
-      (return-from parse-gate-or-waveform-entries
+      (return-from parse-indented-entries
         (values nil tok-lines)))
     ;; Remove the indentation from the top line.
     (setf tok-lines (cons modified-line (rest tok-lines))))
@@ -935,7 +950,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
   (loop :with gate-entries := nil :do
     ;; Reached EOF
     (when (null tok-lines)
-      (return-from parse-gate-or-waveform-entries
+      (return-from parse-indented-entries
         (values (parse-arithmetic-entries gate-entries)
                 tok-lines)))
 
@@ -947,7 +962,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
         (dedented?
          (let ((new-lines (cons modified-line
                                 (rest tok-lines))))
-           (return-from parse-gate-or-waveform-entries
+           (return-from parse-indented-entries
              (values (parse-arithmetic-entries gate-entries)
                      new-lines))))
         ;; DEDENT not found, continue parsing entries.
@@ -1041,29 +1056,29 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
         (setf name (token-payload (pop params-args)))
 
         (multiple-value-bind (params rest-line) (parse-parameters params-args)
-            ;; Check for colon and incise it.
-            (let ((maybe-colon (last rest-line)))
-              (when (or (null maybe-colon)
-                        (not (eql ':COLON (token-type (first maybe-colon)))))
-                (quil-parse-error "Expected a colon in DEFCIRCUIT."))
-              (setf rest-line (butlast rest-line)))
+          ;; Check for colon and incise it.
+          (let ((maybe-colon (last rest-line)))
+            (when (or (null maybe-colon)
+                      (not (eql ':COLON (token-type (first maybe-colon)))))
+              (quil-parse-error "Expected a colon in DEFCIRCUIT."))
+            (setf rest-line (butlast rest-line)))
 
-            ;; Collect arguments and stash them away.
-            (loop :for arg :in rest-line
-                  :when (not (eql ':NAME (token-type arg)))
-                    :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
-                  :collect (parse-argument arg) :into formal-args
-                  :finally (setf args formal-args))
+          ;; Collect arguments and stash them away.
+          (loop :for arg :in rest-line
+                :when (not (eql ':NAME (token-type arg)))
+                  :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
+                :collect (parse-argument arg) :into formal-args
+                :finally (setf args formal-args))
 
-            (multiple-value-bind (parsed-body rest-lines)
-                (parse-indented-body body-lines)
-              (values (make-circuit-definition
-                       name              ; Circuit name
-                       params            ; formal parameters
-                       args              ; formal arguments
-                       parsed-body
-                       :context op)
-                      rest-lines)))))))
+          (multiple-value-bind (parsed-body rest-lines)
+              (parse-indented-body body-lines)
+            (values (make-circuit-definition
+                     name              ; Circuit name
+                     params            ; formal parameters
+                     args              ; formal arguments
+                     parsed-body
+                     :context op)
+                    rest-lines)))))))
 
 (defun parse-quil-type (string)
   (check-type string string)
@@ -1235,32 +1250,32 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                (disappointing-token-error tok "a memory region name" ))
              (unless (find (token-payload tok) *memory-region-names* :test #'string=)
                (quil-parse-error "Unknown memory region name ~S."
-                                   (token-payload tok)))
+                                 (token-payload tok)))
              (memory-name (token-payload tok))))
       (ecase tok-type
-            ((:LOAD)
-             (unless (= 1 (length right))
-               (quil-parse-error "Invalid right argument to LOAD."))
-             (make-instance 'classical-load
-                            :target (parse-memory-or-formal-token target)
-                            :left (parse-memory-region-name left)
-                            :right (parse-classical-argument right)))
-            ((:STORE)
-             (make-instance 'classical-store
-                            :target (parse-memory-region-name target)
-                            :left (parse-memory-or-formal-token left)
-                            :right (parse-classical-argument right)))
-            ((:EQ :GT :GE :LT :LE)
-             (make-instance
-              (ecase tok-type
-                (:EQ 'classical-equality)
-                (:GT 'classical-greater-than)
-                (:GE 'classical-greater-equal)
-                (:LT 'classical-less-than)
-                (:LE 'classical-less-equal))
-              :target (parse-memory-or-formal-token target)
-              :left (parse-classical-argument (list left))
-              :right (parse-classical-argument right)))))))
+        ((:LOAD)
+         (unless (= 1 (length right))
+           (quil-parse-error "Invalid right argument to LOAD."))
+         (make-instance 'classical-load
+                        :target (parse-memory-or-formal-token target)
+                        :left (parse-memory-region-name left)
+                        :right (parse-classical-argument right)))
+        ((:STORE)
+         (make-instance 'classical-store
+                        :target (parse-memory-region-name target)
+                        :left (parse-memory-or-formal-token left)
+                        :right (parse-classical-argument right)))
+        ((:EQ :GT :GE :LT :LE)
+         (make-instance
+          (ecase tok-type
+            (:EQ 'classical-equality)
+            (:GT 'classical-greater-than)
+            (:GE 'classical-greater-equal)
+            (:LT 'classical-less-than)
+            (:LE 'classical-less-equal))
+          :target (parse-memory-or-formal-token target)
+          :left (parse-classical-argument (list left))
+          :right (parse-classical-argument right)))))))
 
 (defun indented-line (tok-line)
   (if (eql ':INDENT (token-type (first tok-line)))
