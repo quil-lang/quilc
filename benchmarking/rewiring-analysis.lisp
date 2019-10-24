@@ -200,6 +200,36 @@
                         #-(or sbcl ecl) (error "don't know how to seed random state")))
     (make-rewiring-prog (quil::generate-random-rewiring n-qubits))))
 
+(defun generate-ring-prog (n-qubits state)
+  (declare (ignore state))
+  (assert (>= n-qubits 3))
+  (make-instance
+   'parsed-program
+   :executable-code (concatenate
+                     'vector
+                     (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
+                     (list (make-instance 'quil::pragma-commuting-blocks))
+                     (loop :for i :below n-qubits
+                           :collect (make-instance 'quil::pragma-block)
+                           :collect (quil::build-gate "CZ" () i (mod (1+ i) n-qubits))
+                           :collect (make-instance 'quil::pragma-end-block))
+                     (list (make-instance 'quil::pragma-end-commuting-blocks)))))
+
+(defun generate-star-prog (n-qubits state)
+  (declare (ignore state))
+  (assert (>= n-qubits 3))
+  (make-instance
+   'parsed-program
+   :executable-code (concatenate
+                     'vector
+                     (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
+                     (list (make-instance 'quil::pragma-commuting-blocks))
+                     (loop :for i :from 1 :to (1- n-qubits)
+                           :collect (make-instance 'quil::pragma-block)
+                           :collect (quil::build-gate "CZ" () 0 i)
+                           :collect (make-instance 'quil::pragma-end-block))
+                     (list (make-instance 'quil::pragma-end-commuting-blocks)))))
+
 (defun generate-handshake-prog (n-qubits state)
   (declare (ignore state))
   (make-instance
@@ -231,6 +261,42 @@
                   :for i :below trials
                   :collect (let ((curval i))
                              (lambda () (generate-random-rewiring-prog rewiring-qubits curval))))
+         args))
+
+(defun measure-ring-prog-performance (assn &rest args
+                                           &key break-on-error include-runtime
+                                                (n-qubits 20)
+                                                (chips (rewiring-test-chips))
+                                                (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
+  (apply 'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :nconc (loop :for j :from 3 :to n-qubits
+                               :collect (let ((j j)) (lambda () (generate-ring-prog j 0)))))
+         args))
+
+(defun measure-star-prog-performance (assn &rest args
+                                           &key break-on-error include-runtime
+                                                (n-qubits 20)
+                                                (chips (rewiring-test-chips))
+                                                (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
+  (apply 'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :nconc (loop :for j :from 3 :to n-qubits
+                               :collect (let ((j j)) (lambda () (generate-star-prog j 0)))))
          args))
 
 (defun measure-handshake-prog-performance (assn &rest args
