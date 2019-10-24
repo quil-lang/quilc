@@ -4,6 +4,31 @@
 
 (in-package #:cl-quil)
 
+;;; There are three main steps on the journey from Quil string to Quil program,
+;;; namely lexing, parsing, and analysis.
+;;;
+;;; The lexing rules are encoded in LINE-LEXER below, with TOKENIZE providing a
+;;; higher interface with special management of indentation etc.
+;;;
+;;; Once lexed, the high-level control flow of parsing is managed by
+;;; PARSE-PROGRAM-LINES, which dispatches on token type and hands off to
+;;; specialized parsing routines.
+;;;
+;;; The main entry point provided here is PARSE-QUIL-INTO-RAW-PROGRAM. Most
+;;; users would instead do well to use PARSE-QUIL, which performs additional
+;;; analysis (like object resolution).
+;;;
+;;;
+;;; A brief note on extensions:
+;;;
+;;; The parsing code below is written to support some amount of extensibility at
+;;; runtime. There are two main hooks in for this:
+;;;
+;;;   *LEXER-EXTENSIONS* allows for new keywords to be added
+;;;   *PARSER-EXTENSIONS* allows for new AST objects to be produced
+;;;
+;;; For more information on these mechanisms, see their respective documentation.
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;; Lexical Analysis ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (deftype quil-keyword ()
