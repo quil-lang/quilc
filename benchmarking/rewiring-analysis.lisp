@@ -123,14 +123,14 @@
 
 (defun measure-performance (assignments
                             &key (progs (rewiring-test-files))
-                                 (chips (rewiring-test-chips))
-                                 (break-on-error t))
+                              (chips (rewiring-test-chips))
+                              (break-on-error t))
   (let ((counter 0))
     (labels
-        ((get-prog (prog-source)
+        ((get-prog (prog-source chip)
            (typecase prog-source
              (function
-              (funcall prog-source))
+              (funcall prog-source chip))
              (otherwise
               (read-quil-file prog-source))))
 
@@ -141,26 +141,29 @@
                     (when break-on-error
                       (break "~A" e))
                     (return-from by-assignment (list nil nil 1)))))
-             (funcall assn (lambda ()
-                             #+ignore
-                             (format t "Tick! ~A~%" (incf counter))
-                             (multiple-value-list (compiler-hook (get-prog prog-source) chip))))))
+             (let* ((progm (get-prog prog-source chip))
+                    (max-needed (apply #'max (quil::prog-used-qubits progm))))
+               (when (< max-needed
+                        (quil::chip-spec-n-qubits chip))
+                 (funcall assn (lambda ()
+                                 #+ignore
+                                 (format t "Tick! ~A~%" (incf counter))
+                                 (multiple-value-list (compiler-hook (get-prog prog-source chip) chip))))))))
 
          (by-chip (prog-source chip)
            (loop
              :for (label assn) :on assignments :by #'cddr
              :for (compiled-program swaps duration elapsed) := (by-assignment prog-source chip assn)
              :for fidelity := (when compiled-program
-                                (quil::calculate-instructions-fidelity (coerce (quil::parsed-program-executable-code compiled-program) 'list) chip))
+                                (quil::calculate-instructions-fidelity
+                                 (coerce (quil::parsed-program-executable-code compiled-program) 'list)
+                                 chip))
              :nconc (list label (list swaps duration elapsed fidelity))))
 
          (by-prog (prog-source)
            (loop
-             :with max-needed := (apply #'max (quil::prog-used-qubits (get-prog prog-source)))
              :for (label . chip) :in chips
-             :for n-qubits := (quil::chip-spec-n-qubits chip)
-             :when (< max-needed (quil::chip-spec-n-qubits chip))
-               :nconc (list label (by-chip prog-source chip)))))
+             :nconc (list label (by-chip prog-source chip)))))
 
       (loop
         :for prog-source :in progs
@@ -230,7 +233,7 @@
                            :collect (make-instance 'quil::pragma-end-block))
                      (list (make-instance 'quil::pragma-end-commuting-blocks)))))
 
-(defun generate-handshake-prog (n-qubits state)
+(defun generate-handshake-prog (n-qubits state chip)
   (declare (ignore state))
   (make-instance
    'parsed-program
@@ -238,11 +241,14 @@
                      'vector
                      (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
                      (list (make-instance 'quil::pragma-commuting-blocks))
-                     (loop :for i :below n-qubits
-                                  :nconc (loop :for j :below i
-                                               :collect (make-instance 'quil::pragma-block)
-                                               :collect (quil::build-gate "CZ" () i j)
-                                               :collect (make-instance 'quil::pragma-end-block)))
+                     (loop :with live-qubits := (quil::chip-spec-live-qubits chip)
+                           :for i :below n-qubits
+                           :for qi := (nth i live-qubits)
+                           :nconc (loop :for j :below i
+                                        :for qj := (nth j live-qubits)
+                                        :collect (make-instance 'quil::pragma-block)
+                                        :collect (quil::build-gate "CZ" () qi qj)
+                                        :collect (make-instance 'quil::pragma-end-block)))
                      (list (make-instance 'quil::pragma-end-commuting-blocks)))))
 
 (defun measure-rewiring-swap-search (assn &rest args
@@ -260,7 +266,8 @@
          :progs (loop
                   :for i :below trials
                   :collect (let ((curval i))
-                             (lambda () (generate-random-rewiring-prog rewiring-qubits curval))))
+                             (lambda (chip) (declare (ignore chip))
+                               (generate-random-rewiring-prog rewiring-qubits curval))))
          args))
 
 (defun measure-ring-prog-performance (assn &rest args
@@ -278,7 +285,10 @@
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 3 :to n-qubits
-                               :collect (let ((j j)) (lambda () (generate-ring-prog j 0)))))
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (declare (ignore chip))
+                                            (generate-ring-prog j 0)))))
          args))
 
 (defun measure-star-prog-performance (assn &rest args
@@ -296,25 +306,31 @@
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 3 :to n-qubits
-                               :collect (let ((j j)) (lambda () (generate-star-prog j 0)))))
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (declare (ignore chip))
+                                            (generate-star-prog j 0)))))
          args))
 
 (defun measure-handshake-prog-performance (assn &rest args
-                                                &key break-on-error include-runtime
-                                                     (n-qubits 20)
-                                                     (chips (rewiring-test-chips))
-                                                     (trials 20))
+                                           &key break-on-error include-runtime
+                                             (n-qubits 20)
+                                             (chips (rewiring-test-chips))
+                                             (trials 20))
   (declare (ignore break-on-error include-runtime))
   (remf args :n-qubits)
   (remf args :trials)
   (setf (getf args :chips)
         (loop :for (name chip) :in chips
-              :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
+              :when (= (length (quil::chip-spec-live-qubits chip)) n-qubits) :collect (cons name chip)))
+  (print (getf args :chips))
   (apply 'measure-performance assn
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 2 :to n-qubits
-                               :collect (let ((j j)) (lambda () (generate-handshake-prog j 0)))))
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (generate-handshake-prog j 0 chip)))))
          args))
 
 (defvar *basic-swap-search-assn*
