@@ -82,7 +82,6 @@
                  (parsed-program-frame-definitions parsed-program))
   instr)
 
-
 (defmethod resolve-instruction ((instr swap-phase) parsed-program)
   (unless quil::*in-definition-body*
     (let ((defns (parsed-program-frame-definitions parsed-program)))
@@ -90,12 +89,14 @@
       (resolve-frame (swap-phase-right-frame instr) defns)))
   instr)
 
-;;; TODO?
-(defmethod resolve-instruction ((instr delay) parsed-program)
-  ;; DELAY allows users to specify frames explicitly (by giving their names),
-  ;; or implicitly (by giving no names).
+(defmethod resolve-instruction ((instr delay-on-qubits) parsed-program)
   (declare (ignore parsed-program))
   instr)
+
+(defmethod resolve-instruction ((instr delay-on-frames) parsed-program)
+  (unless quil::*in-definition-body*
+    (dolist (frame (delay-frames delay))
+      (resolve-frame frame (parsed-program-frame-definitions parsed-program)))))
 
 (defmethod resolve-instruction ((instr pulse) parsed-program)
   (unless quil::*in-definition-body*

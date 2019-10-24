@@ -1,4 +1,8 @@
-DELAY 0 1.0 
+DEFFRAME 0 "xy"
+DEFFRAME 0 1 "cz"
+DEFFRAME 0 1 "foo"
+
+DELAY 0 1.0
 DELAY 0 1e-2
 DELAY 0 "xy" 1e-2
 DELAY 0 "xy" "ff" 1e-2 
