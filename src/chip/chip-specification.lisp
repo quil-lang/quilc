@@ -360,6 +360,8 @@ used to specify CHIP-SPEC."
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
             'cnot-to-native-cnots))
+        (constantly 'cz-to-native-czs)
+        #+ignore
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
@@ -396,6 +398,12 @@ used to specify CHIP-SPEC."
         (constantly 'state-prep-4q-compiler)
         (constantly 'state-prep-trampolining-compiler)
         (constantly 'recognize-ucr)
+        (constantly 'nearest-circuit-of-depth-0)
+        (constantly 'nearest-cz-circuit-of-depth-1)
+        (constantly 'nearest-cz-circuit-of-depth-2)
+        (constantly 'nearest-cz-circuit-of-depth-3)
+        (constantly 'canonical-decomposition)
+        #+ignore
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (a:curry 'approximate-2q-compiler
