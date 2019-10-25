@@ -340,7 +340,10 @@ we've dirtied up the schedule.")
                (typep instr 'measure-discard)
                (typep instr 'reset-qubit))
            ;; insert the instruction
-           (rewire-l2p-instruction working-l2p instr)
+           (handler-case (rewire-l2p-instruction working-l2p instr)
+             (missing-rewiring-assignment ()
+               (return-from dequeue-classical-instruction
+                 (values nil nil (list instr)))))
            (chip-schedule-append chip-sched instr)
            ;; dequeue the instruction and set the dirty flag
            (lscheduler-dequeue-instruction lschedule instr)
@@ -649,10 +652,10 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
           (gate-weights (assign-weights-to-gates state)))
       ;; gather unassigned qubits
       (dolist (instr instrs-partially-assigned)
-        (dolist (qubit (application-arguments instr))
-          (unless (or (apply-rewiring-l2p working-l2p (qubit-index qubit))
-                      (member (qubit-index qubit) unassigned-qubits))
-            (push (qubit-index qubit) unassigned-qubits))))
+        (dolist (qubit (cl-quil.resource::resource-qubits-list (instruction-resources instr)))
+          (unless (or (apply-rewiring-l2p working-l2p qubit)
+                      (member qubit unassigned-qubits))
+            (push qubit unassigned-qubits))))
       
       ;; maximize over best-qubit-position
       (let (best-logical-qubit

@@ -465,3 +465,10 @@ RANGES."
 
 (defun range-difference (r1 r2)
   (range-intersection r1 (range-complement r2)))
+
+(defun resource-qubits-list (r)
+  (let ((qs (resource-collection-qubits r)))
+    (bit-set-to-list
+     (if (infinite-integer-set-p qs)
+         (integer-bits-complement qs)
+         qs))))
