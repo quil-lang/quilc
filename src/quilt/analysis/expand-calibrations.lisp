@@ -101,7 +101,7 @@
 ;;; Instruction Instantiation
 
 (defun instantiate-frame (frame arg-value)
-  "Instantiate FRAME with respect to the unary function ARG-VALUE, constructing a new frame if needed."
+  "Instantiate FRAME with respect to the argument values represented by ARG-VALUE, constructing a new frame if needed."
   (let* ((remake nil)
          (qubits (mapcar (quil::flag-on-update remake
                                                (lambda (q) (quil::ensure-instantiated q arg-value)))
@@ -113,11 +113,32 @@
           instantiated)
         frame)))
 
+(defun instantiate-waveform-ref (waveform param-value)
+  "Instantiate the waveform reference WAVEFORM with respect to the parameter values represented by PARAM-VALUE, constructing a new waveform if needed."
+  (let ((remake nil))
+    (flet ((instantiate-parameter (assoc)
+             (destructuring-bind (name . value) assoc
+               (let ((instantiated-value (quil::ensure-instantiated value param-value)))
+                 (cond ((eq value instantiated-value)
+                        assoc)
+                       (t
+                        (setf remake t)
+                        (cons name instantiated-value)))))))
+      (let ((updated-alist (mapcar #'instantiate-parameter
+                                   (waveform-ref-parameter-alist waveform))))
+        (if remake
+            (let ((new-wf (waveform-ref (waveform-ref-name waveform)
+                                        updated-alist)))
+              (setf (waveform-ref-name-resolution new-wf)
+                    (waveform-ref-name-resolution waveform))
+              new-wf)
+            waveform)))))
+
 (defmethod instantiate-instruction ((instr simple-frame-mutation) param-value arg-value)
   (let ((frame (instantiate-frame (frame-mutation-target-frame instr)
                                   arg-value))
         (value (quil::ensure-instantiated (frame-mutation-value instr)
-                                          arg-value)))
+                                          param-value)))
     (if (and (eq frame (frame-mutation-target-frame instr))
              (eq value (frame-mutation-value instr)))
         instr
@@ -139,26 +160,32 @@
 
 (defmethod instantiate-instruction ((instr pulse) param-value arg-value)
   (let ((frame (instantiate-frame (pulse-frame instr)
-                                  arg-value)))
-    (if (eq frame (pulse-frame instr))
+                                  arg-value))
+        (waveform (instantiate-waveform-ref (pulse-waveform instr)
+                                            param-value)))
+    (if (and (eq frame (pulse-frame instr))
+             (eq waveform (pulse-waveform instr)))
         instr
         (make-instance 'pulse
                        :frame frame
-                       :waveform (pulse-waveform instr)
+                       :waveform waveform
                        :nonblocking (nonblocking-p instr)))))
 
 (defmethod instantiate-instruction ((instr capture) param-value arg-value)
   (let ((frame (instantiate-frame (capture-frame instr)
                                   arg-value))
+        (waveform (instantiate-waveform-ref (capture-waveform instr)
+                                            param-value))
         (memory-ref (quil::ensure-instantiated (capture-memory-ref instr)
                                                arg-value)))
     (quil::check-mref memory-ref)
     (if (and (eq frame (capture-frame instr))
+             (eq waveform (capture-waveform instr))
              (eq memory-ref (capture-memory-ref instr)))
         instr
         (make-instance 'capture
                        :frame frame
-                       :waveform (capture-waveform instr)
+                       :waveform waveform
                        :memory-ref memory-ref
                        :nonblocking (nonblocking-p instr)))))
 
@@ -168,7 +195,7 @@
         (memory-ref (quil::ensure-instantiated (raw-capture-memory-ref instr)
                                                arg-value))
         (duration (quil::ensure-instantiated (raw-capture-duration instr)
-                                             arg-value)))
+                                             param-value)))
     (quil::check-mref memory-ref)
     (if (and (eq frame (raw-capture-frame instr))
              (eq memory-ref (raw-capture-memory-ref instr))
