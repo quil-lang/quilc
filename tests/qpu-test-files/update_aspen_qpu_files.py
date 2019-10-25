@@ -29,10 +29,16 @@ def main():
     for device in list_devices():
         os.makedirs(os.path.join(device, now), exist_ok=True)
 
-    for lattice in map(get_lattice, list_quantum_computers(qvms=False)):
-        print(lattice.name, file=sys.stderr)
-        with open(qpu_dir.format(device, now, lattice.name), 'w') as f:
-            json.dump(device_to_chipspec(lattice, timestamp=now), f, indent=2)
+        for lattice in map(get_lattice, list_quantum_computers(qvms=False)):
+            # This is a bit hacky. The "lattice" object (really a
+            # device object) doesn't contain the name of its parent
+            # "device" as a property. Hopefully it contains it as a
+            # substring of its own name.
+            if device in lattice.name:
+                print(lattice.__dir__())
+                print(lattice.name, file=sys.stderr)
+                with open(qpu_dir.format(device, now, lattice.name), 'w') as f:
+                    json.dump(device_to_chipspec(lattice, timestamp=now), f, indent=2)
 
     try:
         os.unlink(f"{device}/latest")
