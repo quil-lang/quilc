@@ -34,7 +34,11 @@ def main():
         with open(qpu_dir.format(device, now, lattice.name), 'w') as f:
             json.dump(device_to_chipspec(lattice, timestamp=now), f, indent=2)
 
-    os.unlink(f"{device}/latest")
+    try:
+        os.unlink(f"{device}/latest")
+    except FileNotFoundError:
+        pass
+
     os.symlink(f"{now}", f"{device}/latest")
 
 
