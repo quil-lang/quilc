@@ -1,5 +1,43 @@
 (in-package #:cl-quil/quilt-tests)
 
+(deftest test-quilt-circuit-expansion ()
+  (let ((pp (parse-quilt "
+DECLARE iq REAL[1000]
+DEFFRAME 0 \"xy\":
+    SAMPLE-RATE: 1.0
+
+DEFFRAME 0 \"ff\"
+
+DEFCIRCUIT FOO(%theta) q:
+    SET-PHASE q \"xy\" %theta
+    SWAP-PHASE q \"xy\" q \"ff\"
+    PULSE q \"xy\" flat(iq: 1.0, duration: %theta)
+    CAPTURE q \"xy\" flat(iq: 1.0, duration: %theta) iq[0]
+    RAW-CAPTURE q \"xy\" %theta iq[0]
+    DELAY q %theta
+    DELAY q \"xy\" %theta
+    FENCE q
+
+FOO(1.0) 0"
+                         :transforms '(quil::expand-circuits)))
+        (expected-instrs
+          (list
+           "SET-PHASE 0 \"xy\" 1.0"
+           "SWAP-PHASE 0 \"xy\" 0 \"ff\""
+           "PULSE 0 \"xy\" flat(iq: 1.0, duration: 1.0)"
+           "CAPTURE 0 \"xy\" flat(iq: 1.0, duration: 1.0) iq[0]"
+           "RAW-CAPTURE 0 \"xy\" 1.0 iq[0]"
+           "DELAY 0 1.0"
+           "DELAY 0 \"xy\" 1.0"
+           "FENCE 0")))
+    (is (= (length (parsed-program-executable-code pp))
+           (length expected-instrs)))
+    (loop :for instr :across (parsed-program-executable-code pp)
+          :for expected :in expected-instrs
+          :do
+             (is (string= expected
+                          (quil::print-instruction-to-string instr))))))
+
 (deftest test-quilt-name-resolution ()
   (let ((pp (parse-quilt "
 DEFFRAME 0 \"xy\"
