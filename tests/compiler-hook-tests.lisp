@@ -328,7 +328,7 @@ CNOT 1 2"))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
-  (let ((pp (quil::parse-quil "
+  (let* ((pp (quil::parse-quil "
 DECLARE beta REAL[1]
 DECLARE gamma REAL[1]
 DECLARE ro BIT[3]
@@ -364,14 +364,16 @@ H 2
 MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]
-")))
-    (multiple-value-bind (code initial final)
-        (quil::do-greedy-temporal-addressing
-            (coerce (parsed-program-executable-code pp) 'list)
-          (quil::qpu-hash-table-to-chip-specification
-           (yason:parse "
+"))
+         (chip (quil::qpu-hash-table-to-chip-specification
+                (yason:parse "
 {\"isa\":
-{\"1Q\": {\"0\": {}, \"1\": {}, \"2\": {}, \"3\": {}, \"4\": {}, \"5\": {}, \"6\": {}, \"7\": {}, \"8\": {}}, \"2Q\": {\"0-3\": {}, \"0-1\": {}, \"1-4\": {}, \"1-2\": {}, \"2-5\": {}, \"3-6\": {}, \"3-4\": {}, \"4-7\": {}, \"4-5\": {}, \"5-8\": {}, \"6-7\": {}, \"7-8\": {}}}}"))
+{\"1Q\": {\"0\": {}, \"1\": {}, \"2\": {}, \"3\": {}, \"4\": {}, \"5\": {}, \"6\": {}, \"7\": {}, \"8\": {}}, \"2Q\": {\"0-3\": {}, \"0-1\": {}, \"1-4\": {}, \"1-2\": {}, \"2-5\": {}, \"3-6\": {}, \"3-4\": {}, \"4-7\": {}, \"4-5\": {}, \"5-8\": {}, \"6-7\": {}, \"7-8\": {}}}}")))
+         (initial-rewiring (quil::prog-initial-rewiring pp chip)))
+    (multiple-value-bind (code initial final)
+        (quil::do-greedy-addressing
+            (funcall quil::*addresser-state-constructor* chip initial-rewiring)
+          (coerce (parsed-program-executable-code pp) 'list)
           :use-free-swaps t)
       (declare (ignore code))
       (is (every #'identity (quil::rewiring-l2p initial)))
