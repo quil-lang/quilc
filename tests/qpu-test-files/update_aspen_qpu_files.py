@@ -35,7 +35,6 @@ def main():
             # "device" as a property. Hopefully it contains it as a
             # substring of its own name.
             if device in lattice.name:
-                print(lattice.__dir__())
                 print(lattice.name, file=sys.stderr)
                 with open(qpu_dir.format(device, now, lattice.name), 'w') as f:
                     json.dump(device_to_chipspec(lattice, timestamp=now), f, indent=2)
