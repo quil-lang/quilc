@@ -587,3 +587,7 @@
    #:clifford-from-quil                 ; FUNCTION
    )
   )
+
+(defpackage #:cl-quil.qasm
+  (:nicknames #:quil.qasm)
+  (:use #:cl))

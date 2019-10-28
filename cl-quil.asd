@@ -54,6 +54,7 @@
                (:file "define-pragma")
                (:file "pragmas")
                (:file "parser")
+               (:file "qasm")
                (:file "gates")
                (:file "context")
                (:file "build-gate")

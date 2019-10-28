@@ -83,6 +83,8 @@ This also signals ambiguous definitions, which may be handled as needed."
                (let ((originating-file (typecase (lexical-context instr)
                                          (token
                                           (token-pathname (lexical-context instr)))
+                                         (null
+                                          "")
                                          (t
                                           (quil-parse-error "Unable to resolve definition context ~A" instr)))))
                  ;; check for conflicts
