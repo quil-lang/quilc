@@ -25,7 +25,6 @@ qpu_dir = "{}/{}/{}.qpu"
 
 def main():
     now = str(datetime.datetime.today())
-    print(list_devices())
     for device in list_devices():
         os.makedirs(os.path.join(device, now), exist_ok=True)
 
