@@ -290,6 +290,12 @@ If no exit rewiring is found, return NIL."
              :reader include-pathname))
   (:documentation "A directive to include another file in a Quil file."))
 
+;; TODO Better name
+(defclass string-print ()
+  ((string :initarg :string
+           :reader string-print-string))
+  (:documentation "A pseudo-instruction that prints only and exactly itself."))
+
 
 ;;;;;;;;;;;;;;;;;;;; Gate and Circuit Definitions ;;;;;;;;;;;;;;;;;;;;
 
@@ -1426,10 +1432,14 @@ For example,
                                 (* i gate-size)
                                 (* (1+ i) gate-size)))))
       (terpri stream)))
+  
   (:method ((gate permutation-gate-definition) (stream stream))
     (format stream "DEFGATE ~A AS PERMUTATION:~%    ~{~D~^, ~}~%"
             (gate-definition-name gate)
-            (permutation-gate-definition-permutation gate))))
+            (permutation-gate-definition-permutation gate)))
+
+  (:method ((str string-print) (stream stream))
+    (write-line (string-print-string str) stream)))
 
 (defmethod print-object ((object instruction) stream)
   (print-unreadable-object (object stream :type nil :identity nil)

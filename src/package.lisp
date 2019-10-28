@@ -128,6 +128,9 @@
    #:include                            ; CLASS
    #:include-pathname                   ; READER
 
+   #:string-print                       ; CLASS
+   #:string-print-string                ; READER
+
    #:instruction                        ; ABSTRACT CLASS
 
    #:no-operation                       ; CLASS
