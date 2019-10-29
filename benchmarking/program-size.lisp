@@ -1,3 +1,14 @@
+;;; program-size.lisp
+;;;
+;;;
+
+;;; The purpose of these benchmarks is to see how program depth
+;;; (namely 2Q) affects compilation time and memory usage.
+;;;
+;;; (run-benchmarks) is the entry point for this set of
+;;; benchmarks. Benchmark data can be written to disk with
+;;; (write-benchmarks-to-files (run-benchmarks)).
+
 (benchmark:define-benchmark-package #:cl-quil-benchmarking.program-compilation
   (:use #:cl-quil)
   ;; Both CL-QUIL and TRIVIAL-BENCHMARK define a RESET function --
