@@ -83,16 +83,17 @@ with i ranging from 0 to N-QUBITS - 1."
 
 (defun run-benchmarks ()
   (list
-   (cons "Bell program compilation (fully connected nQ chip)"
+   (cons (print "Bell program compilation (fully connected nQ chip)")
          (loop :with samples := 10
                :for i :from 1 :upto 20
                :for chip := (quil::build-nq-fully-connected-chip i :architecture ':cz)
                :for program := (make-bell-program i)
                :for metrics := (benchmark:metrics (benchmark-program program samples :chip chip))
+               :do (print i)
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
                               :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))
-   (cons "Bell program compilation (Aspen-4-16Q)"
+   (cons (print "Bell program compilation (Aspen-4-16Q)")
          (loop :with samples := 10
                :for i :from 1 :upto 16
                :for chip := (quil::read-chip-spec-file "../tests/qpu-test-files/Aspen-4-16Q-A.qpu")
@@ -101,7 +102,7 @@ with i ranging from 0 to N-QUBITS - 1."
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
                               :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))
-   (cons "QFT program compilation (fully connected nQ chip)"
+   (cons (print "QFT program compilation (fully connected nQ chip)")
          (loop :with samples := 10
                :for i :from 1 :upto 20
                :for chip    := (quil::build-nq-fully-connected-chip i :architecture ':cz)
@@ -110,7 +111,7 @@ with i ranging from 0 to N-QUBITS - 1."
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
                               :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))
-   (cons "QFT program compilation (Aspen-4-16Q)"
+   (cons (print "QFT program compilation (Aspen-4-16Q)")
          (loop :with samples := 10
                :for i :from 1 :upto 16
                :for chip := (quil::read-chip-spec-file "../tests/qpu-test-files/Aspen-4-16Q-A.qpu")
