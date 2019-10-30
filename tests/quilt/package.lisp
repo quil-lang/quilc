@@ -7,10 +7,10 @@
 #-(or sbcl ecl ccl)
 (rename-package :alexandria :alexandria '(:a))
 
-(fiasco:define-test-package #:cl-quil/quilt-tests
+(fiasco:define-test-package #:cl-quil.quilt-tests
   #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
-  (:use #:cl-quil #:cl-quil/quilt)
+  (:use #:cl-quil #:cl-quil.quilt)
 
   ;; suite.lisp
   (:export

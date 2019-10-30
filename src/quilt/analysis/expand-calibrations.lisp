@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 ;;; Calibration Expansion
 ;;;
@@ -119,12 +119,11 @@
     (flet ((instantiate-parameter (assoc)
              (destructuring-bind (name . value) assoc
                (let ((instantiated-value (quil::ensure-instantiated value param-value)))
-                 (cond ((eq value instantiated-value)
-                        assoc)
-                       (t
-                        (setf remake t)
-                        (cons name instantiated-value)))))))
-      (let ((updated-alist (mapcar #'instantiate-parameter
+                 (if (eq value instantiated-value)
+                     ;; Remember folks, a CONS saved is a CONS earned.
+                     assoc
+                     (cons name instantiated-value))))))
+      (let ((updated-alist (mapcar (quil::flag-on-update remake #'instantiate-parameter)
                                    (waveform-ref-parameter-alist waveform))))
         (if remake
             (let ((new-wf (waveform-ref (waveform-ref-name waveform)

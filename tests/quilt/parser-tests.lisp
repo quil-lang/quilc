@@ -1,4 +1,4 @@
-(in-package #:cl-quil/quilt-tests)
+(in-package #:cl-quil.quilt-tests)
 
 (defparameter *good-quilt-test-file-directory*
   (asdf:system-relative-pathname

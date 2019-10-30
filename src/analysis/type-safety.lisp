@@ -30,13 +30,18 @@
       (memory-name (setf (memory-name-descriptor mref) desc)))
     desc))
 
-(defun mref-available-length (mref memory-descriptor)
-  (- (memory-descriptor-length memory-descriptor)
-     (memory-ref-position mref)))
+(defun memory-segment-length (memory-descriptor &key offset)
+  "Get the length of the memory segment specified by MEMORY-DESCRIPTOR, relative to the offset indicated by the memory reference OFFSET."
+  (check-type memory-descriptor memory-descriptor)
+  (check-type offset (or null memory-ref))
+  (if offset
+      (- (memory-descriptor-length memory-descriptor)
+         (memory-ref-position offset))
+      (memory-descriptor-length memory-descriptor)))
 
 (defun enforce-mref-bounds (mref memory-descriptor)
   (when (and (typep mref 'memory-ref)
-             (not (plusp (mref-available-length mref memory-descriptor))))
+             (not (plusp (memory-segment-length memory-descriptor :offset mref))))
     (quil-type-error "Memory ref \"~/quil:instruction-fmt/\" exceeds region size ~A."
                      mref
                      (memory-descriptor-length memory-descriptor))))

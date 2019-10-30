@@ -148,7 +148,6 @@ Each lexer extension is a function mapping strings to tokens. They are used to h
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ;; both Quil and Quilt keywords are handled here
   ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
@@ -942,7 +941,6 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
              (parse-arithmetic-tokens entry :eval t)))
     (mapcar #'simplify entries)))
 
-;;; This is used for both Quil and Quilt
 (defun parse-indented-entries (tok-lines &key require-indent)
   "Parse indented, comma separated entries from TOK-LINES. Returns the the parsed entries as well as the remaining lines.
 

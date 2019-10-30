@@ -12,6 +12,8 @@
 
 (defun qubit= (x y)
   "Do the qubits X and Y have equal indices?"
+  (check-type x qubit)
+  (check-type y qubit)
   (= (qubit-index x) (qubit-index y)))
 
 (defstruct (memory-name (:constructor memory-name (region-name &optional descriptor)))
@@ -33,10 +35,13 @@
   (descriptor nil :type (or null memory-descriptor)))
 
 (defun memory-ref= (a b)
+  (check-type a memory-ref)
+  (check-type b memory-ref)
   (and (string= (memory-ref-name a) (memory-ref-name b))
        (= (memory-ref-position a) (memory-ref-position b))))
 
 (defun memory-ref-hash (m)
+  (check-type m memory-ref)
   #+sbcl
   (sb-int:mix (sxhash (memory-ref-name m)) (sxhash (memory-ref-position m)))
   #-sbcl
@@ -57,6 +62,8 @@
 
 (defun constant= (x y)
   "Do the constants X and Y have equal types and values?"
+  (check-type x constant)
+  (check-type y constant)
   (and (equal (constant-value-type x)
               (constant-value-type y))
        (= (constant-value x)
@@ -75,6 +82,8 @@
 
 (defun param= (x y)
   "Do parameters X and Y have the same name?"
+  (check-type x param)
+  (check-type y param)
   (string= (param-name x)
            (param-name y)))
 
@@ -85,6 +94,8 @@
 
 (defun formal= (x y)
   "Do formal arguments X and Y have the same name?"
+  (check-type x formal)
+  (check-type y formal)
   (string= (formal-name x) (formal-name y)))
 
 (defun argument= (x y)
@@ -1467,17 +1478,17 @@ For example,
   ;; The following are not actually instructions, but who cares.
 
   (:method ((defn memory-descriptor) (stream stream))
-    (format stream "DECLARE ~a ~a"
+    (format stream "DECLARE ~A ~A"
             (memory-descriptor-name defn)
             (quil-type-string (memory-descriptor-type defn)))
-    (format stream "~[[0]~;~:;[~:*~a]~]" (memory-descriptor-length defn))
+    (format stream "~[[0]~;~:;[~:*~A]~]" (memory-descriptor-length defn))
     (when (memory-descriptor-sharing-parent defn)
-      (format stream " SHARING ~a"
+      (format stream " SHARING ~A"
               (memory-descriptor-sharing-parent defn))
       (a:when-let (x (memory-descriptor-sharing-offset-alist defn))
         (format stream " OFFSET")
         (loop :for (type . count) :in x
-              :do (format stream " ~a ~a" count (quil-type-string type))))))
+              :do (format stream " ~A ~A" count (quil-type-string type))))))
 
   (:method ((gate matrix-gate-definition) (stream stream))
     (let ((gate-size (isqrt (length (gate-definition-entries gate)))))
@@ -1505,7 +1516,7 @@ For example,
             (permutation-gate-definition-permutation gate)))
 
   (:method ((defn circuit-definition) (stream stream))
-    (format stream "DEFCIRCUIT ~a"
+    (format stream "DEFCIRCUIT ~A"
             (circuit-definition-name defn))
     (unless (endp (circuit-definition-parameters defn))
       (format stream "(~{~/quil:instruction-fmt/~^, ~})"

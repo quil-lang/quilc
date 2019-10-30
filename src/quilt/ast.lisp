@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package :cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Objects ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -14,10 +14,13 @@
   (name-resolution nil :type (or null frame-definition)))
 
 (defun frame= (a b)
+  (check-type a frame)
+  (check-type b frame)
   (and (string= (frame-name a) (frame-name b))
        (quil::list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
 (defun frame-hash (f)
+  (check-type f frame)
   #+sbcl
   (sb-int:mix (sxhash (frame-name f)) (sxhash (frame-qubits f)))
   #-sbcl
@@ -54,7 +57,7 @@
 (defclass standard-waveform ()
   ((duration :initarg :duration
              :reader waveform-duration
-             :type float
+             :type (or float constant param)
              :documentation "Duration of the waveform, in seconds."))
   (:documentation "Base class for built-in waveforms.")
   (:metaclass abstract-class))
@@ -67,8 +70,10 @@
 
 (defclass simple-frame-mutation (instruction)
   ((frame :initarg :frame
+          :type frame
           :accessor frame-mutation-target-frame)
    (value :initarg :value
+          :type (or constant param)
           :accessor frame-mutation-value))
   (:documentation "An instruction representing the mutation of a frame attribute.")
   (:metaclass abstract-class))
@@ -111,8 +116,10 @@
 
 (defclass swap-phase (instruction)
   ((left-frame :initarg :left-frame
+               :type frame
                :accessor swap-phase-left-frame)
    (right-frame :initarg :right-frame
+                :type frame
                 :accessor swap-phase-right-frame))
   (:documentation "An instruction representing a phase swap between two frames."))
 
@@ -156,6 +163,7 @@
              :documentation "A waveform, used as an integration kernel for the capture operation.")
    (memory-ref :initarg :memory-ref
                :accessor capture-memory-ref
+               :type (or memory-ref formal)
                :documentation "The location in memory to store the captured IQ value.")
    (nonblocking :initarg :nonblocking
                 :initform nil
@@ -178,11 +186,11 @@
           :documentation "The frame from which a value is to be captured.")
    (duration :initarg :duration
              :accessor raw-capture-duration
-             :type constant
+             :type (or constant param)
              :documentation "The duration for which IQ values will be recorded.")
    (memory-ref :initarg :memory-ref
                :accessor raw-capture-memory-ref
-               :type memory-ref
+               :type (or memory-ref formal)
                :documentation "The location in memory to store captured IQ values.")
    (nonblocking :initarg :nonblocking
                 :initform nil
@@ -203,7 +211,7 @@
 (defclass delay (instruction)
   ((duration :initarg :duration
              :accessor delay-duration
-             :type constant
+             :type (or constant param)
              :documentation "The duration (in seconds) of the DELAY instruction."))
   (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
@@ -313,6 +321,7 @@
 
 (defclass parameterized-waveform-definition (waveform-definition)
   ((parameters :initarg :parameters
+               :type list
                :reader waveform-definition-parameters
                :documentation "A list of symbol parameter names."))
   (:documentation "A waveform definition that has named parameters."))
@@ -334,13 +343,13 @@
                      :context context)))
 
 (defmethod print-instruction-generic ((defn waveform-definition) (stream stream))
-  (format stream "DEFWAVEFORM ~a~@[(~{%~a~^, ~})~] ~/quil:instruction-fmt/:"
+  (format stream "DEFWAVEFORM ~A~@[(~{%~A~^, ~})~] ~/quil:instruction-fmt/:"
           (waveform-definition-name defn)
           (if (typep defn 'static-waveform-definition)
               '()
               (waveform-definition-parameters defn))
           (waveform-definition-sample-rate defn))
-  (format stream "~%    ~{~a~^, ~}"
+  (format stream "~%    ~{~A~^, ~}"
           (mapcar (lambda (z)
                     (with-output-to-string (s)
                       (etypecase z
@@ -395,7 +404,7 @@
 (defclass measurement-calibration-definition (calibration-definition)
   ((qubit :initarg :qubit
           :reader measurement-calibration-qubit
-          :type qubit
+          :type (or qubit formal)
           :documentation "The qubit being measured."))
   (:metaclass abstract-class)
   (:documentation "Superclass to measurement calibration definitions."))
@@ -403,7 +412,7 @@
 (defclass measure-calibration-definition (measurement-calibration-definition)
   ((address :initarg :address
             :reader measure-calibration-address
-            :type memory-ref
+            :type formal
             :documentation "The classical memory destination for measured values."))
   (:documentation "A representation of a user-specified MEASURE calibration."))
 

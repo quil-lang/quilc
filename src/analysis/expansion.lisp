@@ -1,9 +1,18 @@
+;;;; analysis/expansion.lisp
+;;;;
+;;;; Authors: Robert Smith
+;;;;          Erik Davis
+
 (in-package #:cl-quil)
 
 ;;; Since both circuit and calibration expansion rely on some common code, but
 ;;; we would like error messages to be as specific as possible, we choose to
 ;;; explicitly track an "expansion context".
-
+;;;
+;;; This should be bound to a token type (e.g. :DEFCIRCUIT) representing the AST
+;;; object being expanded, before entry to RELABEL-BLOCK-LABELS-UNIQUELY or
+;;; INSTANTIATE-INSTRUCTION. If it is not bound, error messages from
+;;; QUIL-EXPANSION-ERROR will be less descriptive.
 (defvar *expansion-context*)
 (setf (documentation '*expansion-context* 'variable)
       "The the context for expansion, mainly used for error messages (cf. QUIL-EXPANSION-ERROR).")
@@ -105,7 +114,7 @@
               (relabel-block-labels-uniquely body)))))
 
 (defun substitute-parameter (param-value)
-  "Given a function PARAM-VALUE to compute the value of a PARAM object, return a function which takes either a PARAM, DELAYED-EXPRESSION, or CONSTANT and computes it's numerical value. Should always"
+  "Given a function PARAM-VALUE to compute the value of a PARAM object, return a function which takes either a PARAM, DELAYED-EXPRESSION, or CONSTANT and computes it's numerical value."
   (lambda (param)
     (cond
       ((is-param param)
@@ -154,8 +163,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
 ;;; The macro FLAG-ON-UPDATE is just a helper for the kind of bookkeeping involved.
 (defmacro flag-on-update (flag op)
   "Given a unary function OP, lift to a function which applies OP and sets FLAG to T if the result differs from the input."
-  (let ((x (gensym))
-        (new-x (gensym)))
+  (a:with-gensyms (x new-x)
     `(lambda (,x)
        (let ((,new-x (funcall ,op ,x)))
          (unless (eq ,x ,new-x)

@@ -2,20 +2,20 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
   (let ((actual (mapcar (a:compose #'param-name #'car)
                         (waveform-ref-parameter-alist waveform-ref))))
     (a:when-let ((missing (set-difference expected-parameters actual :test #'string=)))
-      (quil-parse-error "Expected parameter ~A in waveform ~A."
-                        (first missing)
+      (quil-parse-error "Expected parameters ~{~A~^, ~} in waveform ~A."
+                        missing
                         (waveform-ref-name waveform-ref)))
     (a:when-let ((unexpected (set-difference actual expected-parameters :test #'string=)))
-      (quil-parse-error "Unexpected parameter ~A in waveform ~A. ~@
+      (quil-parse-error "Unexpected parameters ~{A~^, ~} in waveform ~A. ~@
                         Expected parameters are: ~{~A~^, ~}."
-                        (first unexpected)
+                        unexpected
                         (waveform-ref-name waveform-ref)
                         expected-parameters))
     t))

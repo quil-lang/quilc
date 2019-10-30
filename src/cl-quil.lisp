@@ -72,10 +72,10 @@
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: the processing below preserves the order of definitions.
-  (let ((gate-defs nil)
-        (circ-defs nil)
-        (memory-defs nil)
-        (exec-code nil)
+  (let ((gate-defs '())
+        (circ-defs '())
+        (memory-defs '())
+        (exec-code '())
         ;; The following maps definition signatures to a list of (filename . defn) pairs
         (all-seen-defns (make-hash-table :test 'equalp)))
     (flet ((bin (instr)

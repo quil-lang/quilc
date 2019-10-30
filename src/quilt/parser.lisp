@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Tokenization ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -44,7 +44,7 @@
 (defun parse-frame (toks)
   "Parse a frame from the list of tokens TOKS. Returns the frame and the remaining tokens."
   (multiple-value-bind (qubit-toks rest-toks)
-      (quil::take-until (lambda (tok) (eql ':STRING (quil::token-type tok)))
+      (quil::take-until (lambda (tok) (eq ':STRING (quil::token-type tok)))
                         toks)
     (let ((qubits (mapcar #'quil::parse-qubit qubit-toks)))
       (when (endp rest-toks)
@@ -60,7 +60,7 @@
     (quil-parse-error "Expected a waveform reference."))
   (let ((name-tok (first toks))
         (rest-toks (rest toks)))
-    (unless (eql :NAME (quil::token-type name-tok))
+    (unless (eq :NAME (quil::token-type name-tok))
       (quil-parse-error "Expected a NAME when parsing waveform reference~@[ in ~A~]."
                         name-tok))
     (if (endp rest-toks)
@@ -73,22 +73,14 @@
 
 (defun parse-waveform-parameter-and-value (toks)
   "Parse a <param>:<value> pair, consuming TOKS."
-  (let ((name (first toks))
-        (colon (second toks))
-        (value-expr (rest (rest toks))))
-    (unless (and name
-                 colon
-                 value-expr
-                 (eql ':NAME (quil::token-type name))
-                 (eql ':COLON (quil::token-type colon)))
-      (quil-parse-error "Waveform parameters must be provided by name. Exected <name>: <value>."))
-    (cons
-     (param (quil::token-payload name))
-     (quil::parse-parameter-or-expression value-expr))))
+  (quil::match-line ((name :NAME) (colon :COLON) &rest value-expr) (list toks)
+      (cons
+       (param (quil::token-payload name))
+       (quil::parse-parameter-or-expression value-expr))))
 
 (defun parse-waveform-parameter-alist (params-args)
   "Parse waveform parameters and their assigned values from the list of tokens PARAMS-ARGS. Returns an association list and the remaining tokens."
-  (unless (eql ':LEFT-PAREN (quil::token-type (first params-args)))
+  (unless (eq ':LEFT-PAREN (quil::token-type (first params-args)))
     (return-from parse-waveform-parameter-alist (values nil params-args)))
 
   ;; Remove :LEFT-PAREN
@@ -96,7 +88,7 @@
 
   ;; Parse out the parameters enclosed.
   (multiple-value-bind (found-params rest-line)
-      (quil::take-while-from-end (lambda (x) (eql ':RIGHT-PAREN (quil::token-type x)))
+      (quil::take-while-from-end (lambda (x) (eq ':RIGHT-PAREN (quil::token-type x)))
                                  params-args)
 
     ;; Error if we didn't find a right parenthesis.
@@ -119,7 +111,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun parse-pulse (tok-lines)
-  "Parse a PULSE instruction from TOK-LINES. Returns the instruction object, and the remaining lines."
+  "Parse a PULSE instruction from TOK-LINES. Returns the instruction object and the remaining lines."
   (quil::match-line ((op :PULSE) &rest rest-toks) tok-lines
     (multiple-value-bind (frame rest-toks)
         (parse-frame rest-toks)
@@ -149,7 +141,7 @@
 
       (multiple-value-bind (frame-name-toks duration-toks)
           (quil::take-until (lambda (tok)
-                              (not (eql ':STRING (quil::token-type tok))))
+                              (not (eq ':STRING (quil::token-type tok))))
                             rest-toks)
         (when (endp duration-toks)
           (quil-parse-error "Expected a duration in DELAY instruction."))
@@ -242,10 +234,10 @@
       (let ((result (quil::parse-parameter-or-expression value-toks)))
         (make-instance
          (ecase tok-type
-           ((:SET-FREQUENCY) 'set-frequency)
-           ((:SET-PHASE)     'set-phase)
-           ((:SHIFT-PHASE)   'shift-phase)
-           ((:SET-SCALE)     'set-scale))
+           (:SET-FREQUENCY 'set-frequency)
+           (:SET-PHASE     'set-phase)
+           (:SHIFT-PHASE   'shift-phase)
+           (:SET-SCALE     'set-scale))
          :frame frame
          :value result)))))
 
@@ -273,8 +265,8 @@
   (when (null tok-lines)
     (quil-parse-error "EOF reached when frame definition was expected."))
   (destructuring-bind (defframe-tok . frame-toks) (first tok-lines)
-    (unless (eql ':DEFFRAME (quil::token-type defframe-tok))
-      (quil-parse-error "DEFFRAME exoected. Got ~A."
+    (unless (eq ':DEFFRAME (quil::token-type defframe-tok))
+      (quil-parse-error "DEFFRAME expected. Got ~A."
                         (quil::token-type defframe-tok)))
 
     (when (null frame-toks)
@@ -293,9 +285,9 @@
       ;; nonempty body, so we pull the parameters
       (symbol-macrolet ((next-line (cadr tok-lines)))
         (unless (and (= 1 (length rest-line))
-                     (eql ':COLON (quil::token-type (first rest-line)))
+                     (eq ':COLON (quil::token-type (first rest-line)))
                      ;; next token is indentation
-                     (eql ':INDENT (quil::token-type (first next-line))))
+                     (eq ':INDENT (quil::token-type (first next-line))))
           (quil-parse-error "Expected DEFFRAME line to be followed by a colon (:) and an indented body."))
         ;; remove the indent token
         (pop next-line))
@@ -335,10 +327,14 @@
      (parse-sample-rate value-toks))
     ((:INITIAL-FREQUENCY)
      (let ((freq (quil::parse-parameter-or-expression value-toks)))
-       (unless (and (constantp freq)
-                    (plusp (constant-value freq)))
-         (quil-parse-error "Expected INITIAL-FREQUENCY to be a positive real, but got ~/quil:instruction-fmt/."
+       (unless (and (is-constant freq)
+                    (realp (constant-value freq)))
+         (quil-parse-error "Expected INITIAL-FREQUENCY to be a real number, but got ~/quil:instruction-fmt/."
                            freq))
+       ;; TODO: Can the frame frequency reasonably be negative? Should we allow this?
+       (unless (plusp (constant-value freq))
+         (warn "Expected INITIAL-FREQUENCY to be positive, but got ~/quil:instruction-fmt/."
+               freq))
        freq))
     (otherwise
      (quil-parse-error "Unknown property ~A in DEFFRAME. Note: This is case sensitive."
@@ -351,16 +347,16 @@
       (values argument-plist lines)))
   (let ((line (first lines)))
     ;; we parse until DEDENT
-    (when (eql ':DEDENT (quil::token-type (first line)))
+    (when (eq ':DEDENT (quil::token-type (first line)))
       (pop (first lines))
       (return-from parse-frame-definition-body
         (values argument-plist lines)))
     (when (< 3 (length line))
       (quil-parse-error "DEFFRAME body lines should be of the form <property>: <value>."))
     (destructuring-bind (property-tok col-tok &rest value-toks) line
-      (unless (eql ':NAME (quil::token-type property-tok))
+      (unless (eq ':NAME (quil::token-type property-tok))
         (quil::disappointing-token-error property-tok "an identifier"))
-      (unless (eql ':COLON (quil::token-type col-tok))
+      (unless (eq ':COLON (quil::token-type col-tok))
         (quil::disappointing-token-error col-tok "a colon"))
       (let* ((property-name (intern (quil::token-payload property-tok)
                                     ':keyword))
@@ -387,7 +383,7 @@
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFWAVEFORM.
-        (unless (eql ':DEFWAVEFORM (quil::token-type op))
+        (unless (eq ':DEFWAVEFORM (quil::token-type op))
           (quil::disappointing-token-error op "DEFWAVEFORM"))
 
         ;; Check that something is following the DEFWAVEFORM.
@@ -395,7 +391,7 @@
           (quil-parse-error "Expected more after DEFWAVEFORM token."))
 
         ;; Check for a name.
-        (unless (eql ':NAME (quil::token-type (first params-args)))
+        (unless (eq ':NAME (quil::token-type (first params-args)))
           (quil::disappointing-token-error (first params-args) "a name"))
 
         ;; We have a name. Stash it away.
@@ -408,7 +404,7 @@
           ;; Check for colon and incise it.
           (let ((maybe-colon (last rest-line)))
             (when (or (null maybe-colon)
-                      (not (eql ':COLON (quil::token-type (first maybe-colon)))))
+                      (not (eq ':COLON (quil::token-type (first maybe-colon)))))
               (quil-parse-error "Expected a colon terminating the first line of DEFWAVEFORM.")))
 
           (let ((quil::*arithmetic-parameters* nil)
@@ -451,7 +447,7 @@
     ;; Check that we have a well-formed header line.
     (destructuring-bind (defcal-tok . rest-line) parameter-line
       ;; We must be working with a DEFCAL
-      (unless (eql ':DEFCAL (quil::token-type defcal-tok))
+      (unless (eq ':DEFCAL (quil::token-type defcal-tok))
         (quil-parse-error "DEFCAL expected. Got ~S"
                           (quil::token-type defcal-tok)))
 
@@ -459,7 +455,7 @@
       (when (null rest-line)
         (quil-parse-error "Expected more after DEFCAL token."))
 
-      (if (eql ':MEASURE (quil::token-type (first rest-line)))
+      (if (eq ':MEASURE (quil::token-type (first rest-line)))
           (parse-measurement-calibration-definition defcal-tok rest-line body-lines)
           (parse-gate-calibration-definition defcal-tok rest-line body-lines)))))
 
@@ -470,7 +466,7 @@
   ;; Check for colon and incise it.
   (let ((maybe-colon (last header)))
     (when (or (null maybe-colon)
-              (not (eql ':COLON (quil::token-type (first maybe-colon)))))
+              (not (eq ':COLON (quil::token-type (first maybe-colon)))))
       (quil-parse-error "Expected a colon in DEFCAL."))
     (setf header (butlast header)))
 
@@ -519,7 +515,7 @@
       (setf header remaining)
 
       ;; Check for name.
-      (unless (eql ':NAME (quil::token-type (first header)))
+      (unless (eq ':NAME (quil::token-type (first header)))
         (quil-parse-error "Expected a name for the gate calibration."))
 
       (let ((name (quil::token-payload (pop header))))
@@ -539,7 +535,7 @@
         ;; Check for colon and incise it.
         (let ((maybe-colon (last rest-line)))
           (when (or (null maybe-colon)
-                    (not (eql ':COLON (quil::token-type (first maybe-colon)))))
+                    (not (eq ':COLON (quil::token-type (first maybe-colon)))))
             (quil-parse-error "Expected a colon in DEFCAL."))
           (setf rest-line (butlast rest-line)))
 

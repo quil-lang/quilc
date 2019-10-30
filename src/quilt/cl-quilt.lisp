@@ -2,14 +2,14 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 (defmethod definition-signature ((instr waveform-definition))
   (cons 'waveform-definition
         (intern (waveform-definition-name instr) :keyword)))
 
 ;;; When computing signatures for calibrations, we must account for the fact
-;;; that parrameter and argument names don't matter (e.g. `DEFCAL MEASURE q` is
+;;; that parameter and argument names don't matter (e.g. `DEFCAL MEASURE q` is
 ;;; the same as `DEFCAL MEASURE v`). Our approach here is just to replace all
 ;;; parameters by the symbol 'PARAM, and all arguments by the symbol 'FORMAL.
 (defun canonicalize-params-args (obj)
@@ -42,13 +42,13 @@
 
 This also signals ambiguous definitions, which may be handled as needed."
   ;; Note: the processing below preserves the order of definitions.
-  (let ((gate-defs nil)
-        (circ-defs nil)
-        (memory-defs nil)
-        (wf-defs nil)
-        (calib-defs nil)
-        (frame-defs nil)
-        (exec-code nil)
+  (let ((gate-defs '())
+        (circ-defs '())
+        (memory-defs '())
+        (wf-defs '())
+        (calib-defs '())
+        (frame-defs '())
+        (exec-code '())
         ;; The following maps definition signatures to a list of (filename . defn) pairs
         (all-seen-defns (make-hash-table :test 'equalp)))
     (flet ((bin (instr)

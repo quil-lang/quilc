@@ -1,4 +1,4 @@
-(in-package #:cl-quil/quilt-tests)
+(in-package #:cl-quil.quilt-tests)
 
 (deftest test-gate-calibration-matching ()
   (let ((pp (parse-quilt "
