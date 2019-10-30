@@ -41,9 +41,11 @@
 (defun latest-sdk-version (&key (proxy nil))
   "Get the latest SDK quilc version, or NIL if unavailable."
   (handler-case
-      (let* ((s (drakma:http-request "http://downloads.rigetti.com/qcs-sdk/version"
-                                     :want-stream t
-                                     :proxy proxy))
+      (let* ((s (drakma:http-request
+                 (format nil "http://downloads.rigetti.com/qcs-sdk/version?quilc=~A"
+                         +QUILC-VERSION+)
+                 :want-stream t
+                 :proxy proxy))
              (p (yason:parse s)))
         (multiple-value-bind (version success)
             (gethash "quilc" p)
