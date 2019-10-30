@@ -117,7 +117,7 @@
     (("check-sdk-version")
      :type boolean
      :optional t
-     :initial-value nil
+     :initial-value t
      :documentation "Check for a new SDK version at launch.")
 
     (("proxy")
@@ -424,9 +424,8 @@ end of the name."
         (sdk-update-available-p +QUILC-VERSION+ :proxy proxy)
       (when available-p
         (format t "An update is available to the SDK. You have version ~A. ~
-Version ~A is available from https://www.rigetti.com/forest~%"
-                +QUILC-VERSION+ version))
-      (uiop:quit (if (and available-p version) 0 1))))
+Version ~A is available from https://downloads.rigetti.com/~%"
+                +QUILC-VERSION+ version))))
 
   #-forest-sdk
   (when benchmark
