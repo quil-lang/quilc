@@ -34,7 +34,7 @@
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))
   :around-compile (lambda (compile)
-                    (let (#+sbcl(sb-ext:*derive-function-types* t))
+                    (let (#+sbcl (sb-ext:*derive-function-types* t))
                       (funcall compile)))
   :serial t
   :components ((:module "quil"
@@ -204,7 +204,7 @@
   :depends-on (#:cl-quil)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/quilt-tests)))
   :around-compile (lambda (compile)
-                    (let (#+sbcl(sb-ext:*derive-function-types* t))
+                    (let (#+sbcl (sb-ext:*derive-function-types* t))
                       (funcall compile)))
   :pathname "src/quilt/"
   :serial t
@@ -227,7 +227,7 @@
   :depends-on (#:cl-quil-tests
                #:cl-quil/quilt)
   :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil/quilt-tests
+                         (uiop:symbol-call ':cl-quil.quilt-tests
                                            '#:run-quilt-tests))
   :pathname "tests/quilt/"
   :serial t

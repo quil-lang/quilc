@@ -1,4 +1,4 @@
-(in-package #:cl-quil/quilt-tests)
+(in-package #:cl-quil.quilt-tests)
 
 (deftest test-quilt-circuit-expansion ()
   (let ((pp (parse-quilt "

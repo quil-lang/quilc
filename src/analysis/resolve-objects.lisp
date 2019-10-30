@@ -78,7 +78,7 @@
 (defgeneric resolve-objects (unresolved-program)
   (:documentation "Perform all object resolution within UNRESOLVED-PROGRAM, returning a PARSED-PROGRAM.")
   (:method ((unresolved-program parsed-program))
-    ;; For straight quil, we need to resolve UNRESOLVED-APPLICATIONS. For Quilt,
+    ;; For straight Quil, we need to resolve UNRESOLVED-APPLICATIONS. For Quilt,
     ;; we need to also resolve waveform and frame references.
 
     ;; NOTE: Some frames within calibration bodies cannot be resolved here (e.g.

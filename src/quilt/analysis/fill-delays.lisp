@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package :cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 (define-transform fill-delays (fill-delays)
   "This transform fills empty time on Quilt frames with explicit DELAY instructions in a greedy fashion."
@@ -193,7 +193,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 (defun fill-delays (parsed-program &key (omit-fences t) (synchronize-at-end t))
   "Introduce any implicit DELAY instructions in the Quilt program PARSED-PROGRAM.
 
-If OMIT-FENCE is T, then FENCE instructions will be removed from the resulting program.
+If OMIT-FENCES is T, then FENCE instructions will be removed from the resulting program.
 If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so that each frame has the same total duration."
   (let ((frame-clocks (make-frame-table))
         new-instrs)

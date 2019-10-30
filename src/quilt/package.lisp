@@ -7,7 +7,7 @@
 #-(or sbcl ecl ccl)
 (rename-package :alexandria :alexandria '(:a))
 
-(defpackage #:cl-quil/quilt
+(defpackage #:cl-quil.quilt
   (:nicknames #:quilt)
   (:use #:cl
         #:cl-quil
@@ -45,7 +45,7 @@
 
    #:waveform-ref                       ; STRUCTURE
    #:waveform-ref-name                  ; READER
-   #:waveform-ref-args                  ; READER
+   #:waveform-ref-parameter-alist       ; READER
 
    #:pulse                              ; CLASS
    #:pulse-frame                        ; READER

@@ -2,16 +2,16 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil/quilt)
+(in-package #:cl-quil.quilt)
 
 (defun raw-capture-num-real-samples (instr)
   (check-type instr raw-capture)
   (let ((frame-defn (frame-name-resolution
                      (raw-capture-frame instr))))
     (if (frame-definition-sample-rate frame-defn)
-        (* 2                            ; real, imag
-           (constant-value (raw-capture-duration instr))
-           (constant-value (frame-definition-sample-rate frame-defn)))
+        (ceiling (* 2                            ; real, imag
+                   (constant-value (raw-capture-duration instr))
+                   (constant-value (frame-definition-sample-rate frame-defn))))
         nil)))
 
 ;; CAPTURE must target a REAL[2]
@@ -21,7 +21,7 @@
     (quil::enforce-mref-bounds mref mdesc)
     (adt:match quil-type (memory-descriptor-type mdesc)
       (quil-real
-       (if (> 2 (quil::mref-available-length mref mdesc))
+       (if (> 2 (quil::memory-segment-length mdesc :offset mref))
            (quil-type-error "CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
                             vector of length no less than 2."
                             mref)
@@ -42,9 +42,9 @@
     (adt:match quil-type (memory-descriptor-type mdesc)
       (quil-real
        (a:if-let ((samples (raw-capture-num-real-samples instr)))
-         (if (> samples (quil::mref-available-length mref mdesc))
+         (if (> samples (quil::memory-segment-length mdesc :offset mref))
              (quil-type-error "RAW-CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
-                                 vector of length no less than ~A."
+                              vector of length no less than ~A."
                               mref
                               samples))
          (warn "RAW-CAPTURE on frame ~/quil:instruction-fmt/ with unknown sample rate."
