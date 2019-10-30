@@ -425,8 +425,7 @@ end of the name."
       (when available-p
         (format t "An update is available to the SDK. You have version ~A. ~
 Version ~A is available from https://downloads.rigetti.com/~%"
-                +QUILC-VERSION+ version))
-      (uiop:quit (if (and available-p version) 0 1))))
+                +QUILC-VERSION+ version))))
 
   #-forest-sdk
   (when benchmark
