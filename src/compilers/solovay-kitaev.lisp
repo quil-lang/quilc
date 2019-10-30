@@ -33,14 +33,15 @@
 ;;; Temporary, should be removed later (because it should ideally be
 ;;; calculated dynamically depending on the accuracy of approximation
 ;;; desired
-(defparameter +ballie-radius+ 0.1 "The radius of ballies on the axis-angle ball. Determines the size of each ballie used for the IDDFS base approximation generation method (i.e. generating base approximations of increasing length using IDDFS until each ballie contains at least one element).")
+(defparameter +ballie-radius+ 0.1 "The radius of ballies on the axis-angle ball. Determines the size of each ballie used for the Iterative Deepening Depth First Search base approximation generation method (i.e. generating base approximations of increasing length using Iterative Deepening Depth First Search until each ballie contains at least one element).")
 
 ;;; ------------------------------------------------------------------
 ;;; --------------Various utility functions/structures----------------
 ;;; ------------------------------------------------------------------
 
 ;;; Some of the functions below might have better alternatives
-;;; elsewhere; if they exist, they can replace these ones
+;;; elsewhere; if they exist, they can replace these ones.
+;;; Waiting for a MAGICL high level interface...
 (defun vector-dot-product (a b)
   "Dot product between vectors A and B."
   (assert (= (length a) (length b)))
@@ -112,7 +113,6 @@
 (defun charles-distance (u s)
   (- 1 (fidelity (m* (magicl:conjugate-transpose s) u))))
 
-;;; Not sure which distance measure to use, this one or trace norm or charles' fidelity
 (defun operator-dist (u s)
   "Returns d(u, s) = ||U - S||, the operator norm of U - S defined in the paper."
   (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s))))))
@@ -148,7 +148,7 @@
    (epsilon0 :reader epsilon0
              :initarg :epsilon0
              :type double-float
-             :documentation "Parameter controlling the density of base-approximation unitaries for this decomposer. Specifically, the angle-axis ball for NUM-QUBITS will be divided into segments of SUBDIVISION along each axis.")
+             :documentation "Parameter controlling the quality base-approximation unitaries for this decomposer. Specifically, base approximations should be a maximum of EPSILON0 distance away from the unitaries being approximated.")
    (subdivision :reader subdivision
                 :initarg :subdivision
                 :type double-float
@@ -249,7 +249,8 @@
                              :collect (/ x subdivision))))
 
 ;;; Generate a hash table of grid coordinate -> unitary. Populate
-;;; using IDDFS, as we want to minimize approximation lengths.
+;;; using Iterative Deepening Depth First Search, as we want to
+;;; minimize approximation lengths.
 (defun generate-base-approximations-ballies (basis-gates &key (ballie-r +ballie-radius+) (depth-limit 10) (verbose nil) (debug nil))
   "Generates a set of base approximations such that every unitary operator on NUM-QUBITS (all operators in SU(2^NUM-QUBITS)) is within EPSILON0 of some unitary in the set. The approximations are returned as a hash map from each grid block in the axis-angle ball to the unitary that approximates that block."
   ;; Gates of odd index [2n + 1] correspond to the inverse of gate [2n]
