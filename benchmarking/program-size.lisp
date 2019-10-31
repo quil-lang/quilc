@@ -64,6 +64,32 @@ with i ranging from 0 to N-QUBITS - 1."
 (defparameter *metrics* (list 'benchmark:user-run-time 'benchmark:bytes-consed)
   "The benchmark metrics we are interested in.")
 
+ (defun get-dynamic-space-usage ()
+  (let* ((line (first (uiop:split-string
+                       (with-output-to-string (*standard-output*) (room))
+                       :separator '(#\Newline)))))
+    (parse-integer
+     (remove-if-not (lambda (c) (parse-integer (string c) :junk-allowed t)) line))))
+
+(defvar *profiling-memory* nil)
+(defvar *profiling-thread* nil)
+
+(defun start-profiling-memory-usage (&optional (sleep-time 0.001))
+  (setf *profiling-memory-data* nil)
+  (setf *profiling-memory* t)
+  (setf *profiling-thread* (bt:make-thread
+                            (lambda ()
+                              (loop :while *profiling-memory*
+                                    :collect (get-dynamic-space-usage) :into mem
+                                    :do (sleep sleep-time)
+                                    :finally (return (apply 'max mem)))))))
+
+(defun stop-profiling-memory-usage ()
+  (assert *profiling-memory*)
+  (assert (bt:thread-alive-p *profiling-thread*))
+  (setf *profiling-memory* nil)
+  (bt:join-thread *profiling-thread*))
+
 (defun benchmark-program (program samples
                           &key
                             (chip (error "Need a chip")))
@@ -72,6 +98,19 @@ with i ranging from 0 to N-QUBITS - 1."
       (benchmark:with-sampling (timer)
         (quil::compiler-hook program chip)))
     timer))
+
+(defun benchmark-program-memory (program samples
+                                         &key
+                                         (chip (error "Need a chip")))
+  (let ((timer (benchmark:make-timer *metrics*))
+        (mem-usage nil))
+    (loop :repeat samples :do
+      (sb-ext:gc :full t)
+      (start-profiling-memory-usage)
+      (benchmark:with-sampling (timer)
+        (quil::compiler-hook program chip))
+      (push (stop-profiling-memory-usage) mem-usage))
+    (coerce (/ (reduce #'+ mem-usage) samples) 'float)))
 
 (defun get-metric (metric-type benchmark-metrics)
   (find metric-type benchmark-metrics :test 'eql :key 'type-of))
@@ -92,7 +131,7 @@ with i ranging from 0 to N-QUBITS - 1."
                :do (print i)
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
-                              :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))
+                              :avg-max-memory (benchmark-program-memory program samples :chip chip))))
    (cons (print "Bell program compilation (Aspen-4-16Q)")
          (loop :with samples := 10
                :for i :from 1 :upto 16
@@ -101,7 +140,7 @@ with i ranging from 0 to N-QUBITS - 1."
                :for metrics := (benchmark:metrics (benchmark-program program samples :chip chip))
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
-                              :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))
+                              :avg-max-memory (benchmark-program-memory program samples :chip chip))))
    (cons (print "QFT program compilation (fully connected nQ chip)")
          (loop :with samples := 10
                :for i :from 1 :upto 20
@@ -110,7 +149,7 @@ with i ranging from 0 to N-QUBITS - 1."
                :for metrics := (benchmark:metrics (benchmark-program program samples :chip chip))
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
-                              :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))
+                              :avg-max-memory (benchmark-program-memory program samples :chip chip))))
    (cons (print "QFT program compilation (Aspen-4-16Q)")
          (loop :with samples := 10
                :for i :from 1 :upto 16
@@ -119,7 +158,7 @@ with i ranging from 0 to N-QUBITS - 1."
                :for metrics := (benchmark:metrics (benchmark-program program samples :chip chip))
                :collect (list :num-qubits i
                               :user-run-time (get-average (get-metric 'user-run-time metrics))
-                              :bytes-consed (get-average (get-metric 'bytes-consed metrics)))))))
+                              :avg-max-memory (benchmark-program-memory program samples :chip chip))))))
 
 (defun write-benchmark (benchmark &optional stream)
   (write-line "number_qubits user_run_time bytes_consed" stream)
@@ -127,7 +166,7 @@ with i ranging from 0 to N-QUBITS - 1."
     (format stream "~A ~A ~A~%"
             (getf bm :num-qubits)
             (getf bm :user-run-time)
-            (getf bm :bytes-consed))))
+            (getf bm :avg-max-memory))))
 
 (defun write-benchmarks-to-files (benchmarks &optional (prefix "./"))
   (dolist (bm benchmarks)
