@@ -75,7 +75,6 @@ with i ranging from 0 to N-QUBITS - 1."
 (defvar *profiling-thread* nil)
 
 (defun start-profiling-memory-usage (&optional (sleep-time 0.001))
-  (setf *profiling-memory-data* nil)
   (setf *profiling-memory* t)
   (setf *profiling-thread* (bt:make-thread
                             (lambda ()
