@@ -146,7 +146,6 @@
                (when (< max-needed
                         (quil::chip-spec-n-qubits chip))
                  (funcall assn (lambda ()
-                                 #+ignore
                                  (format t "Tick! ~A~%" (incf counter))
                                  (multiple-value-list (compiler-hook (get-prog prog-source chip) chip))))))))
 
@@ -251,29 +250,35 @@
 
 (defun generate-handshake-prog (n-qubits state chip &key (random-unitaries nil))
   (declare (ignore state))
-  (make-instance
-   'parsed-program
-   :executable-code (concatenate
-                     'vector
-                     (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
-                     (when (null random-unitaries)
-                       (list (make-instance 'quil::pragma-commuting-blocks)))
-                     (loop :with live-qubits := (quil::chip-spec-live-qubits chip)
-                           :for i :below n-qubits
-                           :for qi := (nth i live-qubits)
-                           :nconc (loop :for j :below i
-                                        :for qj := (nth j live-qubits)
-                                        :when (null random-unitaries)
-                                          :collect (make-instance 'quil::pragma-block)
-                                        :if (null random-unitaries)
-                                          :collect (quil::build-gate "CZ" () i j)
-                                        :else
-                                          :collect (quil::anon-gate
-                                                    "U" (quil::random-special-unitary 4) i j)
-                                        :when (null random-unitaries)
-                                          :collect (make-instance 'quil::pragma-end-block)))
-                     (when (null random-unitaries)
-                       (list (make-instance 'quil::pragma-end-commuting-blocks))))))
+  (let* ((pairs (loop :with live-qubits := (quil::chip-spec-live-qubits chip)
+                      :for qi :in live-qubits
+                      :for i :from 0
+                      :when (< i n-qubits)
+                        :nconc (loop :for qj :in live-qubits
+                                     :when (= qi qj)
+                                       :return pairs
+                                     :collect `(,qi ,qj) :into pairs)))
+         (perm (cl-permutation:random-perm (length pairs)))
+         (pairs (cl-permutation:permute perm pairs)))
+    (make-instance
+     'parsed-program
+     :executable-code (concatenate
+                       'vector
+                       (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
+                       (when (null random-unitaries)
+                         (list (make-instance 'quil::pragma-commuting-blocks)))
+                       (loop :for (qi qj) :in pairs
+                             :when (null random-unitaries)
+                               :collect (make-instance 'quil::pragma-block)
+                             :if (null random-unitaries)
+                               :collect (quil::build-gate "CZ" () qi qj)
+                             :else
+                               :collect (quil::anon-gate
+                                         "U" (quil::random-special-unitary 4) qi qj)
+                             :when (null random-unitaries)
+                               :collect (make-instance 'quil::pragma-end-block))
+                       (when (null random-unitaries)
+                         (list (make-instance 'quil::pragma-end-commuting-blocks)))))))
 
 (defun measure-rewiring-swap-search (assn &rest args
                                           &key break-on-error include-runtime
