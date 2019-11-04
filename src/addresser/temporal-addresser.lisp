@@ -388,6 +388,9 @@ instruction, adding to logical queue.~%"
       (flush-1q-instructions-after-wiring state left-line)
       (flush-1q-instructions-after-wiring state right-line))))
 
+(defvar *compute-tight-recombination-bound* nil
+  "If T, use the compressor to try to precompute a tighter recombination bound.")
+
 ;; initialize the 1Q queues
 (defun initial-temporal-addresser-working-state (chip-spec initial-rewiring)
   (let ((state (initial-addresser-working-state chip-spec initial-rewiring)))
@@ -410,7 +413,9 @@ instruction, adding to logical queue.~%"
                                          (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
                                              (list j)))
                     :for instrs-decomposed := (expand-to-native-instructions (list instr) chip-spec)
-                    :for instrs-compressed := (compress-instructions instrs-decomposed chip-spec)
+                    :for instrs-compressed := (if *compute-tight-recombination-bound*
+                                                  (compress-instructions instrs-decomposed chip-spec)
+                                                  instrs-decomposed)
                     :for lschedule := (make-lscheduler)
                     :for fake-state := (make-instance 'temporal-addresser-state
                                                       :chip-spec chip-spec

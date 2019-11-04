@@ -162,8 +162,7 @@
     (call-next-method)))
 
 (defun initial-fidelity-addresser-working-state (chip-spec initial-rewiring)
-  (let* ((*cost-fn-weight-style* ':fidelity)
-         (state (initial-addresser-working-state chip-spec initial-rewiring)))
+  (let ((state (initial-addresser-working-state chip-spec initial-rewiring)))
     (change-class state 'fidelity-addresser-state)
     ;; set up the qq-distances slot to use log-infidelity as the basic unit
     (let ((distance-mapping (make-hash-table)))
@@ -181,7 +180,9 @@
                                          (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
                                              (list j)))
                     :for instrs-decomposed := (expand-to-native-instructions (list instr) chip-spec)
-                    :for instrs-compressed := (compress-instructions instrs-decomposed chip-spec)
+                    :for instrs-compressed := (if *compute-tight-recombination-bound*
+                                                  (compress-instructions instrs-decomposed chip-spec)
+                                                  instrs-decomposed)
                     :for lschedule := (make-lscheduler)
                     :for fake-state := (make-instance 'fidelity-addresser-state
                                                       :chip-spec chip-spec
