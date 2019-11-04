@@ -20,8 +20,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defstruct temporal-cost
-  start-time
-  heuristic-value)
+  "Value returned by the duration-based COST-FUNCTION, which is computed from an individual instruction as well as the states of those instructions already scheduled and those instructions yet to be scheduled. Consists of a pair of values: the soonest start time of the proposed instruction, as well as a heuristic evaluation of the opportunity for scheduling future instructions after this one passes."
+  (start-time      nil :type real :read-only t)
+  (heuristic-value nil :type real :read-only t))
 
 ;;;; The scheme used by the duration-based scheduler is to weight a given
 ;;;; logical-to-physical addressing configuration by how far some set of
@@ -393,6 +394,13 @@ instruction, adding to logical queue.~%"
     (change-class state 'temporal-addresser-state)
     (setf (temporal-addresser-state-1q-queues state)
           (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))
+    ;; set up the qq-distances slot to use runtime as the basic unit
+    (let ((distance-mapping (make-hash-table)))
+      (loop :for object :across (chip-spec-links chip-spec)
+            :do (setf (gethash object distance-mapping)
+                      (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object)))))
+      (setf (addresser-state-qq-distances state)
+            (precompute-qubit-qubit-distances chip-spec distance-mapping)))
     ;; warm the cost-bounds slot
     (loop :for order-list :across (chip-specification-objects chip-spec)
           :for qubits :from 1

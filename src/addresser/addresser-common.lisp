@@ -59,24 +59,24 @@
 ;;; See DO-GREEDY-TEMPORAL-ADDRESSING below for the main entry point.
 
 
-(defparameter *addresser-swap-lookahead-depth* 2
+(defvar *addresser-swap-lookahead-depth* 2
   "Controls the length of SWAP chains explored by the addresser loop.
 
 WARNING: This value makes the SWAP-selection stage run as
 O((# 2Q links)^(*addresser-swap-lookahead-depth*)). Beware making it too
 large.")
 
-(defparameter *addresser-max-swap-sequence-length* 1000
+(defvar *addresser-max-swap-sequence-length* 1000
   "Controls the maximum number of swaps that can occur in a row.")
 
-(defparameter *prefer-ranged-gates-to-swaps* nil
+(defvar *prefer-ranged-gates-to-swaps* nil
   "When T, use chains of instructions to simulate long-range gates rather than
 SWAPping qubits into place.")
 
-(defparameter *addresser-start-with-partial-rewiring* t
+(defvar *addresser-start-with-partial-rewiring* t
   "When T, starts with a partial rewiring that is filled in gradually.")
 
-(defparameter *addresser-use-2q-tiers* t
+(defvar *addresser-use-2q-tiers* t
   "When T, uses the 2-qubit tiers rather than the general instruction tiers.")
 
 ;;; A pseudoinstruction class used to send directives to the addresser ;;;
@@ -112,41 +112,45 @@ SWAPping qubits into place.")
 (defclass addresser-state ()
   ((initial-l2p :accessor addresser-state-initial-l2p
                 :initarg :initial-l2p
-                :documentation "The initial logical-to-physical rewiring.")
+                :documentation "The initial logical-to-physical rewiring."
+                :type rewiring)
    (working-l2p :accessor addresser-state-working-l2p
                 :initarg :working-l2p
-                :documentation "The working / current logical-to-physical rewiring. NOTE: This get mutated a _lot_.")
+                :documentation "The working / current logical-to-physical rewiring. NOTE: This get mutated a _lot_."
+                :type rewiring)
    (qq-distances :accessor addresser-state-qq-distances
                  :initarg :qq-distances
-                 :documentation "Precomputed SWAP penalties between separated qubits.")
+                 :documentation "Precomputed SWAP penalties between separated qubits."
+                 :type array)
    (qubit-cc :accessor addresser-state-qubit-cc
              :initarg :qubit-cc
-             :documentation "The connected component where newly-assigned qubits will live.")
+             :documentation "The connected component where newly-assigned qubits will live."
+             :type list)
    (lschedule :accessor addresser-state-logical-schedule
               :initarg :lschedule
-              :documentation "The logical schedule of not-yet-processed instructions.")
+              :documentation "The logical schedule of not-yet-processed instructions."
+              :type logical-schedule)
    (chip-sched :accessor addresser-state-chip-schedule
                :initarg :chip-sched
-               :documentation "The outgoing schedule of processed instructions.")
+               :documentation "The outgoing schedule of processed instructions."
+               :type chip-schedule)
    (chip-spec :accessor addresser-state-chip-specification
               :initarg :chip-spec
-              :documentation "The CHIP-SPECIFICATION governing native-ness.")))
+              :documentation "The CHIP-SPECIFICATION governing native-ness."
+              :type chip-specification)))
 
-(defun swap-fidelity (chip-spec link-index)
+(defun swap-fidelity (chip-spec hardware-object)
   "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
-  (let* ((hardware-object (chip-spec-nth-link chip-spec link-index))
-         (permutation-record (vnth 0 (hardware-object-permutation-gates
+  (let* ((permutation-record (vnth 0 (hardware-object-permutation-gates
                                       hardware-object)))
          (swap (apply #'build-gate
                       (permutation-record-operator permutation-record)
                       '()
-                      (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list))))
+                      (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
     (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
 
-(defparameter *cost-fn-weight-style* ':duration)
-
 ;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
-(defun precompute-qubit-qubit-distances (chip-spec)
+(defun precompute-qubit-qubit-distances (chip-spec initial-map)
   "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by swap duration."
   (let* ((vertex-count (length (vnth 0 (chip-specification-objects chip-spec))))
          (dist (make-array (list vertex-count vertex-count)
@@ -155,16 +159,10 @@ SWAPping qubits into place.")
     (dotimes (j vertex-count)
       (setf (aref dist j j) 0))
     ;; write the direct node-to-node weights into the table
-    (dotimes (link-index (length (vnth 1 (chip-specification-objects chip-spec))))
-      (let ( ; eventually this should look up "SWAP" in this list, but for now
-             ; this is guaranteed to be the only 2Q permutation anyway.
-            (weight (ecase *cost-fn-weight-style*
-                      (:duration (permutation-record-duration (vnth 0 (hardware-object-permutation-gates (chip-spec-nth-link chip-spec link-index)))))
-                      (:fidelity (- (log (swap-fidelity chip-spec link-index))))))
-            (left-vertex (vnth 0 (chip-spec-qubits-on-link chip-spec link-index)))
-            (right-vertex (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))))
-        (setf (aref dist right-vertex left-vertex) weight)
-        (setf (aref dist left-vertex right-vertex) weight)))
+    (dohash ((object value) initial-map)
+      (destructuring-bind (q0 q1) (coerce (vnth 0 (hardware-object-cxns object)) 'list)
+        (setf (aref dist q0 q1) value
+              (aref dist q1 q0) value)))
     ;; for each intermediate vertex...
     (dotimes (k vertex-count)
       ;; for each left vertex...
@@ -197,7 +195,6 @@ CHIP-SPEC and an initial logical-to-physical rewirign INITIAL-REWIRING."
                    :initial-l2p initial-l2p
                    :working-l2p (copy-rewiring initial-l2p)
                    :lschedule (make-lscheduler)
-                   :qq-distances (precompute-qubit-qubit-distances chip-spec)
                    :qubit-cc (a:extremum (chip-spec-live-qubit-cc chip-spec)
                                          #'>
                                          :key #'length)
@@ -205,7 +202,7 @@ CHIP-SPEC and an initial logical-to-physical rewirign INITIAL-REWIRING."
                    :chip-spec chip-spec)))
 
 ;; TODO: why isn't this part of the state?
-(defparameter *addresser-use-free-swaps* nil
+(defvar *addresser-use-free-swaps* nil
   "Does the addresser treat the initial rewiring as something that can be changed?")
 
 (defgeneric assign-weights-to-gates (state)

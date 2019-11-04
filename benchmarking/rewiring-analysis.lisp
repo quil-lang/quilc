@@ -6,6 +6,11 @@
 
 (in-package #:cl-quil-benchmarking)
 
+(defun seed-random-state ()
+  #+sbcl (sb-ext:seed-random-state 1)
+  #+ecl  (make-random-state 1)
+  #-(or sbcl ecl) (error "don't know how to seed random state."))
+
 (defun make-graph (num-nodes &rest paths)
   "Creates a graph from paths"
   (let ((adj (make-array num-nodes :initial-element nil)))
@@ -63,7 +68,7 @@
 (defparameter *rewiring-explicit-test-chips*
   '((:0006q-2ring *chip-6q-2ring*)
     (:0008q *chip-0008q*)
-    #+ignore(:0016q *chip-0016q*)
+    (:0016q *chip-0016q*)
     (:0020q-linear *chip-0020q-linear*)
     (:0020q-skew-rect *chip-0020q-skew-rect*))
   "Explicit layouts for testing the initial rewiring performance")
@@ -197,9 +202,7 @@
                      (list (make-instance 'quil::application-force-rewiring :target target)))))
 
 (defun generate-random-rewiring-prog (n-qubits state)
-  (let ((*random-state* #+sbcl (sb-ext:seed-random-state state)
-                        #+ecl  (make-random-state state)
-                        #-(or sbcl ecl) (error "don't know how to seed random state")))
+  (let ((*random-state* (seed-random-state)))
     (make-rewiring-prog (quil::generate-random-rewiring n-qubits))))
 
 (defun generate-ring-prog (n-qubits state &key (random-unitaries nil))
@@ -291,7 +294,7 @@
   (setf (getf args :chips)
         (loop :for (name chip) :in chips
               :when (= (quil::chip-spec-n-qubits chip) rewiring-qubits) :collect (cons name chip)))
-  (apply 'measure-performance assn
+  (apply #'measure-performance assn
          :progs (loop
                   :for i :below trials
                   :collect (let ((curval i))
@@ -310,7 +313,7 @@
   (setf (getf args :chips)
         (loop :for (name chip) :in chips
               :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
-  (apply 'measure-performance assn
+  (apply #'measure-performance assn
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 3 :to n-qubits
@@ -332,7 +335,7 @@
   (setf (getf args :chips)
         (loop :for (name chip) :in chips
               :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
-  (apply 'measure-performance assn
+  (apply #'measure-performance assn
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 3 :to n-qubits
@@ -356,7 +359,7 @@
               :when (= (length (quil::chip-spec-live-qubits chip)) n-qubits)
                 :collect (cons name chip)))
   (print (getf args :chips))
-  (apply 'measure-performance assn
+  (apply #'measure-performance assn
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 2 :to n-qubits
@@ -379,7 +382,7 @@
         (loop :for (name chip) :in chips
               :when (= (length (quil::chip-spec-live-qubits chip)) n-qubits)
                 :collect (cons name chip)))
-  (apply 'measure-performance assn
+  (apply #'measure-performance assn
          :progs (loop
                   :for i :below trials
                   :nconc (loop :for j :from 2 :to n-qubits
@@ -391,9 +394,7 @@
 
 (defvar *basic-swap-search-assn*
     (make-assignments
-        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                         #+ecl  (make-random-state 1)
-                         #-(or sbcl ecl) (error "don't know how to seed random state"))
+        ((*random-state* (seed-random-state))
          (quil::*compressor-passes* 0))
         (quil::*addresser-swap-search-type*
          quil::*addresser-move-to-rewiring-swap-search-type*)
@@ -404,9 +405,7 @@
 
 (defvar *2q-tiers-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -426,9 +425,7 @@
 
 (defvar *swap-search-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -445,9 +442,7 @@
 
 (defvar *initial-rewiring-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0)
        (quil::*addresser-swap-search-type* :greedy-qubit))
       (quil::*initial-rewiring-default-type*)
@@ -459,9 +454,7 @@
 
 (defvar *depth-vs-swaps-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -477,9 +470,7 @@
 
 (defvar *cost-fn-weight-style-assn*
     (make-assignments
-        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                         #+ecl  (make-random-state 1)
-                         #-(or sbcl ecl) (error "don't know how to seed random state"))
+        ((*random-state* (seed-random-state))
          (quil::*compressor-passes* 1))
         (quil::*cost-fn-weight-style*)
       :duration   (:duration)
@@ -488,9 +479,7 @@
 
 (defvar *addresser-style-assn*
     (make-assignments
-        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                         #+ecl  (make-random-state 1)
-                         #-(or sbcl ecl) (error "don't know how to seed random state"))
+        ((*random-state* (seed-random-state))
          (quil::*compressor-passes* 1))
         (quil::*addresser-state-constructor*)
       :duration   ('quil::initial-temporal-addresser-working-state)

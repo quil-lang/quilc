@@ -8,7 +8,7 @@
 ;;; SWAP into a schedule, usually as part of migrating an active addresser
 ;;; instance from one state to another.
 
-(defparameter *addresser-swap-search-type* ':greedy-qubit
+(defvar *addresser-swap-search-type* ':greedy-qubit
   "The type of swap search the addresser should use.
 
 GREEDY-PATH: Assign links values based on whether they are on the shortest path
@@ -16,7 +16,7 @@ between two qubits that need to be adjacent
 A*: Use A* search algorithm using the cost function as a heuristic
 GREEDY-QUBIT: Greedily choose the best link to swap according to the cost function.")
 
-(defparameter *addresser-move-to-rewiring-swap-search-type* :a*
+(defvar *addresser-move-to-rewiring-swap-search-type* :a*
   "The type of swap search the addresser should use when doing move-to-rewiring.")
 
 ;;; This stuff is all at the service of SELECT-AND-EMBED-A-PERMUTATION below.
@@ -182,7 +182,7 @@ rewiring REWIRING to the TARGET-REWIRING."
     (move-to-expected-rewiring rewiring target-rewiring qq-distances chip-spec chip-sched initial-l2p use-free-swaps rewirings-tried)))
 
 (defun embed-swap (link-index initial-l2p working-l2p chip-spec chip-sched &key use-free-swaps)
-  "Insert a SWAP selected by LINK-INDEX into CHIP-SCHED."
+  "Safely insert a SWAP selected by LINK-INDEX into CHIP-SCHED, accounting for the possibility of virtualization."
   ;; we now insert the SWAP selected by LINK-INDEX.
   (destructuring-bind (q0 q1) (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list)
     ;; can we make it a virtual SWAP?

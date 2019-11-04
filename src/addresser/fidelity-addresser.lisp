@@ -20,8 +20,8 @@
                 :accessor fidelity-addresser-state-cost-bounds
                 :documentation "Table of maximum costs for a program exercising this hardware object.")))
 
-(defstruct fidelity-cost
-  value)
+(defstruct (fidelity-cost (:constructor fidelity-cost (value)))
+  (value nil :type real :read-only t))
 
 (defmethod cost-function ((state fidelity-addresser-state) &key gate-weights instr)
   (let ((instr-cost 0d0)
@@ -40,19 +40,19 @@
         
         ;; then, see if there's a non-naive cost available
         (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
-                      (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state)))
-                      (resource (apply #'make-qubit-resource
-                                       (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list)))
-                      (carving-point (chip-schedule-resource-carving-point
-                                      (addresser-state-chip-schedule state)
-                                      resource))
-                      (subschedule (chip-schedule-from-carving-point
-                                    (addresser-state-chip-schedule state) resource carving-point))
-                      (preceding-fidelity
+                      (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state))))
+          (let* ((resource (apply #'make-qubit-resource
+                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list)))
+                 (carving-point (chip-schedule-resource-carving-point
+                                 (addresser-state-chip-schedule state)
+                                 resource))
+                 (subschedule (chip-schedule-from-carving-point
+                               (addresser-state-chip-schedule state) resource carving-point))
+                 (preceding-fidelity
                        (calculate-instructions-log-fidelity subschedule
                                                             (addresser-state-chip-specification state))))
-          (when (<= cost-bound (+ preceding-fidelity instr-cost))
-            (setf instr-cost (- cost-bound preceding-fidelity))))))
+            (when (<= cost-bound (+ preceding-fidelity instr-cost))
+              (setf instr-cost (- cost-bound preceding-fidelity)))))))
     
     ;; conglomerate the log-infidelities in GATE-WEIGHTS, depressed by some decay factor
     (when gate-weights
@@ -121,7 +121,7 @@
         (dolist (qubit assigned-qubits) (rewiring-unassign rewiring qubit))
         ;; normalize actual-cost
         (setf gate-weights-cost (if (zerop gate-count) 0d0 (/ gate-weights-cost gate-count)))))
-    (make-fidelity-cost :value (+ instr-cost gate-weights-cost))))
+    (fidelity-cost (+ instr-cost gate-weights-cost))))
 
 (defmethod cost-< ((val1 fidelity-cost) (val2 fidelity-cost))
   (< (- (fidelity-cost-value val1) +double-comparison-threshold-strict+)
@@ -131,29 +131,30 @@
   (double= (fidelity-cost-value val1) (fidelity-cost-value val2)))
 
 (defmethod build-worst-cost ((state fidelity-addresser-state))
-  (make-fidelity-cost :value most-positive-fixnum))
+  (fidelity-cost most-positive-fixnum))
 
 (defparameter *fidelity-1q-descaling* 1/10)
 
 (defmethod assign-weights-to-gates ((state fidelity-addresser-state))
-  (multiple-value-bind (max-value value-hash)
-      (lscheduler-walk-graph (addresser-state-logical-schedule state)
-                             :base-value 0
-                             :bump-value (lambda (instr value)
-                                           (cond
-                                             ((typep instr 'gate-application)
-                                              (case (length (application-arguments instr))
-                                                (1
-                                                 (+ *fidelity-1q-descaling* value))
-                                                (2
-                                                 (+ 1 value))
-                                                (otherwise
-                                                 value)))
-                                             (t
-                                              value)))
-                             :test-values #'max)
-    (declare (ignore max-value))
-    value-hash))
+  (flet ((weight-bumper (instr value)
+           (cond
+             ((typep instr 'gate-application)
+              (case (length (application-arguments instr))
+                (1
+                 (+ *fidelity-1q-descaling* value))
+                (2
+                 (+ 1 value))
+                (otherwise
+                 value)))
+             (t
+              value))))
+    (multiple-value-bind (max-value value-hash)
+        (lscheduler-walk-graph (addresser-state-logical-schedule state)
+                               :base-value 0
+                               :bump-value #'weight-bumper
+                               :test-values #'max)
+      (declare (ignore max-value))
+      value-hash)))
 
 (defmethod select-and-embed-a-permutation ((state fidelity-addresser-state) rewiring-tried)
   (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
@@ -164,6 +165,13 @@
   (let* ((*cost-fn-weight-style* ':fidelity)
          (state (initial-addresser-working-state chip-spec initial-rewiring)))
     (change-class state 'fidelity-addresser-state)
+    ;; set up the qq-distances slot to use log-infidelity as the basic unit
+    (let ((distance-mapping (make-hash-table)))
+      (loop :for object :across (chip-spec-links chip-spec)
+            :do (setf (gethash object distance-mapping)
+                      (- (log (swap-fidelity chip-spec object)))))
+      (setf (addresser-state-qq-distances state)
+            (precompute-qubit-qubit-distances chip-spec distance-mapping)))
     ;; warm the cost-bounds slot
     (loop :for order-list :across (chip-specification-objects chip-spec)
           :for qubits :from 1

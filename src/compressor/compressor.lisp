@@ -82,17 +82,17 @@
 (defun calculate-instructions-duration (instructions chip-specification)
   "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
   (let ((lschedule (make-lscheduler)))
-    ; load up the logical schedule
+    ;; load up the logical schedule
     (append-instructions-to-lschedule lschedule instructions)
-    ; sift through it for durations
+    ;; sift through it for durations
     (lscheduler-calculate-duration lschedule chip-specification)))
 
 (defun calculate-instructions-log-fidelity (instructions chip-specification)
   "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
   (let ((lschedule (make-lscheduler)))
-    ; load up the logical schedule
+    ;; load up the logical schedule
     (append-instructions-to-lschedule lschedule instructions)
-    ; sift through it for durations
+    ;; sift through it for fidelities
     (lscheduler-calculate-log-fidelity lschedule chip-specification)))
 
 (defun calculate-instructions-fidelity (instructions chip-specification)

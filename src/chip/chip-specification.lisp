@@ -294,7 +294,7 @@ used to specify CHIP-SPEC."
                                   (hardware-object-gate-information obj))
                          (make-gate-record :duration 150
                                            :fidelity fidelity)))))
-      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.98d0)
+      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.89d0)
                       (:iswap  "ISWAP"  ()  (_ _) 0.91d0)
                       (:cphase "CPHASE" (_) (_ _) 0.80d0)
                       (:piswap "PISWAP" (_) (_ _) 0.80d0)
@@ -339,10 +339,10 @@ used to specify CHIP-SPEC."
       (when (member ':RZ type)
         (stash-gate-record "RZ" '(_) (list q) 1/100 +near-perfect-fidelity+))
       (when (member ':X/2 type)
-        (stash-gate-record "RX" '(#.pi/2)  `(,q) 9 0.9999d0)
-        (stash-gate-record "RX" '(#.-pi/2) `(,q) 9 0.9999d0)
-        (stash-gate-record "RX" '(#.pi)    `(,q) 9 0.9999d0)
-        (stash-gate-record "RX" '(#.-pi)   `(,q) 9 0.9999d0)
+        (stash-gate-record "RX" '(#.pi/2)  `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.-pi/2) `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.pi)    `(,q) 9 0.98d0)
+        (stash-gate-record "RX" '(#.-pi)   `(,q) 9 0.98d0)
         (stash-gate-record "RX" '(0d0)     `(,q) 9 +near-perfect-fidelity+)))
     ;; return the qubit
     obj))

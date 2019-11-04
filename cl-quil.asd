@@ -108,7 +108,6 @@
                              (:file "initial-rewiring")
                              (:file "logical-schedule")
                              (:file "outgoing-schedule")
-                             (:file "cost-function")
                              (:file "astar-rewiring-search")
                              (:file "path-heuristic")
                              (:file "addresser-common")
