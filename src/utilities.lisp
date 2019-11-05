@@ -59,6 +59,7 @@ WARNING: The default will work for instances of \"idiomatic\" classes that aren'
   `(progn
      (declaim (type fixnum ,counter-name))
      (global-vars:define-global-var ,counter-name 0)
+     (declaim (inline ,incf-name))
      (defun ,incf-name ()
        #+sbcl
        (sb-ext:atomic-incf ,counter-name)
