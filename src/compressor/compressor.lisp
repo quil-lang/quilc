@@ -242,7 +242,7 @@ other's."
   (labels
       ( ;; utility for calculating how many instructions a rewriting rule requests
        (rewriting-rule-count (compiler)
-         (length (cleave-options (compiler-bindings compiler))))
+         (length (compiler-bindings compiler)))
        
        ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
