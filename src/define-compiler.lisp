@@ -716,7 +716,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
           (loop :for binding :being :the :hash-keys :of gateset
                 :never (wildcard-binding-p binding))
           (or
-           ;; have cleared these checks, we support two kinds of matches:
+           ;; having cleared these checks, we support two kinds of matches:
            ;; (1) a "blind" match, where we can tell just by considering bindings
            ;;     that the compiler will always have reasonable input and output
            ;; (2) an "exhaustive" match, where we instantiate different test cases
