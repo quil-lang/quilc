@@ -596,6 +596,7 @@ other's."
         (let ((result-instructions
                 (cond
                   ((and decompiled-instructions
+                        (not (equalp decompiled-instructions reduced-decompiled-instructions))
                         (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
                            (calculate-instructions-duration reduced-instructions chip-specification)))
                    reduced-decompiled-instructions)

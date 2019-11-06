@@ -348,7 +348,8 @@ OPTIONS: plist of options governing applicability of the compiler binding."
   (:method ((binding gate-binding))
     (when (symbolp (gate-binding-operator binding))
       (error 'cannot-concretize-binding))
-    (when (some #'symbolp (gate-binding-parameters binding))
+    (when (or (symbolp (gate-binding-parameters binding))
+              (some #'symbolp (gate-binding-parameters binding)))
       (error 'cannot-concretize-binding))
     (when (some #'symbolp (gate-binding-arguments binding))
       (error 'cannot-concretize-binding))
@@ -589,7 +590,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
-  (flet ( ;; Checks whether PATH doubles back through the occurrence table START.         
+  (flet (;; Checks whether PATH doubles back through the occurrence table START.         
          (path-has-a-loop-p (path start)
            (and (< 1 (length path))
                 (loop :for (gateset compiler) :on path :by #'cddr
@@ -707,18 +708,20 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
            (compiler-does-not-apply () nil)
            (cannot-concretize-binding () nil)))
        (consider-compiler (compiler)
-         ;; certain things we will never tolerate:
-         ;; (1) unguarded matches will always result in infinite loops.
          (and
+          ;; certain things we will never tolerate:
+          ;; (1) unguarded matches will always result in infinite loops.
           (notany #'unguarded-binding-p (compiler-bindings compiler))
-          ;; have cleared these checks, we support two kinds of matches:
-          ;; (1) a "blind" match, where we can tell just by considering bindings
-          ;;     that the compiler will always have reasonable input and output
-          ;; (2) an "exhaustive" match, where we instantiate different test cases
-          ;;     to pump through the compiler, convincing ourselves that in all
-          ;;     applicable situations the compiler gives good output.
+          ;; (2) unguarded gatesets don't benefit from reduction
+          (loop :for binding :being :the :hash-keys :of gateset
+                :never (wildcard-binding-p binding))
           (or
-           ;; first try the blind match
+           ;; having cleared these checks, we support two kinds of matches:
+           ;; (1) a "blind" match, where we can tell just by considering bindings
+           ;;     that the compiler will always have reasonable input and output
+           ;; (2) an "exhaustive" match, where we instantiate different test cases
+           ;;     to pump through the compiler, convincing ourselves that in all
+           ;;     applicable situations the compiler gives good output.
            (let* ((gateset (blank-out-qubits gateset))
                   (in-fidelity 1d0)
                   (out-fidelity (occurrence-table-cost (compiler-output-gates compiler) gateset)))

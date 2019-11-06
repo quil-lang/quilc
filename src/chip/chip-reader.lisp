@@ -119,6 +119,8 @@
       ((string= "MEASURE" (gethash "operator" gate-datum))
        (make-measure-binding :target (intern-if-string (gethash "target" gate-datum))
                              :qubit (intern-if-string (gethash "qubit" gate-datum))))
+      ((string= "_" (gethash "operator" gate-datum))
+       (make-wildcard-binding))
       (t
        (multiple-value-bind (operator op-p) (gethash "operator" gate-datum)
          (unless op-p (error 'missing-gates-default-value
