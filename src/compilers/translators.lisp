@@ -155,6 +155,27 @@
   (inst "RZ"   '(#.(/ pi -4)) q1)
   (inst "CNOT" ()             q0 q1))
 
+(define-compiler XY-to-XY/2 ((XY-gate ("XY" (theta) q1 q0)))
+  (inst "RZ" `(,(/ pi 4))  q0)
+  (inst "RZ" `(,(/ pi -4)) q1)
+  (inst "XY" `(,pi/2)      q1 q0)
+  (inst "RZ" `(,(param-*  0.5d0 theta)) q0)
+  (inst "RZ" `(,(param-* -0.5d0 theta)) q1)
+  (inst "RZ" `(,pi/2)      q0)
+  (inst "RZ" `(,-pi/2)     q1)
+  (inst "XY" `(,pi/2)      q1 q0)
+  (inst "RZ" `(,-pi/2)     q0)
+  (inst "RZ" `(,pi/2)      q1)
+  (inst "RZ" `(,(/ pi -4)) q0)
+  (inst "RZ" `(,(/ pi  4)) q1))
+
+;; record synonyms
+(define-compiler PISWAP-to-XY ((PISWAP-gate ("PISWAP" (theta) q1 q0)))
+  (inst "XY" `(,theta) q1 q0))
+
+(define-compiler XY-to-PISWAP ((XY-gate ("XY" (theta) q1 q0)))
+  (inst "PISWAP" `(,theta) q1 q0))
+
 (defun find-shortest-path-on-chip-spec (chip-spec start-node target-node)
   "Returns a sequence of qubit indices that reach from START-NODE to TARGET-NODE on CHIP-SPEC, or NIL if no path can be found.
 
