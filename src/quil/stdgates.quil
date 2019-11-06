@@ -143,6 +143,15 @@ DEFGATE PISWAP(%theta):
     0, i*sin(%theta/2), cos(%theta/2),   0
     0, 0,               0,               1
 
+# there has been some internal debate about whether this gate should be parameterized
+# by -1.0*%theta instead. we seem to have picked this one for good, but it's still
+# not 100% clear to me that this is the "right" move.
+DEFGATE XY(%theta):
+    1, 0,               0,               0
+    0, cos(%theta/2),   i*sin(%theta/2), 0
+    0, i*sin(%theta/2), cos(%theta/2),   0
+    0, 0,               0,               1
+
 DEFGATE CAN(%alpha, %beta, %gamma):
     (cis((%alpha+%beta-%gamma)/2)+cis((%alpha-%beta+%gamma)/2))/2, 0, 0, (cis((%alpha-%beta+%gamma)/2)-cis((%alpha+%beta-%gamma)/2))/2
     0, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, 0
