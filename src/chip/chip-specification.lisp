@@ -143,7 +143,7 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
 Used to be an anonymous function associated to HARDWARE-OBJECT; now computed from its GATE-INFORMATION table."
   (a:when-let ((gate-record
                 (loop :for key :being :the :hash-keys :of (hardware-object-gate-information obj)
-                      :using (hash-value value)
+                        :using (hash-value value)
                       :when (binding-subsumes-p key (get-binding-from-instr instr))
                         :do (return value))))
     (gate-record-duration gate-record)))
