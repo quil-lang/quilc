@@ -881,7 +881,8 @@ INST* is a local function usable within the dynamic extent of a compiler body."
 FINISH-COMPILER is a local macro usable within a compiler body."
   (error "FINISH-COMPILER can only be used in the body of a compiler."))
 
-(defmacro with-inst (&body body)
+;;; The empty list is so that options can be provided in the future.
+(defmacro with-inst (() &body body)
   "Define INST, INST*, and FINISH-COMPILER handlers extending over BODY."
   (a:with-gensyms (list tail compiler-context x xs retval-p)
     `(block ,compiler-context
@@ -959,7 +960,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
   (labels ((expand-bindings (bindings env)
              (cond
                ((endp bindings)
-                `(values (with-inst ,@body)
+                `(values (with-inst () ,@body)
                          t))
                ((typep (first bindings) 'symbol)
                 (expand-bindings (rest bindings)

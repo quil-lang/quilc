@@ -469,7 +469,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                                    :permit-binding-mismatches-when *enable-approximate-compilation*)
              ,docstring
 	     ,@decls
-             (let ((,circuit (with-inst ,@body))
+             (let ((,circuit (with-inst () ,@body))
                    (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
                    (,q1 (qubit-index (first (application-arguments ,instr-name))))
                    (,q0 (qubit-index (second (application-arguments ,instr-name)))))
@@ -497,7 +497,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 	 ,@decls
          (labels
              ((circuit-template (,parameter-array ,q1 ,q0)
-                (with-inst
+                (with-inst ()
                   ,@parametric-circuit))
               (run-optimizer ()
                 (multiple-value-bind (,template-values ,goodness)
@@ -617,7 +617,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
           (inst "Z"     ()              q1)
           (dolist (instr
                    (sandwich-with-local-gates
-                    (with-inst
+                    (with-inst ()
                       (inst "ISWAP" '()       q1 q0)
                       (inst "RY"    `(,alpha) q1)
                       (inst "RY"    `(,beta)  q0)
