@@ -496,6 +496,14 @@
    #:standard-qubit-relabeler           ; FUNCTION
    )
 
+  ;; from utilities.lisp
+  (:export
+   #:-pi                                ; CONSTANT
+   #:pi/2                               ; CONSTANT
+   #:-pi/2                              ; CONSTANT
+   #:2pi                                ; CONSTANT
+   #:4pi                                ; CONSTANT
+   )
   (:shadow
    #:pi))
 
@@ -529,6 +537,7 @@
    #:pauli-basis-decompose              ; FUNCTION
    #:pauli=                             ; FUNCTION
    #:make-pauli-hash-table              ; FUNCTION
+   #:exp-pauli                          ; FUNCTION
 
    ;; clifford.lisp
    #:count-clifford                     ; FUNCTION
