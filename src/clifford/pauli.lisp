@@ -33,7 +33,12 @@
                                 :initial-element 0))
 
   (defun phase-factor (p)
+    "Return the phase factor as an integer. This integer can be interpreted as a complex number via the function INTERPRET-PAULI-PHASE-FACTOR."
     (aref (pauli-components p) 0))
+
+  (defun interpret-pauli-phase-factor (n)
+    "Interpret the phase of a Pauli term (as given by PHASE-FACTOR) as a complex number."
+    (expt #C(0 1) n))
 
   (defun base4-list (p)
     (coerce (subseq (pauli-components p) 1) 'list))
@@ -194,8 +199,7 @@ phase factor)."
       (prog1 (%make-pauli :components c)
         (loop :for i :from 1
               :while s
-              :do (setf (aref c i) (sym-to-base4 (pop s)))
-              ))))
+              :do (setf (aref c i) (sym-to-base4 (pop s)))))))
 
   (defun pauli-from-string (s)
     "Make Pauli operator from a string, e.g., \"iXYZ\", \"-iZ\", \"Z\"
@@ -323,3 +327,83 @@ hash-function."
         (c (copy-seq (pauli-components p))))
     (setf (aref c 0) new-phase)
     (%make-pauli :components c)))
+
+;;; Exponentiation of a Pauli
+;;;
+;;; Reference:
+;;;
+;;;     Section VIII ("Trotterization") of "The Bravyi-Kitaev
+;;;     transformation for quantum computation of electronic
+;;;     structure" by Seeley, Richard, and
+;;;     Love. (https://arxiv.org/pdf/1208.5986.pdf)
+(defun build-cnot-ladder (qubits)
+  (let ((reverse nil)
+        (forward nil))
+    (map nil (lambda (from to)
+               ;; We make copies because quilc doens't like EQ things.
+               (push (quil:build-gate "CNOT" () from to) reverse)
+               (push (quil:build-gate "CNOT" () from to) forward))
+         qubits
+         (subseq qubits 1))
+    (values (nreverse forward)
+            reverse)))
+
+(defvar *exp-pauli-toggles* 'build-cnot-ladder
+  "A function designator which takes a list of qubits Q and builds a two sequences of instructions S and S' such that S \"toggles\" the last qubit of Q through the previous elements of Q. S' should be the mathematical inverse of S.")
+
+(defun exp-pauli (p x)
+  "Compute exp(-ixp) as a list of Quil instructions.
+
+Note that this function is somewhat informed by the variable *EXP-PAULI-COLLECT-TOGGLES* variable; see its documentation. which is a function which takes a list of qubits and \"collects all toggles\" on those qubits
+"
+  (let ((phase (interpret-pauli-phase-factor (phase-factor p))))
+    (assert (realp phase) (p) "The given Pauli term has a non-real phase of ~A ~
+                               which isn't allowed in EXP-PAULI."
+            phase)
+    (setf phase (coerce (realpart phase) 'double-float))
+    (quil:with-inst ()
+      (cond
+        ((pauli-identity-p p)
+         ;; PyQuil would generate
+         ;;
+         ;;   X 0
+         ;;   PHASE(-phase) 0
+         ;;   X 0
+         ;;   PHASE(-phase) 0
+         ;;
+         ;; We are just going to generate nothing.
+         nil)
+
+        ;; A simple case so we can generate a single rotation.
+        ((= 1 (count-if #'plusp (pauli-components p) :start 1))
+         (multiple-value-bind (op qubit)
+             (loop :for i :from 1
+                   :for op := (base4-to-sym (aref (pauli-components p) i))
+                   :unless (eq 'I op)
+                     :return (values op (1- i)))
+           (ecase op
+             (X (quil:inst "RX" (list (quil::param-* (* 2.0d0 phase) x)) qubit))
+             (Y (quil:inst "RY" (list (quil::param-* (* 2.0d0 phase) x)) qubit))
+             (Z (quil:inst "RZ" (list (quil::param-* (* 2.0d0 phase) x)) qubit)))))
+
+        ;; The general case.
+        (t
+         (let* ((n (num-qubits p)))
+           (loop :for qubit :below n
+                 :for pauli-component := (base4-to-sym (aref (pauli-components p) (1+ qubit)))
+                 :unless (eq 'I pauli-component)
+                   :collect qubit :into toggle-qubits
+                 ;; This collect builds pairs of basis-changing gates.
+                 :when (eq 'X pauli-component)
+                   :collect      (quil:build-gate "H" () qubit) :into to-z
+                   :and :collect (quil:build-gate "H" () qubit) :into from-z
+                 :when (eq 'Y pauli-component)
+                   :collect      (quil:build-gate "RX" (list quil:pi/2) qubit)  :into to-z
+                   :and :collect (quil:build-gate "RX" (list quil:-pi/2) qubit) :into from-z
+                 :finally
+                    (multiple-value-bind (forward reverse) (funcall *exp-pauli-toggles* toggle-qubits)
+                      (mapc #'quil:inst to-z)
+                      (mapc #'quil:inst forward)
+                      (quil:inst "RZ" (list (quil::param-* (* 2.0d0 phase) x)) (first (last toggle-qubits)))
+                      (mapc #'quil:inst reverse)
+                      (mapc #'quil:inst from-z)))))))))
