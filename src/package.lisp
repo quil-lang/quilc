@@ -409,6 +409,20 @@
    #:quil-parse-error                   ; CONDITION
    )
 
+  ;; build-gate.lisp
+  (:export
+   #:build-gate                         ; FUNCTION
+   #:anon-gate                          ; FUNCTION
+   )
+
+  ;; define-compiler.lisp
+  (:export
+   #:with-inst                          ; MACRO
+   #:inst                               ; LOCAL FUNCTION
+   #:inst*                              ; LOCAL FUNCTION
+   #:finish-compiler                    ; LOCAL MACRO
+   )
+
   ;; desugar.lisp
   (:export
    #:qubits-needed                      ; FUNCTION

@@ -1,5 +1,5 @@
 ;;;; build-gate.lisp
-;;;; 
+;;;;
 ;;;; Author: Eric Peterson
 ;;;;
 ;;;; This file collects the gate-construction routines in CL-QUIL which are
