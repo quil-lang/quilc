@@ -163,17 +163,13 @@ is found, then return NIL."
       (t
        (return-from prog-rewiring-pragma nil)))))
 
-(defun %naively-applicable-p (gate-app chip-spec
-                              &aux (qubit-indices (application-qubit-indices gate-app)))
-  "Return true if the given GATE-APP's arguments correspond to a valid HARDWARE-OBJECT in CHIP-SPEC."
-  (and (not (null (lookup-hardware-object-by-qubits chip-spec qubit-indices)))
-       (or (/= 1 (length qubit-indices))
-           (not (chip-spec-qubit-dead? chip-spec (first qubit-indices))))))
-
-(defun %filter-gate-applications (parsed-prog)
-  "Remove non-GATE-APPICATION's from PARSED-PROG's instruction sequence."
-  (remove-if-not #'gate-application-p
-                 (parsed-program-executable-code parsed-prog)))
+(defun %naively-applicable-p (instr chip-spec
+                              &aux (qubit-indices (%qubits-used instr)))
+  "Return true if the given INSTR does not consume qubit arguments or if the qubit arguments correspond to a valid HARDWARE-OBJECT in CHIP-SPEC."
+  (or (null qubit-indices)
+      (and (not (null (lookup-hardware-object-by-qubits chip-spec qubit-indices)))
+           (or (/= 1 (length qubit-indices))
+               (not (chip-spec-qubit-dead? chip-spec (first qubit-indices)))))))
 
 (defun prog-initial-rewiring-heuristic (parsed-prog chip-spec)
   "Return a resonable guess at the initial rewiring for PARSED-PROG that is compatible with CHIP-SPEC.
@@ -183,7 +179,7 @@ Otherwise, if every GATE-APPLICATION in PARSED-PROG can use a NAIVE rewiring, re
 Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
   (or (prog-rewiring-pragma parsed-prog)
       (and (every (a:rcurry #'%naively-applicable-p chip-spec)
-                  (%filter-gate-applications parsed-prog))
+                  (parsed-program-executable-code parsed-prog))
            ':naive)
       *initial-rewiring-default-type*))
 
