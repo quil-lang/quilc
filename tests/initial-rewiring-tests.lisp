@@ -144,4 +144,20 @@ HALT
 
       ;; Always :NAIVE for PP-B on linear chip
       (is (eq ':naive
-              (quil::prog-initial-rewiring-heuristic pp-b (quil::build-nq-linear-chip 4)))))))
+              (quil::prog-initial-rewiring-heuristic pp-b (quil::build-nq-linear-chip 4))))))
+
+  ;; Test instructions operating on dead or non-existent qubit.
+  (let ((pp-x       (with-output-to-quil "X 0"))
+        (pp-reset   (with-output-to-quil "RESET 0"))
+        (pp-measure (with-output-to-quil "DECLARE ro BIT" "MEASURE 0 ro"))
+        (pp-r-and-m (with-output-to-quil "RESET" "DECLARE ro BIT" "MEASURE 0 ro"))
+        (chip-dead  (quil::qpu-hash-table-to-chip-specification
+                     (yason:parse "{\"isa\": {\"1Q\": {\"0\": {\"dead\": \"true\"}, \"1\": {}},
+                                              \"2Q\": {}}}")))
+        (chip-missing (quil::qpu-hash-table-to-chip-specification
+                       (yason:parse "{\"isa\": {\"1Q\": {\"1\": {}}}}"))))
+    (dolist (quil::*initial-rewiring-default-type* '(:naive :partial :greedy :random))
+      (dolist (pp (list pp-x pp-reset pp-measure pp-r-and-m))
+        (dolist (chip (list chip-dead chip-missing))
+          (is (eq quil::*initial-rewiring-default-type*
+                  (quil::prog-initial-rewiring-heuristic pp chip))))))))
