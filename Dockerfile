@@ -24,7 +24,7 @@ RUN make dump-version-info install-test-deps
 # build the quilc app
 ADD . /src/quilc
 WORKDIR /src/quilc
-RUN git clean -fdx && CXX=clang++-7 make ${build_target} && make install-tweedledum && ldconfig
+RUN git clean -fdx && make ${build_target} && ldconfig
 
 EXPOSE 5555
 EXPOSE 6000
