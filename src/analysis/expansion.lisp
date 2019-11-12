@@ -350,8 +350,3 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
                                  param-value
                                  (circuit-definition-arguments instr)
                                  arg-value)))
-
-(defun ensure-instantiated (obj param-arg-value)
-  (if (or (is-formal obj) (is-param obj))
-      (funcall param-arg-value obj)
-      obj))

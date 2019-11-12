@@ -100,11 +100,25 @@
 
 ;;; Instruction Instantiation
 
+(defun ensure-instantiated (obj &key param-value arg-value)
+  "Ensure that OBJ is instantiated with respect to the provided parameter or argument values."
+  (cond ((is-formal obj)
+         (assert arg-value () "Formal argument instantiation requires :ARG-VALUE to be specified.")
+         (funcall arg-value obj))
+        ((is-param obj)
+         (assert param-value () "Parameter instantiation requires :PARAM-VALUE to be specified.")
+         (funcall param-value obj))
+        ((quil::delayed-expression-p obj)
+         (quil::evaluate-delayed-expression
+          ;; pass the buck upwards
+          (quil::map-de-params (quil::substitute-parameter param-value) obj)))
+        (t obj)))
+
 (defun instantiate-frame (frame arg-value)
   "Instantiate FRAME with respect to the argument values represented by ARG-VALUE, constructing a new frame if needed."
   (let* ((remake nil)
          (qubits (mapcar (quil::flag-on-update remake
-                                               (lambda (q) (quil::ensure-instantiated q arg-value)))
+                                               (lambda (q) (ensure-instantiated q :arg-value arg-value)))
                          (frame-qubits frame))))
     (if remake
         (let ((instantiated (frame qubits (frame-name frame))))
@@ -118,7 +132,7 @@
   (let ((remake nil))
     (flet ((instantiate-parameter (assoc)
              (destructuring-bind (name . value) assoc
-               (let ((instantiated-value (quil::ensure-instantiated value param-value)))
+               (let ((instantiated-value (ensure-instantiated value :param-value param-value)))
                  (if (eq value instantiated-value)
                      ;; Remember folks, a CONS saved is a CONS earned.
                      assoc
@@ -136,8 +150,8 @@
 (defmethod instantiate-instruction ((instr simple-frame-mutation) param-value arg-value)
   (let ((frame (instantiate-frame (frame-mutation-target-frame instr)
                                   arg-value))
-        (value (quil::ensure-instantiated (frame-mutation-value instr)
-                                          param-value)))
+        (value (ensure-instantiated (frame-mutation-value instr)
+                                    :param-value param-value)))
     (if (and (eq frame (frame-mutation-target-frame instr))
              (eq value (frame-mutation-value instr)))
         instr
@@ -175,8 +189,8 @@
                                   arg-value))
         (waveform (instantiate-waveform-ref (capture-waveform instr)
                                             param-value))
-        (memory-ref (quil::ensure-instantiated (capture-memory-ref instr)
-                                               arg-value)))
+        (memory-ref (ensure-instantiated (capture-memory-ref instr)
+                                         :arg-value arg-value)))
     (quil::check-mref memory-ref)
     (if (and (eq frame (capture-frame instr))
              (eq waveform (capture-waveform instr))
@@ -191,10 +205,10 @@
 (defmethod instantiate-instruction ((instr raw-capture) param-value arg-value)
   (let ((frame (instantiate-frame (raw-capture-frame instr)
                                   arg-value))
-        (memory-ref (quil::ensure-instantiated (raw-capture-memory-ref instr)
-                                               arg-value))
-        (duration (quil::ensure-instantiated (raw-capture-duration instr)
-                                             param-value)))
+        (memory-ref (ensure-instantiated (raw-capture-memory-ref instr)
+                                         :arg-value arg-value))
+        (duration (ensure-instantiated (raw-capture-duration instr)
+                                       :param-value param-value)))
     (quil::check-mref memory-ref)
     (if (and (eq frame (raw-capture-frame instr))
              (eq memory-ref (raw-capture-memory-ref instr))
@@ -207,8 +221,8 @@
                        :nonblocking (nonblocking-p instr)))))
 
 (defmethod instantiate-instruction ((instr delay-on-qubits) param-value arg-value)
-  (let ((duration (quil::ensure-instantiated (delay-duration instr)
-                                             param-value)))
+  (let ((duration (ensure-instantiated (delay-duration instr)
+                                       :param-value param-value)))
     (if (and (eq duration (delay-duration instr))
              (not (some #'is-formal (delay-qubits instr))))
         instr
@@ -219,8 +233,8 @@
 
 (defmethod instantiate-instruction ((instr delay-on-frames) param-value arg-value)
   (let* ((remake nil)
-         (duration (quil::ensure-instantiated (delay-duration instr)
-                                              param-value))
+         (duration (ensure-instantiated (delay-duration instr)
+                                        :param-value param-value))
          (frames (mapcar (quil::flag-on-update remake
                                                (lambda (f) (instantiate-frame f arg-value)))
                          (delay-frames instr))))
@@ -234,7 +248,7 @@
 (defmethod instantiate-instruction ((instr fence) param-value arg-value)
   (let* ((remake nil)
          (qubits (mapcar (quil::flag-on-update remake
-                                               (lambda (q) (quil::ensure-instantiated q arg-value)))
+                                               (lambda (q) (ensure-instantiated q :arg-value arg-value)))
                          (fence-qubits instr))))
     (if remake
         (make-instance 'fence :qubits qubits)

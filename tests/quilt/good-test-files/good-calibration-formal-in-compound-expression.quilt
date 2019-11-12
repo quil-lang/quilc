@@ -1,0 +1,6 @@
+DEFFRAME 0 "rf"
+
+DEFCAL RZ(%theta) q:
+    SHIFT-PHASE q "rf" -%theta / (2 * pi)
+
+RZ(pi/2) 0
