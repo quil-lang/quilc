@@ -201,7 +201,7 @@ CHIP-SPEC and an initial logical-to-physical rewirign INITIAL-REWIRING."
                    :chip-sched (make-chip-schedule chip-spec)
                    :chip-spec chip-spec)))
 
-;; TODO: why isn't this part of the state?
+;; TODO: consider making this part of the state
 (defvar *addresser-use-free-swaps* nil
   "Does the addresser treat the initial rewiring as something that can be changed?")
 
