@@ -66,7 +66,7 @@
         (dohash ((gate tier-index) gate-weights)
           (when (and (<= tier-index 3)
                      (typep gate 'application))
-            (let* ((logical-qubits (mapcar #'qubit-index (application-arguments gate)))
+            (let* ((logical-qubits (application-qubit-indices gate))
                    (physical-qubits (mapcar (a:curry #'apply-rewiring-l2p rewiring) logical-qubits))
                    (any-assigned? (some #'identity physical-qubits))
                    (all-assigned? (every #'identity physical-qubits)))
