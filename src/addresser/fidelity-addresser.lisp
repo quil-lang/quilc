@@ -23,6 +23,9 @@
 (defstruct (fidelity-cost (:constructor fidelity-cost (value)))
   (value nil :type real :read-only t))
 
+(defmethod cost-flatten ((cost fidelity-cost))
+  (fidelity-cost-value cost))
+
 (defmethod cost-function ((state fidelity-addresser-state) &key gate-weights instr)
   (let ((instr-cost 0d0)
         (gate-weights-cost 0d0))

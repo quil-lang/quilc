@@ -236,6 +236,9 @@ INSTR is the \"active instruction\".
 (defgeneric build-worst-cost (state)
   (:documentation "Builds a POSITIVE-INFINITY type value for the COST-FUNCTION associated to STATE."))
 
+(defgeneric cost-flatten (cost)
+  (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION."))
+
 
 (defgeneric select-and-embed-a-permutation (state rewirings-tried)
   (:documentation
@@ -248,13 +251,13 @@ cost-function associated to the current lschedule.")
               "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.~%")
       (let ((gates-in-waiting (assign-weights-to-gates state)))
         (ecase *addresser-swap-search-type*
-          #+ignore  ; TODO: test this
           (:a*
-           (flet ((cost-function (rewiring)
+           (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+                    (declare (ignore instr))
                     (let ((modified-state (copy-instance state)))
                       (setf (addresser-state-working-l2p state) rewiring)
                       (* *addresser-a*-swap-search-heuristic-scale*
-                         (cost-function modified-state :gate-weights gates-in-waiting))))
+                         (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
                   (done-function (rewiring)
                     (prog2
                         (rotatef rewiring working-l2p)
@@ -286,8 +289,6 @@ cost-function associated to the current lschedule.")
                          chip-sched
                          :use-free-swaps *addresser-use-free-swaps*)
              rewirings-tried))
-          ;; TODO: reenable this
-          #+ignore
           (:greedy-path
            (push (copy-rewiring working-l2p) rewirings-tried)
            (let ((link-index (select-swap-path-gates chip-spec qq-distances gates-in-waiting
