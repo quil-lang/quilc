@@ -707,9 +707,9 @@ Optional arguments:
         ;; [ initialization       ]
         ;;    |
         ;;    v
-        ;; [ dequeue-logical-to-physical     and      ]
-        ;; [ dequeue-soonest-2q-instruction-from-list ]
-        ;; [ inserts available logical instructions   ]
+        ;; [ dequeue-logical-to-physical    and     ]
+        ;; [ dequeue-best-instr                     ]
+        ;; [ inserts available logical instructions ]
         ;;   |        ^         ^
         ;;   |        |         |
         ;;   |        |        yes
@@ -719,8 +719,8 @@ Optional arguments:
         ;;   no       |
         ;;   |        |
         ;;   v        |
-        ;; < is the logical schedule empty? > --yes-> [ do-greedy-temporal-addressing ]
-        ;;   |        |                               [ flush / cleanup ]
+        ;; < is the logical schedule empty? > --yes-> [ do-greedy-addressing ]
+        ;;   |        |                               [ flush / cleanup      ]
         ;;   no       |
         ;;   |        |
         ;;   v        |
