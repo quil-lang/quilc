@@ -155,7 +155,8 @@ CNOT 0 2"))
 
 (deftest test-ccnot-compilation-on-cphase-iswap ()
   "Test that CCNOT compiles nicely on a line having the (:CPHASE ISWAP) architecture."
-  (let* ((chip (quil::build-nq-linear-chip 3 :architecture '(:cphase :cz :iswap)))
+  (let* ((quil::*addresser-state-constructor* #'quil::initial-temporal-addresser-working-state)
+         (chip (quil::build-nq-linear-chip 3 :architecture '(:cphase :cz :iswap)))
          (orig-prog (quil::parse-quil "CCNOT 0 1 2"))
          (orig-matrix (quil::parsed-program-to-logical-matrix orig-prog))
          (proc-prog (quil::compiler-hook orig-prog chip))
@@ -165,7 +166,4 @@ CNOT 0 2"))
     (is (every (link-nativep chip) 2q-code))
     ;; NOTE: Decomposing into fewer 2q gates is more of a regression
     ;; test on quality of compilation, and not on correctness.
-
-    ;; NOTE: This test used to be upper-bounded 6. Changes to the
-    ;; addresser raised it to 7. Investigate why.
-    (is (>= 7 (length 2q-code)))))
+    (is (>= 6 (length 2q-code)))))
