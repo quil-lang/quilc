@@ -147,7 +147,7 @@
 ;; Forward declaration from compressor.lisp
 (declaim (special *compressor-passes*))
 
-(defparameter *addresser-state-constructor* 'initial-fidelity-addresser-working-state)
+(defparameter *default-addresser-state-class* 'fidelity-addresser-state)
 
 ;; TODO: deal with classical control and basic-blocks
 (defun compiler-hook (parsed-program
@@ -256,9 +256,11 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-addressing
-                   (funcall *addresser-state-constructor* chip-specification (if registrant
-                                                                                 (basic-block-in-rewiring blk)
-                                                                                 initial-rewiring))
+                   (make-instance *default-addresser-state-class*
+                                  :chip-spec chip-specification
+                                  :initial-l2p (if registrant
+                                                   (basic-block-in-rewiring blk)
+                                                   initial-rewiring))
                  (coerce (basic-block-code blk) 'list)
                  :initial-rewiring (if registrant
                                        (basic-block-in-rewiring blk)
@@ -286,9 +288,10 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-addressing
-                   (funcall *addresser-state-constructor* chip-specification
-                            (prog-initial-rewiring parsed-program chip-specification
-                                                   :type rewiring-type))
+                   (make-instance *default-addresser-state-class*
+                                  :chip-spec chip-specification
+                                  :initial-l2p (prog-initial-rewiring parsed-program chip-specification
+                                                                      :type rewiring-type))
                  (coerce (basic-block-code blk) 'list)
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))

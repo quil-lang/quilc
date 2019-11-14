@@ -180,26 +180,29 @@ SWAPping qubits into place.")
               (setf (aref dist j i) (+ ik kj)))))))
     dist))
 
-(defun initial-addresser-working-state (chip-spec initial-rewiring)
-  "Prepare the initial working state for the logical addresser, given chip specification
-CHIP-SPEC and an initial logical-to-physical rewirign INITIAL-REWIRING."
+(defmethod initialize-instance :after ((instance addresser-state)
+                                       &rest initargs
+                                       &key
+                                         chip-spec
+                                         initial-l2p
+                                       &allow-other-keys)
+  (declare (ignore initargs))
   (let* ((n-qubits (chip-spec-n-qubits chip-spec))
          (initial-l2p (cond
-                        (initial-rewiring
-                         (copy-rewiring initial-rewiring))
+                        (initial-l2p
+                         (copy-rewiring initial-l2p))
                         (*addresser-start-with-partial-rewiring*
                          (make-partial-rewiring n-qubits))
                         (t
                          (make-rewiring n-qubits)))))
-    (make-instance 'addresser-state
-                   :initial-l2p initial-l2p
-                   :working-l2p (copy-rewiring initial-l2p)
-                   :lschedule (make-lscheduler)
-                   :qubit-cc (a:extremum (chip-spec-live-qubit-cc chip-spec)
-                                         #'>
-                                         :key #'length)
-                   :chip-sched (make-chip-schedule chip-spec)
-                   :chip-spec chip-spec)))
+    (setf (addresser-state-initial-l2p instance) initial-l2p
+          (addresser-state-working-l2p instance) (copy-rewiring initial-l2p)
+          (addresser-state-logical-schedule instance) (make-lscheduler)
+          (addresser-state-qubit-cc instance) (a:extremum (chip-spec-live-qubit-cc chip-spec)
+                                                          #'>
+                                                          :key #'length)
+          (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec)
+          (addresser-state-chip-specification instance) chip-spec)))
 
 ;; TODO: consider making this part of the state
 (defvar *addresser-use-free-swaps* nil
