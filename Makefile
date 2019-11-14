@@ -47,7 +47,7 @@ dump-version-info:
 install-test-deps:
 ifeq ($(UNAME_S),Linux)
 ifeq ($(shell sed -n "s/^ID=//p" /etc/os-release),debian)
-	apt update && apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev clang-7
+	apt update && apt-get install -y git libblas-dev libffi-dev liblapack-dev libzmq3-dev
 else
 	echo "Centos-based platforms unsupported"
 endif
@@ -61,9 +61,9 @@ LIBTWEEDLEDUM := libtweedledum.dylib
 else
 LIBTWEEDLEDUM := libtweedledum.so
 endif
-.PHONY: install-tweedledum
-install-tweedledum:
-	install src/contrib/tweedledum/$(LIBTWEEDLEDUM) /usr/local/lib
+#.PHONY: install-tweedledum
+#install-tweedledum:
+#	install src/contrib/tweedledum/$(LIBTWEEDLEDUM) /usr/local/lib
 
 ###############################################################################
 # BUILD
