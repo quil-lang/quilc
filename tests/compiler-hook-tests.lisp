@@ -372,7 +372,9 @@ MEASURE 2 ro[2]
          (initial-rewiring (quil::prog-initial-rewiring pp chip)))
     (multiple-value-bind (code initial final)
         (quil::do-greedy-addressing
-            (funcall quil::*addresser-state-constructor* chip initial-rewiring)
+            (make-instance quil::*default-addresser-state-class*
+                           :chip-spec chip
+                           :initial-l2p initial-rewiring)
           (coerce (parsed-program-executable-code pp) 'list)
           :use-free-swaps t)
       (declare (ignore code))
@@ -478,7 +480,7 @@ MEASURE 1
 
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
-  (let* ((quil::*addresser-state-constructor* #'quil::initial-temporal-addresser-working-state)
+  (let* ((quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
          (p (quil::compiler-hook (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
