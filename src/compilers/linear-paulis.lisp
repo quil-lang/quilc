@@ -33,8 +33,6 @@
                     pos j)
         :finally (return pos)))
 
-;; WARNING: i don't know where this method has been considered before, and i
-;;          myself haven't worked out a proof that it's correct. caveat compiler
 (define-compiler parametric-diagonal-compiler
     ((instr _
             :where (and (typep (gate-application-gate instr) 'pauli-sum-gate)
@@ -179,8 +177,33 @@
   "Decomposes a gate described by the exponential of a time-independent Hamiltonian into static orthogonal and parametric diagonal components."
   (let ((gate (gate-application-gate instr)))
     (with-slots (arguments parameters terms dimension) gate
-      ;; XXX: check that every component in the gate has coefficient of the form
-      ;;      c*t for c a constant and t the application-parameter.
+      
+      (labels ((crawl-parameter (p)
+                 (typecase p
+                   (list
+                    (case (first p)
+                      (-
+                       (unless (= 2 (length p))
+                         (give-up-compilation))
+                       (crawl-parameter (second p)))
+                      (*
+                       (unless (= 3 (length p))
+                         (give-up-compilation))
+                       (let ((total (+ (crawl-parameter (second p))
+                                       (crawl-parameter (third p)))))
+                         (unless (<= total 1)
+                           (give-up-compilation))
+                         total))
+                      (otherwise
+                       (give-up-compilation))))
+                   (number
+                    0)
+                   (symbol
+                    1)
+                   (otherwise
+                    (give-up-compilation)))))
+        (dolist (term terms)
+          (crawl-parameter (pauli-term-prefactor term))))
       
       ;; instantiate the Hamiltonian
       (let ((H (magicl:make-zero-matrix dimension dimension)))
