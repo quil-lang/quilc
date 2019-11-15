@@ -403,6 +403,8 @@ used to specify CHIP-SPEC."
         (constantly 'state-prep-4q-compiler)
         (constantly 'state-prep-trampolining-compiler)
         (constantly 'recognize-ucr)
+        (constantly 'parametric-pauli-compiler)
+        (constantly 'parametric-diagonal-compiler)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (a:curry 'approximate-2q-compiler
