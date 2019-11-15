@@ -389,13 +389,14 @@ If no exit rewiring is found, return NIL."
 (defclass pauli-sum-gate-definition (gate-definition)
   ((terms :initarg :terms
           :reader pauli-sum-gate-definition-terms
-          :documentation "")            ; XXX
+          :documentation "List of PAULI-TERMs comprising the sum.")
    (parameters :initarg :parameters
                :reader pauli-sum-gate-definition-parameters
-               :documentation "")       ; XXX
+               :documentation "Ordered list of parameter names to be supplied to the definition, which can appear in arithmetical expressions weighting the definition's Pauli terms.")
    (arguments :initarg :arguments
               :reader pauli-sum-gate-definition-arguments
-              :documentation "")))      ; XXX
+              :documentation "Ordered list of formal arguments appearing in the definition's Pauli terms."))
+  (:documentation "Represents a gate definition as the exponential of a weighted sum of Pauli matrices."))
 
 (defmethod gate-definition-qubits-needed ((gate pauli-sum-gate-definition))
   (length (pauli-sum-gate-definition-arguments gate)))
