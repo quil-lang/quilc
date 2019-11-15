@@ -44,10 +44,16 @@
 
 ;;; rewriting rules specialized to qubit types
 
+(defun full-rotation-p (param)
+  (or (and (typep param 'double-float)
+           (double= (/ param 2pi) (round (/ param 2pi))))
+      (and (typep param 'constant)
+           (let ((val (constant-value param)))
+             (double= (/ val 2pi) (round (/ val 2 pi)))))))
+
 (define-compiler eliminate-full-RX-rotations
     ((x ("RX" (theta) _)
-        :where (and (typep theta 'double-float)
-                    (double= (/ theta 2pi) (round (/ theta 2pi))))))
+        :where (full-rotation-p theta)))
   nil)
 
 (define-compiler normalize-RX-rotations
@@ -75,8 +81,7 @@
 
 (define-compiler eliminate-full-RZ-rotations
     ((x ("RZ" (theta) _)
-        :where (and (typep theta 'double-float)
-                    (double= (/ theta 2pi) (round (/ theta 2pi))))))
+        :where (full-rotation-p theta)))
   nil)
 
 (define-compiler normalize-RZ-rotations
@@ -300,8 +305,7 @@
 
 (define-compiler eliminate-full-CPHASE
     ((x ("CPHASE" (theta) _ _)
-        :where (and (typep theta 'double-float)
-                    (double= 0d0 (mod theta 2pi)))))
+        :where (full-rotation-p theta)))
   nil)
 
 (define-compiler normalize-CPHASE

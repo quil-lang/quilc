@@ -40,6 +40,7 @@
                (:file "compilation-tests")
                (:file "clifford-tests")
                (:file "translator-tests")
+               (:file "rewrite-tests")
                (:file "state-prep-tests")
                (:file "compiler-hook-tests")
                (:file "benchmarking-procedures-tests")
