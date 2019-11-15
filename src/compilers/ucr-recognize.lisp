@@ -9,7 +9,10 @@
 (define-compiler recognize-ucr ((instr
                                  :where (anonymous-gate-application-p instr)))
   "Checks whether an anonymous gate is a UCRY or UCRZ instruction, in which case it relabels it as such."
-  (let* ((matrix (gate-matrix instr))
+  (let* ((matrix (handler-case (gate-matrix instr)
+                   (unknown-gate-parameter (c)
+                     (declare (ignore c))
+                     (give-up-compilation))))
          (dimension (magicl:matrix-rows matrix))
          (log-dimension (length (application-arguments instr)))
          angles)

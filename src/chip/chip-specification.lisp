@@ -393,6 +393,8 @@ used to specify CHIP-SPEC."
         (constantly 'state-prep-4q-compiler)
         (constantly 'state-prep-trampolining-compiler)
         (constantly 'recognize-ucr)
+        (constantly 'parametric-pauli-compiler)
+        (constantly 'parametric-diagonal-compiler)
         (constantly 'nearest-circuit-of-depth-0)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
