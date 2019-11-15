@@ -5,22 +5,19 @@
 (in-package #:quilc-tests)
 
 (deftest test-update-available ()
-  (multiple-value-bind (update-available-p update)
-      (quilc::sdk-update-available-p "0.0.0")
-    (if update-available-p
-        ;; If the network is down, then update-available-p is NIL, but
-        ;; we don't want to error in that case. Skip instead.
-        (is update)
-        (skip)))
-
   (with-mocked-function-definitions
-      ((quilc::latest-sdk-version (lambda (&rest args)
-                                    (declare (ignore args))
-                                    "1.0.0")))
+      ((quilc::query-latest-sdk-version (lambda (&rest args)
+                                          (declare (ignore args))
+                                          "1.0.0")))
     (multiple-value-bind (update-available-p update)
         (quilc::sdk-update-available-p "1.5.0")
       (declare (ignore update))
-      (is (not update-available-p)))))
+      (is (not update-available-p)))
+
+    (multiple-value-bind (update-available-p update)
+        (quilc::sdk-update-available-p "0.1.0")
+      (declare (ignore update))
+      (is update-available-p))))
 
 (deftest test-process-program ()
   (let ((progm "H 0")

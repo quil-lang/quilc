@@ -25,5 +25,5 @@
                       (with-output-to-string (*error-output*)
                         (locally
                             (declare #+sbcl(sb-ext:muffle-conditions style-warning))
-                          (quilc::%entry-point (list "quilc" "-mP")))))
+                          (quilc::%entry-point (list "quilc" "-mP" "--check-sdk-version=no")))))
                     :from-end t))))))

@@ -38,7 +38,7 @@
 
 (declaim (special *logger*))
 
-(defun latest-sdk-version (&key (proxy nil))
+(defun query-latest-sdk-version (&key (proxy nil))
   "Get the latest SDK quilc version, or NIL if unavailable."
   (handler-case
       (let* ((s (drakma:http-request
@@ -67,6 +67,25 @@
 (defun sdk-update-available-p (current-version &key (proxy nil))
   "Test whether the current SDK version is the latest SDK
 version. Second value returned indicates the latest version."
-  (let ((latest (latest-sdk-version :proxy proxy)))
+  (let ((latest (query-latest-sdk-version :proxy proxy)))
     (values (and latest (uiop:version< current-version latest))
             latest)))
+
+(defun asynchronously-indicate-update-availability (current-version &key (proxy nil))
+  "Write to the logger the state of the software version (whether it's the latest, if there's an update, if an update couldn't be queried)."
+  (bt:make-thread
+   (lambda ()
+     (multiple-value-bind (available? latest) (sdk-update-available-p current-version :proxy proxy)
+       (cond
+         ((null latest)
+          ;; There was some kind of issue getting the version and a warning was already emitted.
+          )
+         ((not available?)
+          (cl-syslog:rfc-log (*logger* :info "This is the latest version of the SDK.")
+            (:msgid "LOG0001")))
+         (available?
+          (cl-syslog:rfc-log (*logger* :notice "An update is available to the SDK. You have version ~A. ~
+Version ~A is available from https://downloads.rigetti.com/~%"
+                                       +QUILC-VERSION+ latest)
+            (:msgid "LOG0001"))))))
+   :name "Version Check"))

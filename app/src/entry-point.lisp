@@ -413,14 +413,6 @@
                                   (cl-syslog:syslog-log-writer "quilc" :local0)
                                   *error-output*)))
 
-  (when check-sdk-version
-    (multiple-value-bind (available-p version)
-        (sdk-update-available-p +QUILC-VERSION+ :proxy proxy)
-      (when available-p
-        (format t "An update is available to the SDK. You have version ~A. ~
-Version ~A is available from https://downloads.rigetti.com/~%"
-                +QUILC-VERSION+ version))))
-
   #-forest-sdk
   (when benchmark
     (benchmarks))
@@ -449,6 +441,9 @@ Version ~A is available from https://downloads.rigetti.com/~%"
        (*quil-stream* (make-broadcast-stream))
        (*verbose* (make-broadcast-stream))
        (*protoquil* protoquil))
+
+    (when check-sdk-version
+      (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
     ;; at this point we know we're doing something. strap in LAPACK.
     (magicl:with-blapack
       (reload-foreign-libraries)
