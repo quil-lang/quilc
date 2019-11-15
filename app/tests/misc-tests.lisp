@@ -7,8 +7,8 @@
 (deftest test-update-available ()
   (with-mocked-function-definitions
       ((quilc::query-latest-sdk-version (lambda (&rest args)
-                                    (declare (ignore args))
-                                    "1.0.0")))
+                                          (declare (ignore args))
+                                          "1.0.0")))
     (multiple-value-bind (update-available-p update)
         (quilc::sdk-update-available-p "1.5.0")
       (declare (ignore update))
