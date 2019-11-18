@@ -46,11 +46,11 @@
 
 (defun full-rotation-p (param &key (full 2pi))
   "Return T if PARAM is an integer multiple of FULL. PARAM may be a DOUBLE-FLOAT, or a CONSTANT."
-  (or (and (typep param 'double-float)
-           (double= (/ param full) (round (/ param full))))
-      (and (typep param 'constant)
-           (let ((val (constant-value param)))
-             (double= (/ val full) (round (/ val full)))))))
+  (check-type param (or constant double-float))
+  (let ((val (or (and (is-constant param)
+                      (constant-value param))
+                 param)))
+    (double= (/ val full) (round (/ val full)))))
 
 (define-compiler eliminate-full-RX-rotations
     ((x ("RX" (theta) _)
