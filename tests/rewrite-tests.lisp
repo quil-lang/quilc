@@ -1,5 +1,9 @@
 (in-package #:cl-quil-tests)
 
+(defun %filter-halt (pp)
+  (remove-if #'quil::haltp
+             (parsed-program-executable-code pp)))
+
 (deftest test-rz-full-rotation-elimination ()
   ;; Test the compiler directly.
   (is (null (quil::eliminate-full-rz-rotations (quil::build-gate "RZ" (list 0d0) 0))))
@@ -11,8 +15,7 @@
                    (quil::parse-quil "DECLARE theta REAL[1]; RZ(2*pi) 0;")
                    (quil::parse-quil "DECLARE theta REAL[1]; RZ(-2*pi) 0;"))))
     (dolist (pp pps)
-      (is (zerop (length (parsed-program-executable-code
-                          (quilc::process-program pp chip :protoquil t))))))))
+      (is (zerop (length (%filter-halt (quil::compiler-hook pp chip))))))))
 
 (deftest test-rz-agglutination-elimination ()
   (let ((chip (quil::build-nq-fully-connected-chip 2))
@@ -20,7 +23,6 @@
               (parse-quil "RZ(1) 0; RZ(-1) 0;")
               (parse-quil "DECLARE theta REAL[1]; RZ(theta) 0; RZ(-theta) 0"))))
     (dolist (pp pps)
-      (is (zerop (length (parsed-program-executable-code
-                          (quilc::process-program pp chip :protoquil t))))))))
+      (is (zerop (length (%filter-halt (quil::compiler-hook pp chip))))))))
 
 
