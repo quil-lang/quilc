@@ -182,7 +182,8 @@
 
 (define-compiler eliminate-half-PISWAP
     ((x ("PISWAP" (theta) p q)
-        :where (full-rotation-p theta :full 2pi)))
+        :where (and (full-rotation-p theta :full 2pi)
+                    (not (full-rotation-p theta :full 4pi)))))
   (inst "RZ" '(#.pi) p)
   (inst "RZ" '(#.pi) q))
 
