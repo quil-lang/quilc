@@ -184,19 +184,17 @@ AFFINE-REPRESENTATION                       (* 2.0 theta[0])
   (:documentation "Generic function that defines the underlying mechanics for the SIMPLIFY-ARITHMETIC transform. If this function is given a PARSED-PROGRAM, it recursively applies itself to the program's exectuable code. Otherwise, if this function is given a GATE-APPLICATION, it attempts to simplify the gate parameters by canonicalizing the arithmetic expressions they (potentially) contain.")
   (:method ((thing t))
     thing)
+  (:method ((thing constant))
+    thing)
+  (:method ((thing delayed-expression))
+    (handler-case
+        (canonicalize-expression thing)
+      (expression-not-linear () thing)
+      (expression-not-simplifiable () thing)))
   (:method ((thing gate-application))
     (let ((new-gate (copy-instance thing)))
       (setf (application-parameters new-gate)
-            (mapcar (lambda (de)
-                      (handler-case
-                          (typecase de
-                            (constant
-                             de)
-                            (delayed-expression
-                             (canonicalize-expression de))
-                            (otherwise de))
-                        (expression-not-linear () de)
-                        (expression-not-simplifiable () de)))
+            (mapcar #'simplify-arithmetic
                     (application-parameters new-gate)))
       new-gate))
   (:method ((thing parsed-program))

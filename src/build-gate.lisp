@@ -104,7 +104,7 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
                 :when (find (second head) zipped-tail :key #'second :test #'equal)
                   :do (error "Duplicate definition of lambda-param: ~A" (second head)))
           (if (or delayedp-1 delayedp-2)
-              (canonicalize-expression
+              (simplify-arithmetic
                (make-delayed-expression (mapcar #'first params-zipped)
                                         (mapcar #'second params-zipped)
                                         `(,op ,expression-1 ,expression-2)))
