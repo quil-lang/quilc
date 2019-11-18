@@ -45,11 +45,11 @@
 ;;; rewriting rules specialized to qubit types
 
 (defun full-rotation-p (param &key (full 2pi))
-  "Return T if PARAM is an integer multiple of FULL. PARAM may be a DOUBLE-FLOAT, or a CONSTANT."
-  (check-type param (or constant double-float))
-  (let ((val (or (and (is-constant param)
-                      (constant-value param))
-                 param)))
+  "Return T if PARAM is an integer multiple of FULL. PARAM may reasonably be of type CONSTANT or DOUBLE-FLOAT, otherwise return NIL."
+  (alexandria:when-let ((val (or (and (is-constant param)
+                                      (constant-value param))
+                                 (and (typep param 'double-float)
+                                      param))))
     (double= (/ val full) (round (/ val full)))))
 
 (define-compiler eliminate-full-RX-rotations
