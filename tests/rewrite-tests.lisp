@@ -2,8 +2,8 @@
 
 (deftest test-rz-full-rotation-elimination ()
   ;; Test the compiler directly.
-  (is (not (quil::eliminate-full-rz-rotations (quil::build-gate "RZ" (list 0d0) 0))))
-  (is (not (quil::eliminate-full-rz-rotations (quil::build-gate "RZ" (list (quil::constant 0d0)) 0))))
+  (is (null (quil::eliminate-full-rz-rotations (quil::build-gate "RZ" (list 0d0) 0))))
+  (is (null (quil::eliminate-full-rz-rotations (quil::build-gate "RZ" (list (quil::constant 0d0)) 0))))
 
   ;; Test that the compiler takes effect via compiler-hook.
   (let ((chip (quil::build-nq-fully-connected-chip 2))
