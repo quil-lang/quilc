@@ -110,32 +110,28 @@
               (subseq parameters
                       (/ (length parameters) 2)))
             (averages
-              (mapcar (lambda (x y) (constant
-                                     (/ (+ (constant-value x)
-                                           (constant-value y))
-                                        2)))
+              (mapcar (lambda (x y) (param-* 0.5d0 (param-+ x y)))
                       high-order-params
                       low-order-params))
             (differences
-              (mapcar (lambda (x y) (constant
-                                     (/ (- (constant-value x)
-                                           (constant-value y))
-                                        2)))
+              (mapcar (lambda (x y) (param-* 0.5d0 (param-+ x (param-* -1d0 y))))
                       high-order-params
                       low-order-params)))
        (cond
-         ((every (lambda (param) (double= 0d0 (constant-value param)))
+         ((every (lambda (param) (and (is-constant param)
+                                      (double= 0d0 (constant-value param))))
                  parameters)
           nil)
-         ((every (lambda (param) (double= (constant-value (first parameters))
-                                          (constant-value param)))
+         ((every (lambda (param) (and (is-constant param)
+                                      (double= (constant-value (first parameters))
+                                               (constant-value param))))
                  parameters)
           (inst roll-type (list (constant-value (first parameters))) target))
          ((= 1 (length differences))
-          (inst* op     averages    rest)
-          (inst  "CNOT" ()          control target)
-          (inst* op     differences rest)
-          (inst  "CNOT" ()          control target))
+          (inst op     averages    target)
+          (inst "CNOT" ()          control target)
+          (inst op     differences target)
+          (inst "CNOT" ()          control target))
          (t
           ;; see the comments above this function for an explanation of what's
           ;; going on here and why.
@@ -150,8 +146,7 @@
           (let* ((param-count (length differences))
                  (differences-prime
                    (append (subseq differences 0 (/ param-count 2))
-                           (mapcar (lambda (x)
-                                     (constant (- (constant-value x))))
+                           (mapcar (lambda (x) (param-* -1d0 x))
                                    (subseq differences (/ param-count 2))))))
             ;; by feeding it differences-prime, the second UCR will give the alternative
             ;; decomposition indicated in the comments, and the extra BUILD-GATEs will
@@ -184,27 +179,23 @@
               (subseq parameters
                       (/ (length parameters) 2)))
             (averages
-              (mapcar (lambda (x y) (constant
-                                     (/ (+ (constant-value x)
-                                           (constant-value y))
-                                        2)))
+              (mapcar (lambda (x y) (param-* 0.5d0 (param-+ x y)))
                       high-order-params
                       low-order-params))
             (differences
-              (mapcar (lambda (x y) (constant
-                                     (/ (- (constant-value x)
-                                           (constant-value y))
-                                        2)))
+              (mapcar (lambda (x y) (param-* 0.5d0 (param-+ x (param-* -1d0 y))))
                       high-order-params
                       low-order-params)))
        (cond
          ;; if all the UCR parameters are zero, return a NOP (or the CNOT we were meant to cancel with)
-         ((every (lambda (param) (double= 0d0 (constant-value param)))
+         ((every (lambda (param) (and (is-constant param)
+                                      (double= 0d0 (constant-value param))))
                  parameters)
           nil)
          ;; if all the UCR parameters are the same, return an uncontrolled roll
-         ((every (lambda (param) (double= (constant-value (first parameters))
-                                          (constant-value param)))
+         ((every (lambda (param) (and (is-constant param)
+                                      (double= (constant-value (first parameters))
+                                               (constant-value param))))
                  parameters)
           (inst roll-type (list (constant-value (first parameters))) target))
          ;; we're ready to output the list of compiled instructions. we do case
@@ -231,7 +222,7 @@
           (inst "RY"    `(,pi/2)    target))
          ;; also shorter UCRs, this time with ISWAPs.
          ((string= "RY" roll-type)
-          (inst* op      averages    rest)    ; skip first control
+          (inst* op      averages    rest) ; skip first control
           (inst  "Z"     nil         control)
           (inst  "Z"     nil         target)
           (inst  "RZ"   `(,pi/2)     target)
