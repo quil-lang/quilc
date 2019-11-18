@@ -203,7 +203,8 @@
                    (otherwise
                     (give-up-compilation)))))
         (dolist (term terms)
-          (crawl-parameter (pauli-term-prefactor term))))
+          (unless (= 1 (crawl-parameter (pauli-term-prefactor term)))
+            (give-up-compilation))))
       
       ;; instantiate the Hamiltonian
       (let ((H (magicl:make-zero-matrix dimension dimension)))
