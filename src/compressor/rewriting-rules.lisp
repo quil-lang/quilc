@@ -44,12 +44,13 @@
 
 ;;; rewriting rules specialized to qubit types
 
-(defun full-rotation-p (param)
+(defun full-rotation-p (param &key (full 2pi))
+  "Return T if PARAM is an integer multiple of FULL. PARAM may be a DOUBLE-FLOAT, or a CONSTANT."
   (or (and (typep param 'double-float)
-           (double= (/ param 2pi) (round (/ param 2pi))))
+           (double= (/ param full) (round (/ param full))))
       (and (typep param 'constant)
            (let ((val (constant-value param)))
-             (double= (/ val 2pi) (round (/ val 2 pi)))))))
+             (double= (/ val full) (round (/ val full)))))))
 
 (define-compiler eliminate-full-RX-rotations
     ((x ("RX" (theta) _)
@@ -180,12 +181,14 @@
       (inst "PISWAP" (list reduced-theta) p q))))
 
 (define-compiler eliminate-half-PISWAP
-    ((x ("PISWAP" (#.2pi) p q)))
+    ((x ("PISWAP" (theta) p q)
+        :where (full-rotation-p theta :full 2pi)))
   (inst "RZ" '(#.pi) p)
   (inst "RZ" '(#.pi) q))
 
 (define-compiler eliminate-full-PISWAP
-    ((x ("PISWAP" (#.4pi) _ _)))
+    ((x ("PISWAP" (theta) _ _)
+        :where (full-rotation-p theta :full 4pi)))
   nil)
 
 ;; TODO: add a variant of this for symmetric applications of RZ
