@@ -44,10 +44,17 @@
 
 ;;; rewriting rules specialized to qubit types
 
+(defun full-rotation-p (param &key (full 2pi))
+  "Return T if PARAM is an integer multiple of FULL. PARAM may reasonably be of type CONSTANT or DOUBLE-FLOAT, otherwise return NIL."
+  (alexandria:when-let ((val (or (and (is-constant param)
+                                      (constant-value param))
+                                 (and (typep param 'double-float)
+                                      param))))
+    (double= (/ val full) (round (/ val full)))))
+
 (define-compiler eliminate-full-RX-rotations
     ((x ("RX" (theta) _)
-        :where (and (typep theta 'double-float)
-                    (double= (/ theta 2pi) (round (/ theta 2pi))))))
+        :where (full-rotation-p theta)))
   nil)
 
 (define-compiler normalize-RX-rotations
@@ -75,8 +82,7 @@
 
 (define-compiler eliminate-full-RZ-rotations
     ((x ("RZ" (theta) _)
-        :where (and (typep theta 'double-float)
-                    (double= (/ theta 2pi) (round (/ theta 2pi))))))
+        :where (full-rotation-p theta)))
   nil)
 
 (define-compiler normalize-RZ-rotations
@@ -175,12 +181,15 @@
       (inst "PISWAP" (list reduced-theta) p q))))
 
 (define-compiler eliminate-half-PISWAP
-    ((x ("PISWAP" (#.2pi) p q)))
+    ((x ("PISWAP" (theta) p q)
+        :where (and (full-rotation-p theta :full 2pi)
+                    (not (full-rotation-p theta :full 4pi)))))
   (inst "RZ" '(#.pi) p)
   (inst "RZ" '(#.pi) q))
 
 (define-compiler eliminate-full-PISWAP
-    ((x ("PISWAP" (#.4pi) _ _)))
+    ((x ("PISWAP" (theta) _ _)
+        :where (full-rotation-p theta :full 4pi)))
   nil)
 
 ;; TODO: add a variant of this for symmetric applications of RZ
@@ -300,8 +309,7 @@
 
 (define-compiler eliminate-full-CPHASE
     ((x ("CPHASE" (theta) _ _)
-        :where (and (typep theta 'double-float)
-                    (double= 0d0 (mod theta 2pi)))))
+        :where (full-rotation-p theta)))
   nil)
 
 (define-compiler normalize-CPHASE

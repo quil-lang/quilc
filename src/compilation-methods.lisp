@@ -385,5 +385,4 @@ Returns a value list: (processed-program, of type parsed-program
         (values
          processed-program
          topological-swaps
-         unpreserved-duration
-         )))))
+         unpreserved-duration)))))

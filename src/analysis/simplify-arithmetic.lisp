@@ -132,7 +132,7 @@ which fills in the COEFFICIENTS hash table with the memory references and their 
     (number
      (make-affine-representation de))
     (memory-ref
-     (make-affine-representation 0 de 1.0))
+     (make-affine-representation 0d0 de 1.0))
     (cons
      (destructuring-bind (op left &optional right) de
        (if (and (null right) (eq op '-))
@@ -173,29 +173,28 @@ AFFINE-REPRESENTATION                       (* 2.0 theta[0])
 
 (defun canonicalize-expression (de)
   "Given DE (a DELAYED-EXPRESSION), canonicalize it by converting it into its AFFINE-REPRESENTATION form and back into a DELAYED-EXPRESSION once again. Refer to the detailed documentation for the expression->affine-representation and affine-representation->expression functions for more info."
-  (make-delayed-expression (delayed-expression-params de)
-                           (delayed-expression-lambda-params de)
-                           (affine-representation->expression
-                            (expression->affine-representation
-                             (delayed-expression-expression de)))))
+  (evaluate-delayed-expression
+   (make-delayed-expression (delayed-expression-params de)
+                            (delayed-expression-lambda-params de)
+                            (affine-representation->expression
+                             (expression->affine-representation
+                              (delayed-expression-expression de))))))
 
 (defgeneric simplify-arithmetic (thing)
   (:documentation "Generic function that defines the underlying mechanics for the SIMPLIFY-ARITHMETIC transform. If this function is given a PARSED-PROGRAM, it recursively applies itself to the program's exectuable code. Otherwise, if this function is given a GATE-APPLICATION, it attempts to simplify the gate parameters by canonicalizing the arithmetic expressions they (potentially) contain.")
   (:method ((thing t))
     thing)
+  (:method ((thing constant))
+    thing)
+  (:method ((thing delayed-expression))
+    (handler-case
+        (canonicalize-expression thing)
+      (expression-not-linear () thing)
+      (expression-not-simplifiable () thing)))
   (:method ((thing gate-application))
     (let ((new-gate (copy-instance thing)))
       (setf (application-parameters new-gate)
-            (mapcar (lambda (de)
-                      (handler-case
-                          (typecase de
-                            (constant
-                             de)
-                            (delayed-expression
-                             (canonicalize-expression de))
-                            (otherwise de))
-                        (expression-not-linear () de)
-                        (expression-not-simplifiable () de)))
+            (mapcar #'simplify-arithmetic
                     (application-parameters new-gate)))
       new-gate))
   (:method ((thing parsed-program))
