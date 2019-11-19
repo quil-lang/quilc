@@ -656,16 +656,6 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                ;; additionally, we install a couple extra compilers as hax to make
                ;; the whole machine work. each such hak comes with an explanation,
                ;; and it would be preferable to work to make each hak unnecessary.
-               (cleaved-compilers
-                 (loop :for c :in sorted-compilers
-                       :if (occurrence-table-in-gateset-p (filter-occurrence-table-by-qubit-count
-                                                           (compiler-output-gates c)
-                                                           qubit-count)
-                                                          target-gateset)
-                         :collect c :into compilers-t
-                       :else
-                         :collect c :into compilers-nil
-                       :finally (return (append compilers-t compilers-nil))))
                (compilers-with-features
                  (append
                   ;; STATE-PREP-APPLICATION doesn't have a GATE-MATRIX, which causes
@@ -676,7 +666,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                      (list #'state-prep-1q-compiler))
                     ((= 2 qubit-count)
                      (list #'state-prep-2q-compiler)))
-                  cleaved-compilers)))
+                  sorted-compilers)))
           compilers-with-features)))))
 
 (defun compute-applicable-reducers (gateset)
