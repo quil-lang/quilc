@@ -46,6 +46,7 @@
                (:file "utilities")
                (:file "relabeling")
                (:file "matrix-operations")
+               (:file "csd")
                (:file "transformable-mixin")
                (:file "classical-memory")
                (:file "ast")
