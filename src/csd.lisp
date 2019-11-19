@@ -31,7 +31,7 @@
            (values magicl:matrix magicl:matrix))
 
   (multiple-value-bind (u sigma vh)
-      (magicl:svd matrix t)
+      (magicl:svd matrix :reduced t)
 
     (let* ((unitary (m* u vh))
            (hermitian (ecase mode
