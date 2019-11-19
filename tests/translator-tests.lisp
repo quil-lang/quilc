@@ -155,7 +155,8 @@
               parameter-assignments))))
 
 (defun %patch-mref-values (instr table)
-  (unless (quil::application-parameters instr)
+  (unless (and (typep instr 'gate-application)
+               (quil::application-parameters instr))
     (return-from %patch-mref-values instr))
   (let ((instr-new (quil::copy-instance instr)))
     (setf (quil::application-parameters instr-new)
@@ -310,4 +311,17 @@ RZ(2*gamma[0]) 0") (quil::build-8q-chip))))
     (is (= (length (quil::parsed-program-executable-code cphase-parametric-compiled))
            (length (quil::parsed-program-executable-code rz-parametric))))))
 
-
+(deftest test-modifier-compilers ()
+  (let ((text "DECLARE theta REAL ; DAGGER CONTROLLED FORKED RZ(1*theta, 2*theta) 1 0 2"))
+    (dolist (architecture '(:cz :iswap))
+      (let* ((quil::*compress-carefully* nil)
+             (orig (coerce (parsed-program-executable-code (quil::parse-quil text)) 'list))
+             (cpp (quil::expand-to-native-instructions (coerce (parsed-program-executable-code (quil::parse-quil text)) 'list)
+                                                       (quil::build-nq-fully-connected-chip 3 :architecture architecture)))
+             (table (a:plist-hash-table (list "theta" (random 2pi))
+                                        :test #'equalp)))
+        (is (quil::operator=
+             (quil::make-matrix-from-quil (mapcar (a:rcurry #'%patch-mref-values table)
+                                                  orig))
+             (quil::make-matrix-from-quil (mapcar (a:rcurry #'%patch-mref-values table)
+                                                  cpp))))))))

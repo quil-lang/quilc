@@ -398,6 +398,8 @@ used to specify CHIP-SPEC."
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
             'ucr-compiler-to-iswap))
+        (constantly 'undagger-rotation)
+        (constantly 'uncontrol-rotation)
         (constantly 'state-prep-1q-compiler)
         (constantly 'state-prep-2q-compiler)
         (constantly 'state-prep-4q-compiler)

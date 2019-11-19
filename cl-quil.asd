@@ -78,6 +78,7 @@
                              (:file "approx")
                              (:file "state-prep")
                              (:file "translators")
+                             (:file "modifiers")
                              (:file "optimal-2q")
                              ;; attic'd file / pedagogical purposes only
                              (:static-file "cs-compile")))
