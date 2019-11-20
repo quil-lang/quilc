@@ -151,7 +151,7 @@
 (defun compiler-hook (parsed-program
                       chip-specification
                       &key (protoquil nil)
-                           (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification)))
+                        (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification)))
   "Runs a full compiler pass on a parsed-program object.
 
 Returns a value list: (processed-program, of type parsed-program
@@ -182,6 +182,10 @@ Returns a value list: (processed-program, of type parsed-program
          (block-stack (list (list (entry-point cfg) nil)))
          (topological-swaps 0)
          (unpreserved-duration 0))
+
+    ;; In any rewiring scheme a preserved block must not touch dead
+    ;; qubits.
+    (check-preserved-blocks-skip-dead-qubits cfg chip-specification)
 
     (let ((*print-pretty* nil))
       (format *compiler-noise-stream* "COMPILER-HOOK: initial rewiring ~A~%" initial-rewiring))
@@ -278,7 +282,7 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (initial-l2p chip-schedule final-l2p)
                (do-greedy-temporal-addressing
-                 (coerce (basic-block-code blk) 'list)
+                   (coerce (basic-block-code blk) 'list)
                  chip-specification
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))

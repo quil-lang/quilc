@@ -410,19 +410,45 @@
      (let ((*read-default-float-format* 'double-float))
        (yason:parse s)))))
 
+(define-condition illegal-qubits-used-error (error)
+  ((illegal-qubits :initarg :illegal-qubits :reader illegal-qubits-used-error-illegal-qubits)
+   (instruction :initarg :instruction :reader illegal-qubits-used-error-instruction))
+  (:documentation "Error representing the use of an illegal qubit.")
+  (:report (lambda (c s)
+             (format s "Instruction '~/quil:instruction-fmt/' uses the illegal qubits ~{~A~^, ~}."
+                     (illegal-qubits-used-error-instruction c)
+                     (illegal-qubits-used-error-illegal-qubits c)))))
+
+(define-condition illegal-qubits-used-in-preserved-block-error (illegal-qubits-used-error)
+  ()
+  (:documentation "Error representing the use of an illegal qubit in a preserved block.")
+  (:report (lambda (c s)
+             (format s "Within a preserved block, instruction '~/quil:instruction-fmt/' uses the illegal qubits ~{~A~^, ~}."
+                     (illegal-qubits-used-error-instruction c)
+                     (illegal-qubits-used-error-illegal-qubits c)))))
+
+(defun check-instructions-skip-dead-qubits (instrs dead-qubits &key (condition-class 'illegal-qubits-used-error))
+  (map nil
+       (lambda (instr)
+         (when (typep instr 'application)
+           (let ((instr-dead-qubits (intersection (mapcar #'qubit-index (application-arguments instr))
+                                                  dead-qubits)))
+             (unless (endp instr-dead-qubits)
+               (error (make-condition condition-class :illegal-qubits dead-qubits :instruction instr))))))
+       instrs))
+
 (defun check-program-skips-dead-qubits (parsed-program chip-specification)
-  "Throws an assert when PARSED-PROGRAM's instructions, assumed flat,
-touch any qubits marked as dead in CHIP-SPECIFICATION."
-  (let ((dead-qubits (loop :for qubit-index :below (chip-spec-n-qubits chip-specification)
-                           :nconc (when (gethash "dead" (hardware-object-misc-data
-                                                         (chip-spec-nth-qubit chip-specification qubit-index)))
-                                    (list qubit-index)))))
-    (loop :for instr :across (parsed-program-executable-code parsed-program)
-          :do (when (typep instr 'application)
-                (let ((instr-dead-qubits (intersection (mapcar #'qubit-index (application-arguments instr))
-                                                       dead-qubits)))
-                  (assert (endp instr-dead-qubits)
-                          nil
-                          "Program instruction '~/quil:instruction-fmt/' attempts to use illegal qubits: ~{~A~^, ~}. Illegal qubits on this QPU: ~{~A~^, ~}."
-                          instr instr-dead-qubits dead-qubits))))))
+  "Errors if the PARSED-PROGRAM uses any qubits that are dead in the CHIP-SPECIFICATION."
+  (check-instructions-skip-dead-qubits (parsed-program-executable-code parsed-program)
+                                       (chip-spec-dead-qubits chip-specification)))
+
+(defun check-preserved-blocks-skip-dead-qubits (cfg chip-specification)
+  "Errors if any preserved block in the CFG uses any qubits that are dead in the CHIP-SPECIFICATION."
+  (let ((dead-qubits (chip-spec-dead-qubits chip-specification)))
+    (dolist (blk (cfg-blocks cfg))
+      (when (typep blk 'preserved-block)
+        (check-instructions-skip-dead-qubits (basic-block-code blk) dead-qubits
+                                             :condition-class 'illegal-qubits-used-in-preserved-block-error)))))
+
+
 
