@@ -434,7 +434,7 @@
            (let ((instr-dead-qubits (intersection (mapcar #'qubit-index (application-arguments instr))
                                                   dead-qubits)))
              (unless (endp instr-dead-qubits)
-               (error (make-condition condition-class :illegal-qubits dead-qubits :instruction instr))))))
+               (error (make-condition condition-class :illegal-qubits instr-dead-qubits :instruction instr))))))
        instrs))
 
 (defun check-program-skips-dead-qubits (parsed-program chip-specification)
