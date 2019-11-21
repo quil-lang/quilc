@@ -430,7 +430,7 @@
 (defun check-instructions-skip-dead-qubits (instrs dead-qubits &key (condition-class 'illegal-qubits-used-error))
   (map nil
        (lambda (instr)
-         (when (typep instr 'application)
+         (a:when-let ((qubits-used (qubits-used instr)))
            (let ((instr-dead-qubits (intersection (mapcar #'qubit-index (application-arguments instr))
                                                   dead-qubits)))
              (unless (endp instr-dead-qubits)
