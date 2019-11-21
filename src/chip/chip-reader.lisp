@@ -431,8 +431,7 @@
   (map nil
        (lambda (instr)
          (a:when-let ((qubits-used (qubits-used instr)))
-           (let ((instr-dead-qubits (intersection (mapcar #'qubit-index (application-arguments instr))
-                                                  dead-qubits)))
+           (let ((instr-dead-qubits (intersection qubits-used dead-qubits)))
              (unless (endp instr-dead-qubits)
                (error (make-condition condition-class :illegal-qubits instr-dead-qubits :instruction instr))))))
        instrs))
