@@ -7,8 +7,8 @@
 ;;; This file contains an analysis to compute the qubits used by a
 ;;; program.
 
-(defgeneric %qubits-used (isn)
-  (:documentation "Helper function to determine the qubits used by an instruction.")
+(defgeneric qubits-used (isn)
+  (:documentation "Helper function to determine the qubits used by a Quil instruction (classical or quantum), or a PARSED-PROGRAM.")
   (:method ((isn instruction))
     nil)
   (:method ((pseudo-isn jump-target))
@@ -23,13 +23,11 @@
                                 nil))
                     (application-arguments isn))))
   (:method ((isn reset-qubit))
-    (list (qubit-index (reset-qubit-target isn)))))
-
-(defun qubits-used (parsed-prog)
-  "A list of qubit indexes used by the program PARSED-PROGRAM."
-  (reduce #'nunion (parsed-program-executable-code parsed-prog)
-          :key #'%qubits-used
-          :initial-value nil))
+    (list (qubit-index (reset-qubit-target isn))))
+  (:method ((parsed-program parsed-program))
+    (reduce #'nunion (parsed-program-executable-code parsed-program)
+            :key #'qubits-used
+            :initial-value nil)))
 
 (defun qubit-relabeler (mapping)
   "Given a mapping, a sequence of elements q_1 q_2 ... q_n which represents the map q_i -> i, return a function whose lambda list is

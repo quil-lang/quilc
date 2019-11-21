@@ -164,7 +164,7 @@ is found, then return NIL."
        (return-from prog-rewiring-pragma nil)))))
 
 (defun %naively-applicable-p (instr chip-spec
-                              &aux (qubit-indices (%qubits-used instr)))
+                              &aux (qubit-indices (qubits-used instr)))
   "Return true if the given INSTR does not consume qubit arguments or if the qubit arguments correspond to a valid HARDWARE-OBJECT in CHIP-SPEC."
   (or (null qubit-indices)
       (and (not (null (lookup-hardware-object-by-qubits chip-spec qubit-indices)))

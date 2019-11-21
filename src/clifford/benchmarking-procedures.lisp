@@ -284,7 +284,7 @@
 Note: will raise an error if PARSED-QUIL contains instruction types
 other than APPLICATION, PRAGMA, or UNRESOLVED-APPLICATION."
   (loop :for instr :across (quil:parsed-program-executable-code parsed-quil)
-        :for qubits-used := (quil::%qubits-used instr)
+        :for qubits-used := (quil::qubits-used instr)
         :unless (or (typep instr 'quil:application)
                     (typep instr 'quil:pragma)
                     (and quil::*allow-unresolved-applications*
