@@ -92,3 +92,21 @@ STORE w y w
                               quil:classical-exclusive-or-octet/octet
                               quil:classical-load-real/real*/integer
                               quil:classical-store-bit*/integer/bit)))))
+
+(deftest test-classical-equality-immediate-types ()
+  (signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a BIT; EQ r a 1.0"))
+  (signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a OCTET; EQ r a 1.0"))
+  (signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a INTEGER; EQ r a 1.0"))
+  (signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a REAL; EQ r a 1"))
+
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a BIT; DECLARE b BIT; EQ r a b"))
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a BIT; EQ r a 1"))
+
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a OCTET; DECLARE b OCTET; EQ r a b"))
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a OCTET; EQ r a 1"))
+
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a INTEGER; DECLARE b INTEGER; EQ r a b"))
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a INTEGER; EQ r a 1"))
+
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a REAL; DECLARE b REAL; EQ r a b"))
+  (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a REAL; EQ r a 1.0")))

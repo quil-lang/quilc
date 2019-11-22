@@ -714,6 +714,7 @@ Each addressing mode will be a vector of symbols:
                                 (change-class instr ',typed-name)))
              (t (cerror "Return the original instruction."
                         "Could not specialize the type of ~A." instr)
+                ;; TODO This error is unhelpful.
                 instr))))
 
        ;; The mnemonic for this group of instructions.
