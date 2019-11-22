@@ -451,7 +451,7 @@
    :frame-definitions '())
   (:documentation "A representation of a parsed Quilt program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
-(defmethod print-parsed-program-generic ((pp parsed-quilt-program) stream)
+(defmethod print-parsed-program-generic ((pp parsed-quilt-program) (stream stream))
   (flet ((print-definitions (defns)
            (dolist (defn defns)
              (print-instruction defn stream)
