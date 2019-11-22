@@ -1623,7 +1623,7 @@ Examples:
 
 (defgeneric print-parsed-program-generic (parsed-program stream)
   (:documentation "Print the program PARSED-PROGRAM nicely to the stream STREAM.")
-  (:method ((pp parsed-program) stream)
+  (:method ((pp parsed-program) (stream stream))
     (flet ((print-definitions (defns)
              (dolist (defn defns)
                (print-instruction defn stream)
@@ -1639,6 +1639,9 @@ Examples:
 
       (print-instruction-sequence (parsed-program-executable-code pp) :stream stream))))
 
-(defun print-parsed-program (parsed-program &optional (s *standard-output*))
-  "Print the text of a PARSED-PROGRAM to the stream S."
-  (print-parsed-program-generic parsed-program s))
+(defun print-parsed-program (parsed-program &optional (stream *standard-output*))
+  "Print the text of a PARSED-PROGRAM to the stream STREAM."
+  (assert (output-stream-p stream) (stream) "Provided something that's not an output ~
+                                             stream to the STREAM argument of ~
+                                             PRINT-PARSED-PROGRAM.")
+  (print-parsed-program-generic parsed-program stream))
