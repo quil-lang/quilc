@@ -47,12 +47,13 @@
                      (memory-descriptor-length memory-descriptor))))
 
 (defun constant-or-mref-typep (obj quil-type memory-regions)
+  "Test whether OBJ (a CONSTANT or a MEMORY-REF) has a value that has type QUIL-TYPE (or one of those types if QUIL-TYPE is a list)."
   (etypecase obj
     (memory-ref
      (let ((memory-region (find-descriptor-for-mref obj memory-regions)))
-       (equalp quil-type (memory-descriptor-type memory-region))))
+       (member (memory-descriptor-type memory-region) (a:ensure-list quil-type))))
     (constant
-     (equalp quil-type (constant-value-type obj)))))
+     (member (constant-value-type obj) (a:ensure-list quil-type)))))
 
 (defun check-mref (obj)
   (unless (typep obj 'memory-ref)
@@ -116,6 +117,25 @@
          (quil-type-error "Assignment to INTEGER field from non-INTEGER ~A."
                           (classical-right-operand instr)))))))
 
+;;; From the Quil spec
+;; # Comparison
+;; EQ       r a b          # r := (a == b)
+;; GT       r a b          # r := (a > b)
+;; GE       r a b          # r := (a >= b)
+;; LT       r a b          # r := (a < b)
+;; LE       r a b          # r := (a <= b)
+;;          <bit> <bit> <bit>
+;;          <bit> <bit> <!int>
+;;          <bit> <oct> <oct>
+;;          <bit> <oct> <!int>
+;;          <bit> <int> <int>
+;;          <bit> <int> <!int>
+;;          <bit> <real> <real>
+;;          <bit> <real> <!real>
+;;
+;; We don't need to check if the RHS is a memref of a particular
+;; type. That is done by DEFINE-CLASSICAL-INSTRUCTION.
+
 (defun typecheck-conditional-instruction (instr memory-regions)
   (check-mref (classical-target instr))
   (unless (constant-or-mref-typep (classical-target instr) quil-bit memory-regions)
@@ -123,17 +143,29 @@
                      (classical-target instr)))
   (check-mref (classical-left-operand instr))
   (let ((mdesc (find-descriptor-for-mref (classical-left-operand instr)
-                                         memory-regions)))
-    (unless (or (constant-or-mref-typep (classical-right-operand instr)
-                                        (memory-descriptor-type mdesc)
-                                        memory-regions)
-                (and (equal quil-octet (memory-descriptor-type mdesc))
-                     (constant-or-mref-typep (classical-right-operand instr)
-                                             quil-integer
-                                             memory-regions)))
-      (quil-type-error "Conditional tests require type agreement in last two terms, but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/."
-                       (classical-left-operand instr)
-                       (classical-right-operand instr)))))
+                                         memory-regions))
+        (rop (classical-right-operand instr)))
+    (adt:match quil-type (memory-descriptor-type mdesc)
+      (quil-bit
+       (unless (constant-or-mref-typep rop (list quil-bit quil-integer) memory-regions)
+         (quil-type-error "Conditional test for left-hand operand of type BIT requires right-hand operand of type BIT or immediate INT but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/."
+                          (classical-left-operand instr)
+                          rop )))
+      (quil-real
+       (unless (constant-or-mref-typep rop quil-real memory-regions)
+         (quil-type-error "Conditional test for left-hand operand of type REAL requires right-hand operand of type REAL or immediate REAL but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/."
+                          (classical-left-operand instr)
+                          rop)))
+      (quil-octet
+       (unless (constant-or-mref-typep rop (list quil-octet quil-integer) memory-regions)
+         (quil-type-error "Conditional test for left-hand operand of type OCTET requires right-hand operand of type OCTET or immediate INTEGER but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/."
+                          (classical-left-operand instr)
+                          rop)))
+      (quil-integer
+       (unless (constant-or-mref-typep rop quil-integer memory-regions)
+         (quil-type-error "Conditional test for left-hand operand of type INTEGER requires right-hand operand of type INTEGER or immediate INTEGER but got ~/quil:instruction-fmt/ and ~/quil:instruction-fmt/."
+                          (classical-left-operand instr)
+                          rop))))))
 
 (defun walk-parameter-for-real-values (param memory-regions)
   (etypecase param
