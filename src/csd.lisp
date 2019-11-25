@@ -47,13 +47,13 @@
 If A = ⎢    ⎥, then  ⎢    ⎥ = ⎢        ⎥ ⎢    ⎥ V2ᴴ,
        ⎣ A4 ⎦        ⎣ A4 ⎦   ⎣     U2 ⎦ ⎣  C ⎦
 
-where U1, U2, and V2 are unitary and C^2 + S^2 = I. When the partition is p = q = 1, we have
+where U1, U2, and V2 are unitary and C^2 + S^2 = I. When the partition is P = Q = 1 (see documentation string for CSD below), we have
 
 ⎡ a1  A3 ⎤   ⎡ u1     ⎤ ⎡ c  -Sᵀ ⎤ ⎡ v1     ⎤H
 ⎢        ⎥ = ⎢        ⎥ ⎢        ⎥ ⎢        ⎥,
 ⎣ A2  A4 ⎦   ⎣     U2 ⎦ ⎣ S   C  ⎦ ⎣     V2 ⎦
 
-where c = cos θ, s = sin θ, Sᵀ = [ 0ᵀ s ], and
+where a1, u1, and v1 are complex numbers, c = cos θ, s = sin θ, Sᵀ = [ 0ᵀ s ], and
 
     ⎡ I   0 ⎤
 C = ⎢       ⎥.
@@ -89,19 +89,23 @@ The function returns U1, U2, C, S, and V2H."
 If A = ⎢        ⎥, then  ⎢        ⎥ = ⎢        ⎥ ⎢       ⎥ ⎢        ⎥,
        ⎣ A2  A4 ⎦        ⎣ A2  A4 ⎦   ⎣     U2 ⎦ ⎣ S   C ⎦ ⎣     V2 ⎦
 
-where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I. When the partition is p = q = 1, we have
+where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I. The values of P and Q determine the size of the partition of A or, in other words, the dimensions of the blocks A1, A2, A3, and A4.
+
+When the partition is P = Q = 1, we have
 
 ⎡ a1  A3 ⎤   ⎡ u1     ⎤ ⎡ c  -Sᵀ ⎤ ⎡ v1     ⎤H
 ⎢        ⎥ = ⎢        ⎥ ⎢        ⎥ ⎢        ⎥,
 ⎣ A2  A4 ⎦   ⎣     U2 ⎦ ⎣ S   C  ⎦ ⎣     V2 ⎦
 
-where c = cos θ, s = sin θ, Sᵀ = [ 0ᵀ s ], and
+where a1, u1, and, v1 are complex numbers, c = cos θ, s = sin θ, Sᵀ = [ 0ᵀ s ], and
 
     ⎡ I   0 ⎤
 C = ⎢       ⎥.
     ⎣ 0ᵀ  c ⎦
 
-The function returns the matrices U1, U2, V1H, V2H, and the list of principal angles."
+The function returns the matrices U1, U2, V1H, V2H, and the list of principal angles.
+
+See also http://www.netlib.org/lapack/explore-html/de/d0d/zuncsd_8f.html."
   (declare (type magicl:matrix matrix)
            (values magicl:matrix magicl:matrix magicl:matrix magicl:matrix list))
 
