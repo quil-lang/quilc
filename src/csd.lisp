@@ -49,13 +49,16 @@ If A = ⎢    ⎥, then  ⎢    ⎥ = ⎢        ⎥ ⎢    ⎥ V2ᴴ,
 
 where U1, U2, and V2 are unitary and C^2 + S^2 = I."
   ;; XXX update documentation.
+  (declare (type magicl:matrix a3 a4)
+           (values magicl:matrix magicl:matrix magicl:matrix magicl:matrix magicl:matrix))
+
   (multiple-value-bind (w1 h1)
       (polar-decomposition a3 :mode :unitary-hermitian)
 
     (multiple-value-bind (w2 h2)
         (polar-decomposition a4 :mode :unitary-hermitian)
 
-      (let ((b (m- h2 h1)))
+      (let ((b (m- h1 h2)))
         (multiple-value-bind (lambda2 v2)
             (magicl:hermitian-eig b)
           (declare (ignorable lambda2))
@@ -89,7 +92,7 @@ where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
             (p q)
             "This implementation of the CS decomposition supports equipartitions or partitions with (p, q) = (1, 1) only.")
 
-    (let ((equipartition-p (= p (/ m 2)))
+    (let ((equipartition-p (= p q (/ m 2)))
           (a1 (magicl:slice matrix 0 p 0 q))
           (a2 (magicl:slice matrix p m 0 q))
           (a3 (magicl:slice matrix 0 p q m))
@@ -98,11 +101,10 @@ where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
       (multiple-value-bind (u1 u2 c s v2h)
           (csd-2x1 a3 a4)
 
-        (let ((theta (map 'list
-                          (lambda (x y)
-                            (atan (realpart y) (realpart x)))
-                          (subseq (magicl:matrix-diagonal c) 0 p)
-                          (subseq (magicl:matrix-diagonal s) 0 p))))
+        (let ((theta (loop :for i :from (- m p p) :below (- m p)
+                           :for x := (realpart (magicl:ref c i i))
+                           :for y := (realpart (magicl:ref s i i))
+                           :collect (atan y x))))
 
           (multiple-value-bind (v1h y)
               (let ((z (m+ (m* c (magicl:conjugate-transpose u1) a1)
@@ -110,21 +112,13 @@ where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
                 (polar-decomposition z :mode :hermitian-unitary))
             (declare (ignorable y))
 
-            (flet ((make-complex-1x1-matrix (matrix)
-                     "Return complex 1x1 matrix whose sole entry is the first component of the first row of MATRIX."
-                     (magicl:make-complex-matrix 1 1 (list (magicl:ref matrix 0 0)))))
+            (values (if equipartition-p u1 (magicl:slice u1 0 1 (- m 2) (1- m)))
+                    u2
+                    (if equipartition-p v1h (magicl:slice v1h (- m 2) (1- m) 0 1))
+                    v2h
+                    theta)))))))
 
-              (values (if equipartition-p
-                          u1
-                          (make-complex-1x1-matrix u1))
-                      u2
-                      (if equipartition-p
-                          v1h
-                          (make-complex-1x1-matrix v1h))
-                      v2h
-                      theta))))))))
-
-(defparameter *lapack-csd* (if (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_" 'magicl.foreign-libraries:liblapack)
-                               #'magicl:lapack-csd
-                               #'csd)
+(defvar *lapack-csd* (if (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_" 'magicl.foreign-libraries:liblapack)
+                         #'magicl:lapack-csd
+                         #'csd)
   "Implementation of the CS decomposition suitable for use in Quilc. Allows us to replace ZUNCSD on systems whose LAPACK does not provide the function.")
