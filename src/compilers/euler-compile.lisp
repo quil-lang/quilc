@@ -28,7 +28,7 @@
          (let ((m ,(if prefix-quil
                        `(m* ,postfix-matrix (gate-matrix instr) ,prefix-matrix)
                        `(gate-matrix instr))))
-           (multiple-value-bind (,u0 ,u1 ,v0 ,v1 ,angles) (magicl:lapack-csd m 1 1)
+           (multiple-value-bind (,u0 ,u1 ,v0 ,v1 ,angles) (funcall *lapack-csd* m 1 1)
              (inst ,outer-gate `(,(* ,outer-prefactor
                                      (- (phase (magicl:ref ,v1 0 0))
                                         (phase (magicl:ref ,v0 0 0)))))
