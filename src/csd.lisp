@@ -5,7 +5,7 @@
 (in-package #:cl-quil)
 
 ;;; Compute the 2x2 Cosine-Sine decomposition of an unitary matrix using a
-;;; modification of the algorithm in: E. S. Gawlik, Yuji. Nakatsukasa, and
+;;; modification of the algorithm in: E. S. Gawlik, Y. Nakatsukasa, and
 ;;; B. D. Sutton, “A Backward Stable Algorithm for Computing the CS
 ;;; Decomposition via the Polar Decomposition,” SIAM J. Matrix Anal. Appl.,
 ;;; vol. 39, no. 3, pp. 1448–1469, Jan. 2018. DOI:10.1137/18M1182747
@@ -47,8 +47,19 @@
 If A = ⎢    ⎥, then  ⎢    ⎥ = ⎢        ⎥ ⎢    ⎥ V2ᴴ,
        ⎣ A4 ⎦        ⎣ A4 ⎦   ⎣     U2 ⎦ ⎣  C ⎦
 
-where U1, U2, and V2 are unitary and C^2 + S^2 = I."
-  ;; XXX update documentation.
+where U1, U2, and V2 are unitary and C^2 + S^2 = I. When the partition is p = q = 1, we have
+
+⎡ a1  A3 ⎤   ⎡ u1     ⎤ ⎡ c  -Sᵀ ⎤ ⎡ v1     ⎤H
+⎢        ⎥ = ⎢        ⎥ ⎢        ⎥ ⎢        ⎥,
+⎣ A2  A4 ⎦   ⎣     U2 ⎦ ⎣ S   C  ⎦ ⎣     V2 ⎦
+
+where c = cos θ, s = sin θ, Sᵀ = [ 0ᵀ s ], and
+
+    ⎡ I   0 ⎤
+C = ⎢       ⎥.
+    ⎣ 0ᵀ  c ⎦
+
+The function returns U1, U2, C, S, and V2H."
   (declare (type magicl:matrix a3 a4)
            (values magicl:matrix magicl:matrix magicl:matrix magicl:matrix magicl:matrix))
 
@@ -58,12 +69,12 @@ where U1, U2, and V2 are unitary and C^2 + S^2 = I."
     (multiple-value-bind (w2 h2)
         (polar-decomposition a4 :mode :unitary-hermitian)
 
-      (let ((b (m- h1 h2)))
+      (let ((b (m- h1 h2))) ; The sign convention ensures the eigenvalues are in the right order.
         (multiple-value-bind (lambda2 v2)
             (magicl:hermitian-eig b)
           (declare (ignorable lambda2))
 
-          (let* ((u1 (m- (m* w1 v2)))   ; Absorb the negative sign in the unitary matrix.
+          (let* ((u1 (m- (m* w1 v2))) ; Absorb the negative sign in the unitary matrix.
                  (u2 (m* w2 v2))
                  (v2h (magicl:conjugate-transpose v2))
                  (s (m* v2h h1 v2))
@@ -78,8 +89,19 @@ where U1, U2, and V2 are unitary and C^2 + S^2 = I."
 If A = ⎢        ⎥, then  ⎢        ⎥ = ⎢        ⎥ ⎢       ⎥ ⎢        ⎥,
        ⎣ A2  A4 ⎦        ⎣ A2  A4 ⎦   ⎣     U2 ⎦ ⎣ S   C ⎦ ⎣     V2 ⎦
 
-where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
-  ;; XXX update documentation.
+where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I. When the partition is p = q = 1, we have
+
+⎡ a1  A3 ⎤   ⎡ u1     ⎤ ⎡ c  -Sᵀ ⎤ ⎡ v1     ⎤H
+⎢        ⎥ = ⎢        ⎥ ⎢        ⎥ ⎢        ⎥,
+⎣ A2  A4 ⎦   ⎣     U2 ⎦ ⎣ S   C  ⎦ ⎣     V2 ⎦
+
+where c = cos θ, s = sin θ, Sᵀ = [ 0ᵀ s ], and
+
+    ⎡ I   0 ⎤
+C = ⎢       ⎥.
+    ⎣ 0ᵀ  c ⎦
+
+The function returns the matrices U1, U2, V1H, V2H, and the list of principal angles."
   (declare (type magicl:matrix matrix)
            (values magicl:matrix magicl:matrix magicl:matrix magicl:matrix list))
 
@@ -99,6 +121,9 @@ where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
           (a4 (magicl:slice matrix p m q m)))
 
       (multiple-value-bind (u1 u2 c s v2h)
+          ;; We modify Gawlik, Nakatsukasa, and Sutton's algorithm so that
+          ;; the 2x2 CS decomposition is obtained from the largest 2x1 CS
+          ;; decomposition (this only matters for the case p = q = 1).
           (csd-2x1 a3 a4)
 
         (let ((theta (loop :for i :from (- m p p) :below (- m p)
@@ -106,6 +131,12 @@ where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
                            :for y := (realpart (magicl:ref s i i))
                            :collect (atan y x))))
 
+          ;; In the case p = q = 1, we could find the entry of the 1x1 V1ᴴ
+          ;; matrix by exploiting the structure of the C matrix and the S
+          ;; vector shown in the documentation string. However, it turns out
+          ;; that we can abuse POLAR-DECOMPOSITION to yield the correct
+          ;; result, so we follow that path because it makes the code
+          ;; simpler.
           (multiple-value-bind (v1h y)
               (let ((z (m+ (m* c (magicl:conjugate-transpose u1) a1)
                            (m* s (magicl:conjugate-transpose u2) a2))))
@@ -121,4 +152,4 @@ where U1, U2, V1, and V2 are unitary and C^2 + S^2 = I."
 (defvar *lapack-csd* (if (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_" 'magicl.foreign-libraries:liblapack)
                          #'magicl:lapack-csd
                          #'csd)
-  "Implementation of the CS decomposition suitable for use in Quilc. Allows us to replace ZUNCSD on systems whose LAPACK does not provide the function.")
+  "Implementation of the CS decomposition suitable for use in Quilc. Allows us to replace ZUNCSD on systems whose LAPACK does not provide it.")
