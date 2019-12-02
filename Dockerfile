@@ -1,7 +1,7 @@
 # specify the dependency versions (can be overriden with --build_arg)
 ARG rpcq_version=2.7.3
 ARG qvm_version=1.10.0
-ARG quicklisp_version=2019-07-11
+ARG quicklisp_version=2019-11-30
 
 # use multi-stage builds to independently pull dependency versions
 FROM rigetti/rpcq:$rpcq_version as rpcq
