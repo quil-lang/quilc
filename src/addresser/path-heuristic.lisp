@@ -77,35 +77,34 @@ rewiring."
   (loop
     :with n-links := (chip-spec-n-links chip-spec)
     :with link-values := (make-array n-links :initial-element 0d0)
+    
+    :for gate :being :the :hash-keys :of gates-in-waiting
+    :for tier := (gethash gate gates-in-waiting)
+    :for tier-weight := (expt 0.5d0 tier)
 
-    :for tier :in gates-in-waiting
-    :and tier-index :below 3
-    :and tier-weight := 1d0 :then (* tier-weight 0.5d0)
+    :do (when (and (typep gate 'gate-application)
+                   (= 2 (length (application-arguments gate))))
+          (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
+            (let* ((p0 (apply-rewiring-l2p rewiring q0))
+                   (p1 (apply-rewiring-l2p rewiring q1)))
+              (unless p0 (rotatef p0 p1) (rotatef q0 q1))
+              ;; if both are unassigned, then we gain nothing by changing the
+              ;; rewiring, so ignore this gate
 
-    :do (dolist (gate tier)
-          (when (and (typep gate 'gate-application)
-                     (= 2 (length (application-arguments gate))))
-            (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
-              (let* ((p0 (apply-rewiring-l2p rewiring q0))
-                     (p1 (apply-rewiring-l2p rewiring q1)))
-                (unless p0 (rotatef p0 p1) (rotatef q0 q1))
-                ;; if both are unassigned, then we gain nothing by changing the
-                ;; rewiring, so ignore this gate
+              (when p0
+                ;; otherwise at least one is assigned
 
-                (when p0
-                  ;; otherwise at least one is assigned
+                (unless p1
+                  ;; find a position for the other qubit
+                  (setf p1 (a:extremum
+                            (delete-if (lambda (p) (apply-rewiring-p2l rewiring p))
+                                       (a:iota (rewiring-length rewiring)))
+                            #'<
+                            :key (lambda (p) (aref qq-distances p0 p))))
+                  (rewiring-assign rewiring q1 p1))
 
-                  (unless p1
-                    ;; find a position for the other qubit
-                    (setf p1 (a:extremum
-                              (delete-if (lambda (p) (apply-rewiring-p2l rewiring p))
-                                         (a:iota (rewiring-length rewiring)))
-                              #'<
-                              :key (lambda (p) (aref qq-distances p0 p))))
-                    (rewiring-assign rewiring q1 p1))
-
-                  (update-links-by-path chip-spec qq-distances p0 p1 link-values
-                                        :weight-on tier-weight :path-type :move-adj)
-                  (update-links-by-path chip-spec qq-distances p1 p0 link-values
-                                        :weight-on tier-weight :path-type :move-adj))))))
+                (update-links-by-path chip-spec qq-distances p0 p1 link-values
+                                      :weight-on tier-weight :path-type :move-adj)
+                (update-links-by-path chip-spec qq-distances p1 p0 link-values
+                                      :weight-on tier-weight :path-type :move-adj)))))
     :finally (return (select-swap-by-values chip-spec link-values rewirings-tried rewiring))))

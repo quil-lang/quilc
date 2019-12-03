@@ -277,6 +277,8 @@
   "Helper function for APPEND-INSTRUCTIONS-TO-LSCHEDULE, called when the top instruction of INSTRS is an instance of PRAGMA COMMUTING_BLOCKS. Consumes items from INSTRS until PRAGMA END_COMMUTING_BLOCKS is encountered, and inserts the intervening BLOCKs into LSCHEDULE as instances of APPLICATION-THREAD-INVOCATION."
   (labels ((process-blocks-into-lists (instrs acc)
              (cond
+               ((endp instrs)
+                (error "Unexpected end inside of PRAGMA COMMUTING_BLOCKS."))
                ((typep (first instrs) 'pragma-commuting-blocks)
                 nil)
                ((typep (first instrs) 'pragma-end-commuting-blocks)
@@ -534,40 +536,6 @@ mapping instructions to their tags. "
       (walk-graph-with-candidates (lscheduler-topmost-instructions lschedule))
       (values max-distance distance-hash-table))))
 
-(defun lscheduler-2q-tiers (lschedule)
-  (flet
-      ((2q-application-p (instr)
-         (and (typep instr 'application)
-              (= 2 (length (application-arguments instr))))))
-    (multiple-value-bind (max-value value-hash)
-        (lscheduler-walk-graph lschedule
-                               :base-value 0
-                               :bump-value (lambda (instr value)
-                                             (if (2q-application-p instr) (1+ value) value))
-                               :test-values #'max)
-      (when value-hash
-        (let ((tier-array (make-array max-value :initial-element nil)))
-          (dohash ((key val) value-hash)
-            (when (2q-application-p key)
-              (push key (aref tier-array val))))
-          (coerce tier-array 'list))))))
-
-;; TODO: it might be nice to supply a max-depth optional argument. this will
-;;       necessitate modifying LSCHEDULER-WALK-GRAPH above to support early termination.
-(defun lscheduler-instruction-tiers (lschedule)
-  (multiple-value-bind (max-value value-hash)
-      (lscheduler-walk-graph lschedule
-                             :base-value 0
-                             :bump-value (lambda (instr value)
-                                           (declare (ignore instr))
-                                           (1+ value))
-                             :test-values #'max)
-    (when value-hash
-      (let ((tier-array (make-array max-value :initial-element nil)))
-        (dohash ((key val) value-hash)
-          (push key (aref tier-array val)))
-        (coerce tier-array 'list)))))
-
 (defun lscheduler-calculate-duration (lschedule chip-spec)
   (flet ((duration-bumper (instr value)
            (multiple-value-bind (order address obj)
@@ -598,51 +566,48 @@ mapping instructions to their tags. "
   (+ (length (lscheduler-topmost-instructions lschedule))
      (hash-table-count (lscheduler-earlier-instrs lschedule))))
 
+(defun lscheduler-calculate-log-fidelity (lschedule chip-spec)
+  (labels
+      ((get-fidelity (instr)
+         (labels ((warn-and-skip (instr)
+                    (format *compiler-noise-stream* "Unknown fidelity for ~/cl-quil::instruction-fmt/. Skipping." instr)
+                    (return-from get-fidelity 0d0)))
+           (let (fidelity)
+             (typecase instr
+               (measure
+                (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
+                       (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
+                                           (hardware-object-gate-information qubit-obj))))
+                  (unless specs-obj
+                    (warn-and-skip instr))
+                  (setf fidelity (gate-record-fidelity specs-obj))))
+               (application
+                (let ((obj (lookup-hardware-object chip-spec instr)))
+                  (unless obj
+                    (warn-and-skip instr))
+                  (let ((specs-hash (hardware-object-gate-information obj)))
+                    (unless specs-hash (warn-and-skip instr))
+                    (dohash ((key val) specs-hash)
+                      (when (binding-subsumes-p key (get-binding-from-instr instr))
+                        (setf fidelity (gate-record-fidelity val))))
+                    (unless fidelity (warn-and-skip instr)))))
+               (otherwise
+                (warn-and-skip instr)))
+             (expt (log fidelity) 2)))))
+    (let ((running-fidelity 0d0))
+      (dolist (instr (lscheduler-first-instrs lschedule))
+        (unless (gethash instr (lscheduler-earlier-instrs lschedule))
+          (incf running-fidelity (get-fidelity instr))))
+      (maphash (lambda (instr val)
+                 (declare (ignore val))
+                 (incf running-fidelity (get-fidelity instr)))
+               (lscheduler-earlier-instrs lschedule))
+      (sqrt running-fidelity))))
+
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
-  (labels ((fidelity-combinator (val1 val2)
-             (* val1 val2))
-           (fidelity-bumper (instr value)
-             (flet ((warn-and-skip (instr)
-                      (format *compiler-noise-stream*
-                              "Fidelity not known for the following gate: ~/quil:instruction-fmt/. Assuming ideal.~%"
-                              instr)
-                      (return-from fidelity-bumper value)))
-               (let (fidelity)
-                 (typecase instr
-                   (measure
-                    (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                           (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
-                                               (hardware-object-gate-information qubit-obj))))
-                      (unless specs-obj
-                        (warn-and-skip instr))
-                      (setf fidelity (gate-record-fidelity specs-obj))))
-                   (application
-                    (let ((obj (lookup-hardware-object chip-spec instr)))
-                      (unless obj
-                        (warn-and-skip instr))
-                      (let ((specs-hash (hardware-object-gate-information obj)))
-                        (unless specs-hash (warn-and-skip instr))
-                        (dohash ((key val) specs-hash)
-                          (when (binding-subsumes-p key (get-binding-from-instr instr))
-                            (setf fidelity (gate-record-fidelity val))))
-                        (unless fidelity (warn-and-skip instr)))))
-                   (otherwise
-                    (warn-and-skip instr)))
-                 (* value
-                    (exp (- (* (log fidelity) (log fidelity)))))))))
-    ;; actual entry point
-    (multiple-value-bind (max-value value-hash)
-        (lscheduler-walk-graph lschedule
-                               :base-value 1d0
-                               :bump-value #'fidelity-bumper
-                               :test-values #'fidelity-combinator)
-      (declare (ignore max-value))
-      (loop :with fidelity := 1d0
-            :for instr :in (lscheduler-last-instrs lschedule)
-            :do (setf fidelity
-                      (fidelity-combinator (fidelity-bumper instr 1d0)
-                                           (* fidelity (gethash instr value-hash)))) 
-            :finally (return (exp (- (sqrt (- (log fidelity))))))))))
+  (multiple-value-bind (max-value value-hash)
+      (lscheduler-calculate-log-fidelity lschedule chip-spec)
+    (values (exp (- (sqrt max-value))) value-hash)))
 
 (defun lscheduler-all-instructions (lschedule)
   (a:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))

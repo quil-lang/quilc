@@ -304,15 +304,6 @@ used to specify CHIP-SPEC."
     (when (member ':cnot type)
       (vector-push-extend #'CNOT-to-flipped-CNOT
                           (hardware-object-compilation-methods obj)))
-    
-    ;; based on the optimal 2Q compiler, tag this hardware object with the
-    ;; longest duration any compiled sequence of instructions could possibly
-    ;; take to run on it.
-    (when (or (member ':cz type)
-              (member ':iswap type))
-      ;; TODO: compute this based on duration data
-      (setf (gethash "time-bound" (hardware-object-misc-data obj))
-            #.(+ (* 3 150) (* 6 9)))) ; this is the maximum amt of time that a 2Q program might take
     ;; return the link
     obj))
 
@@ -365,14 +356,11 @@ used to specify CHIP-SPEC."
 ;;; maintaining the appropriate interrelations).
 (defvar *global-compilers*
   (list (constantly 'swap-to-native-swaps)
+        (constantly 'cz-to-native-czs)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':cz)
             'cnot-to-native-cnots))
-        (lambda (chip-spec arch)
-          (declare (ignore chip-spec))
-          (when (optimal-2q-target-meets-requirements arch ':cz)
-            'cz-to-native-czs))
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
           (when (optimal-2q-target-meets-requirements arch ':iswap)
@@ -405,18 +393,23 @@ used to specify CHIP-SPEC."
         (constantly 'state-prep-4q-compiler)
         (constantly 'state-prep-trampolining-compiler)
         (constantly 'recognize-ucr)
+        (constantly 'nearest-circuit-of-depth-0)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))
-          (a:curry 'approximate-2q-compiler
-                   (append (list #'nearest-circuit-of-depth-0)
-                           (when (optimal-2q-target-meets-requirements arch ':cz)
-                             (list 'nearest-cz-circuit-of-depth-1
-                                   'nearest-cz-circuit-of-depth-2
-                                   'nearest-cz-circuit-of-depth-3))
-                           (when (optimal-2q-target-meets-requirements arch ':iswap)
-                             (list 'nearest-iswap-circuit-of-depth-1
-                                   'nearest-iswap-circuit-of-depth-2
-                                   'nearest-iswap-circuit-of-depth-3)))))
+          (when (optimal-2q-target-meets-requirements arch ':iswap)
+            'nearest-iswap-circuit-of-depth-1))
+        (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
+          (when (optimal-2q-target-meets-requirements arch ':iswap)
+            'nearest-iswap-circuit-of-depth-2))
+        (lambda (chip-spec arch)
+          (declare (ignore chip-spec))
+          (when (optimal-2q-target-meets-requirements arch ':iswap)
+            'nearest-iswap-circuit-of-depth-3))
+        (constantly 'nearest-cz-circuit-of-depth-1)
+        (constantly 'nearest-cz-circuit-of-depth-2)
+        (constantly 'nearest-cz-circuit-of-depth-3)
+        (constantly 'canonical-decomposition)
         (constantly 'qs-compiler))
   "List of functions taking a CHIP-SPECIFICATION and an architecture specification, and returns an instruction compiler if applicable to the given specs or otherwise returns nil.
 

@@ -82,11 +82,22 @@
 (defun calculate-instructions-duration (instructions chip-specification)
   "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
   (let ((lschedule (make-lscheduler)))
-    ; load up the logical schedule
+    ;; load up the logical schedule
     (append-instructions-to-lschedule lschedule instructions)
-    ; sift through it for durations
+    ;; sift through it for durations
     (lscheduler-calculate-duration lschedule chip-specification)))
 
+(defun calculate-instructions-log-fidelity (instructions chip-specification)
+  "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
+  (let ((lschedule (make-lscheduler)))
+    ;; load up the logical schedule
+    (append-instructions-to-lschedule lschedule instructions)
+    ;; sift through it for fidelities
+    (lscheduler-calculate-log-fidelity lschedule chip-specification)))
+
+(defun calculate-instructions-fidelity (instructions chip-specification)
+  "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
+  (exp (- (calculate-instructions-log-fidelity instructions chip-specification))))
 
 (defun find-noncommuting-instructions (node)
   "Return at most *REWRITING-PEEPHOLE-SIZE* of the earliest instructions below NODE,
@@ -231,7 +242,7 @@ other's."
   (labels
       ( ;; utility for calculating how many instructions a rewriting rule requests
        (rewriting-rule-count (compiler)
-         (length (cleave-options (compiler-bindings compiler))))
+         (length (compiler-bindings compiler)))
        
        ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
@@ -248,38 +259,43 @@ other's."
        ;; of the new node (so that the outer loop can rewind). if none applies,
        ;; announce failure (so that the outer loop can step ahead by one).
        (apply-rules (rewrite-rules nodes-for-inspection)
-         (loop :for rule :across rewrite-rules :do
-           ;; make sure we have enough terms, then apply the rule's consumer
-           (with-simple-restart (try-next-compiler "Ignore this error and try the next rewrite rule in the list.")
-             (handler-case
-                 (a:when-let*
-                     ((relevant-nodes-for-inspection
-                       (and (>= (length nodes-for-inspection) (rewriting-rule-count rule))
-                            ;; TODO: consider calculating this subseq only once.
-                            (subseq nodes-for-inspection 0 (rewriting-rule-count rule)))))
-                   (let ((output
-                           (apply rule
-                                  (append
-                                   (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection)
-                                   (list ':context (peephole-rewriter-node-context
-                                                    (peephole-rewriter-node-prev
-                                                     (first relevant-nodes-for-inspection))))))))
-                     (format *compiler-noise-stream*
-                             "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~A.~%"
-                             (compiler-name rule))
-                     ;; if the rule was triggered, splice it in and remove
-                     ;; all of the instructions that the rule touched.
-                     ;;
-                     ;; NOTE: a delicate point here is *where* the new
-                     ;; instructions ought to be inserted. to avoid sliding
-                     ;; any noncommuting instructions past each other, we
-                     ;; pick a 'bottleneck' instruction.
-                     (let ((insertion-point (find-safe-insertion-node relevant-nodes-for-inspection))
-                           (new-node (rewind-node (first nodes-for-inspection) *rewriting-peephole-size*)))
-                       (splice-instrs-in-at-node output insertion-point)
-                       (mapc #'delete-node relevant-nodes-for-inspection)
-                       (return-from apply-rules new-node))))
-               (compiler-does-not-apply () nil)))))
+         (let* ((number-of-nodes-for-inspection (length nodes-for-inspection))
+                (subsequences-for-inspection (make-array (1+ number-of-nodes-for-inspection)
+                                                         :initial-element nil)))
+           (loop :for rule :across rewrite-rules
+                 :for rule-count := (rewriting-rule-count rule) :do
+             ;; make sure we have enough terms, then apply the rule's consumer
+             (with-simple-restart (try-next-compiler "Ignore this error and try the next rewrite rule in the list.")
+               (handler-case
+                   (a:when-let*
+                       ((relevant-nodes-for-inspection
+                         (and (>= number-of-nodes-for-inspection rule-count)
+                              (or (aref subsequences-for-inspection rule-count)
+                                  (setf (aref subsequences-for-inspection rule-count)
+                                        (subseq nodes-for-inspection 0 rule-count))))))
+                     (let ((output
+                             (apply rule
+                                    (append
+                                     (mapcar #'peephole-rewriter-node-instr relevant-nodes-for-inspection)
+                                     (list ':context (peephole-rewriter-node-context
+                                                      (peephole-rewriter-node-prev
+                                                       (first relevant-nodes-for-inspection))))))))
+                       (format *compiler-noise-stream*
+                               "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~A.~%"
+                               (compiler-name rule))
+                       ;; if the rule was triggered, splice it in and remove
+                       ;; all of the instructions that the rule touched.
+                       ;;
+                       ;; NOTE: a delicate point here is *where* the new
+                       ;; instructions ought to be inserted. to avoid sliding
+                       ;; any noncommuting instructions past each other, we
+                       ;; pick a 'bottleneck' instruction.
+                       (let ((insertion-point (find-safe-insertion-node relevant-nodes-for-inspection))
+                             (new-node (rewind-node (first nodes-for-inspection) *rewriting-peephole-size*)))
+                         (splice-instrs-in-at-node output insertion-point)
+                         (mapc #'delete-node relevant-nodes-for-inspection)
+                         (return-from apply-rules new-node))))
+                 (compiler-does-not-apply () nil))))))
 
        ;; main loop for the peephole rewriter. for any particular node, it
        ;; assembles a list of instructions which might be subject to rewriting

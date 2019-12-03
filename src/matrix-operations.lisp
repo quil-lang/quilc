@@ -199,30 +199,39 @@ as needed so that they are the same size."
 
 (defun orthonormalize-matrix (m)
   "Applies Gram-Schmidt to the columns of a full rank square matrix to produce a unitary matrix."
+  (declare (optimize (speed 3)))
   ;; consider each column
   (dotimes (j (magicl:matrix-cols m))
     ;; consider each preceding column, which together form an orthonormal set
     (dotimes (jp j)
       ;; compute the dot product of the columns...
-      (let ((scalar
-              (loop :for i :below (magicl:matrix-rows m)
-                    :sum (* (magicl:ref m i j)
-                            (conjugate (magicl:ref m i jp))))))
+      (let ((scalar #C(0d0 0d0)))
+        (declare (type (complex double-float) scalar))
+        (dotimes (i (magicl:matrix-rows m))
+          (let ((mij (magicl:ref m i j))
+                (mijp (magicl:ref m i jp)))
+            (declare (type (complex double-float) mij mijp))
+            (incf scalar (* mij (conjugate mijp)))))
         ;; ... and do the subtraction.
         (dotimes (i (magicl:matrix-rows m))
-          (setf (magicl:ref m i j)
-                (- (magicl:ref m i j)
-                   (* scalar
-                      (magicl:ref m i jp)))))))
+          (let ((mij (magicl:ref m i j))
+                (mijp (magicl:ref m i jp)))
+            (declare (type (complex double-float) mij mijp))
+            (setf (magicl:ref m i j)
+                  (- mij (* scalar mijp)))))))
     ;; now j is orthogonal to the things that came before it. normalize it.
-    (let ((scalar
-            (sqrt
-             (loop :for i :below (magicl:matrix-rows m)
-                   :sum (* (abs (magicl:ref m i j))
-                           (abs (magicl:ref m i j)))))))
+    (let ((scalar 0d0))
+      (declare (type (double-float 0d0) scalar))
       (dotimes (i (magicl:matrix-rows m))
-        (setf (magicl:ref m i j)
-              (/ (magicl:ref m i j) scalar)))))
+        (let ((mij (magicl:ref m i j)))
+          (declare (type (complex double-float) mij))
+          (incf scalar (abs (* mij mij)))))
+      (setf scalar (sqrt scalar))
+      (dotimes (i (magicl:matrix-rows m))
+        (let ((mij (magicl:ref m i j)))
+          (declare (type (complex double-float) mij))
+          (setf (magicl:ref m i j)
+                (/ mij scalar))))))
   m)
 
 (defun kron-matrix-up (matrix n)

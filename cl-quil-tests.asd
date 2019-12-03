@@ -46,4 +46,5 @@
                (:file "benchmarking-procedures-tests")
                (:file "typed-memory-tests")
                (:file "approximation-tests")
-               (:file "csd-tests")))
+               (:file "csd-tests")
+               (:file "addresser-tests")))

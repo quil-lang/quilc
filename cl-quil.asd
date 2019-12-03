@@ -108,10 +108,12 @@
                              (:file "initial-rewiring")
                              (:file "logical-schedule")
                              (:file "outgoing-schedule")
-                             (:file "cost-function")
                              (:file "astar-rewiring-search")
                              (:file "path-heuristic")
-                             (:file "temporal-addresser")))
+                             (:file "addresser-common")
+                             (:file "embed-swap")
+                             (:file "temporal-addresser")
+                             (:file "fidelity-addresser")))
                (:module "compressor"
                 :serial t
                 :components ((:file "compressor-configuration")

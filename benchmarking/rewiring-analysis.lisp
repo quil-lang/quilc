@@ -6,6 +6,11 @@
 
 (in-package #:cl-quil-benchmarking)
 
+(defun seed-random-state ()
+  #+sbcl (sb-ext:seed-random-state 1)
+  #+ecl  (make-random-state 1)
+  #-(or sbcl ecl) (error "don't know how to seed random state."))
+
 (defun make-graph (num-nodes &rest paths)
   "Creates a graph from paths"
   (let ((adj (make-array num-nodes :initial-element nil)))
@@ -123,39 +128,44 @@
 
 (defun measure-performance (assignments
                             &key (progs (rewiring-test-files))
-                                 (chips (rewiring-test-chips))
-                                 (break-on-error t))
+                              (chips (rewiring-test-chips))
+                              (break-on-error t))
   (labels
-      ((get-prog (prog-source)
+      ((get-prog (prog-source chip)
          (typecase prog-source
            (function
-            (funcall prog-source))
+            (funcall prog-source chip))
            (otherwise
             (read-quil-file prog-source))))
 
        (by-assignment (prog-source chip assn)
          (handler-bind
              ((simple-error
-               (lambda (e)
-                 (when break-on-error
-                   (break "~A" e))
-                 (return-from by-assignment (list nil nil 1)))))
-           (funcall assn (lambda ()
-                           (rest (multiple-value-list (compiler-hook (get-prog prog-source) chip)))))))
+                (lambda (e)
+                  (when break-on-error
+                    (break "~A" e))
+                  (return-from by-assignment (list nil nil 1)))))
+           (let* ((progm (get-prog prog-source chip))
+                  (max-needed (apply #'max (quil::prog-used-qubits progm))))
+             (when (< max-needed
+                      (quil::chip-spec-n-qubits chip))
+               (funcall assn (lambda ()
+                               (multiple-value-list (compiler-hook (get-prog prog-source chip) chip))))))))
 
        (by-chip (prog-source chip)
          (loop
            :for (label assn) :on assignments :by #'cddr
-           :for (swaps duration elapsed) := (by-assignment prog-source chip assn)
-           :nconc (list label (list swaps duration elapsed))))
+           :for (compiled-program swaps duration elapsed) := (by-assignment prog-source chip assn)
+           :for fidelity := (when compiled-program
+                              (quil::calculate-instructions-fidelity
+                               (coerce (quil::parsed-program-executable-code compiled-program) 'list)
+                               chip))
+           :nconc (list label (list swaps duration elapsed fidelity))))
 
        (by-prog (prog-source)
          (loop
-           :with max-needed := (apply #'max (quil::prog-used-qubits (get-prog prog-source)))
-           :for (label chip) :in chips
-           :for n-qubits := (quil::chip-spec-n-qubits chip)
-           :when (< max-needed (quil::chip-spec-n-qubits chip))
-             :nconc (list label (by-chip prog-source chip)))))
+           :for (label . chip) :in chips
+           :nconc (list label (by-chip prog-source chip)))))
 
     (loop
       :for prog-source :in progs
@@ -184,38 +194,205 @@
    :executable-code (concatenate
                      'vector
                      ;; force start with the identity rewiring
-                     (list (make-instance 'application-force-rewiring :target initial))
+                     (list (make-instance 'quil::application-force-rewiring :target initial))
 
                      ;; force end with the desired rewiring
-                     (list (make-instance 'application-force-rewiring :target target)))))
+                     (list (make-instance 'quil::application-force-rewiring :target target)))))
 
 (defun generate-random-rewiring-prog (n-qubits state)
-  (let ((*random-state* #+sbcl (sb-ext:seed-random-state state)
-                        #+ecl  (make-random-state state)
-                        #-(or sbcl ecl) (error "don't know how to seed random state")))
+  (let ((*random-state* (seed-random-state)))
     (make-rewiring-prog (quil::generate-random-rewiring n-qubits))))
+
+(defun generate-ring-prog (n-qubits state &key (random-unitaries nil))
+  (declare (ignore state))
+  (assert (>= n-qubits 3))
+  (make-instance
+   'parsed-program
+   :executable-code (concatenate
+                     'vector
+                     (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
+                     (when (null random-unitaries)
+                       (list (make-instance 'quil::pragma-commuting-blocks)))
+                     (loop :for i :below n-qubits
+                           :when (null random-unitaries)
+                             :collect (make-instance 'quil::pragma-block)
+                           :if (null random-unitaries)
+                             :collect (quil::build-gate "CZ" () i (mod (1+ i) n-qubits))
+                           :else
+                             :collect (quil::anon-gate
+                                       "U" (quil::random-special-unitary 4) i (mod (1+ i) n-qubits))
+                           :when (null random-unitaries)
+                             :collect (make-instance 'quil::pragma-end-block))
+                     (when (null random-unitaries)
+                       (list (make-instance 'quil::pragma-end-commuting-blocks))))))
+
+(defun generate-star-prog (n-qubits state &key (random-unitaries nil))
+  (declare (ignore state))
+  (assert (>= n-qubits 3))
+  (make-instance
+   'parsed-program
+   :executable-code (concatenate
+                     'vector
+                     (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
+                     (when (null random-unitaries)
+                       (list (make-instance 'quil::pragma-commuting-blocks)))
+                     (loop :for i :from 1 :to (1- n-qubits)
+                           :when (null random-unitaries)
+                             :collect (make-instance 'quil::pragma-block)
+                           :if (null random-unitaries)
+                             :collect (quil::build-gate "CZ" () 0 i)
+                           :else
+                             :collect (quil::anon-gate
+                                       "U" (quil::random-special-unitary 4) 0 i)
+                           :when (null random-unitaries)
+                             :collect (make-instance 'quil::pragma-end-block))
+                     (when (null random-unitaries)
+                       (list (make-instance 'quil::pragma-end-commuting-blocks))))))
+
+(defun generate-handshake-prog (n-qubits state chip &key (random-unitaries nil))
+  (declare (ignore state))
+  (let* ((pairs (loop :with live-qubits := (quil::chip-spec-live-qubits chip)
+                      :for qi :in live-qubits
+                      :for i :from 0
+                      :when (< i n-qubits)
+                        :nconc (loop :for qj :in live-qubits
+                                     :when (= qi qj)
+                                       :return pairs
+                                     :collect `(,qi ,qj) :into pairs)))
+         (perm (cl-permutation:random-perm (length pairs)))
+         (pairs (cl-permutation:permute perm pairs)))
+    (make-instance
+     'parsed-program
+     :executable-code (concatenate
+                       'vector
+                       (list (make-instance 'quil::pragma-initial-rewiring :rewiring-type ':partial))
+                       (when (null random-unitaries)
+                         (list (make-instance 'quil::pragma-commuting-blocks)))
+                       (loop :for (qi qj) :in pairs
+                             :when (null random-unitaries)
+                               :collect (make-instance 'quil::pragma-block)
+                             :if (null random-unitaries)
+                               :collect (quil::build-gate "CZ" () qi qj)
+                             :else
+                               :collect (quil::anon-gate
+                                         "U" (quil::random-special-unitary 4) qi qj)
+                             :when (null random-unitaries)
+                               :collect (make-instance 'quil::pragma-end-block))
+                       (when (null random-unitaries)
+                         (list (make-instance 'quil::pragma-end-commuting-blocks)))))))
 
 (defun measure-rewiring-swap-search (assn &rest args
                                           &key break-on-error include-runtime
                                                (rewiring-qubits 20)
-                                               (chips (rewiring-test-chips)))
+                                               (chips (rewiring-test-chips))
+                                               (trials 20))
   (declare (ignore break-on-error include-runtime))
   (remf args :rewiring-qubits)
+  (remf args :trials)
   (setf (getf args :chips)
-        (loop :for (name . chip) :in chips
+        (loop :for (name chip) :in chips
               :when (= (quil::chip-spec-n-qubits chip) rewiring-qubits) :collect (cons name chip)))
   (apply #'measure-performance assn
          :progs (loop
-                  :for i :below 20
+                  :for i :below trials
                   :collect (let ((curval i))
-                             (lambda () (generate-random-rewiring-prog rewiring-qubits curval))))
+                             (lambda (chip) (declare (ignore chip))
+                               (generate-random-rewiring-prog rewiring-qubits curval))))
+         args))
+
+(defun measure-ring-prog-performance (assn &rest args
+                                           &key break-on-error include-runtime
+                                                (n-qubits 20)
+                                                (chips (rewiring-test-chips))
+                                                (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
+  (apply #'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :nconc (loop :for j :from 3 :to n-qubits
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (declare (ignore chip))
+                                            (generate-ring-prog
+                                             j 0)))))
+         args))
+
+(defun measure-star-prog-performance (assn &rest args
+                                           &key break-on-error include-runtime
+                                                (n-qubits 20)
+                                                (chips (rewiring-test-chips))
+                                                (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (quil::chip-spec-n-qubits chip) n-qubits) :collect (cons name chip)))
+  (apply #'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :nconc (loop :for j :from 3 :to n-qubits
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (declare (ignore chip))
+                                            (generate-star-prog
+                                             j 0)))))
+         args))
+
+(defun measure-handshake-prog-performance (assn &rest args
+                                                &key break-on-error include-runtime
+                                                     (n-qubits 20)
+                                                     (chips (rewiring-test-chips))
+                                                     (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (length (quil::chip-spec-live-qubits chip)) n-qubits)
+                :collect (cons name chip)))
+  (print (getf args :chips))
+  (apply #'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :nconc (loop :for j :from 2 :to n-qubits
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (generate-handshake-prog
+                                             j 0 chip)))))
+         args))
+
+
+(defun measure-handshake-prog-performance-RU (assn &rest args
+                                                   &key break-on-error include-runtime
+                                                        (n-qubits 20)
+                                                        (chips (rewiring-test-chips))
+                                                        (trials 20))
+  (declare (ignore break-on-error include-runtime))
+  (remf args :n-qubits)
+  (remf args :trials)
+  (setf (getf args :chips)
+        (loop :for (name chip) :in chips
+              :when (= (length (quil::chip-spec-live-qubits chip)) n-qubits)
+                :collect (cons name chip)))
+  (apply #'measure-performance assn
+         :progs (loop
+                  :for i :below trials
+                  :nconc (loop :for j :from 2 :to n-qubits
+                               :collect (let ((j j))
+                                          (lambda (chip)
+                                            (generate-handshake-prog
+                                             j 0 chip :random-unitaries T)))))
          args))
 
 (defvar *basic-swap-search-assn*
     (make-assignments
-        ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                         #+ecl  (make-random-state 1)
-                         #-(or sbcl ecl) (error "don't know how to seed random state"))
+        ((*random-state* (seed-random-state))
          (quil::*compressor-passes* 0))
         (quil::*addresser-swap-search-type*
          quil::*addresser-move-to-rewiring-swap-search-type*)
@@ -226,9 +403,7 @@
 
 (defvar *2q-tiers-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -248,9 +423,7 @@
 
 (defvar *swap-search-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -267,9 +440,7 @@
 
 (defvar *initial-rewiring-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0)
        (quil::*addresser-swap-search-type* :greedy-qubit))
       (quil::*initial-rewiring-default-type*)
@@ -281,9 +452,7 @@
 
 (defvar *depth-vs-swaps-assn*
   (make-assignments
-      ((*random-state* #+sbcl (sb-ext:seed-random-state 1)
-                       #+ecl  (make-random-state 1)
-                       #-(or sbcl ecl) (error "don't know how to seed random state"))
+      ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
@@ -296,3 +465,21 @@
     :a*-depth  (:partial :a*           :a*           1d0 :depth)
     :a*-sum    (:partial :a*           :a*           1d0 :sum)
     ))
+
+(defvar *cost-fn-weight-style-assn*
+    (make-assignments
+        ((*random-state* (seed-random-state))
+         (quil::*compressor-passes* 1))
+        (quil::*cost-fn-weight-style*)
+      :duration   (:duration)
+      :fidelity   (:fidelity)
+      ))
+
+(defvar *addresser-style-assn*
+    (make-assignments
+        ((*random-state* (seed-random-state))
+         (quil::*compressor-passes* 1))
+        (quil::*default-addresser-state-class*)
+      :duration   ('quil::temporal-addresser-state)
+      :fidelity   ('quil::fidelity-addresser-state)
+      ))
