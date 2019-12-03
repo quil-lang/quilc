@@ -152,7 +152,7 @@ SWAPping qubits into place.")
 ;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
 (defun precompute-qubit-qubit-distances (chip-spec initial-map)
   "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by swap duration."
-  (let* ((vertex-count (length (vnth 0 (chip-specification-objects chip-spec))))
+  (let* ((vertex-count (chip-spec-n-qubits chip-spec))
          (dist (make-array (list vertex-count vertex-count)
                            :initial-element most-positive-fixnum)))
     ;; all vertices are distance 0 from themselves.
@@ -176,8 +176,8 @@ SWAPping qubits into place.")
             ;; current best paths i->k and k->j?
             (when (> ij (+ ik kj))
               ;; then replace the old best path with these new ones.
-              (setf (aref dist i j) (+ ik kj))
-              (setf (aref dist j i) (+ ik kj)))))))
+              (setf (aref dist i j) (+ ik kj)
+                    (aref dist j i) (+ ik kj)))))))
     dist))
 
 (defmethod initialize-instance :after ((instance addresser-state)
