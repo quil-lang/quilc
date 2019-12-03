@@ -147,7 +147,7 @@
 ;; Forward declaration from compressor.lisp
 (declaim (special *compressor-passes*))
 
-(defparameter *default-addresser-state-class* 'fidelity-addresser-state)
+(defvar *default-addresser-state-class* 'fidelity-addresser-state)
 
 ;; TODO: deal with classical control and basic-blocks
 (defun compiler-hook (parsed-program

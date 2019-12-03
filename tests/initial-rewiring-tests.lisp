@@ -114,9 +114,13 @@ HALT
     (not-signals error (compiler-hook progm chip))
     (not-signals error (compiler-hook progm chip :rewiring-type ':partial))
     (not-signals error (compiler-hook progm chip :rewiring-type ':greedy))
-    ;; It's questionable whether asserting an error is the right thing to do here, but it at least
-    ;; documents the current behavior. And if we ever improve NAIVE rewiring so that this doesn't
-    ;; error, this test will fail and remind us to update it to NOT-SIGNALS.
+    ;; We used to get an error here when using NAIVE rewiring, but after the addresser refactor
+    ;; it went away. That's good: we'd prefer that the addresser never error, and so we're going
+    ;; to retain this test and change the signal expectation.
+    ;;
+    ;; In reality, the NAIVE addresser _does_ have a nonzero chance of erroring in practice, but
+    ;; the input that triggers it is highly fragile under changes to the source.  So, for the
+    ;; purposes of tracking these errors down and monitoring them, this test is no longer useful.
     (not-signals error (compiler-hook progm chip :rewiring-type ':naive))))
 
 (deftest test-prog-initial-rewiring-heuristic ()

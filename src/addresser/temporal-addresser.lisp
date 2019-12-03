@@ -441,7 +441,7 @@ instruction, adding to logical queue.~%"
                        (addresser-state-chip-schedule instance) old-chip-sched)))
 
 ;; also, we randomize the cost function weights during select-and-embed-a-permutation
-(defmethod select-and-embed-a-permutation ((state temporal-addresser-state) rewiring-tried)
+(defmethod select-and-embed-a-permutation :around ((state temporal-addresser-state) rewiring-tried)
   (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
         (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
     (call-next-method)))
