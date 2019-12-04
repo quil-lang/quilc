@@ -290,7 +290,11 @@
        (values (quil::make-pragma
                 (list "QASM_BARRIER")
                 (format nil "~{~A~^, ~}"
-                        (mapcar (lambda (qreg) (quil::print-instruction (register-to-quil-object qreg) nil))
+                        (mapcar (lambda (qreg)
+                                  (quil::print-instruction
+                                   (let ((*gate-applications-are-formal* t))
+                                     (register-to-quil-object qreg))
+                                   nil))
                                 (parse-qregisters (rest (first tok-lines))))))
                (rest tok-lines)))
       
@@ -683,7 +687,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
            (check-number-of-parameters params 0)
            (values nil
                    ;; Bit redundant.  Maybe just nil.
-                   (append (tokenize (format nil "U(0,0,0) ~A;" (print-qreg (first registers))))
+                   (append (tokenize (format nil "U(0,0,0) ~A;" (print-reg (first registers))))
                            rest-toks)))
 
           ;; "QE standard gates"
@@ -704,13 +708,13 @@ Note: the above \"expansion\" is not performed when in a gate body."
           ((string= name "sdg")
            (check-number-of-parameters params 0)
            (values nil
-                   (append (tokenize (format nil "u1(-pi/2) ~A;" (print-qreg (first registers))))
+                   (append (tokenize (format nil "u1(-pi/2) ~A;" (print-reg (first registers))))
                            rest-toks)))
           
           ((string= name "tdg")
            (check-number-of-parameters params 0)
            (values nil
-                   (append (tokenize (format nil "u1(-pi/4) ~A;" (print-qreg (first registers))))
+                   (append (tokenize (format nil "u1(-pi/4) ~A;" (print-reg (first registers))))
                            rest-toks)))
 
           ;; "QE standard user-defined gates"
