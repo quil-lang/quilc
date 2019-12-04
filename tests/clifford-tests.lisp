@@ -81,6 +81,45 @@
                 :always (= i (cl-quil.clifford::pauli-integer
                               (cl-quil.clifford::integer-pauli i n))))))))
 
+(deftest test-exp-pauli ()
+  (signals simple-error (exp-pauli (pauli-from-symbols '(I) 1) 1.0d0))
+  (is (null (exp-pauli (pauli-from-symbols '(I) 0) 1.0d0)))
+
+  (flet ((random-pauli (n &key (fixed-phase-factor t))
+           "Return a random Pauli term. If FIXED-PHASE-FACTOR is T then the phase is set to 1, otherwise its uniformly chosen among the four possible ones."
+           (let ((c (make-array (1+ n) :element-type 'cl-quil.clifford::base4
+                                       :initial-contents (loop :repeat (1+ n) :collect (random 4)))))
+             (when fixed-phase-factor
+               (setf (aref c 0) 0))
+             (cl-quil.clifford::%make-pauli :components c)))
+
+         (pauli-to-parsed-program (p)
+           "Convert Pauli term to parsed program."
+           (let ((program-string (format nil "~{~A~^; ~}"
+                                         (loop :for i :below (num-qubits p)
+                                               :for c :across (subseq (cl-quil.clifford::pauli-components p) 1)
+                                               :collect (format nil "~A ~D" (symbol-name (cl-quil.clifford::base4-to-sym c)) i)))))
+             (quil:parse-quil program-string))))
+
+    (loop :for num-qubits :from 1 :upto 4 :do
+      (loop :with n := 0
+            :while (< n (* num-qubits 50))
+            :for p := (random-pauli num-qubits)
+            :for x := (1- (random 1.0d0))
+            :for reference := (magicl-transcendental:expm
+                               (magicl:scale (* #c(0.0d0 -1.0d0) x)
+                                             (quil:parsed-program-to-logical-matrix
+                                              (pauli-to-parsed-program p))))
+            :for actual := (quil:parsed-program-to-logical-matrix
+                            (quil::raw-quil-to-unresolved-program (exp-pauli p x)))
+            :unless (let ((c (cl-quil.clifford::pauli-components p)))
+                      ;; This condition is meant to avoid matrices of different
+                      ;; dimensions coming from parsed-program-to-logical-matrix.
+                      (or (zerop (aref c 1))
+                          (zerop (aref c (1- (length c))))))
+              :do (is (m= reference actual))
+                  (incf n)))))
+
 (deftest test-clifford-identity ()
   (loop :for i :from 1 :to 10 :do
     (is (cl-quil.clifford::clifford-identity-p
