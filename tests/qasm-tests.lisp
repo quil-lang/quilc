@@ -246,25 +246,32 @@ qreg q[1]; x q[0]; // bye")
     (is (= 1 (quil:qubit-index (quil:reset-qubit-target (elt code 1)))))))
 
 (deftest test-qasm-if ()
-  (let* ((qasm "qreg q[1]; creg c[1]; x q[0]; measure q[0] -> c[0]; if(c[0]==1) x q[0];")
+  (let* ((qasm "qreg q[1]; creg c[1]; x q[0]; measure q[0] -> c[0]; if(c==1) x q[0];")
          (quil (quil.qasm::parse-qasm qasm))
          (qvm (qvm:run-program 1 quil))
          (mem (qvm::classical-memories (qvm:classical-memory-subsystem qvm))))
     (is (equalp #(#C(1 0) #C(0 0))
                 (qvm::amplitudes qvm)))
     (is (gethash "c" mem))
-    (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0)))))
-
-(deftest test-qasm-if-on-qreg ()
-  (let* ((qasm "qreg q[2]; creg c[1]; x q; measure q[0] -> c[0]; if(c[0]==1) x q;")
+    (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0))))
+  
+  (let* ((qasm "qreg q[2]; creg c[3]; x q; measure q -> c; if(c==3) x q;")
          (quil (quil.qasm::parse-qasm qasm))
          (qvm (qvm:run-program 2 quil))
          (mem (qvm::classical-memories (qvm:classical-memory-subsystem qvm))))
     (is (equalp #(#C(1 0) #C(0 0) #C(0 0) #C(0 0))
                 (qvm::amplitudes qvm)))
     (is (gethash "c" mem))
+    (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0))))
+
+  ;; Test that the if branch is not executed (and we're left in |11>).
+  (let* ((qasm "qreg q[2]; creg c[3]; x q; measure q -> c; if(c==4) x q;")
+         (quil (quil.qasm::parse-qasm qasm))
+         (qvm (qvm:run-program 2 quil))
+         (mem (qvm::classical-memories (qvm:classical-memory-subsystem qvm))))
+    (is (equalp #(#C(0 0) #C(0 0) #C(0 0) #C(1 0))
+                (qvm::amplitudes qvm)))
+    (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0)))))
-
-
 
 ;; Barrier is currently uninteresting as Quil has no equivalent.

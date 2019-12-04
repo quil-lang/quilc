@@ -887,13 +887,30 @@ Note: the above \"expansion\" is not performed when in a gate body."
               ;; Build a unique intermediary classical address to store
               ;; the comparison result.
               cmp-desc
-              (make-instance 'quil::classical-equality-bit/integer/immediate
-                             :left (register-to-quil-object register)
-                             :right (quil::constant (token-payload val) quil::quil-integer)
-                             :target (quil::mref cmp-name 0))
-              (make-instance 'quil::jump-unless
-                             :address (quil::mref cmp-name 0)
-                             :label jmp-label)
+              ;; This is admittedly a bit ugly. OpenQASM's "if" is a
+              ;; little strange at first glance.  You might expect
+              ;; that you would compare bits of classical memory with
+              ;; something like `if(c[0] == 1) ...` but actually you
+              ;; compare the entire classical register against a
+              ;; number (bitwise) `if(c == 5) ...` tests
+              ;;
+              ;;     c[0] == 1 & c[1] == 0 & c[2] == 1 & c[3] == 0 
+              ;;
+              ;; etc.
+              (loop :for i :below (1+ (ceiling (log (token-payload val) 2)))
+                    :for reg := (quil:copy-instance register)
+                    :do (setf (reg-index reg) i)
+                    :collect
+                    (make-instance 'quil::classical-equality-bit/bit/immediate
+                                   :left (register-to-quil-object reg)
+                                   :right (quil::constant
+                                           (if (logbitp i (token-payload val)) 1 0)
+                                           quil::quil-bit)
+                                   :target (quil::mref cmp-name 0))
+                    :collect
+                    (make-instance 'quil::jump-unless
+                                   :address (quil::mref cmp-name 0)
+                                   :label jmp-label))
               gate-application
               (make-instance 'quil::jump-target
                              :label jmp-label))
