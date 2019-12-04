@@ -1,7 +1,6 @@
  ;;;; qasm.lisp
 
 (in-package #:cl-quil.qasm)
-(use-package :abstract-classes)
 
 (deftype qasm-keywords ()
   '(member
@@ -55,7 +54,7 @@
          :type string)
    (index :initarg :index :accessor reg-index
           :type (or null (integer 0 *))))
-  (:metaclass abstract-class))
+  (:metaclass abstract-classes:abstract-class))
 
 (defclass qasm-qreg (qasm-reg)
   ())
