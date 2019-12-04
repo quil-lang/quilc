@@ -9,6 +9,7 @@
   :depends-on (#:cl-quil
                (:version #:qvm "1.9.0")
                #:magicl
+               #:magicl-transcendental
                #:alexandria
                #:fiasco
                #:uiop
