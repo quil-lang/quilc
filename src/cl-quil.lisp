@@ -16,7 +16,7 @@
                 :documentation "A definition which has has a common signature with some other definition.")
    (file :initarg :file
          :reader ambiguous-definition-file
-         :type string
+         :type (or null string)
          :documentation "The file in which the conflicting definition originated.")
    (conflicts :initarg :conflicts
               :reader ambiguous-definition-conflicts
@@ -84,7 +84,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                                          (token
                                           (token-pathname (lexical-context instr)))
                                          (t
-                                          (quil-parse-error "Unable to resolve definition context ~A" instr)))))
+                                          nil))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."

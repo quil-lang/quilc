@@ -369,8 +369,7 @@
         (values (quil::make-memory-descriptor
                  :name name
                  :type quil::quil-bit
-                 :length length
-                 :lexical-context nil)
+                 :length length)
                 rest-toks)))))
 
 (defun parse-qreg-definition (tok-lines)
@@ -881,9 +880,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                  (cmp-desc (quil::make-memory-descriptor
                             :name cmp-name
                             :type quil::quil-bit
-                            :length 1
-                            ;; TODO Figure out what to do here. Ask erik
-                            :lexical-context (quil::tok ':name)))
+                            :length 1))
                  (jmp-label (quil::label (string (gensym "JMP-")))))
             (values
              (list
