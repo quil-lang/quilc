@@ -17,14 +17,6 @@
             :MINUS :TIMES :DIVIDE :EXPT :EQUALSEQUALS :NNINTEGER :REAL :ID
             :STRING :KEYWORD :OPENQASM :QREG :CREG :GATE :COMMENT :PI)))
 
-(defparameter *valid-functions*
-    '(("sin"  cl:sin)
-      ("cos"  cl:cos)
-      ("sqrt" cl:sqrt)
-      ("exp"  cl:exp)
-      ("ln"   cl:log)
-      ("tan"  cl:tan)))
-
 (defvar *line-start-position*)
 (defvar *line-number*)
 
