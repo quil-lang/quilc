@@ -929,7 +929,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                    (alexandria:ensure-list program-entity)) :do
             (setf tok-lines rest-toks)))
 
-(defun parse-qasm (string)
+(defun parse-qasm-into-raw-program (string)
   "Parse STRING into a raw, untransformed PARSED-PROGRAM object."
   
   (let* ((*creg-names* (make-hash-table :test #'equal))
@@ -944,10 +944,10 @@ Note: the above \"expansion\" is not performed when in a gate body."
      *qreg-names*
      *qubit-count*)))
 
-(defun parse-qasm-string (string &optional originating-file)
+(defun parse-qasm (string &optional originating-file)
   "Parse STRING into a PARSED-PROGRAM object, applying all transforms."
   (declare (ignore originating-file))
-  (let ((pp (quil::resolve-objects (parse-qasm string))))
+  (let ((pp (quil::resolve-objects (parse-qasm-into-raw-program string))))
     (setf pp (quil::transform 'quil::expand-circuits pp))
     (setf pp (quil::transform 'quil::type-check pp))
     (setf pp (quil::transform 'quil::simplify-arithmetic pp))))

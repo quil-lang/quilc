@@ -590,4 +590,7 @@
 
 (defpackage #:cl-quil.qasm
   (:nicknames #:quil.qasm)
-  (:use #:cl))
+  (:use #:cl)
+
+  (:export
+   #:parse-qasm))
