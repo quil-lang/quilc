@@ -20,8 +20,8 @@
 (defvar *line-start-position*)
 (defvar *line-number*)
 
-(defparameter *gate-names* (make-hash-table :test #'equal)
-  "A table of user-defined gates.")
+(defvar *gate-names* (make-hash-table :test #'equal)
+  "A table of user-defined gates. The table is keyed on the gate name (a string), and the value is simply T.")
 
 (defparameter *gate-applications-are-formal* nil
   "When parsing the body of a gate declaration, this is T, and is generally used to enable/disable certain parsing constraints.")
@@ -32,10 +32,10 @@
 (defparameter *gate-params* nil
   "When parsing the body of a gate declaration, this is a list of the parameter names.")
 
-(defparameter *creg-names* (make-hash-table :test #'equal)
+(defvar *creg-names* (make-hash-table :test #'equal)
   "Maps a creg name to its size.")
 
-(defparameter *qreg-names* (make-hash-table :test #'equal)
+(defvar *qreg-names* (make-hash-table :test #'equal)
   "Maps a qreg name to the pair (offset . size). A qreg defined with `qreg q[size];` maps to Quil qubits (offset, offset + 1, offset + 2, ..., offset + size - 1). This complication maintains unique qubits in the Quil translation.")
 
 (defparameter *qubit-count* 0
