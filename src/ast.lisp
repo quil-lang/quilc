@@ -1510,7 +1510,7 @@ For example,
                         (subseq (gate-definition-entries gate)
                                 (* i gate-size)
                                 (* (1+ i) gate-size)))))))
-  
+
   (:method ((gate permutation-gate-definition) (stream stream))
     (format stream "DEFGATE ~A AS PERMUTATION:~%    ~{~D~^, ~}~%"
             (gate-definition-name gate)
