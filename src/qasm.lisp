@@ -99,7 +99,7 @@
     (second (gethash (reg-name creg) *creg-names*))))
 
 (alexa:define-string-lexer line-lexer
-  "A lexical analyzer for lines of Quil."
+  "A lexical analyzer for lines of OpenQASM 2.0."
   ((:int    "\\d+")
    (:real  "(?=\\d*[.eE])(?=\\.?\\d)\\d*\\.?\\d*(?:[eE][+-]?\\d+)?")
    (:ident  "[a-zA-Z](?:[A-Za-z0-9_\\-]*[A-Za-z0-9_])?")
@@ -109,9 +109,6 @@
   ("//([^\\n\\r]*)"
    (return (tok :COMMENT $@)))
   ((eager "{{NEWLINE}}")
-   ;; We return a keyword because they get split out and
-   ;; removed. They're not actually logical tokens of the Quil
-   ;; language.
    (incf *line-number*)
    (setf *line-start-position* $>)
    (return ':NEWLINE))
@@ -203,19 +200,18 @@
           :collect tok)))
 
 (defun tokenize (string)
-  (let* (;; Forcefully swap semi-colons for newlines, to ease parsing
-         ;; down-the-line.
-         (string (substitute #\Newline #\; string))
-         ;; Similarly to aid parsing, ensure that newlines both
-         ;; precede and follow curly braces.
-         (string (ppcre:regex-replace-all #\{ string "
-{
-"))
-         (string (ppcre:regex-replace-all #\} string "
-}
-"))
-         (lines (nsplit ':NEWLINE (tokenize-line 'line-lexer string))))
-    lines))
+  (flet ((more-newlines (string)
+           ;; Forcefully swap semi-colons for newlines, to ease
+           ;; parsing down-the-line. Likewise, ensure that newlines
+           ;; both precede and follow curly braces.
+           (with-output-to-string (s)
+             (loop :for ch :across string
+                   :do (case ch
+                         ((#\{ #\}) (format s "~%~C~%" ch))
+                         ((#\;) (terpri s))
+                         (t (write-char ch s)))))))
+    (nsplit ':NEWLINE (tokenize-line 'line-lexer
+                                     (more-newlines string)))))
 
 ;; parse
 
@@ -409,9 +405,6 @@
                                                 :address dest))
                                qreg creg)
                 (rest tok-lines))))))
-
-(defun quilify-qasm-comment (str)
-  (concatenate 'string "#" (string-left-trim "/" str)))
 
 (defun parse-comment (tok-lines)
   (q2q-check-unexpected-eof tok-lines "comment")
@@ -914,6 +907,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
          (*qreg-names* (make-hash-table :test #'equal))
          (*qubit-count* 0)
          (*gate-applications-are-formal* nil)
+         (*gate-params* nil)
+         (*gate-names* (make-hash-table :test #'equal))
          (code (parse-qasm-body string)))
     (setf code (quil::process-includes code))
     ;; Return the parsed sequence of objects.
