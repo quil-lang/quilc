@@ -83,10 +83,10 @@
 (defgeneric check-register-is-defined (register)
   (:method ((qreg qasm-qreg))
     (unless (gethash (reg-name qreg) *qreg-names*)
-      (q2q-parse-error "Undefined qregister ~A." (reg-name qreg))))
+      (qasm-parse-error "Undefined qregister ~A." (reg-name qreg))))
   (:method ((creg qasm-creg))
     (unless (gethash (reg-name creg) *creg-names*)
-      (q2q-parse-error "Undefined cregister ~A." (reg-name creg)))))
+      (qasm-parse-error "Undefined cregister ~A." (reg-name creg)))))
 
 (defun register-offset (register)
   (check-type register qasm-qreg)
@@ -216,24 +216,24 @@
 
 ;; parse
 
-(define-condition q2q-parse-error (alexandria:simple-parse-error)
+(define-condition qasm-parse-error (alexandria:simple-parse-error)
   ()
   (:documentation "Representation of an error parsing QASM."))
 
-(defun q2q-parse-error (format-control &rest format-args)
-  "Signal a Q2Q-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
-  (error 'q2q-parse-error :format-control format-control
+(defun qasm-parse-error (format-control &rest format-args)
+  "Signal a QASM-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
+  (error 'qasm-parse-error :format-control format-control
          :format-arguments format-args))
 
-(defmacro q2q-check-token-type (token type)
+(defmacro qasm-check-token-type (token type)
   `(unless (eql (token-type ,token) ,type)
-     (q2q-parse-error "Expected a token of type ~A but got a token of type ~A."
+     (qasm-parse-error "Expected a token of type ~A but got a token of type ~A."
                       ,type
                       (token-type ,token))))
 
-(defmacro q2q-check-unexpected-eof (tokens expected)
+(defmacro qasm-check-unexpected-eof (tokens expected)
   `(when (null ,tokens)
-     (q2q-parse-error "Unexpectedly reached end of program, expected ~A."
+     (qasm-parse-error "Unexpectedly reached end of program, expected ~A."
                       ,expected)))
 
 (defun parse-program-lines (tok-lines)
@@ -294,7 +294,7 @@
        (parse-if tok-lines))
 
       (otherwise
-       (q2q-parse-error "Got an unexpected token of type ~S ~
+       (qasm-parse-error "Got an unexpected token of type ~S ~
                          when trying to parse a program." tok-type)))))
 
 (defmacro destructuring-token-bind (token-idents token-line &body body)
@@ -310,7 +310,7 @@
   (let ((ts (mapcar #'alexandria:ensure-list (remove '_ token-idents))))
     `(progn
        (unless (= ,(length token-idents) (length ,token-line))
-         (q2q-parse-error "Expected ~d tokens but parsed ~d."
+         (qasm-parse-error "Expected ~d tokens but parsed ~d."
                           ,(length token-idents) (length ,token-line)))
        (loop :for (tok-name tok-type) :in ',ts
              :for tok :in ,token-line
@@ -331,7 +331,7 @@
 
 (defun parse-creg-definition (tok-lines)
   (when (null tok-lines)
-    (q2q-parse-error "Unexpectedly reached end of program, expecting creg."))
+    (qasm-parse-error "Unexpectedly reached end of program, expecting creg."))
 
   (destructuring-bind (creg-toks . rest-toks)
       tok-lines
@@ -348,7 +348,7 @@
                 rest-toks)))))
 
 (defun parse-qreg-definition (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "qreg")
+  (qasm-check-unexpected-eof tok-lines "qreg")
 
   (destructuring-bind (qreg-toks . rest-toks)
       tok-lines
@@ -372,7 +372,7 @@
                 rest-toks)))))
 
 (defun parse-include (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "include")
+  (qasm-check-unexpected-eof tok-lines "include")
 
   (destructuring-bind (include-toks . rest-toks)
       tok-lines
@@ -385,14 +385,14 @@
                 rest-toks)))))
 
 (defun parse-measure (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "measure")
+  (qasm-check-unexpected-eof tok-lines "measure")
 
   (let ((measure-toks (first tok-lines)))
-    (q2q-check-token-type (first measure-toks) ':MEASURE)
+    (qasm-check-token-type (first measure-toks) ':MEASURE)
 
     (multiple-value-bind (qreg rest-toks)
         (parse-qregister (rest measure-toks))
-      (q2q-check-token-type (first rest-toks) ':ARROW)
+      (qasm-check-token-type (first rest-toks) ':ARROW)
       (check-register-is-defined qreg)
 
       (multiple-value-bind (creg rest-toks)
@@ -408,13 +408,13 @@
                 (rest tok-lines))))))
 
 (defun parse-comment (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "comment")
+  (qasm-check-unexpected-eof tok-lines "comment")
   
   (values nil
           (rest tok-lines)))
 
 (defun parse-openqasm (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "OPENQASM")
+  (qasm-check-unexpected-eof tok-lines "OPENQASM")
 
   (destructuring-bind (openqasm-toks . rest-toks)
       tok-lines
@@ -429,7 +429,7 @@
   (let* ((id (first tokens))
          (id-type (token-type id)))
     (unless (eql id-type ':ID)
-      (q2q-parse-error "Expected a token of type :ID, got ~A." id-type))
+      (qasm-parse-error "Expected a token of type :ID, got ~A." id-type))
     (let ((next (second tokens)))
       (if (and next
                (eql (token-type next) ':LEFT-SQUARE-BRACKET))
@@ -446,7 +446,7 @@
   (let* ((id (first tokens))
          (id-type (token-type id)))
     (unless (eql id-type ':ID)
-      (q2q-parse-error "Expected a token of type :ID, got ~A." id-type))
+      (qasm-parse-error "Expected a token of type :ID, got ~A." id-type))
     (let ((next (second tokens)))
       (if (and next
                (eql (token-type next) ':LEFT-SQUARE-BRACKET))
@@ -460,7 +460,7 @@
 
 (defun parse-qregisters (tokens)
   "Parse qasm registers from TOKENS until a no more valid tokens are available. Returns the list of parsed registers (of type QASM-REGISTER)."
-  (q2q-check-unexpected-eof tokens "registers")
+  (qasm-check-unexpected-eof tokens "registers")
   
   (loop :for (register rest-toks) := (multiple-value-list (parse-qregister tokens))
           :then (multiple-value-list (parse-qregister rest-toks))
@@ -511,12 +511,12 @@
 
 (defun parse-params (tokens)
   "Parse a list of qasm params (e.g. in the instruction  rx(0.5) q;). Returns a list of parameter values (type float), and a second value which is the remaining tokens (not including closing parenthesis)."
-  (q2q-check-unexpected-eof tokens "parameters")
-  (q2q-check-token-type (first tokens) :LEFT-PAREN)
+  (qasm-check-unexpected-eof tokens "parameters")
+  (qasm-check-token-type (first tokens) :LEFT-PAREN)
   
   (let ((rp-pos (position ':RIGHT-PAREN tokens :key 'token-type)))
     (unless rp-pos
-      (q2q-parse-error "Could not find token of type ':RIGHT-PAREN in parameter list ~A." tokens))
+      (qasm-parse-error "Could not find token of type ':RIGHT-PAREN in parameter list ~A." tokens))
     (let* ((subseq (subseq tokens 1 rp-pos))
            ;; TODO Raise an error when parsing something like "(0, 0,)"
            (param-list (split-sequence:split-sequence ':COMMA subseq :key #'token-type)))
@@ -531,10 +531,10 @@
 
 (defun collect-single-application-from-tokens (tokens)
   ;; gate-name((p1, ...))? reg,+
-  (q2q-check-unexpected-eof tokens "gate application")
+  (qasm-check-unexpected-eof tokens "gate application")
 
   (let ((name-tok (first tokens)))
-    (q2q-check-token-type name-tok :ID)
+    (qasm-check-token-type name-tok :ID)
     (multiple-value-bind (params rest-toks)
         (maybe-parse-params (rest tokens))
       (multiple-value-bind (registers rest-toks)
@@ -546,7 +546,7 @@
 
 (defun check-number-of-parameters (params number)
   (unless (= number (length params))
-    (q2q-parse-error "Expected ~A parameters but found ~A."
+    (qasm-parse-error "Expected ~A parameters but found ~A."
                      number (length params))))
 
 (defun build-u-gate (θ ϕ λ qubit)
@@ -773,7 +773,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                                                           :arguments qubits))
                          registers))
               rest-toks)
-             (q2q-parse-error "Found unknown gate application '~A'."
+             (qasm-parse-error "Found unknown gate application '~A'."
                               name))))))))
 
 (defun parse-gate-body (tok-lines)
@@ -796,8 +796,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
   (quil:param param))
 
 (defun parse-gate-decl (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "gate")
-  (q2q-check-token-type (first (first tok-lines)) ':GATE)
+  (qasm-check-unexpected-eof tok-lines "gate")
+  (qasm-check-token-type (first (first tok-lines)) ':GATE)
   
   (let* ((close-pos (line-position-of-token-type ':RIGHT-CURLY-BRACKET tok-lines))
          (*gate-applications-are-formal* t)
@@ -817,8 +817,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
               (subseq tok-lines (1+ close-pos))))))
 
 (defun parse-opaque (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "opaque")
-  (q2q-check-token-type (first (first tok-lines)) ':OPAQUE)
+  (qasm-check-unexpected-eof tok-lines "opaque")
+  (qasm-check-token-type (first (first tok-lines)) ':OPAQUE)
 
   (destructuring-bind ((opaque gate name-tok &rest rest-toks) &rest rest-lines)
       tok-lines
@@ -836,18 +836,18 @@ Note: the above \"expansion\" is not performed when in a gate body."
                 rest-lines)))))
 
 (defun parse-if (tok-lines)
-  (q2q-check-unexpected-eof tok-lines "if")
+  (qasm-check-unexpected-eof tok-lines "if")
 
   (destructuring-bind (if-toks . rest-lines)
       tok-lines
     (pop if-toks)
-    (q2q-check-token-type (pop if-toks) ':LEFT-PAREN)
+    (qasm-check-token-type (pop if-toks) ':LEFT-PAREN)
     (multiple-value-bind (register rest-toks)
         (parse-cregister if-toks)
-      (q2q-check-token-type (pop rest-toks) ':EQUALSEQUALS)
+      (qasm-check-token-type (pop rest-toks) ':EQUALSEQUALS)
       (let ((val (pop rest-toks)))
-        (q2q-check-token-type val ':NNINTEGER)
-        (q2q-check-token-type (pop rest-toks) ':RIGHT-PAREN)
+        (qasm-check-token-type val ':NNINTEGER)
+        (qasm-check-token-type (pop rest-toks) ':RIGHT-PAREN)
         (multiple-value-bind (gate-application rest-toks)
             (parse-application (list rest-toks))
           (assert (null rest-toks))
