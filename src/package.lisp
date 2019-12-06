@@ -405,6 +405,9 @@
 
   ;; parser.lisp
   (:export
+   #:tok
+   #:token-type
+   #:token-payload
    #:parse-quil-into-raw-program        ; FUNCTION
    #:quil-parse-error                   ; CONDITION
    #:resolve-safely                     ; FUNCTION
@@ -590,7 +593,8 @@
 
 (defpackage #:cl-quil.qasm
   (:nicknames #:quil.qasm)
-  (:use #:cl)
+  (:use #:cl) 
+  (:import-from #:cl-quil #:tok #:token-type #:token-payload)
 
   (:export
    #:parse-qasm))

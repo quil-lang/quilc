@@ -2,21 +2,6 @@
 
 (in-package #:cl-quil.qasm)
 
-(deftype qasm-keywords ()
-  '(member
-    :OPENQASM :QREG :CREG :GATE :BARRIER
-    :MEASURE :RESET :OPAQUE :INCLUDE
-    :IF))
-
-(deftype token-type ()
-  '(or
-    qasm-keywords
-    (member :SEMI-COLON :LEFT-PAREN :RIGHT-PAREN :COMMA
-            :ARROW :LEFT-SQUARE-BRACKET :RIGHT-SQUARE-BRACKET :LEFT-CURLY-BRACKET
-            :RIGHT-CURLY-BRACKET :LEFT-ANGLE-BRACKET :RIGHT-ANGLE-BRACKET :PLUS
-            :MINUS :TIMES :DIVIDE :EXPT :EQUALSEQUALS :NNINTEGER :REAL :ID
-            :STRING :KEYWORD :OPENQASM :QREG :CREG :GATE :COMMENT :PI)))
-
 (defvar *line-start-position*)
 (defvar *line-number*)
 
@@ -105,12 +90,6 @@
     (second (gethash (reg-name qreg) *qreg-names*)))
   (:method ((creg qasm-creg))
     (second (gethash (reg-name creg) *creg-names*))))
-
-(defstruct (token (:constructor tok (type &optional payload)))
-  "A lexical token."
-  (line nil :type (or null (integer 1)))
-  (type nil :type token-type)
-  (payload nil))
 
 (alexa:define-string-lexer line-lexer
   "A lexical analyzer for lines of Quil."
