@@ -327,8 +327,6 @@
                    :collect tok)
          ,@body))))
 
-;; u1(alpha) qubit;
-
 (defun parse-creg-definition (tok-lines)
   (when (null tok-lines)
     (qasm-parse-error "Unexpectedly reached end of program, expecting creg."))
