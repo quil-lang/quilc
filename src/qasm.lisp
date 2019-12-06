@@ -5,26 +5,33 @@
 (defvar *line-start-position*)
 (defvar *line-number*)
 
-(defvar *gate-names* (make-hash-table :test #'equal)
-  "A table of user-defined gates. The table is keyed on the gate name (a string), and the value is simply T.")
+(defvar *gate-names*)
+(setf (documentation '*gate-names* 'variable)
+      "A HASH-TABLE of user-defined gates. The table is keyed on the gate name (a string), and the value is simply T.")
 
-(defparameter *gate-applications-are-formal* nil
-  "When parsing the body of a gate declaration, this is T, and is generally used to enable/disable certain parsing constraints.")
+(defvar *gate-applications-are-formal*)
+(setf (documentation '*gate-applications-are-formal* 'variable)
+      "When parsing the body of a gate declaration, this is T, and is generally used to enable/disable certain parsing constraints.")
 
-(defparameter *gate-qregs* nil
-  "When parsing the body of a gate declaration, this is a list of the qubit register names.")
+(defvar *gate-qregs*)
+(setf (documentation '*gate-qregs* 'variable)
+      "When parsing the body of a gate declaration, this is a list of the qubit register names (strings).")
 
-(defparameter *gate-params* nil
-  "When parsing the body of a gate declaration, this is a list of the parameter names.")
+(defvar *gate-params*)
+(setf (documentation '*gate-params* 'variable)
+      "When parsing the body of a gate declaration, this is a list of the parameter names (strings). Otherwise, NIL.")
 
-(defvar *creg-names* (make-hash-table :test #'equal)
-  "Maps a creg name to its size.")
+(defvar *creg-names*)
+(setf (documentation '*creg-names* 'variable)
+      "Maps a creg name to its size.")
 
-(defvar *qreg-names* (make-hash-table :test #'equal)
-  "Maps a qreg name to the pair (offset . size). A qreg defined with `qreg q[size];` maps to Quil qubits (offset, offset + 1, offset + 2, ..., offset + size - 1). This complication maintains unique qubits in the Quil translation.")
+(defvar *qreg-names*)
+(setf (documentation '*qreg-names* 'variable)
+      "Maps a qreg name to the pair (offset . size). A qreg defined with `qreg q[size];` maps to Quil qubits (offset, offset + 1, offset + 2, ..., offset + size - 1). This complication maintains unique qubits in the Quil translation.")
 
-(defparameter *qubit-count* 0
-  "The number of qubits registered by qreg.")
+(defvar *qubit-count*)
+(setf (documentation '*qubit-count* 'variable)
+      "The number of qubits registered by qreg.")
 
 (defclass qasm-reg ()
   ((name :initarg :name :accessor reg-name
@@ -906,6 +913,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
   (let* ((*creg-names* (make-hash-table :test #'equal))
          (*qreg-names* (make-hash-table :test #'equal))
          (*qubit-count* 0)
+         (*gate-applications-are-formal* nil)
          (code (parse-qasm-body string)))
     (setf code (quil::process-includes code))
     ;; Return the parsed sequence of objects.
