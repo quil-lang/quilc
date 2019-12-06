@@ -33,24 +33,19 @@
 (setf (documentation '*qubit-count* 'variable)
       "The number of qubits registered by qreg.")
 
-(defclass qasm-reg ()
-  ((name :initarg :name :accessor reg-name
-         :type string)
-   (index :initarg :index :accessor reg-index
-          :type (or null (integer 0 *))))
-  (:metaclass abstract-classes:abstract-class))
+(defstruct (qasm-register (:conc-name reg-)
+                          (:constructor nil))    ; :constructor nil ensures this thing can't be created
+  "Abstract structure for ..."
+  (name nil :type string :read-only t)
+  (index nil :type (or null (integer 0 *))))
 
-(defclass qasm-qreg (qasm-reg)
-  ())
+(defstruct (qreg (:include qasm-register)
+                 (:constructor qreg (name &optional index)))
+  "An OpenQASM qregister object.")
 
-(defun qreg (name &optional index)
-  (make-instance 'qasm-qreg :name name :index index))
-
-(defclass qasm-creg (qasm-reg)
-  ())
-
-(defun creg (name &optional index)
-  (make-instance 'qasm-creg :name name :index index))
+(defstruct (creg (:include qasm-register)
+                 (:constructor creg (name &optional index)))
+  "An OpenQASM cregister object.")
 
 (defun reg-fmt (stream reg &optional colon-modifier at-modifier)
   (declare (ignore colon-modifier at-modifier))
@@ -61,7 +56,7 @@
         (format stream "~A" name))))
 
 (defgeneric register-to-quil-object (register)
-  (:method ((qreg qasm-qreg))
+  (:method ((qreg qreg))
     (with-slots (name index) qreg
       (if *gate-applications-are-formal*
           (quil:formal name)
@@ -71,7 +66,7 @@
                     "The index ~s is out-of-bounds for qreg ~s."
                     index qreg)
             (quil:qubit (+ offset index))))))
-  (:method ((creg qasm-creg))
+  (:method ((creg creg))
     (with-slots (name index) creg
       (destructuring-bind (offset size)
           (gethash name *creg-names*)
@@ -81,22 +76,22 @@
         (quil::mref name (+ offset index))))))
 
 (defgeneric check-register-is-defined (register)
-  (:method ((qreg qasm-qreg))
+  (:method ((qreg qreg))
     (unless (gethash (reg-name qreg) *qreg-names*)
       (qasm-parse-error "Undefined qregister ~A." (reg-name qreg))))
-  (:method ((creg qasm-creg))
+  (:method ((creg creg))
     (unless (gethash (reg-name creg) *creg-names*)
       (qasm-parse-error "Undefined cregister ~A." (reg-name creg)))))
 
 (defun register-offset (register)
-  (check-type register qasm-qreg)
+  (check-type register qreg)
   (check-register-is-defined register)
   (first (gethash (reg-name register) *qreg-names*)))
 
 (defgeneric register-size (register)
-  (:method ((qreg qasm-qreg))
+  (:method ((qreg qreg))
     (second (gethash (reg-name qreg) *qreg-names*)))
-  (:method ((creg qasm-creg))
+  (:method ((creg creg))
     (second (gethash (reg-name creg) *creg-names*))))
 
 (alexa:define-string-lexer line-lexer
@@ -590,7 +585,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                                 (alexandria:if-let ((index (reg-index register)))
                                   (loop :repeat register-size :collect (register-to-quil-object register))
                                   (loop :for i :below register-size
-                                        :for reg := (quil:copy-instance register)
+                                        :for reg := (copy-qasm-register register)
                                         :do (setf (reg-index reg) i)
                                         :collect (register-to-quil-object reg))))
                               registers)))
@@ -871,7 +866,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
               ;;
               ;; etc.
               (loop :for i :below (1+ (ceiling (log (token-payload val) 2)))
-                    :for reg := (quil:copy-instance register)
+                    :for reg := (copy-qasm-register register)
                     :do (setf (reg-index reg) i)
                     :collect
                     (make-instance 'quil::classical-equality-bit/bit/immediate
