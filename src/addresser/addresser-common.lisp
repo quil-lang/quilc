@@ -79,6 +79,15 @@ SWAPping qubits into place.")
 (defvar *addresser-use-2q-tiers* t
   "When T, uses the 2-qubit tiers rather than the general instruction tiers.")
 
+(defvar *addresser-swap-search-type* ':greedy-qubit
+  "The type of swap search the addresser should use.
+
+GREEDY-PATH: Assign links values based on whether they are on the shortest path
+between two qubits that need to be adjacent
+A*: Use A* search algorithm using the cost function as a heuristic
+GREEDY-QUBIT: Greedily choose the best link to swap according to the cost function.")
+
+
 ;;; A pseudoinstruction class used to send directives to the addresser ;;;
 
 (defclass application-force-rewiring (application)
