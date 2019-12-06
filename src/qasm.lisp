@@ -69,7 +69,7 @@
             (assert (< index size) ()
                     "The index ~s is out-of-bounds for qreg ~s."
                     index qreg)
-            (quil::qubit (+ offset index))))))
+            (quil:qubit (+ offset index))))))
   (:method ((creg qasm-creg))
     (with-slots (name index) creg
       (destructuring-bind (offset size)
