@@ -52,7 +52,8 @@
 (defun creg (name &optional index)
   (make-instance 'qasm-creg :name name :index index))
 
-(defun print-reg (reg &optional stream)
+(defun reg-fmt (stream reg &optional colon-modifier at-modifier)
+  (declare (ignore colon-modifier at-modifier))
   (let ((name (reg-name reg))
         (index (reg-index reg)))
     (if index
@@ -656,7 +657,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
            (check-number-of-parameters params 0)
            (values nil
                    ;; Bit redundant.  Maybe just nil.
-                   (append (tokenize (format nil "U(0,0,0) ~A;" (print-reg (first registers))))
+                   (append (tokenize (format nil "U(0,0,0) ~/quil.qasm:reg-fmt/;"
+                                             (first registers)))
                            rest-toks)))
 
           ;; "QE standard gates"
@@ -677,13 +679,15 @@ Note: the above \"expansion\" is not performed when in a gate body."
           ((string= name "sdg")
            (check-number-of-parameters params 0)
            (values nil
-                   (append (tokenize (format nil "u1(-pi/2) ~A;" (print-reg (first registers))))
+                   (append (tokenize (format nil "u1(-pi/2) ~/quil.qasm:reg-fmt/;"
+                                             (first registers)))
                            rest-toks)))
           
           ((string= name "tdg")
            (check-number-of-parameters params 0)
            (values nil
-                   (append (tokenize (format nil "u1(-pi/4) ~A;" (print-reg (first registers))))
+                   (append (tokenize (format nil "u1(-pi/4) ~/quil.qasm:reg-fmt/;"
+                                             (first registers)))
                            rest-toks)))
 
           ;; "QE standard user-defined gates"
