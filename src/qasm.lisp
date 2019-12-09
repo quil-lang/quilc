@@ -107,7 +107,6 @@
   "A lexical analyzer for lines of OpenQASM 2.0."
   ((:int    "\\d+")
    (:real  "(?=\\d*[.eE])(?=\\.?\\d)\\d*\\.?\\d*(?:[eE][+-]?\\d+)?")
-   (:ident  "[a-zA-Z](?:[A-Za-z0-9_\\-]*[A-Za-z0-9_])?")
    (:string "\\\"(?:[^\\\"]|\\\\\\\")*\\\"")
    (:newline "(?:\\r\\n?|\\n)"))
   ;; TODO Do I want eager here?
@@ -155,8 +154,6 @@
    (return (tok :REAL (parse-float:parse-float $@))))
   ((eager "{{INT}}")
    (return (tok :NNINTEGER (parse-integer $@))))
-  ("{{IDENT}}"
-   (return (tok :ID $@)))
   ("[^\\S\\n\\r]+"
    nil))
 
