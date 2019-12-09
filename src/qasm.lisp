@@ -515,8 +515,9 @@
     (unless rp-pos
       (qasm-parse-error "Could not find token of type ':RIGHT-PAREN in parameter list ~A." tokens))
     (let* ((subseq (subseq tokens 1 rp-pos))
-           ;; TODO Raise an error when parsing something like "(0, 0,)"
            (param-list (split-sequence:split-sequence ':COMMA subseq :key #'token-type)))
+      (when (remove-if-not #'null param-list)
+        (qasm-parse-error "Found a malformed parameter list ~A." tokens))
       (values (mapcar #'parse-param
                       param-list)
               (subseq tokens (1+ rp-pos))))))
