@@ -75,24 +75,33 @@
                 index creg)
         (quil::mref name (+ offset index))))))
 
-(defgeneric check-register-is-defined (register)
-  (:method ((qreg qreg))
-    (unless (gethash (reg-name qreg) *qreg-names*)
-      (qasm-parse-error "Undefined qregister ~A." (reg-name qreg))))
-  (:method ((creg creg))
-    (unless (gethash (reg-name creg) *creg-names*)
-      (qasm-parse-error "Undefined cregister ~A." (reg-name creg)))))
+(defun register-namespace (register)
+  (etypecase register
+    (qreg *qreg-names*)
+    (creg *creg-names*)))
+
+(defun find-register (register &key (error-if-undefined t))
+  "Find the associated register data (in the appropriate namespace) for the given REGISTER.  If ERROR-IF-UNDEFINED, signal error if REGISTER is not defined."
+  (let ((register-val (gethash (reg-name register)
+                               (register-namespace register))))
+    (cond
+     ((not (null register-val))
+      register-val)
+     ((and (null register-val)
+           error-if-undefined)
+      (qasm-parse-error "Undefined ~{~}register ~A." (reg-name register)))
+     (t
+      nil))))
 
 (defun register-offset (register)
   (check-type register qreg)
-  (check-register-is-defined register)
-  (first (gethash (reg-name register) *qreg-names*)))
+  (first (find-register register :error-if-undefined t)))
 
 (defgeneric register-size (register)
   (:method ((qreg qreg))
-    (second (gethash (reg-name qreg) *qreg-names*)))
+    (second (find-register qreg :error-if-undefined t)))
   (:method ((creg creg))
-    (second (gethash (reg-name creg) *creg-names*))))
+    (second (find-register creg :error-if-undefined t))))
 
 (alexa:define-string-lexer line-lexer
   "A lexical analyzer for lines of OpenQASM 2.0."
@@ -386,12 +395,10 @@
     (multiple-value-bind (qreg rest-toks)
         (parse-qregister (rest measure-toks))
       (qasm-check-token-type (first rest-toks) ':ARROW)
-      (check-register-is-defined qreg)
-
+      
       (multiple-value-bind (creg rest-toks)
           (parse-cregister (rest rest-toks))
         (assert (null rest-toks))
-        (check-register-is-defined creg)
         
         (values (map-registers (lambda (src dest)
                                  (make-instance 'quil:measure
@@ -578,7 +585,6 @@ Note: the above \"expansion\" is not performed when in a gate body."
                   ;; performed by the caller however, as it makes this
                   ;; function less general than its name would imply.
                   (not *gate-applications-are-formal*))
-             (map nil #'check-register-is-defined registers)
              (let* ((register-size (reduce #'min (mapcar #'register-size unindexed-registers)))
                     (registers
                       (mapcar (lambda (register)
