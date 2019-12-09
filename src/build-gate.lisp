@@ -90,8 +90,6 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
   (apply #'build-gate (repeatedly-fork (named-operator roll-name) (length qubits))
          params qubit qubits))
 
-(defun pauli-gate (operator &rest pauli-))
-
 ;;; functions for dealing with mixed constant vs delayed-expression types
 
 (defun param-binary-op (op arg1 arg2)
