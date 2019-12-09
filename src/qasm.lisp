@@ -575,27 +575,27 @@ This should be expanded into
 It is an error to have unindexed registers of unequal size.
 
 Note: the above \"expansion\" is not performed when in a gate body."
-  (let ((registers (append (list register) more-registers)))
-    (let ((unindexed-registers (remove-if-not #'null registers :key #'reg-index)))
-      (cond ((and unindexed-registers
-                  ;; This prevents us from expanding, e.g., `x q` in
-                  ;; `gate a q { x q; };`. Perhaps this guard should be
-                  ;; performed by the caller however, as it makes this
-                  ;; function less general than its name would imply.
-                  (not *gate-applications-are-formal*))
-             (let* ((register-size (reduce #'min (mapcar #'register-size unindexed-registers)))
-                    (registers
-                      (mapcar (lambda (register)
-                                (alexandria:if-let ((index (reg-index register)))
-                                  (loop :repeat register-size :collect (register-to-quil-object register))
-                                  (loop :for i :below register-size
-                                        :for reg := (copy-qasm-register register)
-                                        :do (setf (reg-index reg) i)
-                                        :collect (register-to-quil-object reg))))
-                              registers)))
-               (apply #'mapcar function registers)))
-            (t
-             (apply function (mapcar #'register-to-quil-object registers)))))))
+  (let* ((registers (append (list register) more-registers))
+         (unindexed-registers (remove-if-not #'null registers :key #'reg-index)))
+    (cond ((and unindexed-registers
+                ;; This prevents us from expanding, e.g., `x q` in
+                ;; `gate a q { x q; };`. Perhaps this guard should be
+                ;; performed by the caller however, as it makes this
+                ;; function less general than its name would imply.
+                (not *gate-applications-are-formal*))
+           (let* ((register-size (reduce #'min (mapcar #'register-size unindexed-registers)))
+                  (registers
+                    (mapcar (lambda (register)
+                              (alexandria:if-let ((index (reg-index register)))
+                                (loop :repeat register-size :collect (register-to-quil-object register))
+                                (loop :for i :below register-size
+                                      :for reg := (copy-qasm-register register)
+                                      :do (setf (reg-index reg) i)
+                                      :collect (register-to-quil-object reg))))
+                            registers)))
+             (apply #'mapcar function registers)))
+          (t
+           (apply function (mapcar #'register-to-quil-object registers))))))
 
 (defun parse-application (tok-lines)
   (let ((application-toks (collect-single-application-from-tokens (first tok-lines)))
