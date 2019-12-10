@@ -386,20 +386,25 @@ If no exit rewiring is found, return NIL."
                 :reader permutation-gate-definition-permutation))
   (:documentation "A gate definition whose entries can be represented by a permutation of natural numbers."))
 
-(defclass pauli-sum-gate-definition (gate-definition)
+(defclass exp-pauli-sum-gate-definition (gate-definition)
   ((terms :initarg :terms
-          :reader pauli-sum-gate-definition-terms
+          :reader exp-pauli-sum-gate-definition-terms
           :documentation "List of PAULI-TERMs comprising the sum.")
    (parameters :initarg :parameters
-               :reader pauli-sum-gate-definition-parameters
+               :reader exp-pauli-sum-gate-definition-parameters
                :documentation "Ordered list of parameter names to be supplied to the definition, which can appear in arithmetical expressions weighting the definition's Pauli terms.")
    (arguments :initarg :arguments
-              :reader pauli-sum-gate-definition-arguments
+              :reader exp-pauli-sum-gate-definition-arguments
               :documentation "Ordered list of formal arguments appearing in the definition's Pauli terms."))
   (:documentation "Represents a gate definition as the exponential of a weighted sum of Pauli matrices."))
 
-(defmethod gate-definition-qubits-needed ((gate pauli-sum-gate-definition))
-  (length (pauli-sum-gate-definition-arguments gate)))
+(defstruct (pauli-term)
+  pauli-word
+  prefactor
+  arguments)
+
+(defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
+  (length (exp-pauli-sum-gate-definition-arguments gate)))
 
 (defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
   (ilog2 (length (permutation-gate-definition-permutation gate))))
@@ -1545,18 +1550,18 @@ For example,
                                 :stream stream
                                 :prefix "    "))
 
-  (:method ((gate pauli-sum-gate-definition) (stream stream))
+  (:method ((gate exp-pauli-sum-gate-definition) (stream stream))
     (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS PAULI-SUM:~%"
             (gate-definition-name gate)
-            (mapcar #'string (pauli-sum-gate-definition-parameters gate))
-            (mapcar #'formal-name (pauli-sum-gate-definition-arguments gate)))
-    (dolist (pauli-term (pauli-sum-gate-definition-terms gate))
+            (mapcar #'string (exp-pauli-sum-gate-definition-parameters gate))
+            (mapcar #'formal-name (exp-pauli-sum-gate-definition-arguments gate)))
+    (dolist (pauli-term (exp-pauli-sum-gate-definition-terms gate))
       (with-slots (pauli-word prefactor arguments) pauli-term
         (format stream "    ~a(" pauli-word)
         (typecase prefactor
           (number
            (format stream "~a" prefactor))
-          (cons
+          ((or symbol cons)
            (print-instruction (make-delayed-expression nil nil prefactor) stream)))
         (format stream ")")
         (dolist (arg arguments)
