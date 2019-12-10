@@ -120,7 +120,9 @@ DEFWAVEFORM wf 1.0:
         (frame-defns (list
                       "DEFFRAME 0 \"xy\""
                       "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%"
-                      "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%    INITIAL-FREQUENCY: 1.0~%"))
+                      "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%    INITIAL-FREQUENCY: 1.0~%"
+                      "DEFFRAME 0 \"xy\":~%    INITIAL-FREQUENCY: 1.0~%    DIRECTION: \"rx\"~%"
+                      "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%    DIRECTION: \"tx\"~%"))
         (waveform-defns (list
                          "DEFWAVEFORM foo 1.0:~%    1.0~%"
                          "DEFWAVEFORM foo 1.0:~%    1.0+1.0i, 1.0+1.0i~%"

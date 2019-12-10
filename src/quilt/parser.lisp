@@ -325,13 +325,21 @@
   (case property-name
     ((:SAMPLE-RATE)
      (parse-sample-rate value-toks))
+    ((:DIRECTION)
+     (unless (and (= 1 (length value-toks))
+                  (eq ':STRING (quil::token-type (first value-toks))))
+       (quil-parse-error "Expected DIRECTION to be a string literal, but got ~{ ~A~}." value-toks))
+     (let ((direction (quil::token-payload (first value-toks))))
+       (cond ((string= "tx" direction) ':TX)
+             ((string= "rx" direction) ':RX)
+             (t
+              (quil-parse-error "Expected DIRECTION to be one of \"tx\" or \"rx\", but got \"~S.\"" direction)))))
     ((:INITIAL-FREQUENCY)
      (let ((freq (quil::parse-parameter-or-expression value-toks)))
        (unless (and (is-constant freq)
                     (realp (constant-value freq)))
          (quil-parse-error "Expected INITIAL-FREQUENCY to be a real number, but got ~/quil:instruction-fmt/."
                            freq))
-       ;; TODO: Can the frame frequency reasonably be negative? Should we allow this?
        (unless (plusp (constant-value freq))
          (warn "Expected INITIAL-FREQUENCY to be positive, but got ~/quil:instruction-fmt/."
                freq))

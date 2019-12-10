@@ -259,6 +259,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(deftype frame-direction ()
+  `(member :TX :RX))
+
 (defclass frame-definition ()
   ((frame :initarg :frame
           :reader frame-definition-frame
@@ -274,6 +277,11 @@
                       :reader frame-definition-initial-frequency
                       :type (or null constant)
                       :documentation "The initial frequency of the frame. If specified, this should be a positive constant.")
+   (direction :initarg :direction
+              :initform nil
+              :reader frame-definition-direction
+              :type (or null frame-direction)
+              :documentation "The associated frame direction, indicating usage for transmission or reception.")
    (context :initarg :context
             :type lexical-context
             :accessor lexical-context
@@ -281,17 +289,21 @@
 
 (defmethod print-instruction-generic ((defn frame-definition) (stream stream))
   (let ((sample-rate (frame-definition-sample-rate defn))
-        (frequency (frame-definition-initial-frequency defn)))
+        (frequency (frame-definition-initial-frequency defn))
+        (direction (frame-definition-direction defn)))
     (format stream "DEFFRAME ~/quil:instruction-fmt/"
             (frame-definition-frame defn))
     (when (or sample-rate frequency)
       (format stream ":")
       (when sample-rate
-        (format stream "~%    SAMPLE-RATE: ~/quil:instruction-fmt/"
-                sample-rate))
+        (format stream "~%    SAMPLE-RATE: ~/quil:instruction-fmt/" sample-rate))
       (when frequency
-        (format stream "~%    INITIAL-FREQUENCY: ~/quil:instruction-fmt/"
-                frequency))
+        (format stream "~%    INITIAL-FREQUENCY: ~/quil:instruction-fmt/" frequency))
+      (when direction
+        (format stream "~%    DIRECTION: \"~S\""
+                (ecase direction
+                  (:TX "tx")
+                  (:RX "rx"))))
       (terpri stream))))
 
 (defclass waveform-definition ()
