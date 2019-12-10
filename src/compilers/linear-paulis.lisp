@@ -33,6 +33,17 @@
                     pos j)
         :finally (return pos)))
 
+(defun term->count-and-last-Z-position (term)
+  "For TERM a PAULI-TERM, counts the number of Zs and returns the position of the last occuring Z."
+  (loop :for letter :across (pauli-term-pauli-word term)
+        :for j :from 0
+        :with pos := 0
+        :with count := 0
+        :when (eql #\Z letter)
+          :do (setf count (1+ count)
+                    pos j)
+        :finally (return (values count pos))))
+
 (define-compiler parametric-diagonal-compiler
     ((instr _
             :where (and (typep (gate-application-gate instr) 'exp-pauli-sum-gate)
@@ -45,14 +56,7 @@
       ;; first, deal with the words with zero Zs / one Z: they're local gates
       (dolist (term terms)
         (multiple-value-bind (Z-count Z-position)
-            (loop :for letter :across (pauli-term-pauli-word term)
-                  :for j :from 0
-                  :with pos := 0
-                  :with count := 0
-                  :when (eql #\Z letter)
-                    :do (setf count (1+ count)
-                              pos j)
-                  :finally (return (values count pos)))
+            (term->count-and-last-Z-position term)
           (case Z-count
             (0
              nil)
@@ -90,7 +94,7 @@
               control-qubit (nth vote (application-arguments instr)))
         ;; now we re-sort the nonlocal terms into two buckets: those with a Z in
         ;; the voted-upon location, and those without
-        (let* ((Is nil) (Zs nil))
+        (let* (Is Zs)
           (dolist (term nonlocal-terms)
             (let ((Z-pos (loop :for letter :across (pauli-term-pauli-word term)
                                :for arg :in (pauli-term-arguments term)
@@ -98,13 +102,11 @@
                                :when (and (eql #\Z letter)
                                           (eql vote (position arg arguments :test #'equalp)))
                                  :do (return j))))
-              (cond
-                (Z-pos
-                 (push (list term Z-pos) Zs))
-                (t
-                 (push term Is)))))
+              (if Z-pos
+                  (push (list term Z-pos) Zs)
+                  (push term Is))))
           ;; emit the Is
-          (unless (endp Is)
+          (when Is
             (let ((I-gate (make-instance 'exp-pauli-sum-gate
                                          :arguments arguments
                                          :parameters parameters
@@ -161,13 +163,13 @@
                                              :dimension dimension
                                              :terms (mapcar #'first ZIs)
                                              :name "ZI-GATE")))
-                (unless (zerop (length ZZ-terms))
+                (when ZZ-terms
                   (inst "CNOT" () control-qubit subvote-literal)
                   (inst* ZZ-gate
                          (application-parameters instr)
                          (application-arguments instr))
                   (inst "CNOT" () control-qubit subvote-literal))
-                (unless (zerop (length ZIs))
+                (when ZIs
                   (inst* ZI-gate
                          (application-parameters instr)
                          (application-arguments instr)))))))))))
