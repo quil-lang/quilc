@@ -396,12 +396,13 @@ as needed so that they are the same size."
   "Computes EXP(M*S).  Only works for unitarily diagonalizable matrices M."
   (multiple-value-bind (d u)
       (if hermitian? (magicl:hermitian-eig m) (magicl:eig m))
-    (assert (matrix-equality m
-                             (m* u
-                                 (magicl:diag (length d) (length d) d)
-                                 (magicl:conjugate-transpose u)))
-            ()
-            "MATRIX-EXPT failed to diagonalize its input.")
+    (when *compress-carefully*
+      (assert (matrix-equality m
+                               (m* u
+                                   (magicl:diag (length d) (length d) d)
+                                   (magicl:conjugate-transpose u)))
+              ()
+              "MATRIX-EXPT failed to diagonalize its input."))
     (let* ((size (length d))
            (dd (magicl:diag size size
                             (mapcar (lambda (z) (exp (* z s))) d))))

@@ -4,7 +4,7 @@
 ;;;;
 ;;;; This file contains routines for the parametric compilation of gates defined
 ;;;; by time-independent Hamiltonians via expression as a
-;;;; PAULI-SUM-GATE.
+;;;; EXP-PAULI-SUM-GATE.
 
 (in-package #:cl-quil)
 
@@ -35,14 +35,14 @@
 
 (define-compiler parametric-diagonal-compiler
     ((instr _
-            :where (and (typep (gate-application-gate instr) 'pauli-sum-gate)
+            :where (and (typep (gate-application-gate instr) 'exp-pauli-sum-gate)
                         (every (lambda (term) (every (lambda (letter) (or (eql letter #\Z) (eql letter #\I)))
                                                      (pauli-term-pauli-word term)))
-                               (pauli-sum-gate-terms (gate-application-gate instr))))))
+                               (exp-pauli-sum-gate-terms (gate-application-gate instr))))))
   "Decomposes a diagonal Pauli gate by a single step."
   (with-slots (arguments parameters terms arity dimension) (gate-application-gate instr)
     (let ((nonlocal-terms nil))
-      ;; first, deal with the words with a zero Zs / one Z: they're local gates
+      ;; first, deal with the words with zero Zs / one Z: they're local gates
       (dolist (term terms)
         (multiple-value-bind (Z-count Z-position)
             (loop :for letter :across (pauli-term-pauli-word term)
@@ -105,7 +105,7 @@
                  (push term Is)))))
           ;; emit the Is
           (unless (endp Is)
-            (let ((I-gate (make-instance 'pauli-sum-gate
+            (let ((I-gate (make-instance 'exp-pauli-sum-gate
                                          :arguments arguments
                                          :parameters parameters
                                          :arity arity
@@ -116,68 +116,77 @@
                      (application-parameters instr)
                      (application-arguments instr))))
           ;; emit the Zs
-          (labels
-              ((collect-by-target (term-pairs)
-                 (when (endp term-pairs)
-                   (return-from collect-by-target nil))
-                 (let ((subvotes (make-array (length arguments))))
-                   (loop :for (term Z-pos) :in term-pairs
-                         :do (loop :for letter :across (pauli-term-pauli-word term)
-                                   :for j :from 0
-                                   :for arg :in (pauli-term-arguments term)
-                                   :when (and (not (eql j Z-pos))
-                                              (eql #\Z letter))
-                                     :do (incf (aref subvotes (position arg arguments :test #'equalp)))))
-                   (let* ((subvote-position (array-argmax subvotes))
-                          (subvote-formal (nth subvote-position arguments))
-                          (subvote-literal (nth subvote-position (application-arguments instr)))
-                          ZZs ZIs)
-                     (dolist (term-pair term-pairs)
-                       (let ((term (car term-pair)))
-                         (cond
-                           ((position subvote-formal (pauli-term-arguments term) :test #'equalp)
-                            (push term-pair ZZs))
-                           (t
-                            (push term-pair ZIs)))))
-                     (let* ((ZZ-terms
-                              (loop :for (term Z-pos) :in ZZs
-                                    :collect (make-pauli-term
-                                              :prefactor (pauli-term-prefactor term)
-                                              :arguments (pauli-term-arguments term)
-                                              :pauli-word (coerce (loop :for letter :across (pauli-term-pauli-word term)
-                                                                        :for j :from 0
-                                                                        :if (eql j Z-pos)
-                                                                          :collect #\I
-                                                                        :else
-                                                                          :collect letter)
-                                                                  'string))))
-                            (Z-gate (make-instance 'pauli-sum-gate
-                                                   :arguments arguments
-                                                   :parameters parameters
-                                                   :arity arity
-                                                   :dimension dimension
-                                                   :terms ZZ-terms
-                                                   :name "ZZ-GATE")))
-                       (inst "CNOT" () control-qubit subvote-literal)
-                       (inst* Z-gate
-                              (application-parameters instr)
-                              (application-arguments instr))
-                       (inst "CNOT" () control-qubit subvote-literal))
-                     (collect-by-target ZIs)))))
-            (collect-by-target Zs)))))))
+          (let ((subvotes (make-array (length arguments))))
+            (loop :for (term Z-pos) :in Zs
+                  :do (loop :for letter :across (pauli-term-pauli-word term)
+                            :for j :from 0
+                            :for arg :in (pauli-term-arguments term)
+                            :when (and (not (eql j Z-pos))
+                                       (eql #\Z letter))
+                              :do (incf (aref subvotes (position arg arguments :test #'equalp)))))
+            (let* ((subvote-position (array-argmax subvotes))
+                   (subvote-formal (nth subvote-position arguments))
+                   (subvote-literal (nth subvote-position (application-arguments instr)))
+                   ZZs ZIs)
+              (dolist (term-pair Zs)
+                (let ((term (car term-pair)))
+                  (cond
+                    ((position subvote-formal (pauli-term-arguments term) :test #'equalp)
+                     (push term-pair ZZs))
+                    (t
+                     (push term-pair ZIs)))))
+              (let* ((ZZ-terms
+                       (loop :for (term Z-pos) :in ZZs
+                             :collect (make-pauli-term
+                                       :prefactor (pauli-term-prefactor term)
+                                       :arguments (pauli-term-arguments term)
+                                       :pauli-word (coerce (loop :for letter :across (pauli-term-pauli-word term)
+                                                                 :for j :from 0
+                                                                 :if (eql j Z-pos)
+                                                                   :collect #\I
+                                                                 :else
+                                                                   :collect letter)
+                                                           'string))))
+                     (ZZ-gate (make-instance 'exp-pauli-sum-gate
+                                             :arguments arguments
+                                             :parameters parameters
+                                             :arity arity
+                                             :dimension dimension
+                                             :terms ZZ-terms
+                                             :name "ZZ-GATE"))
+                     (ZI-gate (make-instance 'exp-pauli-sum-gate
+                                             :arguments arguments
+                                             :parameters parameters
+                                             :arity arity
+                                             :dimension dimension
+                                             :terms (mapcar #'first ZIs)
+                                             :name "ZI-GATE")))
+                (unless (zerop (length ZZ-terms))
+                  (inst "CNOT" () control-qubit subvote-literal)
+                  (inst* ZZ-gate
+                         (application-parameters instr)
+                         (application-arguments instr))
+                  (inst "CNOT" () control-qubit subvote-literal))
+                (unless (zerop (length ZIs))
+                  (inst* ZI-gate
+                         (application-parameters instr)
+                         (application-arguments instr)))))))))))
 
 
 ;; TODO: also write an orthogonal gate compiler somewhere? approx.lisp will take
 ;;       care of it in the 2Q case, at least.
 
 (define-compiler parametric-pauli-compiler
-    ((instr _ :where (and (typep (gate-application-gate instr) 'pauli-sum-gate)
+    ((instr _ :where (and (typep (gate-application-gate instr) 'exp-pauli-sum-gate)
                           (= 1 (length (application-parameters instr)))
                           (not (typep (first (application-parameters instr)) 'constant)))))
   "Decomposes a gate described by the exponential of a time-independent Hamiltonian into static orthogonal and parametric diagonal components."
   (let ((gate (gate-application-gate instr)))
     (with-slots (arguments parameters terms dimension) gate
       
+      ;; make sure that all the pauli terms are all scalar multiples of the unknown parameter.
+      ;; we track this by making sure that the unknown parameter appears only once and that
+      ;; the surrounding expression takes a particularly nice form.
       (labels ((crawl-parameter (p)
                  (typecase p
                    (list
@@ -239,7 +248,7 @@
                                               :pauli-word (coerce (make-array (length term-arguments)
                                                                               :initial-element #\Z)
                                                                   'string))))
-                    diagonal-gate (make-instance 'pauli-sum-gate
+                    diagonal-gate (make-instance 'exp-pauli-sum-gate
                                                  :arguments arguments
                                                  :parameters parameters
                                                  :terms terms

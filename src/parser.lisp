@@ -844,7 +844,6 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 
 (defun parse-gate-definition (tok-lines)
   "Parse a gate definition from the token lines TOK-LINES."
-  (declare (optimize (debug 3) (speed 0) (space 0)))
   ;; Check that we have tokens left
   (when (null tok-lines)
     (quil-parse-error "EOF reached when gate definition expected"))
@@ -872,30 +871,30 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
 
         (multiple-value-bind (params rest-line) (parse-parameters params-args)
           (multiple-value-bind (args rest-line) (parse-arguments rest-line)
-          (when (eql ':AS (token-type (first rest-line)))
-            (pop rest-line)
-            (let* ((parsed-gate-tok (first rest-line))
-                   (parsed-gate-type (token-type parsed-gate-tok)))
-              (unless (find parsed-gate-type '(:MATRIX :PERMUTATION :PAULI-SUM))
-                (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
-              (setf gate-type parsed-gate-type)))
+            (when (eql ':AS (token-type (first rest-line)))
+              (pop rest-line)
+              (let* ((parsed-gate-tok (first rest-line))
+                     (parsed-gate-type (token-type parsed-gate-tok)))
+                (unless (find parsed-gate-type '(:MATRIX :PERMUTATION :PAULI-SUM))
+                  (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
+                (setf gate-type parsed-gate-type)))
 
-          (ecase gate-type
-            (:MATRIX
-             (when args
-              (quil-parse-error "DEFGATE AS MATRIX cannot carry formal qubit arguments."))
-             (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
-            (:PERMUTATION
-             (when args
-              (quil-parse-error "DEFGATE AS PERMUTATION cannot carry formal qubit arguments."))
-             (when params
-               (quil-parse-error "Permutation gate definitions do not support parameters."))
-             (parse-gate-entries-as-permutation body-lines name :lexical-context op))
-            (:PAULI-SUM
-             (parse-gate-definition-body-into-pauli-sum body-lines name
-                                                     :lexical-context op
-                                                     :legal-arguments args
-                                                     :legal-parameters params)))))))))
+            (ecase gate-type
+              (:MATRIX
+               (when args
+                 (quil-parse-error "DEFGATE AS MATRIX cannot carry formal qubit arguments."))
+               (parse-gate-entries-as-matrix body-lines params name :lexical-context op))
+              (:PERMUTATION
+               (when args
+                 (quil-parse-error "DEFGATE AS PERMUTATION cannot carry formal qubit arguments."))
+               (when params
+                 (quil-parse-error "Permutation gate definitions do not support parameters."))
+               (parse-gate-entries-as-permutation body-lines name :lexical-context op))
+              (:PAULI-SUM
+               (parse-gate-definition-body-into-pauli-sum body-lines name
+                                                          :lexical-context op
+                                                          :legal-arguments args
+                                                          :legal-parameters params)))))))))
 
 (defun parse-gate-definition-body-into-pauli-sum (body-lines name &key lexical-context legal-arguments legal-parameters)
   ;; is the immediate next line indented? if not, error.
@@ -917,7 +916,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                   ;; if we're done, return the gate definition (and the rest of the lines)
                   (when dedented?
                     (return-from parse-gate-definition-body-into-pauli-sum
-                      (values (make-instance 'pauli-sum-gate-definition
+                      (values (make-instance 'exp-pauli-sum-gate-definition
                                              :name name
                                              :terms (nreverse parsed-entries)
                                              :context lexical-context
@@ -933,11 +932,6 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                                                                     :legal-parameters legal-parameters
                                                                     :legal-arguments legal-arguments)
                                               parsed-entries)))))))
-
-(defstruct (pauli-term)
-  pauli-word
-  prefactor
-  arguments)
 
 (defun parse-pauli-sum-line (line &key lexical-context legal-arguments legal-parameters)
   "Parses a line inside of a DEFGATE ... AS PAULI-SUM body."

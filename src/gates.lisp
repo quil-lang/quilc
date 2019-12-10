@@ -190,16 +190,16 @@
 (defmethod gate-matrix ((gate parameterized-gate) &rest parameters)
   (apply (parameterized-gate-matrix-function gate) parameters))
 
-(defclass pauli-sum-gate (parameterized-gate)
+(defclass exp-pauli-sum-gate (parameterized-gate)
   ((parameters :initarg :parameters
-               :reader pauli-sum-gate-parameters)
+               :reader exp-pauli-sum-gate-parameters)
    (arguments :initarg :arguments
-              :reader pauli-sum-gate-arguments)
+              :reader exp-pauli-sum-gate-arguments)
    (terms :initarg :terms
-          :reader pauli-sum-gate-terms))
+          :reader exp-pauli-sum-gate-terms))
   (:documentation "A gate specified by a Pauli sum."))
 
-(defmethod initialize-instance :after ((gate pauli-sum-gate) &key)
+(defmethod initialize-instance :after ((gate exp-pauli-sum-gate) &key)
   (with-slots (parameters arguments terms) gate
     (let ((size (expt 2 (length arguments))))
       (flet ((matrix-function (&rest params)
@@ -208,7 +208,7 @@
                                       (m+ m (pauli-term->matrix term arguments params parameters)))
                                     terms
                                     :initial-value (magicl:make-zero-matrix size size))
-                            (complex 0d0 -1d0)
+                            #C(0d0 -1d0)
                             :hermitian? t)))
         (setf (%parameterized-gate-matrix-function gate) #'matrix-function)))))
 
@@ -380,9 +380,9 @@
                      :arity (length params)
                      :matrix-function (compile nil (lambda-form params dim entries))))))
 
-(defmethod gate-definition-to-gate ((gate-def pauli-sum-gate-definition))
+(defmethod gate-definition-to-gate ((gate-def exp-pauli-sum-gate-definition))
   (with-slots (arguments parameters terms) gate-def
-    (make-instance 'pauli-sum-gate
+    (make-instance 'exp-pauli-sum-gate
                    :arguments arguments
                    :parameters parameters
                    :terms terms
