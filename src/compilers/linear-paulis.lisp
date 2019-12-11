@@ -44,6 +44,27 @@
                     pos j)
         :finally (return (values count pos))))
 
+(defun clone-exp-pauli-sum-gate (gate &key new-name new-terms)
+  (with-slots (arguments parameters arity dimension name terms) gate
+    (make-instance 'exp-pauli-sum-gate
+                   :arguments arguments
+                   :parameters parameters
+                   :arity arity
+                   :dimension dimension
+                   :name (or new-name name)
+                   :terms (or new-terms terms))))
+
+(defun find-most-occurrant-Z (terms arguments &key except)
+  (let ((votes (make-array (length arguments) :initial-element 0)))
+    (dolist (term terms)
+      (loop :for letter :across (pauli-term-pauli-word term)
+            :for argument :in (pauli-term-arguments term)
+            :when (eql #\Z letter)
+              :do (incf (aref votes (position argument arguments :test #'equalp)))))
+    (when except
+      (setf (aref votes except) 0))
+    (array-argmax votes)))
+
 (define-compiler parametric-diagonal-compiler
     ((instr _
             :where (and (typep (gate-application-gate instr) 'exp-pauli-sum-gate)
@@ -53,48 +74,43 @@
   "Decomposes a diagonal Pauli gate by a single step."
   (with-slots (arguments parameters terms arity dimension) (gate-application-gate instr)
     (let ((nonlocal-terms nil))
-      ;; first, deal with the words with zero Zs / one Z: they're local gates
-      (dolist (term terms)
-        (multiple-value-bind (Z-count Z-position)
-            (term->count-and-last-Z-position term)
-          (case Z-count
-            (0
-             nil)
-            (1
-             (inst "RZ"
-                   (list (param-* 2.0d0
-                                  (tree-substitute (pauli-term-prefactor term)
-                                                   (mapcar (lambda (ep ap)
-                                                             (typecase ap
-                                                               (delayed-expression
-                                                                (cons ep (delayed-expression-expression ap)))
-                                                               (otherwise
-                                                                (cons ep ap))))
-                                                           parameters (application-parameters instr)))))
-                   (nth (position (nth Z-position (pauli-term-arguments term))
-                                  arguments :test #'equalp)
-                        (application-arguments instr))))
-            (otherwise
-             (push term nonlocal-terms)))))
-      (let ((votes (make-array (length arguments) :initial-element 0))
-            vote
-            control-qubit)
-        ;; we can break nonlocal terms into two collections: those with Zs in
-        ;; some spot and those without Zs in that spot. the result will be to
-        ;; conjugate the first collection by CNOT, which flips those Zs to Is.
-        ;; since we can only emit local gates, almost all such Zs will have to
-        ;; be eliminated, and so we'll want to pick the position so that this
-        ;; group is as large as possible.
-        (dolist (term nonlocal-terms)
-          (loop :for letter :across (pauli-term-pauli-word term)
-                :for argument :in (pauli-term-arguments term)
-                :when (eql #\Z letter)
-                  :do (incf (aref votes (position argument arguments :test #'equalp)))))
-        (setf vote (array-argmax votes)
-              control-qubit (nth vote (application-arguments instr)))
+      ;; first, deal with the words with zero Zs / one Z: they're local gates.
+      ;; we'll want to evaluate the gate definition at whatever the gate application says.
+      (let ((substitution-table
+              (mapcar (lambda (ep ap)
+                        (typecase ap
+                          (delayed-expression
+                           (cons ep (delayed-expression-expression ap)))
+                          (otherwise
+                           (cons ep ap))))
+                      parameters (application-parameters instr))))
+        (dolist (term terms)
+          (multiple-value-bind (Z-count Z-position)
+              (term->count-and-last-Z-position term)
+            (case Z-count
+              (0
+               nil)
+              (1
+               (inst "RZ"
+                     (list (param-* 2.0d0
+                                    (tree-substitute (pauli-term-prefactor term)
+                                                     substitution-table)))
+                     (nth (position (nth Z-position (pauli-term-arguments term))
+                                    arguments :test #'equalp)
+                          (application-arguments instr))))
+              (otherwise
+               (push term nonlocal-terms))))))
+      ;; we can break nonlocal terms into two collections: those with Zs in
+      ;; some spot and those without Zs in that spot. the result will be to
+      ;; conjugate the first collection by CNOT, which flips those Zs to Is.
+      ;; since we can only emit local gates, almost all such Zs will have to
+      ;; be eliminated, and so we'll want to pick the position so that this
+      ;; group is as large as possible.
+      (let* ((vote (find-most-occurrant-Z nonlocal-terms arguments))
+             (control-qubit (nth vote (application-arguments instr))))
         ;; now we re-sort the nonlocal terms into two buckets: those with a Z in
         ;; the voted-upon location, and those without
-        (let* (Is Zs)
+        (let (Is Zs)
           (dolist (term nonlocal-terms)
             (let ((Z-pos (loop :for letter :across (pauli-term-pauli-word term)
                                :for arg :in (pauli-term-arguments term)
@@ -105,74 +121,58 @@
               (if Z-pos
                   (push (list term Z-pos) Zs)
                   (push term Is))))
-          ;; emit the Is
+          ;; emit the Is as-is
           (when Is
-            (let ((I-gate (make-instance 'exp-pauli-sum-gate
-                                         :arguments arguments
-                                         :parameters parameters
-                                         :arity arity
-                                         :dimension dimension
-                                         :name "Is"
-                                         :terms Is)))
+            (let ((I-gate (clone-exp-pauli-sum-gate (gate-application-gate instr)
+                                                    :new-name "Is" :new-terms Is)))
               (inst* I-gate
                      (application-parameters instr)
                      (application-arguments instr))))
-          ;; emit the Zs
-          (let ((subvotes (make-array (length arguments))))
-            (loop :for (term Z-pos) :in Zs
-                  :do (loop :for letter :across (pauli-term-pauli-word term)
-                            :for j :from 0
-                            :for arg :in (pauli-term-arguments term)
-                            :when (and (not (eql j Z-pos))
-                                       (eql #\Z letter))
-                              :do (incf (aref subvotes (position arg arguments :test #'equalp)))))
-            (let* ((subvote-position (array-argmax subvotes))
-                   (subvote-formal (nth subvote-position arguments))
-                   (subvote-literal (nth subvote-position (application-arguments instr)))
-                   ZZs ZIs)
-              (dolist (term-pair Zs)
-                (let ((term (car term-pair)))
-                  (cond
-                    ((position subvote-formal (pauli-term-arguments term) :test #'equalp)
-                     (push term-pair ZZs))
-                    (t
-                     (push term-pair ZIs)))))
-              (let* ((ZZ-terms
-                       (loop :for (term Z-pos) :in ZZs
-                             :collect (make-pauli-term
-                                       :prefactor (pauli-term-prefactor term)
-                                       :arguments (pauli-term-arguments term)
-                                       :pauli-word (coerce (loop :for letter :across (pauli-term-pauli-word term)
-                                                                 :for j :from 0
-                                                                 :if (eql j Z-pos)
-                                                                   :collect #\I
-                                                                 :else
-                                                                   :collect letter)
-                                                           'string))))
-                     (ZZ-gate (make-instance 'exp-pauli-sum-gate
-                                             :arguments arguments
-                                             :parameters parameters
-                                             :arity arity
-                                             :dimension dimension
-                                             :terms ZZ-terms
-                                             :name "ZZ-GATE"))
-                     (ZI-gate (make-instance 'exp-pauli-sum-gate
-                                             :arguments arguments
-                                             :parameters parameters
-                                             :arity arity
-                                             :dimension dimension
-                                             :terms (mapcar #'first ZIs)
-                                             :name "ZI-GATE")))
-                (when ZZ-terms
-                  (inst "CNOT" () control-qubit subvote-literal)
-                  (inst* ZZ-gate
-                         (application-parameters instr)
-                         (application-arguments instr))
-                  (inst "CNOT" () control-qubit subvote-literal))
-                (when ZIs
-                  (inst* ZI-gate
-                         (application-parameters instr)
-                         (application-arguments instr)))))))))))
+          ;; emit the Zs by reducing their Z-counts (for some of them).
+          ;; we reduce the Z-count by using the identity CNOT ZI CNOT = ZZ, so we seek
+          ;; a second qubit index with a lot of Zs to conjugate away all at once.
+          (let* ((subvote-position (find-most-occurrant-Z (mapcar #'car Zs) arguments
+                                                          :except vote))
+                 (subvote-formal (nth subvote-position arguments))
+                 (subvote-literal (nth subvote-position (application-arguments instr)))
+                 ZZs ZIs)
+            ;; cleave the Zs into ZZs and ZIs.
+            (dolist (term-pair Zs)
+              (let ((term (car term-pair)))
+                (if (position subvote-formal (pauli-term-arguments term) :test #'equalp)
+                    (push term-pair ZZs)
+                    (push term-pair ZIs))))
+            ;; for the ZIs: emit them as-is.
+            (let ((ZI-gate (clone-exp-pauli-sum-gate (gate-application-gate instr)
+                                                     :new-name "ZI-GATE" :new-terms ZIs)))
+              (when ZIs
+                (inst* ZI-gate
+                       (application-parameters instr)
+                       (application-arguments instr))))
+            ;; for the ZZs: rewrite them as if they would be ZIs ...
+            (let* ((ZZs->ZIs
+                     (mapcar (lambda (pair)
+                               (destructuring-bind (term Z-pos) pair
+                                 (let ((new-term (copy-pauli-term term)))
+                                   (setf (pauli-term-pauli-word new-term)
+                                         (coerce (loop :for letter :across (pauli-term-pauli-word term)
+                                                       :for j :from 0
+                                                       :if (eql j Z-pos)
+                                                         :collect #\I
+                                                       :else
+                                                         :collect letter)
+                                                 'string))
+                                   new-term)))
+                             ZZs))
+                   (ZZ-gate (clone-exp-pauli-sum-gate (gate-application-gate instr)
+                                                      :new-name "ZZ-GATE" :new-terms ZZs->ZIs)))
+              ;; ... then emit them in a CNOT sandwich.
+              (when ZZs
+                (inst "CNOT" () control-qubit subvote-literal)
+                (inst* ZZ-gate
+                       (application-parameters instr)
+                       (application-arguments instr))
+                (inst "CNOT" () control-qubit subvote-literal)))))))))
 
 
 ;; TODO: also write an orthogonal gate compiler somewhere? approx.lisp will take
