@@ -59,10 +59,8 @@
            (code (quil:parsed-program-executable-code quil)))
       (is (= 1 (length mems)))
       (is (find "c" mems :key #'quil:memory-descriptor-name :test #'equalp))
-      (is (equal "H" (quil:operator-description-root-name
-                      (quil:application-operator (elt code 0)))))
-      (is (equal "CNOT" (quil:operator-description-root-name
-                         (quil:application-operator (elt code 1)))))
+      (is (equal "H" (quil::application-operator-root-name (elt code 0))))
+      (is (equal "CNOT" (quil::application-operator-root-name (elt code 1))))
       (is (typep (elt code 2) 'quil:measure)))))
 
 (deftest test-qasm-gate-definition-and-application ()
@@ -139,15 +137,15 @@ qreg q[1]; x q[0]; // bye")
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
     
-    (is (equal "RZ" (quil:operator-description-root-name (quil:application-operator (elt code 0)))))
+    (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
     (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
     
-    (is (equal "RY" (quil:operator-description-root-name (quil:application-operator (elt code 1)))))
+    (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
     (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
 
-    (is (equal "RZ" (quil:operator-description-root-name (quil:application-operator (elt code 2)))))
+    (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
     (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2)))))))
 
@@ -157,15 +155,15 @@ qreg q[1]; x q[0]; // bye")
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
     
-    (is (equal "RZ" (quil:operator-description-root-name (quil:application-operator (elt code 0)))))
+    (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
     (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
     
-    (is (equal "RY" (quil:operator-description-root-name (quil:application-operator (elt code 1)))))
+    (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
     (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
 
-    (is (equal "RZ" (quil:operator-description-root-name (quil:application-operator (elt code 2)))))
+    (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
     (is (= quil:pi/2 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2)))))))
 
@@ -175,15 +173,15 @@ qreg q[1]; x q[0]; // bye")
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
     
-    (is (equal "RZ" (quil:operator-description-root-name (quil:application-operator (elt code 0)))))
+    (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
     (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
     
-    (is (equal "RY" (quil:operator-description-root-name (quil:application-operator (elt code 1)))))
+    (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
     (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
 
-    (is (equal "RZ" (quil:operator-description-root-name (quil:application-operator (elt code 2)))))
+    (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
     (is (= -0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2))))))))
 
