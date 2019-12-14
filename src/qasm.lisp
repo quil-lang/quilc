@@ -474,7 +474,11 @@
   (let ((payload (token-payload token)))
     (cond ((and *gate-params*
                 (find payload *gate-params* :test #'equalp :key #'quil:param-name))
-           (format nil "%~A" payload))
+           (format nil "(%~A)" payload))
+          ((eql (token-type token) ':LEFT-PAREN)
+           (format nil "("))
+          ((eql (token-type token) ':RIGHT-PAREN)
+           (format nil ")"))
           ((typep payload 'quil:constant)
            (format nil "~F" (quil:constant-value payload)))
           (t
@@ -500,19 +504,19 @@
       ;; and then pass it through cl-quil's arithmetic parsing stuff.
       ;; This is a bit hacky, but I don't want to duplicate the
       ;; arithmetic stuff in cl-quil.
-      (let* ((str (format nil "(~A)"
+      (let* ((str (format nil "~A"
                           (apply #'concatenate 'string (mapcar #'%stringify-token-payload tokens))))
              (quil-tokens (first (quil::tokenize str)))
              (quil::*parse-context* ':DEFCIRCUIT)
              (quil::*formal-arguments-allowed* t))
-        (quil::parse-parameter-or-expression quil-tokens))))
+        (quil::simplify-arithmetic (quil::parse-parameter-or-expression quil-tokens)))))
 
 (defun parse-params (tokens)
   "Parse a list of qasm params (e.g. in the instruction  rx(0.5) q;). Returns a list of parameter values (type float), and a second value which is the remaining tokens (not including closing parenthesis)."
   (qasm-check-unexpected-eof tokens "parameters")
   (qasm-check-token-type (first tokens) :LEFT-PAREN)
   
-  (let ((rp-pos (position ':RIGHT-PAREN tokens :key 'token-type)))
+  (let ((rp-pos (position ':RIGHT-PAREN tokens :key 'token-type :from-end t)))
     (unless rp-pos
       (qasm-parse-error "Could not find token of type ':RIGHT-PAREN in parameter list ~A." tokens))
     (let* ((subseq (subseq tokens 1 rp-pos))
