@@ -555,8 +555,8 @@
 (defun build-u-gate (θ ϕ λ qubit)
   (list
    (quil::build-gate "RZ" `(,λ) qubit)
-   (quil::build-gate "RY" `(,ϕ) qubit)
-   (quil::build-gate "RZ" `(,θ) qubit)))
+   (quil::build-gate "RY" `(,θ) qubit)
+   (quil::build-gate "RZ" `(,ϕ) qubit)))
 
 (defun map-registers (function register &rest more-registers)
   "Apply FUNCTION to successive sets of registers.
