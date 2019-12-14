@@ -7,7 +7,7 @@
 
 (defvar *gate-names*)
 (setf (documentation '*gate-names* 'variable)
-      "A HASH-TABLE of user-defined gates. The table is keyed on the gate name (a string), and the value is simply T.")
+      "A HASH-TABLE of user-defined gates. The table is keyed on the gate name (a case-sensitive string), and the value is simply T.")
 
 (defvar *gate-applications-are-formal*)
 (setf (documentation '*gate-applications-are-formal* 'variable)
@@ -909,12 +909,12 @@ Note: the above \"expansion\" is not performed when in a gate body."
 (defun parse-qasm-into-raw-program (string)
   "Parse STRING into a raw, untransformed PARSED-PROGRAM object."
   
-  (let* ((*creg-names* (make-hash-table :test #'equal))
-         (*qreg-names* (make-hash-table :test #'equal))
+  (let* ((*creg-names* (make-hash-table :test #'equalp))
+         (*qreg-names* (make-hash-table :test #'equalp))
          (*qubit-count* 0)
          (*gate-applications-are-formal* nil)
          (*gate-params* nil)
-         (*gate-names* (make-hash-table :test #'equal))
+         (*gate-names* (make-hash-table :test #'equalp))
          (code (parse-qasm-body string)))
     (setf code (quil::process-includes code))
     ;; Return the parsed sequence of objects.
