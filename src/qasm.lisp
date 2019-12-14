@@ -602,6 +602,11 @@ Note: the above \"expansion\" is not performed when in a gate body."
           (t
            (apply function (mapcar #'register-to-quil-object registers))))))
 
+(defun %qasm-gate-name (name)
+  "Prefixes NAME with \"QASM_\".  Prevents a QASM gate naming collision with Quil names."
+  (check-type name string)
+  (concatenate 'string "QASM_" name))
+
 (defun parse-application (tok-lines)
   (let ((application-toks (collect-single-application-from-tokens (first tok-lines)))
         (rest-toks (rest tok-lines)))
@@ -612,155 +617,25 @@ Note: the above \"expansion\" is not performed when in a gate body."
         (cond
           ;; TODO Valid number of params, registers
           ;;
-          ;; TODO Allow application of gates to multiple registers,
-          ;; e.g. cx q, r; where q and r can be register arrays.
-          ;;
-          ;; TODO I think there is an opportunity to delete everything
-          ;; except CX and U, since the remaining functions are all
-          ;; defined in terms of just those two gates.  Typically how
-          ;; this works in OpenQASM is that a program would `include
-          ;; "qelib.inc"` which contains QASM definitions of most of
-          ;; the stuff below.  That would simplify this a good deal.
-          ;; The issue I see is that some of those gates use names
-          ;; that are already reserved in Quil (e.g. rx), and so QASM
-          ;; gate names would not (could not) be preserved (and would
-          ;; require e.g. a prefix "qasm_gate_rx").
-
           ;; "QE hardware primitives"
-          ((member name '("CX" "cx") :test 'string=)
+          ((string= name "CX")
            (check-number-of-parameters params 0)
            (values (apply #'map-registers (lambda (ctl tgt)
                                             (quil::build-gate "CNOT" nil ctl tgt))
                           registers)
                    rest-toks))
           
-          ((member name '("U" "u" "u3") :test 'string=)
+          ((string= name "U")
            (check-number-of-parameters params 3)
+           (unless *gate-applications-are-formal*
+             (break))
            (destructuring-bind (θ ϕ λ) params
              (values (apply #'map-registers (lambda (tgt) (build-u-gate θ ϕ λ tgt))
                             registers) 
                      rest-toks)))
           
-          ((member name '("u2") :test 'string=)
-           (check-number-of-parameters params 2)
-           (destructuring-bind (ϕ λ) params
-             (values (apply #'map-registers (lambda (tgt) (build-u-gate quil::pi/2 ϕ λ tgt))
-                            registers)
-                     rest-toks)))
-          
-          ((member name '("u1") :test 'string=)
-           (check-number-of-parameters params 1)
-           (destructuring-bind (λ) params
-             (values (apply #'map-registers (lambda (tgt) (build-u-gate 0d0 0d0 λ tgt))
-                            registers)
-                     rest-toks)))
-          
-          ((member name '("id") :test 'string=)
-           (check-number-of-parameters params 0)
-           (values nil
-                   ;; Bit redundant.  Maybe just nil.
-                   (append (tokenize (format nil "U(0,0,0) ~/quil.qasm:reg-fmt/;"
-                                             (first registers)))
-                           rest-toks)))
-
-          ;; "QE standard gates"
-          
-          ((member name '("x" "y" "z" "h" "s" "t") :test 'string=)
-           (check-number-of-parameters params 0)
-           (values (apply #'map-registers (lambda (tgt) (quil::build-gate (string-upcase name) nil tgt))
-                          registers)
-                   rest-toks))
-          
-          ((member name '("rx" "ry" "rz") :test 'string=)
-           (check-number-of-parameters params 1)
-           (values (apply #'map-registers
-                          (lambda (tgt) (quil::build-gate (string-upcase name) params tgt))
-                          registers)
-                   rest-toks))
-          
-          ((string= name "sdg")
-           (check-number-of-parameters params 0)
-           (values nil
-                   (append (tokenize (format nil "u1(-pi/2) ~/quil.qasm:reg-fmt/;"
-                                             (first registers)))
-                           rest-toks)))
-          
-          ((string= name "tdg")
-           (check-number-of-parameters params 0)
-           (values nil
-                   (append (tokenize (format nil "u1(-pi/4) ~/quil.qasm:reg-fmt/;"
-                                             (first registers)))
-                           rest-toks)))
-
-          ;; "QE standard user-defined gates"
-          
-          ((string= name "cz")
-           (check-number-of-parameters params 0)
-           (values (apply #'map-registers (lambda (ctl tgt)
-                                            (quil:build-gate "CZ" nil ctl tgt))
-                          registers)
-                   rest-toks))
-          
-          ((string= name "cy")
-           (check-number-of-parameters params 0)
-           (values (apply #'map-registers
-                          (lambda (ctl tgt)
-                            (quil:build-gate (quil:controlled-operator (quil:named-operator "Y"))
-                                             nil ctl tgt))
-                          registers) 
-                   rest-toks))
-          
-          ((string= name "ccx")
-           (check-number-of-parameters params 0)
-           (values (apply #'map-registers (lambda (ctl1 ctl2 tgt)
-                                            (quil:build-gate "CCNOT" nil ctl1 ctl2 tgt))
-                          registers)
-                   rest-toks))
-          
-          ((string= name "crx")
-           (check-number-of-parameters params 1)
-           (values (apply #'map-registers
-                          (lambda (ctl tgt)
-                            (quil:build-gate (quil:controlled-operator (quil:named-operator "RX"))
-                                             params ctl tgt))
-                          registers)
-                   rest-toks))
-          
-          ;; CPHASE?
-
-          ((string= name "cu1")
-           (check-number-of-parameters params 1)
-           (values (apply #'map-registers
-                          (lambda (ctl tgt)
-                            (list (build-u-gate 0d0 0d0 (quil::param-* (first params) 1/2) ctl)
-                                  (quil:build-gate "CNOT" nil ctl tgt)
-                                  (build-u-gate 0d0 0d0 (quil::param-* (first params) -1/2) tgt)
-                                  (quil:build-gate "CNOT" nil ctl tgt)
-                                  (build-u-gate 0d0 0d0 (quil::param-* (first params) 1/2) ctl)))
-                          registers)
-                   rest-toks))
-          
-          ((string= name "cu3")
-           (check-number-of-parameters params 3)
-           (destructuring-bind (θ ϕ λ) params
-             (values (apply #'map-registers
-                            (lambda (ctl tgt)
-                              (list (build-u-gate 0d0 0d0
-                                                  (quil::param-* (quil::param-+ λ (quil::param-* ϕ -1))
-                                                                 1/2)
-                                                  tgt)
-                                    (quil:build-gate "CNOT" nil ctl tgt)
-                                    (build-u-gate (quil::param-* θ -1/2)
-                                                  0d0
-                                                  (quil::param-* (quil::param-+ ϕ θ) -1/2)
-                                                  tgt)
-                                    (quil:build-gate "CNOT" nil ctl tgt)
-                                    (build-u-gate (quil::param-* θ 1/2) ϕ 0d0 ctl)))
-                            registers)
-                     rest-toks)))
-          
           (t
-           (alexandria:if-let ((gate (gethash name *gate-names*)))
+           (alexandria:if-let ((gate (gethash (%qasm-gate-name name) *gate-names*)))
              (values
               (if (eql gate ':opaque)
                   (quil::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
@@ -770,13 +645,13 @@ Note: the above \"expansion\" is not performed when in a gate body."
                                                      registers)))
                   (apply #'map-registers (lambda (&rest qubits)
                                            (make-instance 'quil:unresolved-application
-                                                          :operator (quil:named-operator name)
+                                                          :operator (quil:named-operator (%qasm-gate-name name))
                                                           :parameters params
                                                           :arguments qubits))
                          registers))
               rest-toks)
              (qasm-parse-error "Found unknown gate application '~A'."
-                              name))))))))
+                               name))))))))
 
 (defun parse-gate-body (tok-lines)
   (alexandria:flatten (mapcar #'parse-application (mapcar #'list tok-lines))))
@@ -809,9 +684,9 @@ Note: the above \"expansion\" is not performed when in a gate body."
         (collect-gate-decl (first tok-lines))
       ;; TODO Store more info about the gate, for later validating an
       ;; application (num params, qubits, etc).
-      (setf (gethash gate-name *gate-names*) t)
+      (setf (gethash (%qasm-gate-name gate-name) *gate-names*) t)
       (values (quil::make-circuit-definition
-               gate-name
+               (%qasm-gate-name gate-name)
                gate-params
                (mapcar #'quil::formal gate-qargs)
                (parse-gate-body (subseq tok-lines 2 close-pos))
