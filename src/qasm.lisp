@@ -112,7 +112,8 @@
    (:newline "(?:\\r\\n?|\\n)"))
   ;; TODO Do I want eager here?
   ("//([^\\n\\r]*)"
-   (return (tok :COMMENT $@)))
+   nil
+   )
   ((eager "{{NEWLINE}}")
    (incf *line-number*)
    (setf *line-start-position* $>)
@@ -251,9 +252,6 @@
     (case tok-type
       ((:OPENQASM)
        (parse-openqasm tok-lines))
-
-      ((:COMMENT)
-       (parse-comment tok-lines))
 
       ((:INCLUDE)
        (parse-include tok-lines))
