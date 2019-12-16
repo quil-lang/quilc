@@ -518,10 +518,11 @@
       (qasm-parse-error "Could not find token of type ':RIGHT-PAREN in parameter list ~A." tokens))
     (let* ((subseq (subseq tokens 1 rp-pos))
            (param-list (split-sequence:split-sequence ':COMMA subseq :key #'token-type)))
-      (when (remove-if-not #'null param-list)
+      (when (and (some #'null param-list)
+                 (> (length param-list) 1))
         (qasm-parse-error "Found a malformed parameter list ~A." tokens))
       (values (mapcar #'parse-param
-                      param-list)
+                      (remove nil param-list))
               (subseq tokens (1+ rp-pos))))))
 
 (defun maybe-parse-params (tokens)
