@@ -760,6 +760,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
                     :for reg := (copy-qasm-register register)
                     :do (setf (reg-index reg) i)
                     :collect
+                    ;; TODO Make this more efficient by using AND. See
+                    ;; https://github.com/rigetti/quilc/pull/495/files#r353990886
                     (make-instance 'quil::classical-equality-bit/bit/immediate
                                    :left (register-to-quil-object reg)
                                    :right (quil::constant
