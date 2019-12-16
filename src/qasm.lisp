@@ -270,22 +270,22 @@
                                     (register-to-quil-object qreg)))
                                 (parse-qregisters (rest line)))))
                (rest tok-lines)))
-      
+
       ((:GATE)
        (parse-gate-decl tok-lines))
 
       ((:OPAQUE)
        (parse-opaque tok-lines))
-      
+
       ((:MEASURE)
        (parse-measure tok-lines))
-      
+
       ((:RESET)
        (values
         (map-registers (lambda (qub) (make-instance 'quil::reset-qubit :target qub))
                        (parse-qregister (rest line)))
         (rest tok-lines)))
-      
+
       ((:ID)
        (parse-application tok-lines))
 
@@ -392,11 +392,11 @@
     (multiple-value-bind (qreg rest-toks)
         (parse-qregister (rest measure-toks))
       (qasm-check-token-type (first rest-toks) ':ARROW)
-      
+
       (multiple-value-bind (creg rest-toks)
           (parse-cregister (rest rest-toks))
         (assert (null rest-toks))
-        
+
         (values (map-registers (lambda (src dest)
                                  (make-instance 'quil:measure
                                                 :qubit src
@@ -406,7 +406,7 @@
 
 (defun parse-comment (tok-lines)
   (qasm-check-unexpected-eof tok-lines "comment")
-  
+
   (values nil
           (rest tok-lines)))
 
@@ -460,7 +460,7 @@
 (defun parse-qregisters (tokens)
   "Parse qasm registers from TOKENS until a no more valid tokens are available. Returns the list of parsed registers (of type QASM-REGISTER)."
   (qasm-check-unexpected-eof tokens "registers")
-  
+
   (loop :for (register rest-toks) := (multiple-value-list (parse-qregister tokens))
           :then (multiple-value-list (parse-qregister rest-toks))
         :for next-tok := (first rest-toks)
@@ -516,7 +516,7 @@
   "Parse a list of qasm params (e.g. in the instruction  rx(0.5) q;). Returns a list of parameter values (type float), and a second value which is the remaining tokens (not including closing parenthesis)."
   (qasm-check-unexpected-eof tokens "parameters")
   (qasm-check-token-type (first tokens) :LEFT-PAREN)
-  
+
   (let ((rp-pos (position ':RIGHT-PAREN tokens :key 'token-type :from-end t)))
     (unless rp-pos
       (qasm-parse-error "Could not find token of type ':RIGHT-PAREN in parameter list ~A." tokens))
@@ -627,16 +627,16 @@ Note: the above \"expansion\" is not performed when in a gate body."
                                             (quil::build-gate "CNOT" nil ctl tgt))
                           registers)
                    rest-toks))
-          
+
           ((string= name "U")
            (check-number-of-parameters params 3)
            (unless *gate-applications-are-formal*
              (break))
            (destructuring-bind (θ ϕ λ) params
              (values (apply #'map-registers (lambda (tgt) (build-u-gate θ ϕ λ tgt))
-                            registers) 
+                            registers)
                      rest-toks)))
-          
+
           (t
            (a:if-let ((gate (gethash (%qasm-gate-name name) *gate-names*)))
              (values
@@ -678,7 +678,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
 (defun parse-gate-decl (tok-lines)
   (qasm-check-unexpected-eof tok-lines "gate")
   (qasm-check-token-type (first (first tok-lines)) ':GATE)
-  
+
   (let* ((close-pos (line-position-of-token-type ':RIGHT-CURLY-BRACKET tok-lines))
          (*gate-applications-are-formal* t)
          (*gate-params* nil)
@@ -751,7 +751,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
               ;; compare the entire classical register against a
               ;; number (bitwise) `if(c == 5) ...` tests
               ;;
-              ;;     c[0] == 1 & c[1] == 0 & c[2] == 1 & c[3] == 0 
+              ;;     c[0] == 1 & c[1] == 0 & c[2] == 1 & c[3] == 0
               ;;
               ;; etc.
               ;;
@@ -789,7 +789,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
 
 (defun parse-qasm-into-raw-program (string)
   "Parse STRING into a raw, untransformed PARSED-PROGRAM object."
-  
+
   (let* ((*creg-names* (make-hash-table :test #'equalp))
          (*qreg-names* (make-hash-table :test #'equalp))
          (*qubit-count* 0)

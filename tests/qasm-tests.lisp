@@ -124,11 +124,11 @@ qreg q[2]; CX q[0], q[1]; // bye")
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
-    
+
     (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
     (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
-    
+
     (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
     (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
@@ -143,11 +143,11 @@ qreg q[2]; CX q[0], q[1]; // bye")
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
-    
+
     (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
     (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
-    
+
     (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
     (is (= quil:pi/2 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
@@ -162,11 +162,11 @@ qreg q[2]; CX q[0], q[1]; // bye")
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
-    
+
     (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
     (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
-    
+
     (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
     (is (= -0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
@@ -248,7 +248,7 @@ qreg q[2]; CX q[0], q[1]; // bye")
     (is (%probs= '(1 0) (%probs qvm)))
     (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0))))
-  
+
   (let* ((qasm (format nil "include ~S; qreg q[2]; creg c[3]; x q; measure q -> c; if(c==3) x q;"
                        (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
