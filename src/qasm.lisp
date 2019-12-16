@@ -751,7 +751,9 @@ Note: the above \"expansion\" is not performed when in a gate body."
               ;;     c[0] == 1 & c[1] == 0 & c[2] == 1 & c[3] == 0 
               ;;
               ;; etc.
-              (loop :for i :below (1+ (ceiling (log (token-payload val) 2)))
+              ;;
+              ;; TODO Clean this up, possibly using Quil's SHARING.
+              (loop :for i :below (integer-length (token-payload val))
                     :for reg := (copy-qasm-register register)
                     :do (setf (reg-index reg) i)
                     :collect
