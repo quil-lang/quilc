@@ -268,7 +268,7 @@
                         (mapcar (lambda (qreg)
                                   (let ((*gate-applications-are-formal* t))
                                     (register-to-quil-object qreg)))
-                                (parse-qregisters (rest (first tok-lines))))))
+                                (parse-qregisters (rest line)))))
                (rest tok-lines)))
       
       ((:GATE)
@@ -283,7 +283,7 @@
       ((:RESET)
        (values
         (map-registers (lambda (qub) (make-instance 'quil::reset-qubit :target qub))
-                       (parse-qregister (rest (first tok-lines))))
+                       (parse-qregister (rest line)))
         (rest tok-lines)))
       
       ((:ID)
