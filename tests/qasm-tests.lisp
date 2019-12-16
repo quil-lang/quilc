@@ -10,20 +10,15 @@
 ;;; test that parsing produces an equivalent program (up to supported
 ;;; features).
 
+(defparameter *qasm-qelib.inc-path*
+  (asdf:system-relative-pathname
+   ':cl-quil-tests
+   "tests/qasm-files/qelib.inc"))
+
 (deftest test-qasm-openqasm ()
   (is (quil.qasm::parse-qasm "OPENQASM 2.0")))
 
-(deftest test-qreg-declaration ()
-  (let* ((qasm "qreg q[2]; qreg r[2]; x q[0]; x q[1]; x r[0]; x r[1];")
-         (quil (quil.qasm::parse-qasm qasm))
-         (code (quil:parsed-program-executable-code quil)))
-    (is (= 4 (length code)))
-    (is (= 0 (first (quil::qubits-used (elt code 0)))))
-    (is (= 1 (first (quil::qubits-used (elt code 1)))))
-    (is (= 2 (first (quil::qubits-used (elt code 2)))))
-    (is (= 3 (first (quil::qubits-used (elt code 3)))))))
-
-(deftest test-creg-declaration ()
+(deftest test-qasm-creg/qreg-declaration ()
   (let* ((qasm "creg c1[1]; creg c2[1]; qreg q[1]; measure q[0] -> c1[0]; measure q[0] -> c2[0];")
          (quil (quil.qasm::parse-qasm qasm))
          (mems (quil:parsed-program-memory-definitions quil))
@@ -51,7 +46,7 @@
 
 (deftest test-qasm-include ()
   (uiop:with-temporary-file (:stream stream :pathname path)
-    (format stream "creg c[1]; qreg q[2]; h q[0]; cx q[0], q[1]; measure q[1] -> c[0];")
+    (format stream "creg c[1]; qreg q[2]; measure q[1] -> c[0];")
     (force-output stream)
     (let* ((qasm (format nil "include \"~A\";" path))
            (quil (quil.qasm::parse-qasm qasm))
@@ -59,47 +54,39 @@
            (code (quil:parsed-program-executable-code quil)))
       (is (= 1 (length mems)))
       (is (find "c" mems :key #'quil:memory-descriptor-name :test #'equalp))
-      (is (equal "H" (quil::application-operator-root-name (elt code 0))))
-      (is (equal "CNOT" (quil::application-operator-root-name (elt code 1))))
-      (is (typep (elt code 2) 'quil:measure)))))
+      (is (typep (elt code 0) 'quil:measure)))))
 
 (deftest test-qasm-gate-definition-and-application ()
-  (let* ((qasm "qreg q[2]; gate bell q, r { h q; cx q, r; }; bell q[0], q[1];")
+  (let* ((qasm (format nil "include ~S; qreg a[2]; qreg b[2]; gate bell q, r { h q; cx q, r; }; bell a[0], b[1];"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (circ (quil:parsed-program-circuit-definitions quil))
-         (code (quil:parsed-program-executable-code quil)))
-    (is (= 1 (length circ)))
-    (is (equal "bell" (quil:circuit-definition-name (first circ))))
-    (is (= 2 (length (quil:circuit-definition-body (first circ)))))
-    (is (= 2 (length code)))
-    (map nil (lambda (a b)
-               (is (equalp (quil:application-operator a)
-                           (quil:application-operator b)))
-               (is (equalp (quil:application-parameters a)
-                           (quil:application-parameters b)))
-               (is (= (length (quil:application-arguments a))
-                      (length (quil:application-arguments b)))))
-         (quil:circuit-definition-body (first circ))
-         code)))
+         (bell (find (quil.qasm::%qasm-gate-name "bell")
+                     circ
+                     :key #'quil:circuit-definition-name
+                     :test #'string=)))
+    (is bell)
+    (is (= 2 (length (quil:circuit-definition-body bell))))
+    (is (quil::matrix-equals-dwim
+         (quil:parsed-program-to-logical-matrix quil)
+         (quil:parsed-program-to-logical-matrix
+          (quil:parse-quil "H 0; CNOT 0 3;"))))))
 
 (deftest test-qasm-gate-definition-and-application-on-qreg ()
-  (let* ((qasm "qreg a[2]; qreg b[2]; gate bell q, r { h q; cx q, r; }; bell a, b;")
+  (let* ((qasm (format nil "include ~S; qreg a[2]; qreg b[2]; gate bell q, r { h q; cx q, r; }; bell a, b;"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (circ (quil:parsed-program-circuit-definitions quil))
-         (code (quil:parsed-program-executable-code quil)))
-    (is (= 1 (length circ)))
-    (is (equal "bell" (quil:circuit-definition-name (first circ))))
-    (is (= 2 (length (quil:circuit-definition-body (first circ)))))
-    (is (= 4 (length code)))
-    (map nil (lambda (a b)
-               (is (equalp (quil:application-operator a)
-                           (quil:application-operator b)))
-               (is (equalp (quil:application-parameters a)
-                           (quil:application-parameters b)))
-               (is (= (length (quil:application-arguments a))
-                      (length (quil:application-arguments b)))))
-         (quil:circuit-definition-body (first circ))
-         code)))
+         (bell (find (quil.qasm::%qasm-gate-name "bell")
+                     circ
+                     :key #'quil:circuit-definition-name
+                     :test #'string=)))
+    (is bell)
+    (is (= 2 (length (quil:circuit-definition-body bell))))
+    (is (quil::matrix-equals-dwim
+         (quil:parsed-program-to-logical-matrix quil)
+         (quil:parsed-program-to-logical-matrix
+          (quil:parse-quil "H 0; CNOT 0 2; H 1; CNOT 1 3;"))))))
 
 (deftest test-qasm-opaque-gate-definition-and-application ()
   ;; opaque definitions and applications produce pragmas, rather than
@@ -123,7 +110,7 @@
 (deftest test-qasm-comment ()
   ;; Comments are stripped.
   (let* ((qasm "// hi
-qreg q[1]; x q[0]; // bye")
+qreg q[2]; CX q[0], q[1]; // bye")
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 1 (length code)))))
@@ -132,7 +119,8 @@ qreg q[1]; x q[0]; // bye")
   ;; U is compiled into the appropriate identity
 
   ;; u1(lambda) = u3(0, 0, lambda)
-  (let* ((qasm "qreg q[1]; u1(1.0) q[0];")
+  (let* ((qasm (format nil "include ~S; qreg q[1]; u1(1.0) q[0];"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
@@ -149,8 +137,9 @@ qreg q[1]; x q[0]; // bye")
     (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2)))))))
 
-  ;; u2(phi, lambda) = u2(pi/2, phi, lambda)
-  (let* ((qasm "qreg q[1]; u2(0.5, 1) q[0];")
+  ;; u2(phi, lambda) = u3(pi/2, phi, lambda)
+  (let* ((qasm (format nil "include ~S; qreg q[1]; u2(0.5, 1) q[0];"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
@@ -160,15 +149,16 @@ qreg q[1]; x q[0]; // bye")
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
     
     (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
-    (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
+    (is (= quil:pi/2 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
 
     (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
-    (is (= quil:pi/2 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
+    (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2)))))))
 
-  ;; u3(theta, phi, lambda) = RZ(theta) RY(phi) RZ(lambda)
-  (let* ((qasm "qreg q[1]; u3(-0.5, 0.5, 1) q[0];")
+  ;; u3(theta, phi, lambda) = RZ(phi) RY(theta) RZ(lambda)
+  (let* ((qasm (format nil "include ~S; qreg q[1]; u3(-0.5, 0.5, 1) q[0];"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
@@ -178,11 +168,11 @@ qreg q[1]; x q[0]; // bye")
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
     
     (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
-    (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
+    (is (= -0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
 
     (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
-    (is (= -0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
+    (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2))))))))
 
 (deftest test-qasm-measure ()
@@ -243,32 +233,38 @@ qreg q[1]; x q[0]; // bye")
     (is (= 0 (quil:qubit-index (quil:reset-qubit-target (elt code 0)))))
     (is (= 1 (quil:qubit-index (quil:reset-qubit-target (elt code 1)))))))
 
+(defun %probs (qvm)
+  (map 'vector 'qvm:probability (qvm::amplitudes qvm)))
+
+(defun %probs= (probs-a probs-b)
+  (every #'quil::double= probs-a probs-b))
+
 (deftest test-qasm-if ()
-  (let* ((qasm "qreg q[1]; creg c[1]; x q[0]; measure q[0] -> c[0]; if(c==1) x q[0];")
+  (let* ((qasm (format nil "include ~S; qreg q[1]; creg c[1]; x q[0]; measure q[0] -> c[0]; if(c==1) x q[0];"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (qvm (qvm:run-program 1 quil))
          (mem (qvm::classical-memories (qvm:classical-memory-subsystem qvm))))
-    (is (equalp #(#C(1 0) #C(0 0))
-                (qvm::amplitudes qvm)))
+    (is (%probs= '(1 0) (%probs qvm)))
     (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0))))
   
-  (let* ((qasm "qreg q[2]; creg c[3]; x q; measure q -> c; if(c==3) x q;")
+  (let* ((qasm (format nil "include ~S; qreg q[2]; creg c[3]; x q; measure q -> c; if(c==3) x q;"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (qvm (qvm:run-program 2 quil))
          (mem (qvm::classical-memories (qvm:classical-memory-subsystem qvm))))
-    (is (equalp #(#C(1 0) #C(0 0) #C(0 0) #C(0 0))
-                (qvm::amplitudes qvm)))
+    (is (%probs= '(1 0 0 0) (%probs qvm)))
     (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0))))
 
   ;; Test that the if branch is not executed (and we're left in |11>).
-  (let* ((qasm "qreg q[2]; creg c[3]; x q; measure q -> c; if(c==4) x q;")
+  (let* ((qasm (format nil "include ~S; qreg q[2]; creg c[3]; x q; measure q -> c; if(c==4) x q;"
+                       (namestring *qasm-qelib.inc-path*)))
          (quil (quil.qasm::parse-qasm qasm))
          (qvm (qvm:run-program 2 quil))
          (mem (qvm::classical-memories (qvm:classical-memory-subsystem qvm))))
-    (is (equalp #(#C(0 0) #C(0 0) #C(0 0) #C(1 0))
-                (qvm::amplitudes qvm)))
+    (is (%probs= '(0 0 0 1) (%probs qvm)))
     (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0)))))
 

@@ -704,7 +704,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
         (maybe-parse-params rest-toks)
       (let ((*gate-applications-are-formal* t)
             (qregs (parse-qregisters rest-toks)))
-        (setf (gethash (token-payload name-tok) *gate-names*) ':opaque)
+        (setf (gethash (%qasm-gate-name (token-payload name-tok)) *gate-names*) ':opaque)
         (values (quil::make-pragma
                  (list "QASM_OPAQUE_DEFINITION" (token-payload name-tok))
                  (format nil "(~{~A~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
