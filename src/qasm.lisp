@@ -583,7 +583,7 @@ This should be expanded into
 It is an error to have unindexed registers of unequal size.
 
 Note: the above \"expansion\" is not performed when in a gate body."
-  (let* ((registers (append (list register) more-registers))
+  (let* ((registers (cons register more-registers))
          (unindexed-registers (remove-if-not #'null registers :key #'reg-index)))
     (cond ((and unindexed-registers
                 ;; This prevents us from expanding, e.g., `x q` in
