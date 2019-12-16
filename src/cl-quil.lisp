@@ -133,6 +133,20 @@ This also signals ambiguous definitions, which may be handled as needed."
         (dolist (xform transforms pp)
           (setf pp (transform xform pp)))))))
 
+;; A valid OpenQASM program requires the line "OPENQASM 2.0" possibly
+;; preceded by comments (//).
+(defun %check-for-qasm-header (string)
+  (labels ((commented-line-p (line)
+             (string= "//" (subseq (string-left-trim '(#\Space) line) 0 2)))
+           (qasm-line-p (line)
+             (let ((pos (search "OPENQASM 2.0" (string-left-trim '(#\Space) line))))
+               (and pos (= 0 pos)))))
+    (with-input-from-string (*standard-input* string)
+      (loop :for line := (read-line *standard-input* nil) :do
+        (cond ((qasm-line-p line)      (return t))
+              ((commented-line-p line) nil)
+              (t                       (return nil)))))))
+
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)
                             (ambiguous-definition-handler #'continue))
@@ -140,11 +154,13 @@ This also signals ambiguous definitions, which may be handled as needed."
 
 In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
 "
-  (%parse-quil string
-               #'raw-quil-to-unresolved-program
-               :originating-file originating-file
-               :transforms transforms
-               :ambiguous-definition-handler ambiguous-definition-handler))
+  (if (%check-for-qasm-header string)
+      (quil.qasm:parse-qasm string)
+      (%parse-quil string
+                   #'raw-quil-to-unresolved-program
+                   :originating-file originating-file
+                   :transforms transforms
+                   :ambiguous-definition-handler ambiguous-definition-handler)))
 
 (defun read-quil-file (filespec)
   "Read the Quil file designated by FILESPEC, and parse it as if by PARSE-QUIL."

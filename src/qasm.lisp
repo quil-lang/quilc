@@ -813,9 +813,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
      *qreg-names*
      *qubit-count*)))
 
-(defun parse-qasm (string &optional originating-file)
+(defun parse-qasm (string)
   "Parse STRING into a PARSED-PROGRAM object, applying all transforms."
-  (declare (ignore originating-file))
   (let ((pp (quil::resolve-objects (parse-qasm-into-raw-program string))))
     (setf pp (quil::transform 'quil::expand-circuits pp))
     (setf pp (quil::transform 'quil::type-check pp))
