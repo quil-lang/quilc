@@ -555,6 +555,7 @@
                      number (length params))))
 
 (defun build-u-gate (θ ϕ λ qubit)
+  "As per the OpenQASM spec: U(θ, ϕ, λ) = RZ(ϕ) . RY(θ) . RZ(λ)."
   (list
    (quil::build-gate "RZ" `(,λ) qubit)
    (quil::build-gate "RY" `(,θ) qubit)
