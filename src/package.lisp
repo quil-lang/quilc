@@ -593,7 +593,8 @@
 
 (defpackage #:cl-quil.qasm
   (:nicknames #:quil.qasm)
-  (:use #:cl) 
+  (:use #:cl)
+  (:local-nicknames (:a :alexandria))
   (:import-from #:cl-quil #:tok #:token-type #:token-payload)
 
   (:export

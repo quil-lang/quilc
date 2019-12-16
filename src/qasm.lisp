@@ -220,7 +220,7 @@
 
 ;; parse
 
-(define-condition qasm-parse-error (alexandria:simple-parse-error)
+(define-condition qasm-parse-error (a:simple-parse-error)
   ()
   (:documentation "Representation of an error parsing QASM."))
 
@@ -306,7 +306,7 @@
   ;; a[0] -> b[0]`.
   ;;
   ;; TODO I wrote this while very tired. Untested.
-  (let ((ts (mapcar #'alexandria:ensure-list (remove '_ token-idents))))
+  (let ((ts (mapcar #'a:ensure-list (remove '_ token-idents))))
     `(progn
        (unless (= ,(length token-idents) (length ,token-line))
          (qasm-parse-error "Expected ~d tokens but parsed ~d."
@@ -594,7 +594,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
            (let* ((register-size (reduce #'min unindexed-registers :key #'register-size))
                   (registers
                     (mapcar (lambda (register)
-                              (alexandria:if-let ((index (reg-index register)))
+                              (a:if-let ((index (reg-index register)))
                                 (loop :repeat register-size :collect (register-to-quil-object register))
                                 (loop :for i :below register-size
                                       :for reg := (copy-qasm-register register)
@@ -638,7 +638,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                      rest-toks)))
           
           (t
-           (alexandria:if-let ((gate (gethash (%qasm-gate-name name) *gate-names*)))
+           (a:if-let ((gate (gethash (%qasm-gate-name name) *gate-names*)))
              (values
               (if (eql gate ':opaque)
                   (quil::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
@@ -657,7 +657,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                                name))))))))
 
 (defun parse-gate-body (tok-lines)
-  (alexandria:flatten (mapcar #'parse-application (mapcar #'list tok-lines))))
+  (a:flatten (mapcar #'parse-application (mapcar #'list tok-lines))))
 
 (defun collect-gate-decl (tok-line)
   (let ((name (token-payload (second tok-line))))
@@ -670,7 +670,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
 
 (defun line-position-of-token-type (token-type sequence)
   (position token-type sequence
-            :key (alexandria:compose #'token-type #'first)))
+            :key (a:compose #'token-type #'first)))
 
 (defun %formalize (param)
   (quil:param param))
@@ -784,8 +784,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
         :for (program-entity rest-toks) := (multiple-value-list
                                             (parse-program-lines tok-lines))
         :when program-entity
-          :append (alexandria:flatten
-                   (alexandria:ensure-list program-entity)) :do
+          :append (a:flatten (a:ensure-list program-entity)) :do
             (setf tok-lines rest-toks)))
 
 (defun parse-qasm-into-raw-program (string)
