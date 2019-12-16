@@ -13,7 +13,7 @@
 (defparameter *qasm-qelib.inc-path*
   (asdf:system-relative-pathname
    ':cl-quil-tests
-   "tests/qasm-files/qelib.inc"))
+   "tests/qasm-files/qelib1.inc"))
 
 (deftest test-qasm-openqasm ()
   (is (quil.qasm::parse-qasm "OPENQASM 2.0")))

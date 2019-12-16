@@ -68,12 +68,11 @@
             (quil:qubit (+ offset index))))))
   (:method ((creg creg))
     (with-slots (name index) creg
-      (destructuring-bind (offset size)
-          (gethash name *creg-names*)
+      (let ((size (gethash name *creg-names*)))
         (assert (< index size) ()
                 "The index ~s is out-of-bounds for creg ~s."
                 index creg)
-        (quil::mref name (+ offset index))))))
+        (quil::mref name index)))))
 
 (defun register-namespace (register)
   (etypecase register
@@ -101,7 +100,7 @@
   (:method ((qreg qreg))
     (second (find-register qreg :error-if-undefined t)))
   (:method ((creg creg))
-    (second (find-register creg :error-if-undefined t))))
+    (find-register creg :error-if-undefined t)))
 
 (alexa:define-string-lexer line-lexer
   "A lexical analyzer for lines of OpenQASM 2.0."
@@ -340,7 +339,7 @@
         creg-toks
       (let ((name (token-payload name-tok))
             (length (token-payload length-tok)))
-        (setf (gethash name *creg-names*) (list 0 length))
+        (setf (gethash name *creg-names*) length)
         (values (quil::make-memory-descriptor
                  :name name
                  :type quil::quil-bit
