@@ -31,7 +31,7 @@
 
 (defvar *qubit-count*)
 (setf (documentation '*qubit-count* 'variable)
-      "The total number of qubits registered by qreg.")
+      "The total number of qubits registered by qregs in the program.")
 
 (defstruct (qasm-register (:conc-name reg-)
                           (:constructor nil))    ; :constructor nil ensures this thing can't be created
