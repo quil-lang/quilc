@@ -368,6 +368,7 @@
                 rest-toks)))))
 
 (defun parse-include (tok-lines)
+  ;; TODO Use cl-quil's include?
   (qasm-check-unexpected-eof tok-lines "include")
 
   (destructuring-bind (include-toks . rest-toks)
@@ -418,6 +419,8 @@
                                        (format nil "~A" (token-payload version))))
               rest-toks))))
 
+;; TODO parse-cregister and parse-qregister have a common theme. For
+;; D.R.Y.'s sake, factor out.
 (defun parse-cregister (tokens)
   "Parse a single qasm creg from TOKENS. Returns the parsed register (of type QASM-REGISTER), and a second value which is the remaining tokens."
   (let* ((id (first tokens))
