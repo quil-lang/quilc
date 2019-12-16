@@ -264,12 +264,10 @@
       ((:BARRIER)
        (values (quil::make-pragma
                 (list "QASM_BARRIER")
-                (format nil "~{~A~^, ~}"
+                (format nil "~{~/quil::instruction-fmt/~^, ~}"
                         (mapcar (lambda (qreg)
-                                  (quil::print-instruction
-                                   (let ((*gate-applications-are-formal* t))
-                                     (register-to-quil-object qreg))
-                                   nil))
+                                  (let ((*gate-applications-are-formal* t))
+                                    (register-to-quil-object qreg)))
                                 (parse-qregisters (rest (first tok-lines))))))
                (rest tok-lines)))
       
