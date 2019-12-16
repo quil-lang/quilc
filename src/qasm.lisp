@@ -27,7 +27,7 @@
 
 (defvar *qreg-names*)
 (setf (documentation '*qreg-names* 'variable)
-      "Maps a qreg name to the pair (offset . size). A qreg defined with `qreg q[size];` maps to Quil qubits (offset, offset + 1, offset + 2, ..., offset + size - 1). This complication maintains unique qubits in the Quil translation.")
+      "Maps a qreg name to the pair (offset size). A qreg defined with `qreg q[size];` maps to Quil qubits (offset, offset + 1, offset + 2, ..., offset + size - 1). This complication maintains unique qubits in the Quil translation.")
 
 (defvar *qubit-count*)
 (setf (documentation '*qubit-count* 'variable)
