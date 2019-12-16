@@ -327,8 +327,7 @@
          ,@body))))
 
 (defun parse-creg-definition (tok-lines)
-  (when (null tok-lines)
-    (qasm-parse-error "Unexpectedly reached end of program, expecting creg."))
+  (qasm-check-unexpected-eof tok-lines "creg")
 
   (destructuring-bind (creg-toks . rest-toks)
       tok-lines
@@ -694,6 +693,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
 (defun parse-opaque (tok-lines)
   (qasm-check-unexpected-eof tok-lines "opaque")
   (qasm-check-token-type (first (first tok-lines)) ':OPAQUE)
+  (qasm-check-token-type (second (first tok-lines)) ':GATE)
 
   (destructuring-bind ((opaque gate name-tok &rest rest-toks) &rest rest-lines)
       tok-lines
@@ -712,6 +712,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
 
 (defun parse-if (tok-lines)
   (qasm-check-unexpected-eof tok-lines "if")
+  (qasm-check-token-type (first (first tok-lines)) ':IF)
 
   (destructuring-bind (if-toks . rest-lines)
       tok-lines
