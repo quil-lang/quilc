@@ -88,7 +88,7 @@
       register-val)
      ((and (null register-val)
            error-if-undefined)
-      (qasm-parse-error "Undefined ~{~}register ~A." (reg-name register)))
+      (qasm-parse-error "Undefined register ~A." (reg-name register)))
      (t
       nil))))
 
