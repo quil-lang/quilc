@@ -591,7 +591,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                 ;; performed by the caller however, as it makes this
                 ;; function less general than its name would imply.
                 (not *gate-applications-are-formal*))
-           (let* ((register-size (reduce #'min (mapcar #'register-size unindexed-registers)))
+           (let* ((register-size (reduce #'min unindexed-registers :key #'register-size))
                   (registers
                     (mapcar (lambda (register)
                               (alexandria:if-let ((index (reg-index register)))
