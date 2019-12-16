@@ -229,16 +229,16 @@
   (error 'qasm-parse-error :format-control format-control
          :format-arguments format-args))
 
-(defmacro qasm-check-token-type (token type)
-  `(unless (eql (token-type ,token) ,type)
-     (qasm-parse-error "Expected a token of type ~A but got a token of type ~A."
-                      ,type
-                      (token-type ,token))))
+(defun qasm-check-token-type (token type)
+  (unless (eql (token-type token) type)
+    (qasm-parse-error "Expected a token of type ~A but got a token of type ~A."
+                      type
+                      (token-type token))))
 
-(defmacro qasm-check-unexpected-eof (tokens expected)
-  `(when (null ,tokens)
-     (qasm-parse-error "Unexpectedly reached end of program, expected ~A."
-                      ,expected)))
+(defun qasm-check-unexpected-eof (tokens expected)
+  (when (null tokens)
+    (qasm-parse-error "Unexpectedly reached end of program expected ~A."
+                      expected)))
 
 (defun parse-program-lines (tok-lines)
   "Parse the next AST object from the list of token lists. Returns two values:
