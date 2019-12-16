@@ -739,8 +739,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
                             :type quil::quil-bit
                             :length 1))
                  (jmp-label (quil::label (string (gensym "JMP-")))))
-            (unless (<= (token-payload val)
-                        (register-size register))
+            (unless (< (token-payload val)
+                       (expt 2 (register-size register)))
               (qasm-parse-error "Cannot compare the integer ~A to the creg ~A of size ~A."
                                 (token-payload val)
                                 (creg-name register)
