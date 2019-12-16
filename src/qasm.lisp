@@ -666,7 +666,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
       (dolist (p params) (push p *gate-params*))
       (let ((qregs (mapcar #'reg-name (parse-qregisters rest-toks))))
         (dolist (q qregs) (push q *gate-qregs*))
-        (list name params qregs)))))
+        (values name params qregs)))))
 
 (defun line-position-of-token-type (token-type sequence)
   (position token-type sequence
@@ -683,7 +683,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
          (*gate-applications-are-formal* t)
          (*gate-params* nil)
          (*gate-qregs* nil))
-    (destructuring-bind (gate-name gate-params gate-qargs)
+    (multiple-value-bind (gate-name gate-params gate-qargs)
         (collect-gate-decl (first tok-lines))
       ;; TODO Store more info about the gate, for later validating an
       ;; application (num params, qubits, etc).
