@@ -362,6 +362,8 @@
         ;; simply be "MEASURE 3 r[0]". But what about "measure q[3] ->
         ;; r[0]; measure p[3] -> r[1];"? In OpenQASM the qubits "q[3]"
         ;; and "p[3]" are not the same.
+        (when (gethash name *qreg-names*)
+          (qasm-parse-error "Attempting to redefine qreg ~A." name))
         (setf (gethash name *qreg-names*) (list *qubit-count* length))
         (incf *qubit-count* length)
         (values nil
