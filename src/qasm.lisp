@@ -739,6 +739,12 @@ Note: the above \"expansion\" is not performed when in a gate body."
                             :type quil::quil-bit
                             :length 1))
                  (jmp-label (quil::label (string (gensym "JMP-")))))
+            (unless (<= (token-payload val)
+                        (register-size register))
+              (qasm-parse-error "Cannot compare the integer ~A to the creg ~A of size ~A."
+                                (token-payload val)
+                                (creg-name register)
+                                (register-size register)))
             (values
              (list
               ;; Build a unique intermediary classical address to store
@@ -756,7 +762,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
               ;; etc.
               ;;
               ;; TODO Clean this up, possibly using Quil's SHARING.
-              (loop :for i :below (integer-length (token-payload val))
+              (loop :for i :below (register-size register)
                     :for reg := (copy-qasm-register register)
                     :do (setf (reg-index reg) i)
                     :collect
