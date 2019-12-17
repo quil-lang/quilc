@@ -136,16 +136,24 @@ This also signals ambiguous definitions, which may be handled as needed."
 ;; A valid OpenQASM program requires the line "OPENQASM 2.0" possibly
 ;; preceded by comments (//).
 (defun %check-for-qasm-header (string)
-  (labels ((commented-line-p (line)
-             (string= "//" (subseq (string-left-trim '(#\Space) line) 0 2)))
-           (qasm-line-p (line)
-             (let ((pos (search "OPENQASM 2.0" (string-left-trim '(#\Space) line))))
-               (and pos (= 0 pos)))))
+  (labels ((line-begins-with (prefix line)
+             (let ((pos (search prefix (string-left-trim '(#\Space) line))))
+               (and pos (= 0 pos))))
+           (commented-line-p (line) (line-begins-with "//" line))
+           (qasm-line-p (line) (line-begins-with "OPENQASM 2.0" line)))
     (with-input-from-string (*standard-input* string)
       (loop :for line := (read-line *standard-input* nil) :do
-        (cond ((qasm-line-p line)      (return t))
-              ((commented-line-p line) nil)
-              (t                       (return nil)))))))
+        (cond ((qasm-line-p line)
+               ;; Certainly an OpenQASM program.
+               (return t))
+              ((or (string= "" line)
+                   (commented-line-p line))
+               ;; Empty or comment line. Continue searching.
+               nil)
+              (t
+               ;; Neither OPENQASM 2.0, comment, or empty line, so
+               ;; cannot be legal OpenQASM.
+               (return nil)))))))
 
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)

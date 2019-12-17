@@ -268,4 +268,24 @@ qreg q[2]; CX q[0], q[1]; // bye")
     (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0)))))
 
-;; Barrier is currently uninteresting as Quil has no equivalent.
+(defun test-qasm-header ()
+  (is (quil::%check-for-qasm-header "OPENQASM 2.0"))
+  (is (quil::%check-for-qasm-header "OPENQASM 2.0; creg c[0];"))
+  (is (quil::%check-for-qasm-header "// this is a comment
+OPENQASM 2.0;"))
+  (is (quil::%check-for-qasm-header "// this is a comment
+// this is also a comment, and the next line is indented lightly
+// but that should be ok.
+  OPENQASM 2.0;"))
+  (is (quil::%check-for-qasm-header "// this is a comment
+// this is also a comment, and the next line is empty
+
+// and this a comment, and that should be ok
+
+  OPENQASM 2.0;"))
+  (is (not (quil::%check-for-qasm-header "X 0; OPENQASM 2.0")))
+  (is (not (quil::%check-for-qasm-header "# This is a Quil comment,
+# and thus cannot be a qasm program
+
+OPENQASM 2.0")))
+  )
