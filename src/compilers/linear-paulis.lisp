@@ -49,7 +49,7 @@
       (setf (aref votes except) 0))
     (vector-argmax votes)))
 
-(defun pauli-instr-of-all-Zs-p (instr)
+(defun pauli-instr-of-all-Zs-or-Is-p (instr)
   "Predicate: INSTR is a GATE-APPLICATION defined by a diagonal EXP-PAULI-SUM-GATE."
   (and (typep (gate-application-gate instr) 'exp-pauli-sum-gate)
        (every (lambda (term) (every (lambda (letter) (or (eql letter #\Z) (eql letter #\I)))
@@ -57,7 +57,7 @@
               (exp-pauli-sum-gate-terms (gate-application-gate instr)))))
 
 (define-compiler parametric-diagonal-compiler
-    ((instr _ :where (pauli-instr-of-all-Zs-p instr)))
+    ((instr _ :where (pauli-instr-of-all-Zs-or-Is-p instr)))
   "Decomposes a diagonal Pauli gate by a single step."
   (with-slots (arguments parameters terms arity dimension) (gate-application-gate instr)
     (let ((nonlocal-terms nil))
