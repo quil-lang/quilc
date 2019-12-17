@@ -447,6 +447,7 @@
 
   ;; cl-quil.lisp
   (:export
+   #:parse
    #:parse-quil                         ; FUNCTION
    #:read-quil-file                     ; FUNCTION
    )

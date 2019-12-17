@@ -485,7 +485,7 @@
            (setf *verbose* *human-readable-stream*))
 
          (let* ((program-text (slurp-lines))
-                (program (quil:safely-parse-quil program-text))
+                (program (parse program-text))
                 (original-matrix (when (and protoquil compute-matrix-reps)
                                    (parsed-program-to-logical-matrix program))))
            (multiple-value-bind (processed-program statistics)
