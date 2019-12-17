@@ -287,5 +287,4 @@ OPENQASM 2.0;"))
   (is (not (quil::%check-for-qasm-header "# This is a Quil comment,
 # and thus cannot be a qasm program
 
-OPENQASM 2.0")))
-  )
+OPENQASM 2.0"))))
