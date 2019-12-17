@@ -222,6 +222,43 @@
                      (format t "~&  Tested ~2,2F% of all compilers." (* 100 hit-rate))
                      (is (< 1/10 hit-rate))))))
 
+(defun random-pauli-word (n)
+  (coerce (loop :for j :below n
+                :collect (case (random 4)
+                           (0 #\X)
+                           (1 #\Y)
+                           (2 #\Z)
+                           (3 #\I)))
+          'string))
+
+(deftest test-parametric-defexpi ()
+  (let* ((qubit-count 3)
+         (string-count 6)
+         (pauli-strings (loop :for n :below string-count
+                              :collect (format nil "    ~a(~f*%t)~{ q~a~}"
+                                               (random-pauli-word qubit-count) (random pi)
+                                               (a:iota qubit-count))))
+         (program (format nil "
+PRAGMA INITIAL_REWIRING \"NAIVE\"
+DECLARE time REAL
+DEFGATE U(%t)~{ q~a~} AS PAULI-SUM:
+~{~a~%~}
+
+U(time)~{ ~a~}"
+                          (a:iota qubit-count)
+                          pauli-strings
+                          (a:iota qubit-count)))
+         (patch-table (alexandria:plist-hash-table (list "time" (random 2pi))
+                                                   :test #'equalp))
+         (pp (parse-quil program))
+         (original-output (quil::make-matrix-from-quil
+                           (mapcar (a:rcurry #'%patch-mref-values patch-table)
+                                   (coerce (parsed-program-executable-code pp) 'list))))
+         (cpp (compiler-hook pp (quil::build-nq-fully-connected-chip 3)))
+         (compiled-output (quil::make-matrix-from-quil
+                           (mapcar (a:rcurry #'%patch-mref-values patch-table)
+                                   (coerce (parsed-program-executable-code cpp) 'list)))))
+    (is (quil::matrix-equals-dwim original-output compiled-output))))
 
 (defun random-permutation (list)
   (unless (null list)
