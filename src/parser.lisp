@@ -1621,6 +1621,14 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
 
 (defvar *safe-include-directory* nil)
 
+(define-condition resolve-filename-safely-condition (quil-parse-error)
+  ((filename :initarg :filename :reader resolve-safely-filename)
+   (message  :initarg :message  :reader resolve-safely-message))
+  (:report (lambda (condition stream)
+             (format stream "Cannot safely resolve ~A: ~A."
+                     (resolve-safely-filename condition)
+                     (resolve-safely-message  condition)))))
+
 (defun resolve-safely (filename)
   (flet ((contains-up (filename)
            (member-if (lambda (obj)
@@ -1629,20 +1637,28 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                       (pathname-directory filename))))
     (cond
       ((uiop:absolute-pathname-p filename)
-       (error "Not allowed to specify absolute paths to INCLUDE."))
+       (error 'resolve-filename-safely-condition
+              :filename filename
+              :message "absolute paths disallowed"))
 
       ((uiop:relative-pathname-p filename)
        ;; Only files allowed.
        (unless (uiop:file-pathname-p filename)
-         (error "INCLUDE requires a pathname to a file."))
+         (error 'resolve-filename-safely-condition
+                :filename filename
+                :message "provided path does not resolve to a file"))
        (when (contains-up filename)
-         (error "INCLUDE can't refer to files above."))
+         (error 'resolve-filename-safely-condition
+                :filename filename
+                :message "cannot include files from a parent path"))
        (if (null *safe-include-directory*)
            filename
            (merge-pathnames filename *safe-include-directory*)))
 
       (t
-       (error "Invalid pathname: ~S" filename)))))
+       (error 'resolve-filename-safely-condition
+              :filename filename
+              :message "invalid pathname")))))
 
 (defun safely-read-quil (filename)
   "Safely read the Quil file designated by FILENAME."
@@ -1654,11 +1670,16 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
         (let ((*resolve-include-pathname* #'resolve-safely))
           (read-it filename)))))
 
-(defun safely-parse-quil (string)
+(defun safely-parse-quil (string &key originating-file
+                                   (transforms *standard-post-process-transforms*)
+                                   (ambiguous-definition-handler #'continue))
   "Safely parse a Quil string STRING."
   (flet ((parse-it (string)
            (let ((*allow-unresolved-applications* t))
-             (parse-quil string))))
+             (parse-quil string
+                         :originating-file originating-file
+                         :transforms transforms
+                         :ambiguous-definition-handler ambiguous-definition-handler))))
     (if (null *safe-include-directory*)
         (parse-it string)
         (let ((*resolve-include-pathname* #'resolve-safely))

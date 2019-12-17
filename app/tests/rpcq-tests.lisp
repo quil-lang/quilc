@@ -228,3 +228,24 @@ TEST 0 1
                                  (coerce (quil:parsed-program-executable-code cpp) 'list)))
         (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
         (is (quil::matrix-equality mat1 mat2))))))
+
+(deftest test-quil-safely-resolve ()
+  "Test that the \"quil-to-native-quil\" endpoint raises an error when including a file outside of quil::*safe-include-directory*."
+  (quilc::special-bindings-let* ((quil::*safe-include-directory* "./"))
+    (quilc::special-bindings-let* ((bt:*default-special-bindings* bt:*default-special-bindings*))
+      (with-random-rpc-client (client)
+        (let* ((quil "INCLUDE \"../test\"")
+               (isa (a:plist-hash-table
+                     (list
+                      "1Q" (a:plist-hash-table
+                            (list
+                             "0" (make-hash-table)))
+                      "2Q" (make-hash-table))))
+               (specs (make-hash-table))
+               (target-device (make-instance 'rpcq::|TargetDevice|
+                                             :|isa| isa
+                                             :|specs| specs))
+               (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                              :|quil| quil
+                                              :|target_device| target-device)))
+          (signals rpcq:rpc-error (rpcq:rpc-call client "quil-to-native-quil" server-payload)))))))

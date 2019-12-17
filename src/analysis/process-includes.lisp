@@ -25,7 +25,7 @@
                  (when (uiop:relative-pathname-p file)
                    (setf file (merge-pathnames file originating-dir)))
                  (unless (uiop:file-exists-p file)
-                   (quil-parse-error "Could not include ~S because it does not exist." file))
+                   (quil-parse-error "Could not include ~S because it does not exist." (namestring file)))
                  ;; canonicalize the name for the sake of detecting cycles
                  (setf file (truename file))
                  (when (member file seen-files :test #'uiop:pathname-equal)

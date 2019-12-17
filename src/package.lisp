@@ -407,6 +407,9 @@
   (:export
    #:parse-quil-into-raw-program        ; FUNCTION
    #:quil-parse-error                   ; CONDITION
+   #:resolve-safely                     ; FUNCTION
+   #:safely-read-quil                   ; FUNCTION
+   #:safely-parse-quil                  ; FUNCTION
    )
 
   ;; build-gate.lisp
