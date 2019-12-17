@@ -281,6 +281,8 @@ OPENQASM 2.0;"))
 // this is also a comment, and the next line is empty
 
 // and this a comment, and that should be ok
+// and the next line is only whitespace
+    
 
   OPENQASM 2.0;"))
   (is (not (quil::%check-for-qasm-header "X 0; OPENQASM 2.0")))

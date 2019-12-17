@@ -148,7 +148,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         (cond ((qasm-line-p line)
                ;; Certainly an OpenQASM program.
                (return t))
-              ((or (string= "" line)
+              ((or (every (lambda (c) (char= #\Space c)) line)
                    (commented-line-p line))
                ;; Empty or comment line. Continue searching.
                nil)
