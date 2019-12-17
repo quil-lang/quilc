@@ -943,6 +943,9 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
     (unless (eql ':NAME (token-type (first line)))
       (quil-parse-error "DEFGATE AS PAULI-SUM body line begins with something other than a Pauli word: ~a" (first line)))
     (setf pauli-word (token-payload (pop line)))
+    (unless (every (lambda (c) (member c '(#\I #\X #\Y #\Z))) pauli-word)
+      (quil-parse-error "DEFGATE AS PAULI-SUM body line contains Pauli word with letters other than I, X, Y, Z: ~a"
+                        pauli-word))
     ;; LPAREN
     (unless (eql ':LEFT-PAREN (token-type (first line)))
       (quil-parse-error "Pauli term requires a parenthesized scalar factor, but found ~a instead of LPAREN" (first line)))

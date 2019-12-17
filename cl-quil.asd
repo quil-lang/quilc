@@ -82,7 +82,7 @@
                              (:file "modifiers")
                              (:file "linear-paulis")
                              ;; attic'd files / pedagogical purposes only
-                             (:file "optimal-2q")
+                             (:static-file "optimal-2q")
                              (:static-file "cs-compile")))
                (:module "analysis"
                 :serial t
