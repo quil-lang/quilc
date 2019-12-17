@@ -19,11 +19,11 @@
 
 (defvar *gate-params*)
 (setf (documentation '*gate-params* 'variable)
-      "When parsing the body of a gate declaration, this is a list of the parameter names (strings). Otherwise, NIL.")
+      "When parsing the body of a gate declaration, this is a list of the parameter names (strings).")
 
 (defvar *creg-names*)
 (setf (documentation '*creg-names* 'variable)
-      "Maps a creg name to its size.")
+      "Maps a creg name to its size (number of bits).")
 
 (defvar *qreg-names*)
 (setf (documentation '*qreg-names* 'variable)
@@ -37,7 +37,7 @@
                           (:constructor nil))    ; :constructor nil ensures this thing can't be created
   "Abstract structure for ..."
   (name nil :type string :read-only t)
-  (index nil :type (or null (integer 0 *))))
+  (index nil :type (or null unsigned-byte)))
 
 (defstruct (qreg (:include qasm-register)
                  (:constructor qreg (name &optional index)))
@@ -47,13 +47,15 @@
                  (:constructor creg (name &optional index)))
   "An OpenQASM cregister object.")
 
+#+sbcl (declaim (sb-ext:freeze-type qasm-register qreg creg))
+
 (defun reg-fmt (stream reg &optional colon-modifier at-modifier)
   (declare (ignore colon-modifier at-modifier))
   (let ((name (reg-name reg))
         (index (reg-index reg)))
-    (if index
-        (format stream "~A[~A]" name index)
-        (format stream "~A" name))))
+    (if (null index)
+        (format stream "~A" name)
+        (format stream "~A[~A]" name index))))
 
 (defgeneric register-to-quil-object (register)
   (:method ((qreg qreg))
@@ -63,14 +65,14 @@
           (destructuring-bind (offset size)
               (gethash name *qreg-names*)
             (assert (< index size) ()
-                    "The index ~s is out-of-bounds for qreg ~s."
+                    "The index ~s is out-of-bounds for qreg ~/quil.qasm::reg-fmt/."
                     index qreg)
             (quil:qubit (+ offset index))))))
   (:method ((creg creg))
     (with-slots (name index) creg
       (let ((size (gethash name *creg-names*)))
         (assert (< index size) ()
-                "The index ~s is out-of-bounds for creg ~s."
+                "The index ~s is out-of-bounds for creg ~/quil.qasm::reg-fmt/."
                 index creg)
         (quil::mref name index)))))
 
@@ -84,13 +86,13 @@
   (let ((register-val (gethash (reg-name register)
                                (register-namespace register))))
     (cond
-     ((not (null register-val))
-      register-val)
-     ((and (null register-val)
-           error-if-undefined)
-      (qasm-parse-error "Undefined register ~A." (reg-name register)))
-     (t
-      nil))))
+      ((not (null register-val))
+       register-val)
+      ((and (null register-val)
+            error-if-undefined)
+       (qasm-parse-error "Undefined register ~A." (reg-name register)))
+      (t
+       nil))))
 
 (defun register-offset (register)
   (check-type register qreg)
@@ -109,7 +111,6 @@
    (:ident  "[a-zA-Z](?:[A-Za-z0-9_]*[A-Za-z0-9_])?")
    (:string "\\\"(?:[^\\\"]|\\\\\\\")*\\\"")
    (:newline "(?:\\r\\n?|\\n)"))
-  ;; TODO Do I want eager here?
   ("//([^\\n\\r]*)"
    nil
    )
@@ -218,8 +219,6 @@
     (nsplit ':NEWLINE (tokenize-line 'line-lexer
                                      (more-newlines string)))))
 
-;; parse
-
 (define-condition qasm-parse-error (a:simple-parse-error)
   ()
   (:documentation "Representation of an error parsing QASM."))
@@ -227,15 +226,15 @@
 (defun qasm-parse-error (format-control &rest format-args)
   "Signal a QASM-PARSE-ERROR with a descriptive error message described by FORMAT-CONTROL and FORMAT-ARGS."
   (error 'qasm-parse-error :format-control format-control
-         :format-arguments format-args))
+                           :format-arguments format-args))
 
-(defun qasm-check-token-type (token type)
+(defun check-qasm-token-type (token type)
   (unless (eql (token-type token) type)
     (qasm-parse-error "Expected a token of type ~A but got a token of type ~A."
                       type
                       (token-type token))))
 
-(defun qasm-check-unexpected-eof (tokens expected)
+(defun check-qasm-unexpected-eof (tokens expected)
   (when (null tokens)
     (qasm-parse-error "Unexpectedly reached end of program expected ~A."
                       expected)))
@@ -262,13 +261,13 @@
        (parse-creg-definition tok-lines))
 
       ((:BARRIER)
+       ;; TODO Prettier pragma
        (values (quil::make-pragma
                 (list "QASM_BARRIER")
                 (format nil "~{~/quil::instruction-fmt/~^, ~}"
-                        (mapcar (lambda (qreg)
-                                  (let ((*gate-applications-are-formal* t))
-                                    (register-to-quil-object qreg)))
-                                (parse-qregisters (rest line)))))
+                        (let ((*gate-applications-are-formal* t))
+                          (mapcar (lambda (qreg) (register-to-quil-object qreg))
+                                  (parse-qregisters (rest line))))))
                (rest tok-lines)))
 
       ((:GATE)
@@ -282,7 +281,7 @@
 
       ((:RESET)
        (values
-        (map-registers (lambda (qub) (make-instance 'quil::reset-qubit :target qub))
+        (map-registers (lambda (qub) (make-instance 'quil:reset-qubit :target qub))
                        (parse-qregister (rest line)))
         (rest tok-lines)))
 
@@ -310,7 +309,7 @@
     `(progn
        (unless (= ,(length token-idents) (length ,token-line))
          (qasm-parse-error "Expected ~d tokens but parsed ~d."
-                          ,(length token-idents) (length ,token-line)))
+                           ,(length token-idents) (length ,token-line)))
        (loop :for (tok-name tok-type) :in ',ts
              :for tok :in ,token-line
              :when tok-type :do
@@ -327,7 +326,7 @@
          ,@body))))
 
 (defun parse-creg-definition (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "creg")
+  (check-qasm-unexpected-eof tok-lines "creg")
 
   (destructuring-bind (creg-toks . rest-toks)
       tok-lines
@@ -344,7 +343,7 @@
                 rest-toks)))))
 
 (defun parse-qreg-definition (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "qreg")
+  (check-qasm-unexpected-eof tok-lines "qreg")
 
   (destructuring-bind (qreg-toks . rest-toks)
       tok-lines
@@ -371,7 +370,7 @@
 
 (defun parse-include (tok-lines)
   ;; TODO Use cl-quil's include?
-  (qasm-check-unexpected-eof tok-lines "include")
+  (check-qasm-unexpected-eof tok-lines "include")
 
   (destructuring-bind (include-toks . rest-toks)
       tok-lines
@@ -379,19 +378,20 @@
                                (path-tok :STRING))
         include-toks
       ;; TODO Some error checking.
-      (let ((file (uiop:read-file-string (token-payload path-tok))))
+      (let ((file (uiop:read-file-string
+                   (quil::resolve-safely (token-payload path-tok)))))
         (values (parse-qasm-body file)
                 rest-toks)))))
 
 (defun parse-measure (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "measure")
+  (check-qasm-unexpected-eof tok-lines "measure")
 
   (let ((measure-toks (first tok-lines)))
-    (qasm-check-token-type (first measure-toks) ':MEASURE)
+    (check-qasm-token-type (first measure-toks) ':MEASURE)
 
     (multiple-value-bind (qreg rest-toks)
         (parse-qregister (rest measure-toks))
-      (qasm-check-token-type (first rest-toks) ':ARROW)
+      (check-qasm-token-type (first rest-toks) ':ARROW)
 
       (multiple-value-bind (creg rest-toks)
           (parse-cregister (rest rest-toks))
@@ -405,13 +405,13 @@
                 (rest tok-lines))))))
 
 (defun parse-comment (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "comment")
+  (check-qasm-unexpected-eof tok-lines "comment")
 
   (values nil
           (rest tok-lines)))
 
 (defun parse-openqasm (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "OPENQASM")
+  (check-qasm-unexpected-eof tok-lines "OPENQASM")
 
   (destructuring-bind (openqasm-toks . rest-toks)
       tok-lines
@@ -459,7 +459,7 @@
 
 (defun parse-qregisters (tokens)
   "Parse qasm registers from TOKENS until a no more valid tokens are available. Returns the list of parsed registers (of type QASM-REGISTER)."
-  (qasm-check-unexpected-eof tokens "registers")
+  (check-qasm-unexpected-eof tokens "registers")
 
   (loop :for (register rest-toks) := (multiple-value-list (parse-qregister tokens))
           :then (multiple-value-list (parse-qregister rest-toks))
@@ -514,8 +514,8 @@
 
 (defun parse-params (tokens)
   "Parse a list of qasm params (e.g. in the instruction  rx(0.5) q;). Returns a list of parameter values (type float), and a second value which is the remaining tokens (not including closing parenthesis)."
-  (qasm-check-unexpected-eof tokens "parameters")
-  (qasm-check-token-type (first tokens) :LEFT-PAREN)
+  (check-qasm-unexpected-eof tokens "parameters")
+  (check-qasm-token-type (first tokens) :LEFT-PAREN)
 
   (let ((rp-pos (position ':RIGHT-PAREN tokens :key 'token-type :from-end t)))
     (unless rp-pos
@@ -536,10 +536,10 @@
 
 (defun collect-single-application-from-tokens (tokens)
   ;; gate-name((p1, ...))? reg,+
-  (qasm-check-unexpected-eof tokens "gate application")
+  (check-qasm-unexpected-eof tokens "gate application")
 
   (let ((name-tok (first tokens)))
-    (qasm-check-token-type name-tok :ID)
+    (check-qasm-token-type name-tok :ID)
     (multiple-value-bind (params rest-toks)
         (maybe-parse-params (rest tokens))
       (multiple-value-bind (registers rest-toks)
@@ -552,7 +552,7 @@
 (defun check-number-of-parameters (params number)
   (unless (= number (length params))
     (qasm-parse-error "Expected ~A parameters but found ~A."
-                     number (length params))))
+                      number (length params))))
 
 (defun build-u-gate (θ ϕ λ qubit)
   "As per the OpenQASM spec: U(θ, ϕ, λ) = RZ(ϕ) . RY(θ) . RZ(λ)."
@@ -676,8 +676,8 @@ Note: the above \"expansion\" is not performed when in a gate body."
   (quil:param param))
 
 (defun parse-gate-decl (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "gate")
-  (qasm-check-token-type (first (first tok-lines)) ':GATE)
+  (check-qasm-unexpected-eof tok-lines "gate")
+  (check-qasm-token-type (first (first tok-lines)) ':GATE)
 
   (let* ((close-pos (line-position-of-token-type ':RIGHT-CURLY-BRACKET tok-lines))
          (*gate-applications-are-formal* t)
@@ -697,9 +697,9 @@ Note: the above \"expansion\" is not performed when in a gate body."
               (subseq tok-lines (1+ close-pos))))))
 
 (defun parse-opaque (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "opaque")
-  (qasm-check-token-type (first (first tok-lines)) ':OPAQUE)
-  (qasm-check-token-type (second (first tok-lines)) ':GATE)
+  (check-qasm-unexpected-eof tok-lines "opaque")
+  (check-qasm-token-type (first (first tok-lines)) ':OPAQUE)
+  (check-qasm-token-type (second (first tok-lines)) ':GATE)
 
   (destructuring-bind ((opaque gate name-tok &rest rest-toks) &rest rest-lines)
       tok-lines
@@ -717,19 +717,19 @@ Note: the above \"expansion\" is not performed when in a gate body."
                 rest-lines)))))
 
 (defun parse-if (tok-lines)
-  (qasm-check-unexpected-eof tok-lines "if")
-  (qasm-check-token-type (first (first tok-lines)) ':IF)
+  (check-qasm-unexpected-eof tok-lines "if")
+  (check-qasm-token-type (first (first tok-lines)) ':IF)
 
   (destructuring-bind (if-toks . rest-lines)
       tok-lines
     (pop if-toks)
-    (qasm-check-token-type (pop if-toks) ':LEFT-PAREN)
+    (check-qasm-token-type (pop if-toks) ':LEFT-PAREN)
     (multiple-value-bind (register rest-toks)
         (parse-cregister if-toks)
-      (qasm-check-token-type (pop rest-toks) ':EQUALSEQUALS)
+      (check-qasm-token-type (pop rest-toks) ':EQUALSEQUALS)
       (let ((val (pop rest-toks)))
-        (qasm-check-token-type val ':NNINTEGER)
-        (qasm-check-token-type (pop rest-toks) ':RIGHT-PAREN)
+        (check-qasm-token-type val ':NNINTEGER)
+        (check-qasm-token-type (pop rest-toks) ':RIGHT-PAREN)
         (multiple-value-bind (gate-application rest-toks)
             (parse-application (list rest-toks))
           (assert (null rest-toks))
