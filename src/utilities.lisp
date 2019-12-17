@@ -39,6 +39,17 @@ WARNING: The default will work for instances of \"idiomatic\" classes that aren'
 (defun (setf vnth) (val index vector)
   (setf (aref vector index) val))
 
+(defun vector-argmax (arr)
+  "Finds the position of the largest (using #'<) item in a nonempty vector."
+  (loop :with pos := 0
+        :with current-max := (aref arr 0)
+        :for j :from 0
+        :for item :across arr
+        :when (< current-max item)
+          :do (setf current-max item
+                    pos j)
+        :finally (return pos)))
+
 (defmacro dohash (((key val) hash &optional ret) &body body)
   `(loop :for ,key :being :the :hash-keys :of ,hash
            :using (hash-value ,val)
