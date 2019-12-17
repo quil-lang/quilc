@@ -115,6 +115,8 @@
               (inst* I-gate
                      (application-parameters instr)
                      (application-arguments instr))))
+          (unless Zs
+            (finish-compiler))
           ;; emit the Zs by reducing their Z-counts (for some of them).
           ;; we reduce the Z-count by using the identity CNOT ZI CNOT = ZZ, so we seek
           ;; a second qubit index with a lot of Zs to conjugate away all at once.
