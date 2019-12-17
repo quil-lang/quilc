@@ -137,8 +137,10 @@ This also signals ambiguous definitions, which may be handled as needed."
 ;; preceded by comments (//).
 (defun %check-for-qasm-header (string)
   (labels ((line-begins-with (prefix line)
-             (let ((pos (search prefix (string-left-trim '(#\Space) line))))
-               (and pos (= 0 pos))))
+             (when (<= (length prefix) (length line))
+               (let* ((start2 (or (position #\Space line :test-not #'eql) 0))
+                      (end2 (+ start2 (length prefix))))
+                 (string= prefix line :start2 start2 :end2 end2))))
            (commented-line-p (line) (line-begins-with "//" line))
            (qasm-line-p (line) (line-begins-with "OPENQASM 2.0" line)))
     (with-input-from-string (*standard-input* string)
