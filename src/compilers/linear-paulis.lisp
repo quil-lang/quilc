@@ -130,7 +130,7 @@
               (let ((term (car term-pair)))
                 (if (position subvote-formal (pauli-term-arguments term) :test #'equalp)
                     (push term-pair ZZs)
-                    (push term-pair ZIs))))
+                    (push term ZIs))))
             ;; for the ZIs: emit them as-is.
             (let ((ZI-gate (clone-exp-pauli-sum-gate (gate-application-gate instr)
                                                      :new-name "ZI-GATE" :new-terms ZIs)))
