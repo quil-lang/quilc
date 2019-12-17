@@ -1008,7 +1008,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                      (setf entry (- entry)))
                     (#\Y
                      (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
-                     (setf entry (* entry (if (zerop row-toggle) (complex 0 1) (complex 0 -1)))))
+                     (setf entry (* entry (if (zerop row-toggle) #C(0 1) #C(0 -1)))))
                     (#\Z
                      (setf entry (* entry (if (zerop row-toggle) 1 -1))))
                     (#\I

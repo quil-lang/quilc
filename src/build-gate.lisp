@@ -55,7 +55,11 @@ EXAMPLE: The Quil line \"CPHASE(pi) 2 3\" corresponds to the S-expression (build
 (define-global-counter **anonymous-gate-counter** get-anonymous-gate-counter)
 
 (defun anon-gate (operator-or-gate gate-or-parameters qubit &rest qubits)
-  "Variant of BUILD-GATE for constructing anonymous gate applications."
+  "Variant of BUILD-GATE for constructing anonymous gate applications.
+
+Comes in two flavors:
+  (1) (anon-gate string-name magicl-matrix &rest qubits) builds an anonymous gate application with human-readable name STRING-NAME, behavior indicated by MAGICL-MATRIX, and acting on QUBITS.
+  (2) (anon-gate gate-definition parameter-list &rest qubits) builds an anonymous gate application with definition set by GATE-DEFINITION, human-readable name inferred from the defintiion, PARAMETER-LIST fed to the definition, and acting on QUBITS."
   (push qubit qubits)
   (let* ((name
            (etypecase operator-or-gate
