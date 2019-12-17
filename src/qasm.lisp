@@ -379,7 +379,9 @@
         include-toks
       ;; TODO Some error checking.
       (let ((file (uiop:read-file-string
-                   (quil::resolve-safely (token-payload path-tok)))))
+                   (if quil::*safe-include-directory*
+                       (quil::resolve-safely (token-payload path-tok))
+                       (token-payload path-tok)))))
         (values (parse-qasm-body file)
                 rest-toks)))))
 
