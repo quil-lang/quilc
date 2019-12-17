@@ -124,7 +124,13 @@
      :type string
      :optional t
      :initial-value nil
-     :documentation "Proxy to use when checking for an SDK update."))
+     :documentation "Proxy to use when checking for an SDK update.")
+
+    (("safe-include-directory")
+     :type string
+     :optional t
+     :initial-value nil
+     :documentation "Prevent programs from including files not within this directory. Any includes are interpreted as relative to this directory."))
   "Supported and non-deprecated options.")
 
 (defparameter *deprecated-option-spec*
@@ -379,7 +385,8 @@
                           (log-level nil)
                           (quiet nil)
                           (check-sdk-version nil)
-                          (proxy nil))
+                          (proxy nil)
+                          (safe-include-directory nil))
   ;; Deprecated options.
   (declare (ignore compute-gate-depth compute-gate-volume compute-runtime
                    compute-fidelity compute-2Q-gate-depth compute-unused-qubits
@@ -420,6 +427,12 @@
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
 
+  (unless (or (null safe-include-directory)
+              (uiop:directory-pathname-p safe-include-directory))
+    (error "--safe-include-directory must point to a directory. Got ~S. Did you ~
+            forget a trailing slash?"
+           safe-include-directory))
+
   (special-bindings-let*
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
 			*log-level*))
@@ -440,7 +453,8 @@
        (*human-readable-stream* (make-broadcast-stream))
        (*quil-stream* (make-broadcast-stream))
        (*verbose* (make-broadcast-stream))
-       (*protoquil* protoquil))
+       (*protoquil* protoquil)
+       (quil::*safe-include-directory* safe-include-directory))
 
     (when check-sdk-version
       (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
@@ -471,7 +485,7 @@
            (setf *verbose* *human-readable-stream*))
 
          (let* ((program-text (slurp-lines))
-                (program (parse-quil program-text))
+                (program (quil:safely-parse-quil program-text))
                 (original-matrix (when (and protoquil compute-matrix-reps)
                                    (parsed-program-to-logical-matrix program))))
            (multiple-value-bind (processed-program statistics)
