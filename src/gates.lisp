@@ -197,7 +197,9 @@
               :reader exp-pauli-sum-gate-arguments)
    (terms :initarg :terms
           :reader exp-pauli-sum-gate-terms))
-  (:documentation "A gate specified by a Pauli sum."))
+  (:documentation "A gate specified by the exponentiation of a weighted sum of Paulis.
+
+The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS slot, each of which is made up of a phase factor, a string of Pauli symbols (I, X, Y, Z), and an ordered list of qubit formals to which these symbols are applied.  The qubit formals are those appearing in the ARGUMENTS slot, which ultimately get substituted with the arguments appearing in a GATE-APPLICATION tagged with this gate definition.  Similarly, PARAMETERS is populated with a list of formals on which the Pauli phases can depend, and these are ultimately substituted with the parameters appearing in a GATE-APPLICATION tagged with this gate definition."))
 
 (defmethod initialize-instance :after ((gate exp-pauli-sum-gate) &key)
   (with-slots (parameters arguments terms) gate

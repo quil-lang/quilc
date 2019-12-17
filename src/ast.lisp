@@ -399,6 +399,9 @@ If no exit rewiring is found, return NIL."
   (:documentation "Represents a gate definition as the exponential of a weighted sum of Pauli matrices."))
 
 (defstruct (pauli-term)
+  "Records a word of Pauli operators, together with an ordered list of qubit formals on which they act, as well as a scalar prefix.  This is part of the internal representation of a EXP-PAULI-SUM-GATE-DEFINITION and probably shouldn't be instantiated otherwise.
+
+This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends it slightly: a Clifford Pauli is constrained to carry a phase which is a fourth root of unity, but the phase of a PAULI-TERM can be arbitrary (indeed, even a delayed expression).  The reader looking for an embodiment of Pauli words is better off using that data structure without CAREFUL CONSIDERATION."
   pauli-word
   prefactor
   arguments)
