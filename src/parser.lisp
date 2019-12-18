@@ -984,24 +984,28 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
                        :arguments qubit-list))))
 
 (defun pauli-term->matrix (term arguments parameters parameter-names)
-  (let* ((prefactor-fn
+  (let* ((prefactor
            (typecase (pauli-term-prefactor term)
              (number
-              (lambda (&rest args) (declare (ignore args)) (pauli-term-prefactor term)))
+              (pauli-term-prefactor term))
              (delayed-expression
-              (compile nil `(lambda ,parameter-names
-                              (declare (ignorable ,@parameter-names))
-                              ,(delayed-expression-expression (pauli-term-prefactor term)))))
+              (apply
+               (compile nil `(lambda ,parameter-names
+                               (declare (ignorable ,@parameter-names))
+                               ,(delayed-expression-expression (pauli-term-prefactor term))))
+               parameters))
              ((or symbol cons)
-              (compile nil `(lambda ,parameter-names
-                              (declare (ignorable ,@parameter-names))
-                              ,(pauli-term-prefactor term))))))
+              (apply
+               (compile nil `(lambda ,parameter-names
+                               (declare (ignorable ,@parameter-names))
+                               ,(pauli-term-prefactor term)))
+               parameters))))
          (arg-count (length arguments))
          (size (expt 2 arg-count))
          (m (magicl:make-zero-matrix size size)))
     (dotimes (col size)
       (let ((row col)
-            (entry (apply prefactor-fn parameters)))
+            (entry prefactor))
         (loop :for letter :across (pauli-term-pauli-word term)
               :for arg :in (pauli-term-arguments term)
               :for arg-position := (- arg-count 1 (position arg arguments :test #'equalp))
