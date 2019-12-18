@@ -398,6 +398,29 @@ RZ(-2.0) 0"))
               :do (is (quil::double= (magicl:ref m 0 0)
                                      (magicl:ref m j j))))))))
 
+(deftest test-horizontal-composition-of-pauli-term->matrix ()
+  (flet ((word->matrix (word)
+           (quil::pauli-term->matrix
+            (quil::make-pauli-term :pauli-word word
+                                   :prefactor 1
+                                   :arguments (a:iota (length word)))
+            (a:iota (length word)) nil nil)))
+    (let* ((X (word->matrix "X"))
+           (Y (word->matrix "Y"))
+           (Z (word->matrix "Z"))
+           (I (word->matrix "I"))
+           (word-size 4)
+           (word (random-pauli-word word-size))
+           (m (magicl:make-identity-matrix 1)))
+      (loop :for char :across word
+            :for p := (ecase char
+                        (#\X X)
+                        (#\Y Y)
+                        (#\Z Z)
+                        (#\I I))
+            :do (setf m (magicl:kron m p)))
+      (is (quil::operator= m (word->matrix word))))))
+
 (defun random-permutation (list)
   (unless (null list)
     (let ((index (random (length list))))
