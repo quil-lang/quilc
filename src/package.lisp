@@ -405,6 +405,9 @@
 
   ;; parser.lisp
   (:export
+   #:tok
+   #:token-type
+   #:token-payload
    #:parse-quil-into-raw-program        ; FUNCTION
    #:quil-parse-error                   ; CONDITION
    #:resolve-safely                     ; FUNCTION
@@ -444,6 +447,7 @@
 
   ;; cl-quil.lisp
   (:export
+   #:parse
    #:parse-quil                         ; FUNCTION
    #:read-quil-file                     ; FUNCTION
    )
@@ -587,3 +591,12 @@
    #:clifford-from-quil                 ; FUNCTION
    )
   )
+
+(defpackage #:cl-quil.qasm
+  (:nicknames #:quil.qasm)
+  (:use #:cl)
+  (:local-nicknames (:a :alexandria))
+  (:import-from #:cl-quil #:tok #:token-type #:token-payload)
+
+  (:export
+   #:parse-qasm))

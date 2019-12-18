@@ -50,7 +50,7 @@
 (defun quil-to-native-quil-handler (request &key protoquil)
   "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA."
   (check-type request rpcq::|NativeQuilRequest|)
-  (let* ((quil-program (quil::safely-parse-quil (rpcq::|NativeQuilRequest-quil| request)))
+  (let* ((quil-program (safely-parse-quil (rpcq::|NativeQuilRequest-quil| request)))
          (target-device (rpcq::|NativeQuilRequest-target_device| request))
          (qpu-hash (a:plist-hash-table (list "isa" (rpcq::|TargetDevice-isa| target-device)
                                              "specs" (rpcq::|TargetDevice-specs| target-device))
@@ -95,13 +95,11 @@
     (when (> n 2)
       (error "Currently no more than two qubit randomized benchmarking is supported."))
     (let* ((cliffords (mapcar #'quil.clifford::clifford-from-quil gateset))
-           (qubits-used (mapcar (a:compose
-                                 #'cl-quil:qubits-used
-                                 #'cl-quil:safely-parse-quil)
+           (qubits-used (mapcar (a:compose #'qubits-used #'safely-parse-quil)
                                 gateset))
            (qubits-used-by-interleaver
              (when interleaver
-               (cl-quil:qubits-used (cl-quil:safely-parse-quil interleaver))))
+               (cl-quil:qubits-used (safely-parse-quil interleaver))))
            (qubits (union qubits-used-by-interleaver (reduce #'union qubits-used)))
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
@@ -167,8 +165,8 @@
 (defun rewrite-arithmetic-handler (request)
   "Rewrites the request program without arithmetic in gate parameters."
   (check-type request rpcq::|RewriteArithmeticRequest|)
-  (let ((program (quil::safely-parse-quil (rpcq::|RewriteArithmeticRequest-quil| request)
-                                          :transforms nil)))
+  (let ((program (safely-parse-quil (rpcq::|RewriteArithmeticRequest-quil| request)
+                                    :transforms nil)))
     (multiple-value-bind (rewritten-program original-memory-descriptors recalculation-table)
         (cl-quil::rewrite-arithmetic program)
       (let ((reformatted-rt (make-hash-table)))

@@ -16,7 +16,7 @@
                 :documentation "A definition which has has a common signature with some other definition.")
    (file :initarg :file
          :reader ambiguous-definition-file
-         :type string
+         :type (or null string)
          :documentation "The file in which the conflicting definition originated.")
    (conflicts :initarg :conflicts
               :reader ambiguous-definition-conflicts
@@ -84,7 +84,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                                          (token
                                           (token-pathname (lexical-context instr)))
                                          (t
-                                          (quil-parse-error "Unable to resolve definition context ~A" instr)))))
+                                          nil))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."
@@ -132,6 +132,41 @@ This also signals ambiguous definitions, which may be handled as needed."
                            (process-includes raw-quil originating-file)))))
         (dolist (xform transforms pp)
           (setf pp (transform xform pp)))))))
+
+;; A valid OpenQASM program requires the line "OPENQASM 2.0" possibly
+;; preceded by comments (//).
+(defun %check-for-qasm-header (string)
+  (labels ((line-begins-with (prefix line)
+             (when (<= (length prefix) (length line))
+               (let* ((start2 (or (position #\Space line :test-not #'eql) 0))
+                      (end2 (+ start2 (length prefix))))
+                 (string= prefix line :start2 start2 :end2 end2))))
+           (commented-line-p (line) (line-begins-with "//" line))
+           (qasm-line-p (line) (line-begins-with "OPENQASM 2.0" line)))
+    (with-input-from-string (*standard-input* string)
+      (loop :for line := (read-line *standard-input* nil) :do
+        (cond ((qasm-line-p line)
+               ;; Certainly an OpenQASM program.
+               (return t))
+              ((or (every (lambda (c) (char= #\Space c)) line)
+                   (commented-line-p line))
+               ;; Empty or comment line. Continue searching.
+               nil)
+              (t
+               ;; Neither OPENQASM 2.0, comment, or empty line, so
+               ;; cannot be legal OpenQASM.
+               (return nil)))))))
+
+(defun parse (string &key originating-file
+                       (transforms *standard-post-process-transforms*)
+                       (ambiguous-definition-handler #'continue))
+  "Parse the input STRING which can be either Quil or OpenQASM code."
+  (if (%check-for-qasm-header string)
+      (quil.qasm:parse-qasm string)
+      (parse-quil string
+                  :originating-file originating-file
+                  :transforms transforms
+                  :ambiguous-definition-handler ambiguous-definition-handler)))
 
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-process-transforms*)

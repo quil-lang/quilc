@@ -31,6 +31,7 @@
                (:file "initial-rewiring-tests")
                (:file "lexer-tests")
                (:file "parser-tests")
+               (:file "qasm-tests")
                (:file "printer-tests")
                (:file "classical-memory-tests")
                (:file "resource-tests")
