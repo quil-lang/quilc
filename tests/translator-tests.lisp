@@ -254,7 +254,7 @@ U(time)~{ ~a~}"
          (original-output (quil::make-matrix-from-quil
                            (mapcar (a:rcurry #'%patch-mref-values patch-table)
                                    (coerce (parsed-program-executable-code pp) 'list))))
-         (cpp (compiler-hook pp (quil::build-nq-fully-connected-chip 3)))
+         (cpp (compiler-hook pp (quil::build-nq-fully-connected-chip qubit-count)))
          (compiled-output (quil::make-matrix-from-quil
                            (mapcar (a:rcurry #'%patch-mref-values patch-table)
                                    (coerce (parsed-program-executable-code cpp) 'list)))))
