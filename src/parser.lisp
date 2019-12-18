@@ -1676,10 +1676,10 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
   "Safely parse a Quil string STRING."
   (flet ((parse-it (string)
            (let ((*allow-unresolved-applications* t))
-             (parse-quil string
-                         :originating-file originating-file
-                         :transforms transforms
-                         :ambiguous-definition-handler ambiguous-definition-handler))))
+             (parse string
+                    :originating-file originating-file
+                    :transforms transforms
+                    :ambiguous-definition-handler ambiguous-definition-handler))))
     (if (null *safe-include-directory*)
         (parse-it string)
         (let ((*resolve-include-pathname* #'resolve-safely))
