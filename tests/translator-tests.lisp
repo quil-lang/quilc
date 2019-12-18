@@ -373,6 +373,31 @@ U(time)~{ ~a~}"
                                    (coerce (parsed-program-executable-code cpp) 'list)))))
     (is (quil::matrix-equals-dwim original-output compiled-output))))
 
+(deftest test-simple-defexpis ()
+  (let ((chip (quil::build-nq-fully-connected-chip 2)))
+    (dolist (prog-text (list "
+PRAGMA INITIAL_REWIRING \"NAIVE\"
+DEFGATE EXPI(%beta) p q AS PAULI-SUM:
+    ZZ(-%beta/4) p q
+    Z(%beta/4) p
+    Z(%beta/4) q
+
+EXPI(2.0) 0 1
+CPHASE(-2.0) 0 1"
+                             "
+PRAGMA INITIAL_REWIRING \"NAIVE\"
+DEFGATE EXPI(%beta) p AS PAULI-SUM:
+    Z(%beta/2) p
+
+EXPI(2.0) 0
+RZ(-2.0) 0"))
+      (let* ((cpp (compiler-hook (parse-quil prog-text) chip))
+             (m (parsed-program-to-logical-matrix cpp)))
+        (is (quil::double= 1d0 (abs (magicl:ref m 0 0))))
+        (loop :for j :below (magicl:matrix-rows m)
+              :do (is (quil::double= (magicl:ref m 0 0)
+                                     (magicl:ref m j j))))))))
+
 (defun random-permutation (list)
   (unless (null list)
     (let ((index (random (length list))))
