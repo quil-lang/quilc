@@ -406,12 +406,6 @@
                                qreg creg)
                 (rest tok-lines))))))
 
-(defun parse-comment (tok-lines)
-  (check-qasm-unexpected-eof tok-lines "comment")
-
-  (values nil
-          (rest tok-lines)))
-
 (defun parse-openqasm (tok-lines)
   (check-qasm-unexpected-eof tok-lines "OPENQASM")
 
@@ -423,41 +417,30 @@
                                        (format nil "~A" (token-payload version))))
               rest-toks))))
 
+(defun parse-register (tokens reg-ctor)
+  (let* ((id (first tokens))
+         (id-type (token-type id)))
+    (unless (eql id-type ':ID)
+      (qasm-parse-error "Expected a token of type :ID, got ~A." id-type))
+    (let ((next (second tokens)))
+      (if (and next
+               (eql (token-type next) ':LEFT-SQUARE-BRACKET))
+          (destructuring-token-bind ((index :NNINTEGER) (_ :RIGHT-SQUARE-BRACKET))
+              (subseq tokens 2 4)
+            (values (funcall reg-ctor (token-payload id) (token-payload index))
+                    (subseq tokens 4)))
+          (values (funcall reg-ctor (token-payload id))
+                  (rest tokens))))))
+
 ;; TODO parse-cregister and parse-qregister have a common theme. For
 ;; D.R.Y.'s sake, factor out.
 (defun parse-cregister (tokens)
   "Parse a single qasm creg from TOKENS. Returns the parsed register (of type QASM-REGISTER), and a second value which is the remaining tokens."
-  (let* ((id (first tokens))
-         (id-type (token-type id)))
-    (unless (eql id-type ':ID)
-      (qasm-parse-error "Expected a token of type :ID, got ~A." id-type))
-    (let ((next (second tokens)))
-      (if (and next
-               (eql (token-type next) ':LEFT-SQUARE-BRACKET))
-          (destructuring-token-bind ((index :NNINTEGER) (_ :RIGHT-SQUARE-BRACKET))
-              (subseq tokens 2 4)
-            (values (creg (token-payload id)
-                          (token-payload index))
-                    (subseq tokens 4)))
-          (values (creg (token-payload id))
-                  (rest tokens))))))
+  (parse-register tokens #'creg))
 
 (defun parse-qregister (tokens)
   "Parse a single qasm qreg from TOKENS. Returns the parsed register (of type QASM-REGISTER), and a second value which is the remaining tokens."
-  (let* ((id (first tokens))
-         (id-type (token-type id)))
-    (unless (eql id-type ':ID)
-      (qasm-parse-error "Expected a token of type :ID, got ~A." id-type))
-    (let ((next (second tokens)))
-      (if (and next
-               (eql (token-type next) ':LEFT-SQUARE-BRACKET))
-          (destructuring-token-bind ((index :NNINTEGER) (_ :RIGHT-SQUARE-BRACKET))
-              (subseq tokens 2 4)
-            (values (qreg (token-payload id)
-                          (token-payload index))
-                    (subseq tokens 4)))
-          (values (qreg (token-payload id))
-                  (rest tokens))))))
+  (parse-register tokens #'qreg))
 
 (defun parse-qregisters (tokens)
   "Parse qasm registers from TOKENS until a no more valid tokens are available. Returns the list of parsed registers (of type QASM-REGISTER)."
@@ -479,9 +462,9 @@
                 (find payload *gate-params* :test #'equalp :key #'quil:param-name))
            (format nil "(%~A)" payload))
           ((eql (token-type token) ':LEFT-PAREN)
-           (format nil "("))
+           "(")
           ((eql (token-type token) ':RIGHT-PAREN)
-           (format nil ")"))
+           ")")
           ((typep payload 'quil:constant)
            (format nil "~F" (quil:constant-value payload)))
           (t
@@ -507,8 +490,9 @@
       ;; and then pass it through cl-quil's arithmetic parsing stuff.
       ;; This is a bit hacky, but I don't want to duplicate the
       ;; arithmetic stuff in cl-quil.
-      (let* ((str (format nil "~A"
-                          (apply #'concatenate 'string (mapcar #'%stringify-token-payload tokens))))
+      (let* ((str (with-output-to-string (s)
+                    (dolist (tok tokens)
+                      (write-string (%stringify-token-payload tok) s))))
              (quil-tokens (first (quil::tokenize str)))
              (quil::*parse-context* ':DEFCIRCUIT)
              (quil::*formal-arguments-allowed* t))
