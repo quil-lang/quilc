@@ -268,7 +268,7 @@ qreg q[2]; CX q[0], q[1]; // bye")
     (is (gethash "c" mem))
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0)))))
 
-(defun test-qasm-header ()
+(deftest test-qasm-header ()
   (is (quil::%check-for-qasm-header "OPENQASM 2.0"))
   (is (quil::%check-for-qasm-header "OPENQASM 2.0; creg c[0];"))
   (is (quil::%check-for-qasm-header "// this is a comment
@@ -285,6 +285,11 @@ OPENQASM 2.0;"))
     
 
   OPENQASM 2.0;"))
+  (is (not (quil::%check-for-qasm-header "")))
+  (is (not (quil::%check-for-qasm-header " ")))
+  (is (not (quil::%check-for-qasm-header "
+")))
+  (is (not (quil::%check-for-qasm-header "	"))) ; tab char
   (is (not (quil::%check-for-qasm-header "X 0; OPENQASM 2.0")))
   (is (not (quil::%check-for-qasm-header "# This is a Quil comment,
 # and thus cannot be a qasm program

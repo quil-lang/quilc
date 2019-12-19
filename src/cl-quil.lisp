@@ -136,6 +136,7 @@ This also signals ambiguous definitions, which may be handled as needed."
 ;; A valid OpenQASM program requires the line "OPENQASM 2.0" possibly
 ;; preceded by comments (//).
 (defun %check-for-qasm-header (string)
+  (check-type string string)
   (labels ((line-begins-with (prefix line)
              (when (<= (length prefix) (length line))
                (let* ((start2 (or (position #\Space line :test-not #'eql) 0))
@@ -145,10 +146,14 @@ This also signals ambiguous definitions, which may be handled as needed."
            (qasm-line-p (line) (line-begins-with "OPENQASM 2.0" line)))
     (with-input-from-string (*standard-input* string)
       (loop :for line := (read-line *standard-input* nil) :do
-        (cond ((qasm-line-p line)
+        (cond ((null line)
+               ;; EOF encountered before any characters read.
+               (return nil))
+              ((qasm-line-p line)
                ;; Certainly an OpenQASM program.
                (return t))
-              ((or (every (lambda (c) (char= #\Space c)) line)
+              ((or (every (lambda (c) (or (char= #\Space c) (char= #\Tab c)))
+                          line)
                    (commented-line-p line))
                ;; Empty or comment line. Continue searching.
                nil)
