@@ -1555,11 +1555,11 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
       (quil-parse-error "Unterminated argument list in DEFGATE."))
     
     ;; All the intermediate tokens in found-args should be formal qubit names
-    (setf args (loop :for a :in found-args
-                     :unless (eql ':NAME (token-type a))
-                       :do (quil-parse-error "Found something other than a formal qubit name in a DEFGATE argument list: ~A" a)
-                     :collect (parse-argument a)))
-    (values args rest-line)))
+    (let ((args (loop :for a :in found-args
+                      :unless (eql ':NAME (token-type a))
+                        :do (quil-parse-error "Found something other than a formal qubit name in a DEFGATE argument list: ~A" a)
+                      :collect (parse-argument a))))
+      (values args rest-line))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
