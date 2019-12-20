@@ -195,3 +195,83 @@ In the presence of multiple definitions with a common signature, a signal is rai
           "FILESPEC must be a path to a file that exists")
   (parse-quil (a:read-file-into-string filespec)
               :originating-file (first (directory filespec))))
+
+
+(defun parse-quil-into-raw-program (string)
+  "Parse a string STRING into a list of raw Quil syntax objects."
+  (check-type string string)
+  (let* ((*memory-region-names* nil)
+         (tok-lines (tokenize string)))
+    (loop :with parsed-program := nil
+          :until (endp tok-lines) :do
+            (multiple-value-bind (program-entity rest-toks)
+                (parse-program-lines tok-lines)
+              (push program-entity parsed-program)
+              (setf tok-lines rest-toks))
+          :finally (return (nreverse parsed-program)))))
+
+(defvar *safe-include-directory* nil)
+
+(define-condition resolve-filename-safely-condition (quil-parse-error)
+  ((filename :initarg :filename :reader resolve-safely-filename)
+   (message  :initarg :message  :reader resolve-safely-message))
+  (:report (lambda (condition stream)
+             (format stream "Cannot safely resolve ~A: ~A."
+                     (resolve-safely-filename condition)
+                     (resolve-safely-message  condition)))))
+
+(defun resolve-safely (filename)
+  (flet ((contains-up (filename)
+           (member-if (lambda (obj)
+                        (or (eql ':UP obj)
+                            (eql ':BACK obj)))
+                      (pathname-directory filename))))
+    (cond
+      ((uiop:absolute-pathname-p filename)
+       (error 'resolve-filename-safely-condition
+              :filename filename
+              :message "absolute paths disallowed"))
+
+      ((uiop:relative-pathname-p filename)
+       ;; Only files allowed.
+       (unless (uiop:file-pathname-p filename)
+         (error 'resolve-filename-safely-condition
+                :filename filename
+                :message "provided path does not resolve to a file"))
+       (when (contains-up filename)
+         (error 'resolve-filename-safely-condition
+                :filename filename
+                :message "cannot include files from a parent path"))
+       (if (null *safe-include-directory*)
+           filename
+           (merge-pathnames filename *safe-include-directory*)))
+
+      (t
+       (error 'resolve-filename-safely-condition
+              :filename filename
+              :message "invalid pathname")))))
+
+(defun safely-read-quil (filename)
+  "Safely read the Quil file designated by FILENAME."
+  (flet ((read-it (file)
+           (let ((*allow-unresolved-applications* t))
+             (read-quil-file file))))
+    (if (null *safe-include-directory*)
+        (read-it filename)
+        (let ((*resolve-include-pathname* #'resolve-safely))
+          (read-it filename)))))
+
+(defun safely-parse-quil (string &key originating-file
+                                   (transforms *standard-post-process-transforms*)
+                                   (ambiguous-definition-handler #'continue))
+  "Safely parse a Quil string STRING."
+  (flet ((parse-it (string)
+           (let ((*allow-unresolved-applications* t))
+             (parse string
+                    :originating-file originating-file
+                    :transforms transforms
+                    :ambiguous-definition-handler ambiguous-definition-handler))))
+    (if (null *safe-include-directory*)
+        (parse-it string)
+        (let ((*resolve-include-pathname* #'resolve-safely))
+          (parse-it string)))))
