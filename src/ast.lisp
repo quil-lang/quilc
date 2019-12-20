@@ -337,11 +337,11 @@ If no exit rewiring is found, return NIL."
 ;;; Note: In the future this might be expanded to include other objects.
 (deftype lexical-context () '(or null token))
 
-(defgeneric lexical-context (instr)
-  (:method ((instr t))
-    ;; By default, there is none.
-    nil)
-  (:documentation "Get the lexical context of an instruction."))
+;; lexical-context is a generic function which should be implemented
+;; for new token types. Note that this generic has methods defined
+;; earlier than this point, for example in classical-memory.lisp.
+(defmethod lexical-context (instr)
+  nil)
 
 (defclass gate-definition ()
   ((name :initarg :name
