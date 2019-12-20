@@ -54,6 +54,7 @@
                (:file "define-pragma")
                (:file "pragmas")
                (:file "parser")
+               (:file "cl-quil")
                (:file "qasm")
                (:file "gates")
                (:file "context")
@@ -121,8 +122,7 @@
                 :components ((:file "compressor-configuration")
                              (:file "compressor")
                              (:file "wavefunctions")
-                             (:file "rewriting-rules")))
-               (:file "cl-quil")))
+                             (:file "rewriting-rules")))))
 
 ;;; Contribs
 
