@@ -116,17 +116,74 @@ qreg q[2]; CX q[0], q[1]; // bye")
     (is (= 1 (length code)))))
 
 (deftest test-qasm-single-qubit-u ()
-  ;; U is compiled into the appropriate identity
+  ;; u1(lambda) = U(0, 0, lambda)
+  (dolist (qasm (list "qreg q[1]; U(0, 0, 1.0) q[0];"
+                      (format nil "include ~S; qreg q[1]; u1(1.0) q[0];"
+                              (namestring *qasm-qelib.inc-path*))))
+    (let* ((quil (quil.qasm::parse-qasm qasm))
+           (code (quil:parsed-program-executable-code quil)))
+      (is (= 3 (length code)))
 
-  ;; u1(lambda) = u3(0, 0, lambda)
-  (let* ((qasm (format nil "include ~S; qreg q[1]; u1(1.0) q[0];"
-                       (namestring *qasm-qelib.inc-path*)))
+      (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
+      (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
+
+      (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
+      (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
+
+      (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
+      (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2))))))))
+
+  ;; u2(phi, lambda) = U(pi/2, phi, lambda)
+  (dolist (qasm (list "qreg q[1]; U(pi/2, 0.5, 1) q[0];"
+                      (format nil "include ~S; qreg q[1]; u2(0.5, 1) q[0];"
+                              (namestring *qasm-qelib.inc-path*))))
+    (let* ((quil (quil.qasm::parse-qasm qasm))
+           (code (quil:parsed-program-executable-code quil)))
+      (is (= 3 (length code)))
+
+      (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
+      (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
+
+      (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
+      (is (= quil:pi/2 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
+
+      (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
+      (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2))))))))
+
+  ;; u3(theta, phi, lambda) = U(theta, phi, lambda) = RZ(phi) RY(theta) RZ(lambda)
+  (dolist (qasm (list "qreg q[1]; U(-0.5, 0.5, 1) q[0];"
+                      (format nil "include ~S; qreg q[1]; u3(-0.5, 0.5, 1) q[0];"
+                              (namestring *qasm-qelib.inc-path*))))
+    (let* ((quil (quil.qasm::parse-qasm qasm))
+           (code (quil:parsed-program-executable-code quil)))
+      (is (= 3 (length code)))
+
+      (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
+      (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
+
+      (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
+      (is (= -0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
+
+      (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
+      (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
+      (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2))))))))
+
+  ;; U(0,0,0) is compiled into the appropriate sequence
+  (let* ((qasm "qreg q[1]; U(0, 0, 0) q[0];")
          (quil (quil.qasm::parse-qasm qasm))
          (code (quil:parsed-program-executable-code quil)))
     (is (= 3 (length code)))
 
     (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
-    (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
+    (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
 
     (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
@@ -135,44 +192,6 @@ qreg q[2]; CX q[0], q[1]; // bye")
 
     (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
     (is (= 0 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
-    (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2)))))))
-
-  ;; u2(phi, lambda) = u3(pi/2, phi, lambda)
-  (let* ((qasm (format nil "include ~S; qreg q[1]; u2(0.5, 1) q[0];"
-                       (namestring *qasm-qelib.inc-path*)))
-         (quil (quil.qasm::parse-qasm qasm))
-         (code (quil:parsed-program-executable-code quil)))
-    (is (= 3 (length code)))
-
-    (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
-    (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
-    (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
-
-    (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
-    (is (= quil:pi/2 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
-    (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
-
-    (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
-    (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
-    (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2)))))))
-
-  ;; u3(theta, phi, lambda) = RZ(phi) RY(theta) RZ(lambda)
-  (let* ((qasm (format nil "include ~S; qreg q[1]; u3(-0.5, 0.5, 1) q[0];"
-                       (namestring *qasm-qelib.inc-path*)))
-         (quil (quil.qasm::parse-qasm qasm))
-         (code (quil:parsed-program-executable-code quil)))
-    (is (= 3 (length code)))
-
-    (is (equal "RZ" (quil::application-operator-root-name (elt code 0))))
-    (is (= 1 (quil:constant-value (first (quil:application-parameters (elt code 0))))))
-    (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 0))))))
-
-    (is (equal "RY" (quil::application-operator-root-name (elt code 1))))
-    (is (= -0.5 (quil:constant-value (first (quil:application-parameters (elt code 1))))))
-    (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 1))))))
-
-    (is (equal "RZ" (quil::application-operator-root-name (elt code 2))))
-    (is (= 0.5 (quil:constant-value (first (quil:application-parameters (elt code 2))))))
     (is (= 0 (quil:qubit-index (first (quil:application-arguments (elt code 2))))))))
 
 (deftest test-qasm-measure ()
