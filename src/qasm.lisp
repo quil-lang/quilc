@@ -616,8 +616,6 @@ Note: the above \"expansion\" is not performed when in a gate body."
 
           ((string= name "U")
            (check-number-of-parameters params 3)
-           (unless *gate-applications-are-formal*
-             (break))
            (destructuring-bind (θ ϕ λ) params
              (values (apply #'map-registers (lambda (tgt) (build-u-gate θ ϕ λ tgt))
                             registers)
