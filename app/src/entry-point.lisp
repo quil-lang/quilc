@@ -532,7 +532,7 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
         (setf (gethash "final_rewiring" statistics)
               (quil::extract-final-exit-rewiring-vector processed-program))
         (setf (parsed-program-executable-code processed-program)
-              (%strip-halts-respecting-rewirings processed-program))
+              (strip-final-halt-respecting-rewirings processed-program))
 
         (let ((lschedule (quil::make-lscheduler)))
           (loop :for instr :across (parsed-program-executable-code processed-program)
@@ -597,37 +597,59 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
 
       (values processed-program statistics))))
 
-(defun %strip-halts-respecting-rewirings (processed-program)
-  "Remove HALT instructions from PROCESSED-PROGRAM, retaining any rewirings."
-  (flet ((assert-rewirings-compatible (rewiring-type instr prev-instr this-rewiring prev-rewiring)
-           ;; Either one of the rewirings is NULL, or they are EQUALP.
-           (assert (or (or (null this-rewiring)
-                           (null prev-rewiring))
-                       (equalp this-rewiring prev-rewiring))
-                   ()
-                   "Instructions have incompatible ~A rewirings:~@
-                           THIS: ~A ~A~@
+(defun strip-final-halt-respecting-rewirings (processed-program)
+  "Remove the final HALT instruction, if any, from PROCESSED-PROGRAM, retaining any attached rewiring comments."
+  (let* ((instructions (parsed-program-executable-code processed-program))
+         (last-instruction (and (plusp (length instructions))
+                                (quil::nth-instr 0 processed-program :from-end t)))
+         (penultimate-instruction (and (< 1 (length instructions))
+                                       (quil::nth-instr 1 processed-program :from-end t)))
+         (must-transfer-comment-p (and (not (null penultimate-instruction))
+                                       (comment last-instruction))))
+
+    (unless (quil::haltp last-instruction)
+      (return-from strip-final-halt-respecting-rewirings instructions))
+
+    (when must-transfer-comment-p
+      ;; Transfer the rewiring comment from LAST-INSTRUCTION to PENULTIMATE-INSTRUCTION.
+      (multiple-value-bind (last-entering last-exiting)
+          (quil::instruction-rewirings last-instruction)
+        (multiple-value-bind (penultimate-entering penultimate-exiting)
+            (quil::instruction-rewirings penultimate-instruction)
+          (flet ((assert-rewirings-compatible (rewiring-type last-rewiring penultimate-rewiring)
+                   ;; This bit of hoop-jumping guards against the unlikely event that both
+                   ;; PENULTIMATE-INSTRUCTION and LAST-INSTRUCTION have rewiring comments attached
+                   ;; which might be incompatible. We check to ensure that either one of the
+                   ;; rewirings is NULL, or else they are EQUALP and can safely be merged.
+                   (assert (or (or (null last-rewiring)
+                                   (null penultimate-rewiring))
+                               (equalp last-rewiring penultimate-rewiring))
+                           ()
+                           "Failed to strip final HALT. Instructions have incompatible ~A rewirings:~@
+                           LAST: ~A ~A~@
                            PREV: ~A ~A"
-                   rewiring-type instr this-rewiring prev-instr prev-rewiring)))
-    (loop
-      :for j :from 0
-      :for instr :across (parsed-program-executable-code processed-program)
-      :for prev-instr := (and (plusp j) (quil::nth-instr (1- j) processed-program))
-      :when (and (plusp j) (typep instr 'halt) (comment instr)) :do
-        (multiple-value-bind (this-entering this-exiting) (quil::instruction-rewirings instr)
-          (multiple-value-bind (prev-entering prev-exiting) (quil::instruction-rewirings prev-instr)
-            (assert-rewirings-compatible ':ENTERING instr prev-instr this-entering prev-entering)
-            (assert-rewirings-compatible ':EXITING instr prev-instr this-exiting prev-exiting)
-            ;; Because of the (COMMENT INSTR) in the above :WHEN loop clause, we know that at least
-            ;; one of THIS-ENTERING and THIS-EXITING is non-NIL. Furthermore, due to the
-            ;; ASSERT-REWIRINGS-COMPATIBLE calls we know that either at least one the this/prev
-            ;; rewirings are non-NIL, or else they are equal. If they are equal, it doesn't matter
-            ;; which one we pick. If they are both NIL, then MAKE-REWIRING-FROM-STRING will do the
-            ;; right thing and return either an :ENTERING or :EXITING rewiring comment.
-            (setf (comment prev-instr)
-                  (quil::make-rewiring-comment :entering (or this-entering prev-entering)
-                                               :exiting (or this-exiting prev-exiting)))))
-      :unless (typep instr 'halt)
-        :collect instr :into new-instructions
-      :finally
-         (return (coerce new-instructions 'vector)))))
+                           rewiring-type last-instruction last-rewiring
+                           penultimate-instruction penultimate-rewiring)))
+            (assert-rewirings-compatible ':ENTERING last-entering penultimate-entering)
+            (assert-rewirings-compatible ':EXITING last-exiting penultimate-exiting))
+          ;; Consider the following cases for the :ENTERING rewirings (the same case analysis
+          ;; applies to the :EXITING rewiring pair as well).
+          ;;
+          ;; 1) If both the rewirings are non-NIL, then the ASSERT-REWIRINGS-COMPATIBLE check above
+          ;;    guarantees that they are EQUALP, and it doesn't matter which one we select.
+          ;;
+          ;; 2) If only one is non-NIL, the OR selects it.
+          ;;
+          ;; 3) If both are NIL, then MAKE-REWIRING-COMMENT just ignores that keyword argument, and
+          ;;    returns an :EXITING rewiring.
+          ;;
+          ;; Finally, (COMMENT LAST-INSTRUCTION) is non-NIL (otherwise MUST-TRANSFER-COMMENT-P would
+          ;; be NIL), so at least one of LAST-ENTERING and LAST-EXITING is non-NIL, which means that
+          ;; at least one of the :ENTERING and :EXITING keyword args to MAKE-REWIRING-COMMENT is
+          ;; non-NIL and hence the call will produce a rewiring comment.
+          (setf (comment penultimate-instruction)
+                (quil::make-rewiring-comment :entering (or last-entering penultimate-entering)
+                                             :exiting (or last-exiting penultimate-exiting))))))
+
+    ;; Strip the final HALT instruction.
+    (subseq instructions 0 (1- (length instructions)))))
