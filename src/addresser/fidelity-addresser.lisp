@@ -36,11 +36,12 @@
     ;;   + use only the additional infidelity penalty
     (when (and instr (typep instr 'gate-application))
       (let* ((chip-spec (addresser-state-chip-specification state))
+             (l2p (addresser-state-working-l2p state))
              (instr-copy (copy-instance instr))
              (instruction-expansion
                (let ((*compress-carefully* nil))
-                 (rewire-l2p-instruction (addresser-state-working-l2p state)
-                                         instr-copy)
+                 (when (rewiring-available-for-instruction-p l2p instr)
+                   (rewire-l2p-instruction l2p instr-copy))
                  (expand-to-native-instructions (list instr-copy) chip-spec))))
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
         

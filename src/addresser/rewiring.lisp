@@ -309,3 +309,13 @@ BODY as an implicit PROGN."
               first-rewiring-string second-rewiring-string)
       (values (make-rewiring-from-string first-rewiring-string)
               (make-rewiring-from-string second-rewiring-string)))))
+
+(defun rewiring-available-p (rewiring lq)
+  "Test whether REWIRING contains a non-nil rewiring for logical qubit LQ."
+  (aref (rewiring-l2p rewiring) lq))
+
+(defun rewiring-available-for-instruction-p (rewiring instr)
+  "Test whether every logical qubit in INSTR has been rewired in REWIRING."
+  (every (a:curry #'rewiring-available-p rewiring)
+         (mapcar #'qubit-index
+                 (application-arguments instr))))
