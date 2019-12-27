@@ -36,9 +36,12 @@
     ;;   + use only the additional infidelity penalty
     (when (and instr (typep instr 'gate-application))
       (let* ((chip-spec (addresser-state-chip-specification state))
+             (instr-copy (copy-instance instr))
              (instruction-expansion
                (let ((*compress-carefully* nil))
-                 (expand-to-native-instructions (list instr) chip-spec))))
+                 (rewire-l2p-instruction (addresser-state-working-l2p state)
+                                         instr-copy)
+                 (expand-to-native-instructions (list instr-copy) chip-spec))))
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
         
         ;; then, see if there's a non-naive cost available
