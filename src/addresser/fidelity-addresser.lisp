@@ -40,7 +40,7 @@
              (instr-copy (copy-instance instr))
              (instruction-expansion
                (let ((*compress-carefully* nil))
-                 (when (rewiring-available-for-instruction-p l2p instr)
+                 (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
                    (rewire-l2p-instruction l2p instr-copy))
                  (expand-to-native-instructions (list instr-copy) chip-spec))))
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))

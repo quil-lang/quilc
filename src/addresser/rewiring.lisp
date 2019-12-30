@@ -310,12 +310,12 @@ BODY as an implicit PROGN."
       (values (make-rewiring-from-string first-rewiring-string)
               (make-rewiring-from-string second-rewiring-string)))))
 
-(defun rewiring-available-p (rewiring lq)
+(defun rewiring-assigned-for-qubit-p (rewiring lq)
   "Test whether REWIRING contains a non-nil rewiring for logical qubit LQ."
   (aref (rewiring-l2p rewiring) lq))
 
-(defun rewiring-available-for-instruction-p (rewiring instr)
+(defun rewiring-assigned-for-instruction-qubits-p (rewiring instr)
   "Test whether every logical qubit in INSTR has been rewired in REWIRING."
-  (every (a:curry #'rewiring-available-p rewiring)
-         (mapcar #'qubit-index
-                 (application-arguments instr))))
+  (every (a:compose #'qubit-index
+                    (a:curry #'rewiring-assigned-for-qubit-p rewiring))
+         (application-arguments instr)))
