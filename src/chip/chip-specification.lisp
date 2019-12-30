@@ -60,8 +60,8 @@ DURATION is the time duration in nanoseconds of this gate application."
 FIDELITY stores the measured gate fidelity.
 
 DURATION stores the measured gate duration (in nanoseconds)."
-  (fidelity +near-perfect-fidelity+ :type real)
-  (duration 1/100 :type real))
+  (fidelity +near-perfect-fidelity+ :type (or null real))
+  (duration 1/100 :type (or null real)))
 
 (defun copy-gate-record (record &key fidelity duration)
   (make-gate-record :fidelity (or fidelity (gate-record-fidelity record))

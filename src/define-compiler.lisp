@@ -452,34 +452,37 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 ;;;    a fine-grained understanding of the emitted sequences, which is more likely
 ;;;    to perform better on hardware. GATE-RECORDs track this performance info.
 
-(defun make-occurrence-table ()
-  "Construct a fresh occurrence table."
-  (make-hash-table :test #'equalp))
+(defstruct occurrence-table
+  "Wrapper for a hash map from bindings to integer frequencies."
+  (map (make-hash-table :test #'equalp) :read-only t :type hash-table))
+
+(defmethod print-object ((object occurrence-table) stream)
+  (dohash ((binding count) (occurrence-table-map object))
+    (format stream "~/cl-quil::binding-fmt/ -> ~a~%" binding count)))
 
 (defun add-entry-to-occurrence-table (table binding count &optional (scalar 1))
   "Destructively increment a binding's value in an occurrence table."
-  (incf (gethash binding table 0) (* count scalar)))
+  (incf (gethash binding (occurrence-table-map table) 0) (* count scalar)))
 
 (defun copy-occurrence-table (table)
   "Create a shallow copy of an occurrence table."
-  (let ((new-table (make-hash-table :test #'equalp
-                                    :size (hash-table-count table))))
-    (dohash ((key val) table)
+  (let ((new-table (make-occurrence-table)))
+    (dohash ((key val) (occurrence-table-map table))
       (add-entry-to-occurrence-table new-table key val))
     new-table))
 
 (defun add-occurrence-tables (table1 table2 &optional (scalar2 1))
   "Construct a new occurrence table whose values are the sums of the values of the two input tables."
   (let ((new-table (copy-occurrence-table table1)))
-    (dohash ((key val) table2 new-table)
+    (dohash ((key val) (occurrence-table-map table2) new-table)
       (add-entry-to-occurrence-table new-table key val scalar2))))
 
 (defun filter-occurrence-table-by-qubit-count (table qubit-count)
   (let ((new-table (make-occurrence-table)))
-    (dohash ((key val) table new-table)
+    (dohash ((key val) (occurrence-table-map table) new-table)
       (when (= qubit-count
                (length (gate-binding-arguments key)))
-        (setf (gethash key new-table) val)))))
+        (setf (gethash key (occurrence-table-map new-table)) val)))))
 
 (defun update-occurrence-table (table compiler &optional qubit-count)
   "Treats a COMPILER as a replacement rule: each binding in the occurrence table TABLE on which COMPILER matches is replaced by the output occurrence table of COMPILER (appropriately scaled by the frequency of the binding in TABLE).
@@ -490,10 +493,10 @@ Optionally constrains the output to include only those bindings of a particular 
         (replacement (if qubit-count
                          (filter-occurrence-table-by-qubit-count (compiler-output-gates compiler) qubit-count)
                          (compiler-output-gates compiler)))
-        (new-table (make-hash-table :test #'equalp))
+        (new-table (make-occurrence-table))
         (binding-applied? nil))
     ;; for each existing entry in the table...
-    (dohash ((key val) table)
+    (dohash ((key val) (occurrence-table-map table))
       ;; ... do we match the binding?
       (cond
         ;; if so, merge the replacement into the new table
@@ -508,7 +511,7 @@ Optionally constrains the output to include only those bindings of a particular 
 (defun occurrence-table-cost (occurrence-table gateset &optional (default-value 0.5d0))
   "Given an OCCURRENCE-TABLE (i.e., a map from GATE-BINDINGs to frequencies) and a GATESET (i.e., a map from GATE-BINDINGs to GATE-RECORDs, which include fidelities), estimate the overall fidelity cost of all the gates in OCCURRENCE-TABLE."
   (let ((ret 1d0))
-    (dohash ((key val) occurrence-table ret)
+    (dohash ((key val) (occurrence-table-map occurrence-table) ret)
       (let ((true-cost default-value))
         (dohash ((cost-key cost-val) gateset)
           (when (binding-subsumes-p cost-key key)
@@ -517,7 +520,7 @@ Optionally constrains the output to include only those bindings of a particular 
 
 (defun occurrence-table-in-gateset-p (occurrence-table gateset)
   "Are all of the entires in OCCURRENCE-TABLE subsumed by entries in GATESET?  This is the stopping condition for recognizing that a table consists of 'native gates'."
-  (loop :for table-key :being :the :hash-keys :of occurrence-table
+  (loop :for table-key :being :the :hash-keys :of (occurrence-table-map occurrence-table)
         :always (loop :for gateset-key :being :the :hash-keys :of gateset
                         :thereis (and (or (gate-record-duration (gethash gateset-key gateset))
                                           (gate-record-fidelity (gethash gateset-key gateset)))
@@ -771,7 +774,7 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
          (make-occurrence-table)))
      (destructuring-bind (head name param-list &rest qubit-list) body
        (declare (ignore head))
-       (let ((table (make-hash-table :test #'equalp))
+       (let ((table (make-occurrence-table))
              (operator (typecase name
                          (string (named-operator name))
                          (symbol name)
@@ -802,7 +805,7 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
          (setf (gethash (make-gate-binding :operator operator
                                            :parameters param-list
                                            :arguments qubit-list)
-                        table)
+                        (occurrence-table-map table))
                1)
          table)))
     (otherwise
