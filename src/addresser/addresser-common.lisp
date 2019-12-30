@@ -492,16 +492,16 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         (when dirty-flag
           (assert (not dry-run) () "Got dirty when the scheduler was supposed to be dry.")
           (return-from dequeue-logical-to-physical t))
-
+        
         ;; if we didn't dirty up the schedule, see if we collected any
         ;; 2Q gates along the way
         (cond
-          ((dequeue-best-instr state
+          (instrs-ready-for-scheduling
+           (dequeue-best-instr state
                                instrs-ready-for-scheduling
-                               :dry-run dry-run)
-           t)
-          ((try-to-assign-qubits state instrs-partially-assigned)
-           t)
+                               :dry-run dry-run))
+          (instrs-partially-assigned
+           (try-to-assign-qubits state instrs-partially-assigned))
           (t
            nil))))))
 
