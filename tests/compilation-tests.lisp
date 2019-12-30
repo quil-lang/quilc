@@ -167,3 +167,7 @@ CNOT 0 2"))
     ;; NOTE: Decomposing into fewer 2q gates is more of a regression
     ;; test on quality of compilation, and not on correctness.
     (is (>= 6 (length 2q-code)))))
+
+(deftest test-sohaib-fidelity-rewiring-regression ()
+  (is (compiler-hook (parse "CZ 0 1")
+                     (quil::build-chip-from-digraph '((2 3) (3 2))))))

@@ -56,8 +56,8 @@
                  (subschedule (chip-schedule-from-carving-point
                                (addresser-state-chip-schedule state) resource carving-point))
                  (preceding-fidelity
-                       (calculate-instructions-log-fidelity subschedule
-                                                            (addresser-state-chip-specification state))))
+                   (calculate-instructions-log-fidelity subschedule
+                                                        (addresser-state-chip-specification state))))
             (when (<= cost-bound (+ preceding-fidelity instr-cost))
               (setf instr-cost (- cost-bound preceding-fidelity)))))))
 
