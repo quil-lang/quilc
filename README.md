@@ -238,6 +238,16 @@ It is the responsibility of the releaser to verify that the latest quilc release
 break the test suites of these downstream dependencies. All of these repositories pull the
 latest released version of quilc as part of their CI pipelines.
 
+## Benchmarking
+
+`quilc` offers a benchmarking suite to compare its performance against other compilers and
+between its own versions.  To run the benchmark suite, move to the `quilc` root directory,
+make sure the git submodules are checked out, and run
+
+```
+make benchmark-qasm
+```
+
 # Get involved!
 
 We welcome and encourage community contributions! Peruse our
