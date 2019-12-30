@@ -155,6 +155,16 @@ test-ccl:
 		--eval '(quit)'
 
 ###############################################################################
+# BENCHMARKS
+###############################################################################
+.PHONY: benchmark-qasm
+
+benchmark-qasm:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil-benchmarking)" \
+		--eval "(cl-quil-benchmarking::benchmark-qasm-suite)"
+
+###############################################################################
 # CLEAN
 ###############################################################################
 .PHONY: clean clean-quicklisp clean-cache cleanall
