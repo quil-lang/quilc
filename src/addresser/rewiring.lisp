@@ -316,6 +316,6 @@ BODY as an implicit PROGN."
 
 (defun rewiring-assigned-for-instruction-qubits-p (rewiring instr)
   "Test whether every logical qubit in INSTR has been rewired in REWIRING."
-  (every (a:compose #'qubit-index
-                    (a:curry #'rewiring-assigned-for-qubit-p rewiring))
+  (every (a:compose (a:curry #'rewiring-assigned-for-qubit-p rewiring)
+                    #'qubit-index)
          (application-arguments instr)))
