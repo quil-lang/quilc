@@ -515,7 +515,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
     new-state))
 
 (defun next-best-instruction (state instrs)
-  "Find the instruction from the given INSTRS which has the best COST-FUNCTION valuatiuon. Returns three values: the instruction, the index of the hardware object it lies on, and the optional qubit assignments if the selected instruction was only partially assigned."
+  "Find the instruction from the given INSTRS which has the best COST-FUNCTION valuation. Returns three values: the instruction, the index of the hardware object it lies on, and the optional qubit assignments if the selected instruction was only partially assigned."
   (with-slots (chip-spec chip-sched lschedule) state
     (let ((best-cost (build-worst-cost state))
           instr
