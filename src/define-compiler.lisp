@@ -457,8 +457,9 @@ OPTIONS: plist of options governing applicability of the compiler binding."
   (map (make-hash-table :test #'equalp) :read-only t :type hash-table))
 
 (defmethod print-object ((object occurrence-table) stream)
-  (dohash ((binding count) (occurrence-table-map object))
-    (format stream "~/cl-quil::binding-fmt/ -> ~a~%" binding count)))
+  (print-unreadable-object (object stream :type 'occurrence-table)
+    (dohash ((binding count) (occurrence-table-map object))
+      (format stream "~&  ~/cl-quil::binding-fmt/ -> ~a" binding count))))
 
 (defun add-entry-to-occurrence-table (table binding count &optional (scalar 1))
   "Destructively increment a binding's value in an occurrence table."
