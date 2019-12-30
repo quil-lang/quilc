@@ -34,7 +34,7 @@
     (dolist (file (qasm-test-files))
       (format t "| ~Va " 16 (trim-long-string (pathname-name file) 16))
       (handler-case
-          (bt:with-timeout (timeout)
+          (bordeaux-threads:with-timeout (timeout)
             (let ((text (alexandria:read-file-into-string file)))
               #+sbcl (sb-ext:gc :full t)
               (with-stopwatch elapsed-time
