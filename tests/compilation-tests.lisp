@@ -169,5 +169,7 @@ CNOT 0 2"))
     (is (>= 6 (length 2q-code)))))
 
 (deftest test-sohaib-fidelity-rewiring-regression ()
-  (is (compiler-hook (parse "CZ 0 1")
-                     (quil::build-chip-from-digraph '((2 3) (3 2))))))
+  (not-signals bt:timeout
+    (bt:with-timeout (1)
+      (is (compiler-hook (parse "CZ 0 1")
+                         (quil::build-chip-from-digraph '((2 3) (3 2))))))))
