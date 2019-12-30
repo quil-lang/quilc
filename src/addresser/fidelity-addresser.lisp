@@ -29,7 +29,7 @@
 (defmethod cost-function ((state fidelity-addresser-state) &key gate-weights instr)
   (let ((instr-cost 0d0)
         (gate-weights-cost 0d0))
-    
+
     ;; calculate log-infidelity coming from INSTR, using recombination:
     ;;   + calculate the cut point
     ;;   + calculate the infidelity of instructions since the cut point
@@ -44,7 +44,7 @@
                    (rewire-l2p-instruction l2p instr-copy))
                  (expand-to-native-instructions (list instr-copy) chip-spec))))
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
-        
+
         ;; then, see if there's a non-naive cost available
         (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
                       (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state))))
@@ -60,7 +60,7 @@
                                                             (addresser-state-chip-specification state))))
             (when (<= cost-bound (+ preceding-fidelity instr-cost))
               (setf instr-cost (- cost-bound preceding-fidelity)))))))
-    
+
     ;; conglomerate the log-infidelities in GATE-WEIGHTS, depressed by some decay factor
     (when gate-weights
       (let ((qq-distances (addresser-state-qq-distances state)) ; populated with log-infidelities
