@@ -452,7 +452,7 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 ;;;    a fine-grained understanding of the emitted sequences, which is more likely
 ;;;    to perform better on hardware. GATE-RECORDs track this performance info.
 
-(defstruct occurrence-table
+(defstruct (occurrence-table (:copier nil))
   "Wrapper for a hash map from bindings to integer frequencies."
   (map (make-hash-table :test #'equalp) :read-only t :type hash-table))
 
@@ -463,10 +463,13 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 
 (defun add-entry-to-occurrence-table (table binding count &optional (scalar 1))
   "Destructively increment a binding's value in an occurrence table."
+  (check-type table occurrence-table)
+  (check-type binding compiler-binding)
   (incf (gethash binding (occurrence-table-map table) 0) (* count scalar)))
 
 (defun copy-occurrence-table (table)
   "Create a shallow copy of an occurrence table."
+  (check-type table occurrence-table)
   (let ((new-table (make-occurrence-table)))
     (dohash ((key val) (occurrence-table-map table))
       (add-entry-to-occurrence-table new-table key val))
@@ -474,11 +477,15 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 
 (defun add-occurrence-tables (table1 table2 &optional (scalar2 1))
   "Construct a new occurrence table whose values are the sums of the values of the two input tables."
+  (check-type table1 occurrence-table)
+  (check-type table2 occurrence-table)
   (let ((new-table (copy-occurrence-table table1)))
     (dohash ((key val) (occurrence-table-map table2) new-table)
       (add-entry-to-occurrence-table new-table key val scalar2))))
 
 (defun filter-occurrence-table-by-qubit-count (table qubit-count)
+  (check-type table occurrence-table)
+  (check-type qubit-count integer)
   (let ((new-table (make-occurrence-table)))
     (dohash ((key val) (occurrence-table-map table) new-table)
       (when (= qubit-count
@@ -489,6 +496,8 @@ OPTIONS: plist of options governing applicability of the compiler binding."
   "Treats a COMPILER as a replacement rule: each binding in the occurrence table TABLE on which COMPILER matches is replaced by the output occurrence table of COMPILER (appropriately scaled by the frequency of the binding in TABLE).
 
 Optionally constrains the output to include only those bindings of a particular QUBIT-COUNT."
+  (check-type table occurrence-table)
+  (check-type compiler compiler)
   (assert (= 1 (length (compiler-bindings compiler))))
   (let ((binding (first (compiler-bindings compiler)))
         (replacement (if qubit-count
@@ -511,6 +520,7 @@ Optionally constrains the output to include only those bindings of a particular 
 
 (defun occurrence-table-cost (occurrence-table gateset &optional (default-value 0.5d0))
   "Given an OCCURRENCE-TABLE (i.e., a map from GATE-BINDINGs to frequencies) and a GATESET (i.e., a map from GATE-BINDINGs to GATE-RECORDs, which include fidelities), estimate the overall fidelity cost of all the gates in OCCURRENCE-TABLE."
+  (check-type occurrence-table occurrence-table)
   (let ((ret 1d0))
     (dohash ((key val) (occurrence-table-map occurrence-table) ret)
       (let ((true-cost default-value))
@@ -521,6 +531,7 @@ Optionally constrains the output to include only those bindings of a particular 
 
 (defun occurrence-table-in-gateset-p (occurrence-table gateset)
   "Are all of the entires in OCCURRENCE-TABLE subsumed by entries in GATESET?  This is the stopping condition for recognizing that a table consists of 'native gates'."
+  (check-type occurrence-table occurrence-table)
   (loop :for table-key :being :the :hash-keys :of (occurrence-table-map occurrence-table)
         :always (loop :for gateset-key :being :the :hash-keys :of gateset
                         :thereis (and (or (gate-record-duration (gethash gateset-key gateset))
@@ -561,7 +572,7 @@ Optionally restricts to considering only those gates and compilers which involve
 N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means \"of least length\", but in theory this invariant could be violated by pathological compiler output frequency + fidelity pairings that push the least-length path further down the priority queue."
   (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'>)))
     (flet ((collect-bindings (occurrence-table)
-             (loop :for key :being :the :hash-keys :of occurrence-table
+             (loop :for key :being :the :hash-keys :of (occurrence-table-map occurrence-table)
                    :collect key)))
       ;; initial contents: arbitrary gate, no history
       (loop :with visited-nodes := ()
@@ -597,8 +608,8 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
   (flet (;; Checks whether PATH doubles back through the occurrence table START.         
          (path-has-a-loop-p (path start)
            (and (< 1 (length path))
-                (loop :for (gateset compiler) :on path :by #'cddr
-                      :when (loop :for gate :being :the :hash-keys :of gateset
+                (loop :for (table compiler) :on path :by #'cddr
+                      :when (loop :for gate :being :the :hash-keys :of (occurrence-table-map table)
                                   :always (loop :for binding :in start
                                                   :thereis (binding-subsumes-p (first start) gate)))
                         :do (return-from path-has-a-loop-p t)
@@ -620,9 +631,10 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
            ;; start by computing a fast route from the generic gate to the target gate set
            (generic-path (find-shortest-compiler-path unconditional-compilers
                                                       target-gateset
-                                                      (alexandria:plist-hash-table
-                                                       (list (generate-blank-binding qubit-count) 1)
-                                                       :test #'equalp)
+                                                      (make-occurrence-table
+                                                       :map (alexandria:plist-hash-table
+                                                             (list (generate-blank-binding qubit-count) 1)
+                                                             :test #'equalp))
                                                       qubit-count))
            (generic-cost (occurrence-table-cost (first generic-path) target-gateset)))
       
@@ -1166,10 +1178,11 @@ OUTPUT-GATESET: A plist keyed on arguments to MAKE-GATE-BINDING with values in f
                                   :options ',options
                                   :body '(locally ,@decls ,@body)
                                   :output-gates ,(if (getf options ':output-gateset)
-                                                     `(a:plist-hash-table
-                                                       (loop :for (args count) :on ,(getf options ':output-gateset) :by #'cddr
-                                                             :nconc (list (apply #'make-gate-binding args) count))
-                                                       :test #'equalp)
+                                                     `(make-occurrence-table
+                                                       :map (a:plist-hash-table
+                                                             (loop :for (args count) :on ,(getf options ':output-gateset) :by #'cddr
+                                                                   :nconc (list (apply #'make-gate-binding args) count))
+                                                             :test #'equalp))
                                                      `(estimate-output-gates-from-raw-code (quote (progn ,@body))))
                                   :function (a:named-lambda ,name (,@variable-names &key context)
                                               (declare (ignorable context))
