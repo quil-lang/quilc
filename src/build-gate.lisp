@@ -109,6 +109,12 @@ Comes in two flavors:
                arg-lambda-params
                arg-expression
                t))
+             ((memory-ref)
+              (values
+               nil
+               nil
+               arg
+               t))
              ((constant (value val))
               (values nil nil val nil))
              (_

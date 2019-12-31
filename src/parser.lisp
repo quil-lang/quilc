@@ -988,6 +988,10 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
            (typecase (pauli-term-prefactor term)
              (number
               (lambda (&rest args) (declare (ignore args)) (pauli-term-prefactor term)))
+             (delayed-expression
+              (compile nil `(lambda ,parameter-names
+                              (declare (ignorable ,@parameter-names))
+                              ,(delayed-expression-expression (pauli-term-prefactor term)))))
              ((or symbol cons)
               (compile nil `(lambda ,parameter-names
                               (declare (ignorable ,@parameter-names))
