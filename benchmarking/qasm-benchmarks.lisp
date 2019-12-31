@@ -36,10 +36,14 @@
              (ponder-symbol s))))))))
 
 (defun print-configuration ()
-  (format t "Current CL-QUIL configuration:~%")
-  (dolist (symb (idiomatic-package-variables ':cl-quil :include-internal t))
-    (format t "~a: ~a~%" symb (symbol-value symb)))
-  (format t "~%"))
+  (format t "Current CL-QUIL configuration:~2%")
+  (with-standard-io-syntax
+    (dolist (symb (idiomatic-package-variables ':cl-quil :include-internal t))
+      (format t "~A~%    " symb)
+      (write (symbol-value symb) :pretty nil :escape t :readably nil :length 10 :level 2)
+      (terpri)))
+  (terpri)
+  (finish-output))
 
 (defun trim-long-string (string length)
   (if (>= length (length string))
@@ -57,35 +61,43 @@
           :finally (return (quil::lscheduler-calculate-depth lschedule)))))
 
 (defun benchmark-qasm-suite (&key (timeout 30))
-  (flet ((print-rule ()
-           (format t "+------------------+----------+-------+----------+~%")))
-    (print-configuration)
-    (print-rule)
-    (format t "|       NAME       | TIME (s) | SWAPS | 2Q DEPTH |~%")
-    (print-rule)
-    (let ((chip (quil::build-ibm-qx5))
-          (quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
-          (quil::*safe-include-directory* (asdf:system-relative-pathname :cl-quil "tests/qasm-files/")))
-      (dolist (file (qasm-test-files))
-        (format t "| ~Va " 16 (trim-long-string (pathname-name file) 16))
-        (finish-output)
-        (handler-case
-            (bordeaux-threads:with-timeout (timeout)
+  (let ((timed-out nil))
+    (flet ((print-rule ()
+             (format t "+------------------+----------+-------+----------+~%")))
+      (print-configuration)
+      (print-rule)
+      (format t "|       NAME       | TIME (s) | SWAPS | 2Q DEPTH |~%")
+      (print-rule)
+      (let ((chip (quil::build-ibm-qx5))
+            (quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
+            (quil::*safe-include-directory* (asdf:system-relative-pathname :cl-quil "tests/qasm-files/")))
+        (dolist (file (qasm-test-files))
+          (format t "| ~Va " 16 (trim-long-string (pathname-name file) 16))
+          (finish-output)
+          (handler-case
               (let ((text (alexandria:read-file-into-string file)))
-                #+sbcl (sb-ext:gc :full t)
-                (with-stopwatch elapsed-time
-                  (multiple-value-bind (cpp swaps)
-                      (quil::compiler-hook (quil::parse text
-                                                        :originating-file file)
-                                           chip
-                                           :protoquil t)
-                    (format t "| ~Vf | ~Vd | ~Vd |~%"
-                            8 (/ elapsed-time 1000)
-                            5 swaps
-                            8 (calculate-multiqubit-gate-depth (parsed-program-executable-code cpp)))))))
-          (bt:timeout ()
-            (format t "| ~8,'>d | ????? | ???????? |~%"
-                    timeout)))
-        (finish-output)))
-    (print-rule)
-    (finish-output)))
+                (tg:gc :full t)
+                (bordeaux-threads:with-timeout (timeout)
+                  (with-stopwatch elapsed-time
+                    (multiple-value-bind (cpp swaps)
+                        (quil::compiler-hook (quil::parse text
+                                                          :originating-file file)
+                                             chip
+                                             :protoquil t)
+                      (format t "| ~Vf | ~Vd | ~Vd |~%"
+                              8 (/ elapsed-time 1000)
+                              5 swaps
+                              8 (calculate-multiqubit-gate-depth (parsed-program-executable-code cpp)))))))
+            (bt:timeout ()
+              (format t "| ~8,'>d | ????? | ???????? |~%"
+                      timeout)
+              (push (pathname-name file) timed-out)))
+          (finish-output)))
+      (print-rule)
+      (terpri)
+      (when timed-out
+        (with-standard-io-syntax
+          (format t "~D file~:P timed out: " (length timed-out))
+          (write timed-out :escape t :pretty nil :readably nil)
+          (terpri)))
+      (finish-output))))
