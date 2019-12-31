@@ -457,7 +457,7 @@ OPTIONS: plist of options governing applicability of the compiler binding."
   (map (make-hash-table :test #'equalp) :read-only t :type hash-table))
 
 (defmethod print-object ((object occurrence-table) stream)
-  (print-unreadable-object (object stream :type 'occurrence-table)
+  (print-unreadable-object (object stream :type t)
     (dohash ((binding count) (occurrence-table-map object))
       (format stream "~&  ~/cl-quil::binding-fmt/ -> ~a" binding count))))
 
