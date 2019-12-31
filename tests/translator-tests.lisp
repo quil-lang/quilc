@@ -40,6 +40,105 @@
         (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
             "Euler translation test failed: ~A~%" compiler)))))
 
+(global-vars:define-global-var **compiler-fuzzers-available**
+  (make-hash-table))
+
+(defmacro define-fuzzer (compiler-name () &body body)
+  `(setf (gethash ',compiler-name **compiler-fuzzers-available**)
+         (lambda ()
+           (with-inst ()
+             ,@body))))
+
+(define-fuzzer cl-quil::qs-compiler ()
+  (inst "QS-FUZZ" (quil::random-special-unitary 8) 2 1 0))
+
+(define-fuzzer cl-quil::recognize-ucr ()
+  (let ((m (quil::make-matrix-from-quil
+            (list (build-gate (quil::forked-operator (quil::forked-operator (quil::named-operator "RZ")))
+                              (loop :repeat 4
+                                    :collect (random (* 2 pi)))
+                              2 1 0)))))
+    (inst "UCR-FUZZ" m 2 1 0)))
+
+(define-fuzzer cl-quil::ucr-compiler-to-iswap ()
+  (inst (quil::forked-operator (quil::forked-operator (quil::named-operator "RZ")))
+        (loop :repeat 4
+              :collect (random (* 2 pi)))
+        2 1 0))
+
+(define-fuzzer cl-quil::ucr-compiler-to-cz ()
+  (inst (quil::forked-operator (quil::forked-operator (quil::named-operator "RZ")))
+        (loop :repeat 4
+              :collect (random (* 2 pi)))
+        2 1 0))
+
+(define-fuzzer cl-quil::normalize-cphase ()
+  (inst "CPHASE" (list (+ (* 4 pi) (random (* 2 pi)))) 0 1))
+
+(define-fuzzer cl-quil::eliminate-full-cphase ()
+  (inst "CPHASE" (list (* 2 pi (random 5))) 0 1))
+
+(define-fuzzer cl-quil::factor-iswap-out-of-piswap ()
+  (inst "PISWAP" (list (+ pi (* 2 pi (random 5)))) 0 1))
+
+(define-fuzzer cl-quil::eliminate-full-piswap ()
+  (inst "PISWAP" (list (* 4 pi (1+ (random 5)))) 0 1))
+
+(define-fuzzer cl-quil::eliminate-half-piswap ()
+  (inst "PISWAP" (list (+ (* 2 pi) (* 4 pi (random 5)))) 0 1))
+
+(define-fuzzer cl-quil::normalize-piswap ()
+  (inst "PISWAP" (list (+ (* 4 pi) (random (* 4 pi)))) 0 1))
+
+(define-fuzzer cl-quil::normalize-rz-rotations ()
+  (inst "RZ" (list (+ (* 2 pi) (* 2 pi (random 5)))) 0))
+
+(define-fuzzer cl-quil::eliminate-full-rz-rotations ()
+  (inst "RZ" (list (* 2 pi (random 5))) 0))
+
+(define-fuzzer cl-quil::normalize-rx-rotations ()
+  (inst "RX" (list (+ (* 2 pi) (* 2 pi (random 5)))) 0))
+
+(define-fuzzer cl-quil::eliminate-full-rx-rotations ()
+  (inst "RX" (list (* 2 pi (random 5))) 0))
+
+(define-fuzzer cl-quil::uncontrol-rotation ()
+  (inst (controlled-operator (named-operator "RX")) (list (mref "fuzz" 0)) 0))
+
+(define-fuzzer cl-quil::undagger-rotation ()
+  (inst (dagger-operator (named-operator "RX")) (list (mref "fuzz" 0)) 0))
+
+(define-fuzzer cl-quil::parametric-pauli-compiler ()
+  (let* ((pp (parse-quil "
+DECLARE time REAL
+
+DEFGATE U(%alpha) p q AS PAULI-SUM:
+    XX(%alpha) p q
+    YZ(2*%alpha) p q
+    ZZ(-%alpha) p q
+    X(%alpha) p
+    Z(3*%alpha) q
+
+U(time) 1 0"))
+         (inst (quil::vnth 0 (parsed-program-executable-code pp))))
+    (setf (application-parameters inst) (list (mref "fuzz" 0)))
+    (finish-compiler (list inst))))
+
+(define-fuzzer cl-quil::parametric-diagonal-compiler ()
+  (let* ((pp (parse-quil "
+DECLARE time REAL
+
+DEFGATE U(%alpha) p q r AS PAULI-SUM:
+    ZZZ(%alpha) p q r
+    ZZ(2*%alpha) p q
+    ZZ(-%alpha) p r
+    Z(%alpha) q
+
+U(time) 2 1 0"))
+         (inst (quil::vnth 0 (parsed-program-executable-code pp))))
+    (setf (application-parameters inst) (list (mref "fuzz" 0)))
+    (finish-compiler (list inst))))
+
 (define-condition test-case-too-complicated (error)
   ((reason :initarg :reason :reader test-case-too-complicated-reason))
   (:documentation "Signaled when a test case generator is applied to a scenario that is too complicated for it to generate.")
@@ -175,10 +274,14 @@
                       expression))))
       (map-into (quil::application-parameters instr-new)
                 (lambda (param)
-                  (if (quil::delayed-expression-p param)
-                      (let ((res (treesplore param)))
-                        (quil::evaluate-delayed-expression res))
-                      param))
+                  (typecase param
+                    (quil::delayed-expression
+                     (let ((res (treesplore param)))
+                       (quil::evaluate-delayed-expression res)))
+                    (quil::memory-ref
+                     (constant (gethash (memory-ref-name param) table)))
+                    (otherwise
+                     param)))
                 (quil::application-parameters instr-new))
       instr-new)))
 
@@ -186,22 +289,32 @@
   (loop :with table := (make-hash-table :test 'equalp)
         :for instr :in quil
         :for params := (application-parameters instr) :do
-          (loop :for param :in params
-                :when (typep param 'quil::delayed-expression) :do
-                  (let ((name (quil::memory-ref-name (quil::delayed-expression-expression param))))
-                    (setf (gethash name table) (random (* 2 pi)))))
+          (dolist (param (application-parameters instr))
+            (typecase param
+              (quil::delayed-expression
+               (let ((name (quil::memory-ref-name (quil::delayed-expression-expression param))))
+                 (setf (gethash name table) (random (* 2 pi)))))
+              (quil::memory-ref
+               (let ((name (quil::memory-ref-name param)))
+                 (setf (gethash name table) (random (* 2 pi)))))))
         :finally
            (return table)))
 
 (deftest test-translators ()
+  (declare (optimize (debug 3) (speed 0)))
   (labels ((do-compilation (compiler)
              (unless (quil::compiler-gateset-reducer-p compiler)
                (return-from do-compilation nil))
              (let (test-case test-case-patched input-matrix compiled-output output-matrix table)
                ;; building the test case can throw an error if the compiler itself is
                ;; too complicated. we don't intend for that to break the tests.
-               (handler-case (setf test-case (generate-translator-test-case-for-simple-compiler
-                                              (quil::compiler-bindings compiler)))
+               (handler-case (setf test-case (or
+                                              (alexandria:when-let*
+                                                  ((name (quil::compiler-name compiler))
+                                                   (fuzzer (gethash name **compiler-fuzzers-available**)))
+                                                (funcall fuzzer))
+                                              (generate-translator-test-case-for-simple-compiler
+                                               (quil::compiler-bindings compiler))))
                  (test-case-too-complicated (c)
                    (format t "~&Compiler ~A not tested because ~A" compiler (test-case-too-complicated-reason c))
                    (return-from do-compilation nil)))
@@ -211,7 +324,7 @@
                (setf compiled-output (mapcar (a:rcurry #'%patch-mref-values table)
                                              (apply compiler test-case)))
                (setf output-matrix (quil::make-matrix-from-quil compiled-output))
-               (format t "~&    Testing simple compiler ~A" (quil::compiler-name compiler))
+               (format t "~&    Testing compiler ~A" (quil::compiler-name compiler))
                (is (quil::matrix-equals-dwim input-matrix output-matrix))
                t)))
     (loop :for compiler :in (remove-if (a:rcurry #'typep 'quil::approximate-compiler)
