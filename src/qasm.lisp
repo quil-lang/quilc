@@ -1,4 +1,4 @@
- ;;;; qasm.lisp
+;;;; qasm.lisp
 
 (in-package #:cl-quil.qasm)
 
