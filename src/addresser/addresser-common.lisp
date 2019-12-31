@@ -393,7 +393,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
                                       initial-l2p
                                       *addresser-use-free-swaps*)
            (setf dirty-flag t))
-          
+
           ;; is it a small-Q gate?
           ((<= (length (application-arguments instr))
                (length (chip-specification-objects chip-spec)))
@@ -496,12 +496,12 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         ;; if we didn't dirty up the schedule, see if we collected any
         ;; 2Q gates along the way
         (cond
-          ((dequeue-best-instr state
+          (instrs-ready-for-scheduling
+           (dequeue-best-instr state
                                instrs-ready-for-scheduling
-                               :dry-run dry-run)
-           t)
-          ((try-to-assign-qubits state instrs-partially-assigned)
-           t)
+                               :dry-run dry-run))
+          (instrs-partially-assigned
+           (try-to-assign-qubits state instrs-partially-assigned))
           (t
            nil))))))
 
@@ -515,12 +515,12 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
     new-state))
 
 (defun next-best-instruction (state instrs)
-  "Find the instruction from the given INSTRS which has the best COST-FUNCTION valuatiuon. Returns three values: the instruction, the index of the hardware object it lies on, and the optional qubit assignments if the selected instruction was only partially assigned."
+  "Find the instruction from the given INSTRS which has the best COST-FUNCTION valuation. Returns three values: the instruction, the index of the hardware object it lies on, and the optional qubit assignments if the selected instruction was only partially assigned."
   (with-slots (chip-spec chip-sched lschedule) state
     (let ((best-cost (build-worst-cost state))
           instr
           hardware-index)
-      
+
       (loop
         :for (candidate-hardware-index candidate-instr) :in instrs
         :for physical-qubits := (coerce (vnth 0
@@ -529,9 +529,9 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
                                                                                            candidate-instr)))
                                                                     candidate-hardware-index)))
                                         'list)
-        
+
         :for candidate-cost := (cost-function state :instr candidate-instr)
-             
+
         :when (cost-< candidate-cost best-cost)
           :do (setf best-cost candidate-cost
                     instr candidate-instr
@@ -555,7 +555,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
       ;; from now on, we would schedule something, so bail if on a dry run
       (when dry-run (return-from dequeue-best-instr t))
-      
+
       ;; threads always need expansion
       (when (typep instr 'application-thread-invocation)
         (lscheduler-replace-instruction lschedule instr (apply-translation-compilers
@@ -633,7 +633,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
     (let ((locations (or locations qubit-cc)))
       (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
               "Qubit ~a already assigned" logical)
-      
+
       (let ((best-cost (build-worst-cost state))
             (best-physical nil))
         (dolist (physical locations)
@@ -666,7 +666,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
           (unless (or (apply-rewiring-l2p working-l2p qubit)
                       (member qubit unassigned-qubits))
             (push qubit unassigned-qubits))))
-      
+
       ;; maximize over best-qubit-position
       (let (best-logical-qubit
             best-physical-qubit
@@ -678,7 +678,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
               (setf best-logical-qubit logical-qubit
                     best-physical-qubit physical-qubit
                     best-cost cost))))
-        
+
         (cond
           (best-logical-qubit
            (rewiring-assign working-l2p best-logical-qubit best-physical-qubit)

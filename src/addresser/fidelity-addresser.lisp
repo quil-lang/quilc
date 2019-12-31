@@ -29,18 +29,22 @@
 (defmethod cost-function ((state fidelity-addresser-state) &key gate-weights instr)
   (let ((instr-cost 0d0)
         (gate-weights-cost 0d0))
-    
+
     ;; calculate log-infidelity coming from INSTR, using recombination:
     ;;   + calculate the cut point
     ;;   + calculate the infidelity of instructions since the cut point
     ;;   + use only the additional infidelity penalty
     (when (and instr (typep instr 'gate-application))
       (let* ((chip-spec (addresser-state-chip-specification state))
+             (l2p (addresser-state-working-l2p state))
+             (instr-copy (copy-instance instr))
              (instruction-expansion
                (let ((*compress-carefully* nil))
-                 (expand-to-native-instructions (list instr) chip-spec))))
+                 (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                   (rewire-l2p-instruction l2p instr-copy))
+                 (expand-to-native-instructions (list instr-copy) chip-spec))))
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
-        
+
         ;; then, see if there's a non-naive cost available
         (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
                       (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state))))
@@ -52,11 +56,11 @@
                  (subschedule (chip-schedule-from-carving-point
                                (addresser-state-chip-schedule state) resource carving-point))
                  (preceding-fidelity
-                       (calculate-instructions-log-fidelity subschedule
-                                                            (addresser-state-chip-specification state))))
+                   (calculate-instructions-log-fidelity subschedule
+                                                        (addresser-state-chip-specification state))))
             (when (<= cost-bound (+ preceding-fidelity instr-cost))
               (setf instr-cost (- cost-bound preceding-fidelity)))))))
-    
+
     ;; conglomerate the log-infidelities in GATE-WEIGHTS, depressed by some decay factor
     (when gate-weights
       (let ((qq-distances (addresser-state-qq-distances state)) ; populated with log-infidelities
