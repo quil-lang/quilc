@@ -1,3 +1,6 @@
 [submodule "tweedledum"]
 	path = src/contrib/tweedledum/tweedledum
 	url = https://github.com/boschmitt/tweedledum.git
+[submodule "benchmarking/ibm_qx_mapping"]
+	path = benchmarking/ibm_qx_mapping
+	url = https://github.com/iic-jku/ibm_qx_mapping.git
