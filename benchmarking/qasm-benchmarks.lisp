@@ -38,7 +38,7 @@
 (defun print-configuration ()
   (format t "Current CL-QUIL configuration:~%")
   (dolist (symb (idiomatic-package-variables ':cl-quil :include-internal t))
-    (format t "~a: ~a~%" symb (eval symb)))
+    (format t "~a: ~a~%" symb (symbol-value symb)))
   (format t "~%"))
 
 (defun trim-long-string (string length)
