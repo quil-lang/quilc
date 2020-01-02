@@ -136,7 +136,7 @@
 ;; We don't need to check if the RHS is a memref of a particular
 ;; type. That is done by DEFINE-CLASSICAL-INSTRUCTION.
 
-(defun typecheck-conditional-instruction (instr memory-regions)
+(defun typecheck-comparison-instruction (instr memory-regions)
   (check-mref (classical-target instr))
   (unless (constant-or-mref-typep (classical-target instr) quil-bit memory-regions)
     (quil-type-error "Conditional tests write to BIT memory, but got ~/quil:instruction-fmt/ instead."
@@ -251,15 +251,15 @@
   ;; binary bitwise ops requirements agreement and can't be REAL
   (:method :before ((instr classical-and) memory-regions)
     (handle-binary-args-for-binary-classical-instr instr memory-regions
-                                              :object-to-type quil-real))
+                                                   :object-to-type quil-real))
 
   (:method :before ((instr classical-inclusive-or) memory-regions)
     (handle-binary-args-for-binary-classical-instr instr memory-regions
-                                              :object-to-type quil-real))
+                                                   :object-to-type quil-real))
 
   (:method :before ((instr classical-exclusive-or) memory-regions)
     (handle-binary-args-for-binary-classical-instr instr memory-regions
-                                              :object-to-type quil-real))
+                                                   :object-to-type quil-real))
 
   ;; MOVE requires agreement
   (:method :before ((instr classical-move) memory-regions)
@@ -323,7 +323,8 @@
         (quil-type-error "Memory region named ~A not found"
                          (memory-name-region-name (classical-left-operand instr))))
       (unless (or (constant-or-mref-typep (classical-right-operand instr)
-                                          (memory-descriptor-type mdesc)
+                                          (list (memory-descriptor-type mdesc)
+                                                quil-integer)
                                           memory-regions)
                   (and (equal quil-octet (memory-descriptor-type mdesc))
                        (constant-or-mref-typep (classical-right-operand instr)
@@ -340,19 +341,19 @@
 
   ;; comparison operators require bit target in first, agreement in last two
   (:method :before ((instr classical-equality) memory-regions)
-    (typecheck-conditional-instruction instr memory-regions))
+    (typecheck-comparison-instruction instr memory-regions))
 
   (:method :before ((instr classical-greater-than) memory-regions)
-    (typecheck-conditional-instruction instr memory-regions))
+    (typecheck-comparison-instruction instr memory-regions))
 
   (:method :before ((instr classical-greater-equal) memory-regions)
-    (typecheck-conditional-instruction instr memory-regions))
+    (typecheck-comparison-instruction instr memory-regions))
 
   (:method :before ((instr classical-less-than) memory-regions)
-    (typecheck-conditional-instruction instr memory-regions))
+    (typecheck-comparison-instruction instr memory-regions))
 
   (:method :before ((instr classical-less-equal) memory-regions)
-    (typecheck-conditional-instruction instr memory-regions))
+    (typecheck-comparison-instruction instr memory-regions))
 
   ;; MEASURE must target a BIT or INT
   (:method ((instr measure) memory-regions)
