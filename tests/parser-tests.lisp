@@ -17,7 +17,7 @@
 (deftest test-parsing-good-test-files ()
   "Test whether all valid test files parse."
   (dolist (file (uiop:directory-files *good-test-file-directory* #P"*.quil"))
-    (format *debug-io* "~&    Testing good file ~A~%" (pathname-name file))
+    (format t "~&    Testing good file ~A~%" (pathname-name file))
     (let ((cl-quil:*allow-unresolved-applications* t))
       (not-signals quil-parse-error
         (cl-quil:read-quil-file file)))))
@@ -25,7 +25,7 @@
 (deftest test-parsing-bad-test-files ()
   "Test whether all invalid test files signal a parse error."
   (dolist (file (uiop:directory-files *bad-test-file-directory* #P"*.quil"))
-    (format *debug-io* "~&    Testing bad file ~A~%" (pathname-name file))
+    (format t "~&    Testing bad file ~A~%" (pathname-name file))
     (let ((cl-quil:*allow-unresolved-applications* t))
       (signals quil:quil-parse-error
         (handler-case (cl-quil:read-quil-file file)
