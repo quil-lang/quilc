@@ -110,3 +110,23 @@ STORE w y w
 
   (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a REAL; DECLARE b REAL; EQ r a b"))
   (not-signals quil-type-error (parse-quil "DECLARE r BIT; DECLARE a REAL; EQ r a 1.0")))
+
+(deftest test-classical-store-types ()
+  (not-signals quil-type-error (parse-quil "DECLARE ro BIT; DECLARE v BIT; DECLARE index INTEGER; STORE ro index v;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro BIT; DECLARE index INTEGER; STORE ro index 1;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro OCTET; DECLARE v OCTET; DECLARE index INTEGER; STORE ro index v;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro OCTET; DECLARE index INTEGER; STORE ro index 1;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro INTEGER; DECLARE v INTEGER; DECLARE index INTEGER; STORE ro index v;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro INTEGER; DECLARE index INTEGER; STORE ro index 1;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro REAL; DECLARE v REAL; DECLARE index INTEGER; STORE ro index v;"))
+  (not-signals quil-type-error (parse-quil "DECLARE ro REAL; DECLARE index INTEGER; STORE ro index 1;"))
+
+  ;; Storing REAL into BIT
+  (signals quil-type-error (parse-quil "DECLARE ro BIT; DECLARE v REAL; DECLARE index INTEGER; STORE ro index v;"))
+  (signals quil-type-error (parse-quil "DECLARE ro BIT; DECLARE index INTEGER; STORE ro index 1.0;"))
+  ;; Storing REAL into OCTET
+  (signals quil-type-error (parse-quil "DECLARE ro OCTET; DECLARE v REAL; DECLARE index INTEGER; STORE ro index v;"))
+  (signals quil-type-error (parse-quil "DECLARE ro OCTET; DECLARE index INTEGER; STORE ro index 1.0;"))
+  ;; Storing REAL into INTEGER
+  (signals quil-type-error (parse-quil "DECLARE ro INTEGER; DECLARE v REAL; DECLARE index INTEGER; STORE ro index v;"))
+  (signals quil-type-error (parse-quil "DECLARE ro INTEGER; DECLARE index INTEGER; STORE ro index 1.0;")))
