@@ -226,6 +226,10 @@ used to specify CHIP-SPEC."
         :unless (find qi dead-qubits)
           :collect qi))
 
+(defun chip-spec-link-dead? (chip-spec link-index)
+  "Is QUBIT-INDEX a dead qubit in CHIP-SPEC."
+  (gethash "dead" (hardware-object-misc-data (chip-spec-nth-link chip-spec link-index))))
+
 (defun lookup-hardware-address-by-qubits (chip-spec args)
   (unless (chip-specification-lookup-cache chip-spec)
     (warm-chip-spec-lookup-cache chip-spec))
@@ -457,11 +461,14 @@ Compilers are listed in descending precedence.")
   "Initializes the compiler feature sets of HARDWARE-OBJECT instances installed on a CHIP-SPECIFICATION.  Preserves whatever feature sets might be there already; don't call this repeatedly."
   (dotimes (order (length (chip-specification-objects chip-specification)) chip-specification)
     (loop :for obj :across (vnth order (chip-specification-objects chip-specification))
-          :do (setf (hardware-object-compilation-methods obj)
-                    (concatenate 'vector
-                                 (hardware-object-compilation-methods obj)
-                                 (compute-applicable-compilers (hardware-object-gate-information obj)
-                                                               (1+ order))))
+          :do (handler-case
+                  (setf (hardware-object-compilation-methods obj)
+                        (concatenate 'vector
+                                     (hardware-object-compilation-methods obj)
+                                     (compute-applicable-compilers (hardware-object-gate-information obj)
+                                                                   (1+ order))))
+                (no-compiler-path ()
+                  (setf (gethash "dead" (hardware-object-misc-data obj)) t)))
               ;; TODO: incorporate child object gatesets too
               (let ((gate-information (a:copy-hash-table (hardware-object-gate-information obj)
                                                          :test #'equalp)))

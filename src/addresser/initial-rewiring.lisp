@@ -167,9 +167,11 @@ is found, then return NIL."
                               &aux (qubit-indices (qubits-used instr)))
   "Return true if the given INSTR does not consume qubit arguments or if the qubit arguments correspond to a valid HARDWARE-OBJECT in CHIP-SPEC."
   (or (null qubit-indices)
-      (and (not (null (lookup-hardware-object-by-qubits chip-spec qubit-indices)))
-           (or (/= 1 (length qubit-indices))
-               (not (chip-spec-qubit-dead? chip-spec (first qubit-indices)))))))
+      (a:when-let ((obj (lookup-hardware-object-by-qubits chip-spec qubit-indices)))
+        (and (or (/= 2 (length qubit-indices))
+                 (not (gethash "dead" (hardware-object-misc-data obj))))
+             (or (/= 1 (length qubit-indices))
+                 (not (chip-spec-qubit-dead? chip-spec (first qubit-indices))))))))
 
 (defun prog-initial-rewiring-heuristic (parsed-prog chip-spec)
   "Return a resonable guess at the initial rewiring for PARSED-PROG that is compatible with CHIP-SPEC.

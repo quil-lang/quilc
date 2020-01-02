@@ -148,16 +148,6 @@ GREEDY-QUBIT: Greedily choose the best link to swap according to the cost functi
               :documentation "The CHIP-SPECIFICATION governing native-ness."
               :type chip-specification)))
 
-(defun swap-fidelity (chip-spec hardware-object)
-  "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
-  (let* ((permutation-record (vnth 0 (hardware-object-permutation-gates
-                                      hardware-object)))
-         (swap (apply #'build-gate
-                      (permutation-record-operator permutation-record)
-                      '()
-                      (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
-    (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
-
 ;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
 (defun precompute-qubit-qubit-distances (chip-spec initial-map)
   "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by swap duration."
@@ -414,7 +404,9 @@ Two other values are returned: a list of fully rewired instructions for later sc
                ((not all-assigned?)
                 (push instr partial-instrs))
                ;; if we found a hardware object index, save this info for later
-               (hardware-index
+               ((and hardware-index
+                     (not (gethash "dead" (hardware-object-misc-data
+                                           (lookup-hardware-object-by-qubits chip-spec assignments)))))
                 (push (list hardware-index instr) ready-instrs))
                ;; if neither is true and we're not supposed to be SWAPping, we
                ;; should apply some localizing compilers instead.
@@ -644,17 +636,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
               (when (cost-< cost best-cost)
                 (setf best-cost cost
                       best-physical physical)))))
-        (values best-physical best-cost))
-      #+ignore
-      (a:extremum
-       (remove-if (lambda (p)
-                    (or (apply-rewiring-p2l working-l2p p)
-                        (chip-spec-qubit-dead? chip-spec p)))
-                  locations)
-       'cost-<
-       :key (lambda (physical)
-              (with-rewiring-assign working-l2p logical physical
-                (cost-function state :gate-weights gates-in-waiting)))))))
+        (values best-physical best-cost)))))
 
 (defun try-to-assign-qubits (state instrs-partially-assigned)
   (with-slots (working-l2p) state

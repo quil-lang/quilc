@@ -15,6 +15,20 @@
 ;;;
 ;;; See DO-FIDELITY-ADDRESSING below for the main entry point.
 
+;;; lil utility
+
+(defun swap-fidelity (chip-spec hardware-object)
+  "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
+  (let* ((permutation-record (vnth 0 (hardware-object-permutation-gates
+                                      hardware-object)))
+         (swap (apply #'build-gate
+                      (permutation-record-operator permutation-record)
+                      '()
+                      (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
+    (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
+
+;;; ADDRESSER-STATE subclass
+
 (defclass fidelity-addresser-state (addresser-state)
   ((cost-bounds :initform (make-hash-table :test #'eql)
                 :accessor fidelity-addresser-state-cost-bounds
@@ -178,7 +192,9 @@
   (let ((distance-mapping (make-hash-table)))
     (loop :for object :across (chip-spec-links chip-spec)
           :do (setf (gethash object distance-mapping)
-                    (- (log (swap-fidelity chip-spec object)))))
+                    (if (gethash "dead" (hardware-object-misc-data object))
+                        most-positive-fixnum
+                        (- (log (swap-fidelity chip-spec object))))))
     (setf (addresser-state-qq-distances instance)
           (precompute-qubit-qubit-distances chip-spec distance-mapping)))
   ;; warm the cost-bounds slot
@@ -188,25 +204,26 @@
         :with old-chip-sched := (addresser-state-chip-schedule instance)
         :for order-list :across (chip-specification-objects chip-spec)
         :for qubits :from 1
-        :do (loop :for hw :across order-list
-                  :for j :from 0
-                  :for instr := (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
+        :do (dotimes (j (length order-list))
+              (let ((hw (vnth j order-list)))
+                (unless (gethash "dead" (hardware-object-misc-data hw))
+                  (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
                                        (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
-                                           (list j)))
-                  :for instrs-decomposed := (expand-to-native-instructions (list instr) chip-spec)
-                  :for instrs-compressed := (if *compute-tight-recombination-bound*
+                                           (list j))))
+                         (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
+                         (instrs-compressed (if *compute-tight-recombination-bound*
                                                 (compress-instructions instrs-decomposed chip-spec)
-                                                instrs-decomposed)
-                  :do (setf (addresser-state-initial-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-working-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-logical-schedule instance) (make-lscheduler)
-                            (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec))
-                      (append-instructions-to-lschedule (addresser-state-logical-schedule instance)
-                                                        instrs-compressed)
-                      (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
-                            (fidelity-cost-value
-                             (cost-function instance
-                                            :gate-weights (assign-weights-to-gates instance)))))
+                                                instrs-decomposed)))
+                    (setf (addresser-state-initial-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
+                          (addresser-state-working-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
+                          (addresser-state-logical-schedule instance) (make-lscheduler)
+                          (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec))
+                    (append-instructions-to-lschedule (addresser-state-logical-schedule instance)
+                                                      instrs-compressed)
+                    (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
+                          (fidelity-cost-value
+                           (cost-function instance
+                                          :gate-weights (assign-weights-to-gates instance))))))))
         :finally (setf (addresser-state-initial-l2p instance) old-initial-l2p
                        (addresser-state-working-l2p instance) old-working-l2p
                        (addresser-state-logical-schedule instance) old-lscheduler
