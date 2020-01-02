@@ -407,7 +407,11 @@ instruction, adding to logical queue.~%"
   (let ((distance-mapping (make-hash-table)))
     (loop :for object :across (chip-spec-links chip-spec)
           :do (setf (gethash object distance-mapping)
-                    (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object)))))
+                    ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
+                    ;; TODO: is there a good reason this uses floats over COST objects?
+                    (if (hardware-object-dead-p object)
+                        most-positive-fixnum
+                        (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object))))))
     (setf (addresser-state-qq-distances instance)
           (precompute-qubit-qubit-distances chip-spec distance-mapping)))
   ;; warm the cost-bounds slot
@@ -417,24 +421,25 @@ instruction, adding to logical queue.~%"
         :with old-chip-sched := (addresser-state-chip-schedule instance)
         :for order-list :across (chip-specification-objects chip-spec)
         :for qubits :from 1
-        :do (loop :for hw :across order-list
-                  :for j :from 0
-                  :for instr := (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
+        :do (dotimes (j (length order-list))
+              (let ((hw (vnth j order-list)))
+                (unless (hardware-object-dead-p hw)
+                  (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
                                        (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
-                                           (list j)))
-                  :for instrs-decomposed := (expand-to-native-instructions (list instr) chip-spec)
-                  :for instrs-compressed := (if *compute-tight-recombination-bound*
+                                           (list j))))
+                         (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
+                         (instrs-compressed (if *compute-tight-recombination-bound*
                                                 (compress-instructions instrs-decomposed chip-spec)
-                                                instrs-decomposed)
-                  :for lschedule := (make-lscheduler)
-                  :do (setf (addresser-state-initial-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-working-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-logical-schedule instance) (make-lscheduler)
-                            (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec))
-                      (append-instructions-to-lschedule lschedule instrs-compressed)
-                      (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
+                                                instrs-decomposed)))
+                    (setf (addresser-state-initial-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
+                          (addresser-state-working-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
+                          (addresser-state-logical-schedule instance) (make-lscheduler)
+                          (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec))
+                    (append-instructions-to-lschedule (addresser-state-logical-schedule instance)
+                                                      instrs-compressed)
+                    (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
                             (temporal-cost-heuristic-value
-                             (cost-function instance :gate-weights (assign-weights-to-gates instance)))))
+                             (cost-function instance :gate-weights (assign-weights-to-gates instance))))))))
         :finally (setf (addresser-state-initial-l2p instance) old-initial-l2p
                        (addresser-state-working-l2p instance) old-working-l2p
                        (addresser-state-logical-schedule instance) old-lscheduler
