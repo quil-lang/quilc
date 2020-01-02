@@ -225,12 +225,8 @@
               ;; NOTE: By skipping the dead links, we're shifting the internal link
               ;;       indices from what a user (or debugger) might expect.  Beware!
               ((or (gethash "dead" link-hash)
-                   (gethash "dead" (hardware-object-misc-data
-                                    (chip-spec-nth-qubit chip-spec
-                                                         q0)))
-                   (gethash "dead" (hardware-object-misc-data
-                                    (chip-spec-nth-qubit chip-spec
-                                                         q1))))
+                   (hardware-object-dead-p (chip-spec-nth-qubit chip-spec q0))
+                   (hardware-object-dead-p (chip-spec-nth-qubit chip-spec q1)))
                t)
               ;; there's a "gates" field
               ((gethash "gates" link-hash)

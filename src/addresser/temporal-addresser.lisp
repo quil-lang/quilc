@@ -409,7 +409,7 @@ instruction, adding to logical queue.~%"
           :do (setf (gethash object distance-mapping)
                     ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
                     ;; TODO: is there a good reason this uses floats over COST objects?
-                    (if (gethash "dead" (hardware-object-misc-data object))
+                    (if (hardware-object-dead-p object)
                         most-positive-fixnum
                         (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object))))))
     (setf (addresser-state-qq-distances instance)
@@ -423,7 +423,7 @@ instruction, adding to logical queue.~%"
         :for qubits :from 1
         :do (dotimes (j (length order-list))
               (let ((hw (vnth j order-list)))
-                (unless (gethash "dead" (hardware-object-misc-data hw))
+                (unless (hardware-object-dead-p hw)
                   (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
                                        (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
                                            (list j))))

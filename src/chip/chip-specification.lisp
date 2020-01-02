@@ -209,9 +209,11 @@ used to specify CHIP-SPEC."
     :for qubit-index :across (chip-spec-qubits-on-link chip-spec link-index)
     :append (remove link-index (coerce (chip-spec-links-on-qubit chip-spec qubit-index) 'list))))
 
+(defun hardware-object-dead-p (hw-obj)
+  (gethash "dead" (hardware-object-misc-data hw-obj)))
 (defun chip-spec-qubit-dead? (chip-spec qubit-index)
   "Is QUBIT-INDEX a dead qubit in CHIP-SPEC."
-  (gethash "dead" (hardware-object-misc-data (chip-spec-nth-qubit chip-spec qubit-index))))
+  (hardware-object-dead-p (chip-spec-nth-qubit chip-spec qubit-index)))
 (defun chip-spec-dead-qubits (chip-spec)
   "Get all dead qubit indices in CHIP-SPEC."
   (check-type chip-spec chip-specification)
@@ -228,7 +230,7 @@ used to specify CHIP-SPEC."
 
 (defun chip-spec-link-dead? (chip-spec link-index)
   "Is QUBIT-INDEX a dead qubit in CHIP-SPEC."
-  (gethash "dead" (hardware-object-misc-data (chip-spec-nth-link chip-spec link-index))))
+  (hardware-object-dead-p (chip-spec-nth-link chip-spec link-index)))
 
 (defun lookup-hardware-address-by-qubits (chip-spec args)
   (unless (chip-specification-lookup-cache chip-spec)

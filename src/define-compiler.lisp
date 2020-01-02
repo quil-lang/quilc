@@ -548,9 +548,9 @@ Optionally constrains the output to include only those bindings of a particular 
              (setf (occurrence-table-cost-fidelity ret)
                    (* (expt (gate-record-fidelity cost-val) val)
                       (occurrence-table-cost-fidelity ret)))
-             (go :skip)))
+             (go :SKIP)))
          (incf (occurrence-table-cost-unknowns ret))
-         :skip))))
+         :SKIP))))
 
 (defun occurrence-table-in-gateset-p (occurrence-table gateset)
   "Are all of the entires in OCCURRENCE-TABLE subsumed by entries in GATESET?  This is the stopping condition for recognizing that a table consists of 'native gates'."

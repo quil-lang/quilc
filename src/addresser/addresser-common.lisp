@@ -405,8 +405,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
                 (push instr partial-instrs))
                ;; if we found a hardware object index, save this info for later
                ((and hardware-index
-                     (not (gethash "dead" (hardware-object-misc-data
-                                           (lookup-hardware-object-by-qubits chip-spec assignments)))))
+                     (not (hardware-object-dead-p (lookup-hardware-object-by-qubits chip-spec assignments))))
                 (push (list hardware-index instr) ready-instrs))
                ;; if neither is true and we're not supposed to be SWAPping, we
                ;; should apply some localizing compilers instead.

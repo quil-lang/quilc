@@ -15,7 +15,7 @@
 ;;;
 ;;; See DO-FIDELITY-ADDRESSING below for the main entry point.
 
-;;; lil utility
+;;; utilitito
 
 (defun swap-fidelity (chip-spec hardware-object)
   "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
@@ -192,7 +192,7 @@
   (let ((distance-mapping (make-hash-table)))
     (loop :for object :across (chip-spec-links chip-spec)
           :do (setf (gethash object distance-mapping)
-                    (if (gethash "dead" (hardware-object-misc-data object))
+                    (if (hardware-object-dead-p object)
                         most-positive-fixnum
                         (- (log (swap-fidelity chip-spec object))))))
     (setf (addresser-state-qq-distances instance)
@@ -206,7 +206,7 @@
         :for qubits :from 1
         :do (dotimes (j (length order-list))
               (let ((hw (vnth j order-list)))
-                (unless (gethash "dead" (hardware-object-misc-data hw))
+                (unless (hardware-object-dead-p hw)
                   (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
                                        (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
                                            (list j))))

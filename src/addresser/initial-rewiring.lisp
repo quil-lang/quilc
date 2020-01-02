@@ -169,7 +169,7 @@ is found, then return NIL."
   (or (null qubit-indices)
       (a:when-let ((obj (lookup-hardware-object-by-qubits chip-spec qubit-indices)))
         (and (or (/= 2 (length qubit-indices))
-                 (not (gethash "dead" (hardware-object-misc-data obj))))
+                 (not (hardware-object-dead-p obj)))
              (or (/= 1 (length qubit-indices))
                  (not (chip-spec-qubit-dead? chip-spec (first qubit-indices))))))))
 
