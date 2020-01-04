@@ -35,6 +35,10 @@
 ;;; desired
 (defparameter +ballie-radius+ 0.1 "The radius of ballies on the axis-angle ball. Determines the size of each ballie used for the Iterative Deepening Depth First Search base approximation generation method (i.e. generating base approximations of increasing length using Iterative Deepening Depth First Search until each ballie contains at least one element).")
 
+;;; Temporary constant, will be removed later when dynamic
+;;; calculations are more accurate, as with +ballie-radius+ above
+(defparameter +default-eps+ 0.14 "Default epsilon value for approximation methods.")
+
 ;;; ------------------------------------------------------------------
 ;;; --------------Various utility functions/structures----------------
 ;;; ------------------------------------------------------------------
@@ -265,8 +269,21 @@
          (neglected 0))
     (loop :for gate :in gates
           :for i :from 0
-          :do (format verbose "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
-    (labels ((helper (depth seq mat last-idx rep-count)
+          :do (format (not verbose) "Gate ~D: ~D (order = ~D)~%" i gate (elt gate-orders (floor i 2))))
+    (labels ((use-gate (i last-idx curr-count)
+               ;; Don't use a gate if any of these conditions hold: a)
+               ;; it has an odd index and its inverse is already in
+               ;; the gate set b) we're repeating the previous gate
+               ;; and its half-order is exceeded, or c) we're using
+               ;; the previous gate's inverse
+               (let ((order (elt gate-orders (floor i 2))))
+                 (and (not (and (= order 2) (oddp i)))
+                      (or (and (= i last-idx)
+                               (or (zerop order) (< curr-count
+                                                    (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
+                          (and (not (= i last-idx))
+                               (not (= (floor i 2) (floor last-idx 2))))))))
+             (helper (depth seq mat last-idx rep-count)
                (cond ((= depth max-depth)
                       (let* ((exact-grid-coord (matrix-to-grid-coord mat ballie-r))
                              (valid-ballies (remove-if (lambda (x) (or (> (vector-norm x) (/ pi ballie-r))
@@ -284,21 +301,7 @@
                           (incf overcounted))))
                      (t (loop :for gate :in gates
                               :for i :from 0
-                              :for order := (elt gate-orders (floor i 2))
-                              ;; Don't use a gate if any of these
-                              ;; conditions hold:
-                              ;;  a) it has an odd index and its
-                              ;;  inverse is already in the gate set
-                              ;;  b) we're repeating the previous gate
-                              ;;  and its half-order is exceeded, or
-                              ;;  c) we're using the previous gate's
-                              ;;  inverse
-                              :if (and (not (and (= order 2) (oddp i)))
-                                       (or (and (= i last-idx)
-                                                (or (zerop order) (< rep-count
-                                                                     (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
-                                           (and (not (= i last-idx))
-                                                (not (= (floor i 2) (floor last-idx 2))))))
+                              :if (use-gate i last-idx rep-count)
                                 :do (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))
                               :else ;; Look at which sequences are being pruned
                               :do (format debug "Nonono! Not using gate ~A on sequence ~A~%" i seq)
@@ -330,27 +333,29 @@
                      (cdr nearby-ballies) :initial-value (car nearby-ballies))
              base-approximations)))
 
-(defun brute-base (u decomposer max-depth &key (epsilon0 0.14))
+(defun brute-base (u decomposer max-depth &key (epsilon0 +default-eps+))
   "A brute force method for finding a base approximation to U with sequences of maximum length MAX-DEPTH."
-  (labels ((helper (depth seq mat last-idx rep-count)
+  (labels ((use-gate (i last-idx curr-count)
+             ;; Don't use a gate if any of these conditions hold: a)
+             ;; it has an odd index and its inverse is already in the
+             ;; gate set b) we're repeating the previous gate and its
+             ;; half-order is exceeded, or c) we're using the previous
+             ;; gate's inverse
+             (let ((order (elt (gate-orders decomposer) (floor i 2))))
+               (and (not (and (= order 2) (oddp i)))
+                    (or (and (= i last-idx)
+                             (or (zerop order) (< curr-count
+                                                  (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
+                        (and (not (= i last-idx))
+                             (not (= (floor i 2) (floor last-idx 2))))))))
+           (helper (depth seq mat last-idx rep-count)
              (if (< (operator-dist u mat) epsilon0)
                  seq
                  (if (< depth max-depth)
                      (loop :for gate :in (gates decomposer)
                            :for i :from 0
                            :for order := (elt (gate-orders decomposer) (floor i 2))
-                           ;; Don't use a gate if a) it has an odd
-                           ;; index and its inverse is already in
-                           ;; the gate set, b) we're repeating the
-                           ;; previous gate and its half-order is
-                           ;; exceeded, or c) we're using the
-                           ;; previous gate's inverse
-                           :if (and (not (and (= order 2) (oddp i)))
-                                    (or (and (= i last-idx)
-                                             (or (zerop order) (< rep-count
-                                                                  (- (floor order 2) (if (and (evenp order) (oddp i)) 1 0)))))
-                                        (and (not (= i last-idx))
-                                             (not (= (floor i 2) (floor last-idx 2))))))
+                           :if (use-gate i last-idx rep-count)
                              :do (let ((found-seq (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))))
                                    (when found-seq (return found-seq))))
                      nil))))
@@ -376,7 +381,7 @@
                  (w-next (sk-iter decomposer w (1- n))))
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
 
-(defun brute-sk-iter (decomposer u n &key (epsilon0 0.14))
+(defun brute-sk-iter (decomposer u n &key (epsilon0 +default-eps+))
   "An alternative to sk-iter which uses the brute force approximation method instead."
   (if (zerop n)
       (brute-base u decomposer 18 :epsilon0 epsilon0)
@@ -386,7 +391,7 @@
                  (w-next (brute-sk-iter decomposer w (1- n) :epsilon0 epsilon0)))
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
 
-(defun decompose (decomposer unitary &key (depth 3) (epsilon0 0.14))
+(defun decompose (decomposer unitary &key (depth 3) (epsilon0 +default-eps+))
   "Decomposes a unitary into a list of commutator objects terminated by a base approximation to U, at a given depth."
   ;; This depth variable will require some investigation on how to
   ;; determine its value. Here, the ignored expression is the
