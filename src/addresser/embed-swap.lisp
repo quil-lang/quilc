@@ -58,8 +58,8 @@ the cost of the rewiring is reduced."
                            ;; recurse on SWAP chains of one lower length
                            (depth-first-traversal (1- depth) topmost-link)))))))))
       (depth-first-traversal depth nil)
-      (assert potential-first-links)
-      potential-first-links)))
+      (assert (not (endp potential-first-links)))
+      (remove-duplicates potential-first-links :test #'=))))
 
 (defun swap-horizon (link-index chip-sched chip-spec &optional use-free-swaps)
   "Estimate the time horizon associated with applying the 'SWAP' instruction
@@ -101,19 +101,19 @@ instruction if it exists, and errors otherwise."
                                                           chip-spec
                                                           depth)))
     (dolist (index potential-first-links)
-      (let ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
+      (let* ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
         (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
           ;; compute the new cost value
-          (let ((new-cost (funcall cost-function rewiring
-                                   :instr (build-gate "SWAP" () (aref swapped-qubits 0) (aref swapped-qubits 1)))))
+          ;; TODO Maybe fill in the rewiring? When is it better?
+          (a:when-let* ((control (apply-rewiring-p2l rewiring (aref swapped-qubits 0)))
+                        (target (apply-rewiring-p2l rewiring (aref swapped-qubits 1)))
+                        (new-cost
+                         (funcall cost-function rewiring
+                                  :instr (build-gate "SWAP" () control target))))
             ;; TODO: this assumes only SWAPs exist in the permutation list
-            (format *compiler-noise-stream*
-                    "SELECT-COST-LOWERING-SWAP: Considering ~a. New cost ~a vs best cost ~a.~%"
-                    swapped-qubits new-cost best-cost-so-far)
             ;; TODO: there used to be a "(not (zerop new-horizon))" here. why?
             (when (or (null best-cost-so-far) ; we have to make progress.
                       (cost-< new-cost best-cost-so-far))
-              (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: We prefer this SWAP.~%")
               (setf best-cost-so-far new-cost)
               (setf link-index index))))))
     ;; if we have a nil swap, the greedy scheduler has failed to operate. scary!
