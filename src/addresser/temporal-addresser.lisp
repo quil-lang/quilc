@@ -69,16 +69,22 @@
                                 (addresser-state-chip-schedule state)
                                 (apply #'make-qubit-resource 
                                        (mapcar #'qubit-index (application-arguments instr)))))
+             (l2p (addresser-state-working-l2p state))
+             (instr-physical (copy-instance instr))
              (instruction-expansion
                (let ((*compress-carefully* nil))
-                 (expand-to-native-instructions (list instr) chip-spec)))
+                 (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                   (rewire-l2p-instruction l2p instr-physical))
+                 (expand-to-native-instructions (list instr-physical) chip-spec)))
              (lschedule (make-lscheduler)))
         (append-instructions-to-lschedule lschedule instruction-expansion)
         (setf time (+ naive-start-time
                       (lscheduler-calculate-duration lschedule chip-spec)))
         
         ;; then, see if there's a non-naive cost available
-        (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
+        ;; TODO type logical vs physical qubits
+        (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                                            (lookup-hardware-object chip-spec instr-physical)))
                       (cost-bound (gethash hardware-object (temporal-addresser-state-cost-bounds state)))
                       (intelligent-bound
                        (+ cost-bound

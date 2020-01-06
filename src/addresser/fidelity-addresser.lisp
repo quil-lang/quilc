@@ -60,7 +60,8 @@
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
 
         ;; then, see if there's a non-naive cost available
-        (a:when-let* ((hardware-object (lookup-hardware-object chip-spec instr))
+        (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                                            (lookup-hardware-object chip-spec instr)))
                       (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state))))
           (let* ((resource (apply #'make-qubit-resource
                                   (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list)))
