@@ -538,7 +538,7 @@ In accordance with the typical usage here, there are two values returned: the re
   (case (token-type qubit-tok)
     ((:NAME)
      (unless *formal-arguments-allowed*
-       (quil-parse-error "Unexpected formal argument ~A~@[ in ~A~]."
+       (quil-parse-error "Unexpected formal argument \"~A\"~@[ in ~A~]."
                          (token-payload qubit-tok)
                          *parse-context*))
      (formal (token-payload qubit-tok)))
@@ -552,14 +552,17 @@ In accordance with the typical usage here, there are two values returned: the re
 (defun parse-memory-or-formal-token (tok &key (ensure-valid t))
   "Parse the token TOK as a memory reference or formal argument.
 
-If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an error unless 'foo' has been DECLAREd."
+If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will result in an error unless 'foo' has been DECLAREd."
   (declare (special *memory-region-names*)) ; Forward declaration
   (cond
     ;; Actual address to measure into.
     ((eql ':AREF (token-type tok))
      (when (and ensure-valid
                 (not (find (car (token-payload tok)) *memory-region-names* :test #'string=)))
-       (quil-parse-error "Bad memory region name ~A~@[ in ~A~]"
+       (quil-parse-error "Bad memory region name \"~A\"~@[ in ~A~]. This is probably due to either:
+    * a missing DECLARE for this memory,
+    * a misspelling of the memory reference, or
+    * a misspelling of the DECLAREd memory."
                          (car (token-payload tok))
                          *parse-context*))
      (mref (car (token-payload tok))
@@ -573,7 +576,7 @@ If ENSURE-VALID is T, then a memory reference such as 'foo[0]' will result in an
     ;; Formal argument.
     ((eql ':NAME (token-type tok))
      (unless *formal-arguments-allowed*
-       (quil-parse-error "Found formal argument ~A~@[ in ~A~]."
+       (quil-parse-error "Found formal argument \"~A\"~@[ in ~A~]."
                          (token-payload tok)
                          *parse-context*))
      (formal (token-payload tok)))
