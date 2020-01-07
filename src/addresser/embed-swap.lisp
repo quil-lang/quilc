@@ -61,32 +61,6 @@ the cost of the rewiring is reduced."
       (assert (not (endp potential-first-links)))
       (remove-duplicates potential-first-links :test #'=))))
 
-(defun swap-horizon (link-index chip-sched chip-spec &optional use-free-swaps)
-  "Estimate the time horizon associated with applying the 'SWAP' instruction
-indicated by LINK-INDEX, relative to the given schedule CHIP-SCHED."
-  (destructuring-bind (q0 q1) (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list)
-    (let* ((swap-duration (permutation-record-duration
-                           (vnth 0 (hardware-object-permutation-gates
-                                    (chip-spec-nth-link chip-spec link-index)))))
-           ;; What follows depends on whether we know that 2Q programs have a bounded length
-           (time-bound (gethash "time-bound"
-                                (hardware-object-misc-data
-                                 (chip-spec-nth-link chip-spec link-index))))
-           (horizon-time-fn (if time-bound
-                                #'chip-schedule-resource-carving-point
-                                #'chip-schedule-resource-end-time))
-           (horizon-increment (or time-bound swap-duration))
-           (old-horizon (funcall horizon-time-fn
-                                 chip-sched
-                                 (make-qubit-resource q0 q1))))
-      (cond
-        ((not (zerop old-horizon))
-         (+ old-horizon horizon-increment))
-        (use-free-swaps
-         0)
-        (t
-         horizon-increment)))))
-
 (defun select-cost-lowering-swap (rewiring chip-spec cost-function rewirings-tried
                                   &optional
                                     (depth *addresser-swap-lookahead-depth*))
@@ -105,13 +79,17 @@ instruction if it exists, and errors otherwise."
         (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
           ;; compute the new cost value
           ;; TODO Maybe fill in the rewiring? When is it better?
+          ;;
+          ;; cost-function expects its instruction to be
+          ;; logically-addressed, and will then use the provided
+          ;; rewiring to map back to physical addresses before
+          ;; nativizing the instruction.
           (a:when-let* ((control (apply-rewiring-p2l rewiring (aref swapped-qubits 0)))
                         (target (apply-rewiring-p2l rewiring (aref swapped-qubits 1)))
                         (new-cost
                          (funcall cost-function rewiring
                                   :instr (build-gate "SWAP" () control target))))
             ;; TODO: this assumes only SWAPs exist in the permutation list
-            ;; TODO: there used to be a "(not (zerop new-horizon))" here. why?
             (when (or (null best-cost-so-far) ; we have to make progress.
                       (cost-< new-cost best-cost-so-far))
               (setf best-cost-so-far new-cost)
