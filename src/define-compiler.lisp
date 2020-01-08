@@ -626,8 +626,11 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
        (dohash ((key val) item)
          (format t "~/cl-quil::binding-fmt/ -> ~A~%" key val))))))
 
+(setf *applicable-compilers-cache* (make-hash-table :test 'equalp))
+
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
+
   (flet (;; Checks whether PATH doubles back through the occurrence table START.         
          (path-has-a-loop-p (path start)
            (and (< 1 (length path))
@@ -637,78 +640,85 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                                   :thereis (binding-subsumes-p (first start) gate)))
                         :do (return-from path-has-a-loop-p t)
                       :finally (return nil)))))
-    
-    (let* ((target-gateset (blank-out-qubits target-gateset))
-           (compilers (get-compilers qubit-count))
-           (unconditional-compilers
-             (remove-if (lambda (x)
-                          (some (a:conjoin (complement #'symbolp) #'compiler-binding-options)
-                                (compiler-bindings x)))
-                        compilers))
-           (candidate-special-compilers
-             (remove-if (lambda (x)
-                          (or (/= qubit-count (length (gate-binding-arguments (first (compiler-bindings x)))))
-                              (loop :for b :being :the :hash-keys :of target-gateset
-                                      :thereis (binding-subsumes-p b (first (compiler-bindings x))))))
-                        compilers))
-           ;; start by computing a fast route from the generic gate to the target gate set
-           (generic-path (find-shortest-compiler-path unconditional-compilers
-                                                      target-gateset
-                                                      (make-occurrence-table
-                                                       :map (alexandria:plist-hash-table
-                                                             (list (generate-blank-binding qubit-count) 1)
-                                                             :test #'equalp))
-                                                      qubit-count))
-           (generic-cost (occurrence-table-cost-fidelity
-                          (occurrence-table-cost (first generic-path) target-gateset))))
-      
-      ;; it may be that non-generic gates have shorter routes to the target gate set.
-      ;; each possible such route begins with a specialized compiler.
-      ;; so, iterate over specialized compilers and see if they lead anywhere nice.
-      (let ((compiler-hash (make-hash-table)))
-        (dolist (compiler generic-path)
-          (when (typep compiler 'compiler)
-            (setf (gethash compiler compiler-hash) generic-cost)))
-        (dolist (compiler candidate-special-compilers)
-          (let* ((special-path
-                   (find-shortest-compiler-path
-                    unconditional-compilers target-gateset
-                    (filter-occurrence-table-by-qubit-count (compiler-output-gates compiler) qubit-count)
-                    qubit-count))
-                 (special-cost (occurrence-table-cost-fidelity
-                                (occurrence-table-cost (first special-path) target-gateset))))
-            ;; did we in fact beat out the generic machinery?
-            (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
-                       (> special-cost generic-cost))
-              ;; then store it!
-              (setf (gethash compiler compiler-hash) special-cost))))
+    (let ((target-gateset (blank-out-qubits target-gateset)))
+      (a:if-let ((compilers-with-features (gethash (cons target-gateset qubit-count)
+                                                   *applicable-compilers-cache*)))
+        compilers-with-features
+        (let* ((compilers (get-compilers qubit-count))
+               (unconditional-compilers
+                 (remove-if (lambda (x)
+                              (some (a:conjoin (complement #'symbolp) #'compiler-binding-options)
+                                    (compiler-bindings x)))
+                            compilers))
+               (candidate-special-compilers
+                 (remove-if (lambda (x)
+                              (or (/= qubit-count (length (gate-binding-arguments (first (compiler-bindings x)))))
+                                  (loop :for b :being :the :hash-keys :of target-gateset
+                                          :thereis (binding-subsumes-p b (first (compiler-bindings x))))))
+                            compilers))
+               ;; start by computing a fast route from the generic gate to the target gate set
+               (generic-path (find-shortest-compiler-path unconditional-compilers
+                                                          target-gateset
+                                                          (make-occurrence-table
+                                                           :map (alexandria:plist-hash-table
+                                                                 (list (generate-blank-binding qubit-count) 1)
+                                                                 :test #'equalp))
+                                                          qubit-count))
+               (generic-cost (occurrence-table-cost-fidelity
+                              (occurrence-table-cost (first generic-path) target-gateset))))
+
+          ;; it may be that non-generic gates have shorter routes to the target gate set.
+          ;; each possible such route begins with a specialized compiler.
+          ;; so, iterate over specialized compilers and see if they lead anywhere nice.
+          (let ((compiler-hash (make-hash-table)))
+            (dolist (compiler generic-path)
+              (when (typep compiler 'compiler)
+                (setf (gethash compiler compiler-hash) generic-cost)))
+            (dolist (compiler candidate-special-compilers)
+              (let* ((special-path
+                       (find-shortest-compiler-path
+                        unconditional-compilers target-gateset
+                        (filter-occurrence-table-by-qubit-count (compiler-output-gates compiler) qubit-count)
+                        qubit-count))
+                     (special-cost (occurrence-table-cost-fidelity
+                                    (occurrence-table-cost (first special-path) target-gateset))))
+                ;; did we in fact beat out the generic machinery?
+                (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
+                           (> special-cost generic-cost))
+                  ;; then store it!
+                  (setf (gethash compiler compiler-hash) special-cost))))
         
-        ;; these are basically all the compilers we care to use; now we need to
-        ;; sort them into preference order.
-        (let* ((sorted-compilers
-                 (stable-sort (remove-duplicates
-                               (append (loop :for compiler :being :the :hash-keys :of compiler-hash
-                                             :collect compiler)
-                                       (loop :for compiler :in generic-path
-                                             :when (typep compiler 'compiler)
-                                               :collect compiler)))
-                              #'>
-                              :key (lambda (x) (gethash x compiler-hash))))
-               ;; additionally, we install a couple extra compilers as hax to make
-               ;; the whole machine work. each such hak comes with an explanation,
-               ;; and it would be preferable to work to make each hak unnecessary.
-               (compilers-with-features
-                 (append
-                  ;; STATE-PREP-APPLICATION doesn't have a GATE-MATRIX, which causes
-                  ;; some havoc with all this new automation. so, instead, we prefix
-                  ;; with a compiler that catches S-P-As early.
-                  (cond
-                    ((= 1 qubit-count)
-                     (list #'state-prep-1q-compiler))
-                    ((= 2 qubit-count)
-                     (list #'state-prep-2q-compiler)))
-                  sorted-compilers)))
-          compilers-with-features)))))
+            ;; these are basically all the compilers we care to use; now we need to
+            ;; sort them into preference order.
+            (let* ((sorted-compilers
+                     (stable-sort (remove-duplicates
+                                   (append (loop :for compiler :being :the :hash-keys :of compiler-hash
+                                                 :collect compiler)
+                                           (loop :for compiler :in generic-path
+                                                 :when (typep compiler 'compiler)
+                                                   :collect compiler)))
+                                  #'>
+                                  :key (lambda (x) (gethash x compiler-hash))))
+                   ;; additionally, we install a couple extra compilers as hax to make
+                   ;; the whole machine work. each such hak comes with an explanation,
+                   ;; and it would be preferable to work to make each hak unnecessary.
+                   (compilers-with-features
+                     (append
+                      ;; STATE-PREP-APPLICATION doesn't have a GATE-MATRIX, which causes
+                      ;; some havoc with all this new automation. so, instead, we prefix
+                      ;; with a compiler that catches S-P-As early.
+                      (cond
+                        ((= 1 qubit-count)
+                         (list #'state-prep-1q-compiler))
+                        ((= 2 qubit-count)
+                         (list #'state-prep-2q-compiler)))
+                      sorted-compilers)))
+              (setf (gethash (cons target-gateset qubit-count)
+                             *applicable-compilers-cache*)
+                    compilers-with-features)
+              compilers-with-features)))))))
+
+(setf *applicable-reducers-cache* (make-hash-table :test 'equalp))
 
 (defun compute-applicable-reducers (gateset)
   "Returns all those compilers (including those which match on sequences of instructions rather than single instructions) which improve the brevity of a gate sequence without exiting a particular GATESET."
@@ -779,9 +789,15 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
              (every #'identity (apply #'a:map-product (a:curry #'consider-input-test-case compiler) matches)))))))
     
     (let (applicable-compilers)
-      (dolist (compiler **compilers-available** applicable-compilers)
-        (when (consider-compiler compiler)
-          (push compiler applicable-compilers))))))
+      (a:if-let ((applicable-compilers (gethash (blank-out-qubits gateset) *applicable-reducers-cache*)))
+        applicable-compilers
+        (progn
+          (dolist (compiler **compilers-available**)
+            (when (consider-compiler compiler)
+              (push compiler applicable-compilers)))
+          (setf (gethash (blank-out-qubits gateset) *applicable-reducers-cache*)
+                applicable-compilers)
+          applicable-compilers)))))
 
 
 ;;; we now turn attention to the macro DEFINE-COMPILER, which constructs instances

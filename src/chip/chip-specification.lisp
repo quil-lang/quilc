@@ -461,6 +461,8 @@ Compilers are listed in descending precedence.")
 
 (defun warm-hardware-objects (chip-specification)
   "Initializes the compiler feature sets of HARDWARE-OBJECT instances installed on a CHIP-SPECIFICATION.  Preserves whatever feature sets might be there already; don't call this repeatedly."
+  (setf *applicable-compilers-cache* (make-hash-table :test 'equalp))
+  (setf *applicable-reducers-cache* (make-hash-table :test 'equalp))
   (dotimes (order (length (chip-specification-objects chip-specification)) chip-specification)
     (loop :for obj :across (vnth order (chip-specification-objects chip-specification))
           :do (handler-case
