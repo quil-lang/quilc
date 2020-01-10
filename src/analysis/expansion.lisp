@@ -191,6 +191,41 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
            ;; The Hermitian transpose reverses the order of operator
            ;; applications
            (setf instrs (nreverse instrs))))
+        ((simple-controlled-operator-p (application-operator instr))
+         (let ((arguments (arguments instr)))
+           (when (endp arguments)
+             (error "CONTROLLED requires at least one control qubit in ~/quil:instruction-fmt/." instr))
+
+           (destructuring-bind (control-qubit . target-qubits) arguments
+             (when (member control-qubit target-qubits :test #'argument=)
+               (error "CONTROLLED cannot be applied when the control qubit is among the target qubits ~
+                       in ~/quil:instruction-fmt/" instr))
+
+             (let ((definition (circuit-application-definition instr)))
+               ;; Check that the instructions in the body of a given circuit
+               ;; do not involve the control qubit.
+               (dolist (x (circuit-definition-body definition))
+                 (when (member control-qubit (arguments x) :test #'argument=)
+                   (error "CONTROLLED circuit cannot have the control qubit used as a target qubit ~
+                           within the circuit named ~A." (circuit-definition-name definition))))
+
+               ;; The effect of controlling a 2^{n-1} unitary matrix U with
+               ;; the most significant qubit being the control qubit is the
+               ;; same as applying the matrix I ⊕ U, where I is the 2^{n-1} ×
+               ;; 2^{n-1} identity matrix. Thus, if U = Uₖ ... U₂ U₁,
+               ;; then it follows that
+               ;;         I ⊕ U = (I ⊕ Uₖ) ... (I ⊕ U₂) (I ⊕ U₁).
+               ;; If the control qubit is not the most significant one, we can
+               ;; reduce this to the previous case by applying suitable
+               ;; permutation matrices.
+               (let ((instrs (instantiate-instruction definition params target-qubits)))
+                 (dolist (instr instrs instrs)
+                   (unless (unitary-instruction-p instr)
+                     (error "CONTROLLED cannot be applied to the impure instruction ~
+                            ~/quil:instruction-fmt/" instr))
+                   (setf (application-operator instr) (controlled-operator (application-operator instr))
+                         (application-arguments instr) (cons control-qubit (arguments instr)))))))))
+
         ((plain-operator-p (application-operator instr))
          (instantiate-instruction (circuit-application-definition instr)
                                   params

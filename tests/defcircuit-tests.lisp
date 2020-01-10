@@ -268,3 +268,28 @@
                 (coerce code 'list))
       (is (string= "H" instr-h))
       (is (string= "CNOT" instr-cnot)))))
+
+(deftest test-defcircuit-controlled ()
+  "Test application of CONTROLLED modifier on a circuit application."
+  (signals simple-error
+    (quil:safely-parse-quil "
+DEFCIRCUIT ZXZ q0 q1:
+    Z q0; X q1; Z 2
+
+CONTROLLED ZXZ"))
+
+  (signals simple-error
+    (quil:safely-parse-quil "
+DEFCIRCUIT ZXZ q0 q1:
+    Z q0; X q1; Z 2
+
+CONTROLLED ZXZ 2 0 1"))
+
+  (let ((a (quil:safely-parse-quil "
+DEFCIRCUIT ZX q0 q1:
+    Z q0; X q1
+
+CONTROLLED ZX 2 0 1"))
+        (b (quil:safely-parse-quil "CZ 2 0; CONTROLLED X 2 1")))
+    (is (quil::matrix-equals-dwim (quil:parsed-program-to-logical-matrix a)
+                                  (quil:parsed-program-to-logical-matrix b)))))
