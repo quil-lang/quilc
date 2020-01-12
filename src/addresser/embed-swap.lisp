@@ -66,7 +66,7 @@ the cost of the rewiring is reduced."
                                     (depth *addresser-swap-lookahead-depth*))
   "Seaches for a 'SWAP' instruction that lowers the objective COST-FUNCTION. Returns such an
 instruction if it exists, and errors otherwise."
-  (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Entrance.~%")
+  (format-noise "SELECT-COST-LOWERING-SWAP: Entrance.~%")
   (let* ((best-cost-so-far nil)
          (potential-first-links (cost-lowering-candidates rewiring
                                                           cost-function
@@ -98,8 +98,7 @@ instruction if it exists, and errors otherwise."
     (assert link-index
             nil
             "Failed to select a SWAP instruction. This can be caused by a disconnected qubit graph, a program with a lot of symmetry, or even random chance. You might simply try again, or you might try requesting a different addressing strategy.")
-    (format *compiler-noise-stream*
-            "SELECT-COST-LOWERING-SWAP: SWAP ~d ~d is best, lowering cost from ~d to ~d.~%"
+    (format-noise "SELECT-COST-LOWERING-SWAP: SWAP ~d ~d is best, lowering cost from ~d to ~d.~%"
             (vnth 0 (chip-spec-qubits-on-link chip-spec link-index))
             (vnth 1 (chip-spec-qubits-on-link chip-spec link-index))
             (funcall cost-function rewiring)
@@ -111,7 +110,7 @@ instruction if it exists, and errors otherwise."
                                     (rewirings-tried nil))
   "This function inserts the necessary SWAP instructions to move from the working logical-to-physical
 rewiring REWIRING to the TARGET-REWIRING."
-  (format *compiler-noise-stream* "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a~%"
+  (format-noise "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a~%"
           rewiring target-rewiring)
   (flet ((cost-function (rewiring &key instr gate-weights)
            (declare (ignore instr gate-weights))
@@ -167,8 +166,7 @@ rewiring REWIRING to the TARGET-REWIRING."
       ;; yes, we can. apply the link swap to initial-l2p and to working-l2p
       (update-rewiring initial-l2p q0 q1)
       (update-rewiring working-l2p q0 q1)
-      (format *compiler-noise-stream*
-              "EMBED-SWAP: This is a free swap. :)~%~
+      (format-noise "EMBED-SWAP: This is a free swap. :)~%~
                EMBED-SWAP: New rewiring: ~a~%~
                EMBED-SWAP: New initial rewiring: ~a~%"
               working-l2p initial-l2p))
@@ -176,8 +174,6 @@ rewiring REWIRING to the TARGET-REWIRING."
       ;; in this case, this swap has to be performed by the QPU.
       ;; apply the link swap to working-l2p
       (update-rewiring working-l2p q0 q1)
-      (format *compiler-noise-stream*
-              "EMBED-SWAP: New rewiring: ~a~%"
-              working-l2p)
+      (format-noise "EMBED-SWAP: New rewiring: ~a~%" working-l2p)
       ;; insert the relevant 2q instruction
       (chip-schedule-append chip-sched (build-gate "SWAP" '() q0 q1))))))

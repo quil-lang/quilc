@@ -47,11 +47,13 @@
 
 (defun format-quil-sequence (s instructions &optional prefix)
   "Nicely prints a sequence of INSTRUCTIONS to a stream S. If PREFIX is present, prepend it to the overall output."
-  (when prefix
-    (format s prefix)
-    (terpri s))
-  (dolist (instr instructions)
-    (format s "    ~/cl-quil:instruction-fmt/~%" instr)))
+  (when s
+    (when prefix
+      (format s prefix)
+      (terpri s))
+    (dolist (instr instructions)
+      (format s " ~/cl-quil:instruction-fmt/~%" instr))))
+
 
 (defun qubits-in-instr-list (instructions)
   "Produces a list of all of the (unboxed) qubit indices appearing in INSTRUCTIONS, a list of applications."
@@ -243,7 +245,7 @@ other's."
       ( ;; utility for calculating how many instructions a rewriting rule requests
        (rewriting-rule-count (compiler)
          (length (compiler-bindings compiler)))
-       
+
        ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
        (update-context (node)
@@ -280,7 +282,7 @@ other's."
                                      (list ':context (peephole-rewriter-node-context
                                                       (peephole-rewriter-node-prev
                                                        (first relevant-nodes-for-inspection))))))))
-                       (format *compiler-noise-stream*
+                       (format-noise
                                "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~A.~%"
                                (compiler-name rule))
                        ;; if the rule was triggered, splice it in and remove
@@ -587,27 +589,27 @@ other's."
                                                                         context))
             reduced-instructions
             reduced-decompiled-instructions)
-    
+
         ;; now proceed to do the reductions
-        (format *compiler-noise-stream*
+        (format-noise
                 "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
         (setf reduced-instructions
               (algebraically-reduce-instructions instructions chip-specification context))
-        (format *compiler-noise-stream*
+        (format-noise
                 "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.~%")
         (when decompiled-instructions
           (setf reduced-decompiled-instructions
                 (algebraically-reduce-instructions decompiled-instructions
                                                    chip-specification
                                                    context)))
-    
+
         ;; check that the quil that came out was the same as the quil that went in
         (check-contextual-compression-was-well-behaved instructions
                                                        decompiled-instructions
                                                        reduced-instructions
                                                        reduced-decompiled-instructions
                                                        context)
-    
+
         ;; compare their respective runtimes and return the shorter one
         (let ((result-instructions
                 (cond
@@ -618,7 +620,7 @@ other's."
                    reduced-decompiled-instructions)
                   (t
                    reduced-instructions))))
-          (format-quil-sequence *compiler-noise-stream*
+          (format-quil-sequence *compiler-noise*
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
           result-instructions))))
@@ -626,7 +628,7 @@ other's."
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
   "Dispatch routine for compressing a sequence of INSTRUCTIONS, perhaps with unknown parameter values sprinkled through, based on the routines specified by a CHIP-SPECIFICATION and the current CONTEXT."
-  (format-quil-sequence *compiler-noise-stream*
+  (format-quil-sequence *compiler-noise*
                         instructions
                         "COMPRESS-INSTRUCTIONS: Selected the following sequence for compression:~%")
   ;;
@@ -737,7 +739,7 @@ other's."
   "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION.
 
 This specific routine is the start of a giant dispatch mechanism. Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
-  (format *compiler-noise-stream* "COMPRESS-INSTRUCTIONS: entrance.~%")
+  (format-noise "COMPRESS-INSTRUCTIONS: entrance.~%")
   ;; set up the places where our state will live
   (let* ((output nil)
          (n-qubits (chip-spec-n-qubits chip-specification))
@@ -1115,8 +1117,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
         :downto 0
         :do (dotimes (address (length (nth order governors)))
               (transition-governor-state order address ':flushing))))
-    (format *compiler-noise-stream*
-            "COMPRESS-INSTRUCTIONS: departure.~%")
+    (format-noise "COMPRESS-INSTRUCTIONS: departure.~%")
     (nreverse output)))
 
 

@@ -417,7 +417,7 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
       (match-matrix-to-an-e-basis-diagonalization
        (make-matrix-from-quil center-circuit :relabeling (standard-qubit-relabeler `(,q1 ,q0)))
        a d b)
-    
+
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
       (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
         (values
@@ -552,7 +552,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
     ((instr ("CAN" (alpha 0 0) q1 q0)))
   (inst "CPHASE" (list (* 2 alpha)) q1 q0))
 
-(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-2 
+(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-2
     ((instr ("CAN" (alpha beta 0) q1 q0)))
   (inst "ISWAP" ()           q1 q0)
   (inst "RY"    (list alpha) q1)
@@ -646,7 +646,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (inst "PISWAP" (list (aref array 3))     q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-2
-    ((instr ("CAN" (alpha beta 0d0) q1 q0)))    
+    ((instr ("CAN" (alpha beta 0d0) q1 q0)))
   (inst "CZ" () q1 q0)
   (inst "RY" (list alpha) q1)
   (inst "RY" (list beta) q0)
@@ -694,7 +694,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMATE-COMPILER* is NIL."
   (check-type instr gate-application)
   (check-type context compilation-context)
-  
+
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
 
@@ -704,14 +704,12 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
           (q0 (qubit-index (second (application-arguments instr))))
           (candidate-pairs nil)
           (chip-spec (compilation-context-chip-specification context)))
-      
+
       ;; now we manufacture a bunch of candidate circuits
       (dolist (circuit-crafter crafters)
         (unless (and (first candidate-pairs)
                      (double= 1d0 (car (first candidate-pairs))))
-          (format *compiler-noise-stream*
-                  "~&APPROXIMATE-2Q-COMPILER: Trying ~A on ~A...~%"
-                  circuit-crafter
+          (format-noise "~&APPROXIMATE-2Q-COMPILER: Trying ~A on ~A...~%" circuit-crafter
                   (with-output-to-string (s) (print-instruction instr s)))
           (handler-case
               (let* ((center-circuit (funcall circuit-crafter can))
@@ -727,12 +725,11 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                    (mapcar #'constant-value (application-parameters can))
                                    (get-canonical-coords-from-diagonal
                                     (nth-value 1 (orthogonal-decomposition m))))))
-                  (format *compiler-noise-stream*
-                          " for infidelity ~A.~%" infidelity)
+                  (format-noise " for infidelity ~A.~%" infidelity)
                   (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
                         candidate-pairs)))
             (compiler-does-not-apply () nil))))
-      
+
       ;; now vomit the results
       (when (endp candidate-pairs)
         (give-up-compilation))

@@ -17,8 +17,15 @@
 (defvar *resolve-include-pathname* 'identity
   "The function used to handle/resolve pathnames passed to INCLUDE directives in Quil. Specifically, it should be a function designator that takes one argument (a pathname designator) and returns the absolute pathname to include, or signals an error.")
 
-(defvar *compiler-noise-stream* (make-broadcast-stream)
-  "The stream used to emit compiler debug output to.  By default, this variable is bound to a stream that suppresses display.")
+(defvar *compiler-noise* nil
+  "The stream used to emit compiler debug output to. This variable can be bound to a stream that suppresses display, eg (make-broadcast-stream).")
+
+(defmacro format-noise (str &rest args)
+  "format-noise checks to see whether *compiler-noise* has been set and, if so, formats it according to the passed format string and arguments."
+  `(progn
+      (when *compiler-noise*
+        (format *compiler-noise* ,str ,@args))
+      (values)))
 
 (defvar *compress-carefully* nil
   "Flag that turns on/off a bunch of intermediate correctness checks during compression.  WARNING: this can be *very* costly, since it involves computing explicit matrix presentations.")

@@ -63,14 +63,15 @@
                    (handler-case
                        (let ((result (funcall compilation-method instruction :context context)))
                          (let ((*print-pretty* nil))
-                           (format *compiler-noise-stream*
+                           (format-noise
                                    "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/.~%"
                                    compilation-method instruction))
-                         (dolist (instr result)
-                           (write-string "    " *compiler-noise-stream*)
-                           (print-instruction instr *compiler-noise-stream*)
-                           (terpri *compiler-noise-stream*))
-                         (return-from apply-translation-compilers result))
+                         (when *compiler-noise*
+                           ((dolist (instr result)
+                              (write-string "    " *compiler-noise*)
+                              (print-instruction instr *compiler-noise*)
+                              (terpri *compiler-noise*))
+                         (return-from apply-translation-compilers result)))
                      (compiler-does-not-apply () nil))
                  (try-next-compiler ()
                    :report "Ignore this error and try the next compiler in the list."))))
@@ -84,7 +85,7 @@
       ;; if those fail, try the global compilers
       (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
       ;; if those failed too, there's really nothing more to do.
-      (format *compiler-noise-stream*
+      (format-noise
               "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/.~%"
               instruction)
       (give-up-compilation))))
@@ -98,7 +99,7 @@
   (:report (lambda (c s)
              (let ((j (not-protoquil-index c))
                    (p (parsed-program-executable-code (not-protoquil-program c))))
-               (format s "Misplaced or illegal instruction in ProtoQuil program:~%  ")
+               (format s "Misplaced or illegal instruction in ProtoQuil program:~% ")
                (cond ((zerop j)
                       (write-string "(BEGINNING OF PROGRAM)" s))
                      (t
@@ -159,7 +160,7 @@
 Returns a value list: (processed-program, of type parsed-program
                        topological-swaps, of type integer
                        unpreserved-block-duration, of type real)"
-  (format *compiler-noise-stream* "COMPILER-HOOK: entrance.~%")
+  (format-noise "COMPILER-HOOK: entrance.~%")
 
   (warm-chip-spec-lookup-cache chip-specification)
 
@@ -190,7 +191,7 @@ Returns a value list: (processed-program, of type parsed-program
     (check-preserved-blocks-skip-dead-qubits cfg chip-specification)
 
     (let ((*print-pretty* nil))
-      (format *compiler-noise-stream* "COMPILER-HOOK: initial rewiring ~A~%" initial-rewiring))
+      (format-noise "COMPILER-HOOK: initial rewiring ~A~%" initial-rewiring))
 
     ;; if we are expecting to manipulate protoquil, we segment the program-final
     ;; sequence of MEASURE instructions out into a separate CFG block, so that
@@ -241,7 +242,7 @@ Returns a value list: (processed-program, of type parsed-program
                    (redirect-edge blk fresh-block (outgoing registrant)))
              ;; try again, but with this new jump
              (push (list fresh-block registrant) block-stack)
-             (format *compiler-noise-stream* "COMPILER-HOOK: Introduced ~A to deal with the rewiring.~%"
+             (format-noise "COMPILER-HOOK: Introduced ~A to deal with the rewiring.~%"
                      (basic-block-name fresh-block))))
 
          (touch-preserved-block (blk)
@@ -272,7 +273,7 @@ Returns a value list: (processed-program, of type parsed-program
                     (fully-native-quil (expand-to-native-instructions straight-line-quil chip-specification))
                     (processed-quil fully-native-quil))
                (dotimes (n *compressor-passes*)
-                 (format *compiler-noise-stream* "COMPILER-HOOK: Compressing, pass ~D/~D.~%" (1+ n) *compressor-passes*)
+                 (format-noise "COMPILER-HOOK: Compressing, pass ~D/~D.~%" (1+ n) *compressor-passes*)
                  (setf processed-quil
                        (compress-instructions processed-quil chip-specification
                                               :protoquil (null registrant))))
@@ -282,7 +283,7 @@ Returns a value list: (processed-program, of type parsed-program
                (setf (basic-block-out-rewiring blk) final-l2p)
                (incf topological-swaps local-topological-swaps)
                (incf unpreserved-duration duration)
-               (format *compiler-noise-stream* "COMPILER-HOOK: Done processing block ~A.~%" (basic-block-name blk)))))
+               (format-noise "COMPILER-HOOK: Done processing block ~A.~%" (basic-block-name blk)))))
 
          (touch-reset-block (blk)
            ;; actually process this block
@@ -301,7 +302,7 @@ Returns a value list: (processed-program, of type parsed-program
                     (fully-native-quil (expand-to-native-instructions straight-line-quil chip-specification))
                     (processed-quil fully-native-quil))
                (dotimes (n *compressor-passes*)
-                 (format *compiler-noise-stream* "COMPILER-HOOK: Compressing, pass ~D/~D.~%" (1+ n) *compressor-passes*)
+                 (format-noise "COMPILER-HOOK: Compressing, pass ~D/~D.~%" (1+n) *compressor-passes*)
                  (setf processed-quil
                        (compress-instructions processed-quil chip-specification
                                               :protoquil t)))
@@ -311,7 +312,7 @@ Returns a value list: (processed-program, of type parsed-program
                (setf (basic-block-out-rewiring blk) final-l2p)
                (incf topological-swaps local-topological-swaps)
                (incf unpreserved-duration duration)
-               (format *compiler-noise-stream* "COMPILER-HOOK: Done processing block ~A.~%" (basic-block-name blk)))))
+               (format-noise "COMPILER-HOOK: Done processing block ~A.~%" (basic-block-name blk)))))
 
          (process-block (blk registrant)
            ;; if this block is expecting a rewiring, we should make sure the
@@ -325,7 +326,7 @@ Returns a value list: (processed-program, of type parsed-program
                    (initial-l2p (if (typep blk 'preserved-block)
                                     (make-rewiring (chip-spec-n-qubits chip-specification))
                                     (basic-block-in-rewiring blk))))
-               (format *compiler-noise-stream* "COMPILER-HOOK: Matching rewiring from ~A (~A) to ~A (~A).~%"
+               (format-noise "COMPILER-HOOK: Matching rewiring from ~A (~A) to ~A (~A).~%"
                        (basic-block-name registrant)
                        final-l2p
                        (basic-block-name blk)
@@ -341,7 +342,8 @@ Returns a value list: (processed-program, of type parsed-program
              (return-from process-block))
 
            (let ((*print-pretty* nil))
-             (format *compiler-noise-stream* "COMPILER-HOOK: Visiting ~A for the first time, coming from ~A (~A).~%"
+             (format-noise "COMPILER-HOOK: Visiting ~A for the first time,
+             coming from ~A (~A).~%"
                      (basic-block-name blk)
                      (and registrant (basic-block-name registrant))
                      (and registrant (basic-block-out-rewiring registrant))))
@@ -375,10 +377,10 @@ Returns a value list: (processed-program, of type parsed-program
 
       ;; kick off the traversal
       (exhaust-stack)
-      
+
       ;; one more pass of CFG collapse
       (simplify-cfg cfg)
-      
+
       (let ((processed-program (reconstitute-program cfg)))
         ;; Keep global PRAGMAS in the code, at the top of the file.
         (setf (parsed-program-executable-code processed-program)

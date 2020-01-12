@@ -67,7 +67,7 @@
       (let* ((chip-spec (addresser-state-chip-specification state))
              (naive-start-time (chip-schedule-resource-end-time
                                 (addresser-state-chip-schedule state)
-                                (apply #'make-qubit-resource 
+                                (apply #'make-qubit-resource
                                        (mapcar #'qubit-index (application-arguments instr)))))
              (l2p (addresser-state-working-l2p state))
              (instr-physical (copy-instance instr))
@@ -80,7 +80,7 @@
         (append-instructions-to-lschedule lschedule instruction-expansion)
         (setf time (+ naive-start-time
                       (lscheduler-calculate-duration lschedule chip-spec)))
-        
+
         ;; then, see if there's a non-naive cost available
         ;; TODO type logical vs physical qubits
         (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
@@ -93,13 +93,13 @@
                            (apply #'make-qubit-resource
                                   (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))))
           (setf time (min time intelligent-bound)))
-        
+
         ;; finally, we have a special case for early SWAPs
         (when (and *addresser-use-free-swaps*
                    (swap-application-p instr)
                    (double= 0d0 naive-start-time))
           (setf time 0))))
-    
+
     (when gate-weights
       (let ((qq-distances (addresser-state-qq-distances state))
             (rewiring (addresser-state-working-l2p state))
@@ -148,7 +148,7 @@
         (dolist (qubit assigned-qubits) (rewiring-unassign rewiring qubit))
         ;; normalize actual-cost
         (setf actual-cost (if (zerop gate-count) 0d0 (/ actual-cost gate-count)))))
-    
+
     (make-temporal-cost :start-time time
                         :heuristic-value actual-cost)))
 
@@ -363,7 +363,7 @@ following swaps."
 ;; defer picking rewiring for single-qubit instructions
 (defmethod dequeue-gate-application
     ((state temporal-addresser-state) instr &optional dry-run-escape)
-  (cond 
+  (cond
     ((= 1 (length (application-arguments instr)))
      ;; quick error check on instruction qubits
      (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits
@@ -374,11 +374,11 @@ following swaps."
              instr)
      (when dry-run-escape
        (funcall dry-run-escape))
-     (format *compiler-noise-stream*
+     (format-noise
              "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a 1Q ~
 instruction, adding to logical queue.~%"
              instr)
-     ;; dequeue and set the dirty bit  
+     ;; dequeue and set the dirty bit
      (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
      (push instr (aref (temporal-addresser-state-1q-queues state)
                        (qubit-index (first (application-arguments instr)))))
@@ -465,10 +465,10 @@ instruction, adding to logical queue.~%"
   (declare (ignore initial-rewiring use-free-swaps))
   (multiple-value-bind (chip-sched initial-l2p working-l2p)
       (call-next-method)
-      
+
     ;; now flush the 1Q queues in preparation for writing out
     (dotimes (qubit (chip-spec-n-qubits (addresser-state-chip-specification state)))
       (unless (endp (aref (temporal-addresser-state-1q-queues state) qubit))
         (flush-1q-instructions-after-wiring state qubit)))
-      
+
     (values chip-sched initial-l2p working-l2p)))
