@@ -316,7 +316,7 @@ U(time) 2 1 0"))
                                               (generate-translator-test-case-for-simple-compiler
                                                (quil::compiler-bindings compiler))))
                  (test-case-too-complicated (c)
-                   (format t "~&Compiler ~A not tested because ~A" compiler (test-case-too-complicated-reason c))
+                   (format t "~&Compiler ~A not tested because ~A" (quil::compiler-name compiler) (test-case-too-complicated-reason c))
                    (return-from do-compilation nil)))
                (setf table (%make-de-value-table test-case))
                (setf test-case-patched (mapcar (a:rcurry #'%patch-mref-values table) test-case))
