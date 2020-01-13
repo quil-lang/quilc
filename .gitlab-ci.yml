@@ -9,8 +9,7 @@ variables:
 test-cl-quil:
   stage: test
   tags:
-    - github
-    - dockerd
+    - ec2-github
   only:
     - branches
   image: docker:stable
@@ -23,8 +22,7 @@ test-cl-quil:
 test-quilc:
   stage: test
   tags:
-    - github
-    - dockerd
+    - ec2-github
   only:
     - branches
   image: docker:stable
