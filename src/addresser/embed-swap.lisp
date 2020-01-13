@@ -74,7 +74,7 @@ instruction if it exists, and errors otherwise."
                                                           chip-spec
                                                           depth))
          (link-index (first potential-first-links)))
-    (dolist (index (rest potential-first-links))
+    (dolist (index potential-first-links)
       (let* ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
         (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
           ;; compute the new cost value
