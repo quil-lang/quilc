@@ -68,13 +68,13 @@ the cost of the rewiring is reduced."
 instruction if it exists, and errors otherwise."
   (format *compiler-noise-stream* "SELECT-COST-LOWERING-SWAP: Entrance.~%")
   (let* ((best-cost-so-far nil)
-         (link-index nil)
          (potential-first-links (cost-lowering-candidates rewiring
                                                           cost-function
                                                           rewirings-tried
                                                           chip-spec
-                                                          depth)))
-    (dolist (index potential-first-links)
+                                                          depth))
+         (link-index (first potential-first-links)))
+    (dolist (index (rest potential-first-links))
       (let* ((swapped-qubits (chip-spec-qubits-on-link chip-spec index)))
         (with-update-rewiring rewiring (aref swapped-qubits 0) (aref swapped-qubits 1)
           ;; compute the new cost value
