@@ -173,3 +173,24 @@ CNOT 0 2"))
     (bt:with-timeout (1)
       (compiler-hook (parse "CZ 0 1")
                      (quil::build-chip-from-digraph '((2 3) (3 2)))))))
+
+(deftest test-aspen-28q-no-swap-bug ()
+  (let* ((pp (parse "H 5
+H 7
+H 8
+
+CNOT 4 5
+CNOT 4 6
+CNOT 4 6
+CNOT 4 7
+CNOT 4 7
+CNOT 4 8
+"))
+         (chip (quil::read-chip-spec-file
+                (merge-pathnames *qpu-test-file-directory*
+                                 "Aspen-7-28Q-A.qpu"))))
+    ;; An absolute unit of a matrix. Better compress those qubits.
+    (is (quil::matrix-equals-dwim
+         (parsed-program-to-logical-matrix pp :compress-qubits t)
+         (parsed-program-to-logical-matrix (compiler-hook pp chip)
+                                           :compress-qubits t)))))
