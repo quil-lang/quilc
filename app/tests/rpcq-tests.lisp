@@ -4,6 +4,21 @@
 
 (in-package #:quilc-tests)
 
+;; TODO FIXME XXX The below relies on some funky/hacky/unsightly code
+;; to forcefully kill threads. See open issues
+;; https://github.com/rigetti/rpcq/issues/61
+;; https://github.com/rigetti/rpcq/issues/75
+
+;; Stolen from RPCQ-TESTS
+(defun kill-thread-slowly (thread)
+  #+ccl
+  (loop :while (bt:thread-alive-p thread)
+        :do (sleep 1) (bt:destroy-thread thread))
+  #-ccl
+  (when (bt:thread-alive-p thread)
+    (bt:destroy-thread thread))
+  (sleep 1))
+
 (defmacro with-random-rpc-client ((client) &body body)
   "Bind CLIENT to an RPCQ client object for the duration of BODY."
   (let* ((protocol "inproc")
@@ -18,7 +33,7 @@
        (unwind-protect
             (rpcq:with-rpc-client (,client ,endpoint)
               ,@body)
-         (bt:destroy-thread server-thread)))))
+         (kill-thread-slowly server-thread)))))
 
 (deftest test-easy-version-call ()
   "Test that the \"get-version-info\" endpoint works."
