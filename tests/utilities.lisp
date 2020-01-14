@@ -4,6 +4,45 @@
 
 (in-package #:cl-quil-tests)
 
+(define-condition retries-exceeded-error (error)
+  ((condition :initarg :condition
+              :reader retries-exceeded-error-condition)
+   (retries :initarg :retries
+            :reader retries-exceeded-error-retries))
+  (:report (lambda (c s)
+             (format s "After ~D retr~:@P, the condition:
+    ~A
+is still being signalled."
+                     (retries-exceeded-error-retries c)
+                     (retries-exceeded-error-condition c)))))
+(defmacro with-retries (condition-name (&key (retries 3)) &body body)
+  "Retry executing body up to RETRIES number of times (default 3, evaluated at run-time), tolerating CONDITION-NAME being signalled."
+  (check-type condition-name symbol)
+  (alexandria:with-gensyms (retries-body-fn c TRY-AGAIN num-retries retries-left)
+    ;; We create a retries function for easier debuggability and nicer
+    ;; macro-expansions.
+    `(flet ((,retries-body-fn ()
+              ,@body))
+       (declare (dynamic-extent (function ,retries-body-fn)))
+       (let* ((,num-retries ,retries)
+              (,retries-left ,num-retries))
+         (assert (typep ,num-retries 'unsigned-byte)
+                 ()
+                 "The RETRIES argument to WITH-RETRIES did not produce a non-negative integer.")
+         (tagbody
+            ,TRY-AGAIN
+            (handler-case (,retries-body-fn)
+              (,condition-name (,c)
+                (cond
+                  ;; We've exhausted our retries, so we just signal
+                  ;; the error again.
+                  ((zerop ,retries-left)
+                   (error 'retries-exceeded-error :condition ,c
+                                                  :retries ,num-retries))
+                  (t
+                   (decf ,retries-left)
+                   (go ,TRY-AGAIN))))))))))
+
 (defun matrix-mismatch (m u &key (test #'quil::double~))
   "Return a LIST of the (ROW COL) indices of the first mismatch between M and U.
 

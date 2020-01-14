@@ -60,21 +60,19 @@
         (setf instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec))
 
         ;; then, see if there's a non-naive cost available
-        (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
-                                            (lookup-hardware-object chip-spec instr)))
-                      (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state))))
-          (let* ((resource (apply #'make-qubit-resource
-                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list)))
-                 (carving-point (chip-schedule-resource-carving-point
-                                 (addresser-state-chip-schedule state)
-                                 resource))
-                 (subschedule (chip-schedule-from-carving-point
-                               (addresser-state-chip-schedule state) resource carving-point))
-                 (preceding-fidelity
-                   (calculate-instructions-log-fidelity subschedule
-                                                        (addresser-state-chip-specification state))))
-            (when (<= cost-bound (+ preceding-fidelity instr-cost))
-              (setf instr-cost (- cost-bound preceding-fidelity)))))))
+        (a:when-let*
+            ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                                   (lookup-hardware-object chip-spec instr)))
+             (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state)))
+             (subschedule (chip-contiguous-subschedule-from-last-instructions
+                           (addresser-state-chip-schedule state)
+                           (apply #'make-qubit-resource
+                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
+             (preceding-fidelity
+              (calculate-instructions-log-fidelity subschedule
+                                                   (addresser-state-chip-specification state))))
+          (when (<= cost-bound (+ preceding-fidelity instr-cost))
+            (setf instr-cost (- cost-bound preceding-fidelity))))))
 
     ;; conglomerate the log-infidelities in GATE-WEIGHTS, depressed by some decay factor
     (when gate-weights
