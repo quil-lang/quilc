@@ -171,27 +171,28 @@ RX(pi) 2
 
 (deftest test-compiler-hook-random-4Q ()
   (finish-output)
-  (dolist (state-prep '(nil t))
-    (let ((quil::*enable-state-prep-compression* state-prep))
-      (format t "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~A~%" quil::*enable-state-prep-compression*)
-      (dolist (architecture '(:cz :iswap :cphase :piswap :cnot))
-        (format t "      Working on architecture ~A.~%" architecture)
-        (let* ((num-qubits 4)
-               (v (quil::random-special-unitary (expt 2 num-qubits)))
-               (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
-               (parsed-prog (make-instance
-                             'quil::parsed-program
-                             :executable-code (make-array 1
-                                                          :initial-element (make-instance
-                                                                            'quil::gate-application
-                                                                            :operator (named-operator "RANDO-GATE")
-                                                                            :gate v
-                                                                            :arguments (mapcar #'qubit args)))))
-               (processed-program
-                 (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
-                                                                              :architecture architecture))))
-          (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
-                                        (quil::parsed-program-to-logical-matrix processed-program))))))))
+  (with-retries simple-error ()
+    (dolist (state-prep '(nil t))
+      (let ((quil::*enable-state-prep-compression* state-prep))
+        (format t "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~A~%" quil::*enable-state-prep-compression*)
+        (dolist (architecture '(:cz :iswap :cphase :piswap :cnot))
+          (format t "      Working on architecture ~A.~%" architecture)
+          (let* ((num-qubits 4)
+                 (v (quil::random-special-unitary (expt 2 num-qubits)))
+                 (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
+                 (parsed-prog (make-instance
+                               'quil::parsed-program
+                               :executable-code (make-array 1
+                                                            :initial-element (make-instance
+                                                                              'quil::gate-application
+                                                                              :operator (named-operator "RANDO-GATE")
+                                                                              :gate v
+                                                                              :arguments (mapcar #'qubit args)))))
+                 (processed-program
+                   (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
+                                                                                :architecture architecture))))
+            (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
+                                          (quil::parsed-program-to-logical-matrix processed-program)))))))))
 
 
 (deftest test-compiler-hook-preserves-RESETs ()
