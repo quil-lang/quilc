@@ -311,7 +311,9 @@ REGION-COMBINER to their commonly-named regions."
 
 (defun resource-subsetp (rc1 rc2)
   "Return T if all of the resources in RC1 are contained within RC2."
-  (resource-null-p (resource-difference rc1 rc2)))
+  (or (resource-all-p rc2)
+      (and (not (resource-all-p rc1))
+           (resource-null-p (resource-difference rc1 rc2)))))
 
 
 (defun map-sorted-memory-regions (fn regions1 regions2 &key default-value)

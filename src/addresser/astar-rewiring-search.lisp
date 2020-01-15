@@ -249,7 +249,7 @@ should stop with the given rewiring and false otherwise."
 
           ;; did we run out of time?
     :when (>= iterations max-iterations)
-      :do (format *compiler-noise-stream* "SEARCH-REWIRING: Ran out of iterations")
+      :do (format *compiler-noise-stream* "SEARCH-REWIRING: Ran out of iterations~%")
           (return (values (active-state-swaps best-state) nil))
 
           ;; update that we've visited the state
