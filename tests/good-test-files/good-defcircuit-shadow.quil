@@ -1,0 +1,6 @@
+DECLARE x BIT
+
+DEFCIRCUIT f x:
+    X x
+
+f 0
