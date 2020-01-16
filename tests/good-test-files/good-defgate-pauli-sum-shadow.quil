@@ -1,0 +1,6 @@
+DECLARE x BIT
+
+DEFGATE f(%x) x AS PAULI-SUM:
+    X(%x) x
+
+f(1.0) 0

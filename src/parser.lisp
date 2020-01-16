@@ -647,22 +647,45 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
       (otherwise
        (disappointing-token-error tok "a parameter")))))
 
+(defun parse-formal (tok)
+  "Parse a token TOK into a formal argument."
+  (case (token-type tok)
+    ((:NAME)
+     ;; Sanity check that we are allowed to savor a formal.
+     (unless *formal-arguments-allowed*
+       (quil-parse-error "Unexpected formal argument A~@[ in ~A~]."
+                         (token-payload tok)
+                         *parse-context*))
+     (formal (token-payload tok)))
+    (otherwise
+     (disappointing-token-error tok "a formal"))))
+
 (defun parse-argument (tok)
   "Parse a token TOK intended to be an argument."
-  (declare (special *memory-region-names*)) ; Forward declaration
+  (declare (special *memory-region-names* *shadowing-formals*)) ; Forward declaration
   (case (token-type tok)
     ((:NAME)
      (let ((names-memory-region-p (find (token-payload tok)
                                         *memory-region-names*
-                                        :test #'string=)))
+                                        :test #'string=))
+           (shadowing-formal (find (token-payload tok)
+                                   *shadowing-formals*
+                                   :test #'string=
+                                   :key #'formal-name)))
        (unless (or names-memory-region-p
                    *formal-arguments-allowed*)
          (quil-parse-error "Unexpected formal argument ~A~@[ in ~A~]."
                            (token-payload tok)
                            *parse-context*))
-       (if names-memory-region-p
-           (mref (token-payload tok) 0)
-           (formal (token-payload tok)))))
+       (cond
+         ((and *formal-arguments-allowed*
+               shadowing-formal)
+          shadowing-formal)
+         (names-memory-region-p (mref (token-payload tok) 0))
+         (t
+          (warn "In PARSE-ARGUMENT, a formal was parsed even ~
+                 though it isn't known contextually.")
+          (formal (token-payload tok))))))
     ((:INTEGER)
      (qubit (token-payload tok)))
     ((:COMPLEX)
@@ -705,6 +728,9 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
 (defvar *memory-region-names*)
 (setf (documentation '*memory-region-names* 'variable)
       "A special variable to collect the names of declared memory regions.")
+
+(defvar *shadowing-formals* nil
+  "A special variable which indicates formal parameters (as a list of FORMAL objects) which shadow memory names.")
 
 (defun gate-modifier-token-p (tok)
   (member (token-type tok) '(:CONTROLLED :DAGGER :FORKED)))
@@ -894,10 +920,11 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                  (quil-parse-error "Permutation gate definitions do not support parameters."))
                (parse-gate-entries-as-permutation body-lines name :lexical-context op))
               (:PAULI-SUM
-               (parse-gate-definition-body-into-pauli-sum body-lines name
-                                                          :lexical-context op
-                                                          :legal-arguments args
-                                                          :legal-parameters params)))))))))
+               (let ((*shadowing-formals* args))
+                 (parse-gate-definition-body-into-pauli-sum body-lines name
+                                                            :lexical-context op
+                                                            :legal-arguments args
+                                                            :legal-parameters params))))))))))
 
 (defun parse-gate-definition-body-into-pauli-sum (body-lines name &key lexical-context legal-arguments legal-parameters)
   ;; is the immediate next line indented? if not, error.
@@ -1231,11 +1258,12 @@ If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly i
           (loop :for arg :in rest-line
                 :when (not (eql ':NAME (token-type arg)))
                   :do (quil-parse-error "Invalid formal argument in DEFCIRCUIT line.")
-                :collect (parse-argument arg) :into formal-args
+                :collect (parse-formal arg) :into formal-args
                 :finally (setf args formal-args))
 
           (multiple-value-bind (parsed-body rest-lines)
-              (parse-indented-body body-lines)
+              (let ((*shadowing-formals* args))
+                (parse-indented-body body-lines))
             (values (make-circuit-definition
                      name              ; Circuit name
                      params            ; formal parameters
@@ -1564,12 +1592,12 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
     ;; Make sure we have tokens left over: the line can't end in this state.
     (when (null rest-line)
       (quil-parse-error "Unterminated argument list in DEFGATE."))
-    
+
     ;; All the intermediate tokens in found-args should be formal qubit names
     (let ((args (loop :for a :in found-args
                       :unless (eql ':NAME (token-type a))
                         :do (quil-parse-error "Found something other than a formal qubit name in a DEFGATE argument list: ~A" a)
-                      :collect (parse-argument a))))
+                      :collect (parse-formal a))))
       (values args rest-line))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; Arithmetic Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;
