@@ -139,8 +139,11 @@
     ((double= fidelity +forest-error-sentinel+)
      (warn "Chip specification contains a fidelity field populated by the Forest error sentinel. Replacing it with the default ~A." +totally-awful-fidelity+)
      +totally-awful-fidelity+)
+    ((> fidelity 1.0)
+     (warn "Chip specification contained fidelity ~A > 1.0:*. Truncating to ~A." fidelity +near-perfect-fidelity+)
+     +near-perfect-fidelity+)
     ((> fidelity +near-perfect-fidelity+)
-     (warn "Chip specification contained fidelity ~A > ~A~:*. Truncating to ~A." fidelity +near-perfect-fidelity+)
+     ;; Silent truncation.
      +near-perfect-fidelity+)
     ((minusp fidelity)
      (error "Chip specification contained negative fidelity ~A. I don't know what to do with this value." fidelity))
