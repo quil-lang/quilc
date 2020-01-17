@@ -153,6 +153,19 @@ CNOT 0 2"))
     (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))))
 
+(deftest test-ccnot-compilation-well-behaved ()
+  "Test that CCNOT on a line compiles into the best possible outcome of 7 CZ's."
+  (let* ((chip (quil::build-nq-linear-chip 3))
+         (ccnot-prog (parse "CCNOT 0 1 2"))
+         (ccnot-comp (compiler-hook ccnot-prog chip))
+         (ccnot-code (program-2q-instructions ccnot-comp))
+         (2q-code (program-2q-instructions ccnot-comp)))
+    (is (quil::matrix-equals-dwim
+         (parsed-program-to-logical-matrix ccnot-prog)
+         (parsed-program-to-logical-matrix ccnot-comp)))
+    (is (every (link-nativep chip) 2q-code))
+    (is (= 7 (length ccnot-code)))))
+
 (deftest test-ccnot-compilation-on-cphase-iswap ()
   "Test that CCNOT compiles nicely on a line having the (:CPHASE ISWAP) architecture."
   (let* ((quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
