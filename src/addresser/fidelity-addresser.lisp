@@ -62,7 +62,7 @@
         ;; then, see if there's a non-naive cost available
         (a:when-let*
             ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
-                                   (lookup-hardware-object chip-spec instr)))
+                                   (lookup-hardware-object chip-spec instr-copy)))
              (cost-bound (gethash hardware-object (fidelity-addresser-state-cost-bounds state)))
              (subschedule (chip-contiguous-subschedule-from-last-instructions
                            (addresser-state-chip-schedule state)
