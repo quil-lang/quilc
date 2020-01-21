@@ -343,3 +343,18 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
         (t
          (finish-compiler
           (build-PISWAP-string computed-path)))))))
+
+;; h/t ecp
+(define-compiler XY-to-CZs
+    ((xy-gate ("XY" (theta) p q)))
+
+  (inst "RZ"   (list (/ pi 4))  p)
+  (inst "H"    nil              p)
+  (inst "RZ"   (list (/ -pi 4)) q)
+  (inst "CNOT" nil              p q)
+  (inst "RY"   (list (param-* theta 1/2)) p)
+  (inst "RY"   (list (param-* theta 1/2)) q)
+  (inst "CNOT" nil              p q)
+  (inst "H"    nil              p)
+  (inst "RZ"   (list (/ -pi 4)) p)
+  (inst "RZ"   (list (/ pi 4))  q))
