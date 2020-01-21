@@ -398,6 +398,18 @@ RZ(-2.0) 0"))
               :do (is (quil::double= (magicl:ref m 0 0)
                                      (magicl:ref m j j))))))))
 
+(deftest test-parametric-simple-defexpi ()
+  "Test that parametric compilation of a 1Q Pauli gate proceeds successfully. See gh-551."
+  (let ((progm (parse "
+DEFGATE f(%theta) p AS PAULI-SUM:
+    X(%theta) p
+
+DECLARE t REAL
+
+f(t) 0")))
+    (is (compiler-hook progm
+                       (quil::build-nq-fully-connected-chip 2)))))
+
 (deftest test-horizontal-composition-of-pauli-term->matrix ()
   (flet ((word->matrix (word)
            (quil::pauli-term->matrix

@@ -999,7 +999,7 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                                    (quil-parse-error "Expected a formal qubit argument, but got ~a" tok))
                                  (let ((ret (parse-argument tok)))
                                    (unless (member ret legal-arguments :test #'equalp)
-                                     (quil-parse-error "Found formal qubit argument ~a not present in the argument list."))
+                                     (quil-parse-error "Found formal qubit argument ~a not present in the argument list." (formal-name ret)))
                                    ret))
                                line))
       ;; some further Sanity Chex:
