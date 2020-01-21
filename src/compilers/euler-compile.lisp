@@ -25,20 +25,22 @@
             (,postfix-matrix (magicl::conjugate-transpose ,prefix-matrix)))
        (declare (ignorable ,prefix-matrix ,postfix-matrix))
        (define-compiler ,name ((instr (_ _ q)))
-         (let ((m ,(if prefix-quil
-                       `(m* ,postfix-matrix (gate-matrix instr) ,prefix-matrix)
-                       `(gate-matrix instr))))
-           (multiple-value-bind (,u0 ,u1 ,v0 ,v1 ,angles) (funcall *lapack-csd* m 1 1)
-             (inst ,outer-gate `(,(* ,outer-prefactor
-                                     (- (phase (magicl:ref ,v1 0 0))
-                                        (phase (magicl:ref ,v0 0 0)))))
-                   q)
-             (inst ,inner-gate `(,(* ,inner-prefactor 2 (first ,angles)))
-                   q)
-             (inst ,outer-gate `(,(* ,outer-prefactor
-				     (- (phase (magicl:ref ,u1 0 0))
-					(phase (magicl:ref ,u0 0 0)))))
-		   q)))))))
+         (give-up-compilation-unless
+             (every #'is-constant (application-parameters instr))
+           (let ((m ,(if prefix-quil
+                         `(m* ,postfix-matrix (gate-matrix instr) ,prefix-matrix)
+                         `(gate-matrix instr))))
+             (multiple-value-bind (,u0 ,u1 ,v0 ,v1 ,angles) (funcall *lapack-csd* m 1 1)
+               (inst ,outer-gate `(,(* ,outer-prefactor
+                                       (- (phase (magicl:ref ,v1 0 0))
+                                          (phase (magicl:ref ,v0 0 0)))))
+                     q)
+               (inst ,inner-gate `(,(* ,inner-prefactor 2 (first ,angles)))
+                     q)
+               (inst ,outer-gate `(,(* ,outer-prefactor
+				       (- (phase (magicl:ref ,u1 0 0))
+					  (phase (magicl:ref ,u0 0 0)))))
+		     q))))))))
 
 (define-euler-compiler euler-YXY-compiler
     :outer-gate "RY"
