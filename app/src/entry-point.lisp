@@ -49,10 +49,10 @@
      :optional t
      :documentation "restrict input/output to ProtoQuil")
 
-    (("print-statistics"
-      :type boolean
-      :optional t
-      :documentation "print program statistics.  Requires -P."))
+    (("print-statistics")
+     :type boolean
+     :optional t
+     :documentation "print program statistics.  Requires -P.")
 
     (("compute-matrix-reps" #\m)
      :type boolean
@@ -502,7 +502,7 @@
                                                       (remove #\Space gate-blacklist)
                                                       :remove-empty-subseqs t)))
              (print-program processed-program *quil-stream*)
-             (when print-statistics
+             (when (and protoquil print-statistics)
                (print-statistics statistics *quil-stream*))
              (when (and protoquil compute-matrix-reps)
                (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t)))
