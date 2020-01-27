@@ -58,10 +58,10 @@
         (tag (generate-csc-tag)))
     (unless m
       (give-up-compilation))
-    (setf m (magicl:scale (expt (magicl:det m) (/ -1 (magicl:matrix-rows m))) m))
+    (setf m (magicl:scale (expt (magicl:det m) (/ -1 (magicl:nrows m))) m))
 
     ;; first, a utility function.
-    (let ((n (/ (magicl:matrix-rows m) 2)))
+    (let ((n (/ (magicl:nrows m) 2)))
       (multiple-value-bind (u0 u1 v0 v1 thetas) (magicl:lapack-csd m n n)
         ;; rebalance the u and v matrices so that u0 (+) u1 and v0 (+) v1
         ;; are special unitary.

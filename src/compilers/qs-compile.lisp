@@ -18,9 +18,9 @@
   (let ((matrix (gate-matrix instr)))
     (unless matrix
       (give-up-compilation))
-    (let* ((row-count (magicl:matrix-rows matrix))
+    (let* ((row-count (magicl:nrows matrix))
            (prefactor (expt (magicl:det matrix) (- (/ row-count))))
-           (m (magicl:scale prefactor matrix)))
+           (m (magicl:scale matrix prefactor)))
       ;; it starts the same as CSC: build the Cosine-Sine decomposition
       (multiple-value-bind (u0 u1 v0 v1 thetas) (funcall *lapack-csd* m (/ row-count 2) (/ row-count 2))
         ;; rebalance the u and v matrices so that u0 (+) u1 and v0 (+) v1
@@ -28,20 +28,20 @@
         (let* ((neg-nth-root-detu
                  (expt (* (magicl:det u0) (magicl:det u1))
                        (/ -1 row-count)))
-               (u0 (magicl:scale neg-nth-root-detu u0))
-               (u1 (magicl:scale neg-nth-root-detu u1))
-               (v0 (magicl:scale (/ neg-nth-root-detu) v0))
-               (v1 (magicl:scale (/ neg-nth-root-detu) v1))
+               (u0 (magicl:scale u0 neg-nth-root-detu))
+               (u1 (magicl:scale u1 neg-nth-root-detu))
+               (v0 (magicl:scale v0 (/ neg-nth-root-detu)))
+               (v1 (magicl:scale v1 (/ neg-nth-root-detu)))
                ;; now we *also* want u0, u1, v0, v1 to be special unitary. the
                ;; price we pay for this is a Z rotation. calculate their angle
                ;; values now...
                (Lphi (realpart (/ (log (magicl:det u0)) #C(0 1) (/ row-count 2))))
                (Rphi (realpart (/ (log (magicl:det v0)) #C(0 1) (/ row-count 2))))
                ;; ... and then do the rescaling.
-               (u0 (magicl:scale (cis (- Lphi)) u0))
-               (u1 (magicl:scale (cis Lphi) u1))
-               (v0 (magicl:scale (cis (- Rphi)) v0))
-               (v1 (magicl:scale (cis Rphi) v1)))
+               (u0 (magicl:scale u0 (cis (- Lphi))))
+               (u1 (magicl:scale u1 (cis Lphi)))
+               (v0 (magicl:scale v0 (cis (- Rphi))))
+               (v1 (magicl:scale v1 (cis Rphi))))
           ;; now we convert the multiplexed operators u0 (+) u1, v0 (+) v1
           ;; into ordinary operators with a UCRZ.  we are going off of the eqn
           ;;    u0 (+) u1 = (uL (+) uL) (uD (+) uD^*) (uR (+) uR).
@@ -52,9 +52,9 @@
           ;; and then uR can be deduced from this by
           ;;    uR = u0 uL^* uD^*.
           (multiple-value-bind (evals-u uL)
-              (magicl:eig (magicl:multiply-complex-matrices u0 (magicl:conjugate-transpose u1)))
+              (magicl:eig (magicl:@ u0 (magicl:conjugate-transpose u1)))
             (multiple-value-bind (evals-v vL)
-                (magicl:eig (magicl:multiply-complex-matrices v0 (magicl:conjugate-transpose v1)))
+                (magicl:eig (magicl:@ v0 (magicl:conjugate-transpose v1)))
               ;; if the eigenspaces of u0 v1^* or v0 v1^* are pluridimensional,
               ;; then the columns of uL and vL are not guaranteed to form an
               ;; orthonormal set---i.e., they are not guaranteed to be unitary.
@@ -73,18 +73,14 @@
                 (setf (first evals-u) (- (first evals-u))))
               (when (> 0 (realpart (apply '* evals-v)))
                 (setf (first evals-v) (- (first evals-v))))
-              (let* ((uL (magicl:scale (expt (magicl:det uL) (- (/ (magicl:matrix-rows uL)))) uL))
-                     (vL (magicl:scale (expt (magicl:det vL) (- (/ (magicl:matrix-rows vL)))) vL))
-                     (uR (reduce #'magicl:multiply-complex-matrices
-                                 (list (magicl:diag (/ row-count 2)
-                                                    (/ row-count 2)
-                                                    evals-u)
+              (let* ((uL (magicl:scale uL (expt (magicl:det uL) (- (/ (magicl:nrows uL))))))
+                     (vL (magicl:scale vL (expt (magicl:det vL) (- (/ (magicl:nrows vL))))))
+                     (uR (reduce #'magicl:@
+                                 (list (magicl:from-diag evals-u)
                                        (magicl:conjugate-transpose uL)
                                        u1)))
-                     (vR (reduce #'magicl:multiply-complex-matrices
-                                 (list (magicl:diag (/ row-count 2)
-                                                    (/ row-count 2)
-                                                    evals-v)
+                     (vR (reduce #'magicl:@
+                                 (list (magicl:from-diag evals-v)
                                        (magicl:conjugate-transpose vL)
                                        v1)))
                      ;; some convenient shorthand for inst below

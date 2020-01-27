@@ -98,26 +98,26 @@
   ;;
   ;; NOTE: this logic extends just as well to SU(m) (x) SU(n) and could arguably
   ;;       be moved into MAGICL.
-  (let ((m (magicl:make-zero-matrix 4 4)))
+  (let ((m (magicl:zeros '(4 4) :type '(complex double-float))))
     (dotimes (block-i 2)
       (dotimes (block-j 2)
         (dotimes (inner-i 2)
           (dotimes (inner-j 2)
-            (setf (magicl:ref m (+ (* 2 block-j) block-i) (+ (* 2 inner-j) inner-i))
-                  (magicl:ref SU2x2 (+ (* 2 block-i) inner-i) (+ (* 2 block-j) inner-j)))))))
+            (setf (magicl:tref m (+ (* 2 block-j) block-i) (+ (* 2 inner-j) inner-i))
+                  (magicl:tref SU2x2 (+ (* 2 block-i) inner-i) (+ (* 2 block-j) inner-j)))))))
     (multiple-value-bind (u sigma vt) (magicl:svd m)
-      (let ((a (magicl:make-zero-matrix 2 2))
-            (b (magicl:make-zero-matrix 2 2)))
+      (let ((a (magicl:zeros '(2 2) :type '(complex double-float)))
+            (b (magicl:zeros '(2 2) :type '(complex double-float))))
         (dotimes (i 2)
           (dotimes (j 2)
-            (setf (magicl:ref a i j)
-                  (magicl:ref u (+ (* 2 j) i) 0))))
-        (setf a (magicl:scale (sqrt (magicl:ref sigma 0 0)) a))
+            (setf (magicl:tref a i j)
+                  (magicl:tref u (+ (* 2 j) i) 0))))
+        (setf a (magicl:scale a (sqrt (magicl:tref sigma 0 0))))
         (dotimes (i 2)
           (dotimes (j 2)
-            (setf (magicl:ref b i j)
-                  (magicl:ref vt 0 (+ (* 2 j) i)))))
-        (setf b (magicl:scale (sqrt (magicl:ref sigma 0 0)) b))
+            (setf (magicl:tref b i j)
+                  (magicl:tref vt 0 (+ (* 2 j) i)))))
+        (setf b (magicl:scale b (sqrt (magicl:tref sigma 0 0))))
         (values a b)))))
 
 ;; these are special matrices that conjugate SU(2) x SU(2) onto SO(4).
@@ -131,12 +131,13 @@
            (-sqrt2 (- sqrt2))
            (isqrt2 (complex 0 sqrt2))
            (-isqrt2 (complex 0 -sqrt2)))
-      (make-row-major-matrix 4 4
-                             (list sqrt2  isqrt2  0       0
-                                   0      0       isqrt2  sqrt2
-                                   0      0       isqrt2 -sqrt2
-                                   sqrt2 -isqrt2  0       0)))
-  :test #'matrix-equality
+      (magicl:from-list (list sqrt2  isqrt2  0       0
+                              0      0       isqrt2  sqrt2
+                              0      0       isqrt2 -sqrt2
+                              sqrt2 -isqrt2  0       0)
+                        '(4 4)
+                        :type '(complex double-float)))
+  :test #'magicl:=
   :documentation "This is an element of SU(4) that has two properties: (1) e-basis e-basis^T = - sigma_y^((x) 2) and (2) e-basis^dag SU(2)^((x) 2) e-basis = SO(4).")
 
 (a:define-constant
@@ -145,17 +146,18 @@
            (-sqrt2 (- sqrt2))
            (isqrt2 (complex 0 sqrt2))
            (-isqrt2 (complex 0 -sqrt2)))
-      (make-row-major-matrix 4 4
-                             (list sqrt2   0       0      sqrt2
-                                  -isqrt2  0       0      isqrt2
-                                   0      -isqrt2 -isqrt2 0
-                                   0       sqrt2  -sqrt2  0)))
-  :test #'matrix-equality
+      (magicl:from-list (list sqrt2   0       0      sqrt2
+                              -isqrt2  0       0      isqrt2
+                              0      -isqrt2 -isqrt2 0
+                              0       sqrt2  -sqrt2  0)
+                        '(4 4)
+                        :type '(complex double-float)))
+  :test #'magicl:=
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
 (defun ensure-positive-determinant (m)
   (if (double= -1d0 (magicl:det m))
-      (m* m (magicl:diag 4 4 (list -1 1 1 1)))
+      (magicl:@ m (magicl:from-diag (list -1 1 1 1) :type '(complex double-float)))
       m))
 
 (defconstant +diagonalizer-max-attempts+ 16
@@ -178,29 +180,29 @@
 (defun find-diagonalizer-in-e-basis (m num-attempts)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T. This function tries NUM-ATTEMPTS to randomly perturb the matrix in an equivalent form."
   (check-type m magicl:matrix)
-  (let* ((u (m* +edag-basis+ m +e-basis+))
-         (gammag (m* u (magicl:transpose u))))
+  (let* ((u (magicl:@ +edag-basis+ m +e-basis+))
+         (gammag (magicl:@ u (magicl:transpose u))))
     (loop :repeat num-attempts :do
       (let* ((rand-coeff (random 1.0d0))
-             (matrix (matrix-map (lambda (z)
+             (matrix (magicl:map (lambda (z)
                                    (+ (* rand-coeff       (realpart z))
                                       (* (- 1 rand-coeff) (imagpart z))))
                                  gammag))
              (evecs (ensure-positive-determinant
                      (orthonormalize-matrix
                       (nth-value 1 (magicl:eig matrix)))))
-             (evals (magicl:matrix-diagonal
-                     (m* (magicl:transpose evecs)
-                         gammag
-                         evecs)))
-             (v (m* evecs
-                    (magicl:diag (length evals) (length evals) evals)
-                    (magicl:transpose evecs))))
-        (when (matrix-every #'double= gammag v)
-          (assert (matrix-every #'double~
-                                (magicl:make-identity-matrix 4)
-                                (m* (magicl:transpose evecs)
-                                    evecs))
+             (evals (magicl:diag
+                     (magicl:@ (magicl:transpose evecs)
+                               gammag
+                               evecs)))
+             (v (magicl:@ evecs
+                          (magicl:from-diag evals)
+                          (magicl:transpose evecs))))
+        (when (magicl:every #'double= gammag v)
+          (assert (magicl:every #'double~
+                                (magicl:eye 4)
+                                (magicl:@ (magicl:transpose evecs)
+                                          evecs))
                   (evecs)
                   "Calculated eigenvectors were not found to be orthonormal.")
           (return-from find-diagonalizer-in-e-basis evecs)))))
@@ -222,19 +224,19 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
 
 (defun orthogonal-decomposition (m)
   "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
-  (let* ((m (magicl:scale (expt (magicl:det m) -1/4) m))
+  (let* ((m (magicl:scale m (expt (magicl:det m) -1/4)))
          (a (diagonalizer-in-e-basis m))
-         (db (m* (magicl:transpose a) +edag-basis+ m +e-basis+))
+         (db (magicl:@ (magicl:transpose a) +edag-basis+ m +e-basis+))
          (diag (loop :for j :below 4
                      :collect (let ((mag 0d0)
                                     phase)
                                 (dotimes (i 4)
-                                  (when (>= (abs (magicl:ref db j i)) mag)
-                                    (setf mag (abs (magicl:ref db j i)))
-                                    (setf phase (mod (phase (magicl:ref db j i)) pi))))
+                                  (when (>= (abs (magicl:tref db j i)) mag)
+                                    (setf mag (abs (magicl:tref db j i)))
+                                    (setf phase (mod (phase (magicl:tref db j i)) pi))))
                                 (cis phase))))
-         (d (magicl:diag 4 4 diag))
-         (b (m* (magicl:conjugate-transpose d) db)))
+         (d (magicl:from-diag diag))
+         (b (magicl:@ (magicl:conjugate-transpose d) db)))
     ;; it could be the case that b has negative determinant. if that's
     ;; the case, we'll swap two of its columns that live in the same
     ;; eigenspace.  We want to preserve the equation M = ADB and D's
@@ -243,27 +245,27 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
     ;; has determinant 1 and (2) DO is again diagonal. The second
     ;; condition excludes permutation matrices. - ecp
     (when (double~ -1d0 (magicl:det b))
-      (setf d (m* d (magicl:diag 4 4 (list -1 1 1 1))))
-      (setf b (m* (magicl:diag 4 4 (list -1 1 1 1)) b)))
+      (setf d (magicl:@ d (magicl:from-diag (list -1 1 1 1) :type '(complex double-float))))
+      (setf b (magicl:@ (magicl:from-diag (list -1 1 1 1) :type '(complex double-float)) b)))
     (when *compress-carefully*
       (assert (double~ 1d0 (magicl:det m)))
       (assert (double~ 1d0 (magicl:det a)))
       (assert (double~ 1d0 (magicl:det b)))
       (assert (double~ 1d0 (magicl:det d)))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (m* a (magicl:transpose a))))
-      (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                  (m* b (magicl:transpose b))))
-      (assert (matrix-equals-dwim (m* +edag-basis+ m +e-basis+)
-                                  (m* a d b))))
+      (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                  (magicl:@ a (magicl:transpose a))))
+      (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                  (magicl:@ b (magicl:transpose b))))
+      (assert (matrix-equals-dwim (magicl:@ +edag-basis+ m +e-basis+)
+                                  (magicl:@ a d b))))
     (values a d b)))
 
 (defun make-signed-permutation-matrix (sigma &optional (signs (list 1 1 1 1)))
-  (let ((o (magicl:make-zero-matrix 4 4)))
+  (let ((o (magicl:zeros '(4 4) :type '(complex double-float))))
     (loop :for i :below 4
           :for j := (1- (cl-permutation:perm-eval sigma (1+ i)))
           :for sign :in signs
-          :do (setf (magicl:ref o i j) sign))
+          :do (setf (magicl:tref o i j) sign))
     o))
 
 (defun match-matrix-to-an-e-basis-diagonalization (mprime a d b)
@@ -282,11 +284,11 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
   ;; we return the SU(2) (x) SU(2) versions of the triple products, as on the
   ;; last line, as well as the fidelity as a values triple.
   (multiple-value-bind (aprime dprime bprime)
-      (orthogonal-decomposition (magicl:scale (expt (magicl:det mprime) -1/4) mprime))
+      (orthogonal-decomposition (magicl:scale mprime (expt (magicl:det mprime) -1/4)))
     (let (o
           oT
-          (d-as-list (matrix-diagonal-entries d))
-          (dprime-as-list (matrix-diagonal-entries dprime))
+          (d-as-list (magicl:diag d))
+          (dprime-as-list (magicl:diag dprime))
           (max-fidelity 0d0))
       ;; maximize the trace over signed permutations
       (cl-permutation:doperms (sigma 4)
@@ -310,24 +312,24 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
                                                                 (list 1 1 1 1))))
               (setf oT (magicl:transpose (make-signed-permutation-matrix sigma signs)))))))
       (when *compress-carefully*
-        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                    (magicl:multiply-complex-matrices a (magicl:transpose a))))
-        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                    (magicl:multiply-complex-matrices b (magicl:transpose b))))
-        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                    (magicl:multiply-complex-matrices aprime (magicl:transpose aprime))))
-        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                    (magicl:multiply-complex-matrices bprime (magicl:transpose bprime))))
-        (assert (matrix-equals-dwim (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
-                                    (magicl:multiply-complex-matrices o (magicl:transpose o))))
+        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                    (magicl:@ a (magicl:transpose a))))
+        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                    (magicl:@ b (magicl:transpose b))))
+        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                    (magicl:@ aprime (magicl:transpose aprime))))
+        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                    (magicl:@ bprime (magicl:transpose bprime))))
+        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                    (magicl:@ o (magicl:transpose o))))
         (assert (double~ 1d0 (magicl:det a)))
         (assert (double~ 1d0 (magicl:det aprime)))
         (assert (double~ 1d0 (magicl:det b)))
         (assert (double~ 1d0 (magicl:det bprime)))
         (assert (double~ 1d0 (magicl:det o))))
-      (values (reduce #'magicl:multiply-complex-matrices
+      (values (reduce #'magicl:@
                       (list +e-basis+ a oT (magicl:transpose aprime) +edag-basis+))
-              (reduce #'magicl:multiply-complex-matrices
+              (reduce #'magicl:@
                       (list +e-basis+ (magicl:transpose bprime) o b +edag-basis+))
               max-fidelity))))
 
@@ -341,11 +343,11 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
      (trace-distance m1 m2) = \\int_{psi in P(V)} <psi| M1^* M2 |psi>.
 
 One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V rho V^*) that this is equal to the trace calculation that's actually used in this implementation."
-  (assert (= (magicl:matrix-rows m1) (magicl:matrix-cols m1)
-             (magicl:matrix-rows m2) (magicl:matrix-cols m2)))
-  (let* ((n (magicl:matrix-rows m1))
-         (prod (magicl:multiply-complex-matrices m1 (magicl:conjugate-transpose m2)))
-         (tr (matrix-trace prod)))
+  (assert (= (magicl:nrows m1) (magicl:ncols m1)
+             (magicl:nrows m2) (magicl:ncols m2)))
+  (let* ((n (magicl:nrows m1))
+         (prod (magicl:@ m1 (magicl:conjugate-transpose m2)))
+         (tr (magicl:trace prod)))
     (/ (+ n (abs (* tr tr)))
        (+ n (* n n)))))
 
@@ -370,7 +372,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
   "Extracts \"canonical coordinates\" (c1, c2, c3) from a diagonal matrix D which belong to the Weyl chamber satisfying
 
     pi/2 >= c1 >= c2 >= |c3|."
-  (assert (= 4 (magicl:matrix-rows d) (magicl:matrix-cols d)))
+  (assert (= 4 (magicl:nrows d) (magicl:ncols d)))
   (labels ((test (seq) (double>= pi/2 (first seq) (second seq) (abs (third seq))))
            (wrap-value (z)
              (let ((z (- (mod (+ z pi/2) pi) pi/2)))
@@ -383,7 +385,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
                  ((member pi/2 intermediate-value :test #'double=)
                   (sort (mapcar #'abs intermediate-value) #'>))
                  (t intermediate-value)))))
-    (let* ((angles (mapcar #'phase (matrix-diagonal-entries d)))
+    (let* ((angles (mapcar #'phase (magicl:diag d)))
            (first  (mod    (+ (third angles) (fourth angles)) pi))
            (second (mod (- (+ (third angles) (first angles))) pi))
            (third  (mod    (+ (third angles) (second angles)) pi))
@@ -402,12 +404,12 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 (defun build-canonical-gate-in-magic-basis (coord)
   "Given a canonical coordinate, construct the associated canonical gate at that coordinate."
   (destructuring-bind (c1 c2 c3) coord
-    (magicl:diag 4 4
-                 (mapcar (lambda (z) (cis (* 0.5d0 z)))
-                         (list (+    c1  (- c2)    c3)
-                               (+    c1     c2  (- c3))
-                               (+ (- c1) (- c2) (- c3))
-                               (+ (- c1)    c2     c3))))))
+    (magicl:from-diag
+     (mapcar (lambda (z) (cis (* 0.5d0 z)))
+             (list (+    c1  (- c2)    c3)
+                   (+    c1     c2  (- c3))
+                   (+ (- c1) (- c2) (- c3))
+                   (+ (- c1)    c2     c3))))))
 
 (defun sandwich-with-local-gates (center-circuit a d b q1 q0)
   "Given a circuit CENTER-CIRCUIT and an E-basis-diagonalized operator (A, D, B) (as returned by ORTHOGONAL-DECOMPOSITION), this routine computes an extension of CENTER-CIRCUIT by local gates which maximizes the trace fidelity with the product (E-BASIS)ADB(EDAG-BASIS).
@@ -475,9 +477,9 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                    (,q0 (qubit-index (second (application-arguments ,instr-name)))))
                (multiple-value-bind (complete-circuit fidelity)
                    (sandwich-with-local-gates ,circuit
-                                              (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                              (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
                                               (build-canonical-gate-in-magic-basis ,coord)
-                                              (magicl:diag 4 4 '(1d0 1d0 1d0 1d0))
+                                              (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
                                               ,q1 ,q0)
                  (finish-compiler (values complete-circuit fidelity))))))))))
 
@@ -584,25 +586,25 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
            ;; this magical formula was furnished to us by asking a CAS to compute
            ;; the trace of M' for a symbolic M and SIGMA, then solving
            ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)).
-           (let* ((sigma (atan (imagpart (+ (*  1d0 (magicl:ref m 1 3) (magicl:ref m 2 0))
-                                            (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 1))
-                                            (*  1d0 (magicl:ref m 1 1) (magicl:ref m 2 2))
-                                            (*  1d0 (magicl:ref m 1 0) (magicl:ref m 2 3))
-                                            (* -1d0 (magicl:ref m 0 3) (magicl:ref m 3 0))
-                                            (* -1d0 (magicl:ref m 0 2) (magicl:ref m 3 1))
-                                            (* -1d0 (magicl:ref m 0 1) (magicl:ref m 3 2))
-                                            (* -1d0 (magicl:ref m 0 0) (magicl:ref m 3 3))))
-                               (imagpart (+ (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 0))
-                                            (* -1d0 (magicl:ref m 1 3) (magicl:ref m 2 1))
-                                            (*  1d0 (magicl:ref m 1 0) (magicl:ref m 2 2))
-                                            (* -1d0 (magicl:ref m 1 1) (magicl:ref m 2 3))
-                                            (* -1d0 (magicl:ref m 0 2) (magicl:ref m 3 0))
-                                            (*  1d0 (magicl:ref m 0 3) (magicl:ref m 3 1))
-                                            (* -1d0 (magicl:ref m 0 0) (magicl:ref m 3 2))
-                                            (*  1d0 (magicl:ref m 0 1) (magicl:ref m 3 3)))))))
+           (let* ((sigma (atan (imagpart (+ (*  1d0 (magicl:tref m 1 3) (magicl:tref m 2 0))
+                                            (*  1d0 (magicl:tref m 1 2) (magicl:tref m 2 1))
+                                            (*  1d0 (magicl:tref m 1 1) (magicl:tref m 2 2))
+                                            (*  1d0 (magicl:tref m 1 0) (magicl:tref m 2 3))
+                                            (* -1d0 (magicl:tref m 0 3) (magicl:tref m 3 0))
+                                            (* -1d0 (magicl:tref m 0 2) (magicl:tref m 3 1))
+                                            (* -1d0 (magicl:tref m 0 1) (magicl:tref m 3 2))
+                                            (* -1d0 (magicl:tref m 0 0) (magicl:tref m 3 3))))
+                               (imagpart (+ (*  1d0 (magicl:tref m 1 2) (magicl:tref m 2 0))
+                                            (* -1d0 (magicl:tref m 1 3) (magicl:tref m 2 1))
+                                            (*  1d0 (magicl:tref m 1 0) (magicl:tref m 2 2))
+                                            (* -1d0 (magicl:tref m 1 1) (magicl:tref m 2 3))
+                                            (* -1d0 (magicl:tref m 0 2) (magicl:tref m 3 0))
+                                            (*  1d0 (magicl:tref m 0 3) (magicl:tref m 3 1))
+                                            (* -1d0 (magicl:tref m 0 0) (magicl:tref m 3 2))
+                                            (*  1d0 (magicl:tref m 0 1) (magicl:tref m 3 3)))))))
              (values
               sigma
-              (reduce #'magicl:multiply-complex-matrices
+              (reduce #'magicl:@
                       (list
                        m
                        (su2-on-line 0 (gate-matrix (gate-definition-to-gate (lookup-standard-gate "RY")) sigma))
@@ -673,7 +675,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
     ((instr (_ _ q1 q0)))
   (handler-case
       (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
-             (m (magicl:scale (expt (magicl:det m) -1/4) m)))
+             (m (magicl:scale m (expt (magicl:det m) -1/4))))
         (multiple-value-bind (a d b) (orthogonal-decomposition m)
           (let ((canonical-coords (get-canonical-coords-from-diagonal d)))
             (destructuring-bind (b0 b1 center-circuit a0 a1)

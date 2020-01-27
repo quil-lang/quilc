@@ -5,23 +5,23 @@
 (in-package #:cl-quil-tests)
 
 (defun print-matrix (mat &optional (stream *standard-output*))
-  (dotimes (i (magicl:matrix-rows mat))
-    (dotimes (j (magicl:matrix-cols mat))
-      (let ((z (magicl:ref mat i j)))
+  (dotimes (i (magicl:nrows mat))
+    (dotimes (j (magicl:ncols mat))
+      (let ((z (magicl:tref mat i j)))
         (when (= j 0)
           (format stream "# "))
         (format stream "~6,3F+~6,3Fj" (realpart z) (imagpart z))
-        (when (= j (1- (magicl:matrix-cols mat)))
+        (when (= j (1- (magicl:ncols mat)))
           (format stream "~%")
           (format stream ", "))))))
 
 (defun rescale-matrix-against-reference (mat ref-mat)
   (magicl:scale
    (cond
-     ((> (abs (magicl:ref mat 0 0)) 1/32) (/ (magicl:ref ref-mat 0 0) (magicl:ref mat 0 0)))
-     ((> (abs (magicl:ref mat 1 0)) 1/32) (/ (magicl:ref ref-mat 1 0) (magicl:ref mat 1 0)))
-     ((> (abs (magicl:ref mat 2 0)) 1/32) (/ (magicl:ref ref-mat 2 0) (magicl:ref mat 2 0)))
-     ((> (abs (magicl:ref mat 3 0)) 1/32) (/ (magicl:ref ref-mat 3 0) (magicl:ref mat 3 0)))
+     ((> (abs (magicl:tref mat 0 0)) 1/32) (/ (magicl:tref ref-mat 0 0) (magicl:tref mat 0 0)))
+     ((> (abs (magicl:tref mat 1 0)) 1/32) (/ (magicl:tref ref-mat 1 0) (magicl:tref mat 1 0)))
+     ((> (abs (magicl:tref mat 2 0)) 1/32) (/ (magicl:tref ref-mat 2 0) (magicl:tref mat 2 0)))
+     ((> (abs (magicl:tref mat 3 0)) 1/32) (/ (magicl:tref ref-mat 3 0) (magicl:tref mat 3 0)))
      (t (error "Matrix has a degenerate column.")))
    mat))
 
@@ -393,10 +393,10 @@ EXPI(2.0) 0
 RZ(-2.0) 0"))
       (let* ((cpp (compiler-hook (parse-quil prog-text) chip))
              (m (parsed-program-to-logical-matrix cpp)))
-        (is (quil::double= 1d0 (abs (magicl:ref m 0 0))))
-        (loop :for j :below (magicl:matrix-rows m)
-              :do (is (quil::double= (magicl:ref m 0 0)
-                                     (magicl:ref m j j))))))))
+        (is (quil::double= 1d0 (abs (magicl:tref m 0 0))))
+        (loop :for j :below (magicl:nrows m)
+              :do (is (quil::double= (magicl:tref m 0 0)
+                                     (magicl:tref m j j))))))))
 
 (deftest test-parametric-simple-defexpi ()
   "Test that parametric compilation of a 1Q Pauli gate proceeds successfully. See gh-551."
@@ -423,7 +423,7 @@ f(t) 0")))
            (I (word->matrix "I"))
            (word-size 4)
            (word (random-pauli-word word-size))
-           (m (magicl:make-identity-matrix 1)))
+           (m (magicl:eye 1 :type '(complex double-float))))
       (loop :for char :across word
             :for p := (ecase char
                         (#\X X)
