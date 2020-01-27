@@ -107,9 +107,9 @@
             :for p := (random-pauli num-qubits)
             :for x := (1- (random 1.0d0))
             :for reference := (magicl-transcendental:expm
-                               (magicl:scale (* #c(0.0d0 -1.0d0) x)
-                                             (quil:parsed-program-to-logical-matrix
-                                              (pauli-to-parsed-program p))))
+                               (magicl:scale (quil:parsed-program-to-logical-matrix
+                                              (pauli-to-parsed-program p))
+                                             (* #c(0.0d0 -1.0d0) x)))
             :for actual := (quil:parsed-program-to-logical-matrix
                             (quil::raw-quil-to-unresolved-program (exp-pauli p x)))
             :unless (let ((c (cl-quil.clifford::pauli-components p)))

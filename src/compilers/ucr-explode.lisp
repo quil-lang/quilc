@@ -278,8 +278,7 @@
   (check-type n integer)
   (let* ((mat-size (expt 2 n))
          (operating-vector (make-array mat-size :initial-element (/ mat-size))))
-    (make-row-major-matrix
-     mat-size mat-size
+    (magicl:from-list
      (loop
        :for index :in (nconc (gray-code-toggles n) (list n))
        :append (progn
@@ -288,7 +287,8 @@
                        :when (logbitp (1- index) j)
                          :do (setf (aref operating-vector j)
                                    (- (aref operating-vector j))))
-                 (coerce operating-vector 'list))))))
+                 (coerce operating-vector 'list)))
+     (list mat-size mat-size))))
 
 #+#:pedagogical-purposes-only
 (defun ucr-explode-instr (instr)
@@ -308,7 +308,7 @@
          ((control-count (1- (length (application-arguments instr))))
           ;; compute the vector of deltas = M * alphas
           (matrix-deltas
-            (magicl:multiply-complex-matrices
+            (magicl:@
              ;; where M is the "Gray code difference matrix"
              (gray-code-difference-matrix control-count)
              ;; and we load alpha into a magicl matrix
@@ -317,8 +317,8 @@
               (mapcar 'constant-value (application-parameters instr)))))
           ;; finally, we read deltas out of their magicl matrix.
           (deltas
-            (loop :for i :below (magicl:matrix-rows matrix-deltas)
-                  :collect (realpart (magicl:ref matrix-deltas i 0)))))
+            (loop :for i :below (magicl:nrows matrix-deltas)
+                  :collect (realpart (magicl:tref matrix-deltas i 0)))))
        ;; for each delta...
        (nreverse
         (mapcan (lambda (control-qubit delta)

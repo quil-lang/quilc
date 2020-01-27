@@ -207,11 +207,12 @@
             (give-up-compilation))))
       
       ;; instantiate the Hamiltonian
-      (let ((H (magicl:make-zero-matrix dimension dimension)))
+      (let ((H (magicl:zeros (list dimension dimension) :type '(complex double-float))))
         (dolist (term terms)
-          (setf H (m+ H (pauli-term->matrix term arguments (list 1d0) parameters))))
+          (setf H (magicl:.+ H (pauli-term->matrix term arguments (list 1d0) parameters))))
         ;; orthogonally diagonalize it: H = O D O^T
-        (multiple-value-bind (diagonal O) (magicl:hermitian-eig H)
+        ;; TODO: change to HERMITIAN-EIG
+        (multiple-value-bind (diagonal O) (magicl:eig H)
           ;; convert diagonal into a sum of Z paulis
           (let ((pauli-prefactors (make-array dimension :initial-element 0d0))
                 terms diagonal-gate)

@@ -65,17 +65,17 @@
 
 (defun factorize (p diagonal-test anti-diagonal-test pauli-string)
   "Given a square matrix P of even dimension, and functions DIAGONAL-TEST and ANTI-DIAGONAL-TEST, evaluate DIAGONAL-TEST elementwise on the top left and bottom right submatrices of P, and ANTI-DIAGONAL-TEST elementwise on the top right and bottom left submatrices. If both evaluate to true, return PAULI-STRING, else NIL."
-  (let ((m (magicl:matrix-rows p))
-        (n (magicl:matrix-cols p)))
+  (let ((m (magicl:nrows p))
+        (n (magicl:ncols p)))
     (if
      (loop :for i :below (/ m 2)
            :always (loop :for j :below (/ n 2)
                          :always (and (funcall diagonal-test
-                                               (magicl:ref p i j)
-                                               (magicl:ref p (+ i (/ m 2)) (+ j (/ n 2))))
+                                               (magicl:tref p i j)
+                                               (magicl:tref p (+ i (/ m 2)) (+ j (/ n 2))))
                                       (funcall anti-diagonal-test
-                                               (magicl:ref p i (+ j (/ n 2)))
-                                               (magicl:ref p (+ i (/ m 2)) j)))))
+                                               (magicl:tref p i (+ j (/ n 2)))
+                                               (magicl:tref p (+ i (/ m 2)) j)))))
      pauli-string
      nil)))
 
@@ -142,14 +142,14 @@
 (defun pauli-matrix-p (p)
   "Returns two strings. The first is a string representation of the phase of P, assuming P is a Pauli matrix, which will be a fourth root of unity. The second return value is a string representation of P as a tensor product of single qubit Pauli operators. If P is not a Pauli operator, then the second value will be NIL."
   (check-type p magicl:matrix)
-  (let* ((m (magicl:matrix-rows p))
-         (n (magicl:matrix-cols p))
+  (let* ((m (magicl:nrows p))
+         (n (magicl:ncols p))
          (pauli-checks (mapcar (lambda (factor) (funcall factor p))
                                '(factor-I factor-Z factor-X factor-Y)))
-         (pauli-phases (list (magicl:ref p 0 0)
-                             (magicl:ref p 0 0)
-                             (magicl:ref p 0 1)
-                             (* #C(0 1) (magicl:ref p 0 1))))
+         (pauli-phases (list (magicl:tref p 0 0)
+                             (magicl:tref p 0 0)
+                             (magicl:tref p 0 1)
+                             (* #C(0 1) (magicl:tref p 0 1))))
          (pauli-and-phase (find-if #'car (mapcar #'list pauli-checks pauli-phases)))
          (pauli (first pauli-and-phase))
          (phase (second pauli-and-phase)))
@@ -161,11 +161,11 @@
            NIL))
       ((or (factor-I p) (factor-Z p))
        (multiple-value-bind (coeff next-pauli)
-           (pauli-matrix-p (magicl::slice p 0 (/ m 2) 0 (/ n 2)))
+           (pauli-matrix-p (magicl::slice p '(0 0) (list (/ m 2) (/ n 2))))
          (values coeff (concatenate-or-nil pauli next-pauli))))
       ((or (factor-Y p) (factor-X p))
        (multiple-value-bind (coeff next-pauli)
-           (pauli-matrix-p (magicl::slice p (/ m 2) m 0 (/ n 2)))
+           (pauli-matrix-p (magicl::slice p (list (/ m 2) 0) (list m (/ n 2))))
          (values (phase-to-string (* (string-to-phase coeff)
                                      (if (factor-Y p) #C(0 -1) 1)))
                  (concatenate-or-nil pauli next-pauli))))
@@ -178,15 +178,15 @@
     "Return a list of the n qubit pauli basis matrices. Note that this is the basis for group action, consisting of strings with one X or Z, not the basis for the vector space of complex matrices."
     (or (gethash n memo-table)
         (setf (gethash n memo-table)
-              (let ((X   (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
-                    (Z   (magicl:make-complex-matrix 2 2 '(1 0 0 -1))))
+              (let ((X   (magicl:from-list '(0 1 1 0) '(2 2) :type '(complex double-float)))
+                    (Z   (magicl:from-list '(1 0 0 -1) '(2 2) :type '(complex double-float))))
                 (loop :for i :below n
                       :collect (quil::kq-gate-on-lines X n `(,i))
                       :collect (quil::kq-gate-on-lines Z n `(,i))))))))
 
 (defun matrix-to-clifford (gate)
   "Convert a matrix GATE into a CLIFFORD object."
-  (let ((num-qubits (quil:ilog2 (magicl:matrix-cols gate))))
+  (let ((num-qubits (quil:ilog2 (magicl:ncols gate))))
     (make-clifford
      :num-qubits num-qubits
      :basis-map (make-array
@@ -196,7 +196,7 @@
                        :collect
                        (multiple-value-bind (phase conj)
                            (pauli-matrix-p
-                            (reduce #'magicl:multiply-complex-matrices
+                            (reduce #'magicl:@
                                     (list gate
                                           pauli
                                           (magicl:conjugate-transpose gate))))
@@ -251,7 +251,8 @@
 (defun clifford-to-matrix (cliff)
   "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
   (let* ((n (num-qubits cliff))
-         (mat (magicl:make-zero-matrix (expt 2 n) (expt 2 n)))
+         (mat (magicl:zeros (list (expt 2 n) (expt 2 n))
+                            :type '(complex double-float)))
          (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
          (zero-image-tab (make-tableau-zero-state n))
          (pauli-map (clifford-basis-map cliff)))
@@ -260,7 +261,7 @@
     (setf scratch-wf (tableau-wavefunction zero-image-tab))
     ;; Write the image to the first column of MAT
     (dotimes (row (expt 2 n))
-      (setf (magicl:ref mat row 0) (aref scratch-wf row)))
+      (setf (magicl:tref mat row 0) (aref scratch-wf row)))
     ;; For each subsequent basis state,
     (dotimes (curr-state (1- (expt 2 n)))
       ;; Apply the appropriate paulis to find its image under CLIFF
@@ -275,7 +276,7 @@
                   :do (apply-pauli-to-wavefunction 1 (aref (pauli-components (aref pauli-map (* 2 i))) p) (1- p) scratch-wf))))
         ;; Write the basis state's image to the corresponding column of MAT
         (dotimes (row (expt 2 n))
-          (setf (magicl:ref mat row (1+ curr-state)) (aref scratch-wf row)))))
+          (setf (magicl:tref mat row (1+ curr-state)) (aref scratch-wf row)))))
     mat))
 
 (defun extract-cliffords (parsed-quil)

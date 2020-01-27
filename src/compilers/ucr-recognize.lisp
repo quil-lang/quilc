@@ -13,13 +13,13 @@
                    (unknown-gate-parameter (c)
                      (declare (ignore c))
                      (give-up-compilation))))
-         (dimension (magicl:matrix-rows matrix))
+         (dimension (magicl:nrows matrix))
          (log-dimension (length (application-arguments instr)))
          angles)
     (cond
       ;; are we a diagonal matrix?
-      ((loop :for i :below (magicl:matrix-rows matrix)
-             :always (double= 1d0 (abs (magicl:ref matrix i i))))
+      ((loop :for i :below (magicl:nrows matrix)
+             :always (double= 1d0 (abs (magicl:tref matrix i i))))
        ;; if so, we are potentially of the form UCRZ.  the extra check
        ;; we need to do is to see if the matrix has the required extra
        ;; symmetry: there has to be a fixed target bit d about which
@@ -38,9 +38,9 @@
                                             (i (+ (mod jp (ash 1 d))
                                                   (ash (- jp (mod jp (ash 1 d))) -1))))
                                        (setf (nth i angles)
-                                             (constant (* -2 (phase (magicl:ref matrix jp jp)))))
-                                       (double= (magicl:ref matrix jp jp)
-                                                (conjugate (magicl:ref matrix jpp jpp)))))
+                                             (constant (* -2 (phase (magicl:tref matrix jp jp)))))
+                                       (double= (magicl:tref matrix jp jp)
+                                                (conjugate (magicl:tref matrix jpp jpp)))))
                    (inst* (repeatedly-fork (named-operator "RZ") (1- log-dimension))
                           angles
                           (append (subseq (application-arguments instr)
@@ -67,10 +67,10 @@
                  (when (loop :for j :below dimension
                              :always (let* ((jp  (dpb 0 (byte 1 d) j))
                                             (jpp (dpb 1 (byte 1 d) j))
-                                            (m-jp-jp (magicl:ref matrix jp jp))
-                                            (m-jpp-jp (magicl:ref matrix jpp jp))
-                                            (m-jp-jpp (magicl:ref matrix jp jpp))
-                                            (m-jpp-jpp (magicl:ref matrix jpp jpp))
+                                            (m-jp-jp (magicl:tref matrix jp jp))
+                                            (m-jpp-jp (magicl:tref matrix jpp jp))
+                                            (m-jp-jpp (magicl:tref matrix jp jpp))
+                                            (m-jpp-jpp (magicl:tref matrix jpp jpp))
                                             (i (+ (mod jp (ash 1 d))
                                                   (ash (- jp (mod jp (ash 1 d))) -1))))
                                        (setf (nth i angles)

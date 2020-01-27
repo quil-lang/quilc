@@ -43,18 +43,20 @@
          (target-wf (vector-scale
                      (/ (norm (coerce (state-prep-application-target-wf instr) 'list)))
                      (coerce (state-prep-application-target-wf instr) 'list)))
-         (matrix-target (magicl:make-complex-matrix
-                         2 2
-                         (append target-wf
-                                 (list (- (conjugate (second target-wf)))
-                                       (conjugate (first target-wf))))))
-         (matrix-source (magicl:make-complex-matrix
-                         2 2
-                         (list (conjugate (first source-wf))
-                               (- (second source-wf))
-                               (conjugate (second source-wf))
-                               (first source-wf)))))
-    (inst "STATE-1Q" (m* matrix-target matrix-source) q)))
+         (matrix-target (magicl:from-list (append target-wf
+                                                  (list (- (conjugate (second target-wf)))
+                                                        (conjugate (first target-wf))))
+                                          '(2 2)
+                                          :type '(complex double-float)
+                                          :input-layout :column-major))
+         (matrix-source (magicl:from-list (list (conjugate (first source-wf))
+                                                (- (second source-wf))
+                                                (conjugate (second source-wf))
+                                                (first source-wf))
+                                          '(2 2)
+                                          :type '(complex double-float)
+                                          :input-layout :column-major)))
+    (inst "STATE-1Q" (magicl:@ matrix-target matrix-source) q)))
 
 
 ;; setting up 2Q state preparation requires some helper functions
@@ -97,11 +99,11 @@
 
 (defun givens-rotation (d i j theta)
   "Construct a DxD matrix representing a counterclockwise rotation by angle THETA in the (I,J) plane."
-  (let ((m (magicl:make-identity-matrix d)))
-    (setf (magicl:ref m i i) (cos theta)
-          (magicl:ref m i j) (- (sin theta))
-          (magicl:ref m j i) (sin theta)
-          (magicl:ref m j j) (cos theta))
+  (let ((m (magicl:eye d :type '(complex double-float))))
+    (setf (magicl:tref m i i) (cos theta)
+          (magicl:tref m i j) (- (sin theta))
+          (magicl:tref m j i) (sin theta)
+          (magicl:tref m j j) (cos theta))
     m))
 
 
@@ -115,7 +117,7 @@
 ;;; if the Perdomo compiler is brought back into action.
 (defun canonicalize-wf (vector)
   "Calculates a special-orthogonal MATRIX that moves a unit-length VECTOR in C^4 into the form V = (a+bi c 0 0).  Returns (VALUES MATRIX V)."
-  (let ((matrix (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0)))
+  (let ((matrix (magicl:from-diag (list 1d0 1d0 1d0 1d0) :type '(complex double-float)))
         (v (copy-seq vector)))
     (symbol-macrolet ((v0 (aref v 0))
                       (v1 (aref v 1))
@@ -123,7 +125,7 @@
                       (v3 (aref v 3)))
       (flet ((apply-rotation (i j theta)
                (let ((m (givens-rotation 4 i j theta)))
-                 (setf matrix (m* m matrix))
+                 (setf matrix (magicl:@ m matrix))
                  (setf v (nondestructively-apply-matrix-to-vector matrix vector)))))
         ;; start by moving all of the imaginary components into the 0th position.
         (unless (double= 0d0 (imagpart v1))
@@ -182,7 +184,7 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
       ;; write t^dag s as a member of SU(2) x SU(2)
       (multiple-value-bind (c1 c0)
           (convert-su4-to-su2x2
-           (m* +e-basis+
+           (magicl:@ +e-basis+
                (magicl:conjugate-transpose target-matrix)
                source-matrix
                +edag-basis+))
@@ -197,12 +199,14 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
             :where (typep instr 'state-prep-application)))
   "Exact, optimal compiler for STATE-PREP-APPLICATION instances that target a pair of qubits."
   (flet ((orthogonal-vector (v)
-           (make-row-major-matrix 2 1 (list (- (conjugate (magicl:ref v 1 0)))
-                                            (conjugate (magicl:ref v 0 0)))))
+           (magicl:from-list (list (- (conjugate (magicl:tref v 1 0)))
+                                   (conjugate (magicl:tref v 0 0)))
+                             '(2 1)
+                             :type '(complex double-float)))
          (normalize-vector (v)
-           (let ((norm (sqrt (+ (expt (abs (magicl:ref v 0 0)) 2)
-                                (expt (abs (magicl:ref v 1 0)) 2)))))
-             (if (double= 0d0 norm) v (magicl:scale (/ norm) v))))
+           (let ((norm (sqrt (+ (expt (abs (magicl:tref v 0 0)) 2)
+                                (expt (abs (magicl:tref v 1 0)) 2)))))
+             (if (double= 0d0 norm) v (magicl:scale v (/ norm)))))
          ;; this dodges a numerical stability bullet: the bad taylor expansion of
          ;; arcsin at 1 makes input error on the order of e-17 blow up to output
          ;; error on the order of e-8, which exceeds +double-comparison-threshold-strict+.
@@ -213,10 +217,14 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
            (if (double= x 1d0)
                pi/2
                (asin x))))
-    (let* ((A (make-row-major-matrix 2 2 (coerce (state-prep-application-source-wf instr) 'list)))
-           (B (make-row-major-matrix 2 2 (coerce (state-prep-application-target-wf instr) 'list)))
-           (mA (m* (magicl:conjugate-transpose A) A))
-           (mB (m* (magicl:conjugate-transpose B) B)))
+    (let* ((A (magicl:from-list (coerce (state-prep-application-source-wf instr) 'list)
+                                '(2 2)
+                                :type '(complex double-float)))
+           (B (magicl:from-list (coerce (state-prep-application-target-wf instr) 'list)
+                                '(2 2)
+                                :type '(complex double-float)))
+           (mA (magicl:@ (magicl:conjugate-transpose A) A))
+           (mB (magicl:@ (magicl:conjugate-transpose B) B)))
       ;; this routine works requires the source to be entangled.
       (cond
         ;; if the source is unentangled and the target is entangled...
@@ -295,32 +303,44 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
         (t
          (multiple-value-bind (lambdas a-vectors) (magicl:eig mA)
            (multiple-value-bind (deltas x-vectors) (magicl:eig mB)
-             (let* ((a-vector (make-row-major-matrix 2 1 (list (magicl:ref a-vectors 0 1)
-                                                               (magicl:ref a-vectors 1 1))))
-                    (x-vector (make-row-major-matrix 2 1 (list (magicl:ref x-vectors 0 1)
-                                                               (magicl:ref x-vectors 1 1))))
+             (let* ((a-vector (magicl:from-list (list (magicl:tref a-vectors 0 1)
+                                                      (magicl:tref a-vectors 1 1))
+                                                '(2 1)
+                                                :type '(complex double-float)))
+                    (x-vector (magicl:from-list (list (magicl:tref x-vectors 0 1)
+                                                      (magicl:tref x-vectors 1 1))
+                                                '(2 1)
+                                                :type '(complex double-float)))
                     (b-vector (orthogonal-vector a-vector))
                     (y-vector (orthogonal-vector x-vector))
-                    (c (normalize-vector (m* A a-vector)))
-                    (d (normalize-vector (m* A b-vector)))
-                    (z (normalize-vector (m* B x-vector)))
-                    (u (normalize-vector (m* B y-vector)))
+                    (c (normalize-vector (magicl:@ A a-vector)))
+                    (d (normalize-vector (magicl:@ A b-vector)))
+                    (z (normalize-vector (magicl:@ B x-vector)))
+                    (u (normalize-vector (magicl:@ B y-vector)))
                     (theta1 (- pi/2 (phase (+ (sqrt (first lambdas)) (* #C(0 1) (sqrt (second lambdas)))))))
                     (theta2 (- pi/2 (phase (+ (sqrt (first deltas)) (* #C(0 1) (sqrt (second deltas)))))))
-                    (U1 (make-row-major-matrix 2 2 (list (magicl:ref c 0 0) (magicl:ref d 0 0)
-                                                         (magicl:ref c 1 0) (magicl:ref d 1 0))))
-                    (U2 (make-row-major-matrix 2 2 (list (magicl:ref z 0 0) (magicl:ref u 0 0)
-                                                         (magicl:ref z 1 0) (magicl:ref u 1 0))))
-                    (V1 (make-row-major-matrix 2 2 (mapcar #'conjugate
-                                                           (list (magicl:ref a-vector 0 0) (magicl:ref b-vector 0 0)
-                                                                 (magicl:ref a-vector 1 0) (magicl:ref b-vector 1 0)))))
-                    (V2 (make-row-major-matrix 2 2 (mapcar #'conjugate
-                                                           (list (magicl:ref x-vector 0 0) (magicl:ref y-vector 0 0)
-                                                                 (magicl:ref x-vector 1 0) (magicl:ref y-vector 1 0))))))
-               (let ((L1 (m* U1
+                    (U1 (magicl:from-list (list (magicl:tref c 0 0) (magicl:tref d 0 0)
+                                                (magicl:tref c 1 0) (magicl:tref d 1 0))
+                                          '(2 2)
+                                          :type '(complex double-float)))
+                    (U2 (magicl:from-list (list (magicl:tref z 0 0) (magicl:tref u 0 0)
+                                                (magicl:tref z 1 0) (magicl:tref u 1 0))
+                                          '(2 2)
+                                          :type '(complex double-float)))
+                    (V1 (magicl:from-list (mapcar #'conjugate
+                                                  (list (magicl:tref a-vector 0 0) (magicl:tref b-vector 0 0)
+                                                        (magicl:tref a-vector 1 0) (magicl:tref b-vector 1 0)))
+                                          '(2 2)
+                                          :type '(complex double-float)))
+                    (V2 (magicl:from-list (mapcar #'conjugate
+                                                  (list (magicl:tref x-vector 0 0) (magicl:tref y-vector 0 0)
+                                                        (magicl:tref x-vector 1 0) (magicl:tref y-vector 1 0)))
+                                          '(2 2)
+                                          :type '(complex double-float))))
+               (let ((L1 (magicl:@ U1
                              (gate-matrix (build-gate "RY" (list (*  2 theta2)) 0))
                              (magicl:conjugate-transpose U1)))
-                     (L2 (m* U1
+                     (L2 (magicl:@ U1
                              (gate-matrix (build-gate "RY" (list (* -2 theta1)) 0))
                              (magicl:conjugate-transpose U1))))
                  ;; U1' L1 (x) V1'
@@ -426,7 +446,7 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
         ;; write t^dag s as a member of SU(2) x SU(2)
         (multiple-value-bind (c1 c0)
             (convert-su4-to-su2x2
-             (m* +e-basis+
+             (magicl:@ +e-basis+
                  (magicl:conjugate-transpose target-matrix)
                  source-matrix
                  +edag-basis+))
@@ -452,13 +472,10 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
     (setf phi (coerce-to-complex-double-vector phi)))
   (let* ((size-a (expt 2 num-a))
          (size-b (expt 2 num-b))
-         ;; tranpose here to make this row-major
-         (reshaped (magicl:transpose (magicl:make-matrix :rows size-a
-                                                         :cols size-b
-                                                         :data phi))))
+         (reshaped (magicl:from-array phi (list size-a size-b))))
     (multiple-value-bind (u d vt)
         (magicl:svd reshaped)
-      (values (coerce-to-complex-double-vector (magicl:matrix-diagonal d))
+      (values (coerce-to-complex-double-vector (magicl:diag d))
               u
               (magicl:transpose vt)))))
 

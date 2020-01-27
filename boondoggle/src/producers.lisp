@@ -136,9 +136,9 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                  (let ((gate-matrix (quil::random-special-unitary (expt 2 (1+ gate-order)))))
                    (quil::make-gate-definition gate-name
                                                nil
-                                               (loop :for i :below (magicl:matrix-cols gate-matrix)
-                                                     :nconc (loop :for j :below (magicl:matrix-rows gate-matrix)
-                                                                  :collect (magicl:ref gate-matrix j i)))))))
+                                               (loop :for i :below (magicl:ncols gate-matrix)
+                                                     :nconc (loop :for j :below (magicl:nrows gate-matrix)
+                                                                  :collect (magicl:tref gate-matrix j i)))))))
              (gate-parameters
                (unless random-gate-flag
                  (mapcar #'random (gate-set-record-parameter-bounds gate-record))))
