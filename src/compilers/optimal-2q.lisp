@@ -36,25 +36,25 @@ NOTE: I believe that even though both objects (the double-coset space and the sp
   ;; the trace of M' for a symbolic M and SIGMA, then solving
   ;;     0 = imagpart(tr) = imagpart(a cos(sigma) + b sin(sigma)) ,
   ;; where a and b work out to be these disgusting sums below.
-  (let* ((sigma (atan (imagpart (+ (*  1d0 (magicl:ref m 1 3) (magicl:ref m 2 0))
-                                   (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 1))
-                                   (*  1d0 (magicl:ref m 1 1) (magicl:ref m 2 2))
-                                   (*  1d0 (magicl:ref m 1 0) (magicl:ref m 2 3))
-                                   (* -1d0 (magicl:ref m 0 3) (magicl:ref m 3 0))
-                                   (* -1d0 (magicl:ref m 0 2) (magicl:ref m 3 1))
-                                   (* -1d0 (magicl:ref m 0 1) (magicl:ref m 3 2))
-                                   (* -1d0 (magicl:ref m 0 0) (magicl:ref m 3 3))))
-                      (imagpart (+ (*  1d0 (magicl:ref m 1 2) (magicl:ref m 2 0))
-                                   (* -1d0 (magicl:ref m 1 3) (magicl:ref m 2 1))
-                                   (*  1d0 (magicl:ref m 1 0) (magicl:ref m 2 2))
-                                   (* -1d0 (magicl:ref m 1 1) (magicl:ref m 2 3))
-                                   (* -1d0 (magicl:ref m 0 2) (magicl:ref m 3 0))
-                                   (*  1d0 (magicl:ref m 0 3) (magicl:ref m 3 1))
-                                   (* -1d0 (magicl:ref m 0 0) (magicl:ref m 3 2))
-                                   (*  1d0 (magicl:ref m 0 1) (magicl:ref m 3 3)))))))
+  (let* ((sigma (atan (imagpart (+ (*  1d0 (magicl:tref m 1 3) (magicl:tref m 2 0))
+                                   (*  1d0 (magicl:tref m 1 2) (magicl:tref m 2 1))
+                                   (*  1d0 (magicl:tref m 1 1) (magicl:tref m 2 2))
+                                   (*  1d0 (magicl:tref m 1 0) (magicl:tref m 2 3))
+                                   (* -1d0 (magicl:tref m 0 3) (magicl:tref m 3 0))
+                                   (* -1d0 (magicl:tref m 0 2) (magicl:tref m 3 1))
+                                   (* -1d0 (magicl:tref m 0 1) (magicl:tref m 3 2))
+                                   (* -1d0 (magicl:tref m 0 0) (magicl:tref m 3 3))))
+                      (imagpart (+ (*  1d0 (magicl:tref m 1 2) (magicl:tref m 2 0))
+                                   (* -1d0 (magicl:tref m 1 3) (magicl:tref m 2 1))
+                                   (*  1d0 (magicl:tref m 1 0) (magicl:tref m 2 2))
+                                   (* -1d0 (magicl:tref m 1 1) (magicl:tref m 2 3))
+                                   (* -1d0 (magicl:tref m 0 2) (magicl:tref m 3 0))
+                                   (*  1d0 (magicl:tref m 0 3) (magicl:tref m 3 1))
+                                   (* -1d0 (magicl:tref m 0 0) (magicl:tref m 3 2))
+                                   (*  1d0 (magicl:tref m 0 1) (magicl:tref m 3 3)))))))
     (values
      sigma
-     (reduce #'magicl:multiply-complex-matrices
+     (reduce #'magicl:@
              (list
               m
               (su2-on-line 0 (gate-matrix (gate-definition-to-gate (lookup-standard-gate "RY")) sigma))
@@ -85,7 +85,7 @@ a triple (A B C) such that the characteristic polynomial is given by 1
   "For an matrix M in SU(4) with decomposition M = O_1 D O_2 into orthogonal matrices O_1, O_2 and a diagonal matrix D, turns the VALUES pair (ANGLES, EVALS), where ANGLES is sorted descending in (-pi, pi], EVALS_j = exp(i * ANGLES_j), and D is diagonal with EVALS as diagonal entries."
   (when (minusp (realpart (magicl:det m)))
     (setf m (magicl:scale (sqrt #C(0 1)) m)))
-  (let* ((ggt (reduce 'magicl:multiply-complex-matrices
+  (let* ((ggt (reduce 'magicl:@
                       (list m
                             +e-basis+
                             (magicl:transpose +e-basis+)
@@ -398,7 +398,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
                                                   :relabeling (standard-qubit-relabeler
                                                                (mapcar #'qubit-index
                                                                        (application-arguments instr))))))
-                 (unless (= 4 (magicl:matrix-rows temp))
+                 (unless (= 4 (magicl:nrows temp))
                    (setf temp (kron-matrix-up temp 2)))
                  (let ((det-factor (expt (magicl:det temp) -1/4)))
                    (unless (double= 1d0 det-factor)
@@ -417,7 +417,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
              ;; the middle equality and carrying the terms to the left, we get
              ;;     (v^dag b a^t u) (v^dag b a^t u)^t = I ,
              ;; so that c = v^dag b a^t u is in SO(4) <= SU(4)
-             (c (reduce 'magicl:multiply-complex-matrices
+             (c (reduce 'magicl:@
                         (list           ; v^dag = (edag . bm . e)^dag
                                         ;       = edag . bm^dag . e
                          +edag-basis+ (magicl:conjugate-transpose bare-matrix) +e-basis+
@@ -432,7 +432,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
         (multiple-value-bind
               (atb1 atb0)
             (convert-su4-to-su2x2
-             (reduce 'magicl:multiply-complex-matrices
+             (reduce 'magicl:@
                      (list +e-basis+
                            a
                            (magicl:transpose b)
@@ -440,7 +440,7 @@ The optional argument INSTR is used to canonicalize the qubit indices of the ins
           (multiple-value-bind
                 (c1 c0)
               (convert-su4-to-su2x2
-               (reduce 'magicl:multiply-complex-matrices
+               (reduce 'magicl:@
                        (list +e-basis+
                              c
                              +edag-basis+)))

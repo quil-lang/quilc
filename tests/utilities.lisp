@@ -49,11 +49,11 @@ is still being signalled."
 If M and U are equal under TEST, return NIL."
   (check-type m magicl:matrix)
   (check-type u magicl:matrix)
-  (assert (and (= (magicl:matrix-rows m) (magicl:matrix-rows u))
-               (= (magicl:matrix-cols m) (magicl:matrix-cols u))))
-  (dotimes (r (magicl:matrix-rows m))
-    (dotimes (c (magicl:matrix-cols m))
-      (unless (funcall test (magicl:ref m r c) (magicl:ref u r c))
+  (assert (and (= (magicl:nrows m) (magicl:nrows u))
+               (= (magicl:ncols m) (magicl:ncols u))))
+  (dotimes (r (magicl:nrows m))
+    (dotimes (c (magicl:ncols m))
+      (unless (funcall test (magicl:tref m r c) (magicl:tref u r c))
         (return-from matrix-mismatch (list r c))))))
 
 (defun %print-matrix-mismatch (m u &key (test #'quil::double~)
@@ -87,14 +87,14 @@ For example,
         (%print-matrix-mismatch m u :stream stream :test test))))
 
 (defun fiasco-assert-matrices-are-equal (m u)
-  (is (= (magicl:matrix-rows u) (magicl:matrix-rows m)))
-  (is (= (magicl:matrix-cols u) (magicl:matrix-cols m)))
+  (is (= (magicl:nrows u) (magicl:nrows m)))
+  (is (= (magicl:ncols u) (magicl:ncols m)))
   (setf u (quil::scale-out-matrix-phases u m))
   (flet ((test~ (a b)
            (< (abs (- a b)) 0.01)))
-    (is (loop :for i :below (magicl:matrix-rows m) :always
-          (loop :for j :below (magicl:matrix-cols m) :always
-            (test~ (magicl:ref m i j) (magicl:ref u i j))))
+    (is (loop :for i :below (magicl:nrows m) :always
+          (loop :for j :below (magicl:ncols m) :always
+            (test~ (magicl:tref m i j) (magicl:tref u i j))))
         ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion succeeds.
         ;; Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH when/if the
         ;; above assertion actually fails.

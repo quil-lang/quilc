@@ -56,19 +56,19 @@
     (is (equalp (serialize-clifford-sequence cliff-id2) (list (list "IX" "IZ" "XI" "ZI"))))))
 
 (defun matrix-equalp (a b)
-  (let ((ma (magicl:matrix-rows a))
-        (na (magicl:matrix-cols a))
-        (mb (magicl:matrix-rows b))
-        (nb (magicl:matrix-cols b)))
+  (let ((ma (magicl:nrows a))
+        (na (magicl:ncols a))
+        (mb (magicl:nrows b))
+        (nb (magicl:ncols b)))
     (and (= ma mb)
          (= na nb)
          (loop :for i :below ma
                :always (loop :for j :below na
-                             :always (quil::double= (magicl:ref a i j) (magicl:ref b i j)))))))
+                             :always (quil::double= (magicl:tref a i j) (magicl:tref b i j)))))))
 
 (deftest test-n-qubit-pauli-basis-matrices ()
-  (let* ((x (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
-         (z (magicl:make-complex-matrix 2 2 '(1 0 0 -1)))
+  (let* ((x (magicl:from-list '(0 1 1 0) '(2 2) :type '(complex double-float)))
+         (z (magicl:from-list '(1 0 0 -1) '(2 2) :type '(complex double-float)))
          (paulis1 (list x z))
          (generated-paulis1 (n-qubit-pauli-basis-matrices 1))
          (generated-paulis2 (n-qubit-pauli-basis-matrices 2)))
@@ -80,24 +80,24 @@
 
 
 (deftest test-pauli-matrix-p ()
-  (let* ((eye (magicl:make-identity-matrix 2))
-         (x (magicl:make-complex-matrix 2 2 '(0 1 1 0)))
-         (y (magicl:make-complex-matrix 2 2 '(0 #C(0 -1) #C(0 1) 0)))
-         (z (magicl:make-complex-matrix 2 2 '(1 0 0 -1)))
+  (let* ((eye (magicl:eye 2 :type '(complex double-float)))
+         (x (magicl:from-list '(0 1 1 0) '(2 2) :type '(complex double-float)))
+         (y (magicl:from-list '(0 #C(0 1) #C(0 -1) 0) '(2 2) :type '(complex double-float)))
+         (z (magicl:from-list '(1 0 0 -1) '(2 2) :type '(complex double-float)))
          (paulis (list eye x y z))
          (phases (loop :for i :below 4 :collect (expt #C(0 1) i))))
     ;; Make sure the 1 and 2 qubit pauli groups are accepted.
     (is (loop :for pauli :in paulis
               :always (loop :for phase :in phases
-                            :always (pauli-matrix-p (magicl:scale phase pauli)))))
+                            :always (pauli-matrix-p (magicl:scale pauli phase)))))
     (is (loop :for pauli1 :in paulis
               :always (loop :for pauli2 :in paulis
                             :always (loop :for phase :in phases
-                                          :always (pauli-matrix-p (magicl:scale phase (magicl:kron pauli1 pauli2)))))))
-    (is (not (pauli-matrix-p (magicl:make-complex-matrix 2 2 '(0 1 1 1)))))
+                                          :always (pauli-matrix-p (magicl:scale (magicl:kron pauli1 pauli2) phase))))))
+    (is (not (pauli-matrix-p (magicl:from-list '(0 1 1 1) '(2 2) :type '(complex double-float)))))
     (is (not (loop :for pauli :in paulis
                    :always (loop :for phase :in phases
-                                 :always (pauli-matrix-p (magicl:scale (* 2 phase) pauli))))))))
+                                 :always (pauli-matrix-p (magicl:scale pauli (* 2 phase)))))))))
 
 (defmacro time-it (&body body)
   (let ((start (gensym "START"))

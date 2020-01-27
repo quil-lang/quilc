@@ -1032,7 +1032,7 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                parameters))))
          (arg-count (length arguments))
          (size (expt 2 arg-count))
-         (m (magicl:make-zero-matrix size size)))
+         (m (magicl:zeros (list size size) :type '(complex double-float))))
     (dotimes (col size)
       (let ((row col)
             (entry prefactor))
@@ -1051,7 +1051,7 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                      (setf entry (* entry (if (zerop row-toggle) 1 -1))))
                     (#\I
                      nil)))
-        (incf (magicl:ref m row col) entry)))
+        (incf (magicl:tref m row col) entry)))
     m))
 
 (defun parse-gate-entries-as-permutation (body-lines name &key lexical-context)

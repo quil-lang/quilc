@@ -29,41 +29,35 @@
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
   (check-type y magicl:matrix)
-  (and (= (magicl:matrix-rows x) (magicl:matrix-rows y))
-       (= (magicl:matrix-cols x) (magicl:matrix-cols y))
-       (loop :for j :below (magicl:matrix-rows x)
-             :always (double~ (magicl:ref x j 0) (magicl:ref y j 0)))))
+  (and (= (magicl:nrows x) (magicl:nrows y))
+       (= (magicl:ncols x) (magicl:ncols y))
+       (loop :for j :below (magicl:nrows x)
+             :always (double~ (magicl:tref x j 0) (magicl:tref y j 0)))))
 
 (defun matrix-equality (x y)
-  (check-type x magicl:matrix)
-  (check-type y magicl:matrix)
-  (and (= (magicl:matrix-rows x) (magicl:matrix-rows y))
-       (= (magicl:matrix-cols x) (magicl:matrix-cols y))
-       (loop :for i :below (magicl:matrix-rows x)
-             :always (loop :for j :below (magicl:matrix-cols x)
-                           :always (double~ (magicl:ref x i j) (magicl:ref y i j))))))
+  (magicl:= x y +double-comparison-threshold-loose+))
 
 (defun scale-out-matrix-phases (mat ref-mat)
   "Attempts to scale out relative phase shifts between the first columns of MAT and REF-MAT."
   (let ((rescale-value 1d0)
         (goodness-value 0d0))
-    (dotimes (j (magicl:matrix-rows mat))
-      (assert (double~ (abs (magicl:ref mat j 0)) (abs (magicl:ref ref-mat j 0)))
-              nil "Matrices do not lie in the same projective class.")
-      (when (> (abs (magicl:ref mat j 0)) goodness-value)
-        (setf goodness-value (abs (magicl:ref mat j 0)))
-        (setf rescale-value (/ (magicl:ref ref-mat j 0) (magicl:ref mat j 0)))))
-    (magicl:scale rescale-value mat)))
+    (dotimes (j (magicl:nrows mat))
+      (assert (double~ (abs (magicl:tref mat j 0)) (abs (magicl:tref ref-mat j 0)))
+              nil "Matrices do not lie in the same projective class. ~% ~a ~% ~a" mat ref-mat)
+      (when (> (abs (magicl:tref mat j 0)) goodness-value)
+        (setf goodness-value (abs (magicl:tref mat j 0)))
+        (setf rescale-value (/ (magicl:tref ref-mat j 0) (magicl:tref mat j 0)))))
+    (magicl:scale mat rescale-value)))
 
 (defun convert-defgate-to-magicl (matrix)
   "Converts a DEFGATE matrix (a row-major LISP single list) to a MAGIC-L special unitary matrix."
   (check-type matrix list)
   (let*
       ((n (round (sqrt (length matrix))))
-       (m (magicl:make-complex-matrix n n
-                                      (loop :for i :below n :nconc
-                                        (loop :for j :below n :collect
-                                          (nth (+ i (* n j)) matrix))))))
+       (m (magicl:from-list
+           matrix
+           (list n n)
+           :type '(complex double-float))))
     (magicl:scale (expt (magicl:det m) (/ -1 n)) m)))
 
 (defun extend-by-identity (mat d)
@@ -71,7 +65,7 @@
   d. It is required that MAT is n x n with n <= d. Returns the matrix
   MAT (+) I, where (+) denotes direct sum and I is the (d-n) x (d-n)
   identity matrix."
-  (let ((n (ilog2 (magicl:matrix-rows mat))))
+  (let ((n (ilog2 (magicl:nrows mat))))
     (assert (<= n d)
             (d)
             "The resulting matrix must have at least ~D rows, but only ~D were requested."
@@ -86,8 +80,8 @@
   "Given square matrices MAT1 and MAT2, returns a pair of matrices of
 equal dimensions, extending the smaller matrix by a tensor product
 with the identity matrix."
-  (let ((size1 (ilog2 (magicl:matrix-rows mat1)))
-        (size2 (ilog2 (magicl:matrix-rows mat2))))
+  (let ((size1 (ilog2 (magicl:nrows mat1)))
+        (size2 (ilog2 (magicl:nrows mat2))))
     (cond ((< size1 size2)
            (setf mat1 (extend-by-identity mat1 size2)))
           ((< size2 size1)
@@ -98,7 +92,7 @@ with the identity matrix."
   "Multiply two square MAGICL matrices, extending them by the identity
 as needed so that they are the same size."
   (multiple-value-bind (mat1 mat2) (matrix-rescale mat1 mat2)
-    (magicl:multiply-complex-matrices mat1 mat2)))
+    (magicl:@ mat1 mat2)))
 
 (defun parsed-program-to-logical-matrix (pp &key compress-qubits)
   "Convert a parsed program PP, consisting of only i) gate
@@ -114,7 +108,7 @@ as needed so that they are the same size."
   ;; rewiring. this is somewhat complicated by the fact that rewirings
   ;; when we enter a block and when we exit a block may differ.
   (loop
-    :with mat := (magicl:make-complex-matrix 1 1 '(1d0))
+    :with mat := (magicl:const #C(1d0 0d0) '(1 1))
     :with rewiring := (make-rewiring 1)
     :for instr :across (parsed-program-executable-code pp)
     :do (progn
@@ -154,13 +148,6 @@ as needed so that they are the same size."
                       (rewiring-to-permutation-matrix-p2l rewiring)
                       mat))))
 
-(defun make-row-major-matrix (rows cols row-major-entries)
-  "Make a MAGICL matrix of dimensions ROWS x COLS with the entries ROW-MAJOR-ENTRIES written in row-major order."
-  (let ((m (magicl:make-zero-matrix rows cols)))
-    (dotimes (r rows m)
-      (dotimes (c cols)
-        (setf (magicl:ref m r c) (pop row-major-entries))))))
-
 ;; NOTE: the double~ appearing in this routine is anomalous. the SVD routine
 ;; seems not to reliably return singular values within the double= threshold,
 ;; even though that's the required semantics. so far, this hasn't bitten us.
@@ -170,17 +157,18 @@ as needed so that they are the same size."
   (multiple-value-bind (u s v) (magicl:svd m)
     (declare (ignore u))
     (let ((kernel-entries
-           (loop :for i :below (magicl:matrix-cols s) :nconc
-              (when (or (>= i (magicl:matrix-rows s))
-                        (double~ 0 (magicl:ref s i i)))
-                (loop :for j :below (magicl:matrix-rows v) :collect (magicl:ref v i j))))))
-      (magicl:make-complex-matrix (magicl:matrix-rows v)
-                                  (/ (length kernel-entries) (magicl:matrix-rows v))
-                                  kernel-entries))))
+           (loop :for i :below (magicl:ncols s) :nconc
+              (when (or (>= i (magicl:nrows s))
+                        (double~ 0 (magicl:tref s i i)))
+                (loop :for j :below (magicl:nrows v) :collect (magicl:tref v i j))))))
+      (magicl:from-list kernel-entries
+                        (list (magicl:nrows v)
+                              (/ (length kernel-entries) (magicl:nrows v)))
+                        :input-layout :column-major]))))
 
 (defun random-special-unitary (n)
-  (let ((m (magicl:random-unitary n)))
-    (magicl:scale (expt (magicl:det m) (/ (- n))) m)))
+  (let ((m (magicl:random-unitary (list n n) :type '(complex double-float))))
+    (magicl:scale! m (expt (magicl:det m) (/ (- n))))))
 
 (defun random-wavefunction (n-qubits)
   "Get a random complex unit vector with (EXPT 2 N-QUBITS) entries."
@@ -199,54 +187,41 @@ as needed so that they are the same size."
 
 (defun orthonormalize-matrix (m)
   "Applies Gram-Schmidt to the columns of a full rank square matrix to produce a unitary matrix."
-  (declare (optimize (speed 3)))
   ;; consider each column
-  (dotimes (j (magicl:matrix-cols m))
+  (dotimes (j (magicl:ncols m))
     ;; consider each preceding column, which together form an orthonormal set
     (dotimes (jp j)
       ;; compute the dot product of the columns...
-      (let ((scalar #C(0d0 0d0)))
-        (declare (type (complex double-float) scalar))
-        (dotimes (i (magicl:matrix-rows m))
-          (let ((mij (magicl:ref m i j))
-                (mijp (magicl:ref m i jp)))
-            (declare (type (complex double-float) mij mijp))
-            (incf scalar (* mij (conjugate mijp)))))
+      (let ((scalar
+              (loop :for i :below (magicl:nrows m)
+                    :sum (* (magicl:tref m i j)
+                            (conjugate (magicl:tref m i jp))))))
         ;; ... and do the subtraction.
-        (dotimes (i (magicl:matrix-rows m))
-          (let ((mij (magicl:ref m i j))
-                (mijp (magicl:ref m i jp)))
-            (declare (type (complex double-float) mij mijp))
-            (setf (magicl:ref m i j)
-                  (- mij (* scalar mijp)))))))
+        (dotimes (i (magicl:nrows m))
+          (setf (magicl:tref m i j)
+                (- (magicl:tref m i j)
+                   (* scalar
+                      (magicl:tref m i jp)))))))
     ;; now j is orthogonal to the things that came before it. normalize it.
-    (let ((scalar 0d0))
-      (declare (type (double-float 0d0) scalar))
-      (dotimes (i (magicl:matrix-rows m))
-        (let ((mij (magicl:ref m i j)))
-          (declare (type (complex double-float) mij))
-          (incf scalar (abs (* mij mij)))))
-      (setf scalar (sqrt scalar))
-      (dotimes (i (magicl:matrix-rows m))
-        (let ((mij (magicl:ref m i j)))
-          (declare (type (complex double-float) mij))
-          (setf (magicl:ref m i j)
-                (/ mij scalar))))))
+    (let ((scalar
+            (sqrt
+             (loop :for i :below (magicl:nrows m)
+                   :sum (* (abs (magicl:tref m i j))
+                           (abs (magicl:tref m i j)))))))
+      (dotimes (i (magicl:nrows m))
+        (setf (magicl:tref m i j)
+              (/ (magicl:tref m i j) scalar)))))
   m)
 
 (defun kron-matrix-up (matrix n)
   "Thinking of a 2^m x 2^m MATRIX as an operator on m qubits, m < N, produces a 2^n x 2^n matrix acting on qubits 0, ..., m, ..., n-1."
-  (let ((m (ilog2 (magicl:matrix-rows matrix))))
+  (let ((m (ilog2 (magicl:nrows matrix))))
     (assert (<= m n))
     (if (= m n)
         matrix
         (kq-gate-on-lines matrix
                           n
                           (a:iota m :start (1- m) :step -1)))))
-
-(defun matrix-trace (m)
-  (assert (= (magicl:matrix-rows m) (magicl:matrix-cols m)))
-  (loop :for j :below (magicl:matrix-rows m) :sum (magicl:ref m j j)))
 
 ;; also, some routines for manipulating *vectors*, here expressed as Lisp lists
 (defun dot-product (u v)
@@ -320,60 +295,6 @@ as needed so that they are the same size."
            (new-guess (+ guess (/ (- y0) d))))
       (find-root f new-guess (1- depth-bound)))))
 
-(defun matrix-map (f m &rest more-m)
-  "Returns a matrix X_ij = f(M_ij, ...)."
-  (magicl:tabulate (magicl:matrix-rows m)
-                   (magicl:matrix-cols m)
-                   (lambda (i j)
-                     (apply #'funcall f
-                            (magicl:ref m i j)
-                            (mapcar (a:rcurry #'magicl:ref i j)
-                                    more-m)))))
-
-(defun matrix-every (predicate m &rest more-m)
-  "Tests whether predicate is true for all elements in M."
-  (magicl:map-indexes (magicl:matrix-rows m)
-                      (magicl:matrix-cols m)
-                      (lambda (i j)
-                        (unless (apply predicate
-                                       (magicl:ref m i j)
-                                       (mapcar (a:rcurry #'magicl:ref i j)
-                                               more-m))
-                          (return-from matrix-every nil))))
-  t)
-
-(defun matrix-realpart (m)
-  "Returns a matrix X_ij = Re(M_ij)."
-  (matrix-map #'realpart m))
-
-(defun matrix-imagpart (m)
-  "Returns a matrix X_ij = Im(M_ij)."
-  (matrix-map #'imagpart m))
-
-(defun m* (m &rest more-m)
-  "Matrix multiplication of input matrices."
-  (reduce #'magicl:multiply-complex-matrices
-          more-m
-          :initial-value m))
-
-(defun m+ (m &rest more-m)
-  "Matrix component-wise addition of input matrices."
-  (reduce #'magicl:add-matrix
-          more-m
-          :initial-value m))
-
-(defun m- (m &rest more-m)
-  "Matrix component-wise subtraction of input matrices. Negates input if applied as unary function."
-  (reduce #'magicl:sub-matrix
-          more-m
-          :initial-value (if more-m m (magicl:scale -1 m))))
-
-(defun matrix-diagonal-entries (m)
-  "Returns the diagonal elements of the matrix M."
-  (loop :for j :below (min (magicl:matrix-rows m)
-                           (magicl:matrix-cols m))
-        :collect (magicl:ref m j j)))
-
 ;; TODO I have the feeling we have too many matrix comparison routines.
 (defun check-instructions-matrix-consistency (instrs-from instrs-to &key (relabeling (minimal-standard-relabeling instrs-from instrs-to)))
   "Compare for equality (up to a phase) the matrix representations of INSTRS-TO and INSTRS-FROM (under the appropriate relabeling)."
@@ -383,8 +304,8 @@ as needed so that they are the same size."
                      (append instrs-from instrs-to)))
     (let* ((ref-mat (make-matrix-from-quil instrs-from :relabeling relabeling))
            (mat (make-matrix-from-quil instrs-to :relabeling relabeling))
-           (kron-size (max (ilog2 (magicl:matrix-rows ref-mat))
-                           (ilog2 (magicl:matrix-rows mat))))
+           (kron-size (max (ilog2 (magicl:nrows ref-mat))
+                           (ilog2 (magicl:nrows mat))))
            (kroned-mat (kron-matrix-up mat kron-size))
            (kroned-ref-mat (kron-matrix-up ref-mat kron-size)))
       (assert
@@ -398,15 +319,14 @@ as needed so that they are the same size."
       (if hermitian? (magicl:hermitian-eig m) (magicl:eig m))
     (when *compress-carefully*
       (assert (matrix-equality m
-                               (m* u
-                                   (magicl:diag (length d) (length d) d)
-                                   (magicl:conjugate-transpose u)))
+                               (magicl:@ u
+                                         (magicl:from-diag d :type '(complex double-float))
+                                         (magicl:conjugate-transpose u)))
               ()
               "MATRIX-EXPT failed to diagonalize its input."))
-    (let* ((size (length d))
-           (dd (magicl:diag size size
-                            (mapcar (lambda (z) (exp (* z s))) d))))
-      (m* u dd (magicl:conjugate-transpose u)))))
+    (let ((dd (magicl:from-diag
+               (mapcar (lambda (z) (exp (* z s))) d))))
+      (magicl:@ u dd (magicl:conjugate-transpose u)))))
 
 (defun print-polar-matrix (m &optional (stream *standard-output*))
   (let ((*print-fractional-radians* nil)
@@ -416,7 +336,7 @@ as needed so that they are the same size."
     (format stream "~&")
     (dotimes (i height)
       (dotimes (j width)
-        (let* ((z (magicl:ref m i j))
+        (let* ((z (magicl:tref m i j))
                (abs (if (double= 0d0 (abs z)) 0d0 (abs z)))
                (phase (if (zerop abs) 0d0 (mod (phase z) (* 2 pi)))))
           (format stream "~6,4F∠~6,4F" abs phase))

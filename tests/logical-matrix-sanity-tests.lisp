@@ -22,8 +22,8 @@
                  (n (length entries))
                  (p (if (stringp input) (quil:parse-quil input) input))
                  (actual (quil::parsed-program-to-logical-matrix p))
-                 ;; TRANSPOSE here to allow writing ENTRIES in row-major order, for readability.
-                 (expected (magicl:transpose (magicl:make-complex-matrix n n (a:flatten entries))))
+                 (expected (magicl:from-list (a:flatten entries) (list n n)
+                                             :type '(complex double-float)))
                  (compiled (quil::matrix-rescale
                             (quil::parsed-program-to-logical-matrix
                              (quil:compiler-hook p (quil::build-nq-linear-chip
