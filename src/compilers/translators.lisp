@@ -56,7 +56,7 @@
   (inst "RZ"   (list (param-* alpha  0.5d0)) q)
   (inst "RZ"   (list (param-* alpha  0.5d0)) p))
 
-(define-compiler CNOT-to-CZ ((cnot-gate ("CNOT" () q1 q0)))
+(define-compiler CNOT-to-CZ ((cnot-gate ("CNOT" () q0 q1)))
   (inst "RY" '(#.pi/2)  q0)
   (inst "CZ" ()         q0 q1)
   (inst "RY" '(#.-pi/2) q0)
