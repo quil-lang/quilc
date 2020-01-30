@@ -430,14 +430,14 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 (defun record-compiler (name)
   "Record (possibly overwriting) the existence of the compiler named by NAME."
   (check-type name symbol)
-  (let* ((c (fdefinition name)))
+  (let ((c (fdefinition name)))
     (assert (typep c 'compiler) (name) "The name ~S doesn't name a known compiler." name)
-    (let ((prev (find name **compilers-available** :key #'compiler-name)))
+    (let ((prev (member name **compilers-available** :key #'compiler-name)))
       (cond
         ((null prev)
          (push c **compilers-available**))
         (t
-         (substitute c prev **compilers-available**)))))
+         (rplaca prev c)))))
   (values))
 
 ;;; in what follows, we're very interested in two kinds of maps keyed on bindings:
