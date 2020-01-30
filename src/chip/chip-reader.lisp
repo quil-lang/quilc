@@ -244,6 +244,7 @@
                             ((string= "ISWAP" string) ':iswap)
                             ((string= "CPHASE" string) ':cphase)
                             ((string= "PISWAP" string) ':piswap)
+                            ((string= "XY" string) ':xy)
                             (t (error "Unknown link type in QPU descriptor on link ~A: ~A."
                                       (list q0 q1) string)))))
                  (setf link (build-link q0 q1
