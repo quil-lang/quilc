@@ -62,6 +62,10 @@
     (sb-bsd-sockets:socket-error (condition)
       (cl-syslog:rfc-log (*logger* :warning "Encountered a socket error when fetching latest SDK version. (~A)" condition)
         (:msgid "LOG0001"))
+      nil)
+    (error (condition)
+      (cl-syslog:rfc-log (*logger* :warning "Encountered an error when fetching latest SDK version. (~A)" condition)
+        (:msgid "LOG0001"))
       nil)))
 
 (defun sdk-update-available-p (current-version &key (proxy nil))
