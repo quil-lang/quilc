@@ -1,0 +1,115 @@
+{
+    "isa": {
+        "1Q": {
+            "0": {
+                "gates": [
+                    {
+                        "operator": "I",
+                        "parameters": [],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                   {
+                        "operator": "RX",
+                        "parameters": [
+                            0.0
+                        ],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            1.5707963267948966
+                        ],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            -1.5707963267948966
+                        ],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            3.141592653589793
+                        ],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            -3.141592653589793
+                        ],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                    {
+                        "operator": "RZ",
+                        "parameters": [
+                            "theta"
+                        ],
+                        "arguments": [
+                            "_"
+                        ],
+                        "fidelity": null,
+                        "duration": null
+                    },
+                    {
+                        "operator": "MEASURE",
+                        "qubit": "_",
+                        "target": "_",
+                        "duration": null,
+                        "fidelity": null
+                    },
+                    {
+                        "operator": "MEASURE",
+                        "qubit": "_",
+                        "target": null,
+                        "duration": null,
+                        "fidelity": null
+                    }
+                ]
+            }
+        },
+        "2Q": null
+    },
+    "specs": {
+        "1Q": {
+            "0": {
+                "f1QRB": 0.99,
+                "f1QRB_std_err": 0.01,
+                "f1Q_simultaneous_RB": 0.99,
+                "f1Q_simultaneous_RB_std_err": 0.02,
+                "fRO": 0.9,
+                "T1": 3e-05,
+                "T2": 3e-05,
+                "fActiveReset": 0.99
+            }
+        },
+        "2Q": null
+    }
+}

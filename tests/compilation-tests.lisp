@@ -207,3 +207,13 @@ CNOT 4 8
          (parsed-program-to-logical-matrix pp :compress-qubits t)
          (parsed-program-to-logical-matrix (compiler-hook pp chip)
                                            :compress-qubits t)))))
+
+(deftest test-rx-agglutination-with-wildcard-chip ()
+  ;; See #567
+  (let* ((chip (quil::read-chip-spec-file
+                (merge-pathnames *qpu-test-file-directory*
+                                 "1q-wildcard-arguments.qpu")))
+         (progm (parse "RX(pi/2) 0; RX(-pi/2) 0")))
+    (is (m= (magicl:make-identity-matrix 2)
+            (parsed-program-to-logical-matrix
+             (compiler-hook progm chip))))))
