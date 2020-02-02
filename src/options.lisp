@@ -23,9 +23,10 @@
 (defmacro format-noise (str &rest args)
   "format-noise checks to see whether *compiler-noise* has been set and, if so, formats it according to the passed format string and arguments."
   `(progn
-      (when *compiler-noise*
-        (format *compiler-noise* ,str ,@args))
-      (values)))
+     (when *compiler-noise*
+       (format *compiler-noise* ,str ,@args)
+       (fresh-line *compiler-noise*))
+     (values)))
 
 (defvar *compress-carefully* nil
   "Flag that turns on/off a bunch of intermediate correctness checks during compression.  WARNING: this can be *very* costly, since it involves computing explicit matrix presentations.")

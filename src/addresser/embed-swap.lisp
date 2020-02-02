@@ -1,3 +1,4 @@
+
 ;;;; embed-swap.lisp
 ;;;;
 ;;;; Author: Eric Peterson, Erik Davis
@@ -167,9 +168,9 @@ rewiring REWIRING to the TARGET-REWIRING."
       (update-rewiring initial-l2p q0 q1)
       (update-rewiring working-l2p q0 q1)
       (format-noise "EMBED-SWAP: This is a free swap. :)~%~
-               EMBED-SWAP: New rewiring: ~a~%~
-               EMBED-SWAP: New initial rewiring: ~a~%"
-              working-l2p initial-l2p))
+                             EMBED-SWAP: New rewiring: ~a~%~
+                             EMBED-SWAP: New initial rewiring: ~a~%"
+                             working-l2p initial-l2p))
      (t
       ;; in this case, this swap has to be performed by the QPU.
       ;; apply the link swap to working-l2p

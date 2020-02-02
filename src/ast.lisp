@@ -14,6 +14,7 @@
   "Do the qubits X and Y have equal indices?"
   (check-type x qubit)
   (check-type y qubit)
+
   (= (qubit-index x) (qubit-index y)))
 
 (defstruct (memory-name (:constructor memory-name (region-name &optional descriptor)))
@@ -293,12 +294,12 @@ Return (VALUES ENTERING NIL) if INSTRUCTION has only an ENTERING rewiring.
 Return (VALUES NIL EXITING) if INSTRUCTION has only an EXITING rewiring.
 Return (VALUES NIL NIL) if INSTRUCTION has no rewiring attached."
   (a:if-let ((comment (comment instruction)))
-    (ecase (rewiring-comment-type comment)
-      (:ENTERING (values (parse-entering-rewiring comment) nil))
-      (:EXITING  (values nil (parse-exiting-rewiring comment)))
-      (:ENTERING/EXITING (parse-entering/exiting-rewiring comment)))
-    ;; No comment attached to INSTRUCTION.
-    (values nil nil)))
+            (ecase (rewiring-comment-type comment)
+              (:ENTERING (values (parse-entering-rewiring comment) nil))
+              (:EXITING  (values nil (parse-exiting-rewiring comment)))
+              (:ENTERING/EXITING (parse-entering/exiting-rewiring comment)))
+            ;; No comment attached to INSTRUCTION.
+            (values nil nil)))
 
 (defun extract-final-exit-rewiring-vector (parsed-program)
   "Extract the final exit rewiring comment from PARSED-PROGRAM and return it as a VECTOR.
@@ -442,14 +443,14 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
                      :entries entries
                      :context context)
       (a:if-let ((perm (permutation-from-gate-entries entries)))
-        (make-instance 'permutation-gate-definition
-                       :name name
-                       :permutation perm
-                       :context context)
-        (make-instance 'static-gate-definition
-                       :name name
-                       :entries entries
-                       :context context))))
+                (make-instance 'permutation-gate-definition
+                               :name name
+                               :permutation perm
+                               :context context)
+                (make-instance 'static-gate-definition
+                               :name name
+                               :entries entries
+                               :context context))))
 
 ;;; Circuit Definitions
 
@@ -634,7 +635,7 @@ as the reset is formally equivalent to measuring the qubit and then conditionall
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (global-vars:define-global-var **mnemonic-types**
-    (make-hash-table :test 'equal)
+      (make-hash-table :test 'equal)
     "A map between mnemonic instruction strings and a list of possible argument types represented as vectors of type symbols.")
 
   (defun mnemonic-addressing-modes (mnemonic-string)
@@ -649,7 +650,7 @@ Each addressing mode will be a vector of symbols:
     (values (gethash mnemonic-string **mnemonic-types**)))
 
   (global-vars:define-global-var **classical-instruction-class-argument-types**
-    (make-hash-table :test 'eq)
+      (make-hash-table :test 'eq)
     "A map between a class name (symbol) and the vector of types.")
 
   (defun make-typed-name (name types)
@@ -686,17 +687,17 @@ Each addressing mode will be a vector of symbols:
       ;; Only TYPE* satisfy names, but we need to check TYPE.
       (memory-name
        (adt:match quil-type (funcall resolver (memory-name-region-name arg))
-         (quil-bit     (eq 'bit*     type))
-         (quil-octet   (eq 'octet*   type))
-         (quil-integer (eq 'integer* type))
-         (quil-real    (eq 'real*    type))))
+                  (quil-bit     (eq 'bit*     type))
+                  (quil-octet   (eq 'octet*   type))
+                  (quil-integer (eq 'integer* type))
+                  (quil-real    (eq 'real*    type))))
       ;; Only bare types are allowed for memory refs.
       (memory-ref
        (adt:match quil-type (funcall resolver (memory-ref-name arg))
-         (quil-bit     (eq 'bit     type))
-         (quil-octet   (eq 'octet   type))
-         (quil-integer (eq 'integer type))
-         (quil-real    (eq 'real    type))))
+                  (quil-bit     (eq 'bit     type))
+                  (quil-octet   (eq 'octet   type))
+                  (quil-integer (eq 'integer type))
+                  (quil-real    (eq 'real    type))))
       ;; Only immediate's satisfy CONSTANT arguments.
       (constant
        (case type
@@ -1064,13 +1065,13 @@ Each addressing mode will be a vector of symbols:
 
 For example, `DAGGER DAGGER H 0` should produce `H 0`."
   (adt:match operator-description od
-    ((dagger-operator inner-od) inner-od)
-    (_ (dagger-operator od))))
+             ((dagger-operator inner-od) inner-od)
+             (_ (dagger-operator od))))
 
 (defun operator-description-name (od)
   (adt:match operator-description od
-    ((named-operator name)   name)
-    (_ (error "The application doesn't have a canonical name."))))
+             ((named-operator name)   name)
+             (_ (error "The application doesn't have a canonical name."))))
 
 (defun operator-description= (od1 od2)
   "Check whether two operator descriptions have the same structure and the same names."
@@ -1085,62 +1086,62 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
   ;; fall back to hashing the string representation.
   #+sbcl
   (adt:match operator-description od
-    ((named-operator name) (sxhash name))
-    ((controlled-operator inner-od)
-     (sb-int:mix
-      (sxhash 'controlled)
-      (operator-description-hash inner-od)))
-    ((dagger-operator inner-od)
-     (sb-int:mix
-      (sxhash 'dagger)
-      (operator-description-hash inner-od)))
-    ((forked-operator inner-od)
-     (sb-int:mix
-      (sxhash 'forked)
-      (operator-description-hash inner-od))))
+             ((named-operator name) (sxhash name))
+             ((controlled-operator inner-od)
+              (sb-int:mix
+               (sxhash 'controlled)
+               (operator-description-hash inner-od)))
+             ((dagger-operator inner-od)
+              (sb-int:mix
+               (sxhash 'dagger)
+               (operator-description-hash inner-od)))
+             ((forked-operator inner-od)
+              (sb-int:mix
+               (sxhash 'forked)
+               (operator-description-hash inner-od))))
   #-sbcl
   (sxhash (operator-description-string od)))
 
 (defun operator-description-root-name (od)
   "The \"root name\" that the operator description represents. This is usually going to name a gate that said description modifies."
   (adt:match operator-description od
-    ((named-operator name)   name)
-    ((controlled-operator o) (operator-description-root-name o))
-    ((dagger-operator o)     (operator-description-root-name o))
-    ((forked-operator o)     (operator-description-root-name o))))
+             ((named-operator name)   name)
+             ((controlled-operator o) (operator-description-root-name o))
+             ((dagger-operator o)     (operator-description-root-name o))
+             ((forked-operator o)     (operator-description-root-name o))))
 
 (defun operator-description-additional-qubits (od)
   "The number of additional qubits incurred by this operator description (e.g., CONTROLLED adds one qubit)."
   (adt:match operator-description od
-    ((named-operator _)   0)
-    ((controlled-operator o) (1+ (operator-description-additional-qubits o)))
-    ((dagger-operator o)     (operator-description-additional-qubits o))
-    ((forked-operator o)     (1+ (operator-description-additional-qubits o)))))
+             ((named-operator _)   0)
+             ((controlled-operator o) (1+ (operator-description-additional-qubits o)))
+             ((dagger-operator o)     (operator-description-additional-qubits o))
+             ((forked-operator o)     (1+ (operator-description-additional-qubits o)))))
 
 (defun print-operator-description (od stream)
   (adt:match operator-description od
-    ((named-operator name) (write-string name stream))
-    ((controlled-operator o) (write-string "CONTROLLED " stream)
-                             (print-operator-description o stream))
-    ((dagger-operator o) (write-string "DAGGER " stream)
-                         (print-operator-description o stream))
-    ((forked-operator o) (write-string "FORKED " stream)
-                         (print-operator-description o stream))))
+             ((named-operator name) (write-string name stream))
+             ((controlled-operator o) (write-string "CONTROLLED " stream)
+              (print-operator-description o stream))
+             ((dagger-operator o) (write-string "DAGGER " stream)
+              (print-operator-description o stream))
+             ((forked-operator o) (write-string "FORKED " stream)
+              (print-operator-description o stream))))
 
 (defun operator-description-string (od)
   (adt:match operator-description od
-    ((named-operator name) name)
-    (_
-     (with-output-to-string (s)
-       (print-operator-description od s)))))
+             ((named-operator name) name)
+             (_
+              (with-output-to-string (s)
+                (print-operator-description od s)))))
 
 (defun plain-operator-p (od)
   "Is the operator description OD plain?
 
 An operator is *plain* if it is described by a NAMED-OPERATOR."
   (adt:match operator-description od
-    ((named-operator _) t)
-    (_ nil)))
+             ((named-operator _) t)
+             (_ nil)))
 
 (defun simple-dagger-operator-p (od)
   "Is the operator description OD a simple dagger application?
@@ -1148,8 +1149,8 @@ An operator is *plain* if it is described by a NAMED-OPERATOR."
 An operator is considered to be a simple dagger application it
 consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
   (adt:match operator-description od
-    ((dagger-operator dod) (plain-operator-p dod))
-    (_ nil)))
+             ((dagger-operator dod) (plain-operator-p dod))
+             (_ nil)))
 
 (defun simple-controlled-operator-p (od)
   "Is the operator description OD a simple controlled application?
@@ -1157,8 +1158,8 @@ consists of a DAGGER-OPERATOR acting on a NAMED-OPERATOR."
 An operator is considered to be a simple controlled application if it
 consists of a CONTROLLED-OPERATOR acting on a NAMED-OPERATOR."
   (adt:match operator-description od
-    ((controlled-operator cod) (plain-operator-p cod))
-    (_ nil)))
+             ((controlled-operator cod) (plain-operator-p cod))
+             (_ nil)))
 
 (defclass application (instruction)
   ((operator :initarg :operator
@@ -1229,8 +1230,8 @@ N.B. This slot shoould not be accessed directly! Consider using GATE-APPLICATION
   (:documentation "Return a gate-like object represented in the application APP.")
   (:method :around ((app gate-application))
     (a:if-let ((gate (%get-gate-application-gate app)))
-      gate
-      (%set-gate-application-gate (call-next-method) app))))
+              gate
+              (%set-gate-application-gate (call-next-method) app))))
 
 (defgeneric anonymous-gate-application-p (app)
   (:documentation "Is the gate application APP an anonymous application?")
@@ -1258,8 +1259,8 @@ N.B. This slot shoould not be accessed directly! Consider using GATE-APPLICATION
   "Does APP look like a SWAP application?"
   (and (typep app 'gate-application)
        (adt:match operator-description (application-operator app)
-         ((named-operator name) (string= "SWAP" name))
-         (_ nil))))
+                  ((named-operator name) (string= "SWAP" name))
+                  (_ nil))))
 
 (defclass circuit-application (application)
   ((circuit-definition :initarg :circuit-definition
@@ -1395,10 +1396,10 @@ For example,
 
   (:method ((thing constant) (stream stream))
     (adt:match quil-type (constant-value-type thing)
-      (quil-bit (format stream "~A" (constant-value thing)))
-      (quil-octet (format stream "~A" (constant-value thing)))
-      (quil-integer (format stream "~A" (constant-value thing)))
-      (quil-real (format-complex (constant-value thing) stream))))
+               (quil-bit (format stream "~A" (constant-value thing)))
+               (quil-octet (format stream "~A" (constant-value thing)))
+               (quil-integer (format stream "~A" (constant-value thing)))
+               (quil-real (format-complex (constant-value thing) stream))))
 
   (:method ((thing param) (stream stream))
     (format stream "%~A" (param-name thing)))
@@ -1519,9 +1520,9 @@ For example,
       (format stream " SHARING ~A"
               (memory-descriptor-sharing-parent defn))
       (a:when-let (x (memory-descriptor-sharing-offset-alist defn))
-        (format stream " OFFSET")
-        (loop :for (type . count) :in x
-              :do (format stream " ~A ~A" count (quil-type-string type))))))
+                  (format stream " OFFSET")
+                  (loop :for (type . count) :in x
+                        :do (format stream " ~A ~A" count (quil-type-string type))))))
 
   (:method ((gate matrix-gate-definition) (stream stream))
     (let ((gate-size (isqrt (length (gate-definition-entries gate)))))
@@ -1669,7 +1670,7 @@ Examples:
              (write-string prefix stream)
              (print-instruction instr stream)
              (a:when-let ((c (comment instr)))
-               (format stream "~40T# ~A" c))
+                         (format stream "~40T# ~A" c))
              (terpri stream)))
       (map nil #'print-one-line seq))))
 

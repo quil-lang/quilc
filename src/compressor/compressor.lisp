@@ -47,12 +47,11 @@
 
 (defun format-quil-sequence (s instructions &optional prefix)
   "Nicely prints a sequence of INSTRUCTIONS to a stream S. If PREFIX is present, prepend it to the overall output."
-  (when s
-    (when prefix
-      (format s prefix)
-      (terpri s))
-    (dolist (instr instructions)
-      (format s " ~/cl-quil:instruction-fmt/~%" instr))))
+  (when prefix
+    (format s prefix)
+    (terpri s))
+  (dolist (instr instructions)
+    (format s " ~/cl-quil:instruction-fmt/~%" instr)))
 
 
 (defun qubits-in-instr-list (instructions)
@@ -583,54 +582,56 @@ other's."
                             ;; here. We just want to indicate to the
                             ;; user that an error happened down here.
                             ))))
-      ;; start by making a decision about how we're going to do linear algebraic compression
-      (let ((decompiled-instructions (decompile-instructions-in-context instructions
-                                                                        chip-specification
-                                                                        context))
-            reduced-instructions
-            reduced-decompiled-instructions)
+    ;; start by making a decision about how we're going to do linear algebraic compression
+    (let ((decompiled-instructions (decompile-instructions-in-context instructions
+                                                                      chip-specification
+                                                                      context))
+          reduced-instructions
+          reduced-decompiled-instructions)
 
-        ;; now proceed to do the reductions
-        (format-noise
-                "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
-        (setf reduced-instructions
-              (algebraically-reduce-instructions instructions chip-specification context))
-        (format-noise
-                "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.~%")
-        (when decompiled-instructions
-          (setf reduced-decompiled-instructions
-                (algebraically-reduce-instructions decompiled-instructions
-                                                   chip-specification
-                                                   context)))
+      ;; now proceed to do the reductions
+      (format-noise
+       "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
+      (setf reduced-instructions
+            (algebraically-reduce-instructions instructions chip-specification context))
+      (format-noise
+       "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.~%")
+      (when decompiled-instructions
+        (setf reduced-decompiled-instructions
+              (algebraically-reduce-instructions decompiled-instructions
+                                                 chip-specification
+                                                 context)))
 
-        ;; check that the quil that came out was the same as the quil that went in
-        (check-contextual-compression-was-well-behaved instructions
-                                                       decompiled-instructions
-                                                       reduced-instructions
-                                                       reduced-decompiled-instructions
-                                                       context)
+      ;; check that the quil that came out was the same as the quil that went in
+      (check-contextual-compression-was-well-behaved instructions
+                                                     decompiled-instructions
+                                                     reduced-instructions
+                                                     reduced-decompiled-instructions
+                                                     context)
 
-        ;; compare their respective runtimes and return the shorter one
-        (let ((result-instructions
-                (cond
-                  ((and decompiled-instructions
-                        (not (equalp decompiled-instructions reduced-decompiled-instructions))
-                        (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
-                           (calculate-instructions-duration reduced-instructions chip-specification)))
-                   reduced-decompiled-instructions)
-                  (t
-                   reduced-instructions))))
+      ;; compare their respective runtimes and return the shorter one
+      (let ((result-instructions
+              (cond
+                ((and decompiled-instructions
+                      (not (equalp decompiled-instructions reduced-decompiled-instructions))
+                      (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
+                         (calculate-instructions-duration reduced-instructions chip-specification)))
+                 reduced-decompiled-instructions)
+                (t
+                 reduced-instructions))))
+        (when *compiler-noise
           (format-quil-sequence *compiler-noise*
                                 result-instructions
                                 "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
-          result-instructions))))
+          result-instructions)))))
 
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
   "Dispatch routine for compressing a sequence of INSTRUCTIONS, perhaps with unknown parameter values sprinkled through, based on the routines specified by a CHIP-SPECIFICATION and the current CONTEXT."
-  (format-quil-sequence *compiler-noise*
-                        instructions
-                        "COMPRESS-INSTRUCTIONS: Selected the following sequence for compression:~%")
+  (when *compiler-noise*
+    (format-quil-sequence *compiler-noise*
+                          instructions
+                          "COMPRESS-INSTRUCTIONS: Selected the following sequence for compression:~%"))
   ;;
   ;; we can't apply linear algebraic rewriting to instructions with unknown
   ;; parameters, so the plan is to carve up the incoming sequence of INSTRUCTIONS
