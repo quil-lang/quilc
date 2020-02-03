@@ -6,7 +6,8 @@
 (unless *load-truename*
   (error "This file is meant to be loaded."))
 
-(pushnew :drakma-no-ssl *features*)
+(when (find :forest-sdk *features*)
+  (pushnew :drakma-no-ssl *features*))
 
 (require 'asdf)
 
