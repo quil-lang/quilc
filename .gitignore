@@ -13,3 +13,12 @@ doc/*.pdf
 doc/*.synctex.gz
 doc/*.toc
 .DS_Store
+
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
