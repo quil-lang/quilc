@@ -94,99 +94,78 @@
   (- (* (aref vector 0) (aref vector 3))
      (* (aref vector 1) (aref vector 2))))
 
+
+(defun givens-rotation (d i j theta)
+  "Construct a DxD matrix representing a counterclockwise rotation by angle THETA in the (I,J) plane."
+  (let ((m (magicl:make-identity-matrix d)))
+    (setf (magicl:ref m i i) (cos theta)
+          (magicl:ref m i j) (- (sin theta))
+          (magicl:ref m j i) (sin theta)
+          (magicl:ref m j j) (cos theta))
+    m))
+
+
 (defun canonicalize-wf (vector)
   "Calculates a special-orthogonal MATRIX that moves a unit-length VECTOR in C^4 into the form V = (a+bi c 0 0).  Returns (VALUES MATRIX V)."
   (let ((matrix (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0)))
         (v (copy-seq vector)))
-    ;; start by moving all of the imaginary components into the 0th position.
-    (unless (double= 0d0 (imagpart (aref v 1)))
-      (let* ((theta (- (atan (imagpart (aref v 1))
-                             (imagpart (aref v 0)))))
-             (m (magicl:make-complex-matrix 4 4 (list (cos theta) (sin theta) 0 0
-                                                      (- (sin theta)) (cos theta) 0 0
-                                                      0 0 1 0
-                                                      0 0 0 1))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    (unless (double= 0d0 (imagpart (aref v 2)))
-      (let* ((theta (- (atan (imagpart (aref v 2))
-                             (imagpart (aref v 0)))))
-             (m (magicl:make-complex-matrix 4 4 (list (cos theta) 0 (sin theta) 0
-                                                      0 1 0 0
-                                                      (- (sin theta)) 0 (cos theta) 0
-                                                      0 0 0 1))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    (unless (double= 0d0 (imagpart (aref v 3)))
-      (let* ((theta (- (atan (imagpart (aref v 3))
-                             (imagpart (aref v 0)))))
-             (m (magicl:make-complex-matrix 4 4 (list (cos theta) 0 0 (sin theta)
-                                                      0 1 0 0
-                                                      0 0 1 0
-                                                      (- (sin theta)) 0 0 (cos theta)))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    ;; now move the real components into the 1st position (except for 0)
-    (unless (double= 0d0 (realpart (aref v 2)))
-      (let* ((theta (- (atan (realpart (aref v 2))
-                             (realpart (aref v 1)))))
-             (m (magicl:make-complex-matrix 4 4 (list 1 0 0 0
-                                                      0 (cos theta) (sin theta) 0
-                                                      0 (- (sin theta)) (cos theta) 0
-                                                      0 0 0 1))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    (unless (double= 0d0 (realpart (aref v 3)))
-      (let* ((theta (- (atan (realpart (aref v 3))
-                             (realpart (aref v 1)))))
-             (m (magicl:make-complex-matrix 4 4 (list 1 0 0 0
-                                                      0 (cos theta) 0 (sin theta)
-                                                      0 0 1 0
-                                                      0 (- (sin theta)) 0 (cos theta)))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    ;; we're concentrated in positions 0 and 1.
-    ;; if 0 and 1 are actually both real, combine them.
-    (unless (or (double= 0d0 (realpart (aref v 1)))
-                (not (double= 0d0 (imagpart (aref v 0)))))
-      (let* ((theta (- (atan (realpart (aref v 1))
-                             (realpart (aref v 0)))))
-             (m (magicl:make-complex-matrix 4 4 (list (cos theta) (sin theta) 0 0
-                                                      (- (sin theta)) (cos theta) 0 0
-                                                      0 0 1 0
-                                                      0 0 0 1))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    ;; make sure |v0| > |v1|
-    (unless (> (abs (aref v 0)) (abs (aref v 1)))
-      (let* ((m (magicl:make-complex-matrix 4 4 (list 0 1 0 0
-                                                      -1 0 0 0
-                                                      0 0 1 0
-                                                      0 0 0 1))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    ;; we're imagining v1 to be purely real (but it might be purely imaginary).
-    ;; constrain -pi/4 < phase v1 <= 3pi/4, which contains 0 and pi/2
-    (unless (<= (- (/ pi 4)) (phase (aref v 1)) (* 3/4 pi))
-      (let* ((m (magicl:make-complex-matrix 4 4 (list 1  0  0 0
-                                                      0 -1  0 0
-                                                      0  0 -1 0
-                                                      0  0  0 1))))
-        (setf matrix (m* m matrix))
-        (setf v (nondestructively-apply-matrix-to-vector matrix vector))))
-    ;; also constrain -pi/2 < phase v0 - phase v1 <= pi/2
-    (let* ((phase-difference (- (phase (aref v 0)) (phase (aref v 1))))
-           (centered-phase (- (mod (+ phase-difference pi) 2pi) pi)))
-      (when (and (not (double= centered-phase pi/2))
-                 (or (<= centered-phase -pi/2)
-                     (double= centered-phase -pi/2)
-                     (< pi/2 centered-phase)))
-        (let* ((m (magicl:make-complex-matrix 4 4 (list -1 0  0 0
-                                                        0 1  0 0
-                                                        0 0 -1 0
-                                                        0 0  0 1))))
-          (setf matrix (m* m matrix))
-          (setf v (nondestructively-apply-matrix-to-vector matrix vector)))))
+    (symbol-macrolet ((v0 (aref v 0))
+                      (v1 (aref v 1))
+                      (v2 (aref v 2))
+                      (v3 (aref v 3)))
+      (flet ((apply-rotation (i j theta)
+               (let ((m (givens-rotation 4 i j theta)))
+                 (setf matrix (m* m matrix))
+                 (setf v (nondestructively-apply-matrix-to-vector matrix vector)))))
+        ;; start by moving all of the imaginary components into the 0th position.
+        (unless (double= 0d0 (imagpart v1))
+          (apply-rotation 0 1
+                          (- (atan (imagpart v1)
+                                   (imagpart v0)))))
+        (unless (double= 0d0 (imagpart v2))
+          (apply-rotation 0 2
+                          (- (atan (imagpart v2)
+                                   (imagpart v0)))))
+        (unless (double= 0d0 (imagpart v3))
+          (apply-rotation 0 3
+                          (- (atan (imagpart v3)
+                                   (imagpart v0)))))
+        (assert (and (double= 0d0 (imagpart v1))
+                     (double= 0d0 (imagpart v2))
+                     (double= 0d0 (imagpart v3))))
+        ;; now move the real components into the 1st position (except for 0)
+        (unless (double= 0d0 (realpart v2))
+          (apply-rotation 1 2
+                          (- (atan (realpart v2)
+                                   (realpart v1)))))
+        (unless (double= 0d0 (realpart v3))
+          (apply-rotation 1 3
+                          (- (atan (realpart v3)
+                                   (realpart v1)))))
+        (assert (and (double= 0d0 (realpart v2))
+                     (double= 0d0 (realpart v3))))
+        ;; we're concentrated in positions 0 and 1.
+        ;; if 0 and 1 are actually both real, combine them.
+        (unless (or (double= 0d0 (realpart v1))
+                    (not (double= 0d0 (imagpart v0))))
+          (apply-rotation 0 1
+                          (- (atan (realpart v1)
+                                   (realpart v0)))))
+        ;; make sure |v0| > |v1|
+        (unless (> (abs v0) (abs v1))
+          (apply-rotation 0 1 pi/2))
+        ;; we're imagining v1 to be purely real (but it might be purely imaginary).
+        ;; constrain -pi/4 < phase v1 <= 3pi/4, which contains 0 and pi/2
+        (unless (<= (- (/ pi 4)) (phase v0) (* 3/4 pi))
+          (apply-rotation 0 2 pi))
+        ;; also constrain -pi/2 < phase v0 - phase v1 <= pi/2
+        (let* ((phase-difference (- (phase v0) (phase v1)))
+               (centered-phase (- (mod (+ phase-difference pi) 2pi) pi)))
+          (when (and (not (double= centered-phase pi/2))
+                     (or (<= centered-phase -pi/2)
+                         (double= centered-phase -pi/2)
+                         (< pi/2 centered-phase)))
+            (apply-rotation 0 2 pi)))))
     (values matrix v)))
 
 (adt:defdata tensor-factorization
