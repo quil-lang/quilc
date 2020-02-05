@@ -150,22 +150,7 @@
                     (not (double= 0d0 (imagpart v0))))
           (apply-rotation 0 1
                           (- (atan (realpart v1)
-                                   (realpart v0)))))
-        ;; make sure |v0| > |v1|
-        (unless (> (abs v0) (abs v1))
-          (apply-rotation 0 1 pi/2))
-        ;; we're imagining v1 to be purely real (but it might be purely imaginary).
-        ;; constrain -pi/4 < phase v1 <= 3pi/4, which contains 0 and pi/2
-        (unless (<= (- (/ pi 4)) (phase v0) (* 3/4 pi))
-          (apply-rotation 0 2 pi))
-        ;; also constrain -pi/2 < phase v0 - phase v1 <= pi/2
-        (let* ((phase-difference (- (phase v0) (phase v1)))
-               (centered-phase (- (mod (+ phase-difference pi) 2pi) pi)))
-          (when (and (not (double= centered-phase pi/2))
-                     (or (<= centered-phase -pi/2)
-                         (double= centered-phase -pi/2)
-                         (< pi/2 centered-phase)))
-            (apply-rotation 0 2 pi)))))
+                                   (realpart v0)))))))
     (values matrix v)))
 
 (adt:defdata tensor-factorization
@@ -196,6 +181,7 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
 ;; this method is due to Oscar Perdomo, and this implementation blindly follows his notes.
 ;; TODO: this should be made architecture-sensitive, with separate templates
 ;;       for ISWAP-based chips
+#+#:pedagogical-purposes-only
 (define-compiler state-prep-2Q-compiler
     ((instr (_ _ q1 q0)
             :where (typep instr 'state-prep-application)))
@@ -352,9 +338,7 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
 ;; formulas in Oscar's. it would be nice to write out exactly what this meet is.
 ;;
 ;; some of the code in this has been pulled down to state-prep-within-local-equivalence-class
-;; below. if anyone wants to turn this routine back on, it's worth offloading some
-;; of the code in here to that subroutine.
-#+#:pedagogical-purposes-only
+
 (define-compiler state-prep-2Q-compiler
     ((instr (_ _ _ _)
             :where (typep instr 'state-prep-application))) 
@@ -409,30 +393,31 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
                   (* multiplier
                      (aref source-wf j)))))))
     ;; find s, t in SO(4) that puts the source and target wfs expressed in the magic basis into a canonical form
-    (destructuring-bind ((source-matrix source-v) (target-matrix target-v))
-        (list (canonicalize-wf (nondestructively-apply-matrix-to-vector +edag-basis+
-                                                                        source-wf))
-              (canonicalize-wf (nondestructively-apply-matrix-to-vector +edag-basis+
-                                                                        target-wf)))
-      ;; check that source-v and target-v are close to equal
-      (unless (and (double= (aref source-v 0) (aref target-v 0))
-                   (double= (aref source-v 1) (aref target-v 1))
-                   (double= (aref source-v 2) (aref target-v 2))
-                   (double= (aref source-v 3) (aref target-v 3)))
-        ;; NOTE: this is a hard return which escapes the implicit WITH-INST,
-        ;;       which might even have PREFIX-CIRCUIT junk in it
-        (return-from state-prep-2Q-compiler
-          (state-prep-trampolining-compiler instr)))
-      ;; write t^dag s as a member of SU(2) x SU(2)
-      (multiple-value-bind (c1 c0)
-          (convert-su4-to-su2x2
-           (m* +e-basis+
-               (magicl:conjugate-transpose target-matrix)
-               source-matrix
-               +edag-basis+))
-        ;; write out the instructions
-        (inst "LHS-state-prep-gate" c1 (second (application-arguments instr)))
-        (inst "RHS-state-prep-gate" c0 (first (application-arguments instr)))))))
+    (multiple-value-bind (source-matrix source-v)
+        (canonicalize-wf (nondestructively-apply-matrix-to-vector +edag-basis+
+                                                                  source-wf))
+      (multiple-value-bind (target-matrix target-v)
+          (canonicalize-wf (nondestructively-apply-matrix-to-vector +edag-basis+
+                                                                    target-wf))
+        ;; check that source-v and target-v are close to equal
+        (unless (and (double= (aref source-v 0) (aref target-v 0))
+                     (double= (aref source-v 1) (aref target-v 1))
+                     (double= (aref source-v 2) (aref target-v 2))
+                     (double= (aref source-v 3) (aref target-v 3)))
+          ;; NOTE: this is a hard return which escapes the implicit WITH-INST,
+          ;;       which might even have PREFIX-CIRCUIT junk in it
+          (return-from state-prep-2Q-compiler
+            (state-prep-trampolining-compiler instr)))
+        ;; write t^dag s as a member of SU(2) x SU(2)
+        (multiple-value-bind (c1 c0)
+            (convert-su4-to-su2x2
+             (m* +e-basis+
+                 (magicl:conjugate-transpose target-matrix)
+                 source-matrix
+                 +edag-basis+))
+          ;; write out the instructions
+          (inst "LHS-state-prep-gate" c1 (second (application-arguments instr)))
+          (inst "RHS-state-prep-gate" c0 (first (application-arguments instr))))))))
 
 (defun coerce-to-complex-double-vector (elts)
   (map '(vector (complex double-float))

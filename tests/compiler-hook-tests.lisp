@@ -118,7 +118,7 @@ JUMP @a")))
   "Test whether the compiler hook preserves semantic equivalence for
 some test programs."
   (finish-output)
-  (dolist (state-prep '(nil t))
+  (dolist (state-prep '(t nil))
     (let ((quil::*enable-state-prep-compression* state-prep)
           (quil::*compress-carefully* t))
       (format t "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~A~%" quil::*enable-state-prep-compression*)
