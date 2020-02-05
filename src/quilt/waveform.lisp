@@ -85,7 +85,7 @@ Parameters:
        :rpcq-type float
        :documentation "Center time coordinate of the shape in seconds. Defaults to mid-point of pulse.")))
 
-(define-standard-waveform drag-gaussian-waveform "draggaussian"
+(define-standard-waveform drag-gaussian-waveform "drag_gaussian"
   ((fwhm :quilt-name "fwhm"
          :rpcq-type float
          :documentation "Full Width Half Max shape parameter, in seconds.")
@@ -100,7 +100,7 @@ Parameters:
           :documentation "Dimensionless DRAG parameter."))
   :documentation "A DRAG Gaussian shaped waveform envelope defined for a specific frame.")
 
-(define-standard-waveform hermite-gaussian-waveform "hermitegaussian"
+(define-standard-waveform hermite-gaussian-waveform "hermite_gaussian"
   ((fwhm :quilt-name "fwhm"
          :rpcq-type float
          :documentation "Full Width Half Max shape parameter, in seconds.")
@@ -120,7 +120,7 @@ Parameters:
 
 Reference: Effects of arbitrary laser or NMR pulse shapes on population inversion and coherence Warren S. Warren. 81, (1984); doi: 10.1063/1.447644")
 
-(define-standard-waveform erf-square-waveform "erfsquare"
+(define-standard-waveform erf-square-waveform "erf_square"
   ((risetime :quilt-name "risetime"
              :documentation "The width of the rise and fall sections in seconds."
              :rpcq-type float)
