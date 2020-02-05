@@ -118,8 +118,9 @@ JUMP @a")))
   "Test whether the compiler hook preserves semantic equivalence for
 some test programs."
   (finish-output)
-  (dolist (state-prep '(nil t))
-    (let ((quil::*enable-state-prep-compression* state-prep))
+  (dolist (state-prep '(t nil))
+    (let ((quil::*enable-state-prep-compression* state-prep)
+          (quil::*compress-carefully* t))
       (format t "~&    With *ENABLE-STATE-PREP-COMPRESSION* ~A~%" quil::*enable-state-prep-compression*)
       (dolist (file (uiop:directory-files *compiler-hook-test-file-directory* #P"*.quil"))
         (format t "      Testing file ~A:" (pathname-name file))

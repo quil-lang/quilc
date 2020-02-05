@@ -201,3 +201,16 @@ CNOT 3 5
                   :always (if (eql ':not-simulated wf)
                               (eql ':not-simulated expected-size)
                               (= expected-size (array-total-size wf)))))))))
+
+
+(deftest test-canonicalize-wf ()
+  (dotimes (n 100)
+    (let ((wf (quil::random-wavefunction 2)))
+      (multiple-value-bind (m v)
+          (quil::canonicalize-wf wf)
+        (is (every #'quil::double=
+                   v
+                   (quil::nondestructively-apply-matrix-to-vector m wf)))
+        (is (quil::double= 0d0 (imagpart (aref v 1))))
+        (is (quil::double= 0d0 (aref v 2)))
+        (is (quil::double= 0d0 (aref v 3)))))))
