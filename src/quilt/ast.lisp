@@ -100,6 +100,9 @@
 (define-simple-frame-mutation set-frequency "SET-FREQUENCY"
   "An instruction setting the frequency of a frame.")
 
+(define-simple-frame-mutation shift-frequency "SHIFT-FREQUENCY"
+  "An instruction shifting the frequency of a frame.")
+
 (define-simple-frame-mutation set-phase "SET-PHASE"
   "An instruction setting the phase of a frame.")
 
@@ -256,6 +259,14 @@
   (format stream "FENCE~{ ~/quil:instruction-fmt/~}"
           (fence-qubits instr)))
 
+(defclass fence-all (instruction)
+  ()
+  (:documentation "A synchronization barrier on all qubits.")
+  #+#:appleby-sufficiently-classy
+  (:metaclass singleton-class))
+
+(defmethod print-instruction-generic ((instr fence-all) (stream stream))
+  (format stream "FENCE"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -282,28 +293,33 @@
               :reader frame-definition-direction
               :type (or null frame-direction)
               :documentation "The associated frame direction, indicating usage for transmission or reception.")
+   (hardware-object :initarg :hardware-object
+                    :initform nil
+                    :reader frame-definition-hardware-object
+                    :type (or null string)
+                    :documentation "The name of the hardware object associated with this frame.")
    (context :initarg :context
             :type lexical-context
             :accessor lexical-context
             :documentation "The lexical context of the frame definition, used for error messages in subsequent analysis.")))
 
 (defmethod print-instruction-generic ((defn frame-definition) (stream stream))
-  (let ((sample-rate (frame-definition-sample-rate defn))
-        (frequency (frame-definition-initial-frequency defn))
-        (direction (frame-definition-direction defn)))
-    (format stream "DEFFRAME ~/quil:instruction-fmt/"
-            (frame-definition-frame defn))
-    (when (or sample-rate frequency)
+  (with-slots (frame sample-rate initial-frequency direction hardware-object)
+      defn
+    (format stream "DEFFRAME ~/quil:instruction-fmt/" frame)
+    (when (or sample-rate initial-frequency direction hardware-object)
       (format stream ":")
       (when sample-rate
         (format stream "~%    SAMPLE-RATE: ~/quil:instruction-fmt/" sample-rate))
-      (when frequency
-        (format stream "~%    INITIAL-FREQUENCY: ~/quil:instruction-fmt/" frequency))
+      (when initial-frequency
+        (format stream "~%    INITIAL-FREQUENCY: ~/quil:instruction-fmt/" initial-frequency))
       (when direction
-        (format stream "~%    DIRECTION: \"~S\""
+        (format stream "~%    DIRECTION: ~S"
                 (ecase direction
                   (:TX "tx")
                   (:RX "rx"))))
+      (when hardware-object
+        (format stream "~%    HARDWARE-OBJECT: ~S" hardware-object))
       (terpri stream))))
 
 (defclass waveform-definition ()

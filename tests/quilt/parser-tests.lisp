@@ -82,32 +82,34 @@ DEFWAVEFORM foo 4.0:
 
 (deftest test-parse-and-print-quilt-instructions ()
   (let ((boilerplate "
-DEFFRAME 0 \"xy\"
+DEFFRAME 0 \"rf\"
 DEFFRAME 0 \"zz\"
 DEFFRAME 0 1 \"foo\"
 DECLARE iq REAL[2]
 DEFWAVEFORM wf 1.0:
     1.0, 1.0, 1.0
-
 ")
         (instrs (list
-                 "SET-FREQUENCY 0 \"xy\" 1.0"
+                 "SET-FREQUENCY 0 \"rf\" 1.0"
                  "SET-FREQUENCY 0 1 \"foo\" 1.0"
-                 "SET-PHASE 0 \"xy\" 1.0"
+                 "SHIFT-FREQUENCY 0 \"rf\" 1.0"
+                 "SHIFT-FREQUENCY 0 1 \"foo\" 1.0"
+                 "SET-PHASE 0 \"rf\" 1.0"
                  "SET-PHASE 0 1 \"foo\" 1.0"
-                 "SHIFT-PHASE 0 \"xy\" 1.0"
+                 "SHIFT-PHASE 0 \"rf\" 1.0"
                  "SHIFT-PHASE 0 1 \"foo\" 1.0"
-                 "SET-SCALE 0 \"xy\" 1.0"
+                 "SET-SCALE 0 \"rf\" 1.0"
                  "SET-SCALE 0 1 \"foo\" 1.0"
-                 "SWAP-PHASE 0 \"xy\" 0 1 \"foo\""
-                 "PULSE 0 \"xy\" wf"
+                 "SWAP-PHASE 0 \"rf\" 0 1 \"foo\""
+                 "PULSE 0 \"rf\" wf"
                  "PULSE 0 1 \"foo\" wf"
-                 "CAPTURE 0 \"xy\" wf iq[0]"
-                 "RAW-CAPTURE 0 \"xy\" 1.0 iq[0]"
+                 "CAPTURE 0 \"rf\" wf iq[0]"
+                 "RAW-CAPTURE 0 \"rf\" 1.0 iq[0]"
                  "DELAY 0 1.0"          ; delay on qubit
-                 "DELAY 0 \"xy\" 1.0"   ; delay on frame
-                 "DELAY 0 \"xy\" \"zz\" 1.0" ; delay on frames
-                 "FENCE 0 1")))
+                 "DELAY 0 \"rf\" 1.0"   ; delay on frame
+                 "DELAY 0 \"rf\" \"zz\" 1.0" ; delay on frames
+                 "FENCE 0 1"
+                 "FENCE")))
     (dolist (instr instrs)
       (prints-as instr
                  (concatenate 'string boilerplate instr)))))
@@ -118,11 +120,12 @@ DEFWAVEFORM wf 1.0:
 (deftest test-parse-and-print-quilt-definitions ()
   (let ((boilerplate "~%DEFFRAME 0 \"rx\"") ; tacked on at end
         (frame-defns (list
-                      "DEFFRAME 0 \"xy\""
-                      "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%"
-                      "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%    INITIAL-FREQUENCY: 1.0~%"
-                      "DEFFRAME 0 \"xy\":~%    INITIAL-FREQUENCY: 1.0~%    DIRECTION: \"rx\"~%"
-                      "DEFFRAME 0 \"xy\":~%    SAMPLE-RATE: 1.0~%    DIRECTION: \"tx\"~%"))
+                      "DEFFRAME 0 1 \"xy\""
+                      "DEFFRAME 0 1 \"xy\":~%    SAMPLE-RATE: 1.0~%"
+                      "DEFFRAME 0 1 \"xy\":~%    SAMPLE-RATE: 1.0~%    INITIAL-FREQUENCY: 1.0~%"
+                      "DEFFRAME 0 1 \"xy\":~%    INITIAL-FREQUENCY: 1.0~%    DIRECTION: \"rx\"~%"
+                      "DEFFRAME 0 1 \"xy\":~%    HARDWARE-OBJECT: \"q0_q1_xy\"~%"
+                      "DEFFRAME 0 1 \"xy\":~%    SAMPLE-RATE: 1.0~%    DIRECTION: \"tx\"~%"))
         (waveform-defns (list
                          "DEFWAVEFORM foo 1.0:~%    1.0~%"
                          "DEFWAVEFORM foo 1.0:~%    1.0+1.0i, 1.0+1.0i~%"

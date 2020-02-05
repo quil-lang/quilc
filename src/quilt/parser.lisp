@@ -11,7 +11,7 @@
     :PULSE :CAPTURE :RAW-CAPTURE :DELAY :FENCE
     :NONBLOCKING
     :DEFWAVEFORM :DEFCAL :DEFFRAME
-    :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
+    :SET-FREQUENCY :SHIFT-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE :SWAP-PHASE))
 
 (deftype quilt-token-type ()
   '(or
@@ -30,6 +30,7 @@
                                "DEFCAL"
                                "DEFFRAME"
                                "SET-FREQUENCY"
+                               "SHIFT-FREQUENCY"
                                "SET-PHASE"
                                "SHIFT-PHASE"
                                "SET-SCALE"
@@ -107,7 +108,6 @@
       (values (mapcar #'parse-waveform-parameter-and-value entries)
               rest-line))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun parse-pulse (tok-lines)
@@ -159,9 +159,11 @@
 
 (defun parse-fence (tok-lines)
   "Parse a FENCE instruction from TOK-LINES. Returns the instruction object, and the remaining lines."
-  (quil::match-line ((op :FENCE) qubit &rest other-qubit-toks) tok-lines
-    (make-instance 'fence
-                   :qubits (mapcar #'quil::parse-qubit (cons qubit other-qubit-toks)))))
+  (quil::match-line ((op :FENCE) &rest qubits) tok-lines
+    (if (endp qubits)
+        (make-instance 'fence-all)
+        (make-instance 'fence
+                       :qubits (mapcar #'quil::parse-qubit qubits)))))
 
 (defun parse-capture (tok-lines)
   "Parse a CAPTURE instruction from TOK-LINES. Returns the instruction object, and the remaining lines."
@@ -234,6 +236,7 @@
       (let ((result (quil::parse-parameter-or-expression value-toks)))
         (make-instance
          (ecase tok-type
+           (:SHIFT-FREQUENCY 'shift-frequency)
            (:SET-FREQUENCY 'set-frequency)
            (:SET-PHASE     'set-phase)
            (:SHIFT-PHASE   'shift-phase)
@@ -325,6 +328,11 @@
   (case property-name
     ((:SAMPLE-RATE)
      (parse-sample-rate value-toks))
+    ((:HARDWARE-OBJECT)
+     (unless (and (= 1 (length value-toks))
+                  (eq ':STRING (quil::token-type (first value-toks))))
+       (quil-parse-error "Expected HARDWARE-OBJECT to be a string literal, but got ~{ ~A~}." value-toks))
+     (quil::token-payload (first value-toks)))
     ((:DIRECTION)
      (unless (and (= 1 (length value-toks))
                   (eq ':STRING (quil::token-type (first value-toks))))
@@ -571,7 +579,7 @@
          (tok-type (quil::token-type tok)))
 
     (case tok-type
-      ((:SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
+      ((:SHIFT-FREQUENCY :SET-FREQUENCY :SET-PHASE :SHIFT-PHASE :SET-SCALE)
        (parse-simple-frame-mutation tok-type tok-lines))
 
       ((:SWAP-PHASE)
