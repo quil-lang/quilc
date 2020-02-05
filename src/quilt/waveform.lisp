@@ -139,3 +139,16 @@ Reference: Effects of arbitrary laser or NMR pulse shapes on population inversio
        :rpcq-type complex
        :documentation "A complex number representing the in-phase (real) and quadrature (imaginary) values to hold constant."))
   :documentation "Flat pulse.")
+
+
+;;; TODO: This could probably be deprecated in favor of just having FLAT-WAVEFORMs.
+;;; Seemingly the only special thing about BOXCAR-AVERAGER-KERNEL is that it is
+;;; normalized (presumably to integrate to 1), rather than having a specified IQ value.
+(define-standard-waveform boxcar-averager-kernel "boxcar_kernel"
+  ((phase :quilt-name "phase"
+          :rpcq-type complex
+          :documentation "Phase [units of revolutions] to rotate the kernel by.")
+   (detuning :quilt-name "detuning"
+             :rpcq-type float
+             :documentation "Frequency modulation to apply to the kernel [Hz]."))
+  :documentation "A normalized flat or boxcar integration kernel.")
