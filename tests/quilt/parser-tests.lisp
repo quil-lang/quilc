@@ -103,8 +103,11 @@ DEFWAVEFORM wf 1.0:
                  "SWAP-PHASE 0 \"rf\" 0 1 \"foo\""
                  "PULSE 0 \"rf\" wf"
                  "PULSE 0 1 \"foo\" wf"
+                 "NONBLOCKING PULSE 0 1 \"foo\" wf"
                  "CAPTURE 0 \"rf\" wf iq[0]"
+                 "NONBLOCKING CAPTURE 0 \"rf\" wf iq[0]"
                  "RAW-CAPTURE 0 \"rf\" 1.0 iq[0]"
+                 "NONBLOCKING RAW-CAPTURE 0 \"rf\" 1.0 iq[0]"
                  "DELAY 0 1.0"          ; delay on qubit
                  "DELAY 0 \"rf\" 1.0"   ; delay on frame
                  "DELAY 0 \"rf\" \"zz\" 1.0" ; delay on frames

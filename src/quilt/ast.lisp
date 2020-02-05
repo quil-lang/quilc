@@ -150,7 +150,7 @@
   (:documentation "A pulse instruction."))
 
 (defmethod print-instruction-generic ((instr pulse) (stream stream))
-  (format stream "~@[NONBLOCKING ~]PULSE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "~:[~;NONBLOCKING ~]PULSE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
           (nonblocking-p instr)
           (pulse-frame instr)
           (pulse-waveform instr)))
@@ -176,7 +176,7 @@
   (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
 (defmethod print-instruction-generic ((instr capture) (stream stream))
-  (format stream "~@[NONBLOCKING ~]CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "~:[~;NONBLOCKING ~]CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
           (nonblocking-p instr)
           (capture-frame instr)
           (capture-waveform instr)
@@ -203,7 +203,7 @@
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
 (defmethod print-instruction-generic ((instr raw-capture) (stream stream))
-  (format stream "~@[NONBLOCKING ~]RAW-CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "~:[~;NONBLOCKING ~]RAW-CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
           (nonblocking-p instr)
           (raw-capture-frame instr)
           (raw-capture-duration instr)
