@@ -105,6 +105,14 @@
     m))
 
 
+;;; NOTE: The Perdomo 2Q state prep compiler has been deactivated (marked as
+;;; PEDAGOGICAL-PURPOSES-ONLY below) and the older Nelder-Mead based routine
+;;; has been reinstated, due to somewhat tricky floating point issues.
+;;;
+;;; In addition to the marked defuns below, CANONICALIZE-WF has also been changed,
+;;; as the two methods expect slightly different canonical forms for 2Q wavefunctions.
+;;; These changes were originally introduced in 585d3f5 and should be reinstated
+;;; if the Perdomo compiler is brought back into action.
 (defun canonicalize-wf (vector)
   "Calculates a special-orthogonal MATRIX that moves a unit-length VECTOR in C^4 into the form V = (a+bi c 0 0).  Returns (VALUES MATRIX V)."
   (let ((matrix (magicl:diag 4 4 (list 1d0 1d0 1d0 1d0)))
@@ -153,9 +161,11 @@
                                    (realpart v0)))))))
     (values matrix v)))
 
+#+#:pedagogical-purposes-only
 (adt:defdata tensor-factorization
   (tensor-pair magicl:matrix magicl:matrix))
 
+#+#:pedagogical-purposes-only
 (defun state-prep-within-local-equivalence-class (source-wf target-wf)
   "Produces a circuit that carries a two-qubit wavefunction SOURCE-WF to a two-qubit target wavefunction TARGET-WF under the hypothesis that SOURCE-WF and TARGET-WF have the same Segre obstruction.
 
@@ -331,14 +341,19 @@ Returns a pair (LIST C0 C1) of 2x2 matrices with (C0 (x) C1) SOURCE-WF = TARGET-
                  (inst "U1-DAG" (magicl:conjugate-transpose U1) q0)
                  (inst "U2"     U2 q0))))))))))
 
-;; here's a previous version of the 2Q compiler. it uses nelder-mead, so doesn't produce as
-;; pretty of results, but it does rely on this interesting bit of geometry where it
-;; "canonicalizes" the wavefunction through rotation into something of a very particular
-;; form. there's probably a meet between the geometry in this routine and the mysterious
-;; formulas in Oscar's. it would be nice to write out exactly what this meet is.
-;;
-;; some of the code in this has been pulled down to state-prep-within-local-equivalence-class
 
+;; NOTE: We preserve here in original form comments left by ECP, when he
+;; introduced the Perdomo compiler above.
+;;
+;; ;; here's a previous version of the 2Q compiler. it uses nelder-mead, so doesn't produce as
+;; ;; pretty of results, but it does rely on this interesting bit of geometry where it
+;; ;; "canonicalizes" the wavefunction through rotation into something of a very particular
+;; ;; form. there's probably a meet between the geometry in this routine and the mysterious
+;; ;; formulas in Oscar's. it would be nice to write out exactly what this meet is.
+;; ;;
+;; ;; some of the code in this has been pulled down to state-prep-within-local-equivalence-class
+;; ;; below. if anyone wants to turn this routine back on, it's worth offloading some
+;; ;; of the code in here to that subroutine.
 (define-compiler state-prep-2Q-compiler
     ((instr (_ _ _ _)
             :where (typep instr 'state-prep-application))) 
