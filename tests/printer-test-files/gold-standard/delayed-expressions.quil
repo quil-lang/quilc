@@ -100,9 +100,6 @@ DEFCIRCUIT TEST-CIRCUIT-EXPANSION(%arg1, %arg2) p:
 TEST-CIRCUIT-EXPANSION(pi, pi*SIN(pi/2)) 0
 
 # Output
-DEFCIRCUIT TEST-CIRCUIT-EXPANSION(%arg1, %arg2) p:
-    RX((%arg1-%arg2)) p
-
 RX(0.0) 0
 
 # Input

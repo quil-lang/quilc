@@ -94,13 +94,6 @@ TEST ro[0] ro[1]
 # Output
 DECLARE ro BIT[2]
 
-DEFCIRCUIT TEST a b:
-    NOT a
-    AND a b
-    IOR a b
-    MOVE a b
-    EXCHANGE a b
-
 NOT ro[0]
 AND ro[0] ro[1]
 IOR ro[0] ro[1]
@@ -240,11 +233,6 @@ DEFCIRCUIT EULER(%alpha, %beta, %gamma) q:
 
 EULER(pi, 2*pi, 3*pi/2) 0
 # Output
-DEFCIRCUIT EULER(%alpha, %beta, %gamma) q:
-    RX(%alpha) q
-    RY(%beta) q
-    RZ(%gamma) q
-
 RX(pi) 0
 RY(2*pi) 0
 RZ(3*pi/2) 0

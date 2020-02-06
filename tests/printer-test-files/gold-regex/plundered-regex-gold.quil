@@ -105,20 +105,6 @@ TELEPORT 0 1 5
 # Output
 DECLARE ro BIT\[2\]
 
-DEFCIRCUIT TELEPORT A q B:
-    H A
-    CNOT A B
-    CNOT q A
-    H q
-    MEASURE q ro\[0\]
-    MEASURE A ro\[1\]
-    JUMP-UNLESS @SKIP ro\[1\]
-    X B
-    LABEL @SKIP
-    JUMP-UNLESS @END ro\[0\]
-    Z B
-    LABEL @END
-
 H 0
 CNOT 0 5
 CNOT 1 0
