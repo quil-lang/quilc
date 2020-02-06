@@ -97,8 +97,6 @@
   ;; ast.lisp
   (:export
    #:copy-instance                      ; GENERIC, METHOD
-   #:address                            ; STRUCTURE
-   #:address-value                      ; READER
 
    #:qubit                              ; STRUCTURE
    #:qubit-index                        ; READER
@@ -156,7 +154,6 @@
    #:reset-qubit-target                 ; READER
 
    #:wait                               ; CLASS
-   #:wait-address                       ; READER
 
    #:unary-classical-instruction        ; ABSTRACT CLASS
    #:classical-target                   ; READER
@@ -164,7 +161,7 @@
    #:classical-negate                   ; CLASS
    #:classical-not                      ; CLASS
 
-   #:classical-binary-instruction       ; ABSTRACT CLASS
+   #:binary-classical-instruction       ; ABSTRACT CLASS
    #:classical-left-operand             ; READER
    #:classical-right-operand            ; READER
 
@@ -179,7 +176,7 @@
    #:classical-exchange                 ; CLASS
    #:classical-convert                  ; CLASS
 
-   #:classical-trinary-instruction      ; ABSTRACT CLASS
+   #:trinary-classical-instruction      ; ABSTRACT CLASS
 
    #:classical-load                                ; CLASS
    #:classical-store                               ; CLASS
@@ -342,8 +339,8 @@
    #:static-gate-definition             ; CLASS
    #:parameterized-gate-definition      ; CLASS
    #:gate-definition-parameters         ; READER
-   #:permutation-gate-definition            ; CLASS
-   #:permutation-gate-definition-parameters ; READER
+   #:permutation-gate-definition             ; CLASS
+   #:permutation-gate-definition-permutation ; READER
 
    #:circuit-definition                 ; CLASS
    #:circuit-definition-name            ; READER
@@ -354,9 +351,6 @@
    #:parsed-program                         ; CLASS
    #:parsed-program-gate-definitions        ; READER
    #:parsed-program-circuit-definitions     ; READER
-   #:parsed-program-waveform-definitions    ; READER
-   #:parsed-program-calibration-definitions ; READER
-   #:parsed-program-frame-definitions       ; READER
    #:parsed-program-memory-definitions      ; READER
    #:parsed-program-executable-code         ; READER
    #:print-parsed-program                   ; FUNCTION
@@ -390,7 +384,7 @@
    #:make-permutation-gate              ; FUNCTION
 
    #:parameterized-gate                 ; CLASS
-   #:parameterized-gate-function        ; READER
+   #:parameterized-gate-matrix-function ; READER
 
    #:controlled-gate                    ; CLASS
    #:forked-gate                        ; CLASS
