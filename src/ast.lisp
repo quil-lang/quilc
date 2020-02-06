@@ -1687,7 +1687,8 @@ Examples:
       (unless (endp (parsed-program-memory-definitions pp))
         (terpri stream))
       (print-definitions (parsed-program-gate-definitions pp))
-      (print-definitions (parsed-program-circuit-definitions pp))
+      (unless (find 'expand-circuits (transforms-performed pp))
+        (print-definitions (parsed-program-circuit-definitions pp)))
 
       (print-instruction-sequence (parsed-program-executable-code pp) :stream stream))))
 
