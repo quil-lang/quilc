@@ -525,7 +525,12 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
     (multiple-value-bind (processed-program topological-swaps)
         (compiler-hook program chip-specification :protoquil protoquil)
 
-      ;; if we're supposed to output protoQuil, we need to strip the final HALT
+      ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
+      (when protoquil
+        (setf (parsed-program-circuit-definitions processed-program) nil
+              (parsed-program-gate-definitions processed-program) nil))
+
+      ;; if we're supposed to output protoQuil, we also need to strip the final HALT
       ;; instructions from the output
       (when protoquil
         (setf (gethash "topological_swaps" statistics) topological-swaps)
