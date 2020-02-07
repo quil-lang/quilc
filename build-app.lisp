@@ -3,6 +3,8 @@
 ;;;; This file is loaded by the Makefile to produce a quilc[.exe] binary.
 ;;;;
 
+1
+
 (unless *load-truename*
   (error "This file is meant to be loaded."))
 
