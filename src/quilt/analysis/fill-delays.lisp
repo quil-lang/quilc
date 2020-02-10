@@ -21,7 +21,7 @@
 (deftype simple-quilt-instruction ()
   '(or
     pulse capture raw-capture
-    delay fence
+    delay fence fence-all
     simple-frame-mutation swap-phase))
 
 (defun resolved-waveform (instr)
@@ -46,7 +46,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 
 (defun quilt-instruction-duration (instr)
   "Get the duration of the specified Quilt instruction INSTR if it is well defined, or NIL otherwise."
-  (typecase instr
+  (etypecase instr
     ((or pulse capture)
      (waveform-active-duration (resolved-waveform instr)))
     (delay
@@ -56,8 +56,8 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     (simple-frame-mutation
      *quilt-seemingly-instantenous-duration*)
     ;; FENCE and SWAP-PHASE both impose synchronization, and hence only have a duration that is meaningful on a frame-by-frame basis.
-    ((or fence swap-phase)
-     nil)))
+    ((or fence fence-all swap-phase)
+     0.0)))
 
 (defun quilt-instruction-frames (instr parsed-program)
   (a:ensure-list
@@ -78,7 +78,10 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
       (loop :for defn :in (parsed-program-frame-definitions parsed-program)
             :for frame := (frame-definition-frame defn)
             :when (frame-intersects-p frame (fence-qubits instr))
-              :collect frame)))))
+              :collect frame))
+     (fence-all
+      (mapcar #'frame-definition-frame
+              (parsed-program-frame-definitions parsed-program))))))
 
 (defun pulse-operation-frame (instr)
   "If INSTR is a generalized pulse operation (e.g. PULSE, CAPTURE, or RAW-CAPTURE), return the target frame. Otherwise, return NIL."
@@ -156,6 +159,18 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
                                            :frames (list f)
                                            :duration (constant lag)))))
 
+  (:method ((instr fence-all) clocks)
+    (let* ((frames (tracked-frames clocks))
+           (latest (latest-time clocks frames)))
+      (loop :for f :in frames
+            :for lag := (- latest (local-time clocks f))
+            ;; handle implicit delays
+            :when (plusp lag)
+              :do (incf (local-time clocks f) lag)
+              :and :collect (make-instance 'delay-on-frames
+                                           :frames (list f)
+                                           :duration (constant lag)))))
+
   (:method ((instr swap-phase) clocks)
     (with-slots (left-frame right-frame) instr
       (let ((latest (max (local-time clocks left-frame)
@@ -208,7 +223,7 @@ If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so t
              ;; Add delays before the instruction
              (dolist (delay (emit-delays instr frame-clocks))
                (push delay new-instrs))
-             (unless (and omit-fences (typep instr 'fence))
+             (unless (and omit-fences (typep instr '(or fence fence-all)))
                (push instr new-instrs))))
       (loop :for instr :across (parsed-program-executable-code parsed-program)
             :do (process-instr instr))

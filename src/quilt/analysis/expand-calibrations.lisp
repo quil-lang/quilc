@@ -254,6 +254,9 @@
         (make-instance 'fence :qubits qubits)
         instr)))
 
+(defmethod instantiate-instruction ((instr fence-all) param-value arg-value)
+  instr)
+
 ;;; Calibrations instantiate to their bodies, with parameters and formals substituted
 (defmethod instantiate-instruction ((instr gate-calibration-definition) param-value arg-value)
   (quil::instantiate-definition-body instr
