@@ -84,30 +84,25 @@ NOTE: Scheduling instructions (e.g. DELAY, FENCE) will resolve to NIL."
             (swap-phase-right-frame instr))))))
 
 
-;; TODO: track hwobj rather than frames
-;;; TODO: alignment
-(defun schedule-to-hardware (program &optional (initial-time 0.0))
-  (let ((hardware-schedules (make-hash-table :test 'equal))
-        (frame-clocks (make-hash-table :test 'equal)))
-    (flet ((latest-time (frames)
+(defun schedule-to-hardware (program &key (initial-time 0.0) (align-op #'identity))
+  (let ((aligned-start (funcall align-op initial-time))
+        (hardware-schedules (make-hash-table :test 'equal))
+        (frame-clocks (make-hash-table :test #'frame= :hash-function #'frame-hash)))
+    (flet ((latest (frames)
              (apply #'max (mapcar (lambda (f)
-                                    (gethash f frame-clocks initial-time))
+                                    (gethash f frame-clocks aligned-start))
                                   frames))))
       (loop :for instr :across (parsed-program-executable-code program)
             :for frames := (properly-obstructed-frames instr program)
             :for hw-name := (resolve-hardware-object instr)
             :when (typep instr '(or reset reset-qubit))
               :do (error "Scheduling of RESET instructions is not implemented.")
-            :when (and hw-name
-                       (null (gethash hw-name hardware-schedules)))
-              :do (setf (gethash hw-name hardware-schedules)
-                        (make-hash-table :test 'eql))
-            :do (let ((op-time (latest-time frames))
+            :do (let ((op-time (latest frames))
                       (duration (quilt-instruction-duration instr)))
                   (when hw-name
-                    (let ((schedule (gethash hw-name hardware-schedules)))
-                      (setf (gethash instr schedule) op-time)))
+                    (push (cons op-time instr)
+                          (gethash hw-name hardware-schedules)))
                   (loop :for frame :in frames
                         :do (setf (gethash frame frame-clocks)
-                                  (+ op-time duration))))))
+                                  (funcall align-op (+ op-time duration)))))))
     hardware-schedules))

@@ -242,4 +242,5 @@
                (:file "suite")
                (:file "parser-tests")
                (:file "calibration-tests")
-               (:file "analysis-tests")))
+               (:file "analysis-tests")
+               (:file "scheduling-tests")))
