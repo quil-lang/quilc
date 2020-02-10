@@ -122,6 +122,7 @@
    #:frame-definition-frame             ; READER
    #:frame-definition-sample-rate       ; READER
    #:frame-definition-initial-frequency ; READER
+   #:frame-definition-hardware-object   ; READER
 
    #:parse-quilt-into-raw-program       ; FUNCTION
    #:parse-quilt                        ; FUNCTION
