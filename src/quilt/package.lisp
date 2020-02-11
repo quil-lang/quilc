@@ -72,9 +72,11 @@
 
    #:fence                              ; CLASS
    #:fence-qubits                       ; READER
+   #:fence-all                          ; CLASS
 
    #:simple-frame-mutation              ; ABSTRACT CLASS
    #:set-frequency                      ; CLASS
+   #:shift-frequency                    ; CLASS
    #:set-phase                          ; CLASS
    #:shift-phase                        ; CLASS
    #:set-scale                          ; CLASS
@@ -92,11 +94,9 @@
    #:gate-definition-entries            ; READER
    #:gate-definition-parameters         ; READER
 
-   #:circuit-definition                 ; CLASS
-   #:circuit-definition-name            ; READER
-   #:circuit-definition-parameters      ; READER
-   #:circuit-definition-arguments       ; READER
-   #:circuit-definition-body            ; READER
+   #:parsed-program-waveform-definitions    ; READER
+   #:parsed-program-calibration-definitions ; READER
+   #:parsed-program-frame-definitions       ; READER
 
    #:waveform-definition                ; ABSTRACT CLASS
    #:static-waveform-definition         ; CLASS
