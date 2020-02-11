@@ -7,17 +7,26 @@
 ;;; Syntactic conveniences
 
 ;;; For the purposes of this (or related) analyses, "simple Quilt" is the subset
-;;; of straight-line Quilt involving only pulse operations (including captures),
-;;; explicit control of timing/synchronization, and frame updates. These are the
-;;; basic operations which must be supported by any control hardware which may
-;;; be targeted by Quilt, and also reflect a minimal coherent subset of
+;;; of straight-line Quilt involving only pulse operations or captures, explicit
+;;; control of timing/synchronization, and frame updates. These are the basic
+;;; operations which must be supported by any control hardware which may be
+;;; targeted by Quilt, and also reflect a minimal coherent subset of
 ;;; instructions for which time-related program analyses may be performed.
 
 (deftype simple-quilt-instruction ()
   '(or
     pulse capture raw-capture
     delay fence fence-all
-    simple-frame-mutation swap-phase))
+    simple-frame-mutation swap-phase
+    pragma))
+
+(define-condition quilt-scheduling-error ()
+  ()
+  (:documentation "Representation of an error during scheduling of Quilt."))
+
+(defun quilt-scheduling-error (format-control &rest format-args)
+  (error 'quilt-scheduling-error :format-control format-control
+                                 :format-arguments format-args))
 
 (defun resolved-waveform (instr)
   "Get the resolved waveform of an instruction, if it exists."
@@ -89,7 +98,9 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 (defun frame-hardware (frame)
   "Get the name of the hardware object associated with FRAME."
   (unless (frame-name-resolution frame)
-    (error "Frame ~/quilt::instruction-fmt/ has not been resolved to a definition." frame))
+    (quilt-scheduling-error
+     "Frame ~/quilt::instruction-fmt/ has not been resolved to a definition."
+     frame))
   (frame-definition-hardware-object
    (frame-name-resolution frame)))
 
@@ -110,10 +121,9 @@ NOTE: Scheduling instructions (e.g. DELAY, FENCE) will resolve to NIL."
      (let ((left (frame-hardware (swap-phase-left-frame instr)))
            (right (frame-hardware (swap-phase-right-frame instr))))
        (unless (string-equal left right)
-         (error "Instruction ~/quilt::instruction-fmt/ has conflicting hardware objects: ~A and ~A."
-                instr
-                left
-                right))
+         (quilt-scheduling-error
+          "Instruction ~/quilt::instruction-fmt/ has conflicting hardware objects: ~S and ~S."
+          instr left right))
        left))))
 
 ;;; Greedy Scheduling
@@ -198,8 +208,8 @@ The result is a hash table mapping the names of hardware objects to a list of (i
             :for obstructed-hw := (mapcar #'frame-hardware
                                           (properly-obstructed-frames instr program))
             :for target-hw := (resolve-hardware-object instr)
-            :when (typep instr '(or reset reset-qubit))
-              :do (error "Scheduling of RESET instructions is not implemented.")
+            :unless (typep instr 'simple-quilt-instruction)
+              :do (quilt-scheduling-error "Scheduling of ~/quilt::instruction-fmt/ instructions is not implemented." instr)
             :do (let ((op-time (latest obstructed-hw))
                       (duration (quilt-instruction-duration instr)))
                   (when target-hw

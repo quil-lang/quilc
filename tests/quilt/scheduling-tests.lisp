@@ -1,5 +1,22 @@
 (in-package #:cl-quil.quilt-tests)
 
+(deftest test-quilt-instruction-duration ()
+  (flet ((duration= (duration instr-str)
+           (let ((pp (parse-quilt
+                      (format nil "DEFFRAME 0 \"xy\"~%DECLARE iq REAL[2]~%~A"
+                              instr-str)
+                      :transforms nil)))
+             (= duration
+                (quilt::quilt-instruction-duration
+                 (quil::nth-instr 0 pp))))))
+    (is (duration= 1.5 "PULSE 0 \"xy\" flat(duration: 1.5, iq: 1)"))
+    (is (duration= 1.5 "CAPTURE 0 \"xy\" flat(duration: 1.5, iq: 1) iq"))
+    (is (duration= 1.5 "RAW-CAPTURE 0 \"xy\" 1.5 iq"))
+    (is (duration= 1.5 "DELAY 0 1.5"))
+    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SET-FREQUENCY 0 \"xy\" 1.0"))
+    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SET-PHASE 0 \"xy\" 1.0"))
+    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SHIFT-PHASE 0 \"xy\" 1.0"))))
+
 (defvar *dummy-frame-definitions*
   "
 DEFFRAME 0 1 \"cz\":
@@ -188,32 +205,13 @@ PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
     (assert (quil::double= 0.456d0
                            (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
 
-(deftest test-swap-forces-synchronization ()
-  (let* ((pp (calibrate "
-PULSE 0 \"rf\" flat(duration: 1.0, iq: 1.0)
-SWAP-PHASE 0 \"rf\" 1 \"rf\"
-PULSE 0 \"rf\" flat(duration: 1.0, iq: 1.0)
-PULSE 1 \"rf\" flat(duration: 1.0, iq: 1.0)
-"))
-         (schedule (quilt::schedule-to-hardware pp)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
-    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))
-    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 2 pp) schedule)))
-    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
+(deftest test-swap-phase-conflict ()
+  ;; This looks innocent, but the frames are on different hardware objects.
+  ;; How do you get around this? Well, you basically need to propagate the phase as a constant
+  ;; before scheduling, OR figure out some cool way to actually implement this operation on HW.
+  (let* ((pp (calibrate "SWAP-PHASE 0 \"rf\" 1 \"rf\"")))
+    (signals quilt::quilt-scheduling-error (quilt::schedule-to-hardware pp))))
 
-(deftest test-quilt-instruction-duration ()
-  (flet ((duration= (duration instr-str)
-           (let ((pp (parse-quilt
-                      (format nil "DEFFRAME 0 \"xy\"~%DECLARE iq REAL[2]~%~A"
-                              instr-str)
-                      :transforms nil)))
-             (= duration
-                (quilt::quilt-instruction-duration
-                 (quil::nth-instr 0 pp))))))
-    (is (duration= 1.5 "PULSE 0 \"xy\" flat(duration: 1.5, iq: 1)"))
-    (is (duration= 1.5 "CAPTURE 0 \"xy\" flat(duration: 1.5, iq: 1) iq"))
-    (is (duration= 1.5 "RAW-CAPTURE 0 \"xy\" 1.5 iq"))
-    (is (duration= 1.5 "DELAY 0 1.5"))
-    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SET-FREQUENCY 0 \"xy\" 1.0"))
-    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SET-PHASE 0 \"xy\" 1.0"))
-    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SHIFT-PHASE 0 \"xy\" 1.0"))))
+(deftest test-fail-on-reset ()
+  (let* ((pp (calibrate "RESET 0")))
+    (signals quilt::quilt-scheduling-error (quilt::schedule-to-hardware pp))))
