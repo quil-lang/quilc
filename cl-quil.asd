@@ -223,7 +223,6 @@
                 :components ((:file "resolve-objects")
                              (:file "expand-calibrations")
                              (:file "type-safety")
-                             (:file "fill-delays")
                              (:file "schedule-to-hardware")))
                (:file "cl-quilt")))
 

@@ -4,6 +4,73 @@
 
 (in-package #:cl-quil.quilt)
 
+;;; Syntactic conveniences
+
+;;; For the purposes of this (or related) analyses, "simple Quilt" is the subset
+;;; of straight-line Quilt involving only pulse operations (including captures),
+;;; explicit control of timing/synchronization, and frame updates. These are the
+;;; basic operations which must be supported by any control hardware which may
+;;; be targeted by Quilt, and also reflect a minimal coherent subset of
+;;; instructions for which time-related program analyses may be performed.
+
+(deftype simple-quilt-instruction ()
+  '(or
+    pulse capture raw-capture
+    delay fence fence-all
+    simple-frame-mutation swap-phase))
+
+(defun resolved-waveform (instr)
+  "Get the resolved waveform of an instruction, if it exists."
+  (a:if-let ((wf-ref
+              (typecase instr
+                (pulse (pulse-waveform instr))
+                (capture (capture-waveform instr)))))
+    (waveform-ref-name-resolution wf-ref)))
+
+(defun waveform-active-duration (wf-or-wf-defn)
+  "Get the active duration of the waveform or waveform definition, in seconds.
+If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
+  (etypecase wf-or-wf-defn
+    (standard-waveform (constant-value (waveform-duration wf-or-wf-defn)))
+    (waveform-definition
+     (/ (length (waveform-definition-entries wf-or-wf-defn))
+        (constant-value (waveform-definition-sample-rate wf-or-wf-defn))))))
+
+(defparameter *quilt-seemingly-instantenous-duration* 0.0d0
+  "A numerical value representing the duration of seemingly instantenous operations, in seconds. This might be zero, and it might not be!")
+
+(defun quilt-instruction-duration (instr)
+  "Get the duration of the specified Quilt instruction INSTR if it is well defined, or NIL otherwise."
+  (etypecase instr
+    ((or pulse capture)
+     (waveform-active-duration (resolved-waveform instr)))
+    (delay
+      (constant-value (delay-duration instr)))
+    (raw-capture
+     (constant-value (raw-capture-duration instr)))
+    (simple-frame-mutation
+     *quilt-seemingly-instantenous-duration*)
+    ;; FENCE and SWAP-PHASE both impose synchronization, and hence only have a duration that is meaningful on a frame-by-frame basis.
+    ((or fence fence-all swap-phase)
+     0.0)))
+
+
+(defun frame-intersects-p (frame qubits)
+  "Does the FRAME involve any of the specified QUBITS?"
+  (intersection qubits
+                (frame-qubits frame)
+                :test #'qubit=))
+
+(defun frame-on-p (frame qubits)
+  "Does FRAME involve exactly the specified QUBITS?"
+  (null (set-exclusive-or qubits
+                          (frame-qubits frame)
+                          :test #'qubit=)))
+
+(defun frame-subset-p (frame qubits)
+  "Does FRAME involve a subset of the specified QUBITS?"
+  (subsetp (frame-qubits frame) qubits :test #'qubit=))
+
 (defun all-defined-frames (program)
   "Get all frames defined in the Quilt program PROGRAM."
   (mapcar #'frame-definition-frame
@@ -11,18 +78,13 @@
 
 (defun frames-subsumed (qubits program)
   "Get all frames in PROGRAM on any subset of the specified QUBITS."
-  (loop :for frame :in (all-defined-frames program)
-        :when (subsetp (frame-qubits frame) qubits :test #'qubit=)
-          :collect frame))
+  (remove-if-not (lambda (f) (frame-subset-p f qubits))
+                 (all-defined-frames program)))
 
 (defun frames-on (qubits program)
   "Get all frames in PROGRAM on exactly the specified QUBITS."
-  (loop :for frame :in (all-defined-frames program)
-        :when (null (set-exclusive-or qubits
-                                      (frame-qubits frame)
-                                      :test #'qubit=))
-          :collect frame))
-
+  (remove-if-not (lambda (f) (frame-on-p f qubits))
+                 (all-defined-frames program)))
 
 (defun frame-hardware (frame)
   "Get the name of the hardware object associated with FRAME."

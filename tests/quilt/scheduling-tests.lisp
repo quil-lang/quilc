@@ -187,3 +187,33 @@ PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
     ;; DELAY obstructs the other one
     (assert (quil::double= 0.456d0
                            (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
+
+(deftest test-swap-forces-synchronization ()
+  (let* ((pp (calibrate "
+PULSE 0 \"rf\" flat(duration: 1.0, iq: 1.0)
+SWAP-PHASE 0 \"rf\" 1 \"rf\"
+PULSE 0 \"rf\" flat(duration: 1.0, iq: 1.0)
+PULSE 1 \"rf\" flat(duration: 1.0, iq: 1.0)
+"))
+         (schedule (quilt::schedule-to-hardware pp)))
+    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))
+    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 2 pp) schedule)))
+    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
+
+(deftest test-quilt-instruction-duration ()
+  (flet ((duration= (duration instr-str)
+           (let ((pp (parse-quilt
+                      (format nil "DEFFRAME 0 \"xy\"~%DECLARE iq REAL[2]~%~A"
+                              instr-str)
+                      :transforms nil)))
+             (= duration
+                (quilt::quilt-instruction-duration
+                 (quil::nth-instr 0 pp))))))
+    (is (duration= 1.5 "PULSE 0 \"xy\" flat(duration: 1.5, iq: 1)"))
+    (is (duration= 1.5 "CAPTURE 0 \"xy\" flat(duration: 1.5, iq: 1) iq"))
+    (is (duration= 1.5 "RAW-CAPTURE 0 \"xy\" 1.5 iq"))
+    (is (duration= 1.5 "DELAY 0 1.5"))
+    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SET-FREQUENCY 0 \"xy\" 1.0"))
+    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SET-PHASE 0 \"xy\" 1.0"))
+    (is (duration= quilt::*quilt-seemingly-instantenous-duration* "SHIFT-PHASE 0 \"xy\" 1.0"))))
