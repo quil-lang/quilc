@@ -36,33 +36,37 @@
                 (capture (capture-waveform instr)))))
     (waveform-ref-name-resolution wf-ref)))
 
-(defun waveform-active-duration (wf-or-wf-defn)
+(defun waveform-active-duration (wf-or-wf-defn frame)
   "Get the active duration of the waveform or waveform definition, in seconds.
 If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   (etypecase wf-or-wf-defn
     (standard-waveform (constant-value (waveform-duration wf-or-wf-defn)))
     (waveform-definition
-     (/ (length (waveform-definition-entries wf-or-wf-defn))
-        (constant-value (waveform-definition-sample-rate wf-or-wf-defn))))))
+     (let ((frame-defn (frame-name-resolution frame)))
+       (unless frame-defn
+         (quilt-scheduling-error "Unable to determine waveform duration on unresolved frame ~/quilt::instruction-fmt/."
+                                 frame))
+       (unless (frame-definition-sample-rate frame-defn)
+         (quilt-scheduling-error "Unable to determine waveform duration: frame ~/quilt::instruction-fmt/ has no SAMPLE-RATE specified."))
+       (/ (length (waveform-definition-entries wf-or-wf-defn))
+          (constant-value (frame-definition-sample-rate frame-defn)))))))
 
 (defparameter *quilt-seemingly-instantenous-duration* 0.0d0
   "A numerical value representing the duration of seemingly instantenous operations, in seconds. This might be zero, and it might not be!")
 
 (defun quilt-instruction-duration (instr)
-  "Get the duration of the specified Quilt instruction INSTR if it is well defined, or NIL otherwise."
+  "Get the duration of the specified Quilt instruction INSTR."
   (etypecase instr
-    ((or pulse capture)
-     (waveform-active-duration (resolved-waveform instr)))
+    (pulse
+     (waveform-active-duration (resolved-waveform instr) (pulse-frame instr)))
+    (capture
+     (waveform-active-duration (resolved-waveform instr) (capture-frame instr)))
     (delay
-      (constant-value (delay-duration instr)))
+     (constant-value (delay-duration instr)))
     (raw-capture
      (constant-value (raw-capture-duration instr)))
-    (simple-frame-mutation
-     *quilt-seemingly-instantenous-duration*)
-    ;; FENCE and SWAP-PHASE both impose synchronization, and hence only have a duration that is meaningful on a frame-by-frame basis.
-    ((or fence fence-all swap-phase)
-     0.0)))
-
+    ((or fence fence-all swap-phase simple-frame-mutation)
+     *quilt-seemingly-instantenous-duration*)))
 
 (defun frame-intersects-p (frame qubits)
   "Does the FRAME involve any of the specified QUBITS?"

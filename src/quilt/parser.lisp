@@ -394,34 +394,35 @@
     (quil-parse-error "EOF reached when waveform definition expected."))
 
   ;; Get the parameter and body lines
-  (let (name
-        sample-rate)
+  (let (name)
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
-      (destructuring-bind (op . params-args) parameter-line
+      (destructuring-bind (op . rest-line) parameter-line
         ;; Check that we are dealing with a DEFWAVEFORM.
         (unless (eq ':DEFWAVEFORM (quil::token-type op))
           (quil::disappointing-token-error op "DEFWAVEFORM"))
 
         ;; Check that something is following the DEFWAVEFORM.
-        (when (null params-args)
-          (quil-parse-error "Expected more after DEFWAVEFORM token."))
+        (when (null rest-line)
+          (quil-parse-error "Expected a name following DEFWAVEFORM."))
 
         ;; Check for a name.
-        (unless (eq ':NAME (quil::token-type (first params-args)))
-          (quil::disappointing-token-error (first params-args) "a name"))
+        (unless (eq ':NAME (quil::token-type (first rest-line)))
+          (quil::disappointing-token-error (first rest-line) "a name"))
 
         ;; We have a name. Stash it away.
-        (setf name (quil::token-payload (pop params-args)))
+        (setf name (quil::token-payload (pop rest-line)))
 
-        (multiple-value-bind (params rest-line) (quil::parse-parameters params-args)
-
-          (setf sample-rate (parse-sample-rate (butlast rest-line)))
+        (multiple-value-bind (params rest-line) (quil::parse-parameters rest-line)
 
           ;; Check for colon and incise it.
-          (let ((maybe-colon (last rest-line)))
-            (when (or (null maybe-colon)
-                      (not (eq ':COLON (quil::token-type (first maybe-colon)))))
+          (let ((maybe-colon (first rest-line)))
+            (unless (and maybe-colon
+                         (eq ':COLON (quil::token-type maybe-colon))
+                         (endp (rest rest-line)))
               (quil-parse-error "Expected a colon terminating the first line of DEFWAVEFORM.")))
+
+          (when (endp body-lines)
+            (quil-parse-error "DEFWAVEFORM body is empty, but a list of complex numbers is expected."))
 
           (let ((quil::*arithmetic-parameters* nil)
                 (quil::*segment-encountered* nil))
@@ -447,7 +448,7 @@
                               :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
                             :else
                               :collect (second found-p))))
-                (values (make-waveform-definition name param-symbols parsed-entries sample-rate :context op)
+                (values (make-waveform-definition name param-symbols parsed-entries :context op)
                         rest-lines)))))))))
 
 ;;; Calibration Definitions

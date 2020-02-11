@@ -41,7 +41,7 @@ FOO(1.0) 0"
 (deftest test-quilt-name-resolution ()
   (let ((pp (parse-quilt "
 DEFFRAME 0 \"xy\"
-DEFWAVEFORM foo 1.0:
+DEFWAVEFORM foo:
     1.0, 1.0, 1.0
 
 DEFCAL X q:
@@ -64,18 +64,24 @@ PULSE 0 \"xy\" foo")))
 
 (deftest test-quilt-duration ()
   (let ((pp (parse-quilt "
-DEFFRAME 0 \"xy\"
+DEFFRAME 0 \"rf\"
 
-DEFWAVEFORM foo 2.0:
+DEFFRAME 1 \"rf\":
+    SAMPLE-RATE: 2.0
+
+DEFWAVEFORM foo:
     1.0, 1.0, 1.0, 1.0
 
-PULSE 0 \"xy\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)
-PULSE 0 \"xy\" foo
+PULSE 0 \"rf\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)
+PULSE 0 \"rf\" foo
+PULSE 1 \"rf\" foo
 ")))
     (flet ((instr (i)
              (elt (parsed-program-executable-code pp) i)))
       (is (= 1.0 (quilt::quilt-instruction-duration (instr 0))))
-      (is (= 2.0 (quilt::quilt-instruction-duration (instr 1)))))))
+      (signals quilt::quilt-scheduling-error
+        (quilt::quilt-instruction-duration (instr 1)))
+      (is (= 2.0 (quilt::quilt-instruction-duration (instr 2)))))))
 
 (deftest test-capture-type-safety ()
   (let ((bit-prog "

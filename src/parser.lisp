@@ -1540,7 +1540,8 @@ If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly i
   "Parse a list of parameters, surrounded by a pair of parentheses. Returns the parsed parameters and the remaining tokens.
 
 When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a parameter context."
-  (unless (eql ':LEFT-PAREN (token-type (first params-args)))
+  (when (or (endp params-args)
+            (not (eql ':LEFT-PAREN (token-type (first params-args)))))
     (return-from parse-parameters (values nil params-args)))
 
   ;; Remove :LEFT-PAREN
