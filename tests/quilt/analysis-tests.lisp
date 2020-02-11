@@ -3,32 +3,32 @@
 (deftest test-quilt-circuit-expansion ()
   (let ((pp (parse-quilt "
 DECLARE iq REAL[1000]
-DEFFRAME 0 \"xy\":
+DEFFRAME 0 \"rf\":
     SAMPLE-RATE: 1.0
 
 DEFFRAME 0 \"ff\"
 
 DEFCIRCUIT FOO(%theta) q:
-    SET-PHASE q \"xy\" %theta
-    SWAP-PHASE q \"xy\" q \"ff\"
-    PULSE q \"xy\" flat(iq: 1.0, duration: %theta)
-    CAPTURE q \"xy\" flat(iq: 1.0, duration: %theta) iq[0]
-    RAW-CAPTURE q \"xy\" %theta iq[0]
+    SET-PHASE q \"rf\" %theta
+    SWAP-PHASE q \"rf\" q \"ff\"
+    PULSE q \"rf\" flat(iq: 1.0, duration: %theta)
+    CAPTURE q \"rf\" flat(iq: 1.0, duration: %theta) iq[0]
+    RAW-CAPTURE q \"rf\" %theta iq[0]
     DELAY q %theta
-    DELAY q \"xy\" %theta
+    DELAY q \"rf\" %theta
     FENCE q
 
 FOO(1.0) 0"
                          :transforms '(quil::expand-circuits)))
         (expected-instrs
           (list
-           "SET-PHASE 0 \"xy\" 1.0"
-           "SWAP-PHASE 0 \"xy\" 0 \"ff\""
-           "PULSE 0 \"xy\" flat(iq: 1.0, duration: 1.0)"
-           "CAPTURE 0 \"xy\" flat(iq: 1.0, duration: 1.0) iq[0]"
-           "RAW-CAPTURE 0 \"xy\" 1.0 iq[0]"
+           "SET-PHASE 0 \"rf\" 1.0"
+           "SWAP-PHASE 0 \"rf\" 0 \"ff\""
+           "PULSE 0 \"rf\" flat(iq: 1.0, duration: 1.0)"
+           "CAPTURE 0 \"rf\" flat(iq: 1.0, duration: 1.0) iq[0]"
+           "RAW-CAPTURE 0 \"rf\" 1.0 iq[0]"
            "DELAY 0 1.0"
-           "DELAY 0 \"xy\" 1.0"
+           "DELAY 0 \"rf\" 1.0"
            "FENCE 0")))
     (is (= (length (parsed-program-executable-code pp))
            (length expected-instrs)))
@@ -40,14 +40,14 @@ FOO(1.0) 0"
 
 (deftest test-quilt-name-resolution ()
   (let ((pp (parse-quilt "
-DEFFRAME 0 \"xy\"
+DEFFRAME 0 \"rf\"
 DEFWAVEFORM foo:
     1.0, 1.0, 1.0
 
 DEFCAL X q:
-    PULSE q \"xy\" foo
+    PULSE q \"rf\" foo
 
-PULSE 0 \"xy\" foo")))
+PULSE 0 \"rf\" foo")))
     (let ((frame-defn (first
                        (parsed-program-frame-definitions pp)))
           (waveform-defn (first
@@ -86,20 +86,20 @@ PULSE 1 \"rf\" foo
 (deftest test-capture-type-safety ()
   (let ((bit-prog "
 DECLARE b BIT
-DEFFRAME 0 \"xy\"
-CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) b")
+DEFFRAME 0 \"rf\"
+CAPTURE 0 \"rf\" flat(duration: 1.0, iq: 1.0) b")
         (real-prog "
 DECLARE r REAL
-DEFFRAME 0 \"xy\"
-CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) r")
+DEFFRAME 0 \"rf\"
+CAPTURE 0 \"rf\" flat(duration: 1.0, iq: 1.0) r")
         (valid-prog "
 DECLARE iqs REAL[4]
-DEFFRAME 0 \"xy\"
-CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) iqs[2]")
+DEFFRAME 0 \"rf\"
+CAPTURE 0 \"rf\" flat(duration: 1.0, iq: 1.0) iqs[2]")
         (overshoot-prog "
 DECLARE iqs REAL[4]
-DEFFRAME 0 \"xy\"
-CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) iqs[3]"))
+DEFFRAME 0 \"rf\"
+CAPTURE 0 \"rf\" flat(duration: 1.0, iq: 1.0) iqs[3]"))
     (signals quil-type-error (parse-quilt bit-prog))
     (signals quil-type-error (parse-quilt real-prog))
     (is (parse-quilt valid-prog))
@@ -108,13 +108,13 @@ CAPTURE 0 \"xy\" flat(duration: 1.0, iq: 1.0) iqs[3]"))
 (deftest test-raw-capture-type-safety ()
   (let ((bad "
 DECLARE iqs REAL[10]
-DEFFRAME 0 \"xy\":
+DEFFRAME 0 \"rf\":
     SAMPLE-RATE: 4.0
-RAW-CAPTURE 0 \"xy\" 2.0 iqs")              ; 8 iq values = 16 reals
+RAW-CAPTURE 0 \"rf\" 2.0 iqs")              ; 8 iq values = 16 reals
         (good "
 DECLARE iqs REAL[10]
-DEFFRAME 0 \"xy\":
+DEFFRAME 0 \"rf\":
     SAMPLE-RATE: 4.0
-RAW-CAPTURE 0 \"xy\" 1.0 iqs"))
+RAW-CAPTURE 0 \"rf\" 1.0 iqs"))
     (signals quil-type-error (parse-quilt bad))
     (is (parse-quilt good))))

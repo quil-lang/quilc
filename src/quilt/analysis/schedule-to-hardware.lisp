@@ -139,7 +139,7 @@ NOTE: Scheduling instructions (e.g. DELAY, FENCE) will resolve to NIL."
 ;;; A naive approach to scheduling is to maintain a clock for each hardware
 ;;; object, tracking the next available time for an operation. For each
 ;;; instruction, the set of obstructed frames is computed. The instruction
-;;; begins at the next time which sychronizes these, and the associated clocks
+;;; begins at the next time which synchronizes these, and the associated clocks
 ;;; are advanced by the instruction duration.
 ;;;
 ;;; There is one problem with this approach. Consider
@@ -159,8 +159,7 @@ NOTE: Scheduling instructions (e.g. DELAY, FENCE) will resolve to NIL."
 (defun properly-obstructed-frames (instr program)
   "Get all the frames in PROGRAM which are 'properly' obstructed by INSTR.
 
-Here a frame is 'properly' obstructed if it is obstructed by instr and the frame
-qubits are a subset of the qubits on which INSTR acts.
+Here a frame is 'properly' obstructed if it is obstructed by INSTR and the frame qubits are a subset of the qubits on which INSTR acts.
 
 For example, a pulse on 0 \"rf\" does not properly obstruct 0 1 \"cz\"."
   (a:ensure-list
@@ -199,7 +198,7 @@ For example, a pulse on 0 \"rf\" does not properly obstruct 0 1 \"cz\"."
 (defun schedule-to-hardware (program &key (initial-time 0.0d0) (align-op #'identity))
   "Compute hardware schedules for the instructions in the Quilt program PROGRAM.
 
-The result is a hash table mapping the names of hardware objects to a list of (instr . time) pairs."
+The result is a hash table mapping the names of hardware objects to a list of (instruction . time) pairs."
   (check-type program parsed-quilt-program)
   (let ((aligned-start (funcall align-op initial-time))
         (hardware-schedules (make-hash-table :test 'equal))

@@ -84,13 +84,11 @@ DELAY 0 1.0
 "))))
     (flet ((num-instrs (hw)
              (length (gethash hw schedule))))
-      (assert (= 4 (hash-table-count schedule)))
-      (assert (= 1 (num-instrs "q0_ro_tx")))
-      (assert (= 3 (num-instrs "q0_rf")))
-      (assert (= 1 (num-instrs "q1_rf")))
-      (assert (= 1 (num-instrs "q0_ff"))))))
-
-;;; TODO: test swap-phase error
+      (is (= 4 (hash-table-count schedule)))
+      (is (= 1 (num-instrs "q0_ro_tx")))
+      (is (= 3 (num-instrs "q0_rf")))
+      (is (= 1 (num-instrs "q1_rf")))
+      (is (= 1 (num-instrs "q0_ff"))))))
 
 (defun instruction-start-time (instr schedule)
   (let ((hw-name (quilt::resolve-hardware-object instr)))
@@ -106,8 +104,8 @@ NONBLOCKING PULSE 0 \"ro_rx\" flat(duration: 1.0, iq: 1.0)
         (schedule
           (quilt::schedule-to-hardware pp)))
 
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))))
 
 (deftest test-schedule-mixed-pulses ()
   (let* ((pp (calibrate "
@@ -117,10 +115,10 @@ PULSE 0 \"ro_rx\" flat(duration: 1.0, iq: 1.0)
          (schedule
            (quilt::schedule-to-hardware pp)))
 
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
     ;; the second pulse obstructs qubit 0, and so cannot occur simultaneously
     ;; with the first pulse
-    (assert (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))))
+    (is (quil::double= 1.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))))
 
 (deftest test-schedule-fenced-pulses ()
   (let* ((pp (calibrate "
@@ -133,11 +131,11 @@ PULSE 0 \"rf\" flat(duration: 1.0, iq: 1.0)
          (schedule
            (quilt::schedule-to-hardware pp)))
 
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
     ;; the first FENCE does nto delay the pulse on 1 "rf"
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 2 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 2 pp) schedule)))
     ;; the second fence does delay the following pulse
-    (assert (quil::double= 1.5d0 (instruction-start-time (quil::nth-instr 4 pp) schedule)))))
+    (is (quil::double= 1.5d0 (instruction-start-time (quil::nth-instr 4 pp) schedule)))))
 
 (deftest test-schedule-global-fence ()
   (let* ((pp (calibrate "
@@ -151,11 +149,11 @@ CAPTURE 1 \"ro_rx\" flat(duration: 1.0, iq: 1.0) iq
          (schedule
            (quilt::schedule-to-hardware pp)))
 
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))
     ;; the second fence does delay the following pulse
-    (assert (quil::double= 0.5d0 (instruction-start-time (quil::nth-instr 3 pp) schedule)))
-    (assert (quil::double= 0.5d0 (instruction-start-time (quil::nth-instr 4 pp) schedule)))))
+    (is (quil::double= 0.5d0 (instruction-start-time (quil::nth-instr 3 pp) schedule)))
+    (is (quil::double= 0.5d0 (instruction-start-time (quil::nth-instr 4 pp) schedule)))))
 
 (deftest test-rigid-pulse-pair ()
   (let* ((pp (calibrate "
@@ -163,8 +161,8 @@ PULSE 0 \"rf\" flat(duration: 0.123, iq: 1.0)
 PULSE 0 \"rf\" flat(duration: 1.0, iq: 1.0)
 "))
          (schedule (quilt::schedule-to-hardware pp)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
-    (assert (quil::double= 0.123d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.123d0 (instruction-start-time (quil::nth-instr 1 pp) schedule)))))
 
 (deftest test-delay-qubit ()
   (let* ((pp (calibrate "
@@ -173,11 +171,11 @@ DELAY 0 0.456
 PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
 "))
          (schedule (quilt::schedule-to-hardware pp)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
     ;; 0 "rf" pulse obstructs all frames on qubit 0
     ;; DELAY on 0 then obstructs 0 "ro_tx" pulse
-    (assert (quil::double= 0.579d0
-                           (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
+    (is (quil::double= 0.579d0
+                       (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
 
 (deftest test-delay-frame ()
   (let* ((pp (calibrate "
@@ -186,11 +184,11 @@ DELAY 0 \"ro_tx\" 0.456
 PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
 "))
          (schedule (quilt::schedule-to-hardware pp)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
     ;; PULSE 0 obstructs all frames on qubit 0
     ;; DELAY on 0 "rf" occurs after this, and obstructs PULSE 0 "ro_tx"
-    (assert (quil::double= 0.579d0
-                           (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
+    (is (quil::double= 0.579d0
+                       (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
 
 (deftest test-delay-frame-after-nonblocking ()
   (let* ((pp (calibrate "
@@ -199,19 +197,19 @@ DELAY 0 \"ro_tx\" 0.456
 PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
 "))
          (schedule (quilt::schedule-to-hardware pp)))
-    (assert (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
+    (is (quil::double= 0.0d0 (instruction-start-time (quil::nth-instr 0 pp) schedule)))
     ;; NONBLOCKING PULSE only obstructs its own frame
     ;; DELAY obstructs the other one
-    (assert (quil::double= 0.456d0
-                           (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
+    (is (quil::double= 0.456d0
+                       (instruction-start-time (quil::nth-instr 2 pp) schedule)))))
 
 (deftest test-swap-phase-conflict ()
   ;; This looks innocent, but the frames are on different hardware objects.
   ;; How do you get around this? Well, you basically need to propagate the phase as a constant
   ;; before scheduling, OR figure out some cool way to actually implement this operation on HW.
-  (let* ((pp (calibrate "SWAP-PHASE 0 \"rf\" 1 \"rf\"")))
+  (let ((pp (calibrate "SWAP-PHASE 0 \"rf\" 1 \"rf\"")))
     (signals quilt::quilt-scheduling-error (quilt::schedule-to-hardware pp))))
 
 (deftest test-fail-on-reset ()
-  (let* ((pp (calibrate "RESET 0")))
+  (let ((pp (calibrate "RESET 0")))
     (signals quilt::quilt-scheduling-error (quilt::schedule-to-hardware pp))))
