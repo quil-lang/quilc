@@ -133,9 +133,12 @@
                       (resolve-instruction thing unresolved-program))
                 seq)))
     ;; resolve calibration definitions
-    (map nil (lambda (cd)
-               (let ((quil::*in-definition-body* t))
-                 (resolve-instruction-sequence
-                  (calibration-definition-body cd))))
-         (parsed-program-calibration-definitions unresolved-program))
+    (dolist (cd (parsed-program-calibration-definitions unresolved-program))
+      (let ((quil::*in-definition-body* t))
+        (resolve-instruction-sequence
+         (calibration-definition-body cd))))
+    ;; resolve the frame objects associated with frame definitions
+    (dolist (fd (parsed-program-frame-definitions unresolved-program))
+      (setf (frame-name-resolution (frame-definition-frame fd)) fd))
+
     unresolved-program))
