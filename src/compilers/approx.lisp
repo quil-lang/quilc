@@ -709,8 +709,8 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
       (dolist (circuit-crafter crafters)
         (unless (and (first candidate-pairs)
                      (double= 1d0 (car (first candidate-pairs))))
-          (format *compiler-noise-stream*
-                  "~&APPROXIMATE-2Q-COMPILER: Trying ~A on ~A...~%"
+          (format-noise
+                  "~&APPROXIMATE-2Q-COMPILER: Trying ~A on ~A..."
                   circuit-crafter
                   (with-output-to-string (s) (print-instruction instr s)))
           (handler-case
@@ -727,8 +727,8 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                                    (mapcar #'constant-value (application-parameters can))
                                    (get-canonical-coords-from-diagonal
                                     (nth-value 1 (orthogonal-decomposition m))))))
-                  (format *compiler-noise-stream*
-                          " for infidelity ~A.~%" infidelity)
+                  (format-noise
+                          " for infidelity ~A." infidelity)
                   (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
                         candidate-pairs)))
             (compiler-does-not-apply () nil))))
