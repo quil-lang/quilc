@@ -606,27 +606,31 @@ other's."
                                                        reduced-decompiled-instructions
                                                        context)
     
-        ;; compare their respective runtimes and return the shorter one
-        (let ((result-instructions
-                (cond
-                  ((and decompiled-instructions
-                        (not (equalp decompiled-instructions reduced-decompiled-instructions))
-                        (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
-                           (calculate-instructions-duration reduced-instructions chip-specification)))
-                   reduced-decompiled-instructions)
-                  (t
-                   reduced-instructions))))
-          (format-quil-sequence *compiler-noise-stream*
-                                result-instructions
-                                "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%")
-          result-instructions))))
+      ;; compare their respective runtimes and return the shorter one
+      (let ((result-instructions
+             (cond
+              ((and decompiled-instructions
+                    (not (equalp decompiled-instructions reduced-decompiled-instructions))
+                    (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
+                       (calculate-instructions-duration reduced-instructions chip-specification)))
+               reduced-decompiled-instructions)
+              (t
+               reduced-instructions))))
+        (when *compiler-noise*
+          (format-quil-sequence *compiler-noise*
+                              result-instructions
+                              "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%"))
+        
+        result-instructions))))
 
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
   "Dispatch routine for compressing a sequence of INSTRUCTIONS, perhaps with unknown parameter values sprinkled through, based on the routines specified by a CHIP-SPECIFICATION and the current CONTEXT."
-  (format-quil-sequence *compiler-noise-stream*
+  (when *compiler-noise*
+     (format-quil-sequence *compiler-noise*
                         instructions
-                        "COMPRESS-INSTRUCTIONS: Selected the following sequence for compression:~%")
+                        "COMPRESS-INSTRUCTIONS: Selected the following sequence for compression:~%"))
+ 
   ;;
   ;; we can't apply linear algebraic rewriting to instructions with unknown
   ;; parameters, so the plan is to carve up the incoming sequence of INSTRUCTIONS
