@@ -150,9 +150,9 @@ DEFWAVEFORM wf 1.0:
                (prints-as (format nil def)
                           (concatenate 'string (format nil def) (format nil boilerplate))
                           :accessor accessor))))
-      (verify-definitions frame-defns #'quil:parsed-program-frame-definitions)
-      (verify-definitions waveform-defns #'quil:parsed-program-waveform-definitions)
-      (verify-definitions calibration-defns #'quil:parsed-program-calibration-definitions))))
+      (verify-definitions frame-defns #'parsed-program-frame-definitions)
+      (verify-definitions waveform-defns #'parsed-program-waveform-definitions)
+      (verify-definitions calibration-defns #'parsed-program-calibration-definitions))))
 
 (deftest test-definition-signature ()
   (flet ((signature (raw-quil &rest args)
