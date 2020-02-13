@@ -481,9 +481,6 @@
          (setf *human-readable-stream* *error-output*)
          (setf *quil-stream* *standard-output*)
 
-         (when verbose
-           (setf *verbose* *human-readable-stream*))
-
          (let* ((program-text (slurp-lines))
                 (program (safely-parse-quil program-text))
                 (original-matrix (when (and protoquil compute-matrix-reps)
@@ -491,6 +488,7 @@
            (multiple-value-bind (processed-program statistics)
                (process-program program (lookup-isa-descriptor-for-name isa)
                                 :protoquil protoquil
+                                :verbose verbose
                                 :gate-whitelist (and gate-whitelist
                                                      (split-sequence:split-sequence
                                                       #\,
@@ -513,13 +511,14 @@
 (defun process-program (program chip-specification
                         &key
                           protoquil
+                          verbose
                           gate-whitelist
                           gate-blacklist)
   "Compile PROGRAM for the chip CHIP-SPECIFICATION. Optionally calculate statistics described by the keyword arguments. All require :PROTOQUIL T.
 
 Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM is the compiled program, and STATISTICS is a HASH-TABLE whose keys are the slots of the RPCQ::|NativeQuilMetadata| class."
   (let* ((statistics (make-hash-table :test #'equal))
-         (quil::*compiler-noise-stream* *verbose*)
+         (quil::*compiler-noise* (and verbose *human-readable-stream*))
          (*random-state* (make-random-state t)))
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
