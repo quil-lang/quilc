@@ -69,7 +69,7 @@ rewiring."
                                 link-values
                                 :weight-on (+ (random 0.01) 1.0d0)
                                 :weight-off (if (= src dst) 0.2d0 0.6d0))
-    :finally (format *compiler-noise-stream* "SELECT-SWAP-PATH-TARGET: Link-values ~A~%" link-values)
+    :finally (format-noise "SELECT-SWAP-PATH-TARGET: Link-values ~A" link-values)
              (return (select-swap-by-values chip-spec link-values rewirings-tried rewiring))))
 
 (defun select-swap-path-gates (chip-spec qq-distances gates-in-waiting rewirings-tried rewiring)
