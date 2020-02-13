@@ -570,7 +570,7 @@ mapping instructions to their tags. "
   (labels
       ((get-fidelity (instr)
          (labels ((warn-and-skip (instr)
-                    (format *compiler-noise-stream* "Unknown fidelity for ~/cl-quil::instruction-fmt/. Skipping." instr)
+                    (format-noise "Unknown fidelity for ~/cl-quil::instruction-fmt/. Skipping." instr)
                     (return-from get-fidelity 0d0)))
            (let (fidelity)
              (typecase instr
