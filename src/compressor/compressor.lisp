@@ -280,8 +280,8 @@ other's."
                                      (list ':context (peephole-rewriter-node-context
                                                       (peephole-rewriter-node-prev
                                                        (first relevant-nodes-for-inspection))))))))
-                       (format *compiler-noise-stream*
-                               "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~A.~%"
+                       (format-noise
+                               "ALGEBRAICALLY-REDUCE-INSTRUCTIONS: Applying the rewriting rule called ~A."
                                (compiler-name rule))
                        ;; if the rule was triggered, splice it in and remove
                        ;; all of the instructions that the rule touched.
@@ -589,12 +589,10 @@ other's."
             reduced-decompiled-instructions)
     
         ;; now proceed to do the reductions
-        (format *compiler-noise-stream*
-                "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.~%")
+        (format-noise "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.")
         (setf reduced-instructions
               (algebraically-reduce-instructions instructions chip-specification context))
-        (format *compiler-noise-stream*
-                "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.~%")
+        (format-noise "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.")
         (when decompiled-instructions
           (setf reduced-decompiled-instructions
                 (algebraically-reduce-instructions decompiled-instructions
@@ -737,7 +735,7 @@ other's."
   "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION.
 
 This specific routine is the start of a giant dispatch mechanism. Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
-  (format *compiler-noise-stream* "COMPRESS-INSTRUCTIONS: entrance.~%")
+  (format-noise "COMPRESS-INSTRUCTIONS: entrance.")
   ;; set up the places where our state will live
   (let* ((output nil)
          (n-qubits (chip-spec-n-qubits chip-specification))
@@ -1115,8 +1113,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
         :downto 0
         :do (dotimes (address (length (nth order governors)))
               (transition-governor-state order address ':flushing))))
-    (format *compiler-noise-stream*
-            "COMPRESS-INSTRUCTIONS: departure.~%")
+    (format-noise "COMPRESS-INSTRUCTIONS: departure.")
     (nreverse output)))
 
 
