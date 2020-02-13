@@ -125,6 +125,8 @@ test:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil-tests)" \
 		--eval "(asdf:test-system :cl-quil)" \
+		--eval "(ql:quickload :cl-quil/quilt-tests)" \
+		--eval "(asdf:test-system :cl-quil/quilt)" \
 		--eval "(ql:quickload :quilc-tests)" \
 		--eval "(asdf:test-system :quilc)"
 
@@ -137,6 +139,11 @@ test-quilc:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :quilc-tests)" \
 		--eval "(asdf:test-system :quilc)"
+
+test-quilt:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil/quilt-tests)" \
+		--eval "(asdf:test-system :cl-quil/quilt)"
 
 # You can specify a different c++17-compatible compiler via the CXX
 # variable. For example: make CXX=/usr/bin/clang++ test-tweedledum

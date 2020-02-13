@@ -126,5 +126,10 @@
    #:parse-quilt-into-raw-program       ; FUNCTION
    #:parse-quilt                        ; FUNCTION
    #:read-quilt-file                    ; FUNCTION
+
+   #:parsed-quilt-program                   ; CLASS
+   #:parsed-program-waveform-definitions    ; READER
+   #:parsed-program-calibration-definitions ; READER
+   #:parsed-program-frame-definitions       ; READER
    )
   )
