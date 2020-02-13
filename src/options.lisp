@@ -18,10 +18,10 @@
   "The function used to handle/resolve pathnames passed to INCLUDE directives in Quil. Specifically, it should be a function designator that takes one argument (a pathname designator) and returns the absolute pathname to include, or signals an error.")
 
 (defvar *compiler-noise* nil
-  "The stream used to emit compiler debug output to. This variable can be bound to a stream that suppresses display, eg (make-broadcast-stream).")
+  "The stream on which to emit compiler debug output or NIL to suppress compiler noise.")
 
 (defmacro format-noise (str &rest args)
-  "format-noise checks to see whether *compiler-noise* has been set and, if so, formats it according to the passed format string and arguments."
+  "FORMAT-NOISE checks to see whether *COMPILER-NOISE* has been set and, if so, formats it according to the passed format string and arguments."
   `(progn
      (when *compiler-noise*
        (format *compiler-noise* ,str ,@args)

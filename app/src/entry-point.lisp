@@ -452,7 +452,6 @@
        ;; before calling run-CLI-mode, below.
        (*human-readable-stream* (make-broadcast-stream))
        (*quil-stream* (make-broadcast-stream))
-       (*verbose* (make-broadcast-stream))
        (*protoquil* protoquil)
        (quil::*safe-include-directory* safe-include-directory))
 

@@ -249,7 +249,7 @@ cost-function associated to the current lschedule.")
   (:method (state rewirings-tried)
     (with-slots (lschedule initial-l2p working-l2p chip-sched chip-spec qq-distances)
         state
-      (format *compiler-noise-stream*
+      (format *compiler-noise*
               "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.~%")
       (let ((gates-in-waiting (assign-weights-to-gates state)))
         (ecase *addresser-swap-search-type*
@@ -562,7 +562,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
       (let ((rewired-instr (copy-instance instr)))
         (rewire-l2p-instruction working-l2p rewired-instr)
         (format-noise
-         "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring"
+         "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring."
          instr rewired-instr)
 
         ;; Figure out if we need to compile the instruction,

@@ -604,9 +604,7 @@ other's."
                                                        decompiled-instructions
                                                        reduced-instructions
                                                        reduced-decompiled-instructions
-                                                       context)
-
-       
+                                                       context)       
         ;; compare their respective runtimes and return the shorter one
         (let ((result-instructions
                 (cond
@@ -618,7 +616,7 @@ other's."
                   (t
                    reduced-instructions))))
           (when *compiler-noise*
-            (format-quil-sequence *compiler-noise-stream*
+            (format-quil-sequence *compiler-noise*
                                   result-instructions
                                   "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%"))
           result-instructions))))

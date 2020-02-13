@@ -67,9 +67,9 @@
                             "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/."
                             compilation-method instruction))
                          (dolist (instr result)
-                           (write-string "    " *compiler-noise-stream*)
-                           (print-instruction instr *compiler-noise-stream*)
-                           (terpri *compiler-noise-stream*))
+                           (write-string "    " *compiler-noise*)
+                           (print-instruction instr *compiler-noise*)
+                           (terpri *compiler-noise*))
                          (return-from apply-translation-compilers result))
                      (compiler-does-not-apply () nil))
                  (try-next-compiler ()
