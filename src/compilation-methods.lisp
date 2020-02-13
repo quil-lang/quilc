@@ -64,8 +64,8 @@
                        (let ((result (funcall compilation-method instruction :context context)))
                          (let ((*print-pretty* nil))
                            (format-noise
-                                   "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/."
-                                   compilation-method instruction))
+                            "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/."
+                            compilation-method instruction))
                          (dolist (instr result)
                            (write-string "    " *compiler-noise-stream*)
                            (print-instruction instr *compiler-noise-stream*)
@@ -85,8 +85,8 @@
       (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
       ;; if those failed too, there's really nothing more to do.
       (format-noise
-              "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/."
-              instruction)
+       "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/."
+       instruction)
       (give-up-compilation))))
 
 
@@ -242,7 +242,7 @@ Returns a value list: (processed-program, of type parsed-program
              ;; try again, but with this new jump
              (push (list fresh-block registrant) block-stack)
              (format-noise "COMPILER-HOOK: Introduced ~A to deal with the rewiring."
-                     (basic-block-name fresh-block))))
+                           (basic-block-name fresh-block))))
 
          (touch-preserved-block (blk)
            ;; if so, then we don't have any business compiling it. treat
@@ -342,9 +342,9 @@ Returns a value list: (processed-program, of type parsed-program
 
            (let ((*print-pretty* nil))
              (format-noise "COMPILER-HOOK: Visiting ~A for the first time, coming from ~A (~A)."
-                     (basic-block-name blk)
-                     (and registrant (basic-block-name registrant))
-                     (and registrant (basic-block-out-rewiring registrant))))
+                           (basic-block-name blk)
+                           (and registrant (basic-block-name registrant))
+                           (and registrant (basic-block-out-rewiring registrant))))
            ;; set the block-initial-l2p, forced by the previous block
            (when registrant
              (setf (basic-block-in-rewiring blk)
