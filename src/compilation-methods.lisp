@@ -66,10 +66,11 @@
                            (format-noise
                             "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/."
                             compilation-method instruction))
-                         (dolist (instr result)
-                           (write-string "    " *compiler-noise*)
-                           (print-instruction instr *compiler-noise*)
-                           (terpri *compiler-noise*))
+                         (when *compiler-noise*
+                           (dolist (instr result)
+                             (write-string "    " *compiler-noise*)
+                             (print-instruction instr *compiler-noise*)
+                             (terpri *compiler-noise*)))
                          (return-from apply-translation-compilers result))
                      (compiler-does-not-apply () nil))
                  (try-next-compiler ()
@@ -375,10 +376,10 @@ Returns a value list: (processed-program, of type parsed-program
 
       ;; kick off the traversal
       (exhaust-stack)
-      
+
       ;; one more pass of CFG collapse
       (simplify-cfg cfg)
-      
+
       (let ((processed-program (reconstitute-program cfg)))
         ;; Keep global PRAGMAS in the code, at the top of the file.
         (setf (parsed-program-executable-code processed-program)

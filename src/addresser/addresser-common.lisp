@@ -249,8 +249,7 @@ cost-function associated to the current lschedule.")
   (:method (state rewirings-tried)
     (with-slots (lschedule initial-l2p working-l2p chip-sched chip-spec qq-distances)
         state
-      (format *compiler-noise*
-              "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.~%")
+      (format-noise "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.")
       (let ((gates-in-waiting (assign-weights-to-gates state)))
         (ecase *addresser-swap-search-type*
           (:a*
