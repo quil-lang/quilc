@@ -66,11 +66,7 @@
                            (format-noise
                             "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/."
                             compilation-method instruction))
-                         (when *compiler-noise*
-                           (dolist (instr result)
-                             (write-string "    " *compiler-noise*)
-                             (print-instruction instr *compiler-noise*)
-                             (terpri *compiler-noise*)))
+                         (format-noise "~{    ~/quil:instruction-fmt/~%~}" result)
                          (return-from apply-translation-compilers result))
                      (compiler-does-not-apply () nil))
                  (try-next-compiler ()
