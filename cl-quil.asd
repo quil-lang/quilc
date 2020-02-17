@@ -13,7 +13,7 @@
                #:yacc                   ; Arithmetic parsing
                #:alexandria             ; Utilities
                #:parse-float            ; Float parsing
-               (:version #:magicl "0.6.5")
+               (:version #:magicl "0.7.0")
                                         ; internal linear algebra library
                #:cl-grnm                ; nelder-mead implementation
                #:singleton-classes
