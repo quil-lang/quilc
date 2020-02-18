@@ -181,7 +181,7 @@ PRAGMA BLOCK
 CPHASE\(0\.2\) 0 1
 PRAGMA END_BLOCK
 PRAGMA BLOCK
-CPHASE\(0\.30{4,}\d*\) 0 2
+CPHASE\(0\.3\d*\) 0 2
 PRAGMA END_BLOCK
 PRAGMA BLOCK
 CPHASE\(0\.4\) 1 2
@@ -448,7 +448,7 @@ CZ 0 2
 RX(0.2) 1
 
 # Output
-RY\(0\.30{4,}\d*\) 0
+RY\(0\.3\d*\) 0
 CZ 0 2
 RX\(0\.2\) 1
 
