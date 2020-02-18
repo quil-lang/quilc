@@ -2,7 +2,6 @@
 
 (defparameter *program-name* "quilc")
 (defparameter *without-pretty-printing* nil)
-(defparameter *verbose* (make-broadcast-stream))
 (defparameter *log-level* ':info)
 (defparameter *protoquil* nil)
 

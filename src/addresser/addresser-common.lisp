@@ -249,8 +249,7 @@ cost-function associated to the current lschedule.")
   (:method (state rewirings-tried)
     (with-slots (lschedule initial-l2p working-l2p chip-sched chip-spec qq-distances)
         state
-      (format *compiler-noise-stream*
-              "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.~%")
+      (format-noise "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.")
       (let ((gates-in-waiting (assign-weights-to-gates state)))
         (ecase *addresser-swap-search-type*
           (:a*
@@ -430,10 +429,10 @@ Two other values are returned: a list of fully rewired instructions for later sc
                    nil
                    "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
                    instr)
-           (format *compiler-noise-stream*
-                   "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling.~%"
-                   instr
-                   (length (application-arguments instr)))
+           (format-noise
+            "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling."
+            instr
+            (length (application-arguments instr)))
            ;; then we know we can't find a hardware object to support
            ;; it, so pass it to the chip compiler
            (let ((compilation-result (apply-translation-compilers instr chip-spec nil)))
@@ -451,7 +450,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
   ;; Allow for early exit if we are doing a dry run
   (catch 'dry-run-succeeded
     (with-slots (lschedule chip-sched chip-spec working-l2p qq-distances initial-l2p) state
-      (format *compiler-noise-stream* "DEQUEUE-LOGICAL-TO-PHYSICAL: entering dequeueing phase.~%")
+      (format-noise "DEQUEUE-LOGICAL-TO-PHYSICAL: entering dequeueing phase.")
       (let ((dirty-flag nil)
             (instrs-ready-for-scheduling nil)
             (instrs-partially-assigned nil)
@@ -556,24 +555,24 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
         (return-from dequeue-best-instr t))
 
       ;; ... and dispatch it.
-      (format *compiler-noise-stream*
-              "DEQUEUE-BEST-INSTR: Elected to schedule ~/quil:instruction-fmt/.~%"
-              instr)
+      (format-noise
+       "DEQUEUE-BEST-INSTR: Elected to schedule ~/quil:instruction-fmt/."
+       instr)
       (let ((rewired-instr (copy-instance instr)))
         (rewire-l2p-instruction working-l2p rewired-instr)
-        (format *compiler-noise-stream*
-                "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring~%"
-                instr rewired-instr)
+        (format-noise
+         "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring."
+         instr rewired-instr)
 
         ;; Figure out if we need to compile the instruction,
         ;; or if we can add it to the schedule.
         (cond
           ;; if we found a link and the instruction is native...
           ((hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr)
-           (format *compiler-noise-stream*
-                   "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing.~%"
-                   instr
-                   (rewiring-l2p working-l2p))
+           (format-noise
+            "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing."
+            instr
+            (rewiring-l2p working-l2p))
            ;; dequeue the instruction so we can push the
            ;; modified instruction onto the schedule.
            (lscheduler-dequeue-instruction lschedule instr)
@@ -582,9 +581,9 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
           ;; otherwise, we found a link but the instruction is not native
           (t
-           (format *compiler-noise-stream*
-                   "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is non-native in the current rewiring, compiling.~%"
-                   instr)
+           (format-noise
+            "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is non-native in the current rewiring, compiling."
+            instr)
 
            ;; ...release the hounds
            ;;
@@ -690,8 +689,7 @@ Optional arguments:
    If INITIAL-REWIRING is not provided this option has no effect.
 ")
   (:method (state instrs &key (initial-rewiring nil) (use-free-swaps nil))
-    (format *compiler-noise-stream*
-            "DO-GREEDY-ADDRESSING: entrance.~%")
+    (format-noise "DO-GREEDY-ADDRESSING: entrance.")
     (let ((*addresser-use-free-swaps* (or use-free-swaps (not initial-rewiring))))
       (with-slots (lschedule working-l2p chip-sched initial-l2p) state
         ;; This is governed by an FSM of the shape
@@ -725,13 +723,12 @@ Optional arguments:
                  (loop
                    :with rewirings-tried := nil
                    :while (lscheduler-first-instrs lschedule)
-                   :do (format *compiler-noise-stream* "ADDRESSER-FSM: New pass.~%")
+                   :do (format-noise "ADDRESSER-FSM: New pass.")
                    :when (dequeue-logical-to-physical state)
-                     :do (format *compiler-noise-stream* "ADDRESSER-FSM: LSCHED changed, retrying.~%")
+                     :do (format-noise "ADDRESSER-FSM: LSCHED changed, retrying.")
                          (setf rewirings-tried nil)
                    :else
-                     :do (format *compiler-noise-stream*
-                                 "ADDRESSER-FSM: LSCHED unchanged, selecting a permutation.~%")
+                     :do (format-noise "ADDRESSER-FSM: LSCHED unchanged, selecting a permutation.")
                          (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
                                  "Too many SWAP instructions selected in a row: ~a" (length rewirings-tried))
                          (setf rewirings-tried (select-and-embed-a-permutation state rewirings-tried)))))
@@ -748,6 +745,6 @@ Optional arguments:
           (dolist (instr (nreverse (chip-schedule-to-straight-quil chip-sched)))
             (when (swap-application-p instr)
               (apply #'update-rewiring initial-l2p (mapcar #'qubit-index (application-arguments instr)))))
-          (format *compiler-noise-stream* "DO-GREEDY-ADDRESSING: departure.~%")
+          (format-noise "DO-GREEDY-ADDRESSING: departure.")
           ;; finally, return what we've constructed
           (values chip-sched initial-l2p working-l2p))))))

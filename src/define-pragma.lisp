@@ -411,7 +411,5 @@ the display of a specialized pragma instruction.")
                                                           freeform-string)))
                (apply #'change-class instr new-class initargs)))
             (t
-             (format *compiler-noise-stream*
-                     "SPECIALIZE-PRAGMA: Unknown PRAGMA type ~A.~%"
-                     name)
+             (format-noise "SPECIALIZE-PRAGMA: Unknown PRAGMA type ~A." name)
              instr)))))

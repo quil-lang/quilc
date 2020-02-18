@@ -374,10 +374,10 @@ following swaps."
              instr)
      (when dry-run-escape
        (funcall dry-run-escape))
-     (format *compiler-noise-stream*
-             "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a 1Q ~
-instruction, adding to logical queue.~%"
-             instr)
+     (format-noise
+      "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a 1Q ~
+instruction, adding to logical queue."
+      instr)
      ;; dequeue and set the dirty bit  
      (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
      (push instr (aref (temporal-addresser-state-1q-queues state)
