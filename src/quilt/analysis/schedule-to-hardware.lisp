@@ -28,6 +28,27 @@
   (error 'quilt-scheduling-error :format-control format-control
                                  :format-arguments format-args))
 
+(defclass hardware-schedule ()
+  ((hardware-name :initarg :hardware-name
+                  :type string
+                  :reader hardware-schedule-hardware-name
+                  :documentation "The hardware object targeted by the schedule.")
+   (program :initarg :program
+            :type parsed-quilt-program
+            :reader hardware-schedule-program
+            :documentation "A program scheduled to run on a hardware object.")
+   (times :initarg :times
+          :type hash-table
+          :reader hardware-schedule-times
+          :documentation "A map from instructions to their scheduled time of execution [seconds]."))
+  (:documentation "A Quilt program, together with a mapping from instructions to their time of execution."))
+
+(defun schedule-duration (schedule)
+  "Get the length of the hardware schedule SCHEDULE, in seconds."
+  (loop :for instr :being :the :hash-keys :of (hardware-schedule-times schedule)
+          :using (hash-value start-time)
+        :maximize (+ start-time (quilt-instruction-duration instr))))
+
 (defun resolved-waveform (instr)
   "Get the resolved waveform of an instruction, if it exists."
   (a:if-let ((wf-ref
@@ -193,15 +214,80 @@ For example, a pulse on 0 \"rf\" does not properly obstruct 0 1 \"cz\"."
       (list (swap-phase-left-frame instr)
             (swap-phase-right-frame instr))))))
 
+(defun dependent-frame-definitions (instr)
+  (check-type instr simple-quilt-instruction)
+  (let ((frames
+          (a:ensure-list
+           (typecase instr
+             (delay-on-frames
+              (delay-frames instr))
+             (pulse (pulse-frame instr))
+             (capture (capture-frame instr))
+             (raw-capture (raw-capture-frame instr))
+             (simple-frame-mutation
+              (frame-mutation-target-frame instr))
+             (swap-phase
+              (list (swap-phase-left-frame instr)
+                    (swap-phase-right-frame instr)))))))
+    (remove-duplicates
+     (mapcar #'frame-name-resolution frames))))
 
+(defun dependent-waveform-definitions (instr)
+  (check-type instr simple-quilt-instruction)
+  (a:if-let ((wf (resolved-waveform instr)))
+    (typecase wf
+      (waveform-definition (list wf)))))
+
+;;; TODO: handle parametric programs
+(defun dependent-memory-definitions (instr)
+  (check-type instr simple-quilt-instruction)
+  (a:ensure-list
+   (typecase instr
+     (capture (capture-memory-ref instr))
+     (raw-capture (raw-capture-memory-ref instr)))))
+
+(defun reconstruct-program (instructions)
+  "Construct a fresh Quilt program from the resolved simple Quilt instructions INSTRUCTIONS."
+  (let ((waveform-definitions nil)
+        (frame-definitions nil)
+        (memory-definitions nil))
+    (dolist (instr instructions)
+      (a:unionf waveform-definitions (dependent-waveform-definitions instr))
+      (a:unionf frame-definitions (dependent-frame-definitions instr))
+      (a:unionf memory-definitions (dependent-memory-definitions instr)))
+    (resolve-objects
+     (make-instance 'quilt::parsed-quilt-program
+                    :gate-definitions nil
+                    :circuit-definitions nil
+                    :calibration-definitions nil
+                    :waveform-definitions (nreverse waveform-definitions)
+                    :frame-definitions (nreverse frame-definitions)
+                    :memory-definitions (nreverse memory-definitions)
+                    :executable-code (coerce instructions 'simple-vector)))))
+
+
+(defun make-hardware-schedule (hw-name instruction-times)
+  "Construct a new schedule for HW-NAME from a list of (instruction . time) pairs INSTRUCTION-TIMES."
+  (let ((times (make-hash-table :test 'equal))
+        (instructions nil))
+    (loop :for (instr . time) :in instruction-times
+          :for copy := (copy-instance instr)
+          :do (setf (gethash copy times) time)
+          :do (push copy instructions))
+    (make-instance 'hardware-schedule
+                   :hardware-name hw-name
+                   :program (reconstruct-program
+                             (nreverse instructions))
+                   :times times)))
 
 (defun schedule-to-hardware (program &key (initial-time 0.0d0) (align-op #'identity))
   "Compute hardware schedules for the instructions in the Quilt program PROGRAM.
 
-The result is a hash table mapping the names of hardware objects to a list of (instruction . time) pairs."
+The result is a hash table mapping the names of hardware objects to hardware schedules."
   (check-type program parsed-quilt-program)
+  ;; we first built the schedules as (instr . time) alists
   (let ((aligned-start (funcall align-op initial-time))
-        (hardware-schedules (make-hash-table :test 'equal))
+        (hardware-instruction-times (make-hash-table :test 'equal))
         (hardware-clocks (make-hash-table :test 'equal)))
     (flet ((latest (hw-objects)
              (apply #'max (mapcar (lambda (hw-obj)
@@ -216,9 +302,15 @@ The result is a hash table mapping the names of hardware objects to a list of (i
             :do (let ((op-time (latest obstructed-hw))
                       (duration (quilt-instruction-duration instr)))
                   (when target-hw
-                    (push (cons op-time instr)
-                          (gethash target-hw hardware-schedules)))
+                    (push (cons instr op-time)
+                          (gethash target-hw hardware-instruction-times)))
                   (loop :for hw :in obstructed-hw
                         :do (setf (gethash hw hardware-clocks)
                                   (funcall align-op (+ op-time duration)))))))
-    hardware-schedules))
+    ;; now, build the HARDWARE-SCHEDULE objects
+    (let ((hardware-schedules (make-hash-table :test 'equal)))
+      (loop :for hw :being :the :hash-keys :of hardware-instruction-times
+              :using (hash-value instr-times)
+            :do (setf (gethash hw hardware-schedules)
+                      (make-hardware-schedule hw instr-times)))
+      hardware-schedules)))
