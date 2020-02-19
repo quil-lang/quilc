@@ -245,6 +245,9 @@
                        :duration duration
                        :frames frames))))
 
+(defmethod instantiate-instruction ((instr delay-all) param-value arg-value)
+  instr)
+
 (defmethod instantiate-instruction ((instr fence) param-value arg-value)
   (let* ((remake nil)
          (qubits (mapcar (quil::flag-on-update remake

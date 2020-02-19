@@ -94,6 +94,7 @@ DEFWAVEFORM wf:
                  "DELAY 0 1.0"          ; delay on qubit
                  "DELAY 0 \"rf\" 1.0"   ; delay on frame
                  "DELAY 0 \"rf\" \"zz\" 1.0" ; delay on frames
+                 "DELAY 1.0" ; delay all
                  "FENCE 0 1"
                  "FENCE")))
     (dolist (instr instrs)

@@ -243,8 +243,10 @@ For example, a pulse on 0 \"rf\" does not properly obstruct 0 1 \"cz\"."
   (check-type instr simple-quilt-instruction)
   (a:ensure-list
    (typecase instr
-     (capture (capture-memory-ref instr))
-     (raw-capture (raw-capture-memory-ref instr)))))
+     (capture (quil::memory-ref-descriptor
+               (capture-memory-ref instr)))
+     (raw-capture (quil::memory-ref-descriptor
+                   (raw-capture-memory-ref instr))))))
 
 (defun reconstruct-program (instructions)
   "Construct a fresh Quilt program from the resolved simple Quilt instructions INSTRUCTIONS."
@@ -267,13 +269,26 @@ For example, a pulse on 0 \"rf\" does not properly obstruct 0 1 \"cz\"."
 
 
 (defun make-hardware-schedule (hw-name instruction-times)
-  "Construct a new schedule for HW-NAME from a list of (instruction . time) pairs INSTRUCTION-TIMES."
-  (let ((times (make-hash-table :test 'equal))
-        (instructions nil))
+  "Construct a new schedule for HW-NAME from a list of (instruction . time) pairs INSTRUCTION-TIMES.
+
+NOTE: This abides by the original ordering of instructions in INSTRUCTION-TIMES."
+  (let ((instruction-times (stable-sort instruction-times
+                                        (lambda (a b) (< (cdr a) (cdr b)))))
+        (times (make-hash-table :test 'equal))
+        (instructions nil)
+        (current-time 0.0))
     (loop :for (instr . time) :in instruction-times
           :for copy := (copy-instance instr)
+          :when (< current-time time)
+            :do (when (or (zerop current-time) ; special case: start of block
+                          (typep instr '(or capture raw-capture pulse)))
+                  (let ((delay (make-instance 'delay-all
+                                              :duration (constant (- time current-time)))))
+                    (setf (gethash delay times) current-time)
+                    (push delay instructions)))
           :do (setf (gethash copy times) time)
-          :do (push copy instructions))
+          :do (push copy instructions)
+          :do (setf current-time time))
     (make-instance 'hardware-schedule
                    :hardware-name hw-name
                    :program (reconstruct-program
@@ -288,29 +303,30 @@ The result is a hash table mapping the names of hardware objects to hardware sch
   ;; we first built the schedules as (instr . time) alists
   (let ((aligned-start (funcall align-op initial-time))
         (hardware-instruction-times (make-hash-table :test 'equal))
-        (hardware-clocks (make-hash-table :test 'equal)))
-    (flet ((latest (hw-objects)
-             (apply #'max (mapcar (lambda (hw-obj)
-                                    (gethash hw-obj hardware-clocks aligned-start))
-                                  hw-objects))))
+        (frame-clocks (make-hash-table :test #'frame= :hash-function #'frame-hash)))
+    (flet ((latest (frames)
+             (apply #'max (mapcar (lambda (f)
+                                    (gethash f frame-clocks aligned-start))
+                                  frames))))
       (loop :for instr :across (parsed-program-executable-code program)
-            :for obstructed-hw := (mapcar #'frame-hardware
-                                          (properly-obstructed-frames instr program))
+            :for obstructed-frames := (properly-obstructed-frames instr program)
             :for target-hw := (resolve-hardware-object instr)
             :unless (typep instr 'simple-quilt-instruction)
               :do (quilt-scheduling-error "Scheduling of ~/quilt::instruction-fmt/ instructions is not implemented." instr)
-            :do (let ((op-time (latest obstructed-hw))
+            :do (let ((op-time (latest obstructed-frames))
                       (duration (quilt-instruction-duration instr)))
                   (when target-hw
                     (push (cons instr op-time)
                           (gethash target-hw hardware-instruction-times)))
-                  (loop :for hw :in obstructed-hw
-                        :do (setf (gethash hw hardware-clocks)
+                  (loop :for frame :in obstructed-frames
+                        :do (setf (gethash frame frame-clocks)
                                   (funcall align-op (+ op-time duration)))))))
     ;; now, build the HARDWARE-SCHEDULE objects
     (let ((hardware-schedules (make-hash-table :test 'equal)))
       (loop :for hw :being :the :hash-keys :of hardware-instruction-times
               :using (hash-value instr-times)
+            ;; instr-times is in the reversed order of the original instructions
+            :for ordered-instr-times := (nreverse instr-times)
             :do (setf (gethash hw hardware-schedules)
-                      (make-hardware-schedule hw instr-times)))
+                      (make-hardware-schedule hw ordered-instr-times)))
       hardware-schedules)))

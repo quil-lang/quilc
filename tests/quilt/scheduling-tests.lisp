@@ -66,11 +66,54 @@ DEFFRAME 1 \"ro_tx\":
   (parse-quilt
    (concatenate 'string *dummy-frame-definitions* text)))
 
-(deftest test-schedule-basic-counts ()
+(deftest test-schedule-basic-programs ()
   (let ((schedule
           (quilt::schedule-to-hardware
-           (calibrate "
+           (parse-quilt "
+DEFFRAME 0 1 \"cz\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 364250000.0
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q0_ff\"
+
+DEFFRAME 0 \"rf\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 4807537342.41533
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q0_rf\"
+
+DEFFRAME 1 \"rf\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 3357341778.52477
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q1_rf\"
+
+DEFFRAME 0 \"ro_rx\":
+    SAMPLE-RATE: 2000000000.0
+    INITIAL-FREQUENCY: 7139370148.40106
+    DIRECTION: \"rx\"
+    HARDWARE-OBJECT: \"q0_ro_rx\"
+
+DEFFRAME 1 \"ro_rx\":
+    SAMPLE-RATE: 2000000000.0
+    INITIAL-FREQUENCY: 7007052561.50131
+    DIRECTION: \"rx\"
+    HARDWARE-OBJECT: \"q1_ro_rx\"
+
+DEFFRAME 0 \"ro_tx\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 7139370148.40106
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q0_ro_tx\"
+
+DEFFRAME 1 \"ro_tx\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 7007052561.50131
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q1_ro_tx\"
+
 DECLARE iq REAL[2]
+
 PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
 SHIFT-PHASE 0 \"rf\" 0.2
 SET-FREQUENCY 0 \"rf\" 10
@@ -81,16 +124,73 @@ PULSE 0 1 \"cz\" flat(duration: 1.0, iq: 1.0)
 FENCE 0 1
 FENCE
 DELAY 0 1.0
-"))))
-    (flet ((num-instrs (hw)
-             (hash-table-count
-              (quilt::hardware-schedule-times
-               (gethash hw schedule)))))
+")
+           :initial-time 0.05)))
+    (labels ((program= (a b)
+               (let ((sa (with-output-to-string (s)
+                           (print-parsed-program a s)))
+                     (sb (with-output-to-string (s)
+                           (print-parsed-program b s))))
+                 (string= sa sb)))
+             (scheduled-program-matches (hw-obj program)
+               (program= (quilt::hardware-schedule-program (gethash hw-obj schedule))
+                         program)))
       (is (= 4 (hash-table-count schedule)))
-      (is (= 1 (num-instrs "q0_ro_tx")))
-      (is (= 3 (num-instrs "q0_rf")))
-      (is (= 1 (num-instrs "q1_rf")))
-      (is (= 1 (num-instrs "q0_ff"))))))
+      (is (scheduled-program-matches
+           "q0_ro_tx"
+           (parse-quilt "
+DEFFRAME 0 \"ro_tx\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 7139370148.40106
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q0_ro_tx\"
+
+DELAY 0.05
+PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
+")))
+      ;; TODO: fp? note DELAY 1.050000000745058 below
+      (is (scheduled-program-matches
+           "q0_rf"
+           (parse-quilt "
+DECLARE iq REAL[2]
+
+DEFFRAME 0 \"rf\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 4807537342.41533
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q0_rf\"
+
+DELAY 1.050000000745058
+SHIFT-PHASE 0 \"rf\" 0.2
+SET-FREQUENCY 0 \"rf\" 10
+CAPTURE 0 \"rf\" flat(duration: 1.0, iq: 1.0) iq
+")))
+      (is (scheduled-program-matches
+           "q1_rf"
+           (parse-quilt "
+DECLARE iq REAL[2]
+
+DEFFRAME 1 \"rf\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 3357341778.52477
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q1_rf\"
+
+DELAY 0.05
+CAPTURE 1 \"rf\" flat(duration: 1.0, iq: 1.0) iq
+")))
+      (is (scheduled-program-matches
+           "q0_ff"
+           (parse-quilt "
+DEFFRAME 0 1 \"cz\":
+    SAMPLE-RATE: 1000000000.0
+    INITIAL-FREQUENCY: 364250000.0
+    DIRECTION: \"tx\"
+    HARDWARE-OBJECT: \"q0_ff\"
+
+DELAY 2.050000000745058
+PULSE 0 1 \"cz\" flat(duration: 1.0, iq: 1.0)
+"))))))
 
 (defun %instruction-start-time (instr schedule)
   ;; NOTE: since we want to lookup by instruction in the original program

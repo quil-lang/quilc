@@ -134,8 +134,6 @@
           (quil::take-until (lambda (tok)
                               (not (member (quil::token-type tok) '(:NAME :INTEGER))))
                             rest-toks)
-        (when (endp qubit-toks)
-          (quil-parse-error "Expected one or more qubits specified in DELAY instruction."))
         (setf qubits (mapcar #'quil::parse-qubit qubit-toks))
         (setf rest-toks remaining))
 
@@ -143,19 +141,26 @@
           (quil::take-until (lambda (tok)
                               (not (eq ':STRING (quil::token-type tok))))
                             rest-toks)
+        (setf frame-names (mapcar #'quil::token-payload frame-name-toks))
+        (when (and frame-names (endp qubits))
+          (quil-parse-error "Expected one or more qubits specified in DELAY instruction."))
+
         (when (endp duration-toks)
           (quil-parse-error "Expected a duration in DELAY instruction."))
-        (setf frame-names (mapcar #'quil::token-payload frame-name-toks))
         (setf duration (quil::parse-parameter-or-expression duration-toks)))
 
-      (if frame-names
-          (make-instance 'delay-on-frames
-                         :duration duration
-                         :frames (mapcar (lambda (name) (frame qubits name))
-                                         frame-names))
-          (make-instance 'delay-on-qubits
-                         :duration duration
-                         :qubits qubits)))))
+      (cond (frame-names
+             (make-instance 'delay-on-frames
+                            :duration duration
+                            :frames (mapcar (lambda (name) (frame qubits name))
+                                            frame-names)))
+            (qubits
+             (make-instance 'delay-on-qubits
+                            :duration duration
+                            :qubits qubits))
+            (t
+             (make-instance 'delay-all
+                            :duration duration))))))
 
 (defun parse-fence (tok-lines)
   "Parse a FENCE instruction from TOK-LINES. Returns the instruction object, and the remaining lines."

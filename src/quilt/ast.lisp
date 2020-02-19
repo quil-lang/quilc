@@ -219,6 +219,15 @@
   (:metaclass abstract-class)
   (:documentation "A delay of a specific time on a specific qubit."))
 
+(defclass delay-all (delay)
+  ()
+  (:documentation "A global delay.")
+  #+#:appleby-sufficiently-classy
+  (:metaclass singleton-class))
+
+(defmethod print-instruction-generic ((instr delay-all) (stream stream))
+  (format stream "DELAY ~/quil::instruction-fmt/" (delay-duration instr)))
+
 (defclass delay-on-frames (delay)
   ((delayed-frames :initarg :frames
                    :accessor delay-frames
