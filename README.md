@@ -3,6 +3,8 @@
 [![pipeline status](https://gitlab.com/rigetti/forest/quilc/badges/master/pipeline.svg)](https://gitlab.com/rigetti/forest/quilc/commits/master)
 [![github release](https://img.shields.io/github/release/rigetti/quilc.svg)](https://github.com/rigetti/quilc/releases)
 [![docker pulls](https://img.shields.io/docker/pulls/rigetti/quilc.svg)](https://hub.docker.com/r/rigetti/quilc)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3677536.svg)](https://doi.org/10.5281/zenodo.3677536)
+
 
 Quilc is an advanced optimizing compiler for the quantum instruction
 language Quil, licensed under the [Apache 2.0 license](LICENSE.txt).
