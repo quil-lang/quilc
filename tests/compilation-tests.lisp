@@ -213,7 +213,13 @@ CNOT 4 8
   (let* ((chip (quil::read-chip-spec-file
                 (merge-pathnames *qpu-test-file-directory*
                                  "1q-wildcard-arguments.qpu")))
-         (progm (parse "RX(pi/2) 0; RX(-pi/2) 0")))
-    (is (m= (magicl:make-identity-matrix 2)
-            (parsed-program-to-logical-matrix
-             (compiler-hook progm chip))))))
+         (progm (parse "RX(pi/2) 0; RX(pi/2) 0"))
+         (comp (compiler-hook progm chip))
+         (code (%filter-halt comp)))
+    (is (m= (parsed-program-to-logical-matrix
+             (parse "RX(pi) 0"))
+            (parsed-program-to-logical-matrix comp)))
+    (is (= 1 (length code)))
+    (is (string= "RX" (quil::application-operator-root-name (elt code 0))))
+    (is (= pi
+           (constant-value (first (application-parameters (elt code 0))))))))
