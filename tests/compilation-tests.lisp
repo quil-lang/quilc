@@ -223,3 +223,33 @@ CNOT 4 8
     (is (string= "RX" (quil::application-operator-root-name (elt code 0))))
     (is (= pi
            (constant-value (first (application-parameters (elt code 0))))))))
+
+(deftest test-rx-rz-strings-reduce ()
+  ;; Any string of RXs and RYs should reduce to a string of at most 3
+  ;; RZs and 2 RXs.
+  (labels
+      ((random-rz-rx-program ()
+         (make-instance 'parsed-program
+                        :executable-code
+                        (coerce
+                         (loop :for i :below 100
+                               :collect (if (evenp i)
+                                            (build-gate "RZ" (list (* (random 1.0) pi)) 0)
+                                            (build-gate "RX" (list (* (random 1.0) pi)) 0)))
+                         'vector)))
+       (test-reduction-with-chip (chip)
+         (loop :repeat 100
+               :for progm := (random-rz-rx-program)
+               :for comp := (%filter-halt (compiler-hook progm chip))
+               :always (is (<= (length comp) 5)))))
+    (let ((chips (list (quil::build-nq-linear-chip 1)
+                       (quil::read-chip-spec-file
+                        (merge-pathnames *qpu-test-file-directory* "1q-wildcard-arguments.qpu"))
+                       (quil::read-chip-spec-file
+                        (merge-pathnames *qpu-test-file-directory* "Aspen-4-2Q-A.qpu"))
+                       (quil::read-chip-spec-file
+                        (merge-pathnames *qpu-test-file-directory* "Aspen-6-2Q-A.qpu"))
+                       (quil::read-chip-spec-file
+                        (merge-pathnames *qpu-test-file-directory* "Aspen-7-28Q-A.qpu")))))
+      (loop :for chip :in chips :do
+        (test-reduction-with-chip chip)))))
