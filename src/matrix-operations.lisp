@@ -43,7 +43,7 @@
         (goodness-value 0d0))
     (dotimes (j (magicl:nrows mat))
       (assert (double~ (abs (magicl:tref mat j 0)) (abs (magicl:tref ref-mat j 0)))
-              nil "Matrices do not lie in the same projective class. ~% ~a ~% ~a" mat ref-mat)
+              nil "Matrices do not lie in the same projective class. ~% ~A ~% ~A" mat ref-mat)
       (when (> (abs (magicl:tref mat j 0)) goodness-value)
         (setf goodness-value (abs (magicl:tref mat j 0)))
         (setf rescale-value (/ (magicl:tref ref-mat j 0) (magicl:tref mat j 0)))))
