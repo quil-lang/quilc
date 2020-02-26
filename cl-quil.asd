@@ -207,7 +207,7 @@
   :license "Apache License 2.0 (See LICENSE.txt)"
   :maintainer "Rigetti Computing"
   :author "Rigetti Computing"
-  :depends-on (#:cl-quil)
+  :depends-on (#:cl-quil #:cffi)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/quilt-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
@@ -223,6 +223,7 @@
                 :components ((:file "resolve-objects")
                              (:file "expand-calibrations")
                              (:file "type-safety")
+                             (:file "expand-template-waveforms")
                              (:file "schedule-to-hardware")))
                (:file "cl-quilt")))
 
@@ -242,4 +243,5 @@
                (:file "parser-tests")
                (:file "calibration-tests")
                (:file "analysis-tests")
+               (:file "waveform-tests")
                (:file "scheduling-tests")))

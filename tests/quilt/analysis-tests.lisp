@@ -118,3 +118,44 @@ DEFFRAME 0 \"rf\":
 RAW-CAPTURE 0 \"rf\" 1.0 iqs"))
     (signals quil-type-error (parse-quilt bad))
     (is (parse-quilt good))))
+
+
+(deftest test-waveform-ref= ()
+  (let ((a (quilt:waveform-ref "foo" `((,(param "a") . ,(constant 1.0))
+                                       (,(param "b") . ,(constant 2.0)))))
+        (b (quilt:waveform-ref "foo" `((,(param "b") . ,(constant 2.0))
+                                       (,(param "a") . ,(constant 1.0)))))
+        (c (quilt:waveform-ref "foo" `((,(param "b") . ,(constant 2.0)))))
+        (d (quilt:waveform-ref "frob" `((,(param "a") . ,(constant 1.0))
+                                        (,(param "b") . ,(constant 2.0))))))
+    (is (quilt::waveform-ref= a b))
+    (is (not (quilt::waveform-ref= a c)))
+    (is (not (quilt::waveform-ref= a d)))))
+
+
+(deftest test-waveform-expansion ()
+  (let* ((pp (parse-quilt (format nil "DEFFRAME 0 \"rf\"~@
+                                       DEFWAVEFORM foo:~%    1.0, 1.0, 1.0~@
+                                       PULSE 0 \"rf\" foo~@
+                                       PULSE 0 \"rf\" flat(duration: 1.0, iq: 2.0*i)~@
+                                       PULSE 0 \"rf\" gaussian(duration: 1.0, fwhm: 1.0, t0: 0.5)~@
+                                       PULSE 0 \"rf\" drag_gaussian(duration: 1.0, fwhm: 1.0, t0: 0.5, anh: 0.5, alpha: 1.0)~@
+                                       PULSE 0 \"rf\" hermite_gaussian(duration: 1.0, fwhm: 1.0, t0: 0.5, anh: 0.5, alpha: 1.0, hrm_coeff: 2.0)~@
+                                       PULSE 0 \"rf\" erf_square(duration: 1.0, risetime: 0.1, pad_left: 0.5, pad_right: 1.0)")))
+         (expanded (quilt::expand-template-waveforms pp 4)))
+    (is (= 6 (length (parsed-program-waveform-definitions expanded))))
+    ;; check static waveform entries
+    (is (every (lambda (elt)
+                 (= elt #C(1d0 0d0)))
+               (waveform-definition-entries (nth 0 (parsed-program-waveform-definitions expanded)))))
+    ;; check flat waveform entries
+    (is (every (lambda (elt)
+                 (= elt #C(0d0 2d0)))
+               (waveform-definition-entries (nth 1 (parsed-program-waveform-definitions expanded)))))))
+
+(deftest test-waveform-expansion-duplicates ()
+  (let* ((pp (parse-quilt (format nil "DEFFRAME 0 \"rf\"~@
+                                       PULSE 0 \"rf\" gaussian(duration: 1.0, fwhm: 1.0, t0: 0.5)~@
+                                       PULSE 0 \"rf\" gaussian(duration: 1.0, fwhm: 1.0, t0: 0.5)")))
+         (expanded (quilt::expand-template-waveforms pp 4)))
+    (is (= 1 (length (parsed-program-waveform-definitions expanded))))))

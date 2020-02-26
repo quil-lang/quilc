@@ -453,7 +453,11 @@
                               :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
                             :else
                               :collect (second found-p))))
-                (values (make-waveform-definition name param-symbols parsed-entries :context op)
+                (values (make-waveform-definition name
+                                                  param-symbols
+                                                  (make-array (length parsed-entries)
+                                                              :initial-contents parsed-entries)
+                                                  :context op)
                         rest-lines)))))))))
 
 ;;; Calibration Definitions

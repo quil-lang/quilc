@@ -41,6 +41,15 @@
                                  standard-waveform
                                  waveform-definition)))
 
+(defun waveform-ref= (a b)
+  (and (string= (waveform-ref-name a)
+                (waveform-ref-name b))
+       (null (set-exclusive-or (waveform-ref-parameter-alist a)
+                               (waveform-ref-parameter-alist b)
+                               :test (lambda (a b)
+                                       (and (param= (car a) (car b))
+                                            (constant= (cdr a) (cdr b))))))))
+
 ;;; This exists mainly to keep PRINT-INSTRUCTION-GENERIC simple
 (defun waveform-parameter-association-fmt (stream alist-entry &optional colon-modifier at-modifier)
   "Format function for parameter-value associations, compatible with format strings using ~/.../ directive."
@@ -338,7 +347,7 @@
          :documentation "The name of the waveform being defined.")
    (entries :initarg :entries
             :reader waveform-definition-entries
-            :type list
+            :type vector
             :documentation "The raw IQ values of the waveform being defined.")
    (context :initarg :context
             :type lexical-context
@@ -380,14 +389,14 @@
               '()
               (waveform-definition-parameters defn)))
   (format stream "~%    ~{~A~^, ~}"
-          (mapcar (lambda (z)
-                    (with-output-to-string (s)
-                      (etypecase z
-                        (number
-                         (quil::format-complex z s))
-                        ((or list symbol)
-                         (print-instruction (quil::make-delayed-expression nil nil z) s)))))
-                  (waveform-definition-entries defn)))
+          (map 'list (lambda (z)
+                       (with-output-to-string (s)
+                         (etypecase z
+                           (number
+                            (quil::format-complex z s))
+                           ((or list symbol)
+                            (print-instruction (quil::make-delayed-expression nil nil z) s)))))
+               (waveform-definition-entries defn)))
   (terpri stream))
 
 (defclass calibration-definition ()
