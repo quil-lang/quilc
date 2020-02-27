@@ -435,6 +435,14 @@ other's."
         ;; otherwise, we're obligated to do full unitary compilation.
         (decompile-instructions-into-full-unitary)))))
 
+(define-condition state-prep-compression-tolerance-error (error)
+  ((compilation-tolerance :type double-float :initarg :compilation-tolerance :reader state-prep-compression-tolerance-error-tolerance)
+   (compilation-precision :type doubel-float :initarg :compilation-precision :reader state-prep-compression-tolerance-error-precision))
+  (:report (lambda (c s)
+             (with-slots (compilation-tolerance compilation-precision) c
+               (format s "The state vector produced by state-preparation compilation was found to be not colinear with the state vector produced by standard compilation. Compilation has a tolerance of ~A but compilation had a precision of ~A."
+                       compilation-tolerance
+                       compilation-precision)))))
 
 (defun check-contextual-compression-was-well-behaved (instructions
                                                       decompiled-instructions
@@ -499,22 +507,22 @@ other's."
                   (final-wf-reduced-prep (nondestructively-apply-instrs-to-wf
                                           reduced-decompiled-instructions
                                           start-wf
-                                          wf-qc))
-                  (final-wf-reduced-prep-collinearp
-                   (or (null decompiled-instructions)
-                       (and (eql final-wf ':not-simulated)
-                            (eql final-wf-reduced-prep ':not-simulated))
-                       (collinearp final-wf final-wf-reduced-prep))))
+                                          wf-qc)))
              (assert final-wf-reduced-instrs-collinearp
                      (final-wf final-wf-reduced-instrs)
                      "During careful checking of instruction compression, the produced ~
                    wavefunction by instruction reduction was detected to not be ~
                    collinear with the target wavefunction.")
-             (assert final-wf-reduced-prep-collinearp
-                     (final-wf final-wf-reduced-prep)
-                     "During careful checking of instruction compression, the produced ~
-                   wavefunction by state prep reduction was detected to not be ~
-                   collinear with the target wavefunction.")))
+             (unless (or (null decompiled-instructions)
+                         (and (eql final-wf ':not-simulated)
+                              (eql final-wf-reduced-prep ':not-simulated)))
+               (multiple-value-bind (col precision)
+                   (collinearp final-wf final-wf-reduced-prep)
+                 (unless col
+                   (cerror "continue with possibly incorrect compilation"
+                           'state-prep-compression-tolerance-error
+                           :compilation-tolerance +double-comparison-threshold-strict+
+                           :compilation-precision precision))))))
 
          (check-quil-is-near-as-matrices ()
            (a:when-let ((stretched-matrix (make-matrix-from-quil instructions)))
