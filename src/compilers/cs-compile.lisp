@@ -58,7 +58,7 @@
         (tag (generate-csc-tag)))
     (unless m
       (give-up-compilation))
-    (setf m (magicl:scale (expt (magicl:det m) (/ -1 (magicl:nrows m))) m))
+    (setf m (magicl:scale m (expt (magicl:det m) (/ -1 (magicl:nrows m)))))
 
     ;; first, a utility function.
     (let ((n (/ (magicl:nrows m) 2)))

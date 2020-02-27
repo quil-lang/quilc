@@ -10,10 +10,10 @@
   (let* ((a1 (quil::random-special-unitary 2))
          (a0 (quil::random-special-unitary 2))
          (a (magicl:@ (cl-quil::su2-on-line 1 a1)
-                                              (cl-quil::su2-on-line 0 a0))))
-        (multiple-value-bind (b1 b0) (cl-quil::convert-su4-to-su2x2 a)
-          (fiasco-assert-matrices-are-equal a1 b1)
-          (fiasco-assert-matrices-are-equal a0 b0))))
+                      (cl-quil::su2-on-line 0 a0))))
+    (multiple-value-bind (b1 b0) (cl-quil::convert-su4-to-su2x2 a)
+      (fiasco-assert-matrices-are-equal a1 b1)
+      (fiasco-assert-matrices-are-equal a0 b0))))
 
 (deftest test-optimal-2q-on-su2x2 ()
   "Tests that optimal 2Q compilation can handle a gate of the form SU(2) x SU(2)."
