@@ -69,7 +69,8 @@ The function returns U1, U2, C, S, and V2H."
     (multiple-value-bind (w2 h2)
         (polar-decomposition a4 :mode :unitary-hermitian)
 
-      (let ((b (magicl:.- h1 h2))) ; The sign convention ensures the eigenvalues are in the right order.
+      (let ((b (magicl:.- h1 h2)) ; The sign convention ensures the eigenvalues are in the right order.
+            (magicl::*double-comparison-threshold* (* 2 double-float-epsilon))) ;; Avoid errors in hermitian-eig due to too precise epsilon
         (multiple-value-bind (lambda2 v2)
             (magicl:hermitian-eig b)
           (declare (ignorable lambda2))
