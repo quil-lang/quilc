@@ -75,14 +75,14 @@
                 (setf (first evals-v) (- (first evals-v))))
               (let* ((uL (magicl:scale uL (expt (magicl:det uL) (- (/ (magicl:nrows uL))))))
                      (vL (magicl:scale vL (expt (magicl:det vL) (- (/ (magicl:nrows vL))))))
-                     (uR (reduce #'magicl:@
-                                 (list (magicl:from-diag evals-u)
-                                       (magicl:conjugate-transpose uL)
-                                       u1)))
-                     (vR (reduce #'magicl:@
-                                 (list (magicl:from-diag evals-v)
-                                       (magicl:conjugate-transpose vL)
-                                       v1)))
+                     (uR (magicl:@
+                          (magicl:from-diag evals-u)
+                          (magicl:conjugate-transpose uL)
+                          u1))
+                     (vR (magicl:@
+                          (magicl:from-diag evals-v)
+                          (magicl:conjugate-transpose vL)
+                          v1))
                      ;; some convenient shorthand for inst below
                      (control (first (application-arguments instr)))
                      (rest (rest (application-arguments instr)))
@@ -94,13 +94,13 @@
                 ;; which we use to build the output circuit.
 		(inst* "QSC-VR" vR                 rest)
 		(inst* UCR-Z    (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-v)
-		                (append rest (list control)))
+		       (append rest (list control)))
 		(inst* "QSC-VL" vL                 rest)
 		(inst  "RZ"     (list (* -2 Rphi)) control)
 		(inst* UCR-Y    (mapcar (lambda (x) (constant (* 2 x))) thetas)
-		                (append rest (list control)))
+		       (append rest (list control)))
 		(inst  "RZ"     (list (* -2 Lphi)) control)
 		(inst* "QSC-UR" uR                 rest)
 		(inst* UCR-Z    (mapcar (lambda (x) (constant (* -2 (phase x)))) evals-u)
-		                (append rest (list control)))
+		       (append rest (list control)))
 		(inst* "QSC-UL" uL                 rest)))))))))

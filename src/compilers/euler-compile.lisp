@@ -22,7 +22,7 @@
   (check-type prefix-quil a:proper-list)
   (a:with-gensyms (prefix-matrix postfix-matrix u0 u1 v0 v1 angles)
     `(let* ((,prefix-matrix (make-matrix-from-quil ,prefix-quil))
-            (,postfix-matrix (magicl::conjugate-transpose ,prefix-matrix)))
+            (,postfix-matrix (magicl:conjugate-transpose ,prefix-matrix)))
        (declare (ignorable ,prefix-matrix ,postfix-matrix))
        (define-compiler ,name ((instr (_ _ q)))
 

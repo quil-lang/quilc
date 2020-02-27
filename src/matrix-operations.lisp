@@ -187,30 +187,35 @@ as needed so that they are the same size."
 
 (defun orthonormalize-matrix (m)
   "Applies Gram-Schmidt to the columns of a full rank square matrix to produce a unitary matrix."
+  (declare (optimize (speed 3)))
   ;; consider each column
   (dotimes (j (magicl:ncols m))
     ;; consider each preceding column, which together form an orthonormal set
     (dotimes (jp j)
       ;; compute the dot product of the columns...
       (let ((scalar
-              (loop :for i :below (magicl:nrows m)
-                    :sum (* (magicl:tref m i j)
-                            (conjugate (magicl:tref m i jp))))))
+              (loop :for i :below (the fixnum (magicl:nrows m))
+                    :sum (the (complex double-float)
+                              (* (the (complex double-float) (magicl:tref m i j))
+                                 (conjugate (the (complex double-float) (magicl:tref m i jp))))))))
+        (declare (type (complex double-float) scalar))
         ;; ... and do the subtraction.
-        (dotimes (i (magicl:nrows m))
+        (dotimes (i (the fixnum (magicl:nrows m)))
           (setf (magicl:tref m i j)
-                (- (magicl:tref m i j)
+                (- (the (complex double-float) (magicl:tref m i j))
                    (* scalar
-                      (magicl:tref m i jp)))))))
+                      (the (complex double-float) (magicl:tref m i jp))))))))
     ;; now j is orthogonal to the things that came before it. normalize it.
     (let ((scalar
             (sqrt
              (loop :for i :below (magicl:nrows m)
-                   :sum (* (abs (magicl:tref m i j))
-                           (abs (magicl:tref m i j)))))))
+                   :sum (* (abs (the (complex double-float) (magicl:tref m i j)))
+                           (abs (the (complex double-float) (magicl:tref m i j))))))))
+      (declare (type double-float scalar))
       (dotimes (i (magicl:nrows m))
         (setf (magicl:tref m i j)
-              (/ (magicl:tref m i j) scalar)))))
+              (/ (the (complex double-float) (magicl:tref m i j))
+                 scalar)))))
   m)
 
 (defun kron-matrix-up (matrix n)
@@ -331,8 +336,8 @@ as needed so that they are the same size."
 (defun print-polar-matrix (m &optional (stream *standard-output*))
   (let ((*print-fractional-radians* nil)
         (*print-polar-form* t)
-        (height (magicl::matrix-rows m))
-        (width (magicl::matrix-cols m)))
+        (height (magicl:nrows m))
+        (width (magicl:ncols m)))
     (format stream "~&")
     (dotimes (i height)
       (dotimes (j width)
