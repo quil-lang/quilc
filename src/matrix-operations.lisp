@@ -262,29 +262,20 @@ as needed so that they are the same size."
     ret))
 
 (defun collinearp (vect1 vect2)
-  "Tests whether two (complex double) vectors of unit norm are collinear."
-  (flet ((dot-product (v1 v2 &optional (scalar 1d0))
-           (loop :for r :across v1
-                 :for s :across v2
-                 :sum (* (conjugate r) s scalar))))
+  "Tests whether two (complex double) vectors of unit norm are collinear. Returns pair of values: first is whether the vectors were collinear, and the second is the amount by which the dot product of the vectors differs from one."
+  ;; TODO Do not use dot product. Instead do component-wise
+  ;; calculation of the scalar relation, and check that it is the same
+  ;; for all entries.
+  (let ((vect1 (coerce vect1 'list))
+        (vect2 (coerce vect2 'list)))
     (assert (double= 1d0 (sqrt (dot-product vect1 vect1))))
     (assert (double= 1d0 (sqrt (dot-product vect2 vect2))))
-    (let ((peak-abs 1.0d0)
-          scalar)
-      (loop :for r :across vect1
-            :for s :across vect2
-            :when (and (not (double= 0d0 (abs r)))
-                       (not (double= 0d0 (abs s)))
-                       (< (abs (- 1 (abs r))) peak-abs))
-            :do (setf peak-abs (abs (- 1 (abs r))))
-                (setf scalar (- (phase r) (phase s))))
-      ;; rather than computing the full norm, this could be replaced by the
-      ;; component-wise calculation (loop ... :always (double= 0d0 (expt ...)))
-      ;; which has the potential to terminate early on a negative result
-      (and scalar
-           (let ((norm (sqrt (dot-product vect1 vect2 (cis scalar)))))
-             (double= 1d0 norm))))))
-
+    ;; rather than computing the full norm, this could be replaced by the
+    ;; component-wise calculation (loop ... :always (double= 0d0 (expt ...)))
+    ;; which has the potential to terminate early on a negative result
+    (let ((norm^2 (abs (dot-product vect1 vect2))))
+      (values (double= 1d0 norm^2)
+              (- 1d0 norm^2)))))
 
 ;; also just some general math routines
 (defun find-root (f guess &optional (depth-bound 1000))
