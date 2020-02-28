@@ -437,7 +437,7 @@ other's."
 
 (define-condition state-prep-compression-tolerance-error (error)
   ((compilation-tolerance :type double-float :initarg :compilation-tolerance :reader state-prep-compression-tolerance-error-tolerance)
-   (compilation-precision :type doubel-float :initarg :compilation-precision :reader state-prep-compression-tolerance-error-precision))
+   (compilation-precision :type double-float :initarg :compilation-precision :reader state-prep-compression-tolerance-error-precision))
   (:report (lambda (c s)
              (with-slots (compilation-tolerance compilation-precision) c
                (format s "The state vector produced by state-preparation compilation was found to be not colinear with the state vector produced by standard compilation. Compilation has a tolerance of ~A but compilation had a precision of ~A."
