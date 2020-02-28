@@ -114,6 +114,18 @@ JUMP @a")))
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
 
+(defmacro %with-loose-state-prep-compression (&body body)
+  `(progn
+     (handler-bind ((quil::state-prep-compression-tolerance-error
+                      (lambda (c)
+                        (with-slots (compilation-tolerance compilation-precision) c
+                          (when (< compilation-tolerance
+                                   compilation-precision
+                                   quil::+double-comparison-threshold-loose+)
+                            (let ((r (find-restart 'continue c)))
+                              (when r (invoke-restart r))))))))
+       ,@body)))
+
 (deftest test-compiler-hook (&key print-stats)
   "Test whether the compiler hook preserves semantic equivalence for
 some test programs."
@@ -126,7 +138,8 @@ some test programs."
         (format t "      Testing file ~A:" (pathname-name file))
         (dolist (architecture (list ':cz ':iswap ':cphase ':piswap ':cnot))
           (format t " ~A" architecture)
-          (let ((stats (compare-compiled file architecture)))
+          (let ((stats (%with-loose-state-prep-compression
+                         (compare-compiled file architecture))))
             (when print-stats
               (format t "~A" stats))))
         (terpri)))))
@@ -157,10 +170,11 @@ RX(-pi/2) 2
 RZ(0.9293531094939129) 2
 RX(pi) 2
 "))))
-    (CL-QUIL::COMPRESS-INSTRUCTIONS-IN-CONTEXT
-     (coerce instructions 'list)
-     (quil::build-nQ-linear-chip 4 :architecture ':cphase)
-     (quil::set-up-compilation-context :qubit-count 4 :simulate t))))
+    (%with-loose-state-prep-compression
+      (CL-QUIL::COMPRESS-INSTRUCTIONS-IN-CONTEXT
+       (coerce instructions 'list)
+       (quil::build-nQ-linear-chip 4 :architecture ':cphase)
+       (quil::set-up-compilation-context :qubit-count 4 :simulate t)))))
 
 (defun shuffle-list (l &optional (k nil))
         (let* ((elt (nth (random (length l)) l))
@@ -190,8 +204,9 @@ RX(pi) 2
                                                                               :gate v
                                                                               :arguments (mapcar #'qubit args)))))
                  (processed-program
-                   (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
-                                                                                :architecture architecture))))
+                   (%with-loose-state-prep-compression
+                     (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
+                                                                                  :architecture architecture)))))
             (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
                                           (quil::parsed-program-to-logical-matrix processed-program)))))))))
 
@@ -289,16 +304,18 @@ CZ 2 7
 
 (deftest test-parametric-compiler-cphase ()
   (dolist (quil::*enable-state-prep-compression* '(nil t))
-    (parametric-compiler-test "
+    (%with-loose-state-prep-compression
+      (parametric-compiler-test "
 DECLARE angle REAL
 
 CPHASE(angle) 0 1
 "
-                              (list (cons (mref "angle" 0) (random 1d0))))))
+                                (list (cons (mref "angle" 0) (random 1d0)))))))
 
 (deftest test-parametric-compiler-extended ()
   (dolist (quil::*enable-state-prep-compression* '(nil t))
-    (parametric-compiler-test "
+    (%with-loose-state-prep-compression
+      (parametric-compiler-test "
 DECLARE angle REAL
 
 RY(pi/4) 0
@@ -312,7 +329,7 @@ RX(pi/5) 0
 RZ(pi/6) 0
 RX(pi/3) 0
 "
-                              (list (cons (mref "angle" 0) (random 1d0))))))
+                              (list (cons (mref "angle" 0) (random 1d0)))))))
 
 (deftest test-gapped-qpu ()
   (dolist (state-prep '(nil)) ; TODO XXX compression disabled until QUILC-119 is resolved
@@ -325,7 +342,8 @@ RX(pi/3) 0
 H 1
 CNOT 1 2"))
              (old-matrix (quil::parsed-program-to-logical-matrix pp))
-             (cpp (quil::compiler-hook pp chip-spec :protoquil t))
+             (cpp (%with-loose-state-prep-compression
+                    (quil::compiler-hook pp chip-spec :protoquil t)))
              (new-matrix (quil::parsed-program-to-logical-matrix cpp)))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
