@@ -221,5 +221,5 @@ CNOT 4 8
             (parsed-program-to-logical-matrix comp)))
     (is (= 1 (length code)))
     (is (string= "RX" (quil::application-operator-root-name (elt code 0))))
-    (is (= pi
-           (constant-value (first (application-parameters (elt code 0))))))))
+    (is (quil::double= pi
+                       (constant-value (first (application-parameters (elt code 0))))))))
