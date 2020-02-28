@@ -14,6 +14,10 @@ DEFGATE Y:
     0, -i
     i, 0
 
+DEFGATE YY:
+    0, -1
+    1, 0
+
 DEFGATE Z:
     1, 0
     0, -1

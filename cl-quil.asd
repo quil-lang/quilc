@@ -242,3 +242,40 @@
                (:file "parser-tests")
                (:file "calibration-tests")
                (:file "analysis-tests")))
+
+(asdf:defsystem #:cl-quil/quilec
+  :description "Quantum error correction toolkit."
+  :author "Juan M. Bello-Rivas <jbellorivas@rigetti.com>"
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:alexandria
+               #:cl-quil
+               #:quilc
+               #:magicl)
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/quilec-tests)))
+  :around-compile (lambda (compile)
+                    (let (#+sbcl (sb-ext:*derive-function-types* t))
+                      (funcall compile)))
+  :pathname "src/quilec/"
+  :serial t
+  :components ((:file "package")
+               (:file "matrix")
+               (:file "code")
+               (:file "cleve-gottesman")))
+
+(asdf:defsystem #:cl-quil/quilec-tests
+  :description "Test suite for cl-quil/quilec."
+  :author "Juan M. Bello-Rivas <jbellorivas@rigetti.com>"
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil/quilec
+               #:qvm
+               #:qvm-app
+               #:fiasco)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.quilec-tests
+                                           '#:run-quilec-tests))
+  :pathname "tests/quilec/"
+  :serial t
+  :components ((:file "package")
+               (:file "suite")
+               (:file "code-tests")
+               (:file "cleve-gottesman-tests")))
