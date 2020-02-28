@@ -221,6 +221,7 @@ In the presence of multiple definitions with a common signature, a signal is rai
                      (resolve-safely-message  condition)))))
 
 (defun resolve-safely (filename)
+  "If FILENAME is safe, return it, merged with *SAFE-INCLUDE-DIRECTORY* if set. A safe filename has no :UP or :BACK components in its directory and has filename components present."
   (flet ((contains-up (filename)
            (member-if (lambda (obj)
                         (or (eql ':UP obj)

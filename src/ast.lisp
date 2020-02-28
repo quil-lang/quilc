@@ -35,6 +35,7 @@
   (descriptor nil :type (or null memory-descriptor)))
 
 (defun memory-ref= (a b)
+  "Do the memory refs A and B represent the same memory ref?"
   (check-type a memory-ref)
   (check-type b memory-ref)
   (and (string= (memory-ref-name a) (memory-ref-name b))
@@ -191,6 +192,7 @@ Keys are tested with EQ."
 The keys are typically INSTRUCTION instances and associated values are STRINGs.")
 
 (defun comment (x)
+  "Return the comment associated with X."
   (values (gethash x **comments**)))
 
 (defun (setf comment) (comment-string x)
@@ -531,6 +533,7 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
 (defmethod mnemonic ((inst pragma)) (values "PRAGMA" (class-name (class-of inst))))
 
 (defun make-pragma (words &optional freeform)
+  "Return a pragma, possibly specialized based on WORDS and FREEFORM."
   (assert (and (listp words)
                (not (endp words))))
   (assert (stringp (first words))
@@ -1118,6 +1121,7 @@ For example, `DAGGER DAGGER H 0` should produce `H 0`."
     ((forked-operator o)     (1+ (operator-description-additional-qubits o)))))
 
 (defun print-operator-description (od stream)
+  "Print the operator description OD to STREAM."
   (adt:match operator-description od
     ((named-operator name) (write-string name stream))
     ((controlled-operator o) (write-string "CONTROLLED " stream)
