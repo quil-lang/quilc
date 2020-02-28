@@ -300,7 +300,7 @@ OPTIONS: plist of options governing applicability of the compiler binding."
 (define-condition cannot-concretize-binding (serious-condition) ())
 (define-condition no-binding-match (serious-condition) ())
 
-(defun prefer-concrete-items (a b)
+(defun prefer-concrete-atom (a b)
   "Return one of A or B, choosing the one that is more \"concrete\".
 
 What \"concrete\" means depends on the types of A and B:
@@ -334,14 +334,14 @@ What \"concrete\" means depends on the types of A and B:
          (error 'cannot-concretize-binding)
          a))
     (t
-     (mapcar #'prefer-concrete-items a b))))
+     (mapcar #'prefer-concrete-atom a b))))
 
 (defgeneric binding-meet (a b)
   (:documentation "Constructs a maximal binding subsumed by both A and B.")
   (:method (a b)
     (error 'cannot-concretize-binding))
   (:method ((a gate-binding) (b gate-binding))
-    (make-gate-binding :operator (prefer-concrete-items (gate-binding-operator a) (gate-binding-operator b))
+    (make-gate-binding :operator (prefer-concrete-atom (gate-binding-operator a) (gate-binding-operator b))
                        :parameters (prefer-concrete-lists (gate-binding-parameters a)
                                                           (gate-binding-parameters b))
                        :arguments (prefer-concrete-lists (gate-binding-arguments a)
