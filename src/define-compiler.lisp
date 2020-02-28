@@ -537,7 +537,7 @@ Optionally constrains the output to include only those bindings of a particular 
   (fidelity 1d0 :type double-float)
   (unknowns 0 :type (integer 0)))
 
-(defun occurrence-table-cost-> (x y)
+(defun occurrence-table-cost-> (y x)
   (cond
     ((> (occurrence-table-cost-unknowns x)
         (occurrence-table-cost-unknowns y))
