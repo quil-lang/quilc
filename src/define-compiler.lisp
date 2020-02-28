@@ -895,6 +895,7 @@ INST is a local function usable within the dynamic extent of a compiler body."
   (error "INST can only be used in the body of a compiler."))
 
 (define-compiler-macro inst (&rest xs)
+  "Inhibit the attempted use of INST as a plain function."
   (declare (ignore xs))
   (error "INST can only be used in the body of a compiler."))
 
@@ -906,6 +907,7 @@ INST* is a local function usable within the dynamic extent of a compiler body."
   (error "INST* can only be used in the body of a compiler."))
 
 (define-compiler-macro inst* (&rest xs)
+  "Inhibit the attempted use of INST* as a plain function."
   (declare (ignore xs))
   (error "INST* can only be used in the body of a compiler."))
 

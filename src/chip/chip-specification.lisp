@@ -512,6 +512,7 @@ Compilers are listed in descending precedence.")
 ;; 6 --5-- 5 --4-- 4
 ;; all qubits Xhalves-type, all links CZ-type
 (defun build-8Q-chip (&key (architecture ':cz))
+  "Return an example 8Q square chip."
   (let ((chip-spec (make-chip-specification
                     :generic-rewriting-rules (coerce (global-rewriting-rules) 'simple-vector))))
     (install-generic-compilers chip-spec architecture)

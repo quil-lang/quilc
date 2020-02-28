@@ -9,6 +9,7 @@
   (:documentation "An error regarding the classical memory declarations."))
 
 (defun quil-memory-model-error (format-control &rest format-args)
+  "Signal a QUIL-MEMORY-MODEL-ERROR."
   (error 'quil-memory-model-error :format-control format-control
                                   :format-arguments format-args))
 
