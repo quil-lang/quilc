@@ -1,4 +1,4 @@
-;;;; tests/cleve-gottesman-tests.lisp
+;;;; tests/quilec/cleve-gottesman-tests.lisp
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 

@@ -1,4 +1,4 @@
-;;;; src/fault-tolerance/cleve-gottesman.lisp
+;;;; src/quilec/cleve-gottesman.lisp
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 

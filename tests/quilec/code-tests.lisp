@@ -1,4 +1,4 @@
-;;;; tests/code.lisp
+;;;; tests/quilec/code.lisp
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 

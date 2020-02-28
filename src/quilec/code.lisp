@@ -1,4 +1,4 @@
-;;;; src/fault-tolerance/code.lisp
+;;;; src/quilec/code.lisp
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 

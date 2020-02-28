@@ -1,4 +1,4 @@
-;;;; tests/suite.lisp
+;;;; tests/quilec/suite.lisp
 ;;;;
 ;;;; Author: Robert Smith
 

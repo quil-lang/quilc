@@ -1,4 +1,4 @@
-;;;; src/fault-tolerance/matrix.lisp
+;;;; src/quilec/matrix.lisp
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 

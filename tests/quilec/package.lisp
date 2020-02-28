@@ -1,4 +1,4 @@
-;;;; tests/package.lisp
+;;;; tests/quilec/package.lisp
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 
