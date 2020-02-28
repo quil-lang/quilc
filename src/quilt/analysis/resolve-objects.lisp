@@ -20,7 +20,7 @@
                         expected-parameters))
     t))
 
-(defun resolve-standard-waveform (waveform-ref waveform-class)
+(defun resolve-template-waveform (waveform-ref waveform-class)
   ;; pull the alist mapping param objects to their class slot names
   (let ((param-map (quilt-waveform-parameter-alist waveform-class)))
     (validate-waveform-parameters waveform-ref
@@ -45,7 +45,7 @@
   (let ((resolution
           (a:if-let ((default-binding (and use-defaults
                                            (default-waveform-class waveform-ref))))
-            (resolve-standard-waveform waveform-ref default-binding)
+            (resolve-template-waveform waveform-ref default-binding)
             (a:if-let ((defwaveform
                            (find (waveform-ref-name waveform-ref)
                                  waveform-defns

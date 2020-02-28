@@ -185,7 +185,7 @@ Returns the instructions waveform reference as well as a new static waveform def
       (when (assoc wf-ref wf-cache :test #'quilt::waveform-ref=)
         (return-from expand-and-resolve-template-waveform (values wf-ref nil)))
       (etypecase (waveform-ref-name-resolution wf-ref)
-        (standard-waveform
+        (template-waveform
          (let* ((iqs (waveform-iq-values (waveform-ref-name-resolution wf-ref)
                                          sample-rate))
                 (name (fresh-name))

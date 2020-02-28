@@ -38,7 +38,7 @@
   (parameter-alist nil :read-only t :type list)
   ;; Will later be resolved
   (name-resolution nil :type (or null
-                                 standard-waveform
+                                 template-waveform
                                  waveform-definition)))
 
 (defun waveform-ref= (a b)
@@ -63,7 +63,7 @@
           (waveform-ref-name thing)
           (waveform-ref-parameter-alist thing)))
 
-(defclass standard-waveform ()
+(defclass template-waveform ()
   ((duration :initarg :duration
              :reader waveform-duration
              :type (or float constant param)

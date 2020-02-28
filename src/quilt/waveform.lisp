@@ -9,7 +9,7 @@
 ;;; PULSE and CAPTURE instructions require the specification of an appropriate
 ;;; waveform to use. Waveforms come in two flavors.
 ;;;   - "Standard" waveforms are baked-in to the language, and supported by downstream
-;;;     consumers. These are represented by a subclass of STANDARD-WAVEFORM. Each
+;;;     consumers. These are represented by a subclass of TEMPLATE-WAVEFORM. Each
 ;;;     instance has a well-specified duration, which is part of the waveform parameters.
 ;;;   - Custom waveforms, which are associated with a DEFWAVEFORM definition. These
 ;;;     are ultimately specifications for a fixed-length sequence of IQ values. They may
@@ -34,7 +34,7 @@
   "Given the CLASS-NAME of a built-in Quilt waveform, return an association list mapping Quilt waveform parameter names and their corresponding slot names on the waveform class."
   (gethash class-name *waveform-class-parameter-alists*))
 
-(defmacro define-standard-waveform (class-name quilt-name slot-specs &key documentation)
+(defmacro define-template-waveform (class-name quilt-name slot-specs &key documentation)
   "Define a standard waveform.
 
 Parameters:
@@ -63,11 +63,11 @@ Parameters:
                       (remf (rest spec) :quilt-name)
                       (remf (rest spec) :rpcq-type))
                 :collect (list param-quilt-name slot-name))))
-    ;; We get this from STANDARD-WAVEFORM
+    ;; We get this from TEMPLATE-WAVEFORM
     (push (list "duration" 'duration) quilt-param-alist)
 
     `(prog1
-       (defclass ,class-name (standard-waveform)
+       (defclass ,class-name (template-waveform)
          ,slot-specs
          ,@(when documentation
              `((:documentation ,documentation))))
@@ -77,7 +77,7 @@ Parameters:
 
 ;;; These are produced from the similar definitions in RPCQ.
 
-(define-standard-waveform gaussian-waveform "gaussian"
+(define-template-waveform gaussian-waveform "gaussian"
   ((fwhm :quilt-name "fwhm"
          :rpcq-type float
          :documentation "Full Width Half Max shape parameter, in seconds.")
@@ -85,7 +85,7 @@ Parameters:
        :rpcq-type float
        :documentation "Center time coordinate of the shape in seconds. Defaults to mid-point of pulse.")))
 
-(define-standard-waveform drag-gaussian-waveform "drag_gaussian"
+(define-template-waveform drag-gaussian-waveform "drag_gaussian"
   ((fwhm :quilt-name "fwhm"
          :rpcq-type float
          :documentation "Full Width Half Max shape parameter, in seconds.")
@@ -100,7 +100,7 @@ Parameters:
           :documentation "Dimensionless DRAG parameter."))
   :documentation "A DRAG Gaussian shaped waveform envelope defined for a specific frame.")
 
-(define-standard-waveform hermite-gaussian-waveform "hermite_gaussian"
+(define-template-waveform hermite-gaussian-waveform "hermite_gaussian"
   ((fwhm :quilt-name "fwhm"
          :rpcq-type float
          :documentation "Full Width Half Max shape parameter, in seconds.")
@@ -120,7 +120,7 @@ Parameters:
 
 Reference: Effects of arbitrary laser or NMR pulse shapes on population inversion and coherence Warren S. Warren. 81, (1984); doi: 10.1063/1.447644")
 
-(define-standard-waveform erf-square-waveform "erf_square"
+(define-template-waveform erf-square-waveform "erf_square"
   ((risetime :quilt-name "risetime"
              :documentation "The width of the rise and fall sections in seconds."
              :rpcq-type float)
@@ -134,7 +134,7 @@ Reference: Effects of arbitrary laser or NMR pulse shapes on population inversio
               :rpcq-type float))
   :documentation "Pulse with a flat top and rounded shoulders given by error functions.")
 
-(define-standard-waveform flat-waveform "flat"
+(define-template-waveform flat-waveform "flat"
   ((iq :quilt-name "iq"
        :rpcq-type complex
        :documentation "A complex number representing the in-phase (real) and quadrature (imaginary) values to hold constant."))
@@ -144,7 +144,7 @@ Reference: Effects of arbitrary laser or NMR pulse shapes on population inversio
 ;;; TODO: This could probably be deprecated in favor of just having FLAT-WAVEFORMs.
 ;;; Seemingly the only special thing about BOXCAR-AVERAGER-KERNEL is that it is
 ;;; normalized (presumably to integrate to 1), rather than having a specified IQ value.
-(define-standard-waveform boxcar-averager-kernel "boxcar_kernel"
+(define-template-waveform boxcar-averager-kernel "boxcar_kernel"
   ((phase :quilt-name "phase"
           :rpcq-type complex
           :documentation "Phase [units of revolutions] to rotate the kernel by.")
