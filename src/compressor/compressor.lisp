@@ -436,13 +436,13 @@ other's."
         (decompile-instructions-into-full-unitary)))))
 
 (define-condition state-prep-compression-tolerance-error (error)
-  ((compilation-tolerance :type double-float :initarg :compilation-tolerance :reader state-prep-compression-tolerance-error-tolerance)
-   (compilation-precision :type double-float :initarg :compilation-precision :reader state-prep-compression-tolerance-error-precision))
+  ((compilation-tolerance :type real :initarg :compilation-tolerance :reader state-prep-compression-tolerance-error-tolerance)
+   (compilation-precision :type real :initarg :compilation-precision :reader state-prep-compression-tolerance-error-precision))
+  (:documentation "This error is raised when the state vector produced by state-preparation compilation is not within some tolerance.")
   (:report (lambda (c s)
-             (with-slots (compilation-tolerance compilation-precision) c
-               (format s "The state vector produced by state-preparation compilation was found to be not colinear with the state vector produced by standard compilation. Compilation has a tolerance of ~A but compilation had a precision of ~A."
-                       compilation-tolerance
-                       compilation-precision)))))
+             (format s "The state vector produced by state-preparation compilation was found to be not colinear with the state vector produced by standard compilation. Compilation has a tolerance of ~A but compilation had a precision of ~A."
+                     (state-prep-compression-tolerance-error-tolerance c)
+                     (state-prep-compression-tolerance-error-precision c)))))
 
 (defun check-contextual-compression-was-well-behaved (instructions
                                                       decompiled-instructions

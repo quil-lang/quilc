@@ -276,7 +276,7 @@ as needed so that they are the same size."
     ;; which has the potential to terminate early on a negative result
     (let ((abs-overlap (abs (dot-product vect1 vect2))))
       (values (double= 1d0 abs-overlap)
-              (1- abs-overlap)))))
+              (- 1d0 abs-overlap)))))
 
 ;; also just some general math routines
 (defun find-root (f guess &optional (depth-bound 1000))
