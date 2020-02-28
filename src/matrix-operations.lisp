@@ -266,6 +266,7 @@ as needed so that they are the same size."
   ;; TODO Do not use dot product. Instead do component-wise
   ;; calculation of the scalar relation, and check that it is the same
   ;; for all entries.
+  ;; TODO Use magicl's dot-product, etc.
   (let ((vect1 (coerce vect1 'list))
         (vect2 (coerce vect2 'list)))
     (assert (double= 1d0 (sqrt (dot-product vect1 vect1))))
