@@ -223,12 +223,14 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     #+allegro excl:*infinity-double*
     #-(or ccl ecl sbcl allegro) (error "double-float-positive-infinity not available."))
 
-(defconstant pi    (coerce cl:pi 'double-float))
-(defconstant -pi   (- pi))
-(defconstant pi/2  (/ pi 2))
-(defconstant -pi/2 (/ pi -2))
-(defconstant 2pi   (* 2 pi))
-(defconstant 4pi   (* 4 pi))
+(macrolet ((define-self-documenting-constant (symbol value)
+             `(defconstant ,symbol ,value ,(string-downcase symbol))))
+  (define-self-documenting-constant pi    (coerce cl:pi 'double-float))
+  (define-self-documenting-constant -pi   (- pi))
+  (define-self-documenting-constant pi/2  (/ pi 2))
+  (define-self-documenting-constant -pi/2 (/ pi -2))
+  (define-self-documenting-constant 2pi   (* 2 pi))
+  (define-self-documenting-constant 4pi   (* 4 pi)))
 
 (defun print-hash (hash &optional (stream *standard-output*))
   (fresh-line stream)
@@ -237,6 +239,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 
 ;;; Cribbed from QVM-TESTS
 (defmacro with-output-to-quil (&body body)
+  "Collect all data sent to *STANDARD-OUTPUT* and return it parsed as as a Quil program."
   `(let ((quil:*allow-unresolved-applications* t))
      (quil:parse-quil
       (with-output-to-string (*standard-output*)
