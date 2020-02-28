@@ -29,8 +29,8 @@
         :for vk :across (magicl::matrix-data v)
         :sum (* uk (conjugate vk))))
 
- (defun rayleigh-quotient (matrix vector)
-   (dot-product vector (quil::m* matrix vector)))
+(defun rayleigh-quotient (matrix vector)
+  (dot-product vector (quil::m* matrix vector)))
 
 (defun get-amplitudes (qvm)
   (declare (type qvm:pure-state-qvm qvm))
@@ -178,11 +178,7 @@
       (loop :for generator :across (concatenate 'qec::generators primary-generators secondary-generators)
             :for matrix := (pauli-to-matrix generator)
             :for vector := (make-state) :do
-              (let ((rq (magicl:ref
-                         (magicl:multiply-complex-matrices
-                          (magicl:transpose vector)
-                          (magicl:multiply-complex-matrices matrix vector))
-                         0 0)))
+              (let ((rq (rayleigh-quotient matrix vector)))
                 (is (and (quil::double= 1.0d0 (realpart rq))
                          (quil::double= 0.0d0 (imagpart rq)))))))))
 
