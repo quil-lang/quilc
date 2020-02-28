@@ -66,7 +66,7 @@
 (defclass template-waveform ()
   ((duration :initarg :duration
              :reader waveform-duration
-             :type (or float constant param)
+             :type constant
              :documentation "Duration of the waveform, in seconds."))
   (:documentation "Base class for built-in waveforms.")
   (:metaclass abstract-class))

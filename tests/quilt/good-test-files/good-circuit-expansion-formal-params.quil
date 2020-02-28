@@ -7,8 +7,8 @@ DECLARE iq REAL[1000]
 DEFCIRCUIT FOO(%theta) q:
     SET-PHASE q "xy" %theta
     SWAP-PHASE q "xy" q "ff"
-    PULSE q "xy" flat(iq: 1.0, duration: %theta)
-    CAPTURE q "xy" flat(iq: 1.0, duration: %theta) iq
+    PULSE q "xy" flat(iq: 1.0, duration: 1.0)
+    CAPTURE q "xy" flat(iq: 1.0, duration: 1.0) iq
     RAW-CAPTURE q "xy" %theta iq
     DELAY q %theta
     DELAY q "xy" %theta

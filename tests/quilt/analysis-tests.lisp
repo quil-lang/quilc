@@ -11,8 +11,8 @@ DEFFRAME 0 \"ff\"
 DEFCIRCUIT FOO(%theta) q:
     SET-PHASE q \"rf\" %theta
     SWAP-PHASE q \"rf\" q \"ff\"
-    PULSE q \"rf\" flat(iq: 1.0, duration: %theta)
-    CAPTURE q \"rf\" flat(iq: 1.0, duration: %theta) iq[0]
+    PULSE q \"rf\" flat(iq: 1.0, duration: 1.0)
+    CAPTURE q \"rf\" flat(iq: 1.0, duration: 1.0) iq[0]
     RAW-CAPTURE q \"rf\" %theta iq[0]
     DELAY q %theta
     DELAY q \"rf\" %theta

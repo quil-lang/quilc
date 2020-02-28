@@ -1,0 +1,4 @@
+DEFFRAME 0 "rf"
+DECLARE time REAL
+
+PULSE 0 "rf" gaussian(duration: 1.0, fwhm: 1.0, t0: time)

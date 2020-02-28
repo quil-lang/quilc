@@ -75,9 +75,13 @@
 (defun parse-waveform-parameter-and-value (toks)
   "Parse a <param>:<value> pair, consuming TOKS."
   (quil::match-line ((name :NAME) (colon :COLON) &rest value-expr) (list toks)
-      (cons
-       (param (quil::token-payload name))
-       (quil::parse-parameter-or-expression value-expr))))
+    (let ((param-name (quil::token-payload name))
+          (value (quil::parse-parameter-or-expression value-expr)))
+      ;; template waveform parameters need to be statically determined
+      (unless (is-constant value)
+        (quil-parse-error "Parameter ~A of template waveform has non-constant value."
+                          param-name))
+      (cons (param param-name) value))))
 
 (defun parse-waveform-parameter-alist (params-args)
   "Parse waveform parameters and their assigned values from the list of tokens PARAMS-ARGS. Returns an association list and the remaining tokens."
@@ -94,7 +98,7 @@
 
     ;; Error if we didn't find a right parenthesis.
     (when (endp rest-line)
-      (quil-parse-error "No matching right paren in~@[ ~A~] parameters." quil::*parse-context*))
+      (quil-parse-error "No matching right paren in~@[ ~A~] waveform parameters." quil::*parse-context*))
 
     ;; Remove right paren and stash away params.
     (pop rest-line)
@@ -102,8 +106,7 @@
     ;; Parse out the parameters.
     (let ((entries
             (split-sequence:split-sequence-if
-             (lambda (tok)
-               (eq ':COMMA (quil::token-type tok)))
+             (lambda (tok) (eq ':COMMA (quil::token-type tok)))
              found-params)))
       (values (mapcar #'parse-waveform-parameter-and-value entries)
               rest-line))))
