@@ -532,38 +532,46 @@ Optionally constrains the output to include only those bindings of a particular 
          (add-entry-to-occurrence-table new-table key val))))
     (values new-table binding-applied?)))
 
-(defstruct occurrence-table-cost
-  "Wrapper for deduced costs from occurrence tables married to gate sets."
-  (fidelity 1d0 :type double-float)
-  (unknowns 0 :type (integer 0)))
+(declaim (inline %make-occurrence-table-metric
+                 occurrence-table-metric-fidelity
+                 occurrence-table-metric-unknowns))
+(defstruct (occurrence-table-metric (:constructor %make-occurrence-table-metric (fidelity unknowns)))
+  "Abstract assessment of an occurrence table, which can be sorted by the function OCCURRENCE-TABLE-METRIC-BETTERP."
+  (fidelity nil :type (double-float 0d0 1d0))
+  (unknowns nil :type (integer 0)))
+#+sbcl (declaim (sb-ext:freeze-type occurrence-table-metric))
 
-(defun occurrence-table-cost-> (y x)
+(defun make-occurrence-table-metric ()
+  (%make-occurrence-table-metric 1d0 0))
+
+(defun occurrence-table-metric-worsep (x y)
+  (declare (type occurrence-table-metric x y))
   (cond
-    ((> (occurrence-table-cost-unknowns x)
-        (occurrence-table-cost-unknowns y))
+    ((< (occurrence-table-metric-unknowns y)
+        (occurrence-table-metric-unknowns x))
      t)
-    ((< (occurrence-table-cost-unknowns x)
-        (occurrence-table-cost-unknowns y))
+    ((> (occurrence-table-metric-unknowns y)
+        (occurrence-table-metric-unknowns x))
      nil)
-    ((> (occurrence-table-cost-fidelity x)
-        (occurrence-table-cost-fidelity y))
+    ((> (occurrence-table-metric-fidelity y)
+        (occurrence-table-metric-fidelity x))
      t)
     (t
      nil)))
 
-(defun occurrence-table-cost (occurrence-table gateset)
+(defun evaluate-occurrence-table (occurrence-table gateset)
   "Given an OCCURRENCE-TABLE (i.e., a map from GATE-BINDINGs to frequencies) and a GATESET (i.e., a map from GATE-BINDINGs to GATE-RECORDs, which include fidelities), estimate the overall fidelity cost of all the gates in OCCURRENCE-TABLE."
   (check-type occurrence-table occurrence-table)
-  (let ((ret (make-occurrence-table-cost)))
+  (let ((ret (make-occurrence-table-metric)))
     (dohash ((key val) (occurrence-table-map occurrence-table) ret)
       (tagbody
          (dohash ((cost-key cost-val) gateset)
            (when (binding-subsumes-p cost-key key)
-             (setf (occurrence-table-cost-fidelity ret)
+             (setf (occurrence-table-metric-fidelity ret)
                    (* (expt (gate-record-fidelity cost-val) val)
-                      (occurrence-table-cost-fidelity ret)))
+                      (occurrence-table-metric-fidelity ret)))
              (go :SKIP)))
-         (incf (occurrence-table-cost-unknowns ret))
+         (incf (occurrence-table-metric-unknowns ret))
          :SKIP))))
 
 (defun occurrence-table-in-gateset-p (occurrence-table gateset)
@@ -607,7 +615,7 @@ Optionally constrains the output to include only those bindings of a particular 
 Optionally restricts to considering only those gates and compilers which involve QUBIT-COUNT many qubits.
 
 N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means \"of least length\", but in theory this invariant could be violated by pathological compiler output frequency + fidelity pairings that push the least-length path further down the priority queue."
-  (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'occurrence-table-cost->)))
+  (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun #'occurrence-table-metric-worsep)))
     (flet ((collect-bindings (occurrence-table)
              (loop :for key :being :the :hash-keys :of (occurrence-table-map occurrence-table)
                    :collect key)))
@@ -629,7 +637,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                       (when updated?
                         (cl-heap:enqueue queue
                                          (list* new-table compiler task history)
-                                         (occurrence-table-cost new-table target-gateset)))))))))
+                                         (evaluate-occurrence-table new-table target-gateset)))))))))
 
 (defun print-compiler-path (path)
   "Pretty-prints the output of FIND-SHORTEST-COMPILER-PATH. Useful for debugging."
@@ -673,9 +681,8 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                                              (list (generate-blank-binding qubit-count) 1)
                                                              :test #'equalp))
                                                       qubit-count))
-           (generic-cost (occurrence-table-cost-fidelity
-                          (occurrence-table-cost (first generic-path) target-gateset))))
-      
+           (generic-cost (occurrence-table-metric-fidelity
+                          (evaluate-occurrence-table (first generic-path) target-gateset))))
       ;; it may be that non-generic gates have shorter routes to the target gate set.
       ;; each possible such route begins with a specialized compiler.
       ;; so, iterate over specialized compilers and see if they lead anywhere nice.
@@ -689,8 +696,8 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                     unconditional-compilers target-gateset
                     (filter-occurrence-table-by-qubit-count (compiler-output-gates compiler) qubit-count)
                     qubit-count))
-                 (special-cost (occurrence-table-cost-fidelity
-                                (occurrence-table-cost (first special-path) target-gateset))))
+                 (special-cost (occurrence-table-metric-fidelity
+                                (evaluate-occurrence-table (first special-path) target-gateset))))
             ;; did we in fact beat out the generic machinery?
             (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
                        (> special-cost generic-cost))
@@ -772,8 +779,8 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
            (let* ((gateset (blank-out-qubits gateset))
                   (in-fidelity 1d0)
                   ;; REM: the OCCURRENCE-TABLE-IN-GATESET-P check below lets us skip checking the UNKNOWNS slot
-                  (out-fidelity (occurrence-table-cost-fidelity
-                                 (occurrence-table-cost (compiler-output-gates compiler) gateset))))
+                  (out-fidelity (occurrence-table-metric-fidelity
+                                 (evaluate-occurrence-table (compiler-output-gates compiler) gateset))))
              (and (occurrence-table-in-gateset-p (compiler-output-gates compiler) gateset)
                   (loop :for b :in (compiler-bindings compiler)
                         :always (loop :for g :being :the :hash-keys :of gateset
