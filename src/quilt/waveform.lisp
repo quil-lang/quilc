@@ -28,7 +28,10 @@
   (gethash (waveform-ref-name waveform-ref) *quilt-to-waveform-class*))
 
 (defvar *waveform-class-parameter-alists* (make-hash-table :test 'equal)
-  "This is keyed by the built-in waveform CLASS-NAMEs, and maintains for each an association list mapping Quilt parameter names to their corresponding slot names.")
+  "This is keyed by the built-in waveform CLASS-NAMEs, and maintains for each an association list mapping Quilt parameter names to their corresponding slot information.
+
+The convention is that each entry is a list of the form (<param-name> <slot-name> <is-required>), where <slot-name> is a symbol indicating the corresponding slot on the waveform class, and <is-required> is a boolean indicating whether the parameter os equired.
+")
 
 (defun quilt-waveform-parameter-alist (class-name)
   "Given the CLASS-NAME of a built-in Quilt waveform, return an association list mapping Quilt waveform parameter names and their corresponding slot names on the waveform class."
@@ -62,9 +65,14 @@ Parameters:
                 :do (progn
                       (remf (rest spec) :quilt-name)
                       (remf (rest spec) :rpcq-type))
-                :collect (list param-quilt-name slot-name))))
+                :collect (list param-quilt-name slot-name t))))
     ;; We get this from TEMPLATE-WAVEFORM
-    (push (list "duration" 'duration) quilt-param-alist)
+    (push (list "duration" 'duration t) quilt-param-alist)
+    ;; optional parameters
+    (push (list "scale" 'scale nil) quilt-param-alist)
+    (push (list "phase" 'phase nil) quilt-param-alist)
+    (push (list "detuning" 'detuning nil) quilt-param-alist)
+
 
     `(prog1
        (defclass ,class-name (template-waveform)

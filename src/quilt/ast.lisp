@@ -65,9 +65,24 @@
 
 (defclass template-waveform ()
   ((duration :initarg :duration
-             :reader waveform-duration
+             :reader template-waveform-duration
              :type constant
-             :documentation "Duration of the waveform, in seconds."))
+             :documentation "Duration of the waveform, in seconds.")
+   (scale :initarg :phase
+          :reader template-waveform-phase
+          :type constant
+          :initform (constant 0.0d0)
+          :documentation "Scale t apply to the waveform envelope.")
+   (phase :initarg :phase
+          :reader template-waveform-phase
+          :type constant
+          :initform (constant 0.0d0)
+          :documentation "Phase to rotate the waveform envelope, in radians.")
+   (detuning :initarg :detuning
+             :reader template-waveform-detuning
+             :type constant
+             :initform (constant 0.0d0)
+             :documentation "Frequency to modulate complex waveform envelope, in Hz."))
   (:documentation "Base class for built-in waveforms.")
   (:metaclass abstract-class))
 

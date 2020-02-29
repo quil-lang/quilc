@@ -4,27 +4,40 @@
 
 (in-package #:cl-quil.quilt)
 
-(defun validate-waveform-parameters (waveform-ref expected-parameters)
-  "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
+(defun validate-waveform-parameters (waveform-ref required optional)
+  "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the lists of REQUIRED and OPTIONAL parameters."
   (let ((actual (mapcar (a:compose #'param-name #'car)
                         (waveform-ref-parameter-alist waveform-ref))))
-    (a:when-let ((missing (set-difference expected-parameters actual :test #'string=)))
+    (a:when-let ((missing (set-difference required actual :test #'string=)))
       (quil-parse-error "Expected parameters ~{~A~^, ~} in waveform ~A."
                         missing
                         (waveform-ref-name waveform-ref)))
-    (a:when-let ((unexpected (set-difference actual expected-parameters :test #'string=)))
-      (quil-parse-error "Unexpected parameters ~{A~^, ~} in waveform ~A. ~@
-                        Expected parameters are: ~{~A~^, ~}."
+    (a:when-let ((unexpected (set-difference actual (union required optional)
+                                             :test #'string=)))
+      (quil-parse-error "Unexpected parameter~P ~{~A~^, ~} in waveform ~A. ~@
+                        Allowed parameters: ~{~A~^, ~}."
+                        (length unexpected)
                         unexpected
                         (waveform-ref-name waveform-ref)
-                        expected-parameters))
+                        (union required optional)))
     t))
+
+(defun required-and-optional-params (param-alist)
+  (let ((required nil)
+        (optional nil))
+    (loop :for (name slot required-p) :in param-alist
+          :if required-p
+            :do (push name required)
+          :else
+            :do (push name optional))
+    (values required optional)))
 
 (defun resolve-template-waveform (waveform-ref waveform-class)
   ;; pull the alist mapping param objects to their class slot names
   (let ((param-map (quilt-waveform-parameter-alist waveform-class)))
-    (validate-waveform-parameters waveform-ref
-                                  (mapcar #'car param-map))
+    (multiple-value-bind (required optional)
+        (required-and-optional-params param-map)
+      (validate-waveform-parameters waveform-ref required optional))
     (let ((obj (make-instance waveform-class)))
       (loop :for (param . val) :in (waveform-ref-parameter-alist waveform-ref)
             :for slot-name := (second (assoc (param-name param) param-map :test #'string=))
@@ -37,7 +50,7 @@
                            nil)
                           (parameterized-waveform-definition
                            (mapcar #'symbol-name (waveform-definition-parameters waveform-defn))))))
-    (validate-waveform-parameters waveform-ref expected-names)
+    (validate-waveform-parameters waveform-ref expected-names nil)
     waveform-defn))
 
 (defun resolve-waveform-reference (waveform-ref waveform-defns &key (use-defaults t))

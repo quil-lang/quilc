@@ -61,7 +61,7 @@
   "Get the active duration of the waveform or waveform definition, in seconds.
 If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   (etypecase wf-or-wf-defn
-    (template-waveform (constant-value (waveform-duration wf-or-wf-defn)))
+    (template-waveform (constant-value (template-waveform-duration wf-or-wf-defn)))
     (waveform-definition
      (let ((frame-defn (frame-name-resolution frame)))
        (unless frame-defn
