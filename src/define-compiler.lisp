@@ -700,7 +700,8 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                 (evaluate-occurrence-table (first special-path) target-gateset))))
             ;; did we in fact beat out the generic machinery?
             (when (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
-                       (> special-cost generic-cost))
+                       ;; TODO hmm
+                       (>= special-cost generic-cost))
               ;; then store it!
               (setf (gethash compiler compiler-hash) special-cost))))
         
