@@ -251,5 +251,5 @@ CNOT 4 8
                         (merge-pathnames *qpu-test-file-directory* "Aspen-6-2Q-A.qpu"))
                        (quil::read-chip-spec-file
                         (merge-pathnames *qpu-test-file-directory* "Aspen-7-28Q-A.qpu")))))
-      (loop :for chip :in chips :do
+      (dolist (chip chips)
         (test-reduction-with-chip chip)))))
