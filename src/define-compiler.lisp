@@ -536,7 +536,7 @@ Optionally constrains the output to include only those bindings of a particular 
                  occurrence-table-metric-fidelity
                  occurrence-table-metric-unknowns))
 (defstruct (occurrence-table-metric (:constructor %make-occurrence-table-metric (fidelity unknowns)))
-  "Abstract assessment of an occurrence table, which can be sorted by the function OCCURRENCE-TABLE-METRIC-BETTERP."
+  "Abstract assessment of an occurrence table, which can be sorted by the function OCCURRENCE-TABLE-METRIC-WORSEP."
   (fidelity nil :type (double-float 0d0 1d0))
   (unknowns nil :type (integer 0)))
 #+sbcl (declaim (sb-ext:freeze-type occurrence-table-metric))
