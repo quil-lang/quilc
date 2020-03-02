@@ -17,11 +17,13 @@
   ((number-of-physical-qubits
     :type non-negative-fixnum
     :initarg :n
+    :initform (error-missing-initform :n)
     :reader number-of-physical-qubits
     :documentation "Number of physical qubits")
    (number-of-logical-qubits
     :type non-negative-fixnum
     :initarg :k
+    :initform (error-missing-initform :k)
     :reader number-of-logical-qubits
     :documentation "Number of logical qubits")
    (distance
@@ -32,10 +34,11 @@
    (generators
     :type generators
     :initarg :generators
+    ;; :initform (error-missing-initform :generators)
     :reader generators
     :documentation "Array of generators of the stabilizer group associated with this code.")
    (primary-generators ;; TODO: replace this by an array of indices into the GENERATORS slot.
-    :type generators 
+    :type generators
     :initarg :primary-generators
     :reader primary-generators
     :documentation "Array of primary generators.")
@@ -64,7 +67,7 @@
              (dolist (term
                       (coerce generators 'list)
                       (values number-of-physical-qubits
-                              (coerce (nreverse effective-generators) 'generators)))               
+                              (coerce (nreverse effective-generators) 'generators)))
                (let ((n (length term))
                      (generator (pauli-from-symbols term)))
                  (if number-of-physical-qubits
@@ -141,5 +144,9 @@
 (defun code-from-matrices (xg zg)
   "Return a new instance of CODE whose generators are dictated by the columns of XG and ZG."
   (declare (type matrix xg zg))
-  (assert (and (equalp (matrix-shape xg) (matrix-shape zg))))
-  (make-instance 'code :n (matrix-rows xg) :generators (generators-from-matrices xg zg)))
+
+  (multiple-value-bind (n d) (matrix-shape xg)
+    (assert (and (equalp (list n d) (multiple-value-list (matrix-shape zg)))))
+    (make-instance 'code :n (matrix-rows xg)
+                         :k (- n d)
+                         :generators (generators-from-matrices xg zg))))

@@ -15,7 +15,7 @@
 
 (defun make-matrix (rows cols &optional entries)
   (declare (type non-negative-fixnum rows cols)
-           (type (or null sequence)))
+           (type (or null sequence) entries))
   (%make-matrix :rows rows :cols cols
                 :entries (if (null entries)
                              (make-array (* rows cols) :element-type 'bit :initial-element 0)
@@ -185,12 +185,12 @@
 (deftype square-matrix ()
   `(and matrix (satisfies square-matrix-p)))
 
-(deftype tall-and-thin-matrix ()
-  `(and matrix (satisfies tall-and-thin-matrix-p)))
-
 (defun tall-and-thin-matrix-p (matrix)
   (< (matrix-cols matrix)
      (matrix-rows matrix)))
+
+(deftype tall-and-thin-matrix ()
+  `(and matrix (satisfies tall-and-thin-matrix-p)))
 
 (defun exchange-rows (matrix from-index to-index)
   "Exchange rows of MATRIX numbered by FROM-INDEX and TO-INDEX in-place."

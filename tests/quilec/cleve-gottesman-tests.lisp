@@ -48,7 +48,8 @@
                vector))
 
            (wrap-into-qvm (vector)
-             (let ((qvm (qvm:make-qvm (truncate (log (magicl:matrix-rows vector) 2)))))
+             (let ((qvm (qvm:make-qvm (+ (qec::number-of-physical-qubits code)
+                                         (length (qec::generators code))))))
                (setf (qvm::amplitudes (qvm::state qvm))
                      (magicl::matrix-data vector))
                qvm)))
@@ -80,11 +81,11 @@
                          (return (values (get-amplitudes qvm) qvm))))))))
 
 (defun load-program-and-run (qvm program)
-  (qvm:load-program qvm program)
+  (qvm:load-program qvm program :supersede-memory-subsystem t)
   (qvm:run qvm))
 
-(defun encode-circuit (encoder bits)
-  "Execute the circuit ENCODER in the QVM in order to encode the bitstring given in BITS. Return the resulting wavefunction and the QVM object."
+(defun encode-circuit (code encoder bits)
+  "Execute the circuit ENCODER in the QVM in order to encode the bitstring given in BITS using CODE. Return the resulting wavefunction and the QVM object."
   (flet ((make-bit-toggler-program (bits)
            "Returns a program that takes the |0> state to the |BITS> state."
            (declare (type a:non-negative-fixnum bits))
@@ -96,18 +97,18 @@
                                    (format stream "X ~D~%" i))))))
              (quil:parse-quil quil))))
 
-    (let ((qvm (qvm:make-qvm (quil::qubits-needed encoder))))
+    (let ((qvm (qvm:make-qvm (+ (qec::number-of-physical-qubits code)
+                                (length (qec::generators code))))))
       (load-program-and-run qvm (make-bit-toggler-program bits))
       (load-program-and-run qvm encoder)
-      (values (get-amplitudes qvm)
-              qvm))))
+      (values (get-amplitudes qvm) qvm))))
 
 (defun test-encoding (code encoder)
   "Ensure the encoding circuit for CODE produces the correct wavefunction."
   (loop :for c :below (expt 2 (length (qec::seed-generators code)))
         ;; The Linear Algebra encoder is regarded as the gold standard here.
         :for v1 := (encode-linear-algebra code c)
-        :for v2 := (encode-circuit encoder c)
+        :for v2 := (encode-circuit code encoder c)
         :do (let ((d (dist v1 v2)))
               (is (quil::double= d 0.0d0)))))
 
@@ -184,18 +185,39 @@
 
 (defun test-commutation (code)
   "Ensure all generators commute."
-  (let ((primary-and-secondary-generators (concatenate 'qec::generators
-                                                       (qec::primary-generators code)
-                                                       (qec::secondary-generators code))))
-    (let ((new-code (make-instance 'qec::code
-                                   :n (qec::number-of-physical-qubits code)
-                                   :generators primary-and-secondary-generators)))
-      (is (qec::commutes-p new-code)))))
+  (let* ((primary-and-secondary-generators (concatenate 'qec::generators
+                                                        (qec::primary-generators code)
+                                                        (qec::secondary-generators code)))
+         (n (qec::number-of-physical-qubits code))
+         (d (length primary-and-secondary-generators))
+         (new-code (make-instance 'qec::code
+                                  :n n
+                                  :k (- n d)
+                                  :generators primary-and-secondary-generators)))
+    (is (qec::commutes-p new-code))))
 
 (defun test-syndromes (code encoder)
   "Verify that the errors lie in the orthogonal complement of the code space and that every error anticommutes with at least one generator."
   (flet ((make-error-program (gate qubit)
-           (quil:parse-quil (format nil "~A ~D~%" gate qubit))))
+           (quil:parse-quil (format nil "~A ~D~%" gate qubit)))
+
+         (make-syndrome-measurement-program (code)
+           (quil:with-output-to-quil
+             (loop :with generators := (qec::generators code)
+                   :with d := (length generators)
+                   :initially (format t "DECLARE ancillae BIT[~D]~%" d)
+                   :for i :from 0
+                   :for qubit :from (qec::number-of-physical-qubits code)
+                   :for generator :across generators :do
+                     (loop :initially (format t "H ~D~%" qubit)
+                           :with base4-terms := (cl-quil.clifford::pauli-components generator)
+                           :for q :from 0
+                           :for base4-term :across (subseq base4-terms 1) :do
+                             (when (plusp base4-term)
+                               (format t "~[CNOT~;CZ~;CONTROLLED YY~] ~D ~D~%"
+                                       (1- base4-term) qubit q))
+                           :finally (format t "H ~D~%~
+                                               MEASURE ~D ancillae[~D]~%" qubit qubit i))))))
 
     (loop :with primary-generators := (qec::primary-generators code)
           :with secondary-generators := (qec::secondary-generators code)
@@ -203,7 +225,7 @@
           :with k := (length (qec::seed-generators code))
           :with n := (qec::number-of-physical-qubits code)
           :for i :below (expt 2 k)
-          :for u := (encode-circuit encoder i) :do
+          :for u := (encode-circuit code encoder i) :do
             (loop ;; :initially (format t "Data: ~3,B~%" i)
                   :for gate :in '("X" "YY" "Z") :do
                     (loop :with syndromes := nil
@@ -212,19 +234,16 @@
                                   :for l :from 0
                                   :for generator :in generators
                                   :for program := (pauli-to-program generator)
-                                  :for matrix := (quil:parsed-program-to-logical-matrix program)
-                                  :do
-                                     (let ((qvm (nth-value 1 (encode-circuit encoder i))))
-                                       (load-program-and-run qvm (make-error-program gate j))
-                                       (let* ((new-vector (get-amplitudes qvm))
-                                              (rq (rayleigh-quotient matrix new-vector)))
-                                         (when (minusp (realpart rq))
-                                           (setf (ldb (byte 1 l) syndrome) 1))
-                                         (is (<= (abs (dot-product u new-vector))
-                                                 double-float-epsilon))))
+                                  :do (let ((qvm (nth-value 1 (encode-circuit code encoder i))))
+                                        (load-program-and-run qvm (make-syndrome-measurement-program code))
+                                        (is (zerop (qvm:memory-ref qvm "ancillae" l)))
+
+                                        (load-program-and-run qvm (make-error-program gate j))
+                                        (load-program-and-run qvm (make-syndrome-measurement-program code))
+                                        (setf (ldb (byte 1 l) syndrome) (qvm:memory-ref qvm "ancillae" l)))
                                   :finally (pushnew syndrome syndromes))
                           :finally (is (every #'plusp syndromes))
-                                   ;; (format t "Syndromes for ~2A: ~{~5,B~^ ~}~%" gate (stable-sort syndromes #'<=))
+                                   ;; (format t "Syndromes for ~2A: ~{~9,'0B~^ ~}~%" gate syndromes)
                           )))))
 
 (defun test-syndromes-linear-algebra (code)

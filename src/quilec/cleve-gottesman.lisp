@@ -4,6 +4,27 @@
 
 (in-package #:cl-quil.quilec)
 
+;;; This file contains an implementation of the algorithm introduced in:
+;;;
+;;; R. Cleve and D. Gottesman, “Efficient computations of encodings for
+;;; quantum error correction,” Phys. Rev. A, vol. 56, no. 1, pp. 76–82,
+;;; Jul. 1997, doi: 10.1103/PhysRevA.56.76.
+;;;
+;;; Both the arXiv and published version of the above paper contain
+;;; significant errors which are not present in this
+;;; implementation. D. Gottesman has published an erratum for his
+;;; Ph.D. thesis at:
+;;; https://www.perimeterinstitute.ca/personal/dgottesman/thesis-errata.html
+;;; Specifically, the comment about Chapter 4 addresses the most important
+;;; issue. Note that the notation in the thesis differs from the notation
+;;; used in the paper, which is the one we have adopted here.
+;;;
+;;; See also:
+;;;
+;;; D. Gottesman, “Class of quantum error-correcting codes saturating the
+;;; quantum Hamming bound,” Phys. Rev. A, vol. 54, no. 3, pp. 1862–1868,
+;;; Sep. 1996, doi: 10.1103/PhysRevA.54.1862.
+
 (defun cleve-gottesman (code)
   "Apply the Cleve-Gottesman algorithm to CODE and return a new code object containing the results."
   (declare (type code code))
@@ -13,26 +34,17 @@
 
 (defun cleve-gottesman-from-matrices (xg zg)
   "Apply the Cleve-Gottesman algorithm to the X- and Z-matrices given in XG and ZG. Return a new object of type CODE containing the results."
-  ;; This implements the algorithm of:
-  ;;
-  ;; R. Cleve and D. Gottesman, “Efficient computations of encodings for
-  ;; quantum error correction,” Phys. Rev. A, vol. 56, no. 1,pp. 76–82,
-  ;; Jul. 1997, doi: 10.1103/PhysRevA.56.76.
-  ;;
-  ;; Warning: the arXiv version of the above paper contains serious
-  ;; errors. See also:
-  ;;
-  ;; D. Gottesman, “Class of quantum error-correcting codes saturating the
-  ;; quantum Hamming bound,” Phys. Rev. A, vol. 54, no. 3, pp. 1862–1868,
-  ;; Sep. 1996, doi: 10.1103/PhysRevA.54.1862.
   (declare (type tall-and-thin-matrix xg zg)
-           (values processed-code))
+           ;; (values processed-code)
+           )
   ;; TODO It would be nice (but not necessary) to enforce some kind of
   ;; lexicographic ordering and/or *minimum* entropy criterion on the
   ;; resulting codeword vectors.
   (flet ((get-x*-and-z* (xg zg r b k)
            (let* ((n (matrix-rows xg))
                   (eye (matrix-eye k))
+                  ;; TODO Gracefully handle the case (not addressed in the
+                  ;; paper) where there are no secondary generators.
                   (b1t (matrix-transpose (matrix-submatrix zg 0 0 k r)))
                   (zeros1 (make-matrix b k))
                   (zeros2 (make-matrix n k)))
@@ -185,9 +197,7 @@ Note that the resulting program requires that the data qubits be set by the user
         (loop :initially (format t "H ~D~%" count)
               :for qubit :below n
               :for gate :across (subseq (pauli-components g) 1)
-              :unless (= qubit count) :do
-                (case gate
-                  (1 (format t "CNOT ~D ~D~%" count qubit))
-                  (2 (format t "CZ ~D ~D~%" count qubit))
-                  (3 (format t "CONTROLLED YY ~D ~D~%" count qubit)))
+              :unless (or (= qubit count) (zerop gate)) :do
+                (format t "~[CNOT~;CZ~;CONTROLLED YY~] ~D ~D~%"
+                        (1- gate) count qubit)
               :finally (incf count))))))
