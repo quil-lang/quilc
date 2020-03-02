@@ -228,28 +228,24 @@ CNOT 4 8
   ;; Any string of RXs and RYs should reduce to a string of at most 3
   ;; RZs and 2 RXs.
   (labels
-      ((random-rz-rx-program ()
+      ((random-rz-rx-program (length)
          (make-instance 'parsed-program
                         :executable-code
                         (coerce
-                         (loop :for i :below 100
+                         (loop :for i :from 0 :below length
                                :collect (if (evenp i)
                                             (build-gate "RZ" (list (* (random 1.0) pi)) 0)
                                             (build-gate "RX" (list (* (random 1.0) pi)) 0)))
                          'vector)))
        (test-reduction-with-chip (chip)
-         (loop :repeat 100
-               :for progm := (random-rz-rx-program)
+         (loop :for length :from 1 :to 100
+               :for progm := (random-rz-rx-program length)
                :for comp := (%filter-halt (compiler-hook progm chip))
                :always (is (<= (length comp) 5)))))
     (let ((chips (list (quil::build-nq-linear-chip 1)
-                       (quil::read-chip-spec-file
-                        (merge-pathnames *qpu-test-file-directory* "1q-wildcard-arguments.qpu"))
-                       (quil::read-chip-spec-file
-                        (merge-pathnames *qpu-test-file-directory* "Aspen-4-2Q-A.qpu"))
-                       (quil::read-chip-spec-file
-                        (merge-pathnames *qpu-test-file-directory* "Aspen-6-2Q-A.qpu"))
-                       (quil::read-chip-spec-file
-                        (merge-pathnames *qpu-test-file-directory* "Aspen-7-28Q-A.qpu")))))
+                       (%read-test-chipspec "1q-wildcard-arguments.qpu")
+                       (%read-test-chipspec "Aspen-4-2Q-A.qpu")
+                       (%read-test-chipspec "Aspen-6-2Q-A.qpu")
+                       (%read-test-chipspec "Aspen-7-28Q-A.qpu"))))
       (dolist (chip chips)
         (test-reduction-with-chip chip)))))
