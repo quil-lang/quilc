@@ -1,0 +1,89 @@
+#+TITLE: Stabilizer codes in Quilc
+#+AUTHOR: Juan M. Bello-Rivas
+#+EMAIL: jbellorivas@rigetti.com
+
+This document is an introduction to =cl-quil.quilec=, a package that provides
+support for handling stabilizer codes in Quilc.
+
+After loading the =cl-quil.quilec= package, we can create a new stabilizer
+group by passing its generators in symbolic form as the arguments of
+=make-stabilizer-group=. Each generator must appear in its own sublist when
+calling =make-stabilizer-group=, as follows:
+
+#+BEGIN_SRC lisp
+  (defparameter *seven-qubit-code* (make-stabilizer-group '((x x x x i i i)
+                                                            (x x i i x x i)
+                                                            (x i x i x i x)
+                                                            (z z z z i i i)
+                                                            (z z i i z z i)
+                                                            (z i z i z i z))))
+#+END_SRC
+
+The previous form instantiates the stabilizer group corresponding to the
+Calderbank-Steane-Shor 7-qubit code and binds it to =*seven-qubit-code*=.
+
+Observe that the generators returned by =(generators *seven-qubit-code*)= are
+guaranteed to generate the same stabilizer group as the ones passed to
+=make-stabilizer-group= as arguments but these are in general not identical.
+
+The code represented by =*seven-qubit-code*= uses n = 7 qubits and is
+determined by d = 6 independent generators and, consequently, can protect up
+to k = n - d = 1 qubits against errors. Thus, we have a single data qubit
+that can be either |0> or |1>. The data qubits always comprise the first k
+qubits of our system. If we start with a QPU/QVM already in the |0...0>
+state, then we must use X gates to flip the qubits and reach the desired
+input. After this, we run the previously obtained encoder program. First,
+however, we must instantiate a QVM with 7 qubits plus an additional 6 qubits
+to account for the ancillae required to do the error checking.
+
+#+BEGIN_SRC lisp
+  (defparameter *qvm* (qvm:make-qvm (+ 7 6)))
+#+END_SRC
+
+As anticipated above, we encode the |1> state by executing an X gate on the
+zeroth qubit.
+
+#+BEGIN_SRC lisp
+  (qvm:load-program *qvm* (quil:parse-quil "X 0"))
+  (qvm:run *qvm*)
+#+END_SRC
+
+Next, we run the encoder program.
+
+#+BEGIN_SRC lisp
+  (qvm:load-program *qvm* (codeword-circuit *seven-qubit-code*))
+  (qvm:run *qvm*)
+#+END_SRC
+
+At this point we have a |1> logical qubit encoded across the first 7 physical
+qubits. To run a sanity check, we can evaluate the syndromes and verify that
+they are indeed zero:
+
+#+BEGIN_SRC lisp
+  (defparameter *syndromes* (make-syndrome-measurement-circuit *seven-qubit-code*))
+  (qvm:load-program *qvm* *syndromes* :supersede-memory-subsystem t)
+  (qvm:run *qvm*)
+#+END_SRC
+
+The output of
+#+BEGIN_SRC lisp
+  (loop :for i :below 6 :collect (qvm:memory-ref *qvm* "ancillae" i))
+#+END_SRC
+should be equal to =(0 0 0 0 0 0)=.
+
+Now let us corrupt one of the qubits, say qubit number 4 by shifting its
+phase and measure the syndromes again.
+
+#+BEGIN_SRC lisp
+  (qvm:load-program *qvm* (quil:parse-quil "Z 4"))
+  (qvm:run *qvm*)
+
+  (qvm:load-program *qvm* *syndromes* :supersede-memory-subsystem t)
+  (qvm:run *qvm*)
+
+  (loop :for i :below 6 :collect (qvm:memory-ref *qvm* "ancillae" i))
+#+END_SRC
+
+The result of the previous operation is =(0 0 0 1 0 0)=, which indicates that
+the error anti-commuted with one of the syndromes, indicating a successful
+detection.
