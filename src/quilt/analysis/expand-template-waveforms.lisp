@@ -26,8 +26,29 @@
   "Convert the 'full-width half-max' value FWHM to a corresponding 'standard deviation' or 'sigma' value."
   (* 0.5d0 fwhm (/ (sqrt (* 2.0d0 (log 2.0d0))))))
 
-(defgeneric waveform-iq-values (waveform sample-rate)
-  (:documentation "Construct a complex vector, corresponding to the entries of WAVEFORM sampled at SAMPLE-RATE.")
+(defun waveform-iq-values (waveform sample-rate)
+  "Construct a complex vector, corresponding to the entries of WAVEFORM sampled at SAMPLE-RATE.
+
+This incorporates and scaling, detuning, and phase shifts."
+  (let* ((scale (slot-constant-value waveform 'scale))
+         (phase (slot-constant-value waveform 'phase))
+         (detuning (slot-constant-value waveform 'detuning))
+         (iqs (default-waveform-iq-values waveform sample-rate)))
+    (dotimes (j (length iqs) iqs)
+      (setf (aref iqs j)
+            (* (aref iqs j)
+               scale
+               (exp (* 2 pi #C(0d0 1d0)
+                       phase))
+               (exp (* 2 pi #C(0d0 1d0)
+                       detuning
+                       j
+                       (/ sample-rate))))))))
+
+(defgeneric default-waveform-iq-values (waveform sample-rate)
+  (:documentation "Construct a complex vector, corresponding to the entries of WAVEFORM sampled at SAMPLE-RATE.
+
+NOTE: This does not apply scaling, detuning, or phase shifts.")
   (:method ((wf quilt::flat-waveform) sample-rate)
     (let ((duration (slot-constant-value wf 'duration))
           (iq (slot-constant-value wf 'iq)))

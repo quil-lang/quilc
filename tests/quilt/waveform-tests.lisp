@@ -62,3 +62,37 @@
   (let ((actual (quilt::erf-square-samples 2d0 4 1d0 0d0 0d0 nil))
         (expected #(#C(0.00043388937934879523d0 0.0d0) #C(0.04794548357123268d0 0.0d0) #C(0.49999999998634925d0 0.0d0) #C(0.9520542227489965d0 0.0d0) #C(0.9991322212413024d0 0.0d0) #C(0.9520542227489965d0 0.0d0) #C(0.49999999998634925d0 0.0d0) #C(0.04794548357123268d0 0.0d0))))
     (is (vec-double= actual expected))))
+
+(defun gaussian-waveform (duration fwhm t0 &key (detuning 0.0d0) (scale 1.0d0) (phase 0.0d0))
+  (let ((wf (make-instance 'quilt::gaussian-waveform
+                           :duration (constant duration)
+                           :detuning (constant detuning)
+                           :scale (constant scale)
+                           :phase (constant phase))))
+    (setf (slot-value wf 'quilt::fwhm) (constant fwhm))
+    (setf (slot-value wf 'quilt::t0) (constant t0))
+    wf))
+
+(deftest test-template-waveform-detuning ()
+  (let ((actual (quilt::waveform-iq-values
+                 (gaussian-waveform 2.0d0 3.0d0 0.5d0 :detuning 10.0d0)
+                 5))
+        ;; lower_template_waveform(GaussianWaveform(frame='q0_rf', duration=2.0, fwhm=3.0, t0=0.5, scale=1.0, detuning=10, phase=0.0), 5).iqs
+        (expected #(#C(0.9258747122872905d0 0.0d0) #C(0.9726549474122855d0 -4.764635072093171d-16) #C(0.9969240862100921d0 -9.767039129360714d-16) #C(0.9969240862100921d0 -1.465055869404107d-15) #C(0.9726549474122855d0 -1.9058540288372684d-15) #C(0.9258747122872905d0 4.3109965047688565d-15) #C(0.8598889270616107d0 -2.527344533155808d-15) #C(0.7791645796604998d0 -2.671763943772627d-15) #C(0.688831117541916d0 -2.699439434402565d-15) #C(0.5941457918240557d0 5.823892055397192d-15))))
+    (is (vec-double= actual expected))))
+
+(deftest test-template-waveform-scale ()
+  (let ((actual (quilt::waveform-iq-values
+                 (gaussian-waveform 2.0d0 3.0d0 0.5d0 :scale 0.5d0)
+                 5))
+        ;; lower_template_waveform(GaussianWaveform(frame='q0_rf', duration=2.0, fwhm=3.0, t0=0.5, scale=0.5, detuning=0.0, phase=0.0), 5).iqs
+        (expected #(#C(0.46293735614364523d0 0.0d0) #C(0.48632747370614277d0 0.0d0) #C(0.49846204310504605d0 0.0d0) #C(0.49846204310504605d0 0.0d0) #C(0.48632747370614277d0 0.0d0) #C(0.46293735614364523d0 0.0d0) #C(0.42994446353080534d0 0.0d0) #C(0.3895822898302499d0 0.0d0) #C(0.344415558770958d0 0.0d0) #C(0.29707289591202785d0 0.0d0))))
+    (is (vec-double= actual expected))))
+
+(deftest test-template-waveform-phase ()
+  (let ((actual (quilt::waveform-iq-values
+                 (gaussian-waveform 2.0d0 3.0d0 0.5d0 :phase 1.5d0)
+                 5))
+        ;; lower_template_waveform(GaussianWaveform(frame='q0_rf', duration=2.0, fwhm=3.0, t0=0.5, scale=1.0, detuning=0.0, phase=1.5), 5).iqs
+        (expected #(#C(-0.9258747122872905d0 3.40160850844232d-16) #C(-0.9726549474122855d0 3.5734763040698775d-16) #C(-0.9969240862100921d0 3.6626396735102676d-16) #C(-0.9969240862100921d0 3.6626396735102676d-16) #C(-0.9726549474122855d0 3.5734763040698775d-16) #C(-0.9258747122872905d0 3.40160850844232d-16) #C(-0.8598889270616107d0 3.15918066644476d-16) #C(-0.7791645796604998d0 2.8626042254706715d-16) #C(-0.688831117541916d0 2.5307244697524045d-16) #C(-0.5941457918240557d0 2.1828562265525982d-16))))
+    (is (vec-double= actual expected))))

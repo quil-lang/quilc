@@ -68,7 +68,7 @@
              :reader template-waveform-duration
              :type constant
              :documentation "Duration of the waveform, in seconds.")
-   (scale :initarg :phase
+   (scale :initarg :scale
           :reader template-waveform-phase
           :type constant
           :initform (constant 0.0d0)
