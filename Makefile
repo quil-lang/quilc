@@ -121,14 +121,8 @@ uninstall:
 # TEST
 ###############################################################################
 
-test:
-	$(QUICKLISP) \
-		--eval "(ql:quickload :cl-quil-tests)" \
-		--eval "(asdf:test-system :cl-quil)" \
-		--eval "(ql:quickload :cl-quil/quilt-tests)" \
-		--eval "(asdf:test-system :cl-quil/quilt)" \
-		--eval "(ql:quickload :quilc-tests)" \
-		--eval "(asdf:test-system :quilc)"
+.PHONY: test test-cl-quil test-quilc test-quilt test-quilec
+test: test-cl-quil test-quilt test-quilec test-quilc
 
 test-cl-quil:
 	$(QUICKLISP) \
@@ -144,6 +138,11 @@ test-quilt:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil/quilt-tests)" \
 		--eval "(asdf:test-system :cl-quil/quilt)"
+
+test-quilec:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil/quilec-tests)" \
+		--eval "(asdf:test-system :cl-quil/quilec)"
 
 # You can specify a different c++17-compatible compiler via the CXX
 # variable. For example: make CXX=/usr/bin/clang++ test-tweedledum

@@ -32,6 +32,19 @@ test-quilt:
     - docker run --rm --entrypoint=make rigetti/quilc:${CI_COMMIT_SHORT_SHA} test-quilt
     - docker rmi rigetti/quilc:${CI_COMMIT_SHORT_SHA}
 
+test-quilec:
+  stage: test
+  tags:
+    - github
+    - dockerd
+  only:
+    - branches
+  image: docker:stable
+  script:
+    - docker build -t rigetti/quilc:${CI_COMMIT_SHORT_SHA} .
+    - docker run --rm --entrypoint=make rigetti/quilc:${CI_COMMIT_SHORT_SHA} test-quilec
+    - docker rmi rigetti/quilc:${CI_COMMIT_SHORT_SHA}
+
 test-quilc:
   stage: test
   tags:
