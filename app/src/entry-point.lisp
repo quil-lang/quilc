@@ -28,6 +28,12 @@
      :optional t
      :documentation "turns off pretty-printing features")
 
+    (("print-circuit-definitions")
+     :type boolean
+     :optional t
+     :initial-value nil
+     :documentation "in batch mode print the circuit definitions from the input program")
+
     (("verbose")
      :type boolean
      :optional t
@@ -373,6 +379,7 @@
                           (enable-state-prep-reductions nil)
                           (protoquil nil)
                           (print-statistics nil)
+                          (print-circuit-definitions nil)
                           (version nil)
                           (check-libraries nil)
                           #-forest-sdk
@@ -498,6 +505,8 @@
                                                       #\,
                                                       (remove #\Space gate-blacklist)
                                                       :remove-empty-subseqs t)))
+             (unless print-circuit-definitions
+               (setf (parsed-program-circuit-definitions processed-program) nil))
              (print-program processed-program *quil-stream*)
              (when (and protoquil print-statistics)
                (print-statistics statistics *quil-stream*))
