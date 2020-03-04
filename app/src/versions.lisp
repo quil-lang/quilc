@@ -82,7 +82,7 @@ version. Second value returned indicates the latest version."
           )
          (available?
           (cl-syslog:rfc-log (*logger* :notice "An update is available to the SDK. You have version ~A. ~
-Version ~A is available from https://downloads.rigetti.com/~%"
+Version ~A is available from https://qcs.rigetti.com/sdk-downloads~%"
                                        +QUILC-VERSION+ latest)
             (:msgid "LOG0001"))))))
    :name "Version Check"))
