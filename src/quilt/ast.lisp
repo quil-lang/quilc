@@ -71,7 +71,7 @@
    (scale :initarg :scale
           :reader template-waveform-phase
           :type constant
-          :initform (constant 0.0d0)
+          :initform (constant 1d0)
           :documentation "Scale t apply to the waveform envelope.")
    (phase :initarg :phase
           :reader template-waveform-phase
