@@ -267,40 +267,96 @@ For example, a pulse on 0 \"rf\" does not properly obstruct 0 1 \"cz\"."
                     :memory-definitions (nreverse memory-definitions)
                     :executable-code (coerce instructions 'simple-vector)))))
 
-
+;;; TODO: some of this could be absorbed into EXPAND-DEFCALS
 (defun make-hardware-schedule (hw-name instruction-times)
-  "Construct a new schedule for HW-NAME from a list of (instruction . time) pairs INSTRUCTION-TIMES.
+  "Construct a full, explicit schedule for HW-NAME from a list of (instruction . time) pairs INSTRUCTION-TIMES, inserting delays and frame mutations as needed.
 
-NOTE: This abides by the original ordering of instructions in INSTRUCTION-TIMES."
+This abides by the original ordering of instructions in INSTRUCTION-TIMES."
+  ;; NOTE: There are some seemingly idiosyncratic aspects of this. Broadly
+  ;; speaking, this is written to produce code akin to what our existing
+  ;; translation pipeline produces. In particular
+  ;; - we track timing globally, but freqs, scale, phases per frame
+  ;; - we elide unneeded frame mutations
   (let ((instruction-times (stable-sort instruction-times
                                         (lambda (a b) (< (cdr a) (cdr b)))))
         (times (make-hash-table :test 'equal))
         (instructions nil)
-        (current-time 0.0))
-    (loop :for (instr . time) :in instruction-times
-          :for copy := (copy-instance instr)
-          :when (< current-time time)
-            :do (when (or (zerop current-time) ; special case: start of block
-                          (typep instr '(or capture raw-capture pulse)))
-                  (let ((delay (make-instance 'delay-all
-                                              :duration (constant (- time current-time)))))
-                    (setf (gethash delay times) current-time)
-                    (push delay instructions)))
-          :do (setf (gethash copy times) time)
-          :do (push copy instructions)
-          :do (setf current-time time))
+        (current-time 0.0d0)
+        (scales (make-hash-table :test #'frame= :hash-function #'frame-hash))
+        (frequencies (make-hash-table :test #'frame= :hash-function #'frame-hash))
+        (phases (make-hash-table :test #'frame= :hash-function #'frame-hash)))
+    (labels ((add-instr (instr &optional time)
+               (setf (gethash instr times) (or time current-time))
+               (push instr instructions))
+             (initialize-frame-frequency (frame)
+               "Emit instructions setting the frame frequency to INITIAL-FREQUENCY, if this has not already been done."
+               (unless (gethash frame frequencies)
+                 (let ((freq (frame-definition-initial-frequency
+                              (frame-name-resolution
+                               frame))))
+                   (unless freq
+                     (error "Unable to resolve frequency of frame ~/quilt::instruction-fmt/." frame))
+                   (add-instr (make-instance 'set-frequency
+                                             :frame frame
+                                             :value freq))
+                   (setf (gethash frame frequencies) (constant-value freq)))))
+             (initialize-frame-scale (frame)
+               "Emit instructions setting the hardware scale to the default 1.0, if this has not already been done."
+               (unless (gethash frame scales)
+                 (add-instr (make-instance 'set-scale
+                                           :frame frame
+                                           :value (constant 1.0d0)))
+                 (setf (gethash frame scales) 1.0d0)))
+             (mutate-frame-state (instr state-table)
+               (let ((value (constant-value (frame-mutation-value instr)))
+                     (current (gethash (frame-mutation-target-frame instr) state-table)))
+                 (unless (and current (= value current))
+                   (add-instr (copy-instance instr))
+                   (setf (gethash (frame-mutation-target-frame instr) state-table) value)))))
+      (loop :for (instr . scheduled-time) :in instruction-times
+            :when (and (< current-time scheduled-time) ; we have time to fill
+                       (or (zerop current-time) ; special case: start of block
+                           (typep instr '(or capture raw-capture pulse))))
+              :do (let ((delay (make-instance 'delay-all
+                                              :duration (constant (- scheduled-time current-time)))))
+                    (add-instr delay)
+                    (setf current-time scheduled-time))
+            :do (typecase instr
+                  (pulse
+                   (initialize-frame-frequency (pulse-frame instr))
+                   (initialize-frame-scale (pulse-frame instr))
+                   (add-instr (copy-instance instr) scheduled-time))
+                  (capture
+                   (initialize-frame-frequency (capture-frame instr))
+                   (initialize-frame-scale (capture-frame instr))
+                   (add-instr (copy-instance instr) scheduled-time))
+                  (raw-capture
+                   (error "RAW-CAPTURE is currently unsupported."))
+                  ;; TODO: this is really dumb, but at present
+                  ;; i) SET-* operations may be partially evaluated, but SHIFT-* operations are not
+                  ;; ii) this will fail for parametric compilation
+                  ;; Both of these should have a proper resolution....
+                  (set-frequency
+                   (mutate-frame-state instr frequencies))
+                  (set-scale
+                   (mutate-frame-state instr scales))
+                  (set-phase
+                   (mutate-frame-state instr phases))
+                  (otherwise
+                   (add-instr (copy-instance instr) scheduled-time)))
+            :do (setf current-time
+                      (+ scheduled-time (quilt-instruction-duration instr)))))
     (make-instance 'hardware-schedule
                    :hardware-name hw-name
                    :program (reconstruct-program
                              (nreverse instructions))
                    :times times)))
 
-(defun schedule-to-hardware (program &key (initial-time 0.0d0) (align-op #'identity))
-  "Compute hardware schedules for the instructions in the Quilt program PROGRAM.
 
-The result is a hash table mapping the names of hardware objects to hardware schedules."
-  (check-type program parsed-quilt-program)
-  ;; we first built the schedules as (instr . time) alists
+(defun assign-hardware-times (program initial-time align-op)
+  "Destructure a simple Quilt program PROGRAM, assigning each instruction to a hardware object for execution at a certain time.
+
+The result is a hash table mapping the name of a hardware object to a (instruction . time) association list."
   (let ((aligned-start (funcall align-op initial-time))
         (hardware-instruction-times (make-hash-table :test 'equal))
         (frame-clocks (make-hash-table :test #'frame= :hash-function #'frame-hash)))
@@ -321,12 +377,25 @@ The result is a hash table mapping the names of hardware objects to hardware sch
                   (loop :for frame :in obstructed-frames
                         :do (setf (gethash frame frame-clocks)
                                   (funcall align-op (+ op-time duration)))))))
-    ;; now, build the HARDWARE-SCHEDULE objects
-    (let ((hardware-schedules (make-hash-table :test 'equal)))
-      (loop :for hw :being :the :hash-keys :of hardware-instruction-times
-              :using (hash-value instr-times)
-            ;; instr-times is in the reversed order of the original instructions
-            :for ordered-instr-times := (nreverse instr-times)
-            :do (setf (gethash hw hardware-schedules)
-                      (make-hardware-schedule hw ordered-instr-times)))
-      hardware-schedules)))
+    hardware-instruction-times))
+
+(defun schedule-to-hardware (program &key (initial-time 0.0d0) (align-op #'identity))
+  "Compute hardware schedules for the instructions in the Quilt program PROGRAM.
+
+The result is a hash table mapping the names of hardware objects to hardware schedules."
+  (check-type program parsed-quilt-program)
+  ;; This proceeds in two steps. First, we assign every instruction to a
+  ;; hardware object at a "suggested" time. Then, for each object we construct
+  ;; the actual schedule, which may incorporate additional operations (e.g.
+  ;; explicit delays, initializing frame state, etc).
+  (let ((hardware-schedules (make-hash-table :test 'equal)))
+    (loop :for hw :being :the :hash-keys :of (assign-hardware-times
+                                              program
+                                              (coerce initial-time 'double-float)
+                                              align-op)
+            :using (hash-value instr-times)
+          ;; instr-times is in the reversed order of the original instructions
+          :for ordered-instr-times := (nreverse instr-times)
+          :do (setf (gethash hw hardware-schedules)
+                    (make-hardware-schedule hw ordered-instr-times)))
+    hardware-schedules))

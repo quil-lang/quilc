@@ -125,7 +125,7 @@ FENCE 0 1
 FENCE
 DELAY 0 1.0
 ")
-           :initial-time 0.05)))
+           :initial-time 0.05d0)))
     (labels ((program= (a b)
                (let ((sa (with-output-to-string (s)
                            (print-parsed-program a s)))
@@ -146,9 +146,10 @@ DEFFRAME 0 \"ro_tx\":
     HARDWARE-OBJECT: \"q0_ro_tx\"
 
 DELAY 0.05
+SET-FREQUENCY 0 \"ro_tx\" 7139370148.40106     # added by scheduler
+SET-SCALE 0 \"ro_tx\" 1.0                      # added by scheduler
 PULSE 0 \"ro_tx\" flat(duration: 1.0, iq: 1.0)
 ")))
-      ;; TODO: fp? note DELAY 1.050000000745058 below
       (is (scheduled-program-matches
            "q0_rf"
            (parse-quilt "
@@ -160,9 +161,10 @@ DEFFRAME 0 \"rf\":
     DIRECTION: \"tx\"
     HARDWARE-OBJECT: \"q0_rf\"
 
-DELAY 1.050000000745058
+DELAY 1.05
 SHIFT-PHASE 0 \"rf\" 0.2
 SET-FREQUENCY 0 \"rf\" 10
+SET-SCALE 0 \"rf\" 1.0
 CAPTURE 0 \"rf\" flat(duration: 1.0, iq: 1.0) iq
 ")))
       (is (scheduled-program-matches
@@ -177,6 +179,8 @@ DEFFRAME 1 \"rf\":
     HARDWARE-OBJECT: \"q1_rf\"
 
 DELAY 0.05
+SET-FREQUENCY 1 \"rf\" 3357341778.52477
+SET-SCALE 1 \"rf\" 1.0
 CAPTURE 1 \"rf\" flat(duration: 1.0, iq: 1.0) iq
 ")))
       (is (scheduled-program-matches
@@ -188,7 +192,9 @@ DEFFRAME 0 1 \"cz\":
     DIRECTION: \"tx\"
     HARDWARE-OBJECT: \"q0_ff\"
 
-DELAY 2.050000000745058
+DELAY 2.05
+SET-FREQUENCY 0 1 \"cz\" 364250000.0
+SET-SCALE 0 1 \"cz\" 1.0
 PULSE 0 1 \"cz\" flat(duration: 1.0, iq: 1.0)
 "))))))
 
