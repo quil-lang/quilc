@@ -211,8 +211,7 @@
         (dolist (term terms)
           (setf H (magicl:.+ H (pauli-term->matrix term arguments (list 1d0) parameters))))
         ;; orthogonally diagonalize it: H = O D O^T
-        ;; TODO: change to HERMITIAN-EIG
-        (multiple-value-bind (diagonal O) (magicl:eig H)
+        (multiple-value-bind (diagonal O) (magicl:hermitian-eig H)
           ;; convert diagonal into a sum of Z paulis
           (let ((pauli-prefactors (make-array dimension :initial-element 0d0))
                 terms diagonal-gate)
