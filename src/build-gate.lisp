@@ -25,6 +25,10 @@
   (typecase param
     (double-float
      (constant param))
+    (real
+     (constant (coerce param 'double-float)))
+    (complex
+     (error "Complex-valued gate parameter ~S not permitted" param))
     (memory-ref
      (make-delayed-expression nil nil param))
     (otherwise
