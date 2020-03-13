@@ -466,6 +466,8 @@
    #:pragma-matrix-entries              ; READER
    #:pragma-qubit-arguments             ; READER
    #:pragma-operator-name               ; READER
+   #:parsed-program-has-pragma-p        ; FUNCTION
+   #:parsed-program-has-preserve-blocks-p ; FUNCTION
    )
 
   ;; matrix-operations.lisp

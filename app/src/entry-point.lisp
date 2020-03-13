@@ -524,13 +524,15 @@
                           gate-blacklist)
   "Compile PROGRAM for the chip CHIP-SPECIFICATION. Optionally calculate statistics described by the keyword arguments. All require :PROTOQUIL T.
 
+Note: PROGRAM is mutated by the compilation process. To avoid this, use COPY-INSTANCE.
+
 Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM is the compiled program, and STATISTICS is a HASH-TABLE whose keys are the slots of the RPCQ::|NativeQuilMetadata| class."
   (let* ((statistics (make-hash-table :test #'equal))
          (quil::*compiler-noise* (and verbose *human-readable-stream*))
          (*random-state* (make-random-state t)))
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
-        (compiler-hook program chip-specification :protoquil protoquil)
+        (compiler-hook program chip-specification :protoquil protoquil :destructive t)
 
       ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
       (when protoquil

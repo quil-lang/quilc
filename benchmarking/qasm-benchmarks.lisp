@@ -83,7 +83,8 @@
                         (quil::compiler-hook (quil::parse text
                                                           :originating-file file)
                                              chip
-                                             :protoquil t)
+                                             :protoquil t
+                                             :destructive t)
                       (format t "| ~Vf | ~Vd | ~Vd |~%"
                               8 (/ elapsed-time 1000)
                               5 swaps

@@ -116,3 +116,12 @@ Expected syntax: PRAGMA INITIAL_REWIRING [NAIVE|PARTIAL|GREEDY|RANDOM]")
             (error "Invalid PRAGMA INITIAL_REWIRING: ~A" rewiring-type-string)))))
   (:display-string
    (prin1-to-string (symbol-name rewiring-type))))
+
+(defun parsed-program-has-pragma-p (parsed-program &optional (pragma-type 'pragma))
+  "Return T if PARSED-PROGRAM's executable code contains any pragma. Optionally use PRAGMA-TYPE to restrict to a particular pragma type."
+  (some (a:rcurry #'typep pragma-type)
+        (parsed-program-executable-code parsed-program)))
+
+(defun parsed-program-has-preserve-blocks-p (parsed-program)
+  "Return T if PARSED-PROGRAM's executable code contains a pragma of type PRAGMA-PRESERVE-BLOCK."
+  (parsed-program-has-pragma-p parsed-program 'pragma-preserve-block))

@@ -21,7 +21,7 @@
                                 (break "~A" e))
                               (setq failed t)
                               (return-from morf-nruter))))
-             (funcall assn (lambda () (compiler-hook quil-file chip))))))
+             (funcall assn (lambda () (compiler-hook quil-file chip :destructive t))))))
     (when failed
       ;; The sets all sample counts to zero, and all metrics to :N/A,
       ;; and this is how any caller should test for failure.
