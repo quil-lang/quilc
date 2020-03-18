@@ -707,15 +707,15 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
         
         ;; these are basically all the compilers we care to use; now we need to
         ;; sort them into preference order.
-        (let* ((sorted-compilers
-                 (stable-sort (remove-duplicates
-                               (append (loop :for compiler :being :the :hash-keys :of compiler-hash
-                                             :collect compiler)
-                                       (loop :for compiler :in generic-path
-                                             :when (typep compiler 'compiler)
-                                               :collect compiler)))
-                              #'>
-                              :key (lambda (x) (gethash x compiler-hash))))
+        (let* ((unique-compilers
+                 (remove-duplicates
+                  (append (loop :for compiler :being :the :hash-keys :of compiler-hash
+                                :collect compiler)
+                          (loop :for compiler :in generic-path
+                                :when (typep compiler 'compiler)
+                                  :collect compiler))))
+               (sorted-compilers
+                 (stable-sort unique-compilers #'> :key (lambda (x) (gethash x compiler-hash))))
                ;; additionally, we install a couple extra compilers as hax to make
                ;; the whole machine work. each such hak comes with an explanation,
                ;; and it would be preferable to work to make each hak unnecessary.
