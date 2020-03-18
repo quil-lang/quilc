@@ -1678,6 +1678,75 @@ For example,
         (%print-indented-string (with-output-to-string (s)
                                   (print-parsed-program parsed-program s))
                                 stream)))))
+(defun combine-programs (a b &key (if-memory-definitions-conflict ':error))
+  "Given two PARSED-PROGRAMS A and B, combine them into a new program object.
+
+In the event there are conflicting memory definition names, there are the following available policies that can be supplied for IF-MEMORY-DEFINITIONS-CONFLICT:
+
+    - :ERROR: Simply signal an error.
+    - :PREFER-LARGER: Keep the larger of the two memories.
+    - :PREFER-A: Prefer the definitions for A. (Note that this may be unsafe!)
+    - :PREFER-B: Prefer the definitions for B. (Note that this may be unsafe!)
+"
+  ;; gate def names might overlap
+  ;;     - perhaps the names clobber
+  ;;     - otherwise just a union
+  ;;
+  ;; circ defs simlar
+  ;;
+  ;; memory defs
+  ;;     - a little more sensitive, esp. with sizes
+  ;;
+  ;;     - ERROR
+  ;;     - PREFER A
+  ;;     - PREFER B
+  ;;     - KEEP LARGER
+  ;;     - GROW MEMORY  [won't do]
+  ;;     - RENAME [maybe later]
+  ;;
+  ;; GOAL: try to factor out PREFER-A, PREFER-B, and ERROR among all cases
+  (let ((code-a (parsed-program-executable-code a))
+        (code-b (parsed-program-executable-code b))
+        (final-memdefs '()))
+    (labels ((register-memory-definition (memdef)
+               (let ((found? (member (memory-descriptor-name memdef) final-memdefs
+                                     :key #'memory-descriptor-name
+                                     :test #'string=)))
+                 (cond
+                   ;; There is no conflict.
+                   ((not found?)
+                    (push memdef final-memdefs))
+                   ;; User specified they want to error.
+                   ((eq ':ERROR if-memory-definitions-conflict)
+                    (error "Trying to combine programs with memories of the same name ~S, ~
+                            and the policy was to error."
+                           (memory-descriptor-name memdef)))
+                   ;; Some other conflict resolution policy.
+                   (t                   ; name conflict to resolve
+                    (let ((found (first found?)))
+                      ;; First, sanity check that the memories represent the same type.
+                      (unless (quil-type= (memory-descriptor-type memdef) (memory-descriptor-type found))
+                        (error "Trying to combine programs with memories called ~S which ~
+                                have different types."
+                               (memory-descriptor-name memdef)))
+                      ;;
+                      (ecase if-memory-definitions-conflict
+                        (:PREFER-LARGER
+                         (when (> (memory-descriptor-length memdef)
+                                  (memory-descriptor-length found))
+                           (rplaca found? memdef)))
+                        (:PREFER-A
+                         ;; Do nothing, because we already processed A.
+                         nil)
+                        (:PREFER-B
+                         (rplaca found? memdef)))))))))
+      (map nil #'register-memory-definition (parsed-program-memory-definitions a))
+      (map nil #'register-memory-definition (parsed-program-memory-definitions b))
+      (make-instance 'parsed-program
+                     ;;:gate-definitions ???
+                     ;;:circuit-definitions ???
+                     :memory-definitions final-memdefs
+                     :executable-code (concatenate 'vector code-a code-b)))))
 
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes

@@ -39,6 +39,10 @@
     (quil-integer "INTEGER")
     (quil-real    "REAL")))
 
+(defun quil-type= (a b)
+  "Are the Quil types A and B the same?"
+  (string= (quil-type-string a) (quil-type-string b)))
+
 (defstruct memory-descriptor
   "A named region of classical memory, as parsed from a Quil program."
   (name nil :read-only t :type string)

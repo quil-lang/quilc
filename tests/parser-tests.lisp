@@ -247,8 +247,12 @@ DEFCIRCUIT FOO(%a) q:
       (signals quil-parse-error
         (parse-quil (read-quil-file path1))))))
 
-
-
+(deftest test-combine-programs ()
+  (let* ((a        (parse-quil "X 0"))
+         (b        (parse-quil "Z 1"))
+         (combined (cl-quil::combine-programs a b)))
+    (is (eq (cl-quil::nth-instr 0 a) (cl-quil::nth-instr 0 combined)))
+    (is (eq (cl-quil::nth-instr 0 b) (cl-quil::nth-instr 1 combined)))))
 
 
 ;;;; Tests for Split-Lines
