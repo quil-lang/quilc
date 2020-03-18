@@ -264,12 +264,12 @@
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
-  (when (gethash "1Q" specs-hash)
+  (a:when-let ((1q-specs (gethash "1Q" specs-hash)))
     (loop :for i :from 0
           :for qubit :across (chip-spec-qubits chip-spec)
           :for gate-info := (hardware-object-gate-information qubit)
           :do ;; load the qubit specs info
-              (a:when-let ((spec (gethash (list i) (gethash "1Q" specs-hash))))
+              (a:when-let ((spec (gethash (list i) 1q-specs)))
                 (setf (gethash "specs" (hardware-object-misc-data qubit))
                       spec)
                 (a:when-let ((fidelity (gethash "fRO" spec)))
@@ -277,18 +277,20 @@
                     (when (measure-binding-p binding)
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity)))))
-                (a:when-let ((fidelity (gethash "f1QRB" spec)))
-                  (setf fidelity (deforestify-fidelity fidelity))
+                (a:when-let* ((fidelity (gethash "f1QRB" spec))
+                              (fidelity (deforestify-fidelity fidelity)))
                   (dohash ((binding record) gate-info)
                     (when (and (gate-binding-p binding)
                                (equalp (named-operator "RX") (gate-binding-operator binding))
+                               ;; Allow for free parameters (e.g. "theta") RXs in ISAs
+                               (numberp (first (gate-binding-parameters binding)))
                                (not (double= 0d0 (first (gate-binding-parameters binding)))))
                       (unless (double= 0d0 (mod (first (gate-binding-parameters binding)) pi/2))
                         (warn "Qubit ~A: applying f1QRB spec to unusual native gate RX(~A)" i (first (gate-binding-parameters binding))))
                       (setf (gethash binding gate-info)
                             (copy-gate-record record :fidelity fidelity))))))))
-  (when (gethash "2Q" specs-hash)
-    (loop :for key :being :the :hash-keys :of (gethash "2Q" specs-hash)
+  (a:when-let ((2q-specs (gethash "2Q" specs-hash)))
+    (loop :for key :being :the :hash-keys :of 2q-specs
             :using (hash-value spec)
           :for (q0 q1) := key
           :for link := (lookup-hardware-object-by-qubits chip-spec (list q0 q1))

@@ -403,8 +403,8 @@ other's."
          ;; as the matrix representation of INSTRUCTIONS
          (decompile-instructions-into-full-unitary ()
            (a:when-let ((matrix (make-matrix-from-quil
-                                          instructions
-                                          :relabeling (standard-qubit-relabeler qubits-on-obj))))
+                                 instructions
+                                 :relabeling (standard-qubit-relabeler qubits-on-obj))))
              (expand-to-native-instructions
               (list (make-instance 'gate-application
                                    :operator #.(named-operator "WHOLEPROGRAM")
@@ -589,45 +589,44 @@ other's."
                             ;; here. We just want to indicate to the
                             ;; user that an error happened down here.
                             ))))
-      ;; start by making a decision about how we're going to do linear algebraic compression
-      (let ((decompiled-instructions (decompile-instructions-in-context instructions
-                                                                        chip-specification
-                                                                        context))
-            reduced-instructions
-            reduced-decompiled-instructions)
-    
-        ;; now proceed to do the reductions
-        (format-noise "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.")
-        (setf reduced-instructions
-              (algebraically-reduce-instructions instructions chip-specification context))
-        (format-noise "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.")
-        (when decompiled-instructions
-          (setf reduced-decompiled-instructions
-                (algebraically-reduce-instructions decompiled-instructions
-                                                   chip-specification
-                                                   context)))
-    
-        ;; check that the quil that came out was the same as the quil that went in
-        (check-contextual-compression-was-well-behaved instructions
-                                                       decompiled-instructions
-                                                       reduced-instructions
-                                                       reduced-decompiled-instructions
-                                                       context)       
-        ;; compare their respective runtimes and return the shorter one
-        (let ((result-instructions
-                (cond
-                  ((and decompiled-instructions
-                        (not (equalp decompiled-instructions reduced-decompiled-instructions))
-                        (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
-                           (calculate-instructions-duration reduced-instructions chip-specification)))
-                   reduced-decompiled-instructions)
-                  (t
-                   reduced-instructions))))
-          (when *compiler-noise*
-            (format-quil-sequence *compiler-noise*
-                                  result-instructions
-                                  "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%"))
-          result-instructions))))
+    ;; start by making a decision about how we're going to do linear algebraic compression
+    (let ((decompiled-instructions (decompile-instructions-in-context instructions
+                                                                      chip-specification
+                                                                      context))
+          reduced-instructions
+          reduced-decompiled-instructions)
+
+      ;; now proceed to do the reductions
+      (format-noise "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to original string.")
+      (setf reduced-instructions
+            (algebraically-reduce-instructions instructions chip-specification context))
+      (format-noise "COMPRESS-INSTRUCTIONS: Applying algebraic rewrites to recompiled string.")
+      (when decompiled-instructions
+        (setf reduced-decompiled-instructions
+              (algebraically-reduce-instructions decompiled-instructions
+                                                 chip-specification
+                                                 context)))
+
+      ;; check that the quil that came out was the same as the quil that went in
+      (check-contextual-compression-was-well-behaved instructions
+                                                     decompiled-instructions
+                                                     reduced-instructions
+                                                     reduced-decompiled-instructions
+                                                     context)
+      ;; compare their respective runtimes and return the shorter one
+      (let ((result-instructions
+              (cond
+                ((and decompiled-instructions
+                      (< (calculate-instructions-duration reduced-decompiled-instructions chip-specification)
+                         (calculate-instructions-duration reduced-instructions chip-specification)))
+                 reduced-decompiled-instructions)
+                (t
+                 reduced-instructions))))
+        (when *compiler-noise*
+          (format-quil-sequence *compiler-noise*
+                                result-instructions
+                                "COMPRESS-INSTRUCTIONS: Replacing the above sequence with the following:~%"))
+        result-instructions))))
 
 
 (defun compress-instructions-with-possibly-unknown-params (instructions chip-specification context &optional processed-instructions)
@@ -707,7 +706,7 @@ other's."
         (dolist (instr first-block)
           (setf new-context
                 (update-compilation-context new-context instr
-                                           :destructive? nil)))
+                                            :destructive? nil)))
         (return-from compress-instructions-with-possibly-unknown-params
           (compress-instructions-with-possibly-unknown-params
            (nconc second-block instr-rest)
