@@ -607,7 +607,7 @@ mapping instructions to their tags. "
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
   (multiple-value-bind (max-value value-hash)
       (lscheduler-calculate-log-fidelity lschedule chip-spec)
-    (values (exp (- (sqrt max-value))) value-hash)))
+    (values (exp (- max-value)) value-hash)))
 
 (defun lscheduler-all-instructions (lschedule)
   (a:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))
