@@ -136,7 +136,13 @@
      :type string
      :optional t
      :initial-value nil
-     :documentation "Prevent programs from including files not within this directory. Any includes are interpreted as relative to this directory."))
+     :documentation "Prevent programs from including files not within this directory. Any includes are interpreted as relative to this directory.")
+
+    #-forest-sdk
+    (("swank-port")
+     :type integer
+     :optional t
+     :documentation "port to start a Swank server on"))
   "Supported and non-deprecated options.")
 
 (defparameter *deprecated-option-spec*
@@ -393,7 +399,8 @@
                           (quiet nil)
                           (check-sdk-version nil)
                           (proxy nil)
-                          (safe-include-directory nil))
+                          (safe-include-directory nil)
+                          (swank-port nil))
   ;; Deprecated options.
   (declare (ignore compute-gate-depth compute-gate-volume compute-runtime
                    compute-fidelity compute-2Q-gate-depth compute-unused-qubits
@@ -415,6 +422,14 @@
 
   (when log-level
     (setf *log-level* (log-level-string-to-symbol log-level)))
+
+  ;; Start Swank if we were asked. Re-enable the debugger.
+  #-forest-sdk
+  (when swank-port
+    (enable-debugger)
+    (setf swank:*use-dedicated-output-stream* nil)
+    (swank:create-server :port swank-port
+                         :dont-close t))
 
   (setf *logger*
         (make-instance 'cl-syslog:rfc5424-logger
@@ -442,16 +457,16 @@
 
   (special-bindings-let*
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
-			*log-level*))
+			                  *log-level*))
        (*logger* (make-instance 'cl-syslog:rfc5424-logger
-				:app-name "quilc"
-				:facility ':local0
-				:maximum-priority *log-level*
-				:log-writer
-				#+windows (cl-syslog:stream-log-writer)
-				#-windows (cl-syslog:tee-to-stream
-					   (cl-syslog:syslog-log-writer "quilc" :local0)
-					   *error-output*)))
+				                        :app-name "quilc"
+				                        :facility ':local0
+				                        :maximum-priority *log-level*
+				                        :log-writer
+				                        #+windows (cl-syslog:stream-log-writer)
+				                        #-windows (cl-syslog:tee-to-stream
+					                                 (cl-syslog:syslog-log-writer "quilc" :local0)
+					                                 *error-output*)))
        (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
        (*without-pretty-printing* without-pretty-printing)
        (quil::*enable-state-prep-compression* enable-state-prep-reductions)
