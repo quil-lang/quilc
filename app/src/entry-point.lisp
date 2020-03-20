@@ -207,10 +207,10 @@
 
 (defun reload-foreign-libraries ()
   (locally
-        (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-      (handler-bind (#+sbcl (style-warning #'muffle-warning))
-        (cffi:load-foreign-library 'magicl.foreign-libraries::libblas)
-        (cffi:load-foreign-library 'magicl.foreign-libraries::liblapack))))
+      (declare #+sbcl (sb-ext:muffle-conditions style-warning))
+    (handler-bind (#+sbcl (style-warning #'muffle-warning))
+      (cffi:load-foreign-library 'magicl.foreign-libraries::libblas)
+      (cffi:load-foreign-library 'magicl.foreign-libraries::liblapack))))
 
 (defun print-matrix-with-comment-hashes (matrix &optional (stream *standard-output*))
   (format stream "~D"
@@ -457,16 +457,16 @@
 
   (special-bindings-let*
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
-			                  *log-level*))
+                        *log-level*))
        (*logger* (make-instance 'cl-syslog:rfc5424-logger
-				                        :app-name "quilc"
-				                        :facility ':local0
-				                        :maximum-priority *log-level*
-				                        :log-writer
-				                        #+windows (cl-syslog:stream-log-writer)
-				                        #-windows (cl-syslog:tee-to-stream
-					                                 (cl-syslog:syslog-log-writer "quilc" :local0)
-					                                 *error-output*)))
+                                :app-name "quilc"
+                                :facility ':local0
+                                :maximum-priority *log-level*
+                                :log-writer
+                                #+windows (cl-syslog:stream-log-writer)
+                                #-windows (cl-syslog:tee-to-stream
+                                           (cl-syslog:syslog-log-writer "quilc" :local0)
+                                           *error-output*)))
        (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
        (*without-pretty-printing* without-pretty-printing)
        (quil::*enable-state-prep-compression* enable-state-prep-reductions)
