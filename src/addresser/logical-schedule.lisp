@@ -605,6 +605,9 @@ mapping instructions to their tags. "
       (sqrt running-fidelity))))
 
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
+  "Calculate fidelity as the minimum fidelity of the individual instructions.
+  
+  This relies on the fact that the function $\exp\{-\sqrt{\log(x)^2 + \log(y)^2}\}$ is approximately equal to $\min\{x, y\}$ for $x, y \in (0, 1]$."
   (multiple-value-bind (max-value value-hash)
       (lscheduler-calculate-log-fidelity lschedule chip-spec)
     (values (exp (- max-value)) value-hash)))
