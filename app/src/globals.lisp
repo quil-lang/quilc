@@ -14,3 +14,5 @@
                                       :facility ':local0
                                       :maximum-priority ':info
                                       :log-writer (cl-syslog:null-log-writer)))
+
+(defvar swank:*use-dedicated-output-stream*)
