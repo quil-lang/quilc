@@ -1661,6 +1661,14 @@ For example,
                (parsed-program-executable-code parsed-program)))
     pp))
 
+(defvar *print-parsed-program-objects* nil
+  "When T, PARSED-PROGRAM objects are printed with PRINT-PARSED-PROGRAM. Otherwise the standard object printer is used.")
+
+(defmethod print-object ((parsed-program parsed-program) stream)
+  (if *print-parsed-program-objects*
+      (print-parsed-program parsed-program stream)
+      (call-next-method)))
+
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
 ;; an &BODY, rather than a CONTINUATION, etc. If you need speed, you're probably better served by
