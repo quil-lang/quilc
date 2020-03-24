@@ -176,7 +176,7 @@
                                  :base-value 0
                                  :bump-value (lambda (instr value)
                                                (if (2q-application-p instr) (1+ value) value))
-                                 :test-values #'max)
+                                 :combine-values #'max)
         (declare (ignore max-value))
         (or value-hash (make-hash-table))))))
 

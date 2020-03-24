@@ -495,17 +495,12 @@ use RESOURCE."
                                 (bump-value (lambda (instr value)
                                               (declare (ignore instr))
                                               (1+ value)))
-                                (test-values #'max))
-  "Walks the edges in the DAG underlying LSCHEDULE according to a topological
-ordering.
+                                (combine-values #'max))
+  "Walks the edges in the directed, acyclic graph underlying LSCHEDULE in topological order.
 
-All instructions begin with a tag of BASE-VALUE. When we visit an instruction
-INSTR, we first compute SOURCE-BUMP, which is a obtained by reducing tags of
-all sources of INSTR's in-edges using TEST-VALUES. Finally, INSTR's tag
-is overwritten by (BUMP-VALUE INSTR SOURCE-BUMP).
+All instructions begin with a value of BASE-VALUE. When we visit an instruction INSTR, we first compute SOURCE-BUMP, which is obtained by applying COMBINE-VALUES to the values associated with all instructions with a directed edge to INSTR. Finally, INSTR's value is overwritten by (BUMP-VALUE INSTR SOURCE-BUMP).
 
-Return the reduction of all bumped values by TEST-VALUES, and a hash table
-mapping instructions to their tags. "
+Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table mapping instructions to their values. "
   (when (endp (lscheduler-topmost-instructions lschedule))
     (return-from lscheduler-walk-graph (values base-value (make-hash-table :test #'eql))))
   (let ((max-distance base-value)
@@ -525,11 +520,11 @@ mapping instructions to their tags. "
                  (setf (gethash candidate visited-hash-table) t)
                  (let ((bumped-value (funcall bump-value candidate (gethash candidate distance-hash-table))))
                    (setf max-distance
-                         (funcall test-values max-distance bumped-value))
+                         (funcall combine-values max-distance bumped-value))
                    (dolist (child (gethash candidate (lscheduler-later-instrs lschedule)))
                      (setf (gethash child distance-hash-table)
                            (if (gethash child distance-hash-table)
-                               (funcall test-values bumped-value (gethash child distance-hash-table))
+                               (funcall combine-values bumped-value (gethash child distance-hash-table))
                                bumped-value)))))))
       (dolist (instr (lscheduler-topmost-instructions lschedule))
         (setf (gethash instr distance-hash-table) base-value))
@@ -550,7 +545,7 @@ mapping instructions to their tags. "
     (or (lscheduler-walk-graph lschedule
                                :base-value 0
                                :bump-value #'duration-bumper
-                               :test-values #'max)
+                               :combine-values #'max)
         0)))
 
 (defun lscheduler-calculate-depth (lschedule)
@@ -559,7 +554,7 @@ mapping instructions to their tags. "
                              :bump-value (lambda (instr value)
                                            (declare (ignore instr))
                                            (1+ value))
-                             :test-values #'max)
+                             :combine-values #'max)
       0))
 
 (defun lscheduler-calculate-volume (lschedule)

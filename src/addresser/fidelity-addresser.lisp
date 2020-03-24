@@ -172,7 +172,7 @@
         (lscheduler-walk-graph (addresser-state-logical-schedule state)
                                :base-value 0
                                :bump-value #'weight-bumper
-                               :test-values #'max)
+                               :combine-values #'max)
       (declare (ignore max-value))
       value-hash)))
 
