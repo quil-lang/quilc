@@ -20,14 +20,11 @@
 
 (in-package #:cl-quil)
 
-(defun update-links-by-path (chip-spec qq-distances qubit-from qubit-to link-values
-                             &key weight-on (weight-off weight-on) (path-type :move-onto))
-  "Updates links on the direct path between QUBIT-FROM and QUBIT-TO.
+(defun update-incident-link-values (qubit-from qubit-to link-values chip-spec qq-distances
+                                    &key weight-on (weight-off weight-on) (path-type :move-onto))
+  "Update LINK-VALUES for links which are incident to QUBIT-FROM and are on the path to QUBIT-TO.
 
-If PATH-TYPE is :MOVE-ONTO, then we are trying to move the qubit onto the
-target. If PATH-TYPE is :MOVE-ADJ, we only need to move the qubit adjacent to
-the target. These correspond to move-to-rewiring and select-cost-lowering-swap,
-respectively."
+If PATH-TYPE is :MOVE-ONTO, then we are trying to move the qubit onto the target. If PATH-TYPE is :MOVE-ADJ, we only need to move the qubit adjacent to the target. These correspond to move-to-rewiring and select-cost-lowering-swap, respectively."
   (loop :for link-index :across (chip-spec-links-on-qubit chip-spec qubit-from)
         :for other := (loop :for q :across (chip-spec-qubits-on-link chip-spec link-index)
                             :when (/= q qubit-from) :return q)
@@ -43,20 +40,21 @@ respectively."
                ;; not on shortest path
                (decf (aref link-values link-index) weight-off)))))
 
-(defun select-swap-by-values (chip-spec link-values rewirings-tried rewiring)
-  (a:extremum
-   (delete-if
-    (lambda (link-index)
-      (destructuring-bind (q0 q1) (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list)
-        (with-update-rewiring rewiring q0 q1
-          (member rewiring rewirings-tried :test #'equalp))))
-    (a:iota (length link-values)))
-   #'>
-   :key (lambda (idx) (aref link-values idx))))
+(defun best-available-link-index (link-values current-rewiring chip-spec rewirings-tried)
+  "Get the index maximizing LINK-VALUES, excluding those links which induce a rewiring in REWIRINGS-TRIED."
+  (flet ((link-yields-duplicate-rewiring (link-index)
+           (destructuring-bind (q0 q1)
+               (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list)
+             (with-update-rewiring current-rewiring q0 q1
+               (member current-rewiring rewirings-tried :test #'equalp))))
+         (link-value (idx) (aref link-values idx)))
+    (a:extremum
+     (delete-if #'link-yields-duplicate-rewiring (a:iota (length link-values)))
+     #'>
+     :key #'link-value)))
 
-(defun select-swap-path-target (chip-spec qq-distances target-rewiring rewirings-tried rewiring)
-  "Select a swap based on the paths to a target rewiring from a current
-rewiring."
+(defun select-swap-for-rewiring (rewiring target-rewiring chip-spec qq-distances rewirings-tried)
+  "Determine a link to swap in order to bring REWIRING closer to TARGET-REWIRING."
   (loop
     :with n-links := (chip-spec-n-links chip-spec)
     :with link-values := (make-array n-links :initial-element 0d0)
@@ -65,35 +63,30 @@ rewiring."
     :for src := (apply-rewiring-l2p rewiring qubit)
     :for dst := (apply-rewiring-l2p target-rewiring qubit)
     :when src
-      :do (update-links-by-path chip-spec qq-distances src dst
-                                link-values
-                                :weight-on (+ (random 0.01) 1.0d0)
-                                :weight-off (if (= src dst) 0.2d0 0.6d0))
-    :finally (format-noise "SELECT-SWAP-PATH-TARGET: Link-values ~A" link-values)
-             (return (select-swap-by-values chip-spec link-values rewirings-tried rewiring))))
+      :do (update-incident-link-values src dst link-values chip-spec qq-distances
+                                       :weight-on (+ (random 0.01) 1.0d0)
+                                       :weight-off (if (= src dst) 0.2d0 0.6d0))
+    :finally (format-noise "SELECT-SWAP-FOR-REWIRING: Link-values ~A" link-values)
+             (return (best-available-link-index link-values rewiring chip-spec rewirings-tried))))
 
-(defun select-swap-path-gates (chip-spec qq-distances gates-in-waiting rewirings-tried rewiring)
-  "Search for a usable rewiring by assigning values to links."
+(defun select-swap-for-gates (rewiring gates-in-waiting chip-spec qq-distances rewirings-tried)
+  "Determine a link to swap in order to schedule GATES-IN-WAITING with respect to the current REWIRING."
   (loop
     :with n-links := (chip-spec-n-links chip-spec)
     :with link-values := (make-array n-links :initial-element 0d0)
-    
     :for gate :being :the :hash-keys :of gates-in-waiting
     :for tier := (gethash gate gates-in-waiting)
     :for tier-weight := (expt 0.5d0 tier)
-
-    :do (when (and (typep gate 'gate-application)
-                   (= 2 (length (application-arguments gate))))
-          (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
+    :when (and (typep gate 'gate-application)
+               (= 2 (length (application-arguments gate))))
+      :do (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
             (let* ((p0 (apply-rewiring-l2p rewiring q0))
                    (p1 (apply-rewiring-l2p rewiring q1)))
               (unless p0 (rotatef p0 p1) (rotatef q0 q1))
               ;; if both are unassigned, then we gain nothing by changing the
               ;; rewiring, so ignore this gate
-
               (when p0
                 ;; otherwise at least one is assigned
-
                 (unless p1
                   ;; find a position for the other qubit
                   (setf p1 (a:extremum
@@ -103,8 +96,9 @@ rewiring."
                             :key (lambda (p) (aref qq-distances p0 p))))
                   (rewiring-assign rewiring q1 p1))
 
-                (update-links-by-path chip-spec qq-distances p0 p1 link-values
-                                      :weight-on tier-weight :path-type :move-adj)
-                (update-links-by-path chip-spec qq-distances p1 p0 link-values
-                                      :weight-on tier-weight :path-type :move-adj)))))
-    :finally (return (select-swap-by-values chip-spec link-values rewirings-tried rewiring))))
+                (update-incident-link-values p0 p1 link-values chip-spec qq-distances
+                                             :weight-on tier-weight :path-type :move-adj)
+                (update-incident-link-values p1 p0 link-values chip-spec qq-distances
+                                             :weight-on tier-weight :path-type :move-adj))))
+    :finally (format-noise "SELECT-SWAP-FOR-GATES: Link-values ~A" link-values)
+             (return (best-available-link-index link-values rewiring chip-spec rewirings-tried))))

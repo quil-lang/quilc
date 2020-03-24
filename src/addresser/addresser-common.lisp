@@ -279,7 +279,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
              (values (list link-index) rewirings-tried))))
         (:greedy-path
          (push (copy-rewiring working-l2p) rewirings-tried)
-         (let ((link-index (select-swap-path-gates chip-spec qq-distances gates-in-waiting rewirings-tried working-l2p)))
+         (let ((link-index (select-swap-for-gates working-l2p gates-in-waiting chip-spec qq-distances rewirings-tried)))
            ;; if we have a nil swap, the greedy scheduler has failed to operate. scary!
            (assert link-index () "Failed to select a SWAP instruction.")
            (values (list link-index) rewirings-tried)))))))
