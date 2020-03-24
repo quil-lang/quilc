@@ -241,68 +241,63 @@ INSTR is the \"active instruction\".
 (defgeneric cost-flatten (cost)
   (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION."))
 
+(defun select-swap-links (state rewirings-tried)
+  "Determine a list of swap links to embed, given the addresser STATE and a list of REWIRINGS-TRIED.
+
+Returns two values: a list of links, and an updated list of rewirings tried."
+  (with-slots (lschedule initial-l2p working-l2p chip-sched chip-spec qq-distances)
+      state
+    (format-noise "SELECT-SWAP-LINKS: entering SWAP selection phase.")
+    (let ((gates-in-waiting (assign-weights-to-gates state)))
+      (ecase *addresser-swap-search-type*
+        (:a*
+         (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+                  (declare (ignore instr))
+                  (let ((modified-state (copy-instance state)))
+                    (setf (addresser-state-working-l2p state) rewiring)
+                    (* *addresser-a*-swap-search-heuristic-scale*
+                       (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
+                (done-function (rewiring)
+                  (prog2
+                      (rotatef rewiring working-l2p)
+                      (dequeue-logical-to-physical state :dry-run t)
+                    (rotatef rewiring working-l2p))))
+           (let ((links (search-rewiring chip-spec working-l2p
+                                         (chip-schedule-qubit-times chip-sched)
+                                         #'cost-function #'done-function
+                                         :max-iterations *addresser-a*-swap-search-max-iterations*)))
+             (values links rewirings-tried))))
+        (:greedy-qubit
+         (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+                  (let ((modified-state (copy-instance state)))
+                    (setf (addresser-state-working-l2p modified-state) rewiring)
+                    (cost-function modified-state
+                                   :gate-weights gate-weights
+                                   :instr instr))))
+           (push (copy-rewiring working-l2p) rewirings-tried)
+           (let ((link-index (select-cost-lowering-swap working-l2p chip-spec #'cost-function rewirings-tried)))
+             (values (list link-index) rewirings-tried))))
+        (:greedy-path
+         (push (copy-rewiring working-l2p) rewirings-tried)
+         (let ((link-index (select-swap-path-gates chip-spec qq-distances gates-in-waiting rewirings-tried working-l2p)))
+           ;; if we have a nil swap, the greedy scheduler has failed to operate. scary!
+           (assert link-index () "Failed to select a SWAP instruction.")
+           (values (list link-index) rewirings-tried)))))))
 
 (defgeneric select-and-embed-a-permutation (state rewirings-tried)
   (:documentation
    "Select a permutation and schedule it for execution. The permutation is selected to lower the
 cost-function associated to the current lschedule.")
   (:method (state rewirings-tried)
-    (with-slots (lschedule initial-l2p working-l2p chip-sched chip-spec qq-distances)
-        state
-      (format-noise "SELECT-AND-EMBED-A-PERMUTATION: entering SWAP selection phase.")
-      (let ((gates-in-waiting (assign-weights-to-gates state)))
-        (ecase *addresser-swap-search-type*
-          (:a*
-           (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-                    (declare (ignore instr))
-                    (let ((modified-state (copy-instance state)))
-                      (setf (addresser-state-working-l2p state) rewiring)
-                      (* *addresser-a*-swap-search-heuristic-scale*
-                         (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
-                  (done-function (rewiring)
-                    (prog2
-                        (rotatef rewiring working-l2p)
-                        (dequeue-logical-to-physical state :dry-run t)
-                      (rotatef rewiring working-l2p))))
-             (dolist (link-index
-                      (search-rewiring chip-spec working-l2p
-                                       (chip-schedule-qubit-times chip-sched)
-                                       #'cost-function #'done-function
-                                       :max-iterations *addresser-a*-swap-search-max-iterations*))
-               (embed-swap link-index
-                           initial-l2p
-                           working-l2p
-                           chip-spec
-                           chip-sched
-                           :use-free-swaps *addresser-use-free-swaps*))))
-          (:greedy-qubit
-           (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-                    (let ((modified-state (copy-instance state)))
-                      (setf (addresser-state-working-l2p modified-state) rewiring)
-                      (cost-function modified-state
-                                     :gate-weights gate-weights
-                                     :instr instr))))
-             (push (copy-rewiring working-l2p) rewirings-tried)
-             (embed-swap (select-cost-lowering-swap working-l2p chip-spec #'cost-function rewirings-tried)
-                         initial-l2p
-                         working-l2p
-                         chip-spec
-                         chip-sched
-                         :use-free-swaps *addresser-use-free-swaps*)
-             rewirings-tried))
-          (:greedy-path
-           (push (copy-rewiring working-l2p) rewirings-tried)
-           (let ((link-index (select-swap-path-gates chip-spec qq-distances gates-in-waiting
-                                                     rewirings-tried working-l2p)))
-             ;; if we have a nil swap, the greedy scheduler has failed to operate. scary!
-             (assert link-index () "Failed to select a SWAP instruction.")
-             (embed-swap link-index
-                         initial-l2p
-                         working-l2p
-                         chip-spec
-                         chip-sched
-                         :use-free-swaps *addresser-use-free-swaps*))
-           rewirings-tried))))))
+    (multiple-value-bind (swap-links rewirings-tried)
+        (select-swap-links state rewirings-tried)
+      (dolist (link-index swap-links rewirings-tried)
+        (embed-swap link-index
+                    (addresser-state-initial-l2p state)
+                    (addresser-state-working-l2p state)
+                    (addresser-state-chip-specification state)
+                    (addresser-state-chip-schedule state)
+                    :use-free-swaps *addresser-use-free-swaps*)))))
 
 (defgeneric dequeue-classical-instruction (state instr &optional dry-run-escape)
   (:documentation
