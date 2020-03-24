@@ -636,17 +636,23 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
                       best-physical physical)))))
         (values best-physical best-cost)))))
 
-(defun try-to-assign-qubits (state instrs-partially-assigned)
-  (with-slots (working-l2p) state
-    (let ((unassigned-qubits nil)
-          (gate-weights (assign-weights-to-gates state)))
-      ;; gather unassigned qubits
-      (dolist (instr instrs-partially-assigned)
-        (dolist (qubit (cl-quil.resource::resource-qubits-list (instruction-resources instr)))
-          (unless (or (apply-rewiring-l2p working-l2p qubit)
-                      (member qubit unassigned-qubits))
-            (push qubit unassigned-qubits))))
+(defun unassigned-qubits (instrs rewiring)
+  "Get all qubits referenced in INSTRS which are not assigned in REWIRING."
+  (let ((unassigned-qubits nil))
+    (dolist (instr instrs unassigned-qubits)
+      (dolist (qubit (cl-quil.resource::resource-qubits-list
+                      (instruction-resources instr)))
+        (unless (or (apply-rewiring-l2p rewiring qubit)
+                    (member qubit unassigned-qubits))
+          (push qubit unassigned-qubits))))))
 
+(defun try-to-assign-qubits (state instrs)
+  "Attempt to assign a logical qubit from INSTRS to a physical qubit, as managed by the addresser state STATE."
+  (with-slots (working-l2p) state
+    (let ((unassigned-qubits (unassigned-qubits instrs working-l2p))
+          (gate-weights (assign-weights-to-gates state)))
+      (unless unassigned-qubits
+        (return-from try-to-assign-qubits nil))
       ;; maximize over best-qubit-position
       (let (best-logical-qubit
             best-physical-qubit
@@ -658,13 +664,8 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
               (setf best-logical-qubit logical-qubit
                     best-physical-qubit physical-qubit
                     best-cost cost))))
-
-        (cond
-          (best-logical-qubit
-           (rewiring-assign working-l2p best-logical-qubit best-physical-qubit)
-           t)
-          (nil
-           nil))))))
+        (rewiring-assign working-l2p best-logical-qubit best-physical-qubit)
+        t))))
 
 ;; todo: eventually we want to modify parts of this to incorporate multi-qubit
 ;;       hardware objects. a lot of this is already correctly set up for that
