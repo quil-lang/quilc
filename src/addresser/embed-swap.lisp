@@ -106,53 +106,58 @@ instruction if it exists, and errors otherwise."
      best-cost-so-far)
     link-index))
 
-(defun move-to-expected-rewiring (rewiring target-rewiring qq-distances chip-spec chip-sched initial-l2p use-free-swaps
-                                  &optional
+(defun move-to-expected-rewiring (rewiring target-rewiring addresser-state
+                                  &key
+                                    (use-free-swaps nil)
                                     (rewirings-tried nil))
-  "This function inserts the necessary SWAP instructions to move from the working logical-to-physical
-rewiring REWIRING to the TARGET-REWIRING."
-  (format-noise "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a" rewiring target-rewiring)
-  (flet ((cost-function (rewiring &key instr gate-weights)
-           (declare (ignore instr gate-weights))
-           (rewiring-distance rewiring target-rewiring qq-distances))
-         (done-moving (rewiring)
-           (zerop (rewiring-distance rewiring target-rewiring qq-distances))))
-    ;; if we're already properly rewired, stop.
-    (when (done-moving rewiring)
-      (loop
-        :for logical :from 0
-        :for physical :across (rewiring-l2p target-rewiring)
-        :unless (apply-rewiring-l2p rewiring logical)
-          :do (rewiring-assign rewiring logical physical))
-      (return-from move-to-expected-rewiring))
-    (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
-            "Too many rewirings tried: ~a" (length rewirings-tried))
-    ;; otherwise, pick a SWAP
-    (flet ((embed (link-index)
-             (embed-swap link-index
-                         initial-l2p
-                         rewiring
-                         chip-spec
-                         chip-sched
-                         :use-free-swaps nil)))
-      (ecase *addresser-move-to-rewiring-swap-search-type*
-        (:greedy-path
-         (push (copy-rewiring rewiring) rewirings-tried)
-         (embed (select-swap-for-rewiring rewiring target-rewiring
-                                          chip-spec qq-distances
-                                          rewirings-tried)))
-        (:greedy-qubit
-         (push (copy-rewiring rewiring) rewirings-tried)
-         (embed (select-cost-lowering-swap rewiring chip-spec #'cost-function rewirings-tried)))
-        (:a*
-         (dolist (link-index (search-rewiring chip-spec rewiring
-                                              (chip-schedule-qubit-times chip-sched)
-                                              #'cost-function
-                                              #'done-moving
-                                              :max-iterations *addresser-a*-swap-search-max-iterations*))
-           (embed link-index)))))
-    ;; and try again
-    (move-to-expected-rewiring rewiring target-rewiring qq-distances chip-spec chip-sched initial-l2p use-free-swaps rewirings-tried)))
+  "This function inserts the necessary SWAP instructions to move from the working logical-to-physical rewiring REWIRING to the TARGET-REWIRING."
+  (with-slots (qq-distances chip-spec chip-sched initial-l2p) addresser-state
+    (flet ((done-rewiring (rewiring)
+             (zerop (rewiring-distance rewiring target-rewiring qq-distances)))
+           (update-rewiring (rewiring)
+             (loop
+               :for logical :from 0
+               :for physical :across (rewiring-l2p target-rewiring)
+               :unless (apply-rewiring-l2p rewiring logical)
+                 :do (rewiring-assign rewiring logical physical))))
+      (loop :do (format-noise "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a" rewiring target-rewiring)
+            :until (done-rewiring rewiring)
+            :do (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
+                        "Too many rewirings tried: ~a" (length rewirings-tried))
+            :do (let ((links (select-swaps-for-rewiring
+                              *addresser-move-to-rewiring-swap-search-type*
+                              rewiring target-rewiring addresser-state rewirings-tried)))
+                  (dolist (link-index links)
+                    (embed-swap link-index
+                                initial-l2p
+                                rewiring
+                                chip-spec
+                                chip-sched
+                                :use-free-swaps use-free-swaps)))
+            :finally (update-rewiring rewiring)))))
+
+(defmethod select-swaps-for-rewiring ((search-type (eql ':greedy-qubit)) rewiring target-rewiring addresser-state rewirings-tried)
+  (push (copy-rewiring rewiring) rewirings-tried)
+  (with-slots (chip-spec qq-distances) addresser-state
+    (flet ((cost-function (rewiring &key instr gate-weights)
+             (declare (ignore instr gate-weights))
+             (rewiring-distance rewiring target-rewiring qq-distances)))
+      (let ((link-index (select-cost-lowering-swap rewiring chip-spec #'cost-function rewirings-tried)))
+        (values (list link-index) rewirings-tried)))))
+
+(defmethod select-swaps-for-rewiring ((search-type (eql ':a*)) rewiring target-rewiring addresser-state rewirings-tried)
+  (with-slots (chip-spec chip-sched qq-distances) addresser-state
+    (flet ((cost-function (rewiring &key instr gate-weights)
+             (declare (ignore instr gate-weights))
+             (rewiring-distance rewiring target-rewiring qq-distances))
+           (done-moving (rewiring)
+             (zerop (rewiring-distance rewiring target-rewiring qq-distances))))
+      (values (search-rewiring chip-spec rewiring
+                               (chip-schedule-qubit-times chip-sched)
+                               #'cost-function
+                               #'done-moving
+                               :max-iterations *addresser-a*-swap-search-max-iterations*)
+              rewirings-tried))))
 
 (defun embed-swap (link-index initial-l2p working-l2p chip-spec chip-sched &key use-free-swaps)
   "Safely insert a SWAP selected by LINK-INDEX into CHIP-SCHED, accounting for the possibility of virtualization."

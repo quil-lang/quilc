@@ -241,6 +241,52 @@ INSTR is the \"active instruction\".
 (defgeneric cost-flatten (cost)
   (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION."))
 
+
+(defgeneric select-swaps-for-rewiring (search-type rewiring target-rewiring addresser-state rewirings-tried)
+  (:documentation "Determine links to swap in order to bring the current REWIRING closer to TARGET-REWIRING.
+
+Returns a list of link indices, along with an updated list of rewirings tried."))
+
+(defgeneric select-swaps-for-gates (search-type rewiring gates-in-waiting addresser-state rewirings-tried)
+  (:documentation "Determine links to swap in order to schedule GATES-IN-WAITING with respect to the current REWIRING.
+
+Returns a list of link indices, along with an updated list of rewirings tried."))
+
+(defmethod select-swaps-for-gates ((search-type (eql ':a*)) rewiring gates-in-waiting addresser-state rewirings-tried)
+  (with-slots (chip-spec chip-sched) addresser-state
+    (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+             (declare (ignore instr))
+             (let ((modified-state (copy-instance addresser-state)))
+               ;; TODO
+               (setf (addresser-state-working-l2p addresser-state) rewiring)
+               (* *addresser-a*-swap-search-heuristic-scale*
+                  (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
+           (done-function (rewiring2)
+             (prog2
+                 (rotatef rewiring2 rewiring)
+                 (dequeue-logical-to-physical addresser-state :dry-run t)
+               (rotatef rewiring2 rewiring))))
+      (let ((links (search-rewiring chip-spec rewiring
+                                    (chip-schedule-qubit-times chip-sched)
+                                    #'cost-function #'done-function
+                                    :max-iterations *addresser-a*-swap-search-max-iterations*)))
+        (values links rewirings-tried)))))
+
+(defmethod select-swaps-for-gates ((search-type (eql ':greedy-qubit)) rewiring gates-in-waiting addresser-state rewirings-tried)
+  (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+           (let ((modified-state (copy-instance addresser-state)))
+             (setf (addresser-state-working-l2p modified-state) rewiring)
+             (cost-function modified-state
+                            :gate-weights gate-weights
+                            :instr instr))))
+    (push (copy-rewiring rewiring) rewirings-tried)
+    (let ((link-index
+            (select-cost-lowering-swap rewiring
+                                       (addresser-state-chip-specification addresser-state)
+                                       #'cost-function
+                                       rewirings-tried)))
+      (values (list link-index) rewirings-tried))))
+
 (defun select-swap-links (state rewirings-tried)
   "Determine a list of swap links to embed, given the addresser STATE and a list of REWIRINGS-TRIED.
 
@@ -249,40 +295,11 @@ Returns two values: a list of links, and an updated list of rewirings tried."
       state
     (format-noise "SELECT-SWAP-LINKS: entering SWAP selection phase.")
     (let ((gates-in-waiting (assign-weights-to-gates state)))
-      (ecase *addresser-swap-search-type*
-        (:a*
-         (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-                  (declare (ignore instr))
-                  (let ((modified-state (copy-instance state)))
-                    (setf (addresser-state-working-l2p state) rewiring)
-                    (* *addresser-a*-swap-search-heuristic-scale*
-                       (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
-                (done-function (rewiring)
-                  (prog2
-                      (rotatef rewiring working-l2p)
-                      (dequeue-logical-to-physical state :dry-run t)
-                    (rotatef rewiring working-l2p))))
-           (let ((links (search-rewiring chip-spec working-l2p
-                                         (chip-schedule-qubit-times chip-sched)
-                                         #'cost-function #'done-function
-                                         :max-iterations *addresser-a*-swap-search-max-iterations*)))
-             (values links rewirings-tried))))
-        (:greedy-qubit
-         (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-                  (let ((modified-state (copy-instance state)))
-                    (setf (addresser-state-working-l2p modified-state) rewiring)
-                    (cost-function modified-state
-                                   :gate-weights gate-weights
-                                   :instr instr))))
-           (push (copy-rewiring working-l2p) rewirings-tried)
-           (let ((link-index (select-cost-lowering-swap working-l2p chip-spec #'cost-function rewirings-tried)))
-             (values (list link-index) rewirings-tried))))
-        (:greedy-path
-         (push (copy-rewiring working-l2p) rewirings-tried)
-         (let ((link-index (select-swap-for-gates working-l2p gates-in-waiting chip-spec qq-distances rewirings-tried)))
-           ;; if we have a nil swap, the greedy scheduler has failed to operate. scary!
-           (assert link-index () "Failed to select a SWAP instruction.")
-           (values (list link-index) rewirings-tried)))))))
+      (select-swaps-for-gates *addresser-swap-search-type*
+                              working-l2p
+                              gates-in-waiting
+                              state
+                              rewirings-tried))))
 
 (defgeneric select-and-embed-a-permutation (state rewirings-tried)
   (:documentation
@@ -371,11 +388,8 @@ Two other values are returned: a list of fully rewired instructions for later sc
            (lscheduler-dequeue-instruction lschedule instr)
            (move-to-expected-rewiring working-l2p
                                       (application-force-rewiring-target instr)
-                                      qq-distances
-                                      chip-spec
-                                      chip-sched
-                                      initial-l2p
-                                      *addresser-use-free-swaps*)
+                                      state
+                                      :use-free-swaps *addresser-use-free-swaps*)
            (setf dirty-flag t))
 
           ;; is it a small-Q gate?
