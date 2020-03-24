@@ -76,7 +76,7 @@
                                                       (< 1 (length (application-arguments instr))))
                                                  (1+ value)
                                                  value))
-                               :test-values #'max)
+                               :combine-values #'max)
         0)))
 
 (defun calculate-instructions-duration (instructions chip-specification)
