@@ -138,8 +138,9 @@ rewiring REWIRING to the TARGET-REWIRING."
       (ecase *addresser-move-to-rewiring-swap-search-type*
         (:greedy-path
          (push (copy-rewiring rewiring) rewirings-tried)
-         (embed (select-swap-path-target chip-spec qq-distances target-rewiring
-                                         rewirings-tried rewiring)))
+         (embed (select-swap-for-rewiring rewiring target-rewiring
+                                          chip-spec qq-distances
+                                          rewirings-tried)))
         (:greedy-qubit
          (push (copy-rewiring rewiring) rewirings-tried)
          (embed (select-cost-lowering-swap rewiring chip-spec #'cost-function rewirings-tried)))
