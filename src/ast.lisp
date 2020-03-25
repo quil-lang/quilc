@@ -1665,9 +1665,16 @@ For example,
   "When T, PARSED-PROGRAM objects are printed with PRINT-PARSED-PROGRAM. Otherwise the standard object printer is used.")
 
 (defmethod print-object ((parsed-program parsed-program) stream)
-  (if *print-parsed-program-objects*
-      (print-parsed-program parsed-program stream)
-      (call-next-method)))
+  (print-unreadable-object (parsed-program stream :type t :identity t)
+    (format stream "of ~D instructions" (length (parsed-program-executable-code parsed-program)))
+    (when *print-parsed-program-objects*
+      (terpri stream)
+      (dolist (line (split-sequence:split-sequence
+                     #\Newline
+                     (with-output-to-string (s)
+                       (print-parsed-program parsed-program s))))
+        (write-string "    " stream)
+        (write-line line stream)))))
 
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
