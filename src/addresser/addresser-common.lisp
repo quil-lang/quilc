@@ -195,6 +195,38 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
                     (aref dist j i) (+ ik kj)))))))
     dist))
 
+(defun warm-up-addresser-state (state hardware-op)
+  "'Warm up' the addresser STATE by iterating over each hardware object on the chip, initializing a random gate on the object and then calling HARDWARE-OP with it."
+  ;; We snag some of the addresser state here, and restore it after the loop.
+  (let ((initial-l2p (addresser-state-initial-l2p state))
+        (working-l2p (addresser-state-working-l2p state))
+        (lscheduler (addresser-state-logical-schedule state))
+        (chip-sched (addresser-state-chip-schedule state)))
+    (loop :with chip-spec := (addresser-state-chip-specification state)
+          :for order-list :across (chip-specification-objects chip-spec)
+          :for qubits :from 1
+          :do (dotimes (j (length order-list))
+                (let ((hw (vnth j order-list)))
+                  (unless (hardware-object-dead-p hw)
+                    (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
+                                         (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
+                                             (list j))))
+                           (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
+                           (instrs-compressed (if *compute-tight-recombination-bound*
+                                                  (compress-instructions instrs-decomposed chip-spec)
+                                                  instrs-decomposed)))
+                      (setf (addresser-state-initial-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
+                            (addresser-state-working-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
+                            (addresser-state-logical-schedule state) (make-lscheduler)
+                            (addresser-state-chip-schedule state) (make-chip-schedule chip-spec))
+                      (append-instructions-to-lschedule (addresser-state-logical-schedule state)
+                                                        instrs-compressed)
+                      (funcall hardware-op hw))))))
+    (setf (addresser-state-initial-l2p state) initial-l2p
+          (addresser-state-working-l2p state) working-l2p
+          (addresser-state-logical-schedule state) lscheduler
+          (addresser-state-chip-schedule state) chip-sched)))
+
 (defmethod initialize-instance :after ((instance addresser-state)
                                        &rest initargs
                                        &key
