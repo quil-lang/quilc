@@ -188,14 +188,12 @@
                                        &allow-other-keys)
   (declare (ignore initargs))
   ;; set up the qq-distances slot to use log-infidelity as the basic unit
-  (let ((distance-mapping (make-hash-table)))
-    (loop :for object :across (chip-spec-links chip-spec)
-          :do (setf (gethash object distance-mapping)
-                    (if (hardware-object-dead-p object)
-                        most-positive-fixnum
-                        (- (log (swap-fidelity chip-spec object))))))
-    (setf (addresser-state-qq-distances instance)
-          (precompute-qubit-qubit-distances chip-spec distance-mapping)))
+  (setf (addresser-state-qq-distances instance)
+        (compute-qubit-qubit-distances chip-spec
+                                       (lambda (object)
+                                         (if (hardware-object-dead-p object)
+                                             most-positive-fixnum
+                                             (- (log (swap-fidelity chip-spec object)))))))
   ;; warm the cost-bounds slot
   (loop :with old-initial-l2p := (addresser-state-initial-l2p instance)
         :with old-working-l2p := (addresser-state-working-l2p instance)

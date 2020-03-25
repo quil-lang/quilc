@@ -163,8 +163,8 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
               :type chip-specification)))
 
 ;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
-(defun precompute-qubit-qubit-distances (chip-spec initial-map)
-  "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by swap duration."
+(defun compute-qubit-qubit-distances (chip-spec link-cost)
+  "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by LINK-COST."
   (let* ((vertex-count (chip-spec-n-qubits chip-spec))
          (dist (make-array (list vertex-count vertex-count)
                            :initial-element most-positive-fixnum)))
@@ -172,10 +172,12 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
     (dotimes (j vertex-count)
       (setf (aref dist j j) 0))
     ;; write the direct node-to-node weights into the table
-    (dohash ((object value) initial-map)
-      (destructuring-bind (q0 q1) (coerce (vnth 0 (hardware-object-cxns object)) 'list)
-        (setf (aref dist q0 q1) value
-              (aref dist q1 q0) value)))
+    (loop :for link :across  (chip-spec-links chip-spec)
+          :for value := (funcall link-cost link)
+          :do (destructuring-bind (q0 q1)
+                  (coerce (vnth 0 (hardware-object-cxns link)) 'list)
+                (setf (aref dist q0 q1) value
+                      (aref dist q1 q0) value)))
     ;; for each intermediate vertex...
     (dotimes (k vertex-count)
       ;; for each left vertex...
