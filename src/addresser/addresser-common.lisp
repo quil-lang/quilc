@@ -684,21 +684,22 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
   (with-slots (working-l2p) state
     (let ((unassigned-qubits (unassigned-qubits instrs working-l2p))
           (gate-weights (assign-weights-to-gates state)))
-      (unless unassigned-qubits
-        (return-from try-to-assign-qubits nil))
-      ;; maximize over best-qubit-position
-      (let (best-logical-qubit
-            best-physical-qubit
-            (best-cost (build-worst-cost state)))
-        (dolist (logical-qubit unassigned-qubits)
-          (multiple-value-bind (physical-qubit cost)
-              (best-qubit-position state gate-weights logical-qubit)
-            (when (cost-< cost best-cost)
-              (setf best-logical-qubit logical-qubit
-                    best-physical-qubit physical-qubit
-                    best-cost cost))))
-        (rewiring-assign working-l2p best-logical-qubit best-physical-qubit)
-        t))))
+      (flet ((placement-data (logical-qubit)
+               "Given a LOGICAL-QUBIT, determine an assigned physical qubit, and the associated cost. Return a list of all three."
+               (multiple-value-bind (physical-qubit cost)
+                   (best-qubit-position state gate-weights logical-qubit)
+                 (list logical-qubit physical-qubit cost))))
+        (cond ((endp unassigned-qubits)
+               nil)
+              (t
+               ;; maximize over best-qubit-position
+               (destructuring-bind (best-logical best-physical best-cost)
+                   (a:extremum (mapcar #'placement-data unassigned-qubits)
+                               (complement #'cost-<)
+                               :key #'third)
+                 (declare (ignore best-cost))
+                 (rewiring-assign working-l2p best-logical best-physical))
+               t))))))
 
 ;; todo: eventually we want to modify parts of this to incorporate multi-qubit
 ;;       hardware objects. a lot of this is already correctly set up for that
