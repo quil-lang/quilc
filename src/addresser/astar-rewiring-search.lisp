@@ -272,3 +272,36 @@ should stop with the given rewiring and false otherwise."
             :do (setf (gethash hash seen)
                       (cons next-state (queues:queue-change queue node next-state))))))
 
+(defmethod select-swaps-for-rewiring ((search-type (eql ':a*)) rewiring target-rewiring addresser-state rewirings-tried)
+  (with-slots (chip-spec chip-sched qq-distances) addresser-state
+    (flet ((cost-function (rewiring &key instr gate-weights)
+             (declare (ignore instr gate-weights))
+             (rewiring-distance rewiring target-rewiring qq-distances))
+           (done-moving (rewiring)
+             (zerop (rewiring-distance rewiring target-rewiring qq-distances))))
+      (values (search-rewiring chip-spec rewiring
+                               (chip-schedule-qubit-times chip-sched)
+                               #'cost-function
+                               #'done-moving
+                               :max-iterations *addresser-a*-swap-search-max-iterations*)
+              rewirings-tried))))
+
+(defmethod select-swaps-for-gates ((search-type (eql ':a*)) rewiring gates-in-waiting addresser-state rewirings-tried)
+  (with-slots (chip-spec chip-sched) addresser-state
+    (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+             (declare (ignore instr))
+             (let ((modified-state (copy-instance addresser-state)))
+               ;; TODO
+               (setf (addresser-state-working-l2p addresser-state) rewiring)
+               (* *addresser-a*-swap-search-heuristic-scale*
+                  (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
+           (done-function (rewiring2)
+             (prog2
+                 (rotatef rewiring2 rewiring)
+                 (dequeue-logical-to-physical addresser-state :dry-run t)
+               (rotatef rewiring2 rewiring))))
+      (let ((links (search-rewiring chip-spec rewiring
+                                    (chip-schedule-qubit-times chip-sched)
+                                    #'cost-function #'done-function
+                                    :max-iterations *addresser-a*-swap-search-max-iterations*)))
+        (values links rewirings-tried)))))

@@ -112,10 +112,10 @@
                              (:file "initial-rewiring")
                              (:file "logical-schedule")
                              (:file "outgoing-schedule")
+                             (:file "addresser-common")
                              (:file "astar-rewiring-search")
                              (:file "path-heuristic")
-                             (:file "addresser-common")
-                             (:file "embed-swap")
+                             (:file "qubit-heuristic")
                              (:file "temporal-addresser")
                              (:file "fidelity-addresser")))
                (:module "compressor"
