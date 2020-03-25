@@ -410,16 +410,15 @@ instruction, adding to logical queue."
   (setf (temporal-addresser-state-1q-queues instance)
         (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))
   ;; set up the qq-distances slot to use runtime as the basic unit
-  (let ((distance-mapping (make-hash-table)))
-    (loop :for object :across (chip-spec-links chip-spec)
-          :do (setf (gethash object distance-mapping)
-                    ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
-                    ;; TODO: is there a good reason this uses floats over COST objects?
-                    (if (hardware-object-dead-p object)
-                        most-positive-fixnum
-                        (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object))))))
-    (setf (addresser-state-qq-distances instance)
-          (precompute-qubit-qubit-distances chip-spec distance-mapping)))
+  (setf (addresser-state-qq-distances instance)
+        (compute-qubit-qubit-distances
+         chip-spec
+         (lambda (object)
+           ;; TODO: is there a good reason this uses floats over COST objects?
+           (if (hardware-object-dead-p object)
+               most-positive-fixnum
+               ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
+               (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object)))))))
   ;; warm the cost-bounds slot
   (loop :with old-initial-l2p := (addresser-state-initial-l2p instance)
         :with old-working-l2p := (addresser-state-working-l2p instance)
