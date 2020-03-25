@@ -420,35 +420,11 @@ instruction, adding to logical queue."
                ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
                (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object)))))))
   ;; warm the cost-bounds slot
-  (loop :with old-initial-l2p := (addresser-state-initial-l2p instance)
-        :with old-working-l2p := (addresser-state-working-l2p instance)
-        :with old-lscheduler := (addresser-state-logical-schedule instance)
-        :with old-chip-sched := (addresser-state-chip-schedule instance)
-        :for order-list :across (chip-specification-objects chip-spec)
-        :for qubits :from 1
-        :do (dotimes (j (length order-list))
-              (let ((hw (vnth j order-list)))
-                (unless (hardware-object-dead-p hw)
-                  (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
-                                       (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
-                                           (list j))))
-                         (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
-                         (instrs-compressed (if *compute-tight-recombination-bound*
-                                                (compress-instructions instrs-decomposed chip-spec)
-                                                instrs-decomposed)))
-                    (setf (addresser-state-initial-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
-                          (addresser-state-working-l2p instance) (make-rewiring (chip-spec-n-qubits chip-spec))
-                          (addresser-state-logical-schedule instance) (make-lscheduler)
-                          (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec))
-                    (append-instructions-to-lschedule (addresser-state-logical-schedule instance)
-                                                      instrs-compressed)
-                    (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
-                            (temporal-cost-heuristic-value
-                             (cost-function instance :gate-weights (assign-weights-to-gates instance))))))))
-        :finally (setf (addresser-state-initial-l2p instance) old-initial-l2p
-                       (addresser-state-working-l2p instance) old-working-l2p
-                       (addresser-state-logical-schedule instance) old-lscheduler
-                       (addresser-state-chip-schedule instance) old-chip-sched)))
+  (flet ((fill-cost-bound (hw)
+           (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
+                 (temporal-cost-heuristic-value
+                  (cost-function instance :gate-weights (assign-weights-to-gates instance))))))
+    (warm-up-addresser-state instance #'fill-cost-bound)))
 
 ;; also, we randomize the cost function weights during select-and-embed-a-permutation
 (defmethod select-and-embed-a-permutation :around ((state temporal-addresser-state) rewiring-tried)
