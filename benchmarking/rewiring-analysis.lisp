@@ -150,7 +150,8 @@
              (when (< max-needed
                       (quil::chip-spec-n-qubits chip))
                (funcall assn (lambda ()
-                               (multiple-value-list (compiler-hook (get-prog prog-source chip) chip))))))))
+                               (multiple-value-list
+                                (compiler-hook (get-prog prog-source chip) chip :destructive t))))))))
 
        (by-chip (prog-source chip)
          (loop

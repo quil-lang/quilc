@@ -149,14 +149,43 @@
 ;; TODO: deal with classical control and basic-blocks
 (defun compiler-hook (parsed-program
                       chip-specification
-                      &key (protoquil nil)
-                        (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification)))
+                      &key
+                        (protoquil nil)
+                        (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification))
+                        (destructive nil))
   "Runs a full compiler pass on a parsed-program object.
+
+Arguments:
+
+  - PARSED-PROGRAM: The parsed program to compile
+
+  - CHIP-SPECIFICATION: The chip specification describing the target chip
+
+Keyword arguments:
+
+  - PROTOQUIL: Whether the input and output programs should conform to protoquil restrictions
+
+  - REWIRING-TYPE: The scheme by which logical qubits are mapped (rewired) to physical qubits
+
+  - DESTRUCTIVE: Default NIL. If T, the input program is mutated and after compilation contains the compiled program. Otherwise, a copy is made of the input program and the compiled copy is returned. Note that for large programs you may prefer to mutate the original program rather than waste time copying it. For example, the server interface will mutate the program since it has no use for the unmolested original program after compilation.
 
 Returns a value list: (processed-program, of type parsed-program
                        topological-swaps, of type integer
                        unpreserved-block-duration, of type real)"
   (format-noise "COMPILER-HOOK: entrance.")
+
+  (unless destructive
+    (setf parsed-program (copy-instance parsed-program)))
+
+  ;; Technically this could be fused with the above, but remains
+  ;; separate for clarity. We should not compress if the rewiring type
+  ;; is naive, or the program uses more qubits than are available on
+  ;; the chip (duh), or if the program has blocks of preserved qubits.
+  (when (and (not (eql ':naive rewiring-type))
+             (> (qubits-needed parsed-program)
+                (length (chip-spec-live-qubits chip-specification)))
+             (not (parsed-program-has-preserve-blocks-p parsed-program)))
+    (setf parsed-program (compress-qubits parsed-program)))
 
   (warm-chip-spec-lookup-cache chip-specification)
 
@@ -323,10 +352,10 @@ Returns a value list: (processed-program, of type parsed-program
                                     (make-rewiring (chip-spec-n-qubits chip-specification))
                                     (basic-block-in-rewiring blk))))
                (format-noise "COMPILER-HOOK: Matching rewiring from ~A (~A) to ~A (~A)."
-                       (basic-block-name registrant)
-                       final-l2p
-                       (basic-block-name blk)
-                       initial-l2p)
+                             (basic-block-name registrant)
+                             final-l2p
+                             (basic-block-name blk)
+                             initial-l2p)
                ;; if they're the same, proceed with analyzing the jump
                (unless (equalp final-l2p initial-l2p)
                  (return-from process-block
