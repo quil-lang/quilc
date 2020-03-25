@@ -705,8 +705,7 @@ other's."
       (let ((new-context context))
         (dolist (instr first-block)
           (setf new-context
-                (update-compilation-context new-context instr
-                                            :destructive? nil)))
+                (update-compilation-context new-context instr :destructive? nil)))
         (return-from compress-instructions-with-possibly-unknown-params
           (compress-instructions-with-possibly-unknown-params
            (nconc second-block instr-rest)
