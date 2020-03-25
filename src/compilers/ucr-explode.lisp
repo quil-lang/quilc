@@ -278,7 +278,7 @@
   (check-type n integer)
   (let* ((mat-size (expt 2 n))
          (operating-vector (make-array mat-size :initial-element (/ mat-size))))
-    (magicl:from-list
+    (from-list
      (loop
        :for index :in (nconc (gray-code-toggles n) (list n))
        :append (progn

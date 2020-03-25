@@ -39,7 +39,7 @@
 (defun get-amplitudes (qvm)
   (declare (type qvm:pure-state-qvm qvm))
   (let ((amplitudes (qvm::amplitudes (qvm::state qvm))))
-    (magicl:from-list (coerce amplitudes 'list) (list (length amplitudes) 1))))
+    (quil::from-list (coerce amplitudes 'list) (list (length amplitudes) 1))))
 
 (defun encode-linear-algebra (stabilizer-group bits)
   "Use STABILIZER-GROUP to encode BITS. Return a vector of amplitudes and a QVM with the corresponding wavefunction."
@@ -47,7 +47,7 @@
          (2^n (expt 2 n)))
 
     (flet ((make-zero-ket ()
-             (let ((vector (magicl:zeros (list 2^n 1))))
+             (let ((vector (quil::zeros (list 2^n 1))))
                (setf (magicl:tref vector 0 0) #c(1.0d0 0.0d0))
                vector))
 
@@ -68,7 +68,7 @@
                   (setf ket (magicl:@ matrix ket))))
 
         (loop :with b := (length primary-generators)
-              :with result := (magicl:zeros (list 2^n 1))
+              :with result := (quil::zeros (list 2^n 1))
               :for z :below (expt 2 b) :do
                 (loop :with term := (magicl::copy-matrix/complex-double-float ket)
                       :for x :below b
@@ -149,14 +149,14 @@
         (secondary-generators (qec::secondary-generators stabilizer-group)))
 
     (labels ((make-zero-ket (n &optional (value #c(1.0d0 0.0d0)))
-               (let ((vector (magicl:zeros (list (expt 2 n)))))
+               (let ((vector (quil::zeros (list (expt 2 n)))))
                  (setf (magicl:tref vector 0) value)
                  vector))
 
              (make-state ()
                (loop :with n := (qec::number-of-physical-qubits stabilizer-group)
                      :with b := (length primary-generators)
-                     :with psi := (magicl:zeros (list (expt 2 n)))
+                     :with psi := (quil::zeros (list (expt 2 n)))
                      :for a :below (expt 2 b) :do
                        (loop :with vector := (make-zero-ket n (/ (sqrt (expt 2 b))))
                              :for i :below b

@@ -6,8 +6,8 @@
 
 (defun wf-to-matrix (wf)
   "Convert a sequence WF to a corresponding column vector."
-  (magicl:from-array (copy-seq wf)
-                     (list (length wf) 1)))
+  (quil::from-array (copy-seq wf)
+                (list (length wf) 1)))
 
 (defun check-state-prep (source-wf target-wf matrix)
   "Checks whether SOURCE-WF maps to TARGET-WF under the specified MATRIX."

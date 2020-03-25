@@ -50,7 +50,7 @@
                ((controlled-operator o)
                 (let ((summand (recurse o parameters)))
                   (magicl:direct-sum
-                   (magicl:eye (gate-dimension summand))
+                   (eye (gate-dimension summand) :type 'double-float)
                    summand)))
                ((dagger-operator o)
                 (magicl:dagger (recurse o parameters)))
@@ -144,7 +144,7 @@
 (defmethod gate-matrix ((gate permutation-gate) &rest parameters)
   (assert (null parameters))
   (let* ((d (gate-dimension gate))
-         (m (magicl:zeros (list d d) :type '(complex double-float))))
+         (m (zeros (list d d))))
     (map nil (let ((row -1))
                (lambda (col)
                  (setf (magicl:tref m (incf row) col) #C(1.0d0 0.0d0))))
@@ -209,7 +209,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
                (matrix-expt (reduce (lambda (m term)
                                       (magicl:.+ m (pauli-term->matrix term arguments params parameters)))
                                     terms
-                                    :initial-value (magicl:zeros (list size size) :type '(complex double-float)))
+                                    :initial-value (zeros (list size size)))
                             #C(0d0 -1d0)
                             :hermitian? t)))
         (setf (%parameterized-gate-matrix-function gate) #'matrix-function)))))
@@ -225,7 +225,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 (defmethod gate-matrix ((gate controlled-gate) &rest parameters)
   (let ((target (target gate)))
-    (magicl:direct-sum (magicl:eye (gate-dimension target))
+    (magicl:direct-sum (eye (gate-dimension target))
                        (apply #'gate-matrix target parameters))))
 
 (defmethod gate-dimension ((gate controlled-gate))
@@ -357,9 +357,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
          (dim (isqrt (length entries))))
     (make-instance 'simple-gate
                    :name name
-                   :matrix (magicl:from-list entries
-                                             (list dim dim)
-                                             :type '(complex double-float)))))
+                   :matrix (from-list entries (list dim dim)))))
 
 (defmethod gate-definition-to-gate ((gate-def permutation-gate-definition))
   (let ((name (gate-definition-name gate-def))
@@ -372,9 +370,8 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
   (flet ((lambda-form (params dimension entries)
            `(lambda ,params
               (declare (ignorable ,@params))
-              (magicl:from-list (list ,@entries)
-                                (list ,dimension ,dimension)
-                                :type '(complex double-float)))))
+              (from-list (list ,@entries)
+                         (list ,dimension ,dimension)))))
     (let* ((name (gate-definition-name gate-def))
            (entries (gate-definition-entries gate-def))
            (params (gate-definition-parameters gate-def))
@@ -432,7 +429,7 @@ or equivalently as
     C * B * A
 
 as matrices."
-  (let ((u (magicl:const #C(1d0 0d0) '(1 1))))
+  (let ((u (const #C(1d0 0d0) '(1 1))))
     (dolist (instr instruction-list u)
       (assert (not (null u)))
       ;; TODO: What to do about other quantum-state-transitioning
@@ -457,7 +454,7 @@ as matrices."
   (check-type n integer)
   (let* ((width (expt 2 n))
          (mask (- -1 (loop :for l :in lines :sum (expt 2 l))))
-         (out-mat (magicl:zeros (list width width) :type '(complex double-float))))
+         (out-mat (zeros (list width width))))
     (dotimes (i width)
       (dotimes (j width)
         (if (= (logand mask i) (logand mask j))
@@ -493,7 +490,7 @@ or equivalently as
     C * B * A
 
 as matrices."
-  (let ((u (magicl:const 1d0 '(1 1) :type '(complex double-float)))
+  (let ((u (const #C(1d0 0d0) '(1 1)))
         (qubits (list)))
     (dolist (instr instructions)
       (let ((new-qubits (set-difference (mapcar #'qubit-index (application-arguments instr))

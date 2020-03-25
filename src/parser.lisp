@@ -1032,7 +1032,7 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                parameters))))
          (arg-count (length arguments))
          (size (expt 2 arg-count))
-         (m (magicl:zeros (list size size) :type '(complex double-float))))
+         (m (zeros (list size size))))
     (dotimes (col size)
       (let ((row col)
             (entry prefactor))

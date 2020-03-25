@@ -98,7 +98,7 @@
   ;;
   ;; NOTE: this logic extends just as well to SU(m) (x) SU(n) and could arguably
   ;;       be moved into MAGICL.
-  (let ((m (magicl:zeros '(4 4) :type '(complex double-float))))
+  (let ((m (zeros '(4 4))))
     (dotimes (block-i 2)
       (dotimes (block-j 2)
         (dotimes (inner-i 2)
@@ -106,8 +106,8 @@
             (setf (magicl:tref m (+ (* 2 block-j) block-i) (+ (* 2 inner-j) inner-i))
                   (magicl:tref SU2x2 (+ (* 2 block-i) inner-i) (+ (* 2 block-j) inner-j)))))))
     (multiple-value-bind (u sigma vt) (magicl:svd m)
-      (let ((a (magicl:zeros '(2 2) :type '(complex double-float)))
-            (b (magicl:zeros '(2 2) :type '(complex double-float))))
+      (let ((a (zeros '(2 2)))
+            (b (zeros '(2 2))))
         (dotimes (i 2)
           (dotimes (j 2)
             (setf (magicl:tref a i j)
@@ -131,12 +131,11 @@
            (-sqrt2 (- sqrt2))
            (isqrt2 (complex 0 sqrt2))
            (-isqrt2 (complex 0 -sqrt2)))
-      (magicl:from-list (list sqrt2  isqrt2  0       0
-                              0      0       isqrt2  sqrt2
-                              0      0       isqrt2 -sqrt2
-                              sqrt2 -isqrt2  0       0)
-                        '(4 4)
-                        :type '(complex double-float)))
+      (from-list (list sqrt2  isqrt2  0       0
+                       0      0       isqrt2  sqrt2
+                       0      0       isqrt2 -sqrt2
+                       sqrt2 -isqrt2  0       0)
+                 '(4 4)))
   :test #'magicl:=
   :documentation "This is an element of SU(4) that has two properties: (1) e-basis e-basis^T = - sigma_y^((x) 2) and (2) e-basis^dag SU(2)^((x) 2) e-basis = SO(4).")
 
@@ -146,18 +145,17 @@
            (-sqrt2 (- sqrt2))
            (isqrt2 (complex 0 sqrt2))
            (-isqrt2 (complex 0 -sqrt2)))
-      (magicl:from-list (list sqrt2   0       0      sqrt2
-                              -isqrt2  0       0      isqrt2
-                              0      -isqrt2 -isqrt2 0
-                              0       sqrt2  -sqrt2  0)
-                        '(4 4)
-                        :type '(complex double-float)))
+      (from-list (list sqrt2   0       0      sqrt2
+                       -isqrt2  0       0      isqrt2
+                       0      -isqrt2 -isqrt2 0
+                       0       sqrt2  -sqrt2  0)
+                 '(4 4)))
   :test #'magicl:=
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
 (defun ensure-positive-determinant (m)
   (if (double= -1d0 (magicl:det m))
-      (magicl:@ m (magicl:from-diag (list -1 1 1 1) :type '(complex double-float)))
+      (magicl:@ m (from-diag (list -1 1 1 1)))
       m))
 
 (defconstant +diagonalizer-max-attempts+ 16
@@ -196,11 +194,11 @@
                                gammag
                                evecs)))
              (v (magicl:@ evecs
-                          (magicl:from-diag evals)
+                          (from-diag evals)
                           (magicl:transpose evecs))))
         (when (magicl:every #'double= gammag v)
           (assert (magicl:every #'double~
-                                (magicl:eye 4)
+                                (eye 4 :type 'double-float)
                                 (magicl:@ (magicl:transpose evecs)
                                           evecs))
                   (evecs)
@@ -235,7 +233,7 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
                                     (setf mag (abs (magicl:tref db j i)))
                                     (setf phase (mod (phase (magicl:tref db j i)) pi))))
                                 (cis phase))))
-         (d (magicl:from-diag diag))
+         (d (from-diag diag))
          (b (magicl:@ (magicl:conjugate-transpose d) db)))
     ;; it could be the case that b has negative determinant. if that's
     ;; the case, we'll swap two of its columns that live in the same
@@ -245,23 +243,23 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
     ;; has determinant 1 and (2) DO is again diagonal. The second
     ;; condition excludes permutation matrices. - ecp
     (when (double~ -1d0 (magicl:det b))
-      (setf d (magicl:@ d (magicl:from-diag (list -1 1 1 1) :type '(complex double-float))))
-      (setf b (magicl:@ (magicl:from-diag (list -1 1 1 1) :type '(complex double-float)) b)))
+      (setf d (magicl:@ d (from-diag (list -1 1 1 1))))
+      (setf b (magicl:@ (from-diag (list -1 1 1 1)) b)))
     (when *compress-carefully*
       (assert (double~ 1d0 (magicl:det m)))
       (assert (double~ 1d0 (magicl:det a)))
       (assert (double~ 1d0 (magicl:det b)))
       (assert (double~ 1d0 (magicl:det d)))
-      (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+      (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                   (magicl:@ a (magicl:transpose a))))
-      (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+      (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                   (magicl:@ b (magicl:transpose b))))
       (assert (matrix-equals-dwim (magicl:@ +edag-basis+ m +e-basis+)
                                   (magicl:@ a d b))))
     (values a d b)))
 
 (defun make-signed-permutation-matrix (sigma &optional (signs (list 1 1 1 1)))
-  (let ((o (magicl:zeros '(4 4) :type '(complex double-float))))
+  (let ((o (zeros '(4 4))))
     (loop :for i :below 4
           :for j := (1- (cl-permutation:perm-eval sigma (1+ i)))
           :for sign :in signs
@@ -312,15 +310,15 @@ Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION.
                                                                 (list 1 1 1 1))))
               (setf oT (magicl:transpose (make-signed-permutation-matrix sigma signs)))))))
       (when *compress-carefully*
-        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+        (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                     (magicl:@ a (magicl:transpose a))))
-        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+        (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                     (magicl:@ b (magicl:transpose b))))
-        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+        (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                     (magicl:@ aprime (magicl:transpose aprime))))
-        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+        (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                     (magicl:@ bprime (magicl:transpose bprime))))
-        (assert (matrix-equals-dwim (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+        (assert (matrix-equals-dwim (from-diag '(1d0 1d0 1d0 1d0))
                                     (magicl:@ o (magicl:transpose o))))
         (assert (double~ 1d0 (magicl:det a)))
         (assert (double~ 1d0 (magicl:det aprime)))
@@ -404,7 +402,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 (defun build-canonical-gate-in-magic-basis (coord)
   "Given a canonical coordinate, construct the associated canonical gate at that coordinate."
   (destructuring-bind (c1 c2 c3) coord
-    (magicl:from-diag
+    (from-diag
      (mapcar (lambda (z) (cis (* 0.5d0 z)))
              (list (+    c1  (- c2)    c3)
                    (+    c1     c2  (- c3))
@@ -477,9 +475,9 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                    (,q0 (qubit-index (second (application-arguments ,instr-name)))))
                (multiple-value-bind (complete-circuit fidelity)
                    (sandwich-with-local-gates ,circuit
-                                              (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                              (from-diag '(1d0 1d0 1d0 1d0))
                                               (build-canonical-gate-in-magic-basis ,coord)
-                                              (magicl:from-diag '(1d0 1d0 1d0 1d0) :type '(complex double-float))
+                                              (from-diag '(1d0 1d0 1d0 1d0))
                                               ,q1 ,q0)
                  (finish-compiler (values complete-circuit fidelity))))))))))
 

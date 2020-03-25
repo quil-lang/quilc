@@ -178,8 +178,8 @@
     "Return a list of the n qubit pauli basis matrices. Note that this is the basis for group action, consisting of strings with one X or Z, not the basis for the vector space of complex matrices."
     (or (gethash n memo-table)
         (setf (gethash n memo-table)
-              (let ((X   (magicl:from-list '(0 1 1 0) '(2 2) :type '(complex double-float)))
-                    (Z   (magicl:from-list '(1 0 0 -1) '(2 2) :type '(complex double-float))))
+              (let ((X (quil::from-list '(0 1 1 0) '(2 2)))
+                    (Z (quil::from-list '(1 0 0 -1) '(2 2))))
                 (loop :for i :below n
                       :collect (quil::kq-gate-on-lines X n `(,i))
                       :collect (quil::kq-gate-on-lines Z n `(,i))))))))
@@ -251,8 +251,7 @@
 (defun clifford-to-matrix (cliff)
   "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
   (let* ((n (num-qubits cliff))
-         (mat (magicl:zeros (list (expt 2 n) (expt 2 n))
-                            :type '(complex double-float)))
+         (mat (zeros (list (expt 2 n) (expt 2 n))))
          (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
          (zero-image-tab (make-tableau-zero-state n))
          (pauli-map (clifford-basis-map cliff)))

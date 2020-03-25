@@ -50,7 +50,7 @@
                (format s "~%"))
              (format s "TEST ~{~D ~}" (a:iota qubit-count))))
          (parsed-prog (quil::parse-quil program-string)))
-    (is (quil::matrix-equality (magicl:eye (expt 2 qubit-count) :type '(complex double-float))
+    (is (quil::matrix-equality (quil::eye (expt 2 qubit-count))
                                (quil::make-matrix-from-quil (coerce (parsed-program-executable-code parsed-prog) 'list))))))
 
 (defclass transformable-thing (quil::transformable)

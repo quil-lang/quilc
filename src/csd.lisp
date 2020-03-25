@@ -17,7 +17,7 @@
   (let* ((m (magicl:nrows diag))
          (n (magicl:ncols diag))
          (k (magicl:ncols matrix))
-         (result (magicl:zeros (list m k) :type '(complex double-float))))
+         (result (zeros (list m k))))
     (dotimes (i (min m n) result)
       (let ((dii (magicl:tref diag i i)))
         (dotimes (j k)
