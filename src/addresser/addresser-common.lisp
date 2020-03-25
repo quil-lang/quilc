@@ -79,17 +79,31 @@ SWAPping qubits into place.")
 (defvar *addresser-use-2q-tiers* t
   "When T, uses the 2-qubit tiers rather than the general instruction tiers.")
 
+;;; The different search strategies implement methods for the following generics
+
+(defgeneric select-swaps-for-rewiring (search-type rewiring target-rewiring addresser-state rewirings-tried)
+  (:documentation "Determine links to swap in order to bring the current REWIRING closer to TARGET-REWIRING.
+
+Returns a list of link indices, along with an updated list of rewirings tried."))
+
+(defgeneric select-swaps-for-gates (search-type rewiring gates-in-waiting addresser-state rewirings-tried)
+  (:documentation "Determine links to swap in order to schedule GATES-IN-WAITING with respect to the current REWIRING.
+
+Returns a list of link indices, along with an updated list of rewirings tried."))
+
+;;; Search routines are implemented in
+;;;   - astar-rewiring-search.lisp (for A*)
+;;;   - qubit-heuristic.lisp (for GREEDY-QUBIT)
+;;;   - path-heuristic (for GREEDY-PATH)
+(deftype addresser-search-type () '(member :a* :greedy-qubit :greedy-path))
+
 (defvar *addresser-swap-search-type* ':greedy-qubit
-  "The type of swap search the addresser should use.
+  "The type of swap search the addresser should use.")
 
-GREEDY-PATH: Assign links values based on whether they are on the shortest path
-between two qubits that need to be adjacent
-A*: Use A* search algorithm using the cost function as a heuristic
-GREEDY-QUBIT: Greedily choose the best link to swap according to the cost function.")
+(defvar *addresser-move-to-rewiring-swap-search-type* ':a*
+  "The type of swap search the addresser should use when doing move-to-rewiring.")
 
-
-;;; A pseudoinstruction class used to send directives to the addresser ;;;
-
+;;; A pseudoinstruction class used to send directives to the addresser
 (defclass application-force-rewiring (application)
   ((target-rewiring :initarg :target
                     :accessor application-force-rewiring-target
@@ -241,52 +255,6 @@ INSTR is the \"active instruction\".
 (defgeneric cost-flatten (cost)
   (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION."))
 
-
-(defgeneric select-swaps-for-rewiring (search-type rewiring target-rewiring addresser-state rewirings-tried)
-  (:documentation "Determine links to swap in order to bring the current REWIRING closer to TARGET-REWIRING.
-
-Returns a list of link indices, along with an updated list of rewirings tried."))
-
-(defgeneric select-swaps-for-gates (search-type rewiring gates-in-waiting addresser-state rewirings-tried)
-  (:documentation "Determine links to swap in order to schedule GATES-IN-WAITING with respect to the current REWIRING.
-
-Returns a list of link indices, along with an updated list of rewirings tried."))
-
-(defmethod select-swaps-for-gates ((search-type (eql ':a*)) rewiring gates-in-waiting addresser-state rewirings-tried)
-  (with-slots (chip-spec chip-sched) addresser-state
-    (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-             (declare (ignore instr))
-             (let ((modified-state (copy-instance addresser-state)))
-               ;; TODO
-               (setf (addresser-state-working-l2p addresser-state) rewiring)
-               (* *addresser-a*-swap-search-heuristic-scale*
-                  (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
-           (done-function (rewiring2)
-             (prog2
-                 (rotatef rewiring2 rewiring)
-                 (dequeue-logical-to-physical addresser-state :dry-run t)
-               (rotatef rewiring2 rewiring))))
-      (let ((links (search-rewiring chip-spec rewiring
-                                    (chip-schedule-qubit-times chip-sched)
-                                    #'cost-function #'done-function
-                                    :max-iterations *addresser-a*-swap-search-max-iterations*)))
-        (values links rewirings-tried)))))
-
-(defmethod select-swaps-for-gates ((search-type (eql ':greedy-qubit)) rewiring gates-in-waiting addresser-state rewirings-tried)
-  (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-           (let ((modified-state (copy-instance addresser-state)))
-             (setf (addresser-state-working-l2p modified-state) rewiring)
-             (cost-function modified-state
-                            :gate-weights gate-weights
-                            :instr instr))))
-    (push (copy-rewiring rewiring) rewirings-tried)
-    (let ((link-index
-            (select-cost-lowering-swap rewiring
-                                       (addresser-state-chip-specification addresser-state)
-                                       #'cost-function
-                                       rewirings-tried)))
-      (values (list link-index) rewirings-tried))))
-
 (defun select-swap-links (state rewirings-tried)
   "Determine a list of swap links to embed, given the addresser STATE and a list of REWIRINGS-TRIED.
 
@@ -300,6 +268,62 @@ Returns two values: a list of links, and an updated list of rewirings tried."
                               gates-in-waiting
                               state
                               rewirings-tried))))
+
+(defun move-to-expected-rewiring (rewiring target-rewiring addresser-state
+                                  &key
+                                    (use-free-swaps nil)
+                                    (rewirings-tried nil))
+  "This function inserts the necessary SWAP instructions to move from the working logical-to-physical rewiring REWIRING to the TARGET-REWIRING."
+  (with-slots (qq-distances chip-spec chip-sched initial-l2p) addresser-state
+    (flet ((done-rewiring (rewiring)
+             (zerop (rewiring-distance rewiring target-rewiring qq-distances)))
+           (update-rewiring (rewiring)
+             (loop
+               :for logical :from 0
+               :for physical :across (rewiring-l2p target-rewiring)
+               :unless (apply-rewiring-l2p rewiring logical)
+                 :do (rewiring-assign rewiring logical physical))))
+      (loop :do (format-noise "MOVE-TO-EXPECTED-REWIRING: Moving~%~a~%~a" rewiring target-rewiring)
+            :until (done-rewiring rewiring)
+            :do (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
+                        "Too many rewirings tried: ~a" (length rewirings-tried))
+            :do (let ((links (select-swaps-for-rewiring
+                              *addresser-move-to-rewiring-swap-search-type*
+                              rewiring target-rewiring addresser-state rewirings-tried)))
+                  (dolist (link-index links)
+                    (embed-swap link-index
+                                initial-l2p
+                                rewiring
+                                chip-spec
+                                chip-sched
+                                :use-free-swaps use-free-swaps)))
+            :finally (update-rewiring rewiring)))))
+
+(defun embed-swap (link-index initial-l2p working-l2p chip-spec chip-sched &key use-free-swaps)
+  "Safely insert a SWAP selected by LINK-INDEX into CHIP-SCHED, accounting for the possibility of virtualization."
+  ;; we now insert the SWAP selected by LINK-INDEX.
+  (destructuring-bind (q0 q1) (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list)
+    ;; can we make it a virtual SWAP?
+    (cond
+     ((and use-free-swaps
+           (zerop (chip-schedule-resource-end-time
+                   chip-sched
+                   (make-qubit-resource q0 q1))))
+      ;; yes, we can. apply the link swap to initial-l2p and to working-l2p
+      (update-rewiring initial-l2p q0 q1)
+      (update-rewiring working-l2p q0 q1)
+      (format-noise
+       "EMBED-SWAP: This is a free swap. :)~%~
+        EMBED-SWAP: New rewiring: ~a~%~
+        EMBED-SWAP: New initial rewiring: ~a"
+       working-l2p initial-l2p))
+     (t
+      ;; in this case, this swap has to be performed by the QPU.
+      ;; apply the link swap to working-l2p
+      (update-rewiring working-l2p q0 q1)
+      (format-noise "EMBED-SWAP: New rewiring: ~a" working-l2p)
+      ;; insert the relevant 2q instruction
+      (chip-schedule-append chip-sched (build-gate "SWAP" '() q0 q1))))))
 
 (defgeneric select-and-embed-a-permutation (state rewirings-tried)
   (:documentation

@@ -319,3 +319,10 @@ BODY as an implicit PROGN."
   (every (a:compose (a:curry #'rewiring-assigned-for-qubit-p rewiring)
                     #'qubit-index)
          (application-arguments instr)))
+
+(defun rewiring-distance (rewiring target-rewiring qq-distances)
+  "A measure of the distance between a given REWIRING and a TARGET-REWIRING, based on the qubit-qubit distance array QQ-DISTANCES."
+  (loop :for i :across (rewiring-l2p rewiring)
+        :for j :across (rewiring-l2p target-rewiring)
+        :when i
+          :sum (aref qq-distances i j)))
