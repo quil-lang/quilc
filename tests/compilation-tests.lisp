@@ -224,28 +224,32 @@ CNOT 4 8
     (is (quil::double= pi
                        (constant-value (first (application-parameters (elt code 0))))))))
 
+(defun %random-rz-rx-program (length)
+  (make-instance 'parsed-program
+                 :executable-code
+                 (coerce
+                  (loop :for i :from 0 :below length
+                        :collect (if (evenp i)
+                                     (build-gate "RZ" (list (* (random 1.0) pi)) 0)
+                                     (build-gate "RX" (list (* (random 1.0) pi)) 0)))
+                  'vector)))
+
+(defun %test-reduction-with-chip (reduced-bound chip)
+  (loop :for length :from 1 :to 100
+        :for progm := (%random-rz-rx-program length)
+        :for comp := (%filter-halt (compiler-hook progm chip))
+        :always (is (<= (length comp) reduced-bound))))
+
 (deftest test-rx-rz-strings-reduce ()
   ;; Any string of RXs and RYs should reduce to a string of at most 3
   ;; RZs and 2 RXs.
-  (labels
-      ((random-rz-rx-program (length)
-         (make-instance 'parsed-program
-                        :executable-code
-                        (coerce
-                         (loop :for i :from 0 :below length
-                               :collect (if (evenp i)
-                                            (build-gate "RZ" (list (* (random 1.0) pi)) 0)
-                                            (build-gate "RX" (list (* (random 1.0) pi)) 0)))
-                         'vector)))
-       (test-reduction-with-chip (chip)
-         (loop :for length :from 1 :to 100
-               :for progm := (random-rz-rx-program length)
-               :for comp := (%filter-halt (compiler-hook progm chip))
-               :always (is (<= (length comp) 5)))))
-    (let ((chips (list (quil::build-nq-linear-chip 1)
-                       (%read-test-chipspec "1q-wildcard-arguments.qpu")
-                       (%read-test-chipspec "Aspen-4-2Q-A.qpu")
-                       (%read-test-chipspec "Aspen-6-2Q-A.qpu")
-                       (%read-test-chipspec "Aspen-7-28Q-A.qpu"))))
-      (dolist (chip chips)
-        (test-reduction-with-chip chip)))))
+  (let ((chips (list (quil::build-nq-linear-chip 1)
+                     (%read-test-chipspec "1q-wildcard-arguments.qpu")
+                     (%read-test-chipspec "Aspen-4-2Q-A.qpu")
+                     (%read-test-chipspec "Aspen-6-2Q-A.qpu")
+                     (%read-test-chipspec "Aspen-7-28Q-A.qpu"))))
+    (dolist (chip chips)
+      (%test-reduction-with-chip 5 chip))))
+
+(deftest test-free-rx-rz-strings-reduce ()
+  (%test-reduction-with-chip 3 (%read-test-chipspec "1q-free-rx.qpu")))
