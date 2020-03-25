@@ -207,7 +207,7 @@
             (give-up-compilation))))
       
       ;; instantiate the Hamiltonian
-      (let ((H (magicl:zeros (list dimension dimension) :type '(complex double-float))))
+      (let ((H (zeros (list dimension dimension))))
         (dolist (term terms)
           (setf H (magicl:.+ H (pauli-term->matrix term arguments (list 1d0) parameters))))
         ;; orthogonally diagonalize it: H = O D O^T

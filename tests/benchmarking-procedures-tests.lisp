@@ -67,8 +67,8 @@
                              :always (quil::double= (magicl:tref a i j) (magicl:tref b i j)))))))
 
 (deftest test-n-qubit-pauli-basis-matrices ()
-  (let* ((x (magicl:from-list '(0 1 1 0) '(2 2) :type '(complex double-float)))
-         (z (magicl:from-list '(1 0 0 -1) '(2 2) :type '(complex double-float)))
+  (let* ((x (quil::from-list '(0 1 1 0) '(2 2)))
+         (z (quil::from-list '(1 0 0 -1) '(2 2)))
          (paulis1 (list x z))
          (generated-paulis1 (n-qubit-pauli-basis-matrices 1))
          (generated-paulis2 (n-qubit-pauli-basis-matrices 2)))
@@ -80,10 +80,10 @@
 
 
 (deftest test-pauli-matrix-p ()
-  (let* ((eye (magicl:eye 2 :type '(complex double-float)))
-         (x (magicl:from-list '(0 1 1 0) '(2 2) :type '(complex double-float)))
-         (y (magicl:from-list '(0 #C(0 1) #C(0 -1) 0) '(2 2) :type '(complex double-float)))
-         (z (magicl:from-list '(1 0 0 -1) '(2 2) :type '(complex double-float)))
+  (let* ((eye (quil::eye 2))
+         (x (quil::from-list '(0 1 1 0) '(2 2)))
+         (y (quil::from-list '(0 #C(0 1) #C(0 -1) 0) '(2 2)))
+         (z (quil::from-list '(1 0 0 -1) '(2 2)))
          (paulis (list eye x y z))
          (phases (loop :for i :below 4 :collect (expt #C(0 1) i))))
     ;; Make sure the 1 and 2 qubit pauli groups are accepted.
@@ -94,7 +94,7 @@
               :always (loop :for pauli2 :in paulis
                             :always (loop :for phase :in phases
                                           :always (pauli-matrix-p (magicl:scale (magicl:kron pauli1 pauli2) phase))))))
-    (is (not (pauli-matrix-p (magicl:from-list '(0 1 1 1) '(2 2) :type '(complex double-float)))))
+    (is (not (pauli-matrix-p (quil::from-list '(0 1 1 1) '(2 2)))))
     (is (not (loop :for pauli :in paulis
                    :always (loop :for phase :in phases
                                  :always (pauli-matrix-p (magicl:scale pauli (* 2 phase)))))))))

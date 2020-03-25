@@ -54,10 +54,7 @@
   (check-type matrix list)
   (let*
       ((n (round (sqrt (length matrix))))
-       (m (magicl:from-list
-           matrix
-           (list n n)
-           :type '(complex double-float))))
+       (m (from-list matrix (list n n))))
     (magicl:scale (expt (magicl:det m) (/ -1 n)) m)))
 
 (defun extend-by-identity (mat d)
@@ -108,7 +105,7 @@ as needed so that they are the same size."
   ;; rewiring. this is somewhat complicated by the fact that rewirings
   ;; when we enter a block and when we exit a block may differ.
   (loop
-    :with mat := (magicl:const #C(1d0 0d0) '(1 1))
+    :with mat := (const #C(1d0 0d0) '(1 1))
     :with rewiring := (make-rewiring 1)
     :for instr :across (parsed-program-executable-code pp)
     :do (progn
@@ -161,13 +158,12 @@ as needed so that they are the same size."
               (when (or (>= i (magicl:nrows s))
                         (double~ 0 (magicl:tref s i i)))
                 (loop :for j :below (magicl:nrows v) :collect (magicl:tref v i j))))))
-      (magicl:from-list kernel-entries
-                        (list (magicl:nrows v)
-                              (/ (length kernel-entries) (magicl:nrows v)))
-                        :input-layout :column-major]))))
+      (from-list kernel-entries
+                   (list (magicl:nrows v)
+                         (/ (length kernel-entries) (magicl:nrows v)))))))
 
 (defun random-special-unitary (n)
-  (let ((m (magicl:random-unitary (list n n) :type '(complex double-float))))
+  (let ((m (random-unitary (list n n))))
     (magicl:scale! m (expt (magicl:det m) (/ (- n))))))
 
 (defun random-wavefunction (n-qubits)
@@ -317,11 +313,11 @@ as needed so that they are the same size."
     (when *compress-carefully*
       (assert (matrix-equality m
                                (magicl:@ u
-                                         (magicl:from-diag d :type '(complex double-float))
+                                         (from-diag d)
                                          (magicl:conjugate-transpose u)))
               ()
               "MATRIX-EXPT failed to diagonalize its input."))
-    (let ((dd (magicl:from-diag
+    (let ((dd (from-diag
                (mapcar (lambda (z) (exp (* z s))) d))))
       (magicl:@ u dd (magicl:conjugate-transpose u)))))
 

@@ -12,8 +12,8 @@
 ;; NOTE: these break some MAGICL abstractions and really belongs in that package
 (defun nondestructively-apply-matrix-to-vector (matrix vector)
   "Takes a column VECTOR, specified as an array of complex doubles, and applies a MAGICL MATRIX to it on the left, producing a new column vector, also specified as a fresh array of complex doubles.  The original VECTOR is not modified."
-  (let* ((vector-as-matrix (magicl:from-list (coerce vector 'list)
-                                             (list (array-total-size vector) 1)))
+  (let* ((vector-as-matrix (from-array vector
+                                       (list (array-total-size vector) 1)))
          (new-vector (make-array (array-total-size vector)
                                  :element-type '(complex double-float))))
     (let ((output-matrix (magicl:@ matrix vector-as-matrix)))

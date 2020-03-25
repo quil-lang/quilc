@@ -44,6 +44,7 @@
                (:file "options")
                (:file "types")
                (:file "utilities")
+               (:file "magicl-constructors")
                (:file "relabeling")
                (:file "matrix-operations")
                (:file "csd")

@@ -22,8 +22,7 @@
                  (n (length entries))
                  (p (if (stringp input) (quil:parse-quil input) input))
                  (actual (quil::parsed-program-to-logical-matrix p))
-                 (expected (magicl:from-list (a:flatten entries) (list n n)
-                                             :type '(complex double-float)))
+                 (expected (quil::from-list (a:flatten entries) (list n n)))
                  (compiled (quil::matrix-rescale
                             (quil::parsed-program-to-logical-matrix
                              (quil:compiler-hook p (quil::build-nq-linear-chip

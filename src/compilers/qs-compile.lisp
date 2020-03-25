@@ -76,11 +76,11 @@
               (let* ((uL (magicl:scale uL (expt (magicl:det uL) (- (/ (magicl:nrows uL))))))
                      (vL (magicl:scale vL (expt (magicl:det vL) (- (/ (magicl:nrows vL))))))
                      (uR (magicl:@
-                          (magicl:from-diag evals-u)
+                          (from-diag evals-u)
                           (magicl:conjugate-transpose uL)
                           u1))
                      (vR (magicl:@
-                          (magicl:from-diag evals-v)
+                          (from-diag evals-v)
                           (magicl:conjugate-transpose vL)
                           v1))
                      ;; some convenient shorthand for inst below

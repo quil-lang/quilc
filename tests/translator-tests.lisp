@@ -423,7 +423,7 @@ f(t) 0")))
            (I (word->matrix "I"))
            (word-size 4)
            (word (random-pauli-word word-size))
-           (m (magicl:eye 1 :type '(complex double-float))))
+           (m (quil::eye 1)))
       (loop :for char :across word
             :for p := (ecase char
                         (#\X X)
