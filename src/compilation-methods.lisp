@@ -174,7 +174,7 @@ Returns a value list: (processed-program, of type parsed-program
                        unpreserved-block-duration, of type real)"
   (format-noise "COMPILER-HOOK: entrance.")
 
-  (when destructive
+  (unless destructive
     (setf parsed-program (copy-instance parsed-program)))
 
   ;; Technically this could be fused with the above, but remains
