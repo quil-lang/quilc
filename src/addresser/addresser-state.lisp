@@ -34,7 +34,10 @@
    (chip-spec :accessor addresser-state-chip-specification
               :initarg :chip-spec
               :documentation "The CHIP-SPECIFICATION governing native-ness."
-              :type chip-specification)))
+              :type chip-specification)
+   (1q-queues :accessor addresser-state-1q-queues
+              :initarg :1q-queues
+              :documentation "The family of queues where not-yet-scheduled 1Q instructions live, while we get them out of the way to process 2Q instructions.")))
 
 (defmethod initialize-instance :after ((instance addresser-state)
                                        &rest initargs
@@ -58,17 +61,13 @@
                                                           #'>
                                                           :key #'length)
           (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec)
-          (addresser-state-chip-specification instance) chip-spec)))
+          (addresser-state-chip-specification instance) chip-spec
+          (addresser-state-1q-queues instance) (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))))
 
 ;;; Generics that should be specialized by different addressers
 
 (defgeneric assign-weights-to-gates (state)
   (:documentation "Generic method for assigning weights to gates, for consumption by COST-FUNCTION."))
-
-(defgeneric append-instr-to-chip-schedule (state instr)
-  (:documentation "Appends INSTR to the CHIP-SCHEDULE housed within STATE.")
-  (:method (state instr)
-    (chip-schedule-append (addresser-state-chip-schedule state) instr)))
 
 (defgeneric cost-function (state &key gate-weights instr)
   (:documentation "Generic method for extracting a heuristic value.
