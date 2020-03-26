@@ -135,7 +135,7 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
   "Determine a list of swap links to embed, given the addresser STATE and a list of REWIRINGS-TRIED.
 
 Returns two values: a list of links, and an updated list of rewirings tried."
-  (with-slots (lschedule initial-l2p working-l2p chip-sched chip-spec qq-distances)
+  (with-slots (working-l2p chip-sched chip-spec)
       state
     (format-noise "SELECT-SWAP-LINKS: entering SWAP selection phase.")
     (let ((gates-in-waiting (assign-weights-to-gates state)))
@@ -324,7 +324,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
 Returns T if the schedule gets dirtied in the process, or NIL otherwise.
 
 Two other values are returned: a list of fully rewired instructions for later scheduling, and a list of partially-rewired instructions for later scheduling."
-  (with-slots (lschedule working-l2p initial-l2p chip-spec chip-sched qq-distances)
+  (with-slots (lschedule working-l2p initial-l2p chip-spec chip-sched)
       state
     (let ((dirty-flag nil)
           (ready-instrs nil)
@@ -422,7 +422,7 @@ instruction, adding to logical queue."
 If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
   ;; Allow for early exit if we are doing a dry run
   (catch 'dry-run-succeeded
-    (with-slots (lschedule chip-sched chip-spec working-l2p qq-distances initial-l2p) state
+    (with-slots (lschedule chip-sched chip-spec working-l2p initial-l2p) state
       (format-noise "DEQUEUE-LOGICAL-TO-PHYSICAL: entering dequeueing phase.")
       (let ((dirty-flag nil)
             (instrs-ready-for-scheduling nil)
@@ -587,7 +587,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
 (defun best-qubit-position (state gates-in-waiting logical &key locations)
   "Finds the best location for an unassigned logical under the given future schedule."
-  (with-slots (working-l2p chip-spec qq-distances qubit-cc) state
+  (with-slots (working-l2p chip-spec qubit-cc) state
     (let ((locations (or locations qubit-cc)))
       (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
               "Qubit ~a already assigned" logical)
