@@ -12,20 +12,6 @@
 ;;; itself as a heuristic for producing "efficient" programs, where "efficient"
 ;;; is primarily taken to mean "short". In this routine, we make the necessary
 ;;; modifications to take "efficient" to mean "high-fidelity".
-;;;
-;;; See DO-FIDELITY-ADDRESSING below for the main entry point.
-
-;;; utilitito
-
-(defun swap-fidelity (chip-spec hardware-object)
-  "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
-  (let* ((permutation-record (vnth 0 (hardware-object-permutation-gates
-                                      hardware-object)))
-         (swap (apply #'build-gate
-                      (permutation-record-operator permutation-record)
-                      '()
-                      (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
-    (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
 
 ;;; ADDRESSER-STATE subclass
 
@@ -41,7 +27,7 @@
   (fidelity-cost-value cost))
 
 (defun application-fidelity-cost (state instr)
-  "Compute the fidelity cost of INSTR, withr respect to the provided addresser state."
+  "Compute the fidelity cost of INSTR, with respect to the provided addresser state."
   ;; calculate log-infidelity coming from INSTR, using recombination:
   ;;   + calculate the cut point
   ;;   + calculate the infidelity of instructions since the cut point
@@ -172,7 +158,7 @@
 
 (defparameter *fidelity-1q-descaling* 1/10)
 
-(defmethod unscheduled-gate-weights ((state fidelity-addresser-state))
+(defmethod weighted-future-gates ((state fidelity-addresser-state))
   (flet ((weight-bumper (instr value)
            (cond
              ((typep instr 'gate-application)
@@ -193,6 +179,8 @@
       (declare (ignore max-value))
       value-hash)))
 
+;;; We also specialize this, to set up some state before this stage of swap
+;;; selection.
 (defmethod select-and-embed-a-permutation ((state temporal-addresser-state) rewirings-tried)
   ;; randomize cost function weights
   ;; not sure exactly why -- possibly to break symmetry when
@@ -200,6 +188,16 @@
   (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
         (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
     (call-next-method)))
+
+(defun swap-fidelity (chip-spec hardware-object)
+  "Computes the fidelity of a SWAP operation on a given CHIP-SPECIFICATION and LINK-INDEX."
+  (let* ((permutation-record (vnth 0 (hardware-object-permutation-gates
+                                      hardware-object)))
+         (swap (apply #'build-gate
+                      (permutation-record-operator permutation-record)
+                      '()
+                      (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
+    (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
 
 (defmethod initialize-instance :after ((instance fidelity-addresser-state)
                                        &rest initargs
@@ -219,6 +217,6 @@
            (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
                  (fidelity-cost-value
                   (cost-function instance
-                                 :gate-weights (unscheduled-gate-weights instance))))))
+                                 :gate-weights (weighted-future-gates instance))))))
     (warm-up-addresser-state instance #'fill-cost-bound)))
 

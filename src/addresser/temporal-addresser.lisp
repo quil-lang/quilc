@@ -188,7 +188,7 @@
   (make-temporal-cost :start-time most-positive-fixnum
                       :heuristic-value most-positive-fixnum))
 
-(defmethod unscheduled-gate-weights ((state temporal-addresser-state))
+(defmethod weighted-future-gates ((state temporal-addresser-state))
   (with-slots (lschedule) state
     (flet
         ((2q-application-p (instr)
@@ -207,9 +207,8 @@
   "If T, use the compressor to try to precompute a tighter recombination bound.")
 
 (defmethod select-and-embed-a-permutation ((state temporal-addresser-state) rewirings-tried)
-  ;; randomize cost function weights
-  ;; not sure exactly why -- possibly to break symmetry when
-  ;; swap selection fails and we rerun?
+  ;; randomize cost function weights to break
+  ;; symmetry when swap selection fails and we rerun?
   (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
         (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
     (call-next-method)))
@@ -234,5 +233,5 @@
   (flet ((fill-cost-bound (hw)
            (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
                  (temporal-cost-heuristic-value
-                  (cost-function instance :gate-weights (unscheduled-gate-weights instance))))))
+                  (cost-function instance :gate-weights (weighted-future-gates instance))))))
     (warm-up-addresser-state instance #'fill-cost-bound)))
