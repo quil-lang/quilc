@@ -138,7 +138,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
   (with-slots (working-l2p chip-sched chip-spec)
       state
     (format-noise "SELECT-SWAP-LINKS: entering SWAP selection phase.")
-    (let ((gates-in-waiting (assign-weights-to-gates state)))
+    (let ((gates-in-waiting (unscheduled-gate-weights state)))
       (select-swaps-for-gates *addresser-swap-search-type*
                               working-l2p
                               gates-in-waiting
@@ -201,13 +201,10 @@ Returns two values: a list of links, and an updated list of rewirings tried."
       ;; insert the relevant 2q instruction
       (chip-schedule-append chip-sched (build-gate "SWAP" '() q0 q1))))))
 
-(defun select-and-embed-a-permutation (state rewirings-tried)
-  "Select a permutation and schedule it for execution. The permutation is selected to lower the cost-function associated to the current lschedule."
-  ;; randomize cost function weights
-  ;; not sure exactly why -- possibly to break symmetry when
-  ;; swap selection fails and we rerun?
-  (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
-        (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
+(defgeneric select-and-embed-a-permutation (state rewirings-tried)
+  (:documentation
+   "Select a permutation and schedule it for execution. The permutation is selected to lower the cost-function associated to the current lschedule.")
+  (:method (state rewirings-tried)
     (multiple-value-bind (swap-links rewirings-tried)
         (select-swap-links state rewirings-tried)
       (dolist (link-index swap-links rewirings-tried)
@@ -618,7 +615,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
   "Attempt to assign a logical qubit from INSTRS to a physical qubit, as managed by the addresser state STATE."
   (with-slots (working-l2p) state
     (let ((unassigned-qubits (unassigned-qubits instrs working-l2p))
-          (gate-weights (assign-weights-to-gates state)))
+          (gate-weights (unscheduled-gate-weights state)))
       (flet ((placement-data (logical-qubit)
                "Given a LOGICAL-QUBIT, determine an assigned physical qubit, and the associated cost. Return a list of all three."
                (multiple-value-bind (physical-qubit cost)

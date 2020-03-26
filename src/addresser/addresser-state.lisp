@@ -66,8 +66,10 @@
 
 ;;; Generics that should be specialized by different addressers
 
-(defgeneric assign-weights-to-gates (state)
-  (:documentation "Generic method for assigning weights to gates, for consumption by COST-FUNCTION."))
+(defgeneric unscheduled-gate-weights (state)
+  (:documentation "Collect unscheduled gates, along with their weights.
+
+Returns a hash mapping gates from the logical schedule to numeric values."))
 
 (defgeneric cost-function (state &key gate-weights instr)
   (:documentation "Generic method for extracting a heuristic value.

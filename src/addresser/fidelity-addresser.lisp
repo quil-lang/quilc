@@ -172,7 +172,7 @@
 
 (defparameter *fidelity-1q-descaling* 1/10)
 
-(defmethod assign-weights-to-gates ((state fidelity-addresser-state))
+(defmethod unscheduled-gate-weights ((state fidelity-addresser-state))
   (flet ((weight-bumper (instr value)
            (cond
              ((typep instr 'gate-application)
@@ -193,6 +193,14 @@
       (declare (ignore max-value))
       value-hash)))
 
+(defmethod select-and-embed-a-permutation ((state temporal-addresser-state) rewirings-tried)
+  ;; randomize cost function weights
+  ;; not sure exactly why -- possibly to break symmetry when
+  ;; swap selection fails and we rerun?
+  (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
+        (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
+    (call-next-method)))
+
 (defmethod initialize-instance :after ((instance fidelity-addresser-state)
                                        &rest initargs
                                        &key
@@ -211,6 +219,6 @@
            (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
                  (fidelity-cost-value
                   (cost-function instance
-                                 :gate-weights (assign-weights-to-gates instance))))))
+                                 :gate-weights (unscheduled-gate-weights instance))))))
     (warm-up-addresser-state instance #'fill-cost-bound)))
 
