@@ -58,14 +58,6 @@
 ;;;
 ;;; See DO-GREEDY-TEMPORAL-ADDRESSING below for the main entry point.
 
-
-(defvar *addresser-swap-lookahead-depth* 2
-  "Controls the length of SWAP chains explored by the addresser loop.
-
-WARNING: This value makes the SWAP-selection stage run as
-O((# 2Q links)^(*addresser-swap-lookahead-depth*)). Beware making it too
-large.")
-
 (defvar *addresser-max-swap-sequence-length* 1000
   "Controls the maximum number of swaps that can occur in a row.")
 
