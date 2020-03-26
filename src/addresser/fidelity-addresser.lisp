@@ -193,11 +193,6 @@
       (declare (ignore max-value))
       value-hash)))
 
-(defmethod select-and-embed-a-permutation ((state fidelity-addresser-state) rewiring-tried)
-  (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
-        (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
-    (call-next-method)))
-
 (defmethod initialize-instance :after ((instance fidelity-addresser-state)
                                        &rest initargs
                                        &key

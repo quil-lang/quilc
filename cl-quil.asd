@@ -113,6 +113,7 @@
                              (:file "logical-schedule")
                              (:file "outgoing-schedule")
                              (:file "addresser-state")
+                             (:file "1q-queues")
                              (:file "addresser-common")
                              (:file "astar-rewiring-search")
                              (:file "path-heuristic")

@@ -83,6 +83,9 @@ SWAPping qubits into place.")
 (defvar *addresser-use-free-swaps* nil
   "Does the addresser treat the initial rewiring as something that can be changed?")
 
+(defvar *addresser-use-1q-queues* nil
+  "A flag indicating whether the addresser should ignore unscheduled 1Q gates for the purposes of computing 2Q costs.")
+
 ;;; The different search strategies implement methods for the following generics
 
 (defgeneric select-swaps-for-rewiring (search-type rewiring target-rewiring addresser-state rewirings-tried)
@@ -198,11 +201,13 @@ Returns two values: a list of links, and an updated list of rewirings tried."
       ;; insert the relevant 2q instruction
       (chip-schedule-append chip-sched (build-gate "SWAP" '() q0 q1))))))
 
-(defgeneric select-and-embed-a-permutation (state rewirings-tried)
-  (:documentation
-   "Select a permutation and schedule it for execution. The permutation is selected to lower the
-cost-function associated to the current lschedule.")
-  (:method (state rewirings-tried)
+(defun select-and-embed-a-permutation (state rewirings-tried)
+  "Select a permutation and schedule it for execution. The permutation is selected to lower the cost-function associated to the current lschedule."
+  ;; randomize cost function weights
+  ;; not sure exactly why -- possibly to break symmetry when
+  ;; swap selection fails and we rerun?
+  (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
+        (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
     (multiple-value-bind (swap-links rewirings-tried)
         (select-swap-links state rewirings-tried)
       (dolist (link-index swap-links rewirings-tried)
@@ -213,84 +218,148 @@ cost-function associated to the current lschedule.")
                     (addresser-state-chip-schedule state)
                     :use-free-swaps *addresser-use-free-swaps*)))))
 
-(defgeneric dequeue-classical-instruction (state instr &optional dry-run-escape)
-  (:documentation
-   "Dispatch for dequeueing classical instructions. Returns a flag indicating whether
-we've dirtied up the schedule.")
-  (:method ((state addresser-state) instr &optional dry-run-escape)
-    (when dry-run-escape  ; every classical instruction can be handled
-      (funcall dry-run-escape))
-    (with-slots (lschedule chip-spec chip-sched working-l2p) state
-      (let (dirty-flag)
-        (cond
-          ;; is it resourceless?
-          ((typep instr 'no-operation)
-           ;; if so, discard it and continue.
-           (lscheduler-dequeue-instruction lschedule instr)
-           (setf dirty-flag t))
+(defun append-instr-to-chip-schedule (state instr)
+  "Appends INSTR to the CHIP-SCHEDULE housed within STATE."
+  ;; flush the queues before adding the 2Q instruction
+  (when (and *addresser-use-1q-queues*
+             (= 2 (length (application-arguments instr))))
+    (let ((left-line (apply-rewiring-p2l (addresser-state-working-l2p state)
+                                         (qubit-index (first (application-arguments instr)))))
+          (right-line (apply-rewiring-p2l (addresser-state-working-l2p state)
+                                          (qubit-index (second (application-arguments instr))))))
+      ;; flush the 1Q gates down the line
+      (flush-1q-instructions-after-wiring state left-line)
+      (flush-1q-instructions-after-wiring state right-line)))
 
+  (chip-schedule-append (addresser-state-chip-schedule state) instr))
+
+(defun dequeue-classical-instruction (state instr &optional dry-run-escape)
+  "Dispatch for dequeueing classical instructions. Returns a flag indicating whether we've dirtied up the schedule."
+  (when dry-run-escape  ; every classical instruction can be handled
+    (funcall dry-run-escape))
+
+  (with-slots (lschedule chip-spec chip-sched working-l2p) state
+    (let ((dirty-flag nil))
+      (when *addresser-use-1q-queues*
+        ;; flush the 1Q lines in the relevant events
+        (cond
           ;; is it maximally resourceful?
           ((global-instruction-p instr)
-           ;; dequeue the instruction and set the dirty flag
-           (chip-schedule-append chip-sched instr)
-           (lscheduler-dequeue-instruction lschedule instr)
-           (setf dirty-flag t))
+           ;; unload the 1Q queues, dequeue the instruction,
+           ;; and set the dirty flag
+           (dotimes (qubit (chip-spec-n-qubits chip-spec))
+             (flush-1q-instructions-after-wiring state qubit)))
 
           ;; is it a pure classical instruction?
           ((local-classical-instruction-p instr)
-           ;; dequeue the instruction and set the dirty flag
-           (chip-schedule-append chip-sched instr)
-           (lscheduler-dequeue-instruction lschedule instr)
-           (setf dirty-flag t))
+           ;; clear relevant 1Q queues, dequeue the instruction
+           ;; and set the dirty flag
+           (partially-flush-1Q-queues state (instruction-resources instr)))
 
           ;; is it a local mixed pure/classical instruction?
+          ;;
+          ;; TODO: this currently does not do the clever 'threading'
+          ;; that happens with other 1Q instructions. it probably isn't
+          ;; worth it, since MEASUREs are slow instructions.
           ((or (local-classical-quantum-instruction-p instr)
                (typep instr 'measure-discard)
                (typep instr 'reset-qubit))
-           ;; insert the instruction
-           (handler-case (rewire-l2p-instruction working-l2p instr)
-             (missing-rewiring-assignment ()
-               (return-from dequeue-classical-instruction
-                 (values nil nil (list instr)))))
-           (chip-schedule-append chip-sched instr)
-           ;; dequeue the instruction and set the dirty flag
-           (lscheduler-dequeue-instruction lschedule instr)
-           (setf dirty-flag t))
+           (let ((resources (instruction-resources instr)))
+             ;; flush the 1Q queues
+             (dotimes (qubit (chip-spec-n-qubits chip-spec))
+               (when (resource-subsetp (make-qubit-resource qubit)
+                                       resources)
+                 (flush-1q-instructions-after-wiring state qubit)))))))
 
-          ;; is it some other kind of PRAGMA not covered above?
-          ((typep instr 'pragma)
-           ;; just throw it away.
-           (lscheduler-dequeue-instruction lschedule instr)
-           (setf dirty-flag t))
+      (cond
+        ;; is it resourceless?
+        ((typep instr 'no-operation)
+         ;; if so, discard it and continue.
+         (lscheduler-dequeue-instruction lschedule instr)
+         (setf dirty-flag t))
 
-          ;; otherwise, we don't know what to do
-          (t
-           (error "The instruction type of \"~/quil:instruction-fmt/\" is not supported by the addresser." instr)))
+        ;; is it maximally resourceful?
+        ((global-instruction-p instr)
+         ;; dequeue the instruction and set the dirty flag
+         (chip-schedule-append chip-sched instr)
+         (lscheduler-dequeue-instruction lschedule instr)
+         (setf dirty-flag t))
 
-        dirty-flag))))
+        ;; is it a pure classical instruction?
+        ((local-classical-instruction-p instr)
+         ;; dequeue the instruction and set the dirty flag
+         (chip-schedule-append chip-sched instr)
+         (lscheduler-dequeue-instruction lschedule instr)
+         (setf dirty-flag t))
 
-(defgeneric dequeue-gate-application (state instr &optional dry-run-escape)
-  (:documentation
-   "Dequeues the given gate application INSTR, if possible.
+        ;; is it a local mixed pure/classical instruction?
+        ((or (local-classical-quantum-instruction-p instr)
+             (typep instr 'measure-discard)
+             (typep instr 'reset-qubit))
+         ;; insert the instruction
+         (handler-case (rewire-l2p-instruction working-l2p instr)
+           (missing-rewiring-assignment ()
+             (return-from dequeue-classical-instruction
+               (values nil nil (list instr)))))
+         (chip-schedule-append chip-sched instr)
+         ;; dequeue the instruction and set the dirty flag
+         (lscheduler-dequeue-instruction lschedule instr)
+         (setf dirty-flag t))
+
+        ;; is it some other kind of PRAGMA not covered above?
+        ((typep instr 'pragma)
+         ;; just throw it away.
+         (lscheduler-dequeue-instruction lschedule instr)
+         (setf dirty-flag t))
+
+        ;; otherwise, we don't know what to do
+        (t
+         (error "The instruction type of \"~/quil:instruction-fmt/\" is not supported by the addresser." instr)))
+
+      dirty-flag)))
+
+(defun dequeue-gate-application (state instr &optional dry-run-escape)
+  "Dequeues the given gate application INSTR, if possible.
 
 Returns T if the schedule gets dirtied in the process, or NIL otherwise.
 
-Two other values are returned: a list of fully rewired instructions for later scheduling, and a list of partially-rewired instructions for later scheduling.")
-  (:method (state instr &optional dry-run-escape)
-    (with-slots (lschedule working-l2p initial-l2p chip-spec chip-sched qq-distances) state
-      (let (dirty-flag ready-instrs partial-instrs)
-        (cond
-          ;; is it a rewiring pseudoinstruction?
-          ((typep instr 'application-force-rewiring)
-           (lscheduler-dequeue-instruction lschedule instr)
-           (move-to-expected-rewiring working-l2p
-                                      (application-force-rewiring-target instr)
-                                      state
-                                      :use-free-swaps *addresser-use-free-swaps*)
-           (setf dirty-flag t))
-
-          ;; is it a small-Q gate?
-          ((<= (length (application-arguments instr))
+Two other values are returned: a list of fully rewired instructions for later scheduling, and a list of partially-rewired instructions for later scheduling."
+  (with-slots (lschedule working-l2p initial-l2p chip-spec chip-sched qq-distances)
+      state
+    (let ((dirty-flag nil)
+          (ready-instrs nil)
+          (partial-instrs nil))
+      (cond
+        ((and *addresser-use-1q-queues*
+              (= 1 (length (application-arguments instr))))
+         ;; quick error check on instruction qubits
+         (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits
+                                                           (addresser-state-chip-specification state))))
+                        (application-arguments instr))
+                 nil
+                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 instr)
+         (when dry-run-escape
+           (funcall dry-run-escape))
+         (format-noise
+          "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a 1Q ~
+instruction, adding to logical queue."
+          instr)
+         ;; dequeue and set the dirty bit
+         (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
+         (push instr (aref (addresser-state-1q-queues state)
+                           (qubit-index (first (application-arguments instr)))))
+         (setf dirty-flag t))
+        ;; is it a rewiring pseudoinstruction?
+        ((typep instr 'application-force-rewiring)
+         (lscheduler-dequeue-instruction lschedule instr)
+         (move-to-expected-rewiring working-l2p
+                                    (application-force-rewiring-target instr)
+                                    state
+                                    :use-free-swaps *addresser-use-free-swaps*)
+         (setf dirty-flag t))
+        ;; is it a small-Q gate?
+        ((<= (length (application-arguments instr))
                (length (chip-specification-objects chip-spec)))
            ;; quick error check on qubit indices
            (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits chip-spec)))
@@ -323,31 +392,29 @@ Two other values are returned: a list of fully rewired instructions for later sc
                           "Failed to apply localizing compilers.")
                   (setf dirty-flag t)
                   (lscheduler-replace-instruction lschedule instr compilation-result))))))
-
-          ;; is it a many-Q gate?
-          ((> (length (application-arguments instr))
-              (length (chip-specification-objects chip-spec)))
-           (when dry-run-escape
-             (funcall dry-run-escape))
-           ;; quick error check on instruction qubits
-           (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits chip-spec)))
-                          (application-arguments instr))
-                   nil
-                   "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
-                   instr)
-           (format-noise
-            "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling."
-            instr
-            (length (application-arguments instr)))
-           ;; then we know we can't find a hardware object to support
-           ;; it, so pass it to the chip compiler
-           (let ((compilation-result (apply-translation-compilers instr chip-spec nil)))
-             (setf dirty-flag t)
-             (lscheduler-replace-instruction lschedule instr compilation-result)))
-          ;; otherwise, we're helpless
-          (t nil))
-
-        (values dirty-flag ready-instrs partial-instrs)))))
+        ;; is it a many-Q gate?
+        ((> (length (application-arguments instr))
+            (length (chip-specification-objects chip-spec)))
+         (when dry-run-escape
+           (funcall dry-run-escape))
+         ;; quick error check on instruction qubits
+         (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits chip-spec)))
+                        (application-arguments instr))
+                 nil
+                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 instr)
+         (format-noise
+          "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling."
+          instr
+          (length (application-arguments instr)))
+         ;; then we know we can't find a hardware object to support
+         ;; it, so pass it to the chip compiler
+         (let ((compilation-result (apply-translation-compilers instr chip-spec nil)))
+           (setf dirty-flag t)
+           (lscheduler-replace-instruction lschedule instr compilation-result)))
+        ;; otherwise, we're helpless
+        (t nil))
+      (values dirty-flag ready-instrs partial-instrs))))
 
 (defun dequeue-logical-to-physical (state &key (dry-run nil))
   "Offload instructions from the logical schedule onto the physical hardware, returning T if progress is made.
@@ -649,5 +716,10 @@ Optional arguments:
             (when (swap-application-p instr)
               (apply #'update-rewiring initial-l2p (mapcar #'qubit-index (application-arguments instr)))))
           (format-noise "DO-GREEDY-ADDRESSING: departure.")
+          ;; get rid of any floaters
+          (when *addresser-use-1q-queues*
+            (dotimes (qubit (chip-spec-n-qubits (addresser-state-chip-specification state)))
+              (unless (endp (aref (addresser-state-1q-queues state) qubit))
+                (flush-1q-instructions-after-wiring state qubit))))
           ;; finally, return what we've constructed
           (values chip-sched initial-l2p working-l2p))))))

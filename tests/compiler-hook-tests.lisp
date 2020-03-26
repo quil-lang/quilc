@@ -501,6 +501,7 @@ MEASURE 1
 (deftest test-clever-CCNOT-depth-reduction ()
   "Test that the ':GREEDY-QUBIT swap selection strategy brings CZ depth down to optimal for CCNOT."
   (let* ((quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
+         (quil::*addresser-use-1q-queues* t)
          (p (quil::compiler-hook (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
