@@ -50,6 +50,115 @@
 (defparameter *cost-fn-dist-decay* 0.5
   "Describes the rate of decay of instruction importance vs. number of SWAPs required before this instruction is actionable.")
 
+(defun nearest-unassigned-qubit (p0 rewiring qq-distances)
+  "Get the unassigned (relative to REWIRING) qubit with minimum distance to physical qubit P0."
+  (loop :with min-p    := nil
+        :with min-dist := double-float-positive-infinity
+        :for p :below (rewiring-length rewiring)
+        :unless (apply-rewiring-p2l rewiring p)
+          :do (let ((new-dist (aref qq-distances p0 p)))
+                (when (< new-dist min-dist)
+                  (setf min-p    p
+                        min-dist new-dist)))
+        :finally (return min-p)))
+
+(defun application-temporal-cost (state instr)
+  "Compute the temporal cost of INSTR, with respect to the provided addresser state."
+
+  ;; The cost is generally computed in two ways: on the one hand, we can naively
+  ;; translate INSTR to native gates and then count the total duration, and on
+  ;; the other hand, we can try to use the existing chip schedule with
+  ;; precomputed cost bounds to get an estimate.
+  (let ((chip-spec (addresser-state-chip-specification state))
+        (naive-start-time (chip-schedule-resource-end-time
+                           (addresser-state-chip-schedule state)
+                           (apply #'make-qubit-resource
+                                  (mapcar #'qubit-index (application-arguments instr))))))
+
+    ;; early SWAPs are free
+    (when (and *addresser-use-free-swaps*
+               (swap-application-p instr)
+               (double= 0d0 naive-start-time))
+      (return-from application-temporal-cost 0))
+
+    (let* ((l2p (addresser-state-working-l2p state))
+           (instr-physical (copy-instance instr))
+           (lschedule (make-lscheduler))
+           (expanded-instructions
+             (let ((*compress-carefully* nil))
+               (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                 (rewire-l2p-instruction l2p instr-physical))
+               (expand-to-native-instructions (list instr-physical) chip-spec))))
+
+      ;; fill the lschedule with native ops
+      (append-instructions-to-lschedule lschedule expanded-instructions)
+
+      ;; compute time from native ops
+      (let ((time (+ naive-start-time
+                     (lscheduler-calculate-duration lschedule chip-spec))))
+        ;; if we have more info, use it
+        (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
+                                            (lookup-hardware-object chip-spec instr-physical)))
+                      (cost-bound (gethash hardware-object (temporal-addresser-state-cost-bounds state)))
+                      (intelligent-bound
+                       (+ cost-bound
+                          (chip-schedule-resource-carving-point
+                           (addresser-state-chip-schedule state)
+                           (apply #'make-qubit-resource
+                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))))
+          (setf time (min time intelligent-bound)))
+        time))))
+
+(defun gate-weights-temporal-cost (state gate-weights)
+  "Compute the total cost of gates in GATE-WEIGHTS, with the cost of individual gates discounted by their 'tier'."
+  ;; In other words: GATE-WEIGHTS is a hash table mapping gates to their numeric
+  ;; 'tiers'. We iterate through them, greedily assigning physical qubits when
+  ;; need be, and for each such assignment we tally an "exponentially
+  ;; discounted" swap cost. This exponential weighting preferences the
+  ;; near-future over the far-future.
+  (let ((qq-distances (addresser-state-qq-distances state))
+        (rewiring (addresser-state-working-l2p state))
+        (assigned-qubits nil)
+        (gate-count 0)
+        (actual-cost 0))
+    (dohash ((gate tier-index) gate-weights)
+        (when (and (< tier-index 3)
+                   (typep gate 'application)
+                   (= 2 (length (application-arguments gate))))
+          (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
+            (let* ((p0 (apply-rewiring-l2p rewiring q0))
+                   (p1 (apply-rewiring-l2p rewiring q1)))
+              (unless p0 (rotatef p0 p1) (rotatef q0 q1))
+              ;; if both are unassigned, then we gain nothing by changing the
+              ;; rewiring, so ignore this gate
+              (when p0
+                ;; otherwise at least one is assigned
+                (unless p1
+                  ;; find a position for the other qubit
+                  (setf p1 (nearest-unassigned-qubit p0 rewiring qq-distances))
+                  (push q1 assigned-qubits)
+                  (rewiring-assign rewiring q1 p1))
+                (let ((qq-distance (aref qq-distances p0 p1)))
+                  ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
+                  ;; qubits exert weaker forces than nearby ones, encouraging
+                  ;; us to execute more quickly accomplishable gates sooner.
+                  ;; it's totally possible that dist alone is a good cost fn
+                  ;; on its own, and we should experiment with this.
+                  (assert (not (= qq-distance most-positive-fixnum)) ()
+                          "Multiqubit instruction requested between ~
+                         disconnected components of the QPU graph: ~
+                         ~A ."
+                          (print-instruction gate nil))
+                  (incf gate-count)
+                  (incf actual-cost (* (expt *cost-fn-tier-decay* tier-index) qq-distance))))))))
+    ;; clean up the rewiring
+    (dolist (qubit assigned-qubits)
+      (rewiring-unassign rewiring qubit))
+    ;; normalize actual-cost
+    (if (zerop gate-count)
+        0d0
+        (/ actual-cost gate-count))))
+
 ;; the basic components of this function are reasonable, but they are weighted
 ;; by voodoo.
 ;;
@@ -63,92 +172,9 @@
 (defmethod cost-function ((state temporal-addresser-state) &key gate-weights instr)
   (let ((time 0) (actual-cost 0))
     (when (and instr (typep instr 'application))
-      ;; first compute a naive cost
-      (let* ((chip-spec (addresser-state-chip-specification state))
-             (naive-start-time (chip-schedule-resource-end-time
-                                (addresser-state-chip-schedule state)
-                                (apply #'make-qubit-resource 
-                                       (mapcar #'qubit-index (application-arguments instr)))))
-             (l2p (addresser-state-working-l2p state))
-             (instr-physical (copy-instance instr))
-             (instruction-expansion
-               (let ((*compress-carefully* nil))
-                 (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
-                   (rewire-l2p-instruction l2p instr-physical))
-                 (expand-to-native-instructions (list instr-physical) chip-spec)))
-             (lschedule (make-lscheduler)))
-        (append-instructions-to-lschedule lschedule instruction-expansion)
-        (setf time (+ naive-start-time
-                      (lscheduler-calculate-duration lschedule chip-spec)))
-        
-        ;; then, see if there's a non-naive cost available
-        ;; TODO type logical vs physical qubits
-        (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
-                                            (lookup-hardware-object chip-spec instr-physical)))
-                      (cost-bound (gethash hardware-object (temporal-addresser-state-cost-bounds state)))
-                      (intelligent-bound
-                       (+ cost-bound
-                          (chip-schedule-resource-carving-point
-                           (addresser-state-chip-schedule state)
-                           (apply #'make-qubit-resource
-                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))))
-          (setf time (min time intelligent-bound)))
-        
-        ;; finally, we have a special case for early SWAPs
-        (when (and *addresser-use-free-swaps*
-                   (swap-application-p instr)
-                   (double= 0d0 naive-start-time))
-          (setf time 0))))
-    
+      (setf time (application-temporal-cost state instr)))
     (when gate-weights
-      (let ((qq-distances (addresser-state-qq-distances state))
-            (rewiring (addresser-state-working-l2p state))
-            (assigned-qubits nil)
-            (gate-count 0))
-        (dohash ((gate tier-index) gate-weights)
-          (when (and (< tier-index 3)
-                     (typep gate 'application)
-                     (= 2 (length (application-arguments gate))))
-            (destructuring-bind (q0 q1) (mapcar #'qubit-index (application-arguments gate))
-              (let* ((p0 (apply-rewiring-l2p rewiring q0))
-                     (p1 (apply-rewiring-l2p rewiring q1)))
-                (unless p0 (rotatef p0 p1) (rotatef q0 q1))
-                ;; if both are unassigned, then we gain nothing by changing the
-                ;; rewiring, so ignore this gate
-                (when p0
-                  ;; otherwise at least one is assigned
-                  (unless p1
-                    ;; find a position for the other qubit
-                    (setf p1
-                          (loop :with min-p    := nil
-                                :with min-dist := double-float-positive-infinity
-                                :for p :below (rewiring-length rewiring)
-                                :unless (apply-rewiring-p2l rewiring p)
-                                  :do (let ((new-dist (aref qq-distances p0 p)))
-                                        (when (< new-dist min-dist)
-                                          (setf min-p    p
-                                                min-dist new-dist)))
-                                :finally (return min-p)))
-                    (push q1 assigned-qubits)
-                    (rewiring-assign rewiring q1 p1))
-                  (let ((qq-distance (aref qq-distances p0 p1)))
-                    ;; we're using 2^(-depth) * (1 + 2^(1-dist)) so that distant
-                    ;; qubits exert weaker forces than nearby ones, encouraging
-                    ;; us to execute more quickly accomplishable gates sooner.
-                    ;; it's totally possible that dist alone is a good cost fn
-                    ;; on its own, and we should experiment with this.
-                    (assert (not (= qq-distance most-positive-fixnum)) ()
-                            "Multiqubit instruction requested between ~
-                                   disconnected components of the QPU graph: ~
-                                   ~A ."
-                            (print-instruction gate nil))
-                    (incf gate-count)
-                    (incf actual-cost (* (expt *cost-fn-tier-decay* tier-index) qq-distance))))))))
-        ;; clean up the rewiring
-        (dolist (qubit assigned-qubits) (rewiring-unassign rewiring qubit))
-        ;; normalize actual-cost
-        (setf actual-cost (if (zerop gate-count) 0d0 (/ actual-cost gate-count)))))
-    
+      (setf actual-cost (gate-weights-temporal-cost state gate-weights)))
     (make-temporal-cost :start-time time
                         :heuristic-value actual-cost)))
 
