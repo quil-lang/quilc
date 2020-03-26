@@ -76,9 +76,6 @@ SWAPping qubits into place.")
 (defvar *addresser-start-with-partial-rewiring* t
   "When T, starts with a partial rewiring that is filled in gradually.")
 
-(defvar *addresser-use-2q-tiers* t
-  "When T, uses the 2-qubit tiers rather than the general instruction tiers.")
-
 ;; TODO: consider making this part of the state
 (defvar *addresser-use-free-swaps* nil
   "Does the addresser treat the initial rewiring as something that can be changed?")

@@ -409,17 +409,16 @@
       (quil::*initial-rewiring-default-type*
        quil::*addresser-swap-search-type*
        quil::*addresser-move-to-rewiring-swap-search-type*
-       quil::*addresser-a*-swap-search-heuristic-scale*
-       quil::*addresser-use-2q-tiers*)
-    :control (:random  :greedy-qubit :greedy-qubit 1d0 nil)
-    :naive   (:naive   :greedy-qubit :greedy-qubit 1d0 nil)
-    :partial (:partial :greedy-qubit :greedy-qubit 1d0 nil)
-    :pa*     (:partial :a*           :a*           1d0 nil)
-    :path    (:partial :greedy-path  :greedy-path  1d0 nil)
-    :2q-nve  (:naive   :greedy-qubit :greedy-qubit 1d0 t)
-    :2q-ptl  (:partial :greedy-qubit :greedy-qubit 1d0 t)
-    :2q-pa*  (:partial :a*           :a*           1d0 t)
-    :2q-path (:partial :greedy-path  :greedy-path  1d0 t)
+       quil::*addresser-a*-swap-search-heuristic-scale*)
+    :control (:random  :greedy-qubit :greedy-qubit 1d0)
+    :naive   (:naive   :greedy-qubit :greedy-qubit 1d0)
+    :partial (:partial :greedy-qubit :greedy-qubit 1d0)
+    :pa*     (:partial :a*           :a*           1d0)
+    :path    (:partial :greedy-path  :greedy-path  1d0)
+    :2q-nve  (:naive   :greedy-qubit :greedy-qubit 1d0)
+    :2q-ptl  (:partial :greedy-qubit :greedy-qubit 1d0)
+    :2q-pa*  (:partial :a*           :a*           1d0)
+    :2q-path (:partial :greedy-path  :greedy-path  1d0)
     ))
 
 (defvar *swap-search-assn*
