@@ -321,7 +321,9 @@ BODY as an implicit PROGN."
          (application-arguments instr)))
 
 (defun rewiring-distance (rewiring target-rewiring qq-distances)
-  "A measure of the distance between a given REWIRING and a TARGET-REWIRING, based on the qubit-qubit distance array QQ-DISTANCES."
+  "A measure of the distance between a given REWIRING and a TARGET-REWIRING.
+
+It is expectred that REWIRING and PARTIAL-REWIRING should be defined on the same set of logical qubits. The resulting distance value is based on the qubit-qubit distance array QQ-DISTANCES."
   (loop :for i :across (rewiring-l2p rewiring)
         :for j :across (rewiring-l2p target-rewiring)
         :when i

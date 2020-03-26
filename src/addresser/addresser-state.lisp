@@ -64,10 +64,19 @@
           (addresser-state-chip-specification instance) chip-spec
           (addresser-state-1q-queues instance) (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))))
 
-;;; Generics that should be specialized by different addressers
+;;; Current addresser types (of which there are two: the temporal addresser and
+;;; fidelity addresser) subclass ADDRESSER-STATE and then implement methods on a
+;;; few generics listed below. Mostly this has to do assigning and manipulating
+;;; weights and costs.
+;;;
+;;; NOTE: Addresser implementations MUST also fill the qq-distances slot with
+;;; appropriate values. On the one hand, these are necessary for the basic
+;;; functioning of the addresser routines and swap selection heuristics. On the
+;;; other hand, we do not at present wish to suppose exactly what this looks
+;;; like.
 
-(defgeneric unscheduled-gate-weights (state)
-  (:documentation "Collect unscheduled gates, along with their weights.
+(defgeneric weighted-future-gates (state)
+  (:documentation "Collect gates from the logical schedule, along with weights which indicate how far into the future the gate occurs.
 
 Returns a hash mapping gates from the logical schedule to numeric values."))
 
@@ -86,6 +95,12 @@ INSTR is the \"active instruction\".
 - GATE-WEIGHTS and INSTR are both specified: COST-FUNCTION will return a heuristic value suitable for comparing different instructions INSTR to be injected (i.e., INSTR is assumed not to participate in LSCHEDULER).
 "))
 
+(defgeneric build-worst-cost (state)
+  (:documentation "Builds a POSITIVE-INFINITY type value for the COST-FUNCTION associated to STATE."))
+
+;;; Since sometimes costs are compound objects which encode various values, they
+;;; must implement the following:
+
 (defgeneric cost-< (val1 val2)
   (:documentation "Generic comparison function for heuristic values.")
   (:method ((val1 number) (val2 number))
@@ -96,17 +111,16 @@ INSTR is the \"active instruction\".
   (:method ((val1 number) (val2 number))
     (double= val1 val2)))
 
-(defgeneric build-worst-cost (state)
-  (:documentation "Builds a POSITIVE-INFINITY type value for the COST-FUNCTION associated to STATE."))
-
 (defgeneric cost-flatten (cost)
-  (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION."))
+  (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION.")
+  (:method ((cost real))
+    cost))
 
-;;; Miscellanous utilities for state manipulation
+;;; Some utilities
 
-;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
 (defun compute-qubit-qubit-distances (chip-spec link-cost)
   "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by LINK-COST."
+  ;; nearly ripped straight out of the Wikipedia article for Floyd-Warshall
   (let* ((vertex-count (chip-spec-n-qubits chip-spec))
          (dist (make-array (list vertex-count vertex-count)
                            :initial-element most-positive-fixnum)))

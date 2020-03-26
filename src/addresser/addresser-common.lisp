@@ -94,7 +94,7 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
 (deftype addresser-search-type () '(member :a* :greedy-qubit :greedy-path))
 
 (defvar *addresser-swap-search-type* ':greedy-qubit
-  "The type of swap search the addresser should use.")
+  "The type of swap search the addresser should use when selecting gates.")
 
 (defvar *addresser-move-to-rewiring-swap-search-type* ':a*
   "The type of swap search the addresser should use when doing move-to-rewiring.")
@@ -127,7 +127,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
   (with-slots (working-l2p chip-sched chip-spec)
       state
     (format-noise "SELECT-SWAP-LINKS: entering SWAP selection phase.")
-    (let ((gates-in-waiting (unscheduled-gate-weights state)))
+    (let ((gates-in-waiting (weighted-future-gates state)))
       (select-swaps-for-gates *addresser-swap-search-type*
                               working-l2p
                               gates-in-waiting
@@ -225,28 +225,31 @@ Returns two values: a list of links, and an updated list of rewirings tried."
     (funcall dry-run-escape))
 
   (with-slots (lschedule chip-spec chip-sched working-l2p) state
-    (let ((dirty-flag nil))
-      (when *addresser-use-1q-queues*
+    (when *addresser-use-1q-queues*
         ;; flush the 1Q lines in the relevant events
         (cond
           ;; is it maximally resourceful?
           ((global-instruction-p instr)
-           ;; unload the 1Q queues, dequeue the instruction,
-           ;; and set the dirty flag
+           ;; unload the 1Q queues
            (dotimes (qubit (chip-spec-n-qubits chip-spec))
              (flush-1q-instructions-after-wiring state qubit)))
 
           ;; is it a pure classical instruction?
           ((local-classical-instruction-p instr)
-           ;; clear relevant 1Q queues, dequeue the instruction
-           ;; and set the dirty flag
+           ;; clear relevant 1Q queues
            (partially-flush-1Q-queues state (instruction-resources instr)))
 
           ;; is it a local mixed pure/classical instruction?
           ;;
-          ;; TODO: this currently does not do the clever 'threading'
-          ;; that happens with other 1Q instructions. it probably isn't
-          ;; worth it, since MEASUREs are slow instructions.
+          ;; TODO: this currently does not do the clever 'threading' that
+          ;; happens with other 1Q instructions. it probably isn't worth it,
+          ;; since MEASUREs are slow instructions.
+          ;;
+          ;; COUNTERARGUMENT: what's being "threaded" are SWAPs and MEASUREs /
+          ;; RESETs. Doing a MEASURE before a SWAP (1) suffers 3 fewer CZs + (2)
+          ;; has the potential (if, say, MEASURE happens on both participating
+          ;; qubits) to rewrite the post-instruction SWAP as some Xes or to
+          ;; elide it entirely -- ECP
           ((or (local-classical-quantum-instruction-p instr)
                (typep instr 'measure-discard)
                (typep instr 'reset-qubit))
@@ -257,26 +260,23 @@ Returns two values: a list of links, and an updated list of rewirings tried."
                                        resources)
                  (flush-1q-instructions-after-wiring state qubit)))))))
 
-      (cond
+    (cond
         ;; is it resourceless?
         ((typep instr 'no-operation)
          ;; if so, discard it and continue.
-         (lscheduler-dequeue-instruction lschedule instr)
-         (setf dirty-flag t))
+         (lscheduler-dequeue-instruction lschedule instr))
 
         ;; is it maximally resourceful?
         ((global-instruction-p instr)
          ;; dequeue the instruction and set the dirty flag
          (chip-schedule-append chip-sched instr)
-         (lscheduler-dequeue-instruction lschedule instr)
-         (setf dirty-flag t))
+         (lscheduler-dequeue-instruction lschedule instr))
 
         ;; is it a pure classical instruction?
         ((local-classical-instruction-p instr)
          ;; dequeue the instruction and set the dirty flag
          (chip-schedule-append chip-sched instr)
-         (lscheduler-dequeue-instruction lschedule instr)
-         (setf dirty-flag t))
+         (lscheduler-dequeue-instruction lschedule instr))
 
         ;; is it a local mixed pure/classical instruction?
         ((or (local-classical-quantum-instruction-p instr)
@@ -289,20 +289,18 @@ Returns two values: a list of links, and an updated list of rewirings tried."
                (values nil nil (list instr)))))
          (chip-schedule-append chip-sched instr)
          ;; dequeue the instruction and set the dirty flag
-         (lscheduler-dequeue-instruction lschedule instr)
-         (setf dirty-flag t))
+         (lscheduler-dequeue-instruction lschedule instr))
 
         ;; is it some other kind of PRAGMA not covered above?
         ((typep instr 'pragma)
          ;; just throw it away.
-         (lscheduler-dequeue-instruction lschedule instr)
-         (setf dirty-flag t))
+         (lscheduler-dequeue-instruction lschedule instr))
 
         ;; otherwise, we don't know what to do
         (t
          (error "The instruction type of \"~/quil:instruction-fmt/\" is not supported by the addresser." instr)))
-
-      dirty-flag)))
+    ;; turns out we're always always dirty
+    t))
 
 (defun dequeue-gate-application (state instr &optional dry-run-escape)
   "Dequeues the given gate application INSTR, if possible.
@@ -346,7 +344,7 @@ instruction, adding to logical queue."
          (setf dirty-flag t))
         ;; is it a small-Q gate?
         ((<= (length (application-arguments instr))
-               (length (chip-specification-objects chip-spec)))
+             (length (chip-specification-objects chip-spec)))
            ;; quick error check on qubit indices
            (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits chip-spec)))
                           (application-arguments instr))
@@ -604,7 +602,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
   "Attempt to assign a logical qubit from INSTRS to a physical qubit, as managed by the addresser state STATE."
   (with-slots (working-l2p) state
     (let ((unassigned-qubits (unassigned-qubits instrs working-l2p))
-          (gate-weights (unscheduled-gate-weights state)))
+          (gate-weights (weighted-future-gates state)))
       (flet ((placement-data (logical-qubit)
                "Given a LOGICAL-QUBIT, determine an assigned physical qubit, and the associated cost. Return a list of all three."
                (multiple-value-bind (physical-qubit cost)
