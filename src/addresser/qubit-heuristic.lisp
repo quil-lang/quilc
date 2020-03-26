@@ -1,5 +1,12 @@
 (in-package :cl-quil)
 
+(defvar *addresser-swap-lookahead-depth* 2
+  "Controls the length of SWAP chains explored the GREEDY-QUBIT heuristic.
+
+WARNING: This value makes the SWAP-selection stage run as
+O((# 2Q links)^(*addresser-swap-lookahead-depth*)). Beware making it too
+large.")
+
 (defun cost-lowering-candidates (rewiring cost-function rewirings-tried chip-spec depth)
   "Given a rewiring and a cost function, returns a list of swap links for which
 the cost of the rewiring is reduced."
