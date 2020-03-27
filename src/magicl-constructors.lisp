@@ -32,17 +32,21 @@
   (magicl:arange range :type type))
 
 (defun from-array (array shape &key (type +default-magicl-type+) (layout :row-major))
-  "CL-QUIL version of MAGICL:FROM-ARRAY"
+  "CL-QUIL version of MAGICL:FROM-ARRAY
+
+NOTE: When TYPE is not specified the elemnets in ARRAY are coerced to +DEFAULT-MAGICL-TYPE+"
   (magicl:from-array array shape :type type :layout layout))
 
 (defun from-list (list shape &key (type +default-magicl-type+) layout (input-layout :row-major))
   "CL-QUIL version of MAGICL:FROM-LIST
 
-NOTE: This _always_ coerces the input to +DEFAULT-MAGICL-TYPE+"
+NOTE: When TYPE is not specified the elemnets in LIST are coerced to +DEFAULT-MAGICL-TYPE+"
   (magicl:from-list list shape :type type :layout layout :input-layout input-layout))
 
 (defun from-diag (list &key (order 2) (type +default-magicl-type+) layout)
-  "CL-QUIL version of MAGICL:FROM-DIAG"
+  "CL-QUIL version of MAGICL:FROM-DIAG
+
+NOTE: When TYPE is not specified the elemnets in LIST are coerced to +DEFAULT-MAGICL-TYPE+"
   (magicl:from-diag list :order order :type type :layout layout))
 
 (defun zeros (shape &key (type +default-magicl-type+) layout)
