@@ -9,8 +9,7 @@
   ;; Bug in Fiasco commit fe89c0e924c22c667cc11c6fc6e79419fc7c1a8b
   (let ((fiasco::*test-run-standard-output* (make-broadcast-stream
                                              *standard-output*))
-        (quil::*compress-carefully* t)
-        (magicl::*default-tensor-type* '(complex double-float)))
+        (quil::*compress-carefully* t))
     (cond
       ((null headless)
        (run-package-tests :package ':cl-quil.quilec-tests
