@@ -353,7 +353,7 @@
    #:parsed-program-executable-code         ; READER
    #:print-parsed-program                   ; FUNCTION
 
-   #:*print-parsed-program-objects*     ; PARAMETER
+   #:*print-parsed-program-text*        ; PARAMETER
    #:*print-fractional-radians*         ; PARAMETER
    #:print-instruction                  ; FUNCTION
    #:instruction-fmt                    ; FUNCTION (format directive)

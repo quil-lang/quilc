@@ -1661,8 +1661,8 @@ For example,
                (parsed-program-executable-code parsed-program)))
     pp))
 
-(defvar *print-parsed-program-objects* nil
-  "When T, PARSED-PROGRAM objects are printed with PRINT-PARSED-PROGRAM. Otherwise the standard object printer is used.")
+(defvar *print-parsed-program-text* nil
+  "When T, PRINT-OBJECT on a PARSED-PROGRAM will include the program text. Otherwise, only the number of instructions is printed.")
 
 (defun %print-indented-string (string stream &key (indentation "    "))
   (loop :with last := (1- (length string))
@@ -1677,7 +1677,7 @@ For example,
 (defmethod print-object ((parsed-program parsed-program) stream)
   (print-unreadable-object (parsed-program stream :type t :identity t)
     (format stream "of ~D instructions" (length (parsed-program-executable-code parsed-program)))
-    (when *print-parsed-program-objects*
+    (when *print-parsed-program-text*
       (terpri stream)
       (%print-indented-string (with-output-to-string (s)
                                 (print-parsed-program parsed-program s))
