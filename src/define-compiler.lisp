@@ -650,7 +650,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
 
 (defun compute-applicable-compilers (target-gateset qubit-count) ; h/t lisp
   "Starting from all available compilers, constructs a precedence-sorted list of those compilers which help to convert from arbitrary inputs to a particular target gateset."
-  (flet (;; Checks whether PATH doubles back through the occurrence table START.         
+  (flet (;; Checks whether PATH doubles back through the occurrence table START.
          (path-has-a-loop-p (path start)
            (and (< 1 (length path))
                 (loop :for (table compiler) :on path :by #'cddr
@@ -659,7 +659,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                                   :thereis (binding-subsumes-p (first start) gate)))
                         :do (return-from path-has-a-loop-p t)
                       :finally (return nil)))))
-    
+
     (let* ((target-gateset (blank-out-qubits target-gateset))
            (compilers (get-compilers qubit-count))
            (unconditional-compilers
@@ -704,7 +704,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                        (>= special-cost generic-cost))
               ;; then store it!
               (setf (gethash compiler compiler-hash) special-cost))))
-        
+
         ;; these are basically all the compilers we care to use; now we need to
         ;; sort them into preference order.
         (let* ((unique-compilers
@@ -801,7 +801,7 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
              ;; TODO: this MAP-PRODUCT could be better: unknown argument list size,
              ;;       generates a whole big list and then does EVERY afterward, ...
              (every #'identity (apply #'a:map-product (a:curry #'consider-input-test-case compiler) matches)))))))
-    
+
     (let (applicable-compilers)
       (dolist (compiler compilers applicable-compilers)
         (when (consider-compiler compiler)
@@ -903,85 +903,94 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                           :parameters (second (second source))
                           :arguments (rest (rest (second source))))))))
 
-;;; here are the forms directly related to DEFINE-COMPILER, whether its
-;;; destructuring or utilities available with its body.
+;;; Here are the forms directly related to DEFINE-COMPILER, whether
+;;; its destructuring or utilities available with its body.
 
-;; within the body of a DEFINE-COMPILER, we publish instructions to output
-;; using a DEFINE-VOP-like INST macro, and we quit a compiler early using
-;; FINISH-COMPILER.
+;;; Within the dynamic extent of a DEFINE-COMPILER, we publish
+;;; instructions to output using a DEFINE-VOP-like INST macro, and we
+;;; quit a compiler early using FINISH-COMPILER.
 
-;; first, prohibit the use of these items outside of a compiler body
+;;; Special variable private to WITH-INST. Within the context of
+;;; WITH-INST, it will be bound to a cons (LIST . TAIL).
+(declaim (type cons *inst-collection*))
+(defvar *inst-collection*)
+
+(declaim (inline %new-inst-collection %accumulate-inst %collected-insts))
+(defun %new-inst-collection ()
+  (declare (optimize speed (safety 0) (debug 0) (space 0)))
+  (let* ((list (cons nil nil))
+         (tail list))
+    (cons list tail)))
+
+(defun %accumulate-inst (x)
+  (declare (optimize speed (safety 0) (debug 0) (space 0)))
+  (let* ((tail (cdr *inst-collection*)))
+    (declare (type cons tail))
+    (rplacd tail (cons x nil))
+    (rplacd *inst-collection* (cdr tail))
+    (values)))
+
+(defun %collected-insts ()
+  (cdar *inst-collection*))
+
+(defconstant +inst-tag+ '%%inst-tag%%)  ; Tag used to throw values from INST.
+
+(defmacro with-inst (() &body body)
+  "Allow INST, INST*, and FINISH-COMPILER handlers extending over BODY.
+
+This macro is used for DEFINE-COMPILER."
+  `(let ((*inst-collection* (%new-inst-collection)))
+     (catch ',+inst-tag+
+       ,@body
+       (%collected-insts))))            ; FINISH-COMPILER would also be OK.
+
+(defun finish-compiler (&optional (retval nil retval-p))
+  "Finish compiling, by default returning a list of all instructed emitted with INST.
+
+Optionally, if an argument is supplied, it will be returned instead.
+
+FINISH-COMPILER can only be called within the dynamic extent of a compiler body."
+  (unless (boundp '*inst-collection*)
+    (error "FINISH-COMPILER called outside of a WITH-INST context."))
+  (throw +inst-tag+ (if retval-p retval (%collected-insts))))
+
 (defun inst (&rest xs)
   "Emit the instructions XS in the current compiler context.
 
-INST is a local function usable within the dynamic extent of a compiler body."
-  (declare (ignore xs))
-  (error "INST can only be used in the body of a compiler."))
-
-(define-compiler-macro inst (&rest xs)
-  "Inhibit the attempted use of INST as a plain function."
-  (declare (ignore xs))
-  (error "INST can only be used in the body of a compiler."))
+INST can only be called within the dynamic extent of a compiler body."
+  (declare (dynamic-extent xs))
+  (unless (boundp '*inst-collection*)
+    (error "INST called outside of a WITH-INST context."))
+  ;; INST is a no-op if nothing is provided.
+  (when (null xs)
+    (return-from inst))
+  ;; Otherwise we have to parse it out.
+  (let ((xs-len (length xs))
+        (x nil))
+    (cond
+      ;; check for a raw gate object
+      ((and (= 1 xs-len)
+            (typep (first xs) 'gate-application))
+       (setf x (first xs)))
+      ;; check for an anon-gate signature
+      ((and (<= 3 xs-len)
+            (or (typep (second xs) 'magicl:matrix)
+                (typep (first xs) 'gate)))
+       (setf x (apply #'anon-gate xs)))
+      ;; check for a build-gate signature
+      ((and (<= 3 xs-len)
+            (listp (second xs)))
+       (setf x (apply #'build-gate xs)))
+      (t
+       (error "INST argument pattern not recognized: ~A" xs)))
+    (%accumulate-inst x)))
 
 (defun inst* (&rest xs)
-  "Emit the instructions XS in the current compiler context. Treat the last argument of XS as a list of arguments, as if using APPLY #'BUILD-GATE.
+    "Emit the instructions XS in the current compiler context. Treat the last argument of XS as a list of arguments, as if using APPLY #'BUILD-GATE.
 
-INST* is a local function usable within the dynamic extent of a compiler body."
-  (declare (ignore xs))
-  (error "INST* can only be used in the body of a compiler."))
+INST* can only be called within the dynamic extent of a compiler body."
+  (apply #'inst (apply #'list* xs)))
 
-(define-compiler-macro inst* (&rest xs)
-  "Inhibit the attempted use of INST* as a plain function."
-  (declare (ignore xs))
-  (error "INST* can only be used in the body of a compiler."))
-
-(defmacro finish-compiler ()
-  "Finish compiling, retuning all instructed emitted with INST.
-
-FINISH-COMPILER is a local macro usable within a compiler body."
-  (error "FINISH-COMPILER can only be used in the body of a compiler."))
-
-;;; The empty list is so that options can be provided in the future.
-(defmacro with-inst (() &body body)
-  "Define INST, INST*, and FINISH-COMPILER handlers extending over BODY."
-  (a:with-gensyms (list tail compiler-context x xs retval-p)
-    `(block ,compiler-context
-       (let* ((,list (cons nil nil))
-              (,tail ,list))
-         (declare (dynamic-extent ,list)
-                  (type cons ,list ,tail))
-         (labels ((inst (&rest ,xs)
-                    (declare (optimize speed (safety 0) (debug 0) (space 0)))
-                    (let (,x)
-                      (cond
-                        ;; check for a raw gate object
-                        ((and (= 1 (length ,xs))
-                              (typep (first ,xs) 'gate-application))
-                         (setf ,x (first ,xs)))
-                        ;; check for an anon-gate signature
-                        ((and (<= 3 (length ,xs))
-                              (or (typep (cadr ,xs) 'magicl:matrix)
-                                  (typep (car ,xs) 'gate)))
-                         (setf ,x (apply #'anon-gate ,xs)))
-                        ;; check for a build-gate signature
-                        ((and (<= 3 (length ,xs))
-                              (typep (cadr ,xs) 'list))
-                         (setf ,x (apply #'build-gate ,xs)))
-                        (t
-                         (error "INST argument pattern not recognized: ~A" ,xs)))
-                      (rplacd ,tail (cons ,x nil))
-                      (setf ,tail (cdr ,tail))
-                      (values)))
-                  (inst* (&rest ,xs)
-                    (apply #'inst (apply #'list* ,xs))))
-           (declare (dynamic-extent #'inst))
-           (macrolet ((finish-compiler (&optional (retval nil ,retval-p))
-                        (if ,retval-p
-                            `(return-from ,',compiler-context ,retval)
-                            '(return-from ,compiler-context (cdr (the cons ,list))))))
-             ,@body
-             ;; Implicitly return the collected instructions.
-             (finish-compiler)))))))
 
 ;; if we ever want to expand the list of "reserved symbols", this is the place
 ;; to do it. previously, `'pi` lived here, but it seems better to require users
@@ -1032,7 +1041,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                   env
                                   (expand-bindings (rest bindings)
                                                    (extend-environment binding env)))))))
-           
+
            (expand-binding (binding env body)
              (cond
                ((typep binding 'wildcard-binding)
@@ -1046,7 +1055,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                                                 (expand-options binding env body)))))
                (t
                 (error "Malformed binding in compiler form: ~A." binding))))
-           
+
            (expand-sequence (seq env rest &key gensym-name seq-accessor gate-name elt-accessor elt-type test)
              (let* ((target-length (length seq))
                     (seq-var (gensym (format nil "~AS" gensym-name)))
@@ -1069,7 +1078,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                             :elt-accessor elt-accessor
                                             :elt-type elt-type
                                             :test test))))))
-           
+
            (expand-each-element (seq elt-vars env rest &key elt-accessor elt-type test)
              (when (endp seq)
                (return-from expand-each-element rest))
@@ -1109,7 +1118,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                            :elt-accessor elt-accessor
                                            :elt-type elt-type
                                            :test test))))))
-           
+
            (expand-parameters (binding env rest)
              (cond
                ((wildcard-pattern-p (gate-binding-parameters binding))
@@ -1129,7 +1138,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                  :elt-accessor 'constant-value
                                  :elt-type 'constant
                                  :test 'double=))))
-           
+
            (expand-arguments (binding env rest)
              (expand-sequence (gate-binding-arguments binding)
                               env
@@ -1140,7 +1149,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                               :elt-accessor 'qubit-index
                               :elt-type 'qubit
                               :test '=))
-           
+
            (expand-options (binding env rest)
              (declare (ignore env))
              (let ((option-plist (compiler-binding-options binding)))
@@ -1157,7 +1166,7 @@ FINISH-COMPILER is a local macro usable within a compiler body."
                                  (otherwise
                                   (error "Illegal OPERATOR-BIND option: ~A" key)))))
                rest))
-           
+
            (expand-op (binding env body)
              (let ((op (gate-binding-operator binding)))
                (cond
