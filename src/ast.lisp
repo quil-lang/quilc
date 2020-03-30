@@ -1661,6 +1661,28 @@ For example,
                (parsed-program-executable-code parsed-program)))
     pp))
 
+(defvar *print-parsed-program-text* nil
+  "When T, PRINT-OBJECT on a PARSED-PROGRAM will include the program text. Otherwise, only the number of instructions is printed.")
+
+(defun %print-indented-string (string stream &key (indentation "    "))
+  (loop :with last := (1- (length string))
+        :for c :across string
+        :for i :upto last
+        :when (zerop i)
+          :do (write-string indentation stream)
+        :do (write-char c stream)
+        :when (and (eql c #\Newline) (/= i last))
+          :do (write-string indentation stream)))
+
+(defmethod print-object ((parsed-program parsed-program) stream)
+  (print-unreadable-object (parsed-program stream :type t :identity t)
+    (format stream "of ~D instructions" (length (parsed-program-executable-code parsed-program)))
+    (when *print-parsed-program-text*
+      (terpri stream)
+      (%print-indented-string (with-output-to-string (s)
+                                (print-parsed-program parsed-program s))
+                              stream))))
+
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
 ;; an &BODY, rather than a CONTINUATION, etc. If you need speed, you're probably better served by
