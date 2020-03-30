@@ -163,6 +163,82 @@
                        (application-arguments instr))
                 (inst "CNOT" () control-qubit subvote-literal)))))))))
 
+;;; Helper functions for special case Paulis.
+
+(defun inst-aXX+bZZ (a b p q)
+  "Inst a program for aXX + bZZ on qubits p and q. This is
+
+DEFGATE UXZ(%a, %b) p q AS PAULI-SUM:
+    XX(%a) p q
+    ZZ(%b) p q
+"
+  (inst "CNOT" ()                   p q)
+  (inst "RX"   (list (param-* 2 a)) p)
+  (inst "RZ"   (list (param-* 2 b)) q)
+  (inst "CNOT" ()                   p q))
+
+(defun inst-aXX+bYY (a b p q)
+  "Inst a program for aXX + bYY on qubits p and q. This is
+
+DEFGATE UXY(%a, %b) p q AS PAULI-SUM:
+    XX(%a) p q
+    YY(%b) p q
+"
+  (inst "RZ" `(,-pi/2) p)
+  (inst "RZ" `(,-pi/2) q)
+  (inst "H"   ()       p)
+  (inst "H"   ()       q)
+  (inst-aXX+bZZ (param-* -1 a) (param-* -1 b) p q)
+  (inst "H"   ()       p)
+  (inst "H"   ()       q)
+  (inst "RZ" `(,pi/2)  p)
+  (inst "RZ" `(,pi/2)  q))
+
+(defun inst-aYY+bZZ (a b p q)
+  "Inst a program for aYY + bZZ on qubits p and q. This is
+
+DEFGATE UXY(%a, %b) p q AS PAULI-SUM:
+    YY(%a) p q
+    ZZ(%b) p q
+"
+  (declare (ignore a b p q))
+  (warn "Unknown identity for YY+ZZ")
+  (give-up-compilation))
+
+(defun inst-aMM+bNN (a b p q mm nn)
+  (check-type mm (member :XX :YY :ZZ))
+  (check-type nn (member :XX :YY :ZZ))
+  (assert (not (eq mm nn)))
+  (optima:match (list mm nn)
+    ((list ':XX ':YY)
+     (inst-aXX+bYY a p q p))
+    ((list ':XX ':ZZ)
+     (inst-aXX+bZZ a b p q))
+    ((list ':YY ':ZZ)
+     (inst-aYY+bZZ a b p q))
+    (otherwise
+     (inst-aMM+bNN b a q p nn mm))))
+
+(defun pauli-instr-of-type-aMM+bNN (instr)
+  "Test whether INSTR is an EXP-PAULI-SUM-GATE with terms aMM + bNN
+where M /= N and M,N in {X, Y, Z}."
+  ;; XXX There's gotta be a better way to write this.
+  (flet ((PP? (word)
+           (and (= 2 (length word))
+                (char= (elt word 0) (elt word 1)))))
+    (and (typep (gate-application-gate instr) 'exp-pauli-sum-gate)
+         (let ((words (map 'list #'pauli-term-pauli-word
+                           (exp-pauli-sum-gate-terms (gate-application-gate instr)))))
+           (and (= 2 (length words))
+                (every #'PP? words)
+                ;; Note that these interns are not
+                ;; free-for-alls. They'll only be II, XX, YY, or ZZ.
+                (let ((type0 (intern (first words) ':keyword))
+                      (type1 (intern (second words) ':keyword)))
+                  (and (not (eq type0 type1))
+                       (not (eq ':II type0))
+                       (not (eq ':II type1))
+                       (list type0 type1))))))))
 
 ;; TODO: also write an orthogonal gate compiler somewhere? approx.lisp will take
 ;;       care of it in the 2Q case, at least.
@@ -205,6 +281,20 @@
         (dolist (term terms)
           (unless (= 1 (crawl-parameter (pauli-term-prefactor term)))
             (give-up-compilation))))
+      
+      ;; test if it's one of the easy cases first.
+      (alexandria:when-let ((type (pauli-instr-of-type-aMM+bNN instr)))
+        (let ((args (map 'list #'qubit-index (application-arguments instr)))
+              (prefactors (map 'list #'pauli-term-prefactor terms)))
+          (destructuring-bind (typep typeq) type
+            (inst-aMM+bNN
+             ;; TODO XXX FIXME: How do I properly use the Pauli prefactors?
+             (first (application-parameters instr)) (first (application-parameters instr))
+             (nth 0 args)        (nth 1 args)
+             typep typeq)
+            (finish-compiler))))
+      
+      ;; Otherwise proceed to the highlighted rout^W^Wgeneral case.
       
       ;; instantiate the Hamiltonian
       (let ((H (zeros (list dimension dimension))))
