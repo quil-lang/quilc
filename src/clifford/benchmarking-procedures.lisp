@@ -251,7 +251,7 @@
 (defun clifford-to-matrix (cliff)
   "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
   (let* ((n (num-qubits cliff))
-         (mat (zeros (list (expt 2 n) (expt 2 n))))
+         (mat (quil::zeros (list (expt 2 n) (expt 2 n))))
          (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
          (zero-image-tab (make-tableau-zero-state n))
          (pauli-map (clifford-basis-map cliff)))
