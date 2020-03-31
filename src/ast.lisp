@@ -1675,13 +1675,14 @@ For example,
           :do (write-string indentation stream)))
 
 (defmethod print-object ((parsed-program parsed-program) stream)
-  (print-unreadable-object (parsed-program stream :type t :identity t)
-    (format stream "of ~D instructions" (length (parsed-program-executable-code parsed-program)))
-    (when *print-parsed-program-text*
-      (terpri stream)
-      (%print-indented-string (with-output-to-string (s)
-                                (print-parsed-program parsed-program s))
-                              stream))))
+  (let ((*print-circle* nil))
+    (print-unreadable-object (parsed-program stream :type t :identity t)
+      (format stream "of ~D instruction~:P" (length (parsed-program-executable-code parsed-program)))
+      (when *print-parsed-program-text*
+        (terpri stream)
+        (%print-indented-string (with-output-to-string (s)
+                                  (print-parsed-program parsed-program s))
+                                stream)))))
 
 ;; These NTH-INSTR functions prioritize caller convenience and error checking over speed. They could
 ;; possibly be sped up by doing away with type checking, making %NTH-INSTR into a macro that takes
