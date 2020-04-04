@@ -486,6 +486,25 @@
    #:quil-type-error                    ; FUNCTION
    )
 
+  ;; backend/ stuff
+  (:export
+   #:backend                            ; CLASS
+   #:backend-supports-chip-p            ; GENERIC
+   #:incompatible-memory-model-error    ; CONDITION
+   #:incompatible-memory-model-error-backend
+                                        ; READER
+   #:incompatible-memory-model-error-descriptors
+                                        ; READER
+   #:write-executable                   ; GENERIC
+   #:signature                          ; GENERIC
+   #:sign-executable                    ; GENERIC
+   #:verify-signature                   ; GENERIC
+   #:compile-to-backend                 ; GENERIC
+
+   #:quil-backend                       ; CLASS
+   #:quil-executable                    ; CLASS
+   )
+
   ;; utilities.lisp
   (:export
    #:ilog2                              ; FUNCTION

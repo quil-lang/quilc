@@ -44,6 +44,21 @@
      :optional t
      :initial-value "8Q"
      :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", \"bristlecone\", \"ibmqx5\", or path to QPU description file")
+    
+    (("backend")
+     :type string
+     :optional t
+     :documentation "set the backend for which to generate code (default: none). Note that an output file (-o) must be specified!")
+    
+    (("output-file" #\o)
+     :type string
+     :optional t
+     :documentation "the filename to which to write an executable (default: none)")
+    
+    (("private-signing-key")
+     :type string
+     :optional t
+     :documentation "the filename of the RSA private key used to sign executables (default: none)")
 
     (("enable-state-prep-reductions")
      :type boolean
@@ -382,6 +397,9 @@
                           (print-logical-schedule nil)
                           (verbose nil)
                           (isa nil)
+                          (backend nil)
+                          (output-file nil)
+                          (private-signing-key nil)
                           (enable-state-prep-reductions nil)
                           (protoquil nil)
                           (print-statistics nil)
@@ -492,6 +510,10 @@
 
          (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
            (:msgid "LOG0001"))
+         (when (or backend output-file)
+           (cl-syslog:rfc-log (*logger* :warning "--backend and --output-file/-o options ~
+                                                  don't make sense when using server mode. ~
+                                                  Ignoring them.")))
          ;; launch the polling loop
          (start-rpc-server :host host
                            :port port
@@ -501,36 +523,88 @@
         ;; server modes not requested, so continue parsing arguments
         (t
          (setf *human-readable-stream* *error-output*)
-         (setf *quil-stream* *standard-output*)
+         ;; If we didn't specify a backend, then we will use -o to
+         ;; write out the front-end compiled Quil code. If a backend
+         ;; WAS specified, we set this to stdout so that the optional
+         ;; statistics are printed there.
+         ;;
+         ;; We will never print binary output to the terminal.
+         (setf *quil-stream* (if (and (not backend)
+                                      output-file)
+                                 (open output-file :direction ':output
+                                                   :if-does-not-exist ':create
+                                                   :if-exists ':supersede)
+                                 *standard-output*))
+         
+         (when (and backend (not output-file))
+           (error "You specified a backend, so you must specify an ~
+                   output file with --output-file or -o."))
 
-         (let* ((program-text (slurp-lines))
-                (program (safely-parse-quil program-text))
-                (original-matrix (when (and protoquil compute-matrix-reps)
-                                   (parsed-program-to-logical-matrix program))))
-           (multiple-value-bind (processed-program statistics)
-               (process-program program (lookup-isa-descriptor-for-name isa)
-                                :protoquil protoquil
-                                :verbose verbose
-                                :gate-whitelist (and gate-whitelist
-                                                     (split-sequence:split-sequence
-                                                      #\,
-                                                      (remove #\Space gate-whitelist)
-                                                      :remove-empty-subseqs t))
-                                :gate-blacklist (and gate-blacklist
-                                                     (split-sequence:split-sequence
-                                                      #\,
-                                                      (remove #\Space gate-blacklist)
-                                                      :remove-empty-subseqs t)))
-             (unless print-circuit-definitions
-               (setf (parsed-program-circuit-definitions processed-program) nil))
-             (print-program processed-program *quil-stream*)
-             (when (and protoquil print-statistics)
-               (print-statistics statistics *quil-stream*))
-             (when (and protoquil compute-matrix-reps)
-               (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t)))
-                 (print-matrix-comparision original-matrix
-                                           (quil::scale-out-matrix-phases processed-program-matrix
-                                                                          original-matrix)))))))))))
+         (unwind-protect
+              (let* ((chip-spec (lookup-isa-descriptor-for-name isa))
+                     (program-text (slurp-lines))
+                     (program (safely-parse-quil program-text))
+                     (original-matrix (when (and protoquil compute-matrix-reps)
+                                        (parsed-program-to-logical-matrix program))))
+                (cl-syslog:rfc-log (*logger* :info "Generating native Quil."))
+                (multiple-value-bind (processed-program statistics)
+                    (process-program program chip-spec
+                                     :protoquil protoquil
+                                     :verbose verbose
+                                     :gate-whitelist (and gate-whitelist
+                                                          (split-sequence:split-sequence
+                                                           #\,
+                                                           (remove #\Space gate-whitelist)
+                                                           :remove-empty-subseqs t))
+                                     :gate-blacklist (and gate-blacklist
+                                                          (split-sequence:split-sequence
+                                                           #\,
+                                                           (remove #\Space gate-blacklist)
+                                                           :remove-empty-subseqs t)))
+                  (unless print-circuit-definitions
+                    (setf (parsed-program-circuit-definitions processed-program) nil))
+                  ;; If a backend was selected, we do *not* want to
+                  ;; print the processed program, but we *do* want to
+                  ;; print statistics if asked for.
+                  (unless backend
+                    (print-program processed-program *quil-stream*))
+                  (when (and protoquil print-statistics)
+                    (print-statistics statistics *quil-stream*))
+                  (when (and protoquil compute-matrix-reps)
+                    (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t)))
+                      (print-matrix-comparision original-matrix
+                                                (quil::scale-out-matrix-phases processed-program-matrix
+                                                                               original-matrix))))
+                  (when backend
+                    (cl-syslog:rfc-log (*logger* :info "Generating backend code."))
+                    (backend-compile processed-program
+                                     chip-spec
+                                     (parse-backend backend)
+                                     output-file
+                                     private-signing-key) ; TODO: parse key
+                    (cl-syslog:rfc-log (*logger* :info "Wrote executable.")))))
+           (when output-file
+             (close *quil-stream*))))))))
+
+(defun parse-backend (backend-str)
+  ;; TODO: make this more flexible for "real" backends.
+  (alexandria:eswitch (backend-str :test #'string-equal)
+    ("quil" (make-instance 'cl-quil:quil-backend))))
+
+(defun backend-compile (program chip-spec backend out-file &optional signing-key)
+  (when signing-key
+    ;; The caller should parse the signing key from the file.
+    (error "signing isn't supported yet"))
+  (unless (cl-quil:backend-supports-chip-p backend chip-spec)
+    (error "The backend provided doesn't support this ISA."))
+  (let ((exec (cl-quil:compile-to-backend program chip-spec backend)))
+    (when signing-key
+      (cl-quil:sign-executable exec signing-key))
+    (with-open-file (stream out-file :direction ':output
+                                     :element-type '(unsigned-byte 8)
+                                     :if-exists ':supersede
+                                     :if-does-not-exist ':create)
+      (cl-quil:write-executable exec stream))))
 
 (defun process-program (program chip-specification
                         &key

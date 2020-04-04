@@ -30,6 +30,8 @@
                #:cl-heap
                #:cl-permutation
                #:queues.priority-queue
+               #:ironclad               ; Signing executables
+               #:flexi-streams          ; For executable writing
                #+sbcl #:sb-rotate-byte
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))
@@ -106,6 +108,12 @@
                 :serial t
                 :components ((:file "chip-specification")
                              (:file "chip-reader")))
+               (:module "backends"
+                :serial t
+                :components ((:file "common")
+                             (:module "quil"
+                              :serial t
+                              :components ((:file "quil-backend")))))
                (:module "addresser"
                 :serial t
                 :components ((:file "rewiring")
