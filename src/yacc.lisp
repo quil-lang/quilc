@@ -13,14 +13,17 @@
 
 (define-parser *quil-parser*
   (:start-symbol quil)
-  (:terminals (name integer complex semicolon newline left-paren right-paren comma expt times divide plus minus))
+  (:terminals (name integer complex semicolon newline left-paren right-paren left-bracket right-bracket comma expt times divide plus minus declare bit octet integer real))
   (:precedence ((:right expt)
                 (:left times divide)
                 (:left plus minus)))
 
   (quil
+   (declare-mem separator quil (lambda (a b c) (list a c)))
+   (declare-mem separator (lambda (a b) (list a)))
+   declare-mem
    (gate-application separator quil (lambda (a b c) (list a c)))
-   (gate-application separator (picker 0))
+   (gate-application separator (lambda (a b) a))
    gate-application)
 
   (gate-application
@@ -32,25 +35,44 @@
 
   (params-opt
    (left-paren param-expression-maybe-comma right-paren (picker 1))
-   ;; (left-paren param-value-maybe-comma right-paren (picker 1))
    (left-paren right-paren (picker))
    ())
 
   (param-expression-maybe-comma
    ;; Maybe these EVALs should live in PARAM-EXPRESSION?
-   (param-expression (lambda (exp) (eval exp)))
+   (param-expression #'eval)
    (param-expression comma param-expression-maybe-comma
-                     (lambda (a b c) (list (eval a) c))))
+                     (lambda (a b c) (flatten (list (eval a) c)))))
 
   (param-expression
-   (param-expression plus   param-expression (binary '+))
-   (param-expression minus  param-expression (binary '-))
-   (param-expression times  param-expression (binary '*))
+   (param-expression plus param-expression (binary '+))
+   (param-expression minus param-expression (binary '-))
+   (param-expression times param-expression (binary '*))
    (param-expression divide param-expression (binary '/))
-   (param-expression expt   param-expression (binary '+))
+   (param-expression expt param-expression (binary 'expt))
+   (left-paren param-expression right-paren (picker 1))
+   (name left-paren param-expression right-paren
+         (lambda (n l p r)
+           (declare (ignore l r))
+           (let ((f (validate-function n)))
+             (list f p))))
 
-   (minus param-expression  (unary '-))
+   (minus param-expression (unary '-))
    (number #'constant-value))
+
+  (declare-mem
+   (declare name vector-type vector-size
+            (lambda (d n vt vs)
+              (make-memory-descriptor
+               :name n
+               :type (parse-quil-type vt)
+               :length (if vs (constant-value vs) 1)))))
+
+  (vector-size
+   (left-bracket integer right-bracket (lambda (a b c) b))
+   ())
+
+  (vector-type bit octet integer real)
 
   (qubits
    (qubit qubits (picker 0 1))
@@ -65,6 +87,12 @@
    (newline separator (picker 0))
    semicolon
    newline))
+
+(defun yparse (quil)
+  (flatten
+   (a:ensure-list
+    (parse-with-lexer (quil-lexer quil)
+                      *quil-parser*))))
 
 (defun make-rz-quil-string (length)
   ;; (with-output-to-string (s)
@@ -82,6 +110,8 @@
   ("\\;" (return (values 'semicolon nil)))
   ("\\(" (return (values 'left-paren nil)))
   ("\\)" (return (values 'right-paren nil)))
+  ("\\[" (return (values 'left-bracket nil)))
+  ("\\]" (return (values 'right-bracket nil)))
   ("\\," (return (values 'comma nil)))
 
   ("\\*" (return (values 'times  nil)))
@@ -89,6 +119,8 @@
   ("\\+" (return (values 'plus   nil)))
   ("\\-" (return (values 'minus  nil)))
   ("\\^" (return (values 'expt   nil)))
+
+  ("DECLARE|BIT|OCTET|INTEGER|REAL" (return (values (intern $@) $@)))
   
   ("(\\d*[.eE])(\\.?\\d)\\d*\\.?\\d*([eE][+-]?\\d+)?"
    (return (values 'complex (constant (quil::parse-complex $@ nil)))))
@@ -100,15 +132,15 @@
        ((string= "i" $@) (values 'complex (constant #C(0.0d0 1.0d0))))
        (t (values 'name $@))))))
 
-(setf things (quil-lexer "RX 0"))
-(parse-with-lexer things *quil-parser*)
-(setf quilstr (make-rz-quil-string 100000))
-(funcall things)
-(time (progn (flatten (parse-with-lexer (quil-lexer quilstr) *quil-parser*)) 1))
-(time (progn (parse-with-lexer (quil-lexer quilstr) *quil-parser*) 1))
-(time (progn (quil::parse-quil-into-raw-program quilstr) 1))
+;; (setf things (quil-lexer "RX 0"))
+;; (parse-with-lexer things *quil-parser*)
+;; (setf quilstr (make-rz-quil-string 100000))
+;; (funcall things)
+;; (time (progn (flatten (parse-with-lexer (quil-lexer quilstr) *quil-parser*)) 1))
+;; (time (progn (parse-with-lexer (quil-lexer quilstr) *quil-parser*) 1))
+;; (time (progn (quil::parse-quil-into-raw-program quilstr) 1))
 
-(parse-with-lexer (quil-lexer "RX(0.2, 0.1) 1;") *quil-parser*)
+;; (parse-with-lexer (quil-lexer "RX(0.2, 0.1) 1;") *quil-parser*)
 
 ;; Source: https://gist.github.com/westerp/cbc1b0434cc2b52e9b10
 (defun flatten (lst &optional back acc)
