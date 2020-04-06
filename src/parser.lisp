@@ -1715,6 +1715,11 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
       (declare (ignore i0))
       (list head a b)))
 
+  (defun unary (head)
+    (lambda (i0 a)
+      (declare (ignore i0))
+      (list head a)))
+
   (defun validate-function (func-name)
     "Return the lisp symbol that corresponds to the Quil function named FUNC-NAME, or signal a QUIL-PARSE-ERROR if FUNC-NAME is invalid."
     (or (quil-function->lisp-symbol func-name)

@@ -12,14 +12,14 @@
         nil)))
 
 (define-parser *quil-parser*
-  (:start-symbol expression)
+  (:start-symbol quil)
   (:terminals (name integer complex semicolon newline left-paren right-paren comma expt times divide plus minus))
   (:precedence ((:right expt)
                 (:left times divide)
                 (:left plus minus)))
 
-  (expression
-   (gate-application separator expression (lambda (a b c) (list a c)))
+  (quil
+   (gate-application separator quil (lambda (a b c) (list a c)))
    (gate-application separator (picker 0))
    gate-application)
 
@@ -31,15 +31,26 @@
                   (alexandria:ensure-list qubits)))))
 
   (params-opt
-   (left-paren param-value-maybe-comma right-paren (picker 1))
+   (left-paren param-expression-maybe-comma right-paren (picker 1))
+   ;; (left-paren param-value-maybe-comma right-paren (picker 1))
    (left-paren right-paren (picker))
    ())
-  
-  (param-value-maybe-comma
-   (param-value comma param-value-maybe-comma (picker 0 2))
-   param-value)
-  
-  (param-value number)
+
+  (param-expression-maybe-comma
+   ;; Maybe these EVALs should live in PARAM-EXPRESSION?
+   (param-expression (lambda (exp) (eval exp)))
+   (param-expression comma param-expression-maybe-comma
+                     (lambda (a b c) (list (eval a) c))))
+
+  (param-expression
+   (param-expression plus   param-expression (binary '+))
+   (param-expression minus  param-expression (binary '-))
+   (param-expression times  param-expression (binary '*))
+   (param-expression divide param-expression (binary '/))
+   (param-expression expt   param-expression (binary '+))
+
+   (minus param-expression  (unary '-))
+   (number #'constant-value))
 
   (qubits
    (qubit qubits (picker 0 1))
@@ -75,13 +86,13 @@
 
   ("\\*" (return (values 'times  nil)))
   ("\\/" (return (values 'divide nil)))
-  ("\\*" (return (values 'plus   nil)))
-  ("\\*" (return (values 'minus  nil)))
+  ("\\+" (return (values 'plus   nil)))
+  ("\\-" (return (values 'minus  nil)))
   ("\\^" (return (values 'expt   nil)))
   
   ("(\\d*[.eE])(\\.?\\d)\\d*\\.?\\d*([eE][+-]?\\d+)?"
-   (return (values 'complex (quil::parse-complex $@ nil))))
-  ("\\d+" (return (values 'integer (quil::parse-integer $@))))
+   (return (values 'complex (constant (quil::parse-complex $@ nil)))))
+  ("\\d+" (return (values 'integer (constant (quil::parse-integer $@) quil-integer))))
   ("[A-Za-z_]([A-Za-z0-9_\\-]*[A-Za-z0-9_])?"
    (return
      (cond
