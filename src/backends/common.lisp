@@ -52,7 +52,7 @@
   (:documentation "Set the signature of the executbale."))
 
 (defgeneric sign-executable (executable private-key)
-  (:documentation "Sign the EXECUTABLE with PRIVATE-KEY. This should set the signature with SIGNATURE."))
+  (:documentation "Sign the EXECUTABLE with PRIVATE-KEY. This should set the signature with (SETF SIGNATURE)."))
 
 (defgeneric verify-signature (executable public-key)
   (:documentation "Verify the EXECUTABLE was signed by the owner of PUBLIC-KEY."))
