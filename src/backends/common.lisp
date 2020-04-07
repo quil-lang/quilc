@@ -78,5 +78,5 @@
 
 (defconstant +rsa-recommended-size-bits+ 3072)
 
-(defun generate-key-pair ()
+(defun generate-rsa-key-pair (&optional (num-bits +rsa-recommended-size-bits+))
   (ironclad:generate-key-pair ':rsa :num-bits +rsa-recommended-size-bits+))
