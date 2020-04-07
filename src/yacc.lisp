@@ -11,27 +11,66 @@
         (loop :for index :in indices :nconc (alexandria:ensure-list (elt args index)))
         nil)))
 
+(declaim (inline binary-eval))
+(defun binary-eval (head)
+  (lambda (e1 op e2)
+    (declare (ignore op))
+    (if (and (numberp e1) (numberp e2))
+        (eval (list head e1 e2))
+        (list head e1 e2))))
+
 (define-parser *quil-parser*
-  (:start-symbol quil)
-  (:terminals (name integer complex semicolon newline left-paren right-paren left-bracket right-bracket comma expt times divide plus minus declare bit octet integer real))
+  (:start-symbol program)
+  (:terminals (name integer complex semicolon colon newline left-paren right-paren left-bracket right-bracket comma expt times divide plus minus declare bit octet integer real sharing offset defgate indentation parameter))
   (:precedence ((:right expt)
                 (:left times divide)
                 (:left plus minus)))
 
+  ;; TODO FIXME How to incorporate leading semicolons and newlines?
+  ;; (i.e. those at the very beginning of a program) Maybe just do
+  ;; that before lexing?
+  (program
+   quil
+   (quil separator (lambda (a b) a))
+   (quil separator program (lambda (a b c) (list a c))))
+
   (quil
-   (declare-mem separator quil (lambda (a b c) (list a c)))
-   (declare-mem separator (lambda (a b) (list a)))
    declare-mem
-   (gate-application separator quil (lambda (a b c) (list a c)))
-   (gate-application separator (lambda (a b) a))
+   gate-definition
    gate-application)
+  
+  (gate-definition
+   (defgate name gate-definition-params colon newline gate-matrix
+     (lambda (dg n p c nl gm)
+       (let ((symbols (mapcar (a:compose #'intern #'param-name)
+                              (flatten p))))
+         (make-gate-definition n symbols gm)))))
+
+  (gate-matrix
+   (indentation gate-matrix-line newline gate-matrix (picker 1 3))
+   ())
+
+  (gate-matrix-line
+   (param-expression #'list)
+   (param-expression comma gate-matrix-line
+                     (lambda (e c l) (append (list e) l))))
+
+  (gate-definition-params
+   (left-paren gate-definition-params-maybe-comma right-paren
+               (lambda (a b c) (list b)))
+   ())
+  
+  (gate-definition-params-maybe-comma
+   parameter
+   (parameter comma gate-definition-params-maybe-comma (picker 0 2)))
 
   (gate-application
    (name params-opt qubits
          (lambda (name params qubits)
-           (apply #'quil::build-gate name
-                  (alexandria:ensure-list params)
-                  (alexandria:ensure-list qubits)))))
+           (make-instance 'unresolved-application
+                          :operator (named-operator name)
+                          :parameters (mapcar #'constant params)
+                          :arguments (a:ensure-list qubits)))))
 
   (params-opt
    (left-paren param-expression-maybe-comma right-paren (picker 1))
@@ -39,34 +78,50 @@
    ())
 
   (param-expression-maybe-comma
-   ;; Maybe these EVALs should live in PARAM-EXPRESSION?
-   (param-expression #'eval)
+   param-expression
    (param-expression comma param-expression-maybe-comma
-                     (lambda (a b c) (flatten (list (eval a) c)))))
+                     (lambda (a b c) (flatten (list a c)))))
 
   (param-expression
-   (param-expression plus param-expression (binary '+))
-   (param-expression minus param-expression (binary '-))
-   (param-expression times param-expression (binary '*))
-   (param-expression divide param-expression (binary '/))
-   (param-expression expt param-expression (binary 'expt))
-   (left-paren param-expression right-paren (picker 1))
+   (param-expression plus param-expression (binary-eval '+))
+   (param-expression minus param-expression (binary-eval '-))
+   (param-expression times param-expression (binary-eval '*))
+   (param-expression divide param-expression (binary-eval '/))
+   (param-expression expt param-expression (binary-eval 'expt))
+   (left-paren param-expression right-paren (lambda (a b c) b))
    (name left-paren param-expression right-paren
          (lambda (n l p r)
            (declare (ignore l r))
            (let ((f (validate-function n)))
-             (list f p))))
-
-   (minus param-expression (unary '-))
+             (if (numberp p)
+                 (eval (list f p))
+                 (list f p)))))
+   (parameter (lambda (p) (intern (param-name p))))
+   (minus param-expression (lambda (m e)
+                             (if (numberp e)
+                                 (- e)
+                                 (list '- e))))
    (number #'constant-value))
-
+  
+  ;; TODO Store names.
+  ;; TODO Check name isn't already defined.
   (declare-mem
    (declare name vector-type vector-size
             (lambda (d n vt vs)
               (make-memory-descriptor
                :name n
                :type (parse-quil-type vt)
-               :length (if vs (constant-value vs) 1)))))
+               :length (if vs (constant-value vs) 1))))
+   ;; TODO Can this be folded into the above?
+   ;; TODO Support multiple offsets
+   (declare name vector-type vector-size sharing name offset integer vector-type
+            (lambda (d n vt vs s sn o so sot)
+              (make-memory-descriptor
+               :name n
+               :type (parse-quil-type vt)
+               :length (if vs (constant-value vs) 1)
+               :sharing-parent sn
+               :sharing-offset-alist (list (cons (parse-quil-type sot) (constant-value so)))))))
 
   (vector-size
    (left-bracket integer right-bracket (lambda (a b c) b))
@@ -75,12 +130,16 @@
   (vector-type bit octet integer real)
 
   (qubits
-   (qubit qubits (picker 0 1))
-   qubit)
+   (qubit qubits (lambda (q qs) (list (qubit (constant-value q)) qs)))
+   (qubit (lambda (q) (qubit (constant-value q)))))
 
   (qubit integer)
 
   (number integer complex)
+
+  (separator?
+   separator
+   nil)
 
   (separator
    (semicolon separator (picker 0))
@@ -88,26 +147,25 @@
    semicolon
    newline))
 
-(defun yparse (quil)
-  (flatten
-   (a:ensure-list
-    (parse-with-lexer (quil-lexer quil)
-                      *quil-parser*))))
+(defun yparse-quil (quil)
+  (let ((raw-quil (flatten
+                   (a:ensure-list
+                    (parse-with-lexer (quil-lexer quil)
+                                      *quil-parser*)))))
+    (let ((pp (resolve-objects (raw-quil-to-unresolved-program raw-quil))))
+      (dolist (xform *standard-post-process-transforms* pp)
+        (setf pp (transform xform pp))))))
 
 (defun make-rz-quil-string (length)
-  ;; (with-output-to-string (s)
-  ;;   (quil:print-parsed-program
-  ;;    (cl-quil-benchmarking::random-1q-program
-  ;;     0 length :instruction-generators (list #'cl-quil-benchmarking::native-rz))
-  ;;    s))
   (with-output-to-string (s)
     (loop :repeat length :do
-      (format s "RZ(1.0) 0; "))))
+      (format s "RZ(3*pi + 3/(2-4*pi^3)) 0; "))))
 
 (define-string-lexer quil-lexer
   ("\\#[^\\n\\r]*" nil)
   ("(\\r\\n?|\\n)" (return (values 'newline nil)))
   ("\\;" (return (values 'semicolon nil)))
+  ("\\:" (return (values 'colon nil)))
   ("\\(" (return (values 'left-paren nil)))
   ("\\)" (return (values 'right-paren nil)))
   ("\\[" (return (values 'left-bracket nil)))
@@ -120,7 +178,12 @@
   ("\\-" (return (values 'minus  nil)))
   ("\\^" (return (values 'expt   nil)))
 
-  ("DECLARE|BIT|OCTET|INTEGER|REAL" (return (values (intern $@) $@)))
+  ("DEFGATE|DECLARE|BIT|OCTET|INTEGER|REAL|SHARING|OFFSET"
+   (return (values (intern $@) $@)))
+
+  ("\\%([A-Za-z_]([A-Za-z0-9_\\-]*[A-Za-z0-9_])?)"
+   (assert (not (null $1)))
+   (return (values 'parameter (param $1))))
   
   ("(\\d*[.eE])(\\.?\\d)\\d*\\.?\\d*([eE][+-]?\\d+)?"
    (return (values 'complex (constant (quil::parse-complex $@ nil)))))
@@ -130,7 +193,11 @@
      (cond
        ((string= "pi" $@) (values 'complex (constant pi)))
        ((string= "i" $@) (values 'complex (constant #C(0.0d0 1.0d0))))
-       (t (values 'name $@))))))
+       (t (values 'name $@)))))
+
+  ("(    |\\t)+" (return (values 'indentation (parse-indent-string $@))))
+  ("[^\\S\\n\\r]+"
+   nil))
 
 ;; (setf things (quil-lexer "RX 0"))
 ;; (parse-with-lexer things *quil-parser*)
