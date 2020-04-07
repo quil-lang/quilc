@@ -7,7 +7,7 @@
 ;;; The BACKEND protocol
 ;;;
 ;;; The BACKEND class is used primarily to determine available
-;;; baackends primarily by computing subclasses.
+;;; backends primarily by computing subclasses.
 
 (defclass backend ()
   ()
