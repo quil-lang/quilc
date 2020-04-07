@@ -62,7 +62,7 @@
 (defgeneric compile-to-backend (program chip-spec backend)
   (:documentation "Compile the PROGRAM which comports to the CHIP-SPEC to an executable for BACKEND."))
 
-;;;;;;;;;;;;;;; Backend Construction Library Functiona ;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;; Backend Construction Library Functions ;;;;;;;;;;;;;;;
 
 ;;; The things below aren't part of the protocol, but generally useful.
 
