@@ -14,7 +14,7 @@ The `quil` backend is a minimal, dummy backend that emits Quil, and can be used 
 
 1. Make a new directory for your backend.
 
-1. Implement the `BACKEND`, `EXECUTABLE`, and `COMPILATION` protocols in `common.lisp`.
+2. Implement the `BACKEND`, `EXECUTABLE`, and `COMPILATION` protocols in `common.lisp`.
 
 ## Example usage
 
