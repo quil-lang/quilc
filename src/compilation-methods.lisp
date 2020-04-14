@@ -281,18 +281,17 @@ Returns a value list: (processed-program, of type parsed-program
          (touch-unpreserved-block (blk registrant)
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
-               (let ((*addresser-use-1q-queues* (eq *default-addresser-state-class* 'temporal-addresser-state)))
-                 (do-greedy-addressing
-                     (make-instance *default-addresser-state-class*
-                                    :chip-spec chip-specification
-                                    :initial-l2p (if registrant
-                                                     (basic-block-in-rewiring blk)
-                                                     initial-rewiring))
-                   (coerce (basic-block-code blk) 'list)
-                   :initial-rewiring (if registrant
-                                         (basic-block-in-rewiring blk)
-                                         initial-rewiring)
-                   :use-free-swaps (null registrant)))
+               (do-greedy-addressing
+                   (make-instance *default-addresser-state-class*
+                                  :chip-spec chip-specification
+                                  :initial-l2p (if registrant
+                                                   (basic-block-in-rewiring blk)
+                                                   initial-rewiring))
+                 (coerce (basic-block-code blk) 'list)
+                 :initial-rewiring (if registrant
+                                       (basic-block-in-rewiring blk)
+                                       initial-rewiring)
+                 :use-free-swaps (null registrant))
              (let* ((duration (chip-schedule-duration chip-schedule))
                     (straight-line-quil (chip-schedule-to-straight-quil chip-schedule))
                     (local-topological-swaps (count-if #'swap-application-p straight-line-quil))
@@ -314,15 +313,14 @@ Returns a value list: (processed-program, of type parsed-program
          (touch-reset-block (blk)
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
-               (let ((*addresser-use-1q-queues* (eq *default-addresser-state-class* 'temporal-addresser-state)))
-                 (do-greedy-addressing
-                     (make-instance *default-addresser-state-class*
-                                    :chip-spec chip-specification
-                                    :initial-l2p (prog-initial-rewiring parsed-program chip-specification
-                                                                        :type rewiring-type))
-                   (coerce (basic-block-code blk) 'list)
-                   :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
-                                                            :type rewiring-type)))
+               (do-greedy-addressing
+                   (make-instance *default-addresser-state-class*
+                                  :chip-spec chip-specification
+                                  :initial-l2p (prog-initial-rewiring parsed-program chip-specification
+                                                                      :type rewiring-type))
+                 (coerce (basic-block-code blk) 'list)
+                 :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
+                                                          :type rewiring-type))
              (let* ((duration (chip-schedule-duration chip-schedule))
                     (straight-line-quil (chip-schedule-to-straight-quil chip-schedule))
                     (local-topological-swaps (count-if #'swap-application-p straight-line-quil))

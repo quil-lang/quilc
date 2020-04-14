@@ -22,9 +22,10 @@
     (dolist (quil::*default-addresser-state-class*
              (list 'quil::temporal-addresser-state
                    'quil::fidelity-addresser-state))
-      (let* ((pp (quil::parse-quil text))
-             (cpp (quil::compiler-hook pp chip :protoquil t)))
-        (is (quil::operator= orig-mat (quil::parsed-program-to-logical-matrix cpp)))))))
+      (dolist (quil::*addresser-use-1q-queues* (list t nil))
+        (let* ((pp (quil::parse-quil text))
+               (cpp (quil::compiler-hook pp chip :protoquil t)))
+          (is (quil::operator= orig-mat (quil::parsed-program-to-logical-matrix cpp))))))))
 
 (deftest test-fidelity-addresser-subschedule ()
   (flet ((gate= (gate-1 gate-2)

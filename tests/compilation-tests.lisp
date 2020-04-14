@@ -169,6 +169,7 @@ CNOT 0 2"))
 (deftest test-ccnot-compilation-on-cphase-iswap ()
   "Test that CCNOT compiles nicely on a line having the (:CPHASE ISWAP) architecture."
   (let* ((quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
+         (quil::*addresser-use-1q-queues* t)
          (chip (quil::build-nq-linear-chip 3 :architecture '(:cphase :cz :iswap)))
          (orig-prog (quil::parse-quil "CCNOT 0 1 2"))
          (orig-matrix (quil::parsed-program-to-logical-matrix orig-prog))
