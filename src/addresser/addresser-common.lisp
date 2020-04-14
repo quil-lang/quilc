@@ -56,7 +56,7 @@
 ;;; different methods will invoke these guts after binding particular behaviors
 ;;; to various hooks.
 ;;;
-;;; See DO-GREEDY-TEMPORAL-ADDRESSING below for the main entry point.
+;;; See DO-GREEDY-ADDRESSING below for the main entry point.
 
 (defvar *addresser-max-swap-sequence-length* 1000
   "Controls the maximum number of swaps that can occur in a row.")
@@ -93,10 +93,10 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
 ;;;   - path-heuristic (for GREEDY-PATH)
 (deftype addresser-search-type () '(member :a* :greedy-qubit :greedy-path))
 
-(defvar *addresser-swap-search-type* ':greedy-qubit
+(defvar *addresser-gates-swap-search-type* ':greedy-qubit
   "The type of swap search the addresser should use when selecting gates.")
 
-(defvar *addresser-move-to-rewiring-swap-search-type* ':a*
+(defvar *addresser-rewiring-swap-search-type* ':a*
   "The type of swap search the addresser should use when doing move-to-rewiring.")
 
 ;;; A pseudoinstruction class used to send directives to the addresser
@@ -128,7 +128,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
       state
     (format-noise "SELECT-SWAP-LINKS: entering SWAP selection phase.")
     (let ((gates-in-waiting (weighted-future-gates state)))
-      (select-swaps-for-gates *addresser-swap-search-type*
+      (select-swaps-for-gates *addresser-gates-swap-search-type*
                               working-l2p
                               gates-in-waiting
                               state
@@ -153,7 +153,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
             :do (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
                         "Too many rewirings tried: ~a" (length rewirings-tried))
             :do (let ((links (select-swaps-for-rewiring
-                              *addresser-move-to-rewiring-swap-search-type*
+                              *addresser-rewiring-swap-search-type*
                               rewiring target-rewiring addresser-state rewirings-tried)))
                   (dolist (link-index links)
                     (embed-swap link-index
@@ -588,9 +588,8 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
     (dolist (instr instrs unassigned-qubits)
       (dolist (qubit (cl-quil.resource::resource-qubits-list
                       (instruction-resources instr)))
-        (unless (or (apply-rewiring-l2p rewiring qubit)
-                    (member qubit unassigned-qubits))
-          (push qubit unassigned-qubits))))))
+        (unless (apply-rewiring-l2p rewiring qubit)
+          (pushnew qubit unassigned-qubits))))))
 
 (defun try-to-assign-qubits (state instrs)
   "Attempt to assign a logical qubit from INSTRS to a physical qubit, as managed by the addresser state STATE."

@@ -12,23 +12,18 @@
                 :documentation "The initial logical-to-physical rewiring."
                 :type rewiring)
    (working-l2p :accessor addresser-state-working-l2p
-                :initarg :working-l2p
                 :documentation "The working / current logical-to-physical rewiring. NOTE: This get mutated a _lot_."
                 :type rewiring)
    (qq-distances :accessor addresser-state-qq-distances
-                 :initarg :qq-distances
                  :documentation "Precomputed SWAP penalties between separated qubits."
-                 :type array)
+                 :type (array real (* *)))
    (qubit-cc :accessor addresser-state-qubit-cc
-             :initarg :qubit-cc
              :documentation "The connected component where newly-assigned qubits will live."
              :type list)
    (lschedule :accessor addresser-state-logical-schedule
-              :initarg :lschedule
               :documentation "The logical schedule of not-yet-processed instructions."
               :type logical-schedule)
    (chip-sched :accessor addresser-state-chip-schedule
-               :initarg :chip-sched
                :documentation "The outgoing schedule of processed instructions."
                :type chip-schedule)
    (chip-spec :accessor addresser-state-chip-specification
@@ -36,8 +31,8 @@
               :documentation "The CHIP-SPECIFICATION governing native-ness."
               :type chip-specification)
    (1q-queues :accessor addresser-state-1q-queues
-              :initarg :1q-queues
-              :documentation "The family of queues where not-yet-scheduled 1Q instructions live, while we get them out of the way to process 2Q instructions.")))
+              :documentation "The family of queues where not-yet-scheduled 1Q instructions live, while we get them out of the way to process 2Q instructions."))
+  (:documentation "Common state to be manipulated by addressing routines. Implementations may often opt for more, but this represents the minimum that is expectred."))
 
 (defmethod initialize-instance :after ((instance addresser-state)
                                        &rest initargs
@@ -67,9 +62,9 @@
 
 (defmacro with-rotatef (places &body body)
   "Evaluate BODY under a rotation of PLACES, then restore these to their original values."
-  `(prog2
-       (rotatef ,@places)
-       (progn ,@body)
+  `(unwind-protect
+        (progn (rotatef ,@places)
+               ,@body)
      (rotatef ,@(reverse places))))
 
 ;;; Current addresser types (of which there are two: the temporal addresser and
@@ -84,7 +79,7 @@
 ;;; like.
 
 (defgeneric weighted-future-gates (state)
-  (:documentation "Collect gates from the logical schedule, along with weights which indicate how far into the future the gate occurs.
+  (:documentation "Collect gates from the logical schedule, along with weights which indicate how far into the future the gate occurs. The precise interpretation of this depends on the implementation of COST-FUNCTION, but generally it is expected that a larger weight indicates that the gate occurs 'farther' away in the future.
 
 Returns a hash mapping gates from the logical schedule to numeric values."))
 
@@ -109,15 +104,16 @@ INSTR is the \"active instruction\".
 ;;; Since sometimes costs are compound objects which encode various values, they
 ;;; must implement the following:
 
-(defgeneric cost-< (val1 val2)
+(defgeneric cost-< (x y)
   (:documentation "Generic comparison function for heuristic values.")
-  (:method ((val1 number) (val2 number))
-    (< (- val1 +double-comparison-threshold-strict+) val2)))
+  (:method ((x real) (y real))
+    (< (- x +double-comparison-threshold-strict+) y)))
 
-(defgeneric cost-= (val1 val2)
+(defgeneric cost-= (x y)
   (:documentation "Generic equality function for heuristic values.")
-  (:method ((val1 number) (val2 number))
-    (double= val1 val2)))
+  (:method ((x real) (y real))
+    (< (abs (- x y))
+       +double-comparison-threshold-strict+)))
 
 (defgeneric cost-flatten (cost)
   (:documentation "Flattens COST to a REAL.  Preserves cost ordering whenever only one of GATE-WEIGHTS or INSTR was provided to COST-FUNCTION.")
