@@ -5,7 +5,7 @@
 (in-package #:cl-quil-tests)
 
 (deftest test-rewiring-shuffle ()
-  (dolist (quil::*addresser-swap-search-type* '(:a* :greedy-qubit :greedy-path))
+  (dolist (quil::*addresser-gates-swap-search-type* '(:a* :greedy-qubit :greedy-path))
     (not-signals error
       (let ((text "CNOT 2 0"))
         (is (quil::operator=

@@ -395,8 +395,8 @@
     (make-assignments
         ((*random-state* (seed-random-state))
          (quil::*compressor-passes* 0))
-        (quil::*addresser-swap-search-type*
-         quil::*addresser-move-to-rewiring-swap-search-type*)
+        (quil::*addresser-gates-swap-search-type*
+         quil::*addresser-rewiring-swap-search-type*)
       :control   (:greedy-qubit :greedy-qubit)
       :path      (:greedy-path  :greedy-path)
       :a*        (:a*           :a*)
@@ -407,8 +407,8 @@
       ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
-       quil::*addresser-swap-search-type*
-       quil::*addresser-move-to-rewiring-swap-search-type*
+       quil::*addresser-gates-swap-search-type*
+       quil::*addresser-rewiring-swap-search-type*
        quil::*addresser-a*-swap-search-heuristic-scale*)
     :control (:random  :greedy-qubit :greedy-qubit 1d0)
     :naive   (:naive   :greedy-qubit :greedy-qubit 1d0)
@@ -426,8 +426,8 @@
       ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
-       quil::*addresser-swap-search-type*
-       quil::*addresser-move-to-rewiring-swap-search-type*
+       quil::*addresser-gates-swap-search-type*
+       quil::*addresser-rewiring-swap-search-type*
        quil::*addresser-a*-swap-search-heuristic-scale*)
     :control   (:random  :greedy-qubit :greedy-qubit 1d0)
     :path      (:partial :greedy-path  :greedy-path  1d0)
@@ -442,7 +442,7 @@
   (make-assignments
       ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0)
-       (quil::*addresser-swap-search-type* :greedy-qubit))
+       (quil::*addresser-gates-swap-search-type* :greedy-qubit))
       (quil::*initial-rewiring-default-type*)
     :control   (:random)
     :naive     (:naive)
@@ -455,8 +455,8 @@
       ((*random-state* (seed-random-state))
        (quil::*compressor-passes* 0))
       (quil::*initial-rewiring-default-type*
-       quil::*addresser-swap-search-type*
-       quil::*addresser-move-to-rewiring-swap-search-type*
+       quil::*addresser-gates-swap-search-type*
+       quil::*addresser-rewiring-swap-search-type*
        quil::*addresser-a*-swap-search-heuristic-scale*
        quil::*addresser-a*-distance-metric*
        )

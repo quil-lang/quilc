@@ -89,8 +89,8 @@ CNOT 0 1")
         (%parsed-program-to-logical-matrix-rewiring-test pp cpp))))
   ;; then, the block-to-block rewiring methods.
   ;; i'm too lazy to check correctness, but we're at least exercising the pathway.
-  (dolist (quil::*addresser-move-to-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
-    (format t "~&    Testing addresser move type ~A~%" quil::*addresser-move-to-rewiring-swap-search-type*)
+  (dolist (quil::*addresser-rewiring-swap-search-type* '(:greedy-path :greedy-qubit :a*))
+    (format t "~&    Testing addresser move type ~A~%" quil::*addresser-rewiring-swap-search-type*)
     (finish-output)
     (let* ((pp (quil::parse-quil "
 LABEL @a

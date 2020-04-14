@@ -8,7 +8,9 @@
 ;;; costly.
 ;;;
 ;;; This is done via a system of "1Q Queues", which stash the 1Q operations
-;;; during addressing and then are flushed at appropriate times.
+;;; during addressing and then are flushed at appropriate times. Routines for
+;;; managing these queues are found here, but are mostly called by the
+;;; addressing procedures in addresser-common.lisp.
 
 (defun find-ending-1q-line (chip-sched qubit)
   "Find the ending location of QUBIT, following the swaps in CHIP-SCHED."
@@ -112,6 +114,7 @@ following swaps."
 
 (defun flush-1q-instructions-after-wiring (state qubit)
   "Flush the 1Q queue for QUBIT after potentially assigning it to a physical location."
+  (check-type state addresser-state)
   (with-slots (working-l2p chip-sched qubit-cc 1q-queues) state
     (let ((physical (apply-rewiring-l2p working-l2p qubit)))
       (unless physical
@@ -126,6 +129,7 @@ following swaps."
 
 (defun partially-flush-1Q-queues (state resources)
   "Flush any part of any 1Q queue that touches a given set of non-quantum RESOURCES."
+  (check-type state addresser-state)
   (with-slots (chip-spec 1q-queues) state
     ;; for each qubit line
     (dotimes (qubit (chip-spec-n-qubits chip-spec))
@@ -148,6 +152,7 @@ following swaps."
 
 (defun add-instruction-to-1Q-queue (state instr)
   "Add the 1Q instruction to the queues."
+  (check-type state addresser-state)
   (assert (= 1 (length (application-arguments instr)))
           nil
           "Attempted to add instruction ~/quil:instruction-fmt/ to 1Q queues."
