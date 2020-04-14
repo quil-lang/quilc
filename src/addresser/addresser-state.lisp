@@ -64,6 +64,14 @@
           (addresser-state-chip-specification instance) chip-spec
           (addresser-state-1q-queues instance) (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))))
 
+
+(defmacro with-rotatef (places &body body)
+  "Evaluate BODY under a rotation of PLACES, then restore these to their original values."
+  `(prog2
+       (rotatef ,@places)
+       (progn ,@body)
+     (rotatef ,@(reverse places))))
+
 ;;; Current addresser types (of which there are two: the temporal addresser and
 ;;; fidelity addresser) subclass ADDRESSER-STATE and then implement methods on a
 ;;; few generics listed below. Mostly this has to do assigning and manipulating

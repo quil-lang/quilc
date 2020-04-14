@@ -96,16 +96,16 @@ instruction if it exists, and errors otherwise."
         (values (list link-index) rewirings-tried)))))
 
 (defmethod select-swaps-for-gates ((search-type (eql ':greedy-qubit)) rewiring gates-in-waiting addresser-state rewirings-tried)
-  (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
-           (let ((modified-state (copy-instance addresser-state)))
-             (setf (addresser-state-working-l2p modified-state) rewiring)
-             (cost-function modified-state
-                            :gate-weights gate-weights
-                            :instr instr))))
-    (push (copy-rewiring rewiring) rewirings-tried)
-    (let ((link-index
-            (select-cost-lowering-swap rewiring
-                                       (addresser-state-chip-specification addresser-state)
-                                       #'cost-function
-                                       rewirings-tried)))
-      (values (list link-index) rewirings-tried))))
+  (with-slots (chip-spec working-l2p) addresser-state
+    (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
+             (with-rotatef (working-l2p rewiring)
+               (cost-function addresser-state
+                              :gate-weights gate-weights
+                              :instr instr))))
+      (push (copy-rewiring rewiring) rewirings-tried)
+      (let ((link-index
+              (select-cost-lowering-swap rewiring
+                                         chip-spec
+                                         #'cost-function
+                                         rewirings-tried)))
+        (values (list link-index) rewirings-tried)))))
