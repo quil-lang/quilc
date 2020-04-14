@@ -145,3 +145,13 @@ following swaps."
              (return)
              ;; if we didn't intersect, move the pointer on the first segment
         :collect instr :into first-segment))))
+
+(defun add-instruction-to-1Q-queue (state instr)
+  "Add the 1Q instruction to the queues."
+  (assert (= 1 (length (application-arguments instr)))
+          nil
+          "Attempted to add instruction ~/quil:instruction-fmt/ to 1Q queues."
+          instr)
+  (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
+  (push instr (aref (addresser-state-1q-queues state)
+                    (qubit-index (first (application-arguments instr))))))

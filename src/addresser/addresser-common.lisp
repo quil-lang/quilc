@@ -325,14 +325,8 @@ Two other values are returned: a list of fully rewired instructions for later sc
                  instr)
          (when dry-run-escape
            (funcall dry-run-escape))
-         (format-noise
-          "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a 1Q ~
-instruction, adding to logical queue."
-          instr)
-         ;; dequeue and set the dirty bit
-         (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
-         (push instr (aref (addresser-state-1q-queues state)
-                           (qubit-index (first (application-arguments instr)))))
+
+         (add-instruction-to-1q-queue state instr)
          (setf dirty-flag t))
         ;; is it a rewiring pseudoinstruction?
         ((typep instr 'application-force-rewiring)

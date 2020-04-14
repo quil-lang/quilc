@@ -479,7 +479,7 @@
     (make-assignments
         ((*random-state* (seed-random-state))
          (quil::*compressor-passes* 1))
-        (quil::*default-addresser-state-class*)
-      :duration   ('quil::temporal-addresser-state)
-      :fidelity   ('quil::fidelity-addresser-state)
+        (quil::*default-addresser-state-class* quil::*addresser-use-1q-queues*)
+      :duration   ('quil::temporal-addresser-state t)
+      :fidelity   ('quil::fidelity-addresser-state nil)
       ))

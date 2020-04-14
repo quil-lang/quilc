@@ -70,6 +70,7 @@
       (print-rule)
       (let ((chip (quil::build-ibm-qx5))
             (quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
+            (quil::*addresser-use-1q-queues* t)
             (quil::*safe-include-directory* (asdf:system-relative-pathname :cl-quil "tests/qasm-files/")))
         (dolist (file (qasm-test-files))
           (format t "| ~Va " 16 (trim-long-string (pathname-name file) 16))
