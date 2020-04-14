@@ -287,19 +287,15 @@ should stop with the given rewiring and false otherwise."
               rewirings-tried))))
 
 (defmethod select-swaps-for-gates ((search-type (eql ':a*)) rewiring gates-in-waiting addresser-state rewirings-tried)
-  (with-slots (chip-spec chip-sched) addresser-state
+  (with-slots (chip-spec chip-sched working-l2p) addresser-state
     (flet ((cost-function (rewiring &key instr (gate-weights gates-in-waiting))
              (declare (ignore instr))
-             (let ((modified-state (copy-instance addresser-state)))
-               ;; TODO
-               (setf (addresser-state-working-l2p addresser-state) rewiring)
+             (with-rotatef (working-l2p rewiring)
                (* *addresser-a*-swap-search-heuristic-scale*
-                  (cost-flatten (cost-function modified-state :gate-weights gate-weights)))))
-           (done-function (rewiring2)
-             (prog2
-                 (rotatef rewiring2 rewiring)
-                 (dequeue-logical-to-physical addresser-state :dry-run t)
-               (rotatef rewiring2 rewiring))))
+                  (cost-flatten (cost-function addresser-state :gate-weights gate-weights)))))
+           (done-function (rewiring)
+             (with-rotatef (working-l2p rewiring)
+               (dequeue-logical-to-physical addresser-state :dry-run t))))
       (let ((links (search-rewiring chip-spec rewiring
                                     (chip-schedule-qubit-times chip-sched)
                                     #'cost-function #'done-function
