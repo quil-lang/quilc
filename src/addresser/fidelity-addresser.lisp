@@ -179,12 +179,10 @@
       (declare (ignore max-value))
       value-hash)))
 
-;;; We also specialize this, to set up some state before this stage of swap
-;;; selection.
-(defmethod select-and-embed-a-permutation ((state temporal-addresser-state) rewirings-tried)
-  ;; randomize cost function weights
-  ;; not sure exactly why -- possibly to break symmetry when
-  ;; swap selection fails and we rerun?
+
+(defmethod select-and-embed-a-permutation ((state fidelity-addresser-state) rewirings-tried)
+  ;; randomize cost function weights to break
+  ;; symmetry when swap selection fails and we rerun?
   (let ((*cost-fn-tier-decay* (+ 0.25d0 (random 0.5d0)))
         (*cost-fn-dist-decay* (+ 0.25d0 (random 0.5d0))))
     (call-next-method)))
