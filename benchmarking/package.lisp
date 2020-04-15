@@ -22,6 +22,8 @@
                 pragma-end-block
                 pragma-commuting-blocks
                 pragma-initial-rewiring)
+  (:local-nicknames (:a :alexandria))
+
   ;; suite.lisp
   (:export
    #:run-benchmarks)
