@@ -2,11 +2,15 @@
   :depends-on (#:cl-quil
                #:trivial-benchmark
                #:bordeaux-threads
-               #:trivial-garbage)
+               #:trivial-garbage
+               #:lparallel)
   :license "Apache License 2.0 (See LICENSE.txt)"
   :pathname "benchmarking/"
   :serial t
   :components ((:file "package")
+               (:file "utils")
                (:file "rewiring-analysis")
                (:file "qasm-benchmarks")
+               (:file "compressor-benchmarks")
+               (:file "chip-spec-benchmarks")
                (:file "suite")))

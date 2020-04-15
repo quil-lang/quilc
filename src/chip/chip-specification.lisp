@@ -463,6 +463,7 @@ Compilers are listed in descending precedence.")
   "Initializes the compiler feature sets of HARDWARE-OBJECT instances installed on a CHIP-SPECIFICATION.  Preserves whatever feature sets might be there already; don't call this repeatedly."
   (dotimes (order (length (chip-specification-objects chip-specification)) chip-specification)
     (loop :for obj :across (vnth order (chip-specification-objects chip-specification))
+          :unless (hardware-object-dead-p obj)
           :do (handler-case
                   (setf (hardware-object-compilation-methods obj)
                         (concatenate 'vector
@@ -764,6 +765,25 @@ Compilers are listed in descending precedence.")
       (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (loop :for (control target) :in digraph :do
       (install-link-onto-chip chip-spec control target :architecture architecture))
+    (warm-hardware-objects chip-spec)))
+
+(defun build-chip-from-graph (graph &key (architecture ':cz))
+  "Build a CHIP-SPECIFICATION from the directed graph DIGRAPH. DIGRAPH is a list of pairs (qa, qb) which implies there is a (directed) two-qubit gate from qubit qa to qubit qb."
+  (let ((nqubits (1+ (reduce #'max (a:flatten graph))))
+        (chip-spec (make-chip-specification
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
+    (install-generic-compilers chip-spec architecture)
+    (loop :for q :below nqubits :do
+      (adjoin-hardware-object (build-qubit q :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    ;; Mark dead qubits
+    (loop :for deadq :in (set-difference (loop :for i :below nqubits :collect i)
+                                         (remove-duplicates (a:flatten graph)))
+          :do (setf (gethash "dead" (hardware-object-misc-data
+                                     (chip-spec-hw-object chip-spec 0 deadq)))
+                    t))
+    (loop :for (control target) :in graph :do
+      (install-link-onto-chip chip-spec control target :architecture architecture)
+      (install-link-onto-chip chip-spec target control :architecture architecture))
     (warm-hardware-objects chip-spec)))
 
 (defun build-ibm-qx5 ()
