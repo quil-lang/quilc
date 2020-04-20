@@ -463,7 +463,7 @@ Compilers are listed in descending precedence.")
   "Initializes the compiler feature sets of HARDWARE-OBJECT instances installed on a CHIP-SPECIFICATION.  Preserves whatever feature sets might be there already; don't call this repeatedly."
   (dotimes (order (length (chip-specification-objects chip-specification)) chip-specification)
     (loop :for obj :across (vnth order (chip-specification-objects chip-specification))
-          :unless (hardware-object-dead-p obj)
+          ;; :unless (hardware-object-dead-p obj)
           :do (handler-case
                   (setf (hardware-object-compilation-methods obj)
                         (concatenate 'vector

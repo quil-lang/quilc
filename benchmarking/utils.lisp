@@ -50,4 +50,4 @@
             :append (link-below-octagon octagon-index))))
 
 (defun build-tiled-octagon (number-of-octagons max-width)
-  (quil::build-chip-from-graph (tiled-octagon-graph number-of-octagons max-width)))
+  (quil::build-chip-from-digraph (tiled-octagon-graph number-of-octagons max-width)))

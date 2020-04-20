@@ -1,34 +1,39 @@
 (in-package :cl-quil-benchmarking)
 
 (defun benchmark-fully-connected-chip (size)
-  (build-nq-fully-connected-chip size))
+  (quil::build-nq-fully-connected-chip size))
 
 (defun benchmark-linear-chip (size)
-  (build-nq-linear-chip size))
+  (quil::build-nq-linear-chip size))
 
 (defun benchmark-banyan-type-chip (size)
   (build-tiled-octagon size 5))
 
-(defun run-chip-spec-benchmarks (chip-constructor
-                                 max
-                                 &key
-                                   (min 1)
-                                   (step 1)
-                                   completion-callback)
+(defun run-chip-spec-benchmark (chip-constructor
+                                max
+                                &key
+                                  (min 1)
+                                  (step 1)
+                                  completion-callback)
   (loop :for i :from min :upto max :by step
-        :for avg-time := (with-timing (3)
+        :for avg-time := (with-timing (2)
                            (funcall chip-constructor i))
-        :do (format t "~4F%~%" (* 100 (/ i (- max min))))
+        :do (format t "~a of ~a~%" i max)
         :when completion-callback :do
           (funcall completion-callback i avg-time)
         :collect (cons i avg-time)))
 
-;; (defun run-banyan-type-chip-benchmarks ()
-;;   (loop :for width := 5
-;;         :for height :from 1 :upto 10
-;;         :for avg-time := (with-timing (2) (build-tiled-octagon width height))
-;;         :do (format t "~4F%~%" (* 100 (/ height 4)))
-;;         :collect (cons height avg-time)))
+(defun run-all-chip-spec-benchmarks ()
+  (let ((benchmarks (list (list "fully-connected" #'benchmark-fully-connected-chip 10 160 10)
+                          (list "linearly-connected" #'benchmark-linear-chip 10 160 10)
+                          (list "banyan" #'benchmark-banyan-type-chip 5 40 5))))
+    (loop :for (name fn min max step) :in benchmarks
+          :for file := (format nil "results/~a.txt" name) :do
+            (with-open-file (s file :direction :output :if-exists :supersede :if-does-not-exist :create)
+              (write-line "# size avg-time" s))
+            (format t "Benchmarking chip constructor ~A~%" name)
+            (run-chip-spec-benchmark fn max :min min :step step :completion-callback (alexandria:curry #'save-benchmark file))
+            (terpri))))
 
 (defun save-benchmark (filename size avg-time)
   (with-output-appending-file (s filename)
