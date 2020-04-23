@@ -3,7 +3,8 @@
                #:trivial-benchmark
                #:bordeaux-threads
                #:trivial-garbage
-               #:lparallel)
+               #:lparallel
+               #:qvm-examples)
   :license "Apache License 2.0 (See LICENSE.txt)"
   :pathname "benchmarking/"
   :serial t
@@ -11,6 +12,7 @@
                (:file "utils")
                (:file "rewiring-analysis")
                (:file "qasm-benchmarks")
+               (:file "addresser-benchmarks")
                (:file "compressor-benchmarks")
                (:file "chip-spec-benchmarks")
                (:file "suite")))

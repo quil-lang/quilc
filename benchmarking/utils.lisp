@@ -6,10 +6,11 @@
     `(loop :repeat ,n
            :for ,time-start := (get-internal-real-time)
            :do (progn ,@body)
-           :summing (/ (- (get-internal-real-time) ,time-start)
+           :collect (/ (- (get-internal-real-time) ,time-start)
                        internal-time-units-per-second)
              :into timings
-           :finally (return (/ timings ,n)))))
+           :finally (return (values (alexandria:mean timings)
+                                    (alexandria:standard-deviation timings))))))
 
 (defun chip-spec-offset-qubits (chip offset))
 
@@ -51,3 +52,20 @@
 
 (defun build-tiled-octagon (number-of-octagons max-width)
   (quil::build-chip-from-digraph (tiled-octagon-graph number-of-octagons max-width)))
+
+(defun file> (filepath fmt &rest args)
+  (check-type filepath pathname)
+  (check-type fmt string)
+  (with-open-file (s filepath :direction :output :if-exists :supersede :if-does-not-exist :create)
+    (write-string (apply #'format nil fmt args) s)))
+
+(defun file>> (filepath fmt &rest args)
+  (check-type filepath pathname)
+  (check-type fmt string)
+  (with-open-file (s filepath :direction :output :if-exists :append :if-does-not-exist :create)
+    (write-string (apply #'format nil fmt args) s)))
+
+(defun clear-file (filepath)
+  "If a file at FILEPATH exists, delete and recreate it, otherwise create it."
+  (check-type filepath pathname)
+  (file> filepath ""))
