@@ -69,3 +69,8 @@
   "If a file at FILEPATH exists, delete and recreate it, otherwise create it."
   (check-type filepath pathname)
   (file> filepath ""))
+
+(defparameter *benchmarks-results-directory*
+  (asdf:system-relative-pathname
+   ':cl-quil-benchmarking
+   "benchmarking/results/"))
