@@ -330,13 +330,13 @@
 
    #:lexical-context                    ; GENERIC
 
-   #:gate-definition                    ; ABSTRACT CLASS
-   #:gate-definition-name               ; READER
-   #:gate-definition-entries            ; READER
-   #:matrix-gate-definition             ; CLASS
-   #:static-gate-definition             ; CLASS
-   #:parameterized-gate-definition      ; CLASS
-   #:gate-definition-parameters         ; READER
+   #:gate-definition                         ; ABSTRACT CLASS
+   #:gate-definition-name                    ; READER
+   #:gate-definition-entries                 ; READER
+   #:matrix-gate-definition                  ; CLASS
+   #:static-gate-definition                  ; CLASS
+   #:parameterized-gate-definition           ; CLASS
+   #:gate-definition-parameters              ; READER
    #:permutation-gate-definition             ; CLASS
    #:permutation-gate-definition-permutation ; READER
 
@@ -346,12 +346,12 @@
    #:circuit-definition-arguments       ; READER
    #:circuit-definition-body            ; READER
 
-   #:parsed-program                         ; CLASS
-   #:parsed-program-gate-definitions        ; READER
-   #:parsed-program-circuit-definitions     ; READER
-   #:parsed-program-memory-definitions      ; READER
-   #:parsed-program-executable-code         ; READER
-   #:print-parsed-program                   ; FUNCTION
+   #:parsed-program                     ; CLASS
+   #:parsed-program-gate-definitions    ; READER
+   #:parsed-program-circuit-definitions ; READER
+   #:parsed-program-memory-definitions  ; READER
+   #:parsed-program-executable-code     ; READER
+   #:print-parsed-program               ; FUNCTION
 
    #:*print-parsed-program-text*        ; PARAMETER
    #:*print-fractional-radians*         ; PARAMETER
@@ -463,11 +463,11 @@
 
   ;; pragmas.lisp
   (:export
-   #:pragma-qubit-index                 ; READER
-   #:pragma-matrix-entries              ; READER
-   #:pragma-qubit-arguments             ; READER
-   #:pragma-operator-name               ; READER
-   #:parsed-program-has-pragma-p        ; FUNCTION
+   #:pragma-qubit-index                   ; READER
+   #:pragma-matrix-entries                ; READER
+   #:pragma-qubit-arguments               ; READER
+   #:pragma-operator-name                 ; READER
+   #:parsed-program-has-pragma-p          ; FUNCTION
    #:parsed-program-has-preserve-blocks-p ; FUNCTION
    )
 
@@ -506,6 +506,11 @@
    #:2pi                                ; CONSTANT
    #:4pi                                ; CONSTANT
    )
+
+  ;; dsl.lisp
+  (:export
+   #:quil)
+  
   (:shadow
    #:pi))
 

@@ -61,6 +61,7 @@
                (:file "context")
                (:file "build-gate")
                (:file "define-compiler")
+               (:file "dsl")
                (:module "clifford"
                 :serial t
                 :components ((:file "qubit-algebra")
