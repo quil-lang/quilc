@@ -7,6 +7,7 @@
   ;; Both CL-QUIL and TRIVIAL-BENCHMARK define a RESET function --
   ;; tell CL to import neither.
   (:shadow #:reset)
+  (:local-nicknames (:a :alexandria))
 
   ;; suite.lisp
   (:export

@@ -1,23 +1,5 @@
 (in-package :cl-quil-benchmarking)
 
-(defun native-rz (qubit)
-  (build-gate "RZ" (list (random 2pi)) qubit))
-(defun native-rx (qubit)
-  (build-gate "RX" (list (alexandria:random-elt (list 0d0 -pi -pi/2 pi pi/2))) qubit))
-
-(defvar *1q-program-generators*
-  (list #'native-rz #'native-rx))
-
-(defun parsed-program-from-straight-line-quil (instructions)
-  (make-instance 'parsed-program
-                 :executable-code (coerce instructions 'vector)))
-
-(defun random-1q-program (qubit length &key (instruction-generators *1q-program-generators*))
-  (parsed-program-from-straight-line-quil
-   (loop :repeat length
-         :for generator := (alexandria:random-elt instruction-generators)
-         :collect (funcall generator qubit))))
-
 ;; (defun do-compression-experiment-native-rz-only ()
 ;;   (loop :with chip := (build-nq-linear-chip 1)
 ;;         :for i :from 1e3 :upto 1e4 :by 1e2

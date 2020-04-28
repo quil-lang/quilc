@@ -74,3 +74,54 @@
   (asdf:system-relative-pathname
    ':cl-quil-benchmarking
    "benchmarking/results/"))
+
+(defun native-rz (qubit)
+  (quil:build-gate "RZ" (list (random 2pi)) qubit))
+(defun native-rx (qubit)
+  (quil:build-gate "RX" (list (a:random-elt (list 0d0 -pi -pi/2 pi pi/2))) qubit))
+
+(defvar *1q-program-generators*
+  (list #'native-rz #'native-rx))
+
+(defun parsed-program-from-straight-line-quil (instructions)
+  (make-instance 'quil:parsed-program
+                 :executable-code (coerce instructions 'vector)))
+
+(defun random-1q-program (qubit length &key (instruction-generators *1q-program-generators*))
+  (parsed-program-from-straight-line-quil
+   (loop :repeat length
+         :for generator := (a:random-elt instruction-generators)
+         :collect (funcall generator qubit))))
+
+(defun xeb-program (layers chip-spec)
+  (let ((2q-layers
+          (loop :repeat layers
+                :collect
+                (let ((qubits (quil::chip-spec-live-qubits chip-spec)))
+                  (flet ((pop-random ()
+                           (let ((elt (a:random-elt qubits)))
+                             (setf qubits (remove elt qubits))
+                             elt))
+                         (pop-random-neighbor (q)
+                           (a:when-let* ((n (intersection (quil::chip-spec-adj-qubits chip-spec q) qubits))
+                                         (elt (a:random-elt n)))
+                             (setf qubits (remove elt qubits))
+                             elt)))
+                    (loop :for q := (pop-random)
+                          :for qn := (pop-random-neighbor q)
+                          :when qn
+                            :collect (quil:build-gate "CZ" nil q qn) :into czs
+                          :unless qubits
+                            :return czs))))))
+    (flet ((random-1q (q)
+             (a:random-elt (list (quil:build-gate "RZ" `(,pi/2) q)
+                                 (quil:build-gate "RZ" (list (/ pi 3)) q)
+                                 (quil:build-gate "RX" `(,pi/2) q)))))
+      (let ((circuit (a:flatten
+                      (mapcar (lambda (2q-layer)
+                                (append (list (quil:make-pragma '("LATEX_GATE_GROUP")))
+                                        (mapcar #'random-1q (quil::chip-spec-live-qubits chip-spec))
+                                        2q-layer
+                                        (list (quil:make-pragma '("END_LATEX_GATE_GROUP")))))
+                              2q-layers))))
+        (parsed-program-from-straight-line-quil circuit)))))
