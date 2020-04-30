@@ -125,3 +125,11 @@
                                         (list (quil:make-pragma '("END_LATEX_GATE_GROUP")))))
                               2q-layers))))
         (parsed-program-from-straight-line-quil circuit)))))
+
+(defmacro confirm ((message &rest format-args) &body body)
+  `(when (y-or-n-p ,message ,@format-args)
+     ,@body))
+
+(defun confirm-clear-file (file)
+  (confirm ("clear file ~S?" file)
+    (clear-file file)))

@@ -46,7 +46,7 @@
     (run-addresser-benchmarks-qft wilson 32
                                   :min-qubits 2
                                   :runs 10
-                                  :setup-fn (lambda () (clear-file output))
+                                  :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-qft-1x5 ()
@@ -55,7 +55,7 @@
     (run-addresser-benchmarks-qft 1x5 (* 5 8)
                                   :min-qubits 2
                                   :runs 10
-                                  :setup-fn (lambda () (clear-file output))
+                                  :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-qft-2x5 ()
@@ -64,7 +64,7 @@
     (run-addresser-benchmarks-qft 1x5 (* 10 8)
                                   :min-qubits 2
                                   :runs 10
-                                  :setup-fn (lambda () (clear-file output))
+                                  :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-qft-denali ()
@@ -73,7 +73,7 @@
     (run-addresser-benchmarks-qft 1x5 (* 5 20)
                                   :min-qubits 2
                                   :runs 1
-                                  :setup-fn (lambda () (clear-file output))
+                                  :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun bit-reversal-program (qubits)
@@ -115,7 +115,7 @@
     (run-addresser-benchmarks-bit-reversal wilson 32
                                            :min-qubits 2
                                            :runs 10
-                                           :setup-fn (lambda () (clear-file output))
+                                           :setup-fn (lambda () (confirm-clear-file output))
                                            :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-bit-reversal-1x5 ()
@@ -124,7 +124,7 @@
     (run-addresser-benchmarks-bit-reversal 1x5 (* 5 8)
                                            :min-qubits 2
                                            :runs 10
-                                           :setup-fn (lambda () (clear-file output))
+                                           :setup-fn (lambda () (confirm-clear-file output))
                                            :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-bit-reversal-6oct-5wid ()
@@ -133,7 +133,7 @@
     (run-addresser-benchmarks-bit-reversal 2x5 (* 6 8)
                                            :min-qubits 2
                                            :runs 10
-                                           :setup-fn (lambda () (clear-file output))
+                                           :setup-fn (lambda () (confirm-clear-file output))
                                            :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-bit-reversal-2x5 ()
@@ -142,7 +142,7 @@
     (run-addresser-benchmarks-bit-reversal 2x5 (* 10 8)
                                            :min-qubits 2
                                            :runs 2
-                                           :setup-fn (lambda () (clear-file output))
+                                           :setup-fn (lambda () (confirm-clear-file output))
                                            :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-bit-reversal-denali ()
@@ -151,7 +151,7 @@
     (run-addresser-benchmarks-bit-reversal denali (* 5 20)
                                            :min-qubits 2
                                            :runs 1
-                                           :setup-fn (lambda () (clear-file output))
+                                           :setup-fn (lambda () (confirm-clear-file output))
                                            :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 
@@ -181,11 +181,47 @@
                       :collect (cons i avg))
         :do (format t "~a of ~a~%" i max-qubits)))
 
+(defun addresser-benchmark-xeb-wilson ()
+  (let ((denali (build-tiled-octagon 4 4))
+        (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-wilson.txt")))
+    (run-addresser-benchmarks-bit-reversal denali (* 4 8)
+                                           :min-qubits 2
+                                           :runs 5
+                                           :setup-fn (lambda () (confirm-clear-file output))
+                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun addresser-benchmark-xeb-1x5 ()
+  (let ((denali (build-tiled-octagon 5 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-1x5.txt")))
+    (run-addresser-benchmarks-bit-reversal denali (* 5 8)
+                                           :min-qubits 2
+                                           :runs 5
+                                           :setup-fn (lambda () (confirm-clear-file output))
+                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun addresser-benchmark-xeb-6oct-5wid ()
+  (let ((denali (build-tiled-octagon 6 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-6oct-5wid.txt")))
+    (run-addresser-benchmarks-bit-reversal denali (* 6 8)
+                                           :min-qubits 2
+                                           :runs 5
+                                           :setup-fn (lambda () (confirm-clear-file output))
+                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun addresser-benchmark-xeb-2x5 ()
+  (let ((denali (build-tiled-octagon 10 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-2x5.txt")))
+    (run-addresser-benchmarks-bit-reversal denali (* 10 8)
+                                           :min-qubits 2
+                                           :runs 5
+                                           :setup-fn (lambda () (confirm-clear-file output))
+                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
 (defun addresser-benchmark-xeb-denali ()
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-denali.txt")))
-    (run-addresser-benchmarks-bit-reversal denali (* 5 8 4)
+    (run-addresser-benchmarks-bit-reversal denali (+ (* 5 8 4) 10)
                                            :min-qubits 2
-                                           :runs 1
-                                           :setup-fn (lambda () (clear-file output))
+                                           :runs 5
+                                           :setup-fn (lambda () (confirm-clear-file output))
                                            :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
