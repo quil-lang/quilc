@@ -182,7 +182,7 @@
 (defun addresser-benchmark-xeb-wilson ()
   (let ((denali (build-tiled-octagon 4 4))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-wilson.txt")))
-    (run-addresser-benchmarks-xeb denali (* 4 8)
+    (run-addresser-benchmarks-xeb denali 10
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
@@ -191,8 +191,8 @@
 (defun addresser-benchmark-xeb-1x5 ()
   (let ((denali (build-tiled-octagon 5 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-1x5.txt")))
-    (run-addresser-benchmarks-xeb denali (* 5 8)
-                                  :min-qubits 2
+    (run-addresser-benchmarks-xeb denali 10
+                                  :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
@@ -200,8 +200,8 @@
 (defun addresser-benchmark-xeb-6oct-5wid ()
   (let ((denali (build-tiled-octagon 6 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-6oct-5wid.txt")))
-    (run-addresser-benchmarks-xeb denali (* 6 8)
-                                  :min-qubits 2
+    (run-addresser-benchmarks-xeb denali 10
+                                  :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
@@ -209,8 +209,8 @@
 (defun addresser-benchmark-xeb-2x5 ()
   (let ((denali (build-tiled-octagon 10 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-2x5.txt")))
-    (run-addresser-benchmarks-xeb denali (* 10 8)
-                                  :min-qubits 2
+    (run-addresser-benchmarks-xeb denali 10
+                                  :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
@@ -218,8 +218,8 @@
 (defun addresser-benchmark-xeb-denali ()
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-denali.txt")))
-    (run-addresser-benchmarks-xeb denali (+ (* 5 8 4) 10)
-                                  :min-qubits 2
+    (run-addresser-benchmarks-xeb denali 10
+                                  :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
