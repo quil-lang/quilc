@@ -95,3 +95,68 @@
      (dolist (result results)
        (format s "~F ~F~%" (car result) (cdr result))))))
 
+
+(defun do-compressor-benchmark-xeb (qubits chip)
+  "Run a XEB program on the given QUBITS and CHIP. Returns the time spent in the addresser."
+  (let* ((program (xeb-program qubits chip))
+         (instructions (coerce (parsed-program-executable-code program) 'list)))
+    (with-timing (1)
+      (quil::compress-instructions instructions chip))))
+
+(defun run-compressor-benchmarks-xeb
+    (chip max-qubits &key (min-qubits 1) (step 1) (runs 1) setup-fn completion-fn)
+  "Run the XEB benchmarks against the compressor using CHIP, running from MIN-QUBITS to MAX-QUBITS in steps of size STEP. SETUP-FN is called before any benchmarks run. COMPLETION-FN runs after every benchmark (useful for streaming results to a file)."
+  (when setup-fn
+    (funcall setup-fn))
+  (loop :for i :from min-qubits :upto max-qubits :by step
+        :append (loop :repeat runs
+                      :for avg := (do-compressor-benchmark-xeb (a:iota i) chip)
+                      :when completion-fn :do
+                        (funcall completion-fn i avg)
+                      :collect (cons i avg))
+        :do (format t "~a of ~a~%" i max-qubits)))
+
+(defun compressor-benchmark-xeb-wilson ()
+  (let ((denali (build-tiled-octagon 4 4))
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-wilson.txt")))
+    (run-compressor-benchmarks-xeb denali (* 4 8)
+                                   :min-qubits 2
+                                   :runs 5
+                                   :setup-fn (lambda () (confirm-clear-file output))
+                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun compressor-benchmark-xeb-1x5 ()
+  (let ((denali (build-tiled-octagon 5 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-1x5.txt")))
+    (run-compressor-benchmarks-xeb denali (* 5 8)
+                                   :min-qubits 2
+                                   :runs 5
+                                   :setup-fn (lambda () (confirm-clear-file output))
+                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun compressor-benchmark-xeb-6oct-5wid ()
+  (let ((denali (build-tiled-octagon 6 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-6oct-5wid.txt")))
+    (run-compressor-benchmarks-xeb denali (* 6 8)
+                                   :min-qubits 2
+                                   :runs 5
+                                   :setup-fn (lambda () (confirm-clear-file output))
+                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun compressor-benchmark-xeb-2x5 ()
+  (let ((denali (build-tiled-octagon 10 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-2x5.txt")))
+    (run-compressor-benchmarks-xeb denali (* 10 8)
+                                   :min-qubits 2
+                                   :runs 5
+                                   :setup-fn (lambda () (confirm-clear-file output))
+                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+
+(defun compressor-benchmark-xeb-denali ()
+  (let ((denali (build-tiled-octagon 20 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-denali.txt")))
+    (run-compressor-benchmarks-xeb denali (+ (* 5 8 4) 10)
+                                   :min-qubits 2
+                                   :runs 5
+                                   :setup-fn (lambda () (confirm-clear-file output))
+                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))

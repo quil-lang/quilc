@@ -51,7 +51,11 @@
             :append (link-below-octagon octagon-index))))
 
 (defun build-tiled-octagon (number-of-octagons max-width)
-  (quil::build-chip-from-digraph (tiled-octagon-graph number-of-octagons max-width)))
+  (let ((chip (quil::build-chip-from-digraph (tiled-octagon-graph number-of-octagons max-width))))
+    (loop :for i :below (1- number-of-octagons) :do
+      (setf (gethash "dead" (quil::hardware-object-misc-data (quil::chip-spec-nth-qubit chip (+ (* 10 i) 8)))) t)
+      (setf (gethash "dead" (quil::hardware-object-misc-data (quil::chip-spec-nth-qubit chip (+ (* 10 i) 9)))) t))
+    chip))
 
 (defun file> (filepath fmt &rest args)
   (check-type filepath pathname)

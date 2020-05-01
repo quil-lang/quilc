@@ -156,9 +156,9 @@
 
 
 
-(defun do-addresser-benchmark-xeb (qubits chip)
+(defun do-addresser-benchmark-xeb (layers chip)
   "Run a XEB program on the given QUBITS and CHIP. Returns the time spent in the addresser."
-  (let* ((program (xeb-program qubits chip))
+  (let* ((program (xeb-program layers chip))
          (state (make-addresser-state program chip)))
     (with-timing (1)
       (quil::do-greedy-addressing
@@ -167,61 +167,59 @@
         :initial-rewiring (initial-rewiring program chip)
         :use-free-swaps t))))
 
-(defun run-addresser-benchmarks-xeb (chip max-qubits &key (min-qubits 1) (step 1) (runs 1)
-                                                       setup-fn
-                                                       completion-fn)
+(defun run-addresser-benchmarks-xeb (chip max-layers &key (min-layers 1) (step 1) (runs 1) setup-fn completion-fn)
   "Run the XEB benchmarks against the addresser using CHIP, running from MIN-QUBITS to MAX-QUBITS in steps of size STEP. SETUP-FN is called before any benchmarks run. COMPLETION-FN runs after every benchmark (useful for streaming results to a file)."
   (when setup-fn
     (funcall setup-fn))
-  (loop :for i :from min-qubits :upto max-qubits :by step
+  (loop :for i :from min-layers :upto max-layers :by step
         :append (loop :repeat runs
-                      :for avg := (do-addresser-benchmark-xeb (a:iota i) chip)
+                      :for avg := (do-addresser-benchmark-xeb i chip)
                       :when completion-fn :do
                         (funcall completion-fn i avg)
                       :collect (cons i avg))
-        :do (format t "~a of ~a~%" i max-qubits)))
+        :do (format t "~a of ~a~%" i max-layers)))
 
 (defun addresser-benchmark-xeb-wilson ()
   (let ((denali (build-tiled-octagon 4 4))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-wilson.txt")))
-    (run-addresser-benchmarks-bit-reversal denali (* 4 8)
-                                           :min-qubits 2
-                                           :runs 5
-                                           :setup-fn (lambda () (confirm-clear-file output))
-                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+    (run-addresser-benchmarks-xeb denali (* 4 8)
+                                  :min-layers 2
+                                  :runs 5
+                                  :setup-fn (lambda () (confirm-clear-file output))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-1x5 ()
   (let ((denali (build-tiled-octagon 5 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-1x5.txt")))
-    (run-addresser-benchmarks-bit-reversal denali (* 5 8)
-                                           :min-qubits 2
-                                           :runs 5
-                                           :setup-fn (lambda () (confirm-clear-file output))
-                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+    (run-addresser-benchmarks-xeb denali (* 5 8)
+                                  :min-qubits 2
+                                  :runs 5
+                                  :setup-fn (lambda () (confirm-clear-file output))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-6oct-5wid ()
   (let ((denali (build-tiled-octagon 6 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-6oct-5wid.txt")))
-    (run-addresser-benchmarks-bit-reversal denali (* 6 8)
-                                           :min-qubits 2
-                                           :runs 5
-                                           :setup-fn (lambda () (confirm-clear-file output))
-                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+    (run-addresser-benchmarks-xeb denali (* 6 8)
+                                  :min-qubits 2
+                                  :runs 5
+                                  :setup-fn (lambda () (confirm-clear-file output))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-2x5 ()
   (let ((denali (build-tiled-octagon 10 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-2x5.txt")))
-    (run-addresser-benchmarks-bit-reversal denali (* 10 8)
-                                           :min-qubits 2
-                                           :runs 5
-                                           :setup-fn (lambda () (confirm-clear-file output))
-                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+    (run-addresser-benchmarks-xeb denali (* 10 8)
+                                  :min-qubits 2
+                                  :runs 5
+                                  :setup-fn (lambda () (confirm-clear-file output))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-denali ()
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-denali.txt")))
-    (run-addresser-benchmarks-bit-reversal denali (+ (* 5 8 4) 10)
-                                           :min-qubits 2
-                                           :runs 5
-                                           :setup-fn (lambda () (confirm-clear-file output))
-                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+    (run-addresser-benchmarks-xeb denali (+ (* 5 8 4) 10)
+                                  :min-qubits 2
+                                  :runs 5
+                                  :setup-fn (lambda () (confirm-clear-file output))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
