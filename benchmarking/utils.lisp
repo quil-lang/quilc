@@ -113,10 +113,11 @@
                              elt)))
                     (loop :for q := (pop-random)
                           :for qn := (pop-random-neighbor q)
+                          :repeat 4
                           :when qn
                             :collect (quil:build-gate "CZ" nil q qn) :into czs
-                          :unless qubits
-                            :return czs))))))
+                          :finally
+                             (return czs)))))))
     (flet ((random-1q (q)
              (a:random-elt (list (quil:build-gate "RZ" `(,pi/2) q)
                                  (quil:build-gate "RZ" (list (/ pi 3)) q)
