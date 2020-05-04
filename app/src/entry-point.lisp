@@ -261,7 +261,7 @@
 ****************************************
 * Welcome to the Rigetti Quil Compiler *
 ****************************************")))
-  (format t "~%Copyright (c) 2016-2019 Rigetti Computing.~2%")
+  (format t "~%Copyright (c) 2016-2020 Rigetti Computing.~2%")
   #+forest-sdk
   (format t "This is a part of the Forest SDK. By using this program~%~
              you agree to the End User License Agreement (EULA) supplied~%~
