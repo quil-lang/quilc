@@ -97,7 +97,7 @@
          :for generator := (a:random-elt instruction-generators)
          :collect (funcall generator qubit))))
 
-(defun xeb-program (layers chip-spec)
+(defun xeb-program (layers chip-spec &key (use-1q-layers t))
   (let ((2q-layers
           (loop :repeat layers
                 :collect
@@ -123,12 +123,14 @@
                                  (quil:build-gate "RZ" (list (/ pi 3)) q)
                                  (quil:build-gate "RX" `(,pi/2) q)))))
       (let ((circuit (a:flatten
-                      (mapcar (lambda (2q-layer)
-                                (append (list (quil:make-pragma '("LATEX_GATE_GROUP")))
-                                        (mapcar #'random-1q (quil::chip-spec-live-qubits chip-spec))
-                                        2q-layer
-                                        (list (quil:make-pragma '("END_LATEX_GATE_GROUP")))))
-                              2q-layers))))
+                      (if use-1q-layers
+                          (mapcar (lambda (2q-layer)
+                                    (append (list (quil:make-pragma '("LATEX_GATE_GROUP")))
+                                            (mapcar #'random-1q (quil::chip-spec-live-qubits chip-spec))
+                                            2q-layer
+                                            (list (quil:make-pragma '("END_LATEX_GATE_GROUP")))))
+                                  2q-layers)
+                          2q-layers))))
         (parsed-program-from-straight-line-quil circuit)))))
 
 (defmacro confirm ((message &rest format-args) &body body)

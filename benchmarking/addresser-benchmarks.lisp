@@ -172,44 +172,46 @@
   (when setup-fn
     (funcall setup-fn))
   (loop :for i :from min-layers :upto max-layers :by step
+        :do (format t "~a of ~a~%" i max-layers)
         :append (loop :repeat runs
+                      :for j := 1 :then (1+ j)
                       :for avg := (do-addresser-benchmark-xeb i chip)
+                      :do (format t "    iter ~a of ~a: ~f~%" j runs avg)
                       :when completion-fn :do
                         (funcall completion-fn i avg)
-                      :collect (cons i avg))
-        :do (format t "~a of ~a~%" i max-layers)))
+                      :collect (cons i avg))))
 
 (defun addresser-benchmark-xeb-wilson ()
-  (let ((denali (build-tiled-octagon 4 4))
+  (let ((wilson (build-tiled-octagon 4 4))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-wilson.txt")))
-    (run-addresser-benchmarks-xeb denali 10
+    (run-addresser-benchmarks-xeb wilson 10
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
-                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+                                  :completion-fn (lambda (i avg) (format t "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-1x5 ()
-  (let ((denali (build-tiled-octagon 5 5))
+  (let ((1x5 (build-tiled-octagon 5 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-1x5.txt")))
-    (run-addresser-benchmarks-xeb denali 10
+    (run-addresser-benchmarks-xeb 1x5 10
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-6oct-5wid ()
-  (let ((denali (build-tiled-octagon 6 5))
+  (let ((6oct-5wid (build-tiled-octagon 6 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-6oct-5wid.txt")))
-    (run-addresser-benchmarks-xeb denali 10
+    (run-addresser-benchmarks-xeb 6oct-5wid 10
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
                                   :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-2x5 ()
-  (let ((denali (build-tiled-octagon 10 5))
+  (let ((2x5 (build-tiled-octagon 10 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-2x5.txt")))
-    (run-addresser-benchmarks-xeb denali 10
+    (run-addresser-benchmarks-xeb 2x5 10
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
@@ -218,8 +220,43 @@
 (defun addresser-benchmark-xeb-denali ()
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-denali.txt")))
-    (run-addresser-benchmarks-xeb denali 10
+    ;; This is hella slow, so don't do more than 3 layers.
+    (run-addresser-benchmarks-xeb denali 3
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
-                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
+                                  :completion-fn (lambda (i avg) (format t "~D ~F~%" i avg)))))
+
+(defun do-addresser-benchmark-xeb-alt (layers chip)
+  "Run a XEB program on the given QUBITS and CHIP. Returns the time spent in the addresser."
+  (let* ((program (xeb-program layers chip :use-1q-layers nil))
+         (state (make-addresser-state program chip)))
+    (with-timing (1)
+      (quil::do-greedy-addressing
+        state
+        (coerce (quil:parsed-program-executable-code program) 'list)
+        :initial-rewiring (initial-rewiring program chip)
+        :use-free-swaps t))))
+
+(defun run-addresser-benchmarks-xeb-alt (chip max-layers &key (min-layers 1) (step 1) (runs 1) setup-fn completion-fn)
+  "Run the XEB benchmarks against the addresser using CHIP, running from MIN-QUBITS to MAX-QUBITS in steps of size STEP. SETUP-FN is called before any benchmarks run. COMPLETION-FN runs after every benchmark (useful for streaming results to a file)."
+  (when setup-fn
+    (funcall setup-fn))
+  (loop :for i :from min-layers :upto max-layers :by step
+        :do (format t "~a of ~a~%" i max-layers)
+        :append (loop :repeat runs
+                      :for j := 1 :then (1+ j)
+                      :for avg := (do-addresser-benchmark-xeb-alt i chip)
+                      :do (format t "    iter ~a of ~a: ~f~%" j runs avg)
+                      :when completion-fn :do
+                        (funcall completion-fn i avg)
+                      :collect (cons i avg))))
+
+(defun addresser-benchmark-xeb-denali-alt ()
+  (let ((denali (build-tiled-octagon 20 5))
+        (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-denali-alt.txt")))
+    (run-addresser-benchmarks-xeb-alt denali 10
+                                      :min-layers 2
+                                      :runs 5
+                                      :setup-fn (lambda () (confirm-clear-file output))
+                                      :completion-fn (lambda (i avg) (format t "~D ~F~%" i avg)))))
