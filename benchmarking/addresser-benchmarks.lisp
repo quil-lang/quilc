@@ -188,7 +188,7 @@
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
-                                  :completion-fn (lambda (i avg) (format t "~D ~F~%" i avg)))))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun addresser-benchmark-xeb-1x5 ()
   (let ((1x5 (build-tiled-octagon 5 5))
@@ -221,11 +221,11 @@
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-xeb-denali.txt")))
     ;; This is hella slow, so don't do more than 3 layers.
-    (run-addresser-benchmarks-xeb denali 3
+    (run-addresser-benchmarks-xeb denali 5
                                   :min-layers 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
-                                  :completion-fn (lambda (i avg) (format t "~D ~F~%" i avg)))))
+                                  :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
 (defun do-addresser-benchmark-xeb-alt (layers chip)
   "Run a XEB program on the given QUBITS and CHIP. Returns the time spent in the addresser."
@@ -259,4 +259,4 @@
                                       :min-layers 2
                                       :runs 5
                                       :setup-fn (lambda () (confirm-clear-file output))
-                                      :completion-fn (lambda (i avg) (format t "~D ~F~%" i avg)))))
+                                      :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
