@@ -154,5 +154,4 @@
      ,@body))
 
 (defun confirm-clear-file (file)
-  (confirm ("clear file ~S?" file)
-    (clear-file file)))
+  (clear-file file))

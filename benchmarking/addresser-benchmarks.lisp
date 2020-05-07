@@ -297,7 +297,7 @@
 (defun addresser-benchmark-qaoa-wilson ()
   (let ((wilson (build-tiled-octagon 4 4))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-qaoa-wilson.txt")))
-    (run-addresser-benchmarks-qaoa wilson 10
+    (run-addresser-benchmarks-qaoa wilson (* 4 8)
                                   :min-qubits 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
@@ -306,7 +306,7 @@
 (defun addresser-benchmark-qaoa-1x5 ()
   (let ((1x5 (build-tiled-octagon 5 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-qaoa-1x5.txt")))
-    (run-addresser-benchmarks-qaoa 1x5 10
+    (run-addresser-benchmarks-qaoa 1x5 (* 5 8)
                                   :min-qubits 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
@@ -315,7 +315,7 @@
 (defun addresser-benchmark-qaoa-6oct-5wid ()
   (let ((6oct-5wid (build-tiled-octagon 6 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-qaoa-6oct-5wid.txt")))
-    (run-addresser-benchmarks-qaoa 6oct-5wid 10
+    (run-addresser-benchmarks-qaoa 6oct-5wid (* 6 8)
                                   :min-qubits 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
@@ -324,7 +324,7 @@
 (defun addresser-benchmark-qaoa-2x5 ()
   (let ((2x5 (build-tiled-octagon 10 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-qaoa-2x5.txt")))
-    (run-addresser-benchmarks-qaoa 2x5 10
+    (run-addresser-benchmarks-qaoa 2x5 (* 10 8)
                                   :min-qubits 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
@@ -333,8 +333,7 @@
 (defun addresser-benchmark-qaoa-denali ()
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/addresser-qaoa-denali.txt")))
-    ;; This is hella slow, so don't do more than 3 layers.
-    (run-addresser-benchmarks-qaoa denali 5
+    (run-addresser-benchmarks-qaoa denali (* 20 8)
                                   :min-qubits 2
                                   :runs 5
                                   :setup-fn (lambda () (confirm-clear-file output))
