@@ -251,7 +251,7 @@
         (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-wilson.txt")))
     (run-compressor-benchmarks-xeb denali 10
                                    :min-layers 1
-                                   :runs 5
+                                   :runs 2
                                    :setup-fn (lambda () (confirm-clear-file output))
                                    :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
@@ -260,7 +260,7 @@
         (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-1x5.txt")))
     (run-compressor-benchmarks-xeb denali 10
                                    :min-layers 2
-                                   :runs 5
+                                   :runs 2
                                    :setup-fn (lambda () (confirm-clear-file output))
                                    :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
@@ -269,7 +269,7 @@
         (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-6oct-5wid.txt")))
     (run-compressor-benchmarks-xeb denali 10
                                    :min-layers 1
-                                   :runs 5
+                                   :runs 2
                                    :setup-fn (lambda () (confirm-clear-file output))
                                    :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
@@ -278,7 +278,7 @@
         (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-2x5.txt")))
     (run-compressor-benchmarks-xeb denali 10
                                    :min-layers 1
-                                   :runs 5
+                                   :runs 2
                                    :setup-fn (lambda () (confirm-clear-file output))
                                    :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
@@ -287,6 +287,6 @@
         (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-denali.txt")))
     (run-compressor-benchmarks-xeb denali 4
                                    :min-layers 1
-                                   :runs 5
+                                   :runs 2
                                    :setup-fn (lambda () (confirm-clear-file output))
                                    :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
