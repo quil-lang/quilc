@@ -51,66 +51,66 @@
                       :collect (cons i avg))
         :do (format t "~a of ~a~%" i max-length)))
 
-(defun compressor-benchmark-1q-program-wilson ()
+(defun compressor-benchmark-nq-program-wilson ()
   (let ((wilson (build-tiled-octagon 4 4))
-        (output (merge-pathnames *benchmarks-results-directory* "/compressor-1q-wilson.txt")))
-    (run-compressor-benchmarks-1q-program wilson 10000
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-nq-wilson.txt")))
+    (run-compressor-benchmarks-nq-program wilson 10000 (* 4 8)
                                           :step 100
                                           :setup-fn (lambda () (confirm-clear-file output))
                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
-(defun compressor-benchmark-1q-program-1x5 ()
+(defun compressor-benchmark-nq-program-1x5 ()
   (let ((1x5 (build-tiled-octagon 5 5))
-        (output (merge-pathnames *benchmarks-results-directory* "/compressor-1q-1x5.txt")))
-    (run-compressor-benchmarks-1q-program 1x5 10000
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-nq-1x5.txt")))
+    (run-compressor-benchmarks-nq-program 1x5 10000 (* 5 8)
                                           :step 100
                                           :setup-fn (lambda () (confirm-clear-file output))
                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
-(defun compressor-benchmark-1q-program-6oct-5wid ()
+(defun compressor-benchmark-nq-program-6oct-5wid ()
   (let ((6oct-5wid (build-tiled-octagon 6 5))
-        (output (merge-pathnames *benchmarks-results-directory* "/compressor-1q-6oct-5wid.txt")))
-    (run-compressor-benchmarks-1q-program 6oct-5wid 10000
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-nq-6oct-5wid.txt")))
+    (run-compressor-benchmarks-nq-program 6oct-5wid 10000 (* 6 8)
                                           :step 100
                                           :setup-fn (lambda () (confirm-clear-file output))
                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
-(defun compressor-benchmark-1q-program-2x5 ()
+(defun compressor-benchmark-nq-program-2x5 ()
   (let ((2x5 (build-tiled-octagon 10 5))
-        (output (merge-pathnames *benchmarks-results-directory* "/compressor-1q-2x5.txt")))
-    (run-compressor-benchmarks-1q-program 2x5 10000
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-nq-2x5.txt")))
+    (run-compressor-benchmarks-nq-program 2x5 10000 (* 10 8)
                                           :step 100
                                           :setup-fn (lambda () (confirm-clear-file output))
                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
-(defun compressor-benchmark-1q-program-denali ()
+(defun compressor-benchmark-nq-program-denali ()
   (let ((denali (build-tiled-octagon 20 5))
-        (output (merge-pathnames *benchmarks-results-directory* "/compressor-1q-denali.txt")))
-    (run-compressor-benchmarks-1q-program denali 10000
+        (output (merge-pathnames *benchmarks-results-directory* "/compressor-nq-denali.txt")))
+    (run-compressor-benchmarks-nq-program denali 10000 (* 20 8)
                                           :step 100
                                           :setup-fn (lambda () (confirm-clear-file output))
                                           :completion-fn (lambda (i avg) (file>> output "~D ~F~%" i avg)))))
 
-;; (defun do-compressor-benchmark-nq-program (n-qubits length chip)
-;;   (let ((program (random-nq-program (a:iota n-qubits) length)))
-;;     (with-timing (1)
-;;       (quil::compress-instructions
-;;        (coerce (quil:parsed-program-executable-code program) 'list)
-;;        chip))))
+(defun do-compressor-benchmark-nq-program (length chip)
+  (let ((program (random-nq-program length)))
+    (with-timing (1)
+      (quil::compress-instructions
+       (coerce (quil:parsed-program-executable-code program) 'list)
+       chip))))
 
-;; (defun run-compressor-benchmarks-nq-program (chip num-instructions max-qubits
-;;                                              &key (min-qubits 1) (step 1) (runs 1)
-;;                                                setup-fn
-;;                                                completion-fn)
-;;   (when setup-fn
-;;     (funcall setup-fn))
-;;   (loop :for i :from min-qubits :upto max-qubits :by step
-;;         :append (loop :repeat runs
-;;                       :for avg := (do-compressor-benchmark-nq-program i num-instructions chip)
-;;                       :when completion-fn :do
-;;                         (funcall completion-fn i avg)
-;;                       :collect (cons i avg))
-;;         :do (format t "~a of ~a~%" i max-qubits)))
+(defun run-compressor-benchmarks-nq-program (chip num-instructions
+                                             &key (min-qubits 1) (step 1) (runs 1)
+                                               setup-fn
+                                               completion-fn)
+  (when setup-fn
+    (funcall setup-fn))
+  (loop :for i :from min-qubits :upto max-qubits :by step
+        :append (loop :repeat runs
+                      :for avg := (do-compressor-benchmark-nq-program num-instructions chip)
+                      :when completion-fn :do
+                        (funcall completion-fn i avg)
+                      :collect (cons i avg))
+        :do (format t "~a of ~a~%" i max-qubits)))
 
 ;; (defun compressor-benchmark-nq-program-wilson-10000 ()
 ;;   (let ((wilson (build-tiled-octagon 4 4))
@@ -285,7 +285,7 @@
 (defun compressor-benchmark-xeb-denali ()
   (let ((denali (build-tiled-octagon 20 5))
         (output (merge-pathnames *benchmarks-results-directory* "/compressor-xeb-denali.txt")))
-    (run-compressor-benchmarks-xeb denali 4
+    (run-compressor-benchmarks-xeb denali 10
                                    :min-layers 1
                                    :runs 2
                                    :setup-fn (lambda () (confirm-clear-file output))
