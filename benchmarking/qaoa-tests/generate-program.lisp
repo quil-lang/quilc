@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Eric Peterson
 
-(in-package #:cl-quil)
+(in-package #:cl-quil-benchmarking)
 
 (defmacro remfs (place &rest props)
   "Destructively remove the properties specified in PROPS from the plist stored at PLACE.
@@ -38,37 +38,37 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
       (push (build-gate "H" () qubit)
             instructions))
     (when commuting-blocks
-      (push (make-instance 'pragma-end-commuting-blocks) instructions))
+      (push (make-instance 'quil::pragma-end-commuting-blocks) instructions))
     (dolist (link program-links)
       (destructuring-bind (qubit0 qubit1) link
         (when commuting-blocks
-          (push (make-instance 'pragma-end-block) instructions))
+          (push (make-instance 'quil::pragma-end-block) instructions))
         (push (build-gate "CPHASE" (list (mref "gamma" 0)) qubit0 qubit1)
               instructions)
         (when commuting-blocks
           (push (make-instance 'pragma-block) instructions))))
     (when commuting-blocks
-      (push (make-instance 'pragma-commuting-blocks) instructions))
+      (push (make-instance 'quil::pragma-commuting-blocks) instructions))
     (dolist (qubit program-qubits)
       (push (build-gate "RX" (list (mref "beta" 0)) qubit)
             instructions))
     (dolist (qubit program-qubits)
       (push (build-gate "H" () qubit)
             instructions))
-    (push (make-instance 'pragma-initial-rewiring
+    (push (make-instance 'quil::pragma-initial-rewiring
                          :rewiring-type ':partial)
           instructions)
-    (make-instance 'parsed-program
+    (make-instance 'quil::parsed-program
                    :executable-code (coerce instructions 'vector)
-                   :memory-definitions (list (make-memory-descriptor :name "beta"
-                                                                     :type quil-real)
-                                             (make-memory-descriptor :name "gamma"
-                                                                     :type quil-real)))))
+                   :memory-definitions (list (quil::make-memory-descriptor :name "beta"
+                                                                           :type quil-real)
+                                             (quil::make-memory-descriptor :name "gamma"
+                                                                           :type quil-real)))))
 
 (defun generate-natural-qaoa-program (chip-specification qubit-count
                                       &rest rest)
   "Generates a QAOA program which maps perfectly onto the QPU described by CHIP-SPECIFICATION and which occupies QUBIT-COUNT many qubits.  (Should result in a trivial scheduling problem for the NAIVE rewiring method.)  Pass along any keyword arguments to QAOA-PROGRAM-FROM-GRAPH."
-  (let* ((live-ccs (chip-spec-live-qubit-cc chip-specification))
+  (let* ((live-ccs (quil::chip-spec-live-qubit-cc chip-specification))
          (biggest-cc (a:extremum live-ccs #'> :key #'length))
          (program-qubits nil)
          (program-links nil))
@@ -85,18 +85,18 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
           program-qubits)
     
     ;; collect qubits to find a connected subgraph of chip-specification of size qubit-count
-    (loop :with nearby-qubits := (chip-spec-adj-qubits chip-specification (first program-qubits))
+    (loop :with nearby-qubits := (quil::chip-spec-adj-qubits chip-specification (first program-qubits))
           :for next-qubit := (a:random-elt nearby-qubits)
           :do (push next-qubit program-qubits)
               (setf nearby-qubits
                     (set-difference (union nearby-qubits
-                                           (chip-spec-adj-qubits chip-specification next-qubit))
+                                           (quil::chip-spec-adj-qubits chip-specification next-qubit))
                                     program-qubits))
           :when (= qubit-count (length program-qubits))
             :do (return))
     ;; collect all links between these qubits
-    (loop :for link-obj :in (second (chip-specification-objects chip-specification))
-          :for qubit-list := (first (hardware-object-cxns link-obj))
+    (loop :for link-obj :in (quil::vnth 1 (quil::chip-specification-objects chip-specification))
+          :for qubit-list := (first (quil::hardware-object-cxns link-obj))
           :when (subsetp qubit-list program-qubits)
             :do (push qubit-list program-links))
     (apply 'qaoa-program-from-graph

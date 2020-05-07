@@ -15,4 +15,6 @@
                (:file "addresser-benchmarks")
                (:file "compressor-benchmarks")
                (:file "chip-spec-benchmarks")
+               (:file "parser-benchmarks")
+               (:file "qaoa-tests/generate-program")
                (:file "suite")))

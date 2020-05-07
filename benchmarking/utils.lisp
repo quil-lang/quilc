@@ -79,23 +79,39 @@
    ':cl-quil-benchmarking
    "benchmarking/results/"))
 
-(defun native-rz (qubit)
+(defun native-rz (&optional (qubit (random 10)))
   (quil:build-gate "RZ" (list (random 2pi)) qubit))
-(defun native-rx (qubit)
+(defun native-rx (&optional (qubit (random 10)))
   (quil:build-gate "RX" (list (a:random-elt (list 0d0 -pi -pi/2 pi pi/2))) qubit))
+(defun native-cz (&optional ctrl tgt)
+  (let* ((possible-qubits (a:iota 10))
+         (ctrl (or ctrl (a:random-elt possible-qubits)))
+         (tgt (or tgt (a:random-elt (remove ctrl possible-qubits)))))
+    (quil:build-gate "CZ" nil ctrl tgt)))
 
 (defvar *1q-program-generators*
   (list #'native-rz #'native-rx))
+
+(defvar *2q-program-generators*
+  (append *1q-program-generators* (list #'native-cz)))
 
 (defun parsed-program-from-straight-line-quil (instructions)
   (make-instance 'quil:parsed-program
                  :executable-code (coerce instructions 'vector)))
 
 (defun random-1q-program (qubit length &key (instruction-generators *1q-program-generators*))
+  "Make a program with LENGTH many randomly chosen RZ or RX gates on QUBIT."
   (parsed-program-from-straight-line-quil
    (loop :repeat length
          :for generator := (a:random-elt instruction-generators)
          :collect (funcall generator qubit))))
+
+(defun random-nq-program (length &key (instruction-generators *2q-program-generators*))
+  "Make a program with LENGTH many randomly chosen RZ or RX gates each on a random qubit chosen from QUBITS."
+  (parsed-program-from-straight-line-quil
+   (loop :repeat length
+         :for generator := (a:random-elt instruction-generators)
+         :collect (funcall generator))))
 
 (defun xeb-program (layers chip-spec &key (use-1q-layers t))
   (let ((2q-layers
