@@ -218,6 +218,7 @@
                           (server-mode-rpc nil)
                           (host nil)
                           (port nil)
+                          (cache-chips nil)
                           time-limit
                           (help nil)
                           (log-level nil)
@@ -326,7 +327,8 @@
        (*quil-stream* (make-broadcast-stream))
        (*protoquil* protoquil)
        (*state-aware* enable-state-prep-reductions)
-       (quil::*safe-include-directory* safe-include-directory))
+       (quil::*safe-include-directory* safe-include-directory)
+       (*chip-cache-max-size* cache-chips))
 
     (when check-sdk-version
       (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
