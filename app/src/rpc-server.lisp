@@ -55,7 +55,9 @@
          (qpu-hash (a:plist-hash-table (list "isa" (rpcq::|TargetDevice-isa| target-device)
                                              "specs" (rpcq::|TargetDevice-specs| target-device))
                                        :test #'equal))
-         (chip-specification (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
+         (cache (bt:with-lock-held ((cdr *chip-cache*))
+                  (chip-cache-or-create qpu-hash)))
+         (chip-specification (cached-chip-chip cache))
          ;; Allow endpoint to override server's -P
          (protoquil (ecase protoquil
                       ((nil) *protoquil*)
@@ -65,6 +67,11 @@
                         ((nil) *state-aware*)
                         (:false nil)
                         (t t))))
+    (unless (slot-boundp cache 'addresser-state)
+      (setf (cached-chip-addresser-state cache)
+            (make-instance quil::*default-addresser-state-class*
+                           :chip-spec chip-specification
+                           :initial-l2p (quil::prog-initial-rewiring quil-program chip-specification))))
     (multiple-value-bind (processed-program statistics-dict)
         (process-program quil-program chip-specification
                          :protoquil protoquil

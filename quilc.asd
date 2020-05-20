@@ -36,6 +36,7 @@
                (:file "impl/sbcl")
                #+clozure
                (:file "impl/clozure")
+               (:file "chip-cache")
                (:file "rpc-server")
                (:file "printers")
                (:file "options")
