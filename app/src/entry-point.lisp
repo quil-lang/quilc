@@ -475,6 +475,7 @@
        (*human-readable-stream* (make-broadcast-stream))
        (*quil-stream* (make-broadcast-stream))
        (*protoquil* protoquil)
+       (*state-aware* state-aware)
        (quil::*safe-include-directory* safe-include-directory))
 
     (when check-sdk-version
@@ -534,6 +535,7 @@
 (defun process-program (program chip-specification
                         &key
                           protoquil
+                          state-aware
                           verbose
                           gate-whitelist
                           gate-blacklist)
@@ -544,7 +546,8 @@ Note: PROGRAM is mutated by the compilation process. To avoid this, use COPY-INS
 Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM is the compiled program, and STATISTICS is a HASH-TABLE whose keys are the slots of the RPCQ::|NativeQuilMetadata| class."
   (let* ((statistics (make-hash-table :test #'equal))
          (quil::*compiler-noise* (and verbose *human-readable-stream*))
-         (*random-state* (make-random-state t)))
+         (*random-state* (make-random-state t))
+         (quil::*enable-state-prep-compression* state-aware))
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
         (compiler-hook program chip-specification :protoquil protoquil :destructive t)
