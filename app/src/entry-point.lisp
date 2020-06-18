@@ -475,7 +475,7 @@
        (*human-readable-stream* (make-broadcast-stream))
        (*quil-stream* (make-broadcast-stream))
        (*protoquil* protoquil)
-       (*state-aware* state-aware)
+       (*state-aware* enable-state-prep-reductions)
        (quil::*safe-include-directory* safe-include-directory))
 
     (when check-sdk-version
