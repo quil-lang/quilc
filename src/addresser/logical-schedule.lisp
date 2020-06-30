@@ -583,7 +583,7 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                   (let ((specs-hash (hardware-object-gate-information obj)))
                     (unless specs-hash (warn-and-skip instr))
                     (dohash ((key val) specs-hash)
-                      (when (binding-subsumes-p key (get-binding-from-instr instr))
+                      (when (binding-subsumes-p key (binding-from-instr instr))
                         (setf fidelity (gate-record-fidelity val))))
                     (unless fidelity (warn-and-skip instr)))))
                (otherwise
