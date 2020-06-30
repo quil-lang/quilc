@@ -144,7 +144,7 @@ Used to be an anonymous function associated to HARDWARE-OBJECT; now computed fro
   (a:when-let ((gate-record
                 (loop :for key :being :the :hash-keys :of (hardware-object-gate-information obj)
                         :using (hash-value value)
-                      :when (binding-subsumes-p key (get-binding-from-instr instr))
+                      :when (binding-subsumes-p key (binding-from-instr instr))
                         :do (return value))))
     (gate-record-duration gate-record)))
 
