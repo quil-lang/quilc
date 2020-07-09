@@ -358,3 +358,12 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
   (inst "H"    nil              p)
   (inst "RZ"   (list (/ -pi 4)) p)
   (inst "RZ"   (list (/ pi 4))  q))
+
+(define-compiler SWAP-to-iSWAP+CNOT
+    ((swap-gate ("SWAP" () q0 q1)))
+  (inst "CNOT"  () q0 q1)
+  (inst "H"     () q1)
+  (inst "RZ"    (list -pi/2) q0)
+  (inst "RZ"    (list -pi/2) q1)
+  (inst "XY"    (list pi) q0 q1)
+  (inst "H"     () q0))
