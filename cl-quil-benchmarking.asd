@@ -7,6 +7,9 @@
   :pathname "benchmarking/"
   :serial t
   :components ((:file "package")
+               (:module "qaoa-tests"
+                :serial t
+                :components ((:file "generate-program")))
                (:file "rewiring-analysis")
                (:file "qasm-benchmarks")
                (:file "suite")))

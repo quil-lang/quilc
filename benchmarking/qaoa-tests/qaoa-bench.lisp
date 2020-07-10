@@ -6,8 +6,8 @@
 (in-package :cl-user)
 (defvar *this-random-state* (sb-ext:seed-random-state 1337))
 (setf *random-state* (make-random-state *this-random-state*))
-(ql:quickload :cl-quil)
-(in-package #:cl-quil)
+(ql:quickload :cl-quil-benchmarking)
+(in-package #:cl-quil-benchmarking)
 
 (defun reload (file)
   (format t "~&;; reloading ~S~%" file)
@@ -27,7 +27,7 @@
     (format t "~&~A: ~F (~F)~%" name mean sdev)))
 
 (load (asdf:system-relative-pathname
-   ':cl-quil
+   ':cl-quil-benchmarking
    "./benchmarking/qaoa-tests/generate-program.lisp"))
 (sb-ext:gc :full t) 
 
@@ -46,7 +46,7 @@
            (let ((pp (let ((*random-state* (make-random-state
                                             cl-user::*this-random-state*)))
                        (make-program qubits valency)))
-                 (chip (build-nQ-trivalent-chip -1 1 16 16))) ;; 128 qubit chip
+                 (chip (quil::build-nQ-trivalent-chip -1 1 16 16))) ;; 128 qubit chip
              (sb-ext:gc :full t)
              (loop :for count :below repetitions
                    :with runtime := nil

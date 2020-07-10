@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Eric Peterson
 
-(in-package #:cl-quil)
+(in-package #:cl-quil-benchmarking)
 
 (defmacro remfs (place &rest props)
   "Destructively remove the properties specified in PROPS from the plist stored at PLACE.
@@ -95,7 +95,7 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
           :when (= qubit-count (length program-qubits))
             :do (return))
     ;; collect all links between these qubits
-    (loop :for link-obj :in (second (chip-specification-objects chip-specification))
+    (loop :for link-obj :across (vnth 1 (chip-specification-objects chip-specification))
           :for qubit-list := (first (hardware-object-cxns link-obj))
           :when (subsetp qubit-list program-qubits)
             :do (push qubit-list program-links))
