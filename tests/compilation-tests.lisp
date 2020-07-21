@@ -250,7 +250,7 @@ CNOT 4 8
                      (%read-test-chipspec "Aspen-6-2Q-A.qpu")
                      (%read-test-chipspec "Aspen-7-28Q-A.qpu"))))
     (dolist (chip chips)
-      (%test-reduction-with-chip 7 chip))))
+      (%test-reduction-with-chip 5 chip))))
 
 ;; (deftest test-free-rx-rz-strings-reduce ()
 ;;   (%test-reduction-with-chip 3 (%read-test-chipspec "1q-free-rx.qpu")))
