@@ -540,7 +540,11 @@ Optionally constrains the output to include only those bindings of a particular 
                  occurrence-table-metric-fidelity
                  occurrence-table-metric-unknowns))
 (defstruct (occurrence-table-metric (:constructor %make-occurrence-table-metric (fidelity unknowns)))
-  "Abstract assessment of an occurrence table, which can be sorted by the function OCCURRENCE-TABLE-METRIC-WORSEP."
+  "Abstract assessment of an occurrence table, which can be sorted by the function OCCURRENCE-TABLE-METRIC-WORSEP.
+
+FIDELITY is a real number between 0 and 1 which estimates the accuracy of executing gates in the evaluated occurrence table.
+
+UNKNOWNS is the number of gates with unknown fidelity in the evaluated occurrence table. Gates with unknown fidelity are not native and are presumed to be expensive. See OCCURRENCE-TABLE-METRIC-WORSEP."
   (fidelity nil :type (double-float 0d0 1d0))
   (unknowns nil :type (integer 0)))
 #+sbcl (declaim (sb-ext:freeze-type occurrence-table-metric))
@@ -575,7 +579,7 @@ Optionally constrains the output to include only those bindings of a particular 
                    (* (expt (gate-record-fidelity cost-val) val)
                       (occurrence-table-metric-fidelity ret)))
              (go :SKIP)))
-         (incf (occurrence-table-metric-unknowns ret))
+         (incf (occurrence-table-metric-unknowns ret) val)
          :SKIP))))
 
 (defun occurrence-table-in-gateset-p (occurrence-table gateset)
