@@ -252,5 +252,5 @@ CNOT 4 8
     (dolist (chip chips)
       (%test-reduction-with-chip 5 chip))))
 
-;; (deftest test-free-rx-rz-strings-reduce ()
-;;   (%test-reduction-with-chip 3 (%read-test-chipspec "1q-free-rx.qpu")))
+(deftest test-free-rx-rz-strings-reduce ()
+  (%test-reduction-with-chip 3 (%read-test-chipspec "1q-free-rx.qpu")))
