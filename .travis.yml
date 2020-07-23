@@ -1,0 +1,14 @@
+env:
+  - TARGET=cl-quil
+  - TARGET=quilt
+  - TARGET=quilec
+  - TARGET=quilc
+
+services:
+  - docker
+
+script:
+  - echo ${TARGET}
+  - docker build -t rigetti/quilc:${TRAVIS_COMMIT} .
+  - docker run --rm --entrypoint=make rigetti/quilc:${TRAVIS_COMMIT} test-${TARGET}
+  - docker rmi rigetti/quilc:${TRAVIS_COMMIT}
