@@ -10,7 +10,3 @@
 
 (deftype interactive-interrupt ()
   'ccl:interrupt-signal-condition)
-
-(defun zap-info ()
-  ;; No-op on Clozure
-  )
