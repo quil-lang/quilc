@@ -9,12 +9,13 @@
 
 (define-compiler qs-compiler (instr)
   "Performs Quantum Shannon Compilation, emitting a list of anonymous gates and UCR instructions that describe an equivalent circuit."
-  (unless (or (>= (length (application-arguments instr)) 3)
-              (adt:match operator-description (application-operator instr)
-                ((named-operator name) (not (find name (standard-gate-names) :test #'string=)))
-                (_ t)))
+  ;; QS-COMPILER only allows gates with 3 or more qubits. It doesn't
+  ;; make sense (and it can't be done) to recursively decompose a 1-
+  ;; or 2-qubit gate.
+  (when (< (length (application-arguments instr)) 3)
     (give-up-compilation))
-  
+
+  ;; Note that GATE-MATRIX is now going to have dim >= 2^3.
   (let ((matrix (gate-matrix instr)))
     (unless matrix
       (give-up-compilation))
