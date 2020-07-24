@@ -7,8 +7,8 @@
 
 (defmacro pipeline (vars &rest pipes)
   ;; first, deal with all the definition bindings
-  (let* ((vars (nreverse vars))
-         (pipes (nreverse pipes))
+  (let* ((vars (reverse vars))
+         (pipes (reverse pipes))
          (result-form `,(first (first pipes))))
     (dolist (pipe pipes)
       (destructuring-bind (name lambda-list instruction) pipe
