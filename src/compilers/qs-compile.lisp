@@ -9,12 +9,21 @@
 
 (define-compiler qs-compiler (instr)
   "Performs Quantum Shannon Compilation, emitting a list of anonymous gates and UCR instructions that describe an equivalent circuit."
-  (unless (or (>= (length (application-arguments instr)) 3)
-              (adt:match operator-description (application-operator instr)
-                ((named-operator name) (not (find name (standard-gate-names) :test #'string=)))
-                (_ t)))
+  ;; QS-COMPILER only allows gates with 3 or more qubits. It doesn't
+  ;; make sense (and it can't be done) to recursively decompose a 1-
+  ;; or 2-qubit gate.
+  ;;
+  ;; ECP sez: In context, I think this that is a totally reasonable
+  ;; restriction. In the abstract, I'm surprised that QSD doesn't
+  ;; apply to small operators—I feel it should work for 2Q operators
+  ;; without much effort and perhaps also for 1Q operators if the
+  ;; implementer is clever. Might be worth modifying the
+  ;; implementation someday to permit these cases (even if the 2Q and
+  ;; 1Q stuff that quilc already does is superior).
+  (when (< (length (application-arguments instr)) 3)
     (give-up-compilation))
-  
+
+  ;; Note that GATE-MATRIX is now going to have dim >= 2^3.
   (let ((matrix (gate-matrix instr)))
     (unless matrix
       (give-up-compilation))

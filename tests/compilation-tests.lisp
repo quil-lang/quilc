@@ -182,6 +182,29 @@ CNOT 0 2"))
     ;; test on quality of compilation, and not on correctness.
     (is (>= 6 (length 2q-code)))))
 
+(deftest test-cswap-compiles-with-qs ()
+  "Test that CSWAP compiles with QS-COMPILER. (Don't test the output's validity.)"
+  (let ((result (quil::qs-compiler (quil::build-gate "CSWAP" () 0 1 2))))
+    ;; Just check we get compilation output.
+    (is (plusp (length result)))))
+
+(deftest test-anons-compile-with-qs ()
+  "Test that a few anonymous gates compile with QS-COMPILER. (Don't test the output's validity.)"
+  (let ((result3 (quil::qs-compiler (quil::anon-gate "ANON" (quil::random-special-unitary (expt 2 3)) 0 1 2)))
+        (result4 (quil::qs-compiler (quil::anon-gate "ANON" (quil::random-special-unitary (expt 2 4)) 0 1 2 3)))
+        (result5 (quil::qs-compiler (quil::anon-gate "ANON" (quil::random-special-unitary (expt 2 5)) 0 1 2 3 4))))
+    ;; Just check we get compilation output.
+    (is (plusp (length result3)))
+    (is (plusp (length result4)))
+    (is (plusp (length result5)))))
+
+(deftest test-qs-dont-compile-nonsense ()
+  "Test that QS-COMPILER doesn't compile an anonymous 1Q or 2Q gate."
+  (signals CL-QUIL::COMPILER-DOES-NOT-APPLY
+    (quil::qs-compiler (quil::anon-gate "ANON" (quil::random-special-unitary 2) 0)))
+  (signals CL-QUIL::COMPILER-DOES-NOT-APPLY
+    (quil::qs-compiler (quil::anon-gate "ANON" (quil::random-special-unitary 4) 0 1))))
+
 (deftest test-sohaib-fidelity-rewiring-regression ()
   (not-signals bt:timeout
     (bt:with-timeout (1)
