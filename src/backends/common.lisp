@@ -1,0 +1,61 @@
+;;;; common.lisp
+;;;;
+;;;; Author: Robert Smith
+
+(in-package #:cl-quil)
+
+;;; The BACKEND protocol
+;;;
+;;; The BACKEND class is used primarily to determine available
+;;; backends primarily by computing subclasses.
+
+(defclass backend ()
+  ()
+  (:documentation "Every backend must be represented by a subclass of this abstract base class.")
+  (:metaclass abstract-class))
+
+(defgeneric backend-name (backend-class)
+  (:documentation "The user-accessible name for BACKEND-CLASS."))
+
+(defgeneric backend-supports-chip-p (backend chip)
+  (:documentation "Does BACKEND support the chip CHIP-SPECIFICATION?"))
+
+;;; TODO: Should we add anything to the BACKEND protocol to deal with
+;;; memory allocation, the memory model (cf. classical-memory.lisp),
+;;; etc.?
+
+;;; The EXECUTABLE protocol
+;;;
+;;; An executable is an artifact which may be written to a binary
+;;; output stream. (The executable may itself represent characters, of
+;;; course, but we force implementers of this protocol to select an
+;;; encoding.)
+;;;
+;;; Multi-file executables are expected to be managed by the
+;;; implementer with e.g. tarballs.
+;;;
+
+(defgeneric write-executable (executable stream)
+  (:documentation "Write EXECUTABLE to the binary output STREAM."))
+
+
+;;; The COMPILATION protocol
+
+(defgeneric compile-executable (program chip-spec backend)
+  (:documentation "Compile the PROGRAM which comports to the CHIP-SPEC to an executable for BACKEND."))
+
+
+;;;;;;;;;;;;;;; Backend Construction Library Functions ;;;;;;;;;;;;;;;
+
+;;; The things below aren't part of the protocol, but generally useful.
+
+
+(defun list-available-backends ()
+  ;; This is simpleminded and assumes there isn't some crazy
+  ;; inheritance structure.
+  (mapcar #'class-name (c2mop:class-direct-subclasses (find-class 'backend))))
+
+(defun parse-backend (backend-name)
+  "Returns the backend class associated with the string BACKEND-NAME."
+  (find-if (lambda (x) (equal backend-name (backend-name x)))
+           (list-available-backends)))

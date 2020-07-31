@@ -27,6 +27,7 @@
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
                #:trivial-garbage        ; weak hash tables
+               #:flexi-streams          ; For executable writing
                #:cl-heap
                #:cl-permutation
                #:queues.priority-queue
@@ -107,6 +108,12 @@
                 :serial t
                 :components ((:file "chip-specification")
                              (:file "chip-reader")))
+               (:module "backends"
+                :serial t
+                :components ((:file "common")
+                             (:module "quil"
+                              :serial t
+                              :components ((:file "quil-backend")))))
                (:module "addresser"
                 :serial t
                 :components ((:file "rewiring")
