@@ -218,6 +218,10 @@
   (warn-deprecated-options all-args)
   (warn-ignored-options all-args)
 
+  ;;
+  ;; Handle trivial print-then-exit arguments
+  ;;
+  
   (when help
     (show-help)
     (uiop:quit 0))
@@ -229,6 +233,10 @@
   (when check-libraries
     (check-libraries))
 
+  ;;
+  ;; Enable 'passive' feature arguments (logging, etc.)
+  ;;
+  
   (when log-level
     (setf *log-level* (log-level-string-to-symbol log-level)))
 
@@ -251,10 +259,19 @@
                                   (cl-syslog:syslog-log-writer "quilc" :local0)
                                   *error-output*)))
 
+  
+  ;;
+  ;; Handle non-trivial print-then-exit arguments
+  ;;
+
   #-forest-sdk
   (when benchmark
     (benchmarks))
 
+  ;;
+  ;; Validate argument values
+  ;;
+  
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
 
@@ -264,6 +281,10 @@
             forget a trailing slash?"
            safe-include-directory))
 
+  ;;
+  ;; Now we're cooking with fire
+  ;;
+  
   (special-bindings-let*
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
                         *log-level*))
@@ -289,12 +310,17 @@
 
     (when check-sdk-version
       (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
-    ;; at this point we know we're doing something. strap in LAPACK.
+    ;;
+    ;; At this point we know we're doing something. Strap in LAPACK.
+    ;;
+    
     (magicl:with-blapack
       (reload-foreign-libraries)
 
       (cond
+        ;;
         ;; RPCQ server mode requested
+        ;;
         (server-mode-rpc
          (unless quiet
            (show-banner))
@@ -307,7 +333,9 @@
                            :logger *logger*
                            :time-limit time-limit))
 
+        ;;
         ;; server modes not requested, so continue parsing arguments
+        ;;
         (t
          (setf *human-readable-stream* *error-output*)
          (setf *quil-stream* *standard-output*)
