@@ -64,7 +64,7 @@
      :type boolean
      :optional t
      :documentation "prints matrix representations for comparison  Requires -P.  This is deprecated and will eventually be removed.")
-    
+
     (("help" #\h)
      :type boolean
      :optional t
@@ -165,17 +165,17 @@
      :type boolean
      :optional t
      :documentation "prints approximate compiled circuit fidelity.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
+
     (("compute-2Q-gate-depth" #\2)
      :type boolean
      :optional t
      :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists. Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
+
     (("compute-unused-qubits" #\u)
      :type boolean
      :optional t
      :documentation "prints unused qubits.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
+
     (("show-topological-overhead" #\t)
      :type boolean
      :optional t
@@ -187,7 +187,7 @@
      :type boolean
      :optional t
      :documentation "include logically parallelized schedule in output.  Requires -P.  This is inactive and will eventually be removed.")
-    
+
     (("json-serialize" #\j)
      :type boolean
      :optional t
@@ -420,6 +420,8 @@
   (when check-libraries
     (check-libraries))
 
+  (setf *verbose* verbose)
+
   (when log-level
     (setf *log-level* (log-level-string-to-symbol log-level)))
 
@@ -472,8 +474,6 @@
        (quil::*enable-state-prep-compression* enable-state-prep-reductions)
        ;; Null out the streams. If no server mode is requested, these bindings will be modified
        ;; before calling run-CLI-mode, below.
-       (*human-readable-stream* (make-broadcast-stream))
-       (*quil-stream* (make-broadcast-stream))
        (*protoquil* protoquil)
        (*state-aware* enable-state-prep-reductions)
        (quil::*safe-include-directory* safe-include-directory))
@@ -489,6 +489,9 @@
         (server-mode-rpc
          (unless quiet
            (show-banner))
+
+		 (setf *human-readable-stream* *error-output*)
+         (setf *quil-stream* *standard-output*)
 
          (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
            (:msgid "LOG0001"))

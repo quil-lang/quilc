@@ -5,6 +5,7 @@
 (defparameter *log-level* ':info)
 (defparameter *protoquil* nil)
 (defparameter *state-aware* nil)
+(defparameter *verbose* nil)
 
 ;; NOTE: these can't have default values b/c they don't survive serialization
 (defparameter *human-readable-stream* (make-broadcast-stream))
