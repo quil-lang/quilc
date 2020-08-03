@@ -490,7 +490,7 @@
          (unless quiet
            (show-banner))
 
-		 (setf *human-readable-stream* *error-output*)
+         (setf *human-readable-stream* *error-output*)
          (setf *quil-stream* *standard-output*)
 
          (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
