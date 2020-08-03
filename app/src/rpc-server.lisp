@@ -69,7 +69,7 @@
         (process-program quil-program chip-specification
                          :protoquil protoquil
                          :state-aware state-aware
-						 :verbose *verbose*)
+                         :verbose *verbose*)
       (when protoquil
         (setf (gethash "qpu_runtime_estimation" statistics-dict)
               (runtime-estimation processed-program)))
