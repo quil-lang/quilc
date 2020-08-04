@@ -221,7 +221,7 @@
   ;;
   ;; Handle trivial print-then-exit arguments
   ;;
-  
+
   (when help
     (show-help)
     (uiop:quit 0))
@@ -236,7 +236,7 @@
   ;;
   ;; Enable 'passive' feature arguments (logging, etc.)
   ;;
-  
+
   (when log-level
     (setf *log-level* (log-level-string-to-symbol log-level)))
 
@@ -259,7 +259,7 @@
                                   (cl-syslog:syslog-log-writer "quilc" :local0)
                                   *error-output*)))
 
-  
+
   ;;
   ;; Handle non-trivial print-then-exit arguments
   ;;
@@ -271,7 +271,7 @@
   ;;
   ;; Validate argument values
   ;;
-  
+
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
 
@@ -284,7 +284,7 @@
   ;;
   ;; Now we're cooking with fire
   ;;
-  
+
   (special-bindings-let*
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
                         *log-level*))
@@ -313,7 +313,7 @@
     ;;
     ;; At this point we know we're doing something. Strap in LAPACK.
     ;;
-    
+
     (magicl:with-blapack
       (reload-foreign-libraries)
 
