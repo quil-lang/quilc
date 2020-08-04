@@ -87,6 +87,10 @@
 (defun show-version ()
   (format t "~A [~A]~%" +QUILC-VERSION+ +GIT-HASH+))
 
+(defun show-backends ()
+  (format t "Available backends:~%")
+  (format t "~{  ~(~A~)~^~%~}~%" (mapcar #'quil:backend-name (quil:list-available-backends))))
+
 (defun check-libraries ()
   "Check that the foreign libraries are adequate. Exits with status
   0 if so, 1 if not."
@@ -191,6 +195,12 @@
                           (print-logical-schedule nil)
                           (verbose nil)
                           (isa nil)
+                          ;; Backend-related
+                          (compile nil)
+                          (backend nil)
+                          (list-backends nil)
+                          (output nil)
+
                           (enable-state-prep-reductions nil)
                           (protoquil nil)
                           (print-statistics nil)
@@ -228,6 +238,10 @@
 
   (when version
     (show-version)
+    (uiop:quit 0))
+
+  (when list-backends
+    (show-backends)
     (uiop:quit 0))
 
   (when check-libraries
@@ -327,6 +341,11 @@
 
          (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
            (:msgid "LOG0001"))
+
+         (when (or compile backend output)
+           (cl-syslog:rfc-log (*logger* :warning "--backend and --output-file/-o options ~
+                                                  don't make sense when using server mode. ~
+                                                  Ignoring them.")))
          ;; launch the polling loop
          (start-rpc-server :host host
                            :port port
@@ -343,9 +362,10 @@
          (let* ((program-text (slurp-lines))
                 (program (safely-parse-quil program-text))
                 (original-matrix (when (and protoquil compute-matrix-reps)
-                                   (parsed-program-to-logical-matrix program))))
+                                   (parsed-program-to-logical-matrix program)))
+                (chip-spec (lookup-isa-descriptor-for-name isa)))
            (multiple-value-bind (processed-program statistics)
-               (process-program program (lookup-isa-descriptor-for-name isa)
+               (process-program program chip-spec
                                 :protoquil protoquil
                                 :verbose verbose
                                 :gate-whitelist (and gate-whitelist
@@ -358,16 +378,70 @@
                                                       #\,
                                                       (remove #\Space gate-blacklist)
                                                       :remove-empty-subseqs t)))
-             (unless print-circuit-definitions
-               (setf (parsed-program-circuit-definitions processed-program) nil))
-             (print-program processed-program *quil-stream*)
-             (when (and protoquil print-statistics)
-               (print-statistics statistics *quil-stream*))
-             (when (and protoquil compute-matrix-reps)
-               (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t)))
-                 (print-matrix-comparision original-matrix
-                                           (quil::scale-out-matrix-phases processed-program-matrix
-                                                                          original-matrix)))))))))))
+
+             ;; NOTE: This flow is deprecated and will be merged with
+             ;; quil-backend in the future.
+             (unless compile
+               ;; If we want circuit definitons, keep them. Otherwise
+               ;; delete so they don't get printed.
+               (unless print-circuit-definitions
+                 (setf (parsed-program-circuit-definitions processed-program) nil))
+
+               ;; Print the program to stdout
+               (print-program processed-program *quil-stream*)
+
+               ;; If we are using protoquil (no control flow), then we
+               ;; can print statistics about the program as comments at
+               ;; the end of the output.
+               (when (and protoquil print-statistics)
+                 (print-statistics statistics *quil-stream*))
+
+               ;; If we are using protoquil (no control flow), then we
+               ;; can print the input and output unitary matrix as
+               ;; comments at the end of the output.
+               (when (and protoquil compute-matrix-reps)
+                 (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t)))
+                   (print-matrix-comparision original-matrix
+                                             (quil::scale-out-matrix-phases processed-program-matrix
+                                                                            original-matrix)))))
+
+             ;; New and improved flow
+             (when compile
+               (unless backend
+                 (error "Backend must be provided when compilation is enabled. For a list of available backends, run 'quilc --list-backends'."))
+
+               (unless output
+                 (error "Output must be provided when compilation is enabled. Specify an output file with -o or --output."))
+
+               (let ((backend-class (quil:parse-backend backend)))
+                 (unless backend-class
+                   (error "The backend value '~a' does not name an available backend. For a list of available backends, run 'quilc --list-backends'." backend))
+
+                 ;; TODO: Initialize backend with options. This is
+                 ;;       currently blocked by the command line
+                 ;;       argument parser not supporting multiple of
+                 ;;       the same argument as a list (like gcc does)
+
+                 ;; TODO: Compute and pass statistics to backend when
+                 ;; using protoquil
+                 (let ((backend (make-instance backend-class)))
+                   (unless (quil:backend-supports-chip-p backend chip-spec)
+                     (error "The backend provided does not support this ISA."))
+                   (backend-compile processed-program chip-spec backend output)))))))))))
+
+(defun backend-compile (program chip-spec backend output)
+  "Compile the processed program PROGRAM for BACKEND, writing to OUTPUT."
+  (let ((stream))
+    (unwind-protect
+         (progn
+           (setf stream (open output :direction ':output
+                                     :element-type '(unsigned-byte 8)
+                                     :if-exists ':supersede
+                                     :if-does-not-exist ':create))
+           (let ((executable (quil:compile-executable program chip-spec backend)))
+             (quil:write-executable executable stream)))
+      (when stream
+        (close stream)))))
 
 (defun process-program (program chip-specification
                         &key
