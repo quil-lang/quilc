@@ -413,7 +413,7 @@
                (unless output
                  (error "Output must be provided when compilation is enabled. Specify an output file with -o or --output."))
 
-               (let ((backend-class (quil:parse-backend backend)))
+               (let ((backend-class (quil:find-backend backend)))
                  (unless backend-class
                    (error "The backend value '~a' does not name an available backend. For a list of available backends, run 'quilc --list-backends'." backend))
 
@@ -438,7 +438,7 @@
                                      :element-type '(unsigned-byte 8)
                                      :if-exists ':supersede
                                      :if-does-not-exist ':create))
-           (let ((executable (quil:compile-executable program chip-spec backend)))
+           (let ((executable (quil:backend-compile program chip-spec backend)))
              (quil:write-executable executable stream)))
       (when stream
         (close stream)))))

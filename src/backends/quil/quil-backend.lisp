@@ -10,7 +10,6 @@
   ((print-circuit-definitions :initarg :print-circuit-definitions
                               :initform nil
                               :reader print-circuit-definitions))
-  (:metaclass singleton-class)
   (:documentation "A backend the emits plain old Quil. In some sense, this backend does nothing."))
 
 (defmethod backend-name ((backend-class (eql 'quil-backend)))
@@ -34,7 +33,7 @@
 
 ;;; The COMPILATION protocol
 
-(defmethod compile-executable (program chip-spec (backend quil-backend))
+(defmethod backend-compile (program chip-spec (backend quil-backend))
   (declare (ignore chip-spec))
   (labels ((print-program-to-stream (stream)
              ;; If we want circuit definitons, keep them. Otherwise

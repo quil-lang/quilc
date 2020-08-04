@@ -15,7 +15,9 @@
   (:metaclass abstract-class))
 
 (defgeneric backend-name (backend-class)
-  (:documentation "The user-accessible name for BACKEND-CLASS."))
+  (:documentation "The user-accessible name for BACKEND-CLASS.")
+  (:method ((backend backend))
+    (backend-name (class-name (class-of backend)))))
 
 (defgeneric backend-supports-chip-p (backend chip)
   (:documentation "Does BACKEND support the chip CHIP-SPECIFICATION?"))
@@ -41,7 +43,7 @@
 
 ;;; The COMPILATION protocol
 
-(defgeneric compile-executable (program chip-spec backend)
+(defgeneric backend-compile (program chip-spec backend)
   (:documentation "Compile the PROGRAM which comports to the CHIP-SPEC to an executable for BACKEND."))
 
 
@@ -55,7 +57,6 @@
   ;; inheritance structure.
   (mapcar #'class-name (c2mop:class-direct-subclasses (find-class 'backend))))
 
-(defun parse-backend (backend-name)
+(defun find-backend (backend-name)
   "Returns the backend class associated with the string BACKEND-NAME."
-  (find-if (lambda (x) (equal backend-name (backend-name x)))
-           (list-available-backends)))
+  (find backend-name (list-available-backends) :test #'string= :key #'backend-name))
