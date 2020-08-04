@@ -43,6 +43,28 @@
      :initial-value "8Q"
      :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", \"bristlecone\", \"ibmqx5\", or path to QPU description file")
 
+    (("compile" #\c)
+     :type boolean
+     :optional t
+     :initial-value nil
+     :documentation "compile the program to an executable using the specified backend")
+
+    (("backend" #\b)
+     :type string
+     :optional t
+     :documentation "backend used to compile the program. Only has effect when --compile or -c are provided.")
+
+    (("list-backends")
+     :type boolean
+     :optional t
+     :initial-value nil
+     :documentation "list available backends for compilation")
+
+    (("output" #\o)
+     :type string
+     :optional t
+     :documentation "file to write output of compilation to. Only has effect when --compile or -c are provided.")
+
     (("enable-state-prep-reductions")
      :type boolean
      :optional t
