@@ -492,9 +492,9 @@
    #:backend-name                       ; GENERIC
    #:backend-supports-chip-p            ; GENERIC
    #:write-executable                   ; GENERIC
-   #:compile-executable                 ; GENERIC
+   #:backend-compile                    ; GENERIC
    #:list-available-backends            ; FUNCTION
-   #:parse-backend                      ; FUNCTION
+   #:find-backend                       ; FUNCTION
 
    #:quil-backend                       ; CLASS
    #:quil-executable                    ; CLASS
