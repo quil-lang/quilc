@@ -353,7 +353,7 @@
 Note: PROGRAM is mutated by the compilation process. To avoid this, use COPY-INSTANCE.
 
 Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM is the compiled program, and STATISTICS is a HASH-TABLE whose keys are the slots of the RPCQ::|NativeQuilMetadata| class."
-  (let* ((statistics (make-hash-table :test #'equal))
+  (let* ((statistics nil)
          (quil::*compiler-noise* (and verbose *human-readable-stream*))
          (*random-state* (make-random-state t))
          (quil::*enable-state-prep-compression* state-aware))
@@ -361,82 +361,96 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
     (multiple-value-bind (processed-program topological-swaps)
         (compiler-hook program chip-specification :protoquil protoquil :destructive t)
 
-      ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
       (when protoquil
+        ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
         (setf (parsed-program-circuit-definitions processed-program) nil
-              (parsed-program-gate-definitions processed-program) nil))
+              (parsed-program-gate-definitions processed-program) nil)
 
-      ;; if we're supposed to output protoQuil, we also need to strip the final HALT
-      ;; instructions from the output
-      (when protoquil
-        (setf (gethash "topological_swaps" statistics) topological-swaps)
-        (setf (gethash "final_rewiring" statistics)
-              (quil::extract-final-exit-rewiring-vector processed-program))
+        ;; if we're supposed to output protoQuil, we also need to strip the final HALT
+        ;; instructions from the output
         (setf (parsed-program-executable-code processed-program)
               (strip-final-halt-respecting-rewirings processed-program))
 
-        (let ((lschedule (quil::make-lscheduler)))
-          (loop :for instr :across (parsed-program-executable-code processed-program)
-                :unless (typep instr 'pragma)
-                  :do (quil::append-instruction-to-lschedule lschedule instr))
-          (setf (gethash "logical_schedule" statistics)
-                lschedule))
-
-        ;; gate depth, gate volume, duration, and fidelity stats can
-        ;; all share an lschedule
-        (let ((lschedule (quil::make-lscheduler)))
-          (loop :for instr :across (parsed-program-executable-code processed-program)
-                :when (and (typep instr 'gate-application)
-                           (not (member (cl-quil::application-operator-root-name instr)
-                                        gate-blacklist
-                                        :test #'string=))
-                           (or (null gate-whitelist)
-                               (member (cl-quil::application-operator-root-name instr)
-                                       gate-whitelist
-                                       :test #'string=)))
-                  :do (quil::append-instruction-to-lschedule lschedule instr))
-
-          (setf (gethash "gate_depth" statistics)
-                (quil::lscheduler-calculate-depth lschedule))
-
-          (setf (gethash "gate_volume" statistics)
-                (quil::lscheduler-calculate-volume lschedule))
-
-          (setf (gethash "program_duration" statistics)
-                (quil::lscheduler-calculate-duration lschedule chip-specification))
-
-          (setf (gethash "program_fidelity" statistics)
-                (quil::lscheduler-calculate-fidelity lschedule chip-specification))
-
-          (let* ((lscheduler-resources
-                   (let ((collect (quil::make-null-resource)))
-                     (quil::lscheduler-walk-graph
-                      lschedule
-                      :bump-value (lambda (instr value)
-                                    (setf collect
-                                          (quil::resource-union collect
-                                                                (quil::instruction-resources instr)))
-                                    value))
-                     collect))
-                 (unused-qubits
-                   (loop :for i :below (quil::chip-spec-n-qubits chip-specification)
-                         :unless (quil::resources-intersect-p (quil::make-qubit-resource i)
-                                                              lscheduler-resources)
-                           :collect i)))
-            (setf (gethash "unused_qubits" statistics)
-                  unused-qubits)))
-
-        ;; multiq gate depth requires a separate lschedule
-        (let ((lschedule (quil::make-lscheduler)))
-          (loop :for instr :across (parsed-program-executable-code processed-program)
-                :when (and (typep instr 'gate-application)
-                           (<= 2 (length (application-arguments instr))))
-                  :do (quil::append-instruction-to-lschedule lschedule instr)
-                :finally
-                   (setf (gethash "multiqubit_gate_depth" statistics)
-                         (quil::lscheduler-calculate-depth lschedule)))))
+        ;; Compute statistics for protoquil program
+        (setf statistics (compute-statistics processed-program chip-specification :gate-whitelist gate-whitelist :gate-blacklist gate-blacklist))
+        (setf (gethash "topological_swaps" statistics) topological-swaps))
 
       (values processed-program statistics))))
+
+;;
+;; Functions for compiling to protoquil
+;;
+
+(defun compute-statistics (processed-program chip-specification &key gate-whitelist gate-blacklist)
+  "Compute statistics about protoquil program PROCESSED-PROGRAM.
+
+This function will have undefined behavior when PROCESSED-PROGRAM is not protoquil."
+  (let ((statistics (make-hash-table :test #'equal)))
+    (setf (gethash "final_rewiring" statistics)
+          (quil::extract-final-exit-rewiring-vector processed-program))
+
+    (let ((lschedule (quil::make-lscheduler)))
+      (loop :for instr :across (parsed-program-executable-code processed-program)
+            :unless (typep instr 'pragma)
+              :do (quil::append-instruction-to-lschedule lschedule instr))
+      (setf (gethash "logical_schedule" statistics)
+            lschedule))
+
+    ;; gate depth, gate volume, duration, and fidelity stats can
+    ;; all share an lschedule
+    (let ((lschedule (quil::make-lscheduler)))
+      (loop :for instr :across (parsed-program-executable-code processed-program)
+            :when (and (typep instr 'gate-application)
+                       (not (member (cl-quil::application-operator-root-name instr)
+                                    gate-blacklist
+                                    :test #'string=))
+                       (or (null gate-whitelist)
+                           (member (cl-quil::application-operator-root-name instr)
+                                   gate-whitelist
+                                   :test #'string=)))
+              :do (quil::append-instruction-to-lschedule lschedule instr))
+
+      (setf (gethash "gate_depth" statistics)
+            (quil::lscheduler-calculate-depth lschedule))
+
+      (setf (gethash "gate_volume" statistics)
+            (quil::lscheduler-calculate-volume lschedule))
+
+      (setf (gethash "program_duration" statistics)
+            (quil::lscheduler-calculate-duration lschedule chip-specification))
+
+      (setf (gethash "program_fidelity" statistics)
+            (quil::lscheduler-calculate-fidelity lschedule chip-specification))
+
+      (let* ((lscheduler-resources
+               (let ((collect (quil::make-null-resource)))
+                 (quil::lscheduler-walk-graph
+                  lschedule
+                  :bump-value (lambda (instr value)
+                                (setf collect
+                                      (quil::resource-union collect
+                                                            (quil::instruction-resources instr)))
+                                value))
+                 collect))
+             (unused-qubits
+               (loop :for i :below (quil::chip-spec-n-qubits chip-specification)
+                     :unless (quil::resources-intersect-p (quil::make-qubit-resource i)
+                                                          lscheduler-resources)
+                       :collect i)))
+        (setf (gethash "unused_qubits" statistics)
+              unused-qubits)))
+
+    ;; multiq gate depth requires a separate lschedule
+    (let ((lschedule (quil::make-lscheduler)))
+      (loop :for instr :across (parsed-program-executable-code processed-program)
+            :when (and (typep instr 'gate-application)
+                       (<= 2 (length (application-arguments instr))))
+              :do (quil::append-instruction-to-lschedule lschedule instr)
+            :finally
+               (setf (gethash "multiqubit_gate_depth" statistics)
+                     (quil::lscheduler-calculate-depth lschedule))))
+
+    statistics))
 
 (defun strip-final-halt-respecting-rewirings (processed-program)
   "Remove the final HALT instruction, if any, from PROCESSED-PROGRAM, retaining any attached rewiring comments."
