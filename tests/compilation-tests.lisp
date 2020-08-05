@@ -277,3 +277,42 @@ CNOT 4 8
 
 (deftest test-free-rx-rz-strings-reduce ()
   (%test-reduction-with-chip 3 (%read-test-chipspec "1q-free-rx.qpu")))
+
+(deftest test-symbolic-parameter-compiles-in-examples ()
+  "There have been bugs where symbolic compilers aren't found because non-symbolic ones are lower cost. (Bug #667)"
+  ;; Check we can compute this fact right.
+  (is (quil::compiler-allows-symbolic-parameters-p #'quil::RX-to-ZXZXZ))
+  ;; If this happens to change in the future... let me know!
+  (is (not (quil::compiler-allows-symbolic-parameters-p #'quil::EULER-ZYZ-COMPILER)))
+  ;; Some full stack test cases that arose out of bug reports.
+  (not-signals error
+    (quil:compiler-hook (quil:parse-quil "
+DECLARE theta REAL
+RX(theta) 0")
+                   (quil::build-nq-linear-chip 2)))
+  (not-signals error
+    (quil:compiler-hook (quil:parse-quil "
+PRAGMA INITIAL_REWIRING \"NAIVE\"
+DECLARE ro BIT[5]
+DECLARE theta REAL[2]
+H 1
+H 2
+H 3
+H 4
+H 5
+CPHASE(theta[0]) 1 2
+CPHASE(theta[0]) 2 3
+CPHASE(theta[0]) 3 4
+CPHASE(theta[0]) 4 5
+RX(theta[1]) 1
+RX(theta[1]) 2
+RX(theta[1]) 3
+RX(theta[1]) 4
+RX(theta[1]) 5
+MEASURE 1 ro[0]
+MEASURE 2 ro[1]
+MEASURE 3 ro[2]
+MEASURE 4 ro[3]
+MEASURE 5 ro[4]
+")
+                     (quil::build-nq-linear-chip 6))))
