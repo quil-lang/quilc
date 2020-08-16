@@ -38,4 +38,5 @@
                (:file "impl/clozure")
                (:file "rpc-server")
                (:file "printers")
+               (:file "options")
                (:file "entry-point")))

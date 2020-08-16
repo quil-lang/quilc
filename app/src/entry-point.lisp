@@ -7,197 +7,6 @@
 
 (in-package #:quilc)
 
-(defparameter *option-spec*
-  '((("prefer-gate-ladders")
-     :type boolean
-     :optional t
-     :documentation "uses gate ladders rather than SWAPs to implement long-ranged gates")
-
-    (("gate-blacklist")
-     :type string
-     :optional t
-     :documentation "when calculating statistics, ignore these (comma-separated) gates")
-
-    (("gate-whitelist")
-     :type string
-     :optional t
-     :documentation "when calculating statistics, consider only these (comma-separated) gates")
-
-    (("without-pretty-printing")
-     :type boolean
-     :optional t
-     :documentation "turns off pretty-printing features")
-
-    (("print-circuit-definitions")
-     :type boolean
-     :optional t
-     :initial-value nil
-     :documentation "in batch mode print the circuit definitions from the input program")
-
-    (("verbose")
-     :type boolean
-     :optional t
-     :documentation "verbose compiler trace output")
-
-    (("isa")
-     :type string
-     :optional t
-     :initial-value "8Q"
-     :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", \"bristlecone\", \"ibmqx5\", or path to QPU description file")
-
-    (("enable-state-prep-reductions")
-     :type boolean
-     :optional t
-     :documentation "assume that the program starts in the ground state")
-
-    (("protoquil" #\P)
-     :type boolean
-     :optional t
-     :documentation "restrict input/output to ProtoQuil")
-
-    (("print-statistics")
-     :type boolean
-     :optional t
-     :documentation "print program statistics.  Requires -P.")
-
-    (("compute-matrix-reps" #\m)
-     :type boolean
-     :optional t
-     :documentation "prints matrix representations for comparison  Requires -P.  This is deprecated and will eventually be removed.")
-    
-    (("help" #\h)
-     :type boolean
-     :optional t
-     :documentation "print this help information and exit")
-
-    (("server-mode-rpc" #\R #\S)
-     :type boolean
-     :optional t
-     :documentation "run as an RPCQ server")
-
-    (("host")
-     :type string
-     :initial-value "*"
-     :optional t
-     :documentation "host on which to run the RPCQ server")
-
-    (("port" #\p)
-     :type integer
-     :initial-value 5555
-     :optional t
-     :documentation "port to run the RPCQ server on")
-
-    (("time-limit")
-     :type integer
-     :initial-value 0
-     :documentation "time limit (in seconds) for server requests (0 => unlimited)")
-
-    (("version" #\v)
-     :type boolean
-     :optional t
-     :documentation "print version information")
-
-    (("check-libraries")
-     :type boolean
-     :optional t
-     :documentation "check that foreign libraries are adequate")
-
-    #-forest-sdk
-    (("benchmark")
-     :type boolean
-     :optional t
-     :documentation "run benchmarks and print results")
-
-    (("log-level")
-     :type string
-     :optional t
-     :initial-value "info"
-     :documentation "maximum logging level (\"debug\", \"info\", \"notice\", \"warning\", \"err\", \"crit\", \"alert\", or \"emerg\") (default \"info\")")
-
-    (("quiet")
-     :type boolean
-     :optional t
-     :initial-value nil
-     :documentation "Disable all non-logging output (banner, etc.)")
-
-    (("check-sdk-version")
-     :type boolean
-     :optional t
-     :initial-value t
-     :documentation "Check for a new SDK version at launch.")
-
-    (("proxy")
-     :type string
-     :optional t
-     :initial-value nil
-     :documentation "Proxy to use when checking for an SDK update.")
-
-    (("safe-include-directory")
-     :type string
-     :optional t
-     :initial-value nil
-     :documentation "Prevent programs from including files not within this directory. Any includes are interpreted as relative to this directory.")
-
-    #-forest-sdk
-    (("swank-port")
-     :type integer
-     :optional t
-     :documentation "port to start a Swank server on"))
-  "Supported and non-deprecated options.")
-
-(defparameter *deprecated-option-spec*
-  '((("compute-gate-depth" #\d)
-     :type boolean
-     :optional t
-     :documentation "prints compiled circuit gate depth (longest subsequece of data-sharing compiled instructions).  Requires -P.  This is deprecated and will eventually be removed. See --print-statistics.")
-
-    (("compute-gate-volume")
-     :type boolean
-     :optional t
-     :documentation "prints compiled circuit gate volume (number of gates).  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-
-    (("compute-runtime" #\r)
-     :type boolean
-     :optional t
-     :documentation "prints compiled circuit expected runtime.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-
-    (("compute-fidelity" #\f)
-     :type boolean
-     :optional t
-     :documentation "prints approximate compiled circuit fidelity.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
-    (("compute-2Q-gate-depth" #\2)
-     :type boolean
-     :optional t
-     :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists. Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
-    (("compute-unused-qubits" #\u)
-     :type boolean
-     :optional t
-     :documentation "prints unused qubits.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
-    (("show-topological-overhead" #\t)
-     :type boolean
-     :optional t
-     :documentation "prints the number of SWAPs incurred for topological reasons.  This is deprecated and will eventually be removed.  See --print-statistics."))
-  "Supported and deprecated options.")
-
-(defparameter *ignored-option-spec*
-  '((("print-logical-schedule" #\s)
-     :type boolean
-     :optional t
-     :documentation "include logically parallelized schedule in output.  Requires -P.  This is inactive and will eventually be removed.")
-    
-    (("json-serialize" #\j)
-     :type boolean
-     :optional t
-     :documentation "serialize output as a JSON object"))
-  "Inactive and deprecated options.")
-
-(defparameter *retired-option-spec*
-  '()
-  "Invalid options.")
-
 (defun slurp-lines (&optional (stream *standard-input*))
   (flet ((line () (read-line stream nil nil nil)))
     (with-output-to-string (s)
@@ -409,6 +218,10 @@
   (warn-deprecated-options all-args)
   (warn-ignored-options all-args)
 
+  ;;
+  ;; Handle trivial print-then-exit arguments
+  ;;
+
   (when help
     (show-help)
     (uiop:quit 0))
@@ -419,6 +232,10 @@
 
   (when check-libraries
     (check-libraries))
+
+  ;;
+  ;; Enable 'passive' feature arguments (logging, etc.)
+  ;;
 
   (when log-level
     (setf *log-level* (log-level-string-to-symbol log-level)))
@@ -442,9 +259,18 @@
                                   (cl-syslog:syslog-log-writer "quilc" :local0)
                                   *error-output*)))
 
+
+  ;;
+  ;; Handle non-trivial print-then-exit arguments
+  ;;
+
   #-forest-sdk
   (when benchmark
     (benchmarks))
+
+  ;;
+  ;; Validate argument values
+  ;;
 
   (when (minusp time-limit)
     (error "A negative value (~D) was provided for the server time-limit." time-limit))
@@ -454,6 +280,10 @@
     (error "--safe-include-directory must point to a directory. Got ~S. Did you ~
             forget a trailing slash?"
            safe-include-directory))
+
+  ;;
+  ;; Now we're cooking with fire
+  ;;
 
   (special-bindings-let*
       ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
@@ -480,12 +310,17 @@
 
     (when check-sdk-version
       (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
-    ;; at this point we know we're doing something. strap in LAPACK.
+    ;;
+    ;; At this point we know we're doing something. Strap in LAPACK.
+    ;;
+
     (magicl:with-blapack
       (reload-foreign-libraries)
 
       (cond
+        ;;
         ;; RPCQ server mode requested
+        ;;
         (server-mode-rpc
          (unless quiet
            (show-banner))
@@ -498,7 +333,9 @@
                            :logger *logger*
                            :time-limit time-limit))
 
+        ;;
         ;; server modes not requested, so continue parsing arguments
+        ;;
         (t
          (setf *human-readable-stream* *error-output*)
          (setf *quil-stream* *standard-output*)
@@ -552,82 +389,95 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
     (multiple-value-bind (processed-program topological-swaps)
         (compiler-hook program chip-specification :protoquil protoquil :destructive t)
 
-      ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
       (when protoquil
+        ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
         (setf (parsed-program-circuit-definitions processed-program) nil
-              (parsed-program-gate-definitions processed-program) nil))
+              (parsed-program-gate-definitions processed-program) nil)
 
-      ;; if we're supposed to output protoQuil, we also need to strip the final HALT
-      ;; instructions from the output
-      (when protoquil
-        (setf (gethash "topological_swaps" statistics) topological-swaps)
-        (setf (gethash "final_rewiring" statistics)
-              (quil::extract-final-exit-rewiring-vector processed-program))
+        ;; if we're supposed to output protoQuil, we also need to strip the final HALT
+        ;; instructions from the output
         (setf (parsed-program-executable-code processed-program)
               (strip-final-halt-respecting-rewirings processed-program))
 
-        (let ((lschedule (quil::make-lscheduler)))
-          (loop :for instr :across (parsed-program-executable-code processed-program)
-                :unless (typep instr 'pragma)
-                  :do (quil::append-instruction-to-lschedule lschedule instr))
-          (setf (gethash "logical_schedule" statistics)
-                lschedule))
-
-        ;; gate depth, gate volume, duration, and fidelity stats can
-        ;; all share an lschedule
-        (let ((lschedule (quil::make-lscheduler)))
-          (loop :for instr :across (parsed-program-executable-code processed-program)
-                :when (and (typep instr 'gate-application)
-                           (not (member (cl-quil::application-operator-root-name instr)
-                                        gate-blacklist
-                                        :test #'string=))
-                           (or (null gate-whitelist)
-                               (member (cl-quil::application-operator-root-name instr)
-                                       gate-whitelist
-                                       :test #'string=)))
-                  :do (quil::append-instruction-to-lschedule lschedule instr))
-
-          (setf (gethash "gate_depth" statistics)
-                (quil::lscheduler-calculate-depth lschedule))
-
-          (setf (gethash "gate_volume" statistics)
-                (quil::lscheduler-calculate-volume lschedule))
-
-          (setf (gethash "program_duration" statistics)
-                (quil::lscheduler-calculate-duration lschedule chip-specification))
-
-          (setf (gethash "program_fidelity" statistics)
-                (quil::lscheduler-calculate-fidelity lschedule chip-specification))
-
-          (let* ((lscheduler-resources
-                   (let ((collect (quil::make-null-resource)))
-                     (quil::lscheduler-walk-graph
-                      lschedule
-                      :bump-value (lambda (instr value)
-                                    (setf collect
-                                          (quil::resource-union collect
-                                                                (quil::instruction-resources instr)))
-                                    value))
-                     collect))
-                 (unused-qubits
-                   (loop :for i :below (quil::chip-spec-n-qubits chip-specification)
-                         :unless (quil::resources-intersect-p (quil::make-qubit-resource i)
-                                                              lscheduler-resources)
-                           :collect i)))
-            (setf (gethash "unused_qubits" statistics)
-                  unused-qubits)))
-
-        ;; multiq gate depth requires a separate lschedule
-        (let ((lschedule (quil::make-lscheduler)))
-          (loop :for instr :across (parsed-program-executable-code processed-program)
-                :when (and (typep instr 'gate-application)
-                           (<= 2 (length (application-arguments instr))))
-                  :do (quil::append-instruction-to-lschedule lschedule instr)
-                :finally
-                   (setf (gethash "multiqubit_gate_depth" statistics)
-                         (quil::lscheduler-calculate-depth lschedule)))))
+        ;; Compute statistics for protoquil program
+        (compute-statistics processed-program chip-specification statistics :gate-whitelist gate-whitelist :gate-blacklist gate-blacklist)
+        (setf (gethash "topological_swaps" statistics) topological-swaps))
 
       (values processed-program statistics))))
+
+;;
+;; Functions for compiling to protoquil
+;;
+
+(defun compute-statistics (processed-program chip-specification statistics &key gate-whitelist gate-blacklist)
+  "Compute statistics about protoquil program PROCESSED-PROGRAM.
+
+This function will have undefined behavior when PROCESSED-PROGRAM is not protoquil."
+  (setf (gethash "final_rewiring" statistics)
+        (quil::extract-final-exit-rewiring-vector processed-program))
+
+  (let ((lschedule (quil::make-lscheduler)))
+    (loop :for instr :across (parsed-program-executable-code processed-program)
+          :unless (typep instr 'pragma)
+            :do (quil::append-instruction-to-lschedule lschedule instr))
+    (setf (gethash "logical_schedule" statistics)
+          lschedule))
+
+  ;; gate depth, gate volume, duration, and fidelity stats can
+  ;; all share an lschedule
+  (let ((lschedule (quil::make-lscheduler)))
+    (loop :for instr :across (parsed-program-executable-code processed-program)
+          :when (and (typep instr 'gate-application)
+                     (not (member (cl-quil::application-operator-root-name instr)
+                                  gate-blacklist
+                                  :test #'string=))
+                     (or (null gate-whitelist)
+                         (member (cl-quil::application-operator-root-name instr)
+                                 gate-whitelist
+                                 :test #'string=)))
+            :do (quil::append-instruction-to-lschedule lschedule instr))
+
+    (setf (gethash "gate_depth" statistics)
+          (quil::lscheduler-calculate-depth lschedule))
+
+    (setf (gethash "gate_volume" statistics)
+          (quil::lscheduler-calculate-volume lschedule))
+
+    (setf (gethash "program_duration" statistics)
+          (quil::lscheduler-calculate-duration lschedule chip-specification))
+
+    (setf (gethash "program_fidelity" statistics)
+          (quil::lscheduler-calculate-fidelity lschedule chip-specification))
+
+    (let* ((lscheduler-resources
+             (let ((collect (quil::make-null-resource)))
+               (quil::lscheduler-walk-graph
+                lschedule
+                :bump-value (lambda (instr value)
+                              (setf collect
+                                    (quil::resource-union collect
+                                                          (quil::instruction-resources instr)))
+                              value))
+               collect))
+           (unused-qubits
+             (loop :for i :below (quil::chip-spec-n-qubits chip-specification)
+                   :unless (quil::resources-intersect-p (quil::make-qubit-resource i)
+                                                        lscheduler-resources)
+                     :collect i)))
+      (setf (gethash "unused_qubits" statistics)
+            unused-qubits)))
+
+  ;; multiq gate depth requires a separate lschedule
+  (let ((lschedule (quil::make-lscheduler)))
+    (loop :for instr :across (parsed-program-executable-code processed-program)
+          :when (and (typep instr 'gate-application)
+                     (<= 2 (length (application-arguments instr))))
+            :do (quil::append-instruction-to-lschedule lschedule instr)
+          :finally
+             (setf (gethash "multiqubit_gate_depth" statistics)
+                   (quil::lscheduler-calculate-depth lschedule))))
+
+  statistics)
 
 (defun strip-final-halt-respecting-rewirings (processed-program)
   "Remove the final HALT instruction, if any, from PROCESSED-PROGRAM, retaining any attached rewiring comments."
