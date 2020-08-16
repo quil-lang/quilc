@@ -353,6 +353,24 @@ What \"concrete\" means depends on the types of A and B:
   (:method ((a wildcard-binding) (b gate-binding))
     b))
 
+(defvar *instantiate-binding-with-symbolic-parameters* nil
+  "When calling INSTANTIATE-BINDING and encountering a symbolic parameter, instead of erroring, supply a symbolic parameter.")
+
+(defun symbolic-param-generator ()
+  (let ((n -1))
+    (lambda ()
+      (make-delayed-expression nil nil `(* 1.0 ,(mref "G" (incf n)))))))
+
+(defun instantiate-parameters (params)
+  ;; Instantiate PARAMS with symbolic arguments. Used as a helper
+  ;; below.
+  (let ((gen (symbolic-param-generator)))
+    (mapcar (lambda (p)
+              (if (symbolp p)
+                  (funcall gen)
+                  p))
+            params)))
+
 (defgeneric instantiate-binding (binding)
   (:documentation "When possible, construct the unique instruction on which BINDING will match. If any of the binding's arguments are unspecified (i.e. match against any qubit), those arguments will be filled-in with unique qubit indices.")
   (:method (binding)
@@ -360,8 +378,10 @@ What \"concrete\" means depends on the types of A and B:
   (:method ((binding gate-binding))
     (when (symbolp (gate-binding-operator binding))
       (error 'cannot-concretize-binding))
-    (when (or (symbolp (gate-binding-parameters binding))
-              (some #'symbolp (gate-binding-parameters binding)))
+    (when (symbolp (gate-binding-parameters binding))
+      (error 'cannot-concretize-binding))
+    (when (and (some #'symbolp (gate-binding-parameters binding))
+               (not *instantiate-binding-with-symbolic-parameters*))
       (error 'cannot-concretize-binding))
     (when (some #'symbolp (gate-binding-arguments binding))
       (let* ((usedq (gate-binding-arguments binding))
@@ -371,7 +391,7 @@ What \"concrete\" means depends on the types of A and B:
                                                        usedq)))))
     (apply #'build-gate
            (gate-binding-operator binding)
-           (gate-binding-parameters binding)
+           (instantiate-parameters (gate-binding-parameters binding))
            (gate-binding-arguments binding))))
 
 
@@ -405,6 +425,15 @@ What \"concrete\" means depends on the types of A and B:
     :initarg :output-gates
     :reader compiler-output-gates
     :documentation "Information automatically extracted about the target gate set.")
+   (info-plist
+    :initform nil
+    :accessor compiler-info-plist
+    :documentation "A plist of inessential information. You will likely find cached data here. Data includes:
+
+    :SYMBOLIC <boolean>
+        Accepts symbolic parameters.
+
+N.B. This is *NOT* the same as COMPILER-OPTIONS.")
    (%function
     :initarg :function
     :reader compiler-%function
@@ -668,6 +697,75 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                      (compiler-bindings x)))
              (get-compilers qubit-count)))
 
+(defun compiler-allows-symbolic-parameters-p (compiler)
+  "Does COMPILER accept instructions with symbolic parameters?
+
+Compilers matching gates which don't have parameters don't count as accepting parameters."
+  (let ((info (getf (compiler-info-plist compiler) ':SYMBOLIC '#1=#:unknown)))
+    (if (eq info '#1#)
+        (setf (getf (compiler-info-plist compiler) ':SYMBOLIC)
+              (heuristically-determine-if-compiler-allows-symbolic-parameters-p compiler))
+        info)))
+
+(defun heuristically-determine-if-compiler-allows-symbolic-parameters-p (compiler)
+  ;; Things marked as "HEURISTIC ALERT" are not perfect tests, but
+  ;; good enough in practice.
+  (block nil
+    (let* ((bindings (compiler-bindings compiler)))
+      ;; All bindings must be gate bindings.
+      (unless (every (lambda (b) (typep b 'gate-binding)) bindings)
+        (return nil))
+      ;; Now we know we can unpack the bindings.
+      ;;
+      ;; HEURISTIC ALERT: Before we do that, we'll check we are
+      ;; actually operating on named gates. One could imagine the
+      ;; compilation of symbolic 2Q operators with wildcard 1Q gates
+      ;; surrounding, but we don't have this kind of thing anywhere.
+      (unless (every (lambda (b) (typep (gate-binding-operator b) 'operator-description )) bindings)
+        (return nil))
+      ;; Now we descend to look at the bindings' parameter lists for
+      ;; heuristic conformance.
+      (let ((parameter-lists (map 'list #'gate-binding-parameters bindings)))
+        ;; HEURISTIC ALERT: All bindings have fewer than two
+        ;; parameters. This rule doesn't necessarily mean a compiler
+        ;; doesn't accept symbolic parameters, but it is unlikely in
+        ;; practice.
+        ;;
+        ;; We could also relax this rule by allowing bindings with
+        ;; any number of constant parameters. A fish to fry another
+        ;; day.
+        (unless (every (lambda (p) (and (alexandria:proper-list-p p)
+                                        (= 1 (length p))))
+                       parameter-lists)
+          (return nil))
+        ;; Check that we have at least one non-constant parameter.
+        (unless (some (lambda (p) (symbolp (first p))) parameter-lists)
+          (return nil))
+        ;; Ok, so, here's what we now know:
+        ;;
+        ;;     - All bindings take 1 parameter
+        ;;
+        ;;     - At least one binding takes an arbitrary parameter.
+        (let ((*instantiate-binding-with-symbolic-parameters* t))
+          (let ((prototype-instructions (map 'list #'instantiate-binding bindings)))
+            ;; We are ready to lock & load.
+            (handler-bind ((compiler-does-not-apply
+                             (lambda (c)
+                               (declare (ignore c))
+                               (return nil)))
+                           (error
+                             (lambda (c)
+                               (declare (ignore c))
+                               ;; Decline to handle, but issue a warning.
+                               (warn "When checking if the compiler ~A accepts ~
+                                      symbolic parameters, an unexpected error ~
+                                      occurred. This is probably because this ~
+                                      compiler matches against inputs it's not ~
+                                      actually able to process, like symbolic ~
+                                      expressions." (compiler-name compiler)))))
+              (apply compiler prototype-instructions) ; May return an empty list!
+              t)))))))
+
 (defun path-has-a-loop-p (path start)
   (and (< 1 (length path))
        (loop :for (table compiler) :on path :by #'cddr
@@ -692,9 +790,16 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                                                     qubit-count))
          (generic-cost (occurrence-table-metric-fidelity
                         (evaluate-occurrence-table (first generic-path) target-gateset))))
-    ;; it may be that non-generic gates have shorter routes to the target gate set.
-    ;; each possible such route begins with a specialized compiler.
-    ;; so, iterate over specialized compilers and see if they lead anywhere nice.
+    ;; it may be that non-generic gates have shorter routes to the
+    ;; target gate set.  each possible such route begins with a
+    ;; specialized compiler.
+    ;;
+    ;; it's also possible a specialized compiler actually allows a
+    ;; broader set of gates with symbolic arguments, even if it's
+    ;; higher cost.
+    ;;
+    ;; so, iterate over specialized compilers and see if they lead
+    ;; anywhere nice.
     (let ((compiler-hash (make-hash-table)))
       (dolist (compiler generic-path)
         (when (typep compiler 'compiler)
@@ -708,10 +813,14 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
                (special-cost (occurrence-table-metric-fidelity
                               (evaluate-occurrence-table (first special-path) target-gateset))))
           ;; did we in fact beat out the generic machinery?
-          (if (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
-                   (>= special-cost generic-cost))
-              ;; then store it!
-              (setf (gethash compiler compiler-hash) special-cost))))
+          ;;
+          ;; or does this special compiler actually allow a broader
+          ;; set of inputs than the generic ones?
+          (when (or (compiler-allows-symbolic-parameters-p compiler)
+                    (and (not (path-has-a-loop-p special-path (compiler-bindings compiler)))
+                         (>= special-cost generic-cost)))
+            ;; then store it ya dingus!
+            (setf (gethash compiler compiler-hash) special-cost))))
 
       ;; these are basically all the compilers we care to use; now we need to
       ;; sort them into preference order.
