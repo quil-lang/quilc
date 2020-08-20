@@ -54,6 +54,12 @@
      :optional t
      :documentation "backend used to compile the program. Only has effect when --compile or -c are provided.")
 
+    (("backend-option" #\B)
+     :type string
+     :list t
+     :optional t
+     :documentation "backend option passed to initialization of backend. Only has effect when --backend or -b are provided.")
+
     (("list-backends")
      :type boolean
      :optional t

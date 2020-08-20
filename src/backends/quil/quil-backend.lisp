@@ -22,13 +22,13 @@
 ;;; The EXECUTABLE protocol
 
 (defclass quil-executable ()
-  ((utf8-bytes :initarg :utf8-bytes
-               :type (array (unsigned-byte 8) (*))
-               :reader utf8-bytes)))
+  ((utf8-quil-output :initarg :utf8-quil-output
+                     :type (array (unsigned-byte 8) (*))
+                     :reader utf8-quil-output)))
 
 (defmethod write-executable ((executable quil-executable) stream)
   (let ((stream (flexi-streams:make-flexi-stream stream :external-format ':UTF-8)))
-    (loop :for byte :across (utf8-bytes executable)
+    (loop :for byte :across (utf8-quil-output executable)
           :do (write-byte byte stream))))
 
 ;;; The COMPILATION protocol
@@ -47,7 +47,7 @@
              (print-parsed-program program stream)))
     
     (make-instance 'quil-executable
-                   :utf8-bytes
+                   :utf8-quil-output
                    (flexi-streams:with-output-to-sequence (stream :element-type '(unsigned-byte 8))
                      (let ((stream (flexi-streams:make-flexi-stream stream :external-format ':UTF-8)))
                        (print-program-to-stream stream))))))
