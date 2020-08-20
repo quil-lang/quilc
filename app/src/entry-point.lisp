@@ -198,6 +198,7 @@
                           ;; Backend-related
                           (compile nil)
                           (backend nil)
+                          (backend-option nil)
                           (list-backends nil)
                           (output nil)
 
@@ -417,19 +418,29 @@
                  (unless backend-class
                    (error "The backend value '~a' does not name an available backend. For a list of available backends, run 'quilc --list-backends'." backend))
 
-                 ;; TODO: Initialize backend with options. This is
-                 ;;       currently blocked by the command line
-                 ;;       argument parser not supporting multiple of
-                 ;;       the same argument as a list (like gcc does)
-
                  ;; TODO: Compute and pass statistics to backend when
                  ;; using protoquil
-                 (let ((backend (make-instance backend-class)))
+                 (let ((backend
+                         (apply #'make-instance backend-class
+                                (parse-backend-options backend-option))))
                    (unless (quil:backend-supports-chip-p backend chip-spec)
                      (error "The backend provided does not support this ISA."))
-                   (backend-compile processed-program chip-spec backend output)))))))))))
 
-(defun backend-compile (program chip-spec backend output)
+                   (backend-compile-program processed-program chip-spec backend output)))))))))))
+
+(defun parse-backend-options (options)
+  "Parse backend options to keyword init-args for making backend."
+  (mapcan (lambda (opt)
+            (let ((ret (uiop:split-string opt :separator '(#\=))))
+              (unless (= 2 (length ret))
+                (error "Invalid backend option syntax '~A'." opt))
+              (let ((sym (find-symbol (format nil "~@:(~A~)" (first ret)) "KEYWORD")))
+                (unless sym
+                  (error "Invalid backend option '~A'." (first ret)))
+                (list sym (uiop:split-string (second ret) :separator '(#\;))))))
+          options))
+
+(defun backend-compile-program (program chip-spec backend output)
   "Compile the processed program PROGRAM for BACKEND, writing to OUTPUT."
   (let ((stream))
     (unwind-protect
