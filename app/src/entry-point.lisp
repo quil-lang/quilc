@@ -99,7 +99,9 @@
           (mapcar 'sb-alien::shared-object-pathname sb-sys:*shared-objects*))
   (unless (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_"
                                                                'magicl.foreign-libraries:liblapack)
-    (format t "The loaded version of LAPACK is missing functionality. The compiler will still work with your current LAPACK but it is advisable to install a more complete version.~%")
+    (format t "The loaded version of LAPACK is missing ~
+    functionality. The compiler will still work with your current ~
+    LAPACK but it is advisable to install a more complete version.~%")
     (uiop:quit 1))
   (format t "Library check passed.~%")
   (uiop:quit 0))
@@ -166,7 +168,8 @@
   (loop :for kw :in args :by #'cddr
         :for found := (find kw *deprecated-option-spec* :test #'string-equal :key #'caar)
         :when found :do
-          (format *error-output* "The option --~A is deprecated and will be removed. See --help for more information.~%"
+          (format *error-output* "The option --~A is deprecated and ~
+          will be removed. See --help for more information.~%"
                   (caar found))))
 
 (defun warn-ignored-options (args)
@@ -174,7 +177,9 @@
   (loop :for kw :in args :by #'cddr
         :for found := (find kw *ignored-option-spec* :test #'string-equal :key #'caar)
         :when found :do
-          (format *error-output* "The option --~A is deprecated and disabled, and will be removed. See --help for more information.~%"
+          (format *error-output* "The option --~A is deprecated and ~
+          disabled, and will be removed. See --help for more ~
+          information.~%"
                   (caar found))))
 
 (defun process-options (&rest all-args
@@ -409,14 +414,20 @@
              ;; New and improved flow
              (when compile
                (unless backend
-                 (error "Backend must be provided when compilation is enabled. For a list of available backends, run 'quilc --list-backends'."))
+                 (error "Backend must be provided when compilation is ~
+                 enabled. For a list of available backends, run 'quilc ~
+                 --list-backends'."))
 
                (unless output
-                 (error "Output must be provided when compilation is enabled. Specify an output file with -o or --output."))
+                 (error "Output must be provided when compilation is ~
+                 enabled. Specify an output file with -o or ~
+                 --output."))
 
                (let ((backend-class (quil:find-backend backend)))
                  (unless backend-class
-                   (error "The backend value '~a' does not name an available backend. For a list of available backends, run 'quilc --list-backends'." backend))
+                   (error "The backend value '~a' does not name an ~
+                   available backend. For a list of available ~
+                   backends, run 'quilc --list-backends'." backend))
 
                  ;; TODO: Compute and pass statistics to backend when
                  ;; using protoquil
