@@ -25,7 +25,7 @@ If it is not found (with enough accuracy to satisfy DOUBLE=), return NIL.
   (assert (magicl:square-matrix-p matrix))
   (check-type k (integer 1))
   (check-type ansatz (or symbol function))
-  (let* ((1/dim (coerce (/ (elt (magicl:shape matrix) 0)) 'double-float))
+  (let ((1/dim (coerce (/ (elt (magicl:shape matrix) 0)) 'double-float))
          (matrix-dagger (magicl:dagger matrix)))
     (flet ((cost (thetas)
              (- 1.0d0 (* 1/dim
