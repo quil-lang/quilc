@@ -16,7 +16,7 @@
 
 SOLVE-FOR-ANSATZ-INPUTS will attempt to find a vector of values v such that MATRIX == (FUNCALL ANSATZ v).
 
-The keyword argument INITIAL-GUESS is optional to allow control over the optimization process. It should be a vector of K double floats, or NIL. (By default, the a random initial guess will be generated.)
+The keyword argument INITIAL-GUESS is optional to allow control over the optimization process. It should be a vector of K double floats, or NIL. (By default, a random initial guess will be generated.)
 
 If it is found, a vector #(t1 ... tK) will be returned.
 
