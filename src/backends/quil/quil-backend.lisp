@@ -27,9 +27,7 @@
                      :reader utf8-quil-output)))
 
 (defmethod write-executable ((executable quil-executable) stream)
-  (let ((stream (flexi-streams:make-flexi-stream stream :external-format ':UTF-8)))
-    (loop :for byte :across (utf8-quil-output executable)
-          :do (write-byte byte stream))))
+  (write-sequence (utf8-quil-output executable) stream))
 
 ;;; The COMPILATION protocol
 
