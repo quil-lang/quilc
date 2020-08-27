@@ -442,17 +442,12 @@
 
 (defun backend-compile-program (program chip-spec backend output)
   "Compile the processed program PROGRAM for BACKEND, writing to OUTPUT."
-  (let ((stream))
-    (unwind-protect
-         (progn
-           (setf stream (open output :direction ':output
-                                     :element-type '(unsigned-byte 8)
-                                     :if-exists ':supersede
-                                     :if-does-not-exist ':create))
-           (let ((executable (quil:backend-compile program chip-spec backend)))
-             (quil:write-executable executable stream)))
-      (when stream
-        (close stream)))))
+  (with-open-file (stream output :direction ':output
+                                 :element-type '(unsigned-byte 8)
+                                 :if-exists ':supersede
+                                 :if-does-not-exist ':create)
+    (let ((executable (quil:backend-compile program chip-spec backend)))
+      (quil:write-executable executable stream))))
 
 (defun process-program (program chip-specification
                         &key
