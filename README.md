@@ -74,6 +74,14 @@ To install system-wide issue the command
 $ make install
 ```
 
+#### Build flags
+
+`quilc` can be built with additional options provided to `make` as described below:
+
+| Flag                     | Description                                                                                                                                                     |
+|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `POST_LOAD_ASDF_SYSTEMS` | Specify additional ASDF systems to load _after_ `quilc` as part of the executable. This can be used to build `quilc` with additional out-of-tree functionality. |
+
 ### Using the Quil Compiler
 
 The Quil Compiler provides two modes of interaction: (1) communicating
