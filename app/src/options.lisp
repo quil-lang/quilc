@@ -52,13 +52,13 @@
     (("backend" #\b)
      :type string
      :optional t
-     :documentation "backend used to compile the program. Only has effect when --compile or -c are provided.")
+     :documentation "backend used to compile the program. Only has effect when --compile or -c are provided")
 
     (("backend-option" #\B)
      :type string
      :list t
      :optional t
-     :documentation "backend option passed to initialization of backend. Only has effect when --backend or -b are provided.")
+     :documentation "backend option passed to initialization of backend. Only has effect when --backend or -b are provided. Backend options are supplied in the following format: 'option-name=val1;val2;val3...'")
 
     (("list-backends")
      :type boolean
@@ -69,7 +69,7 @@
     (("output" #\o)
      :type string
      :optional t
-     :documentation "file to write output of compilation to. Only has effect when --compile or -c are provided.")
+     :documentation "file to write output of compilation to. Only has effect when --compile or -c are provided")
 
     (("enable-state-prep-reductions")
      :type boolean
