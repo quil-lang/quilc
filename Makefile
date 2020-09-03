@@ -9,12 +9,6 @@ QUICKLISP=$(SBCL) --load $(QUICKLISP_HOME)/setup.lisp \
 	--eval '(push (truename ".") asdf:*central-registry*)' \
 	--eval "(push (truename \"$(RIGETTI_LISP_LIBRARY_HOME)\") ql:*local-project-directories*)"
 QUICKLISP_BOOTSTRAP_URL=https://beta.quicklisp.org/quicklisp.lisp
-
-
-# Extra ASDF systems to load after quilc as part of the executable.
-export ASDF_SYSTEMS_TO_LOAD=quilc $(POST_LOAD_ASDF_SYSTEMS)
-SYSTEM_LOAD_STRING=$(foreach system,$(ASDF_SYSTEMS_TO_LOAD),--eval '(ql:quickload "$(system)")')
-
 UNAME_S=$(shell uname -s)
 PREFIX ?= /usr/local
 
@@ -34,8 +28,8 @@ $(QUICKLISP_SETUP):
 system-index.txt: $(QUICKLISP_SETUP)
 	$(QUICKLISP) \
 		$(FOREST_SDK_FEATURE) \
-		$(SYSTEM_LOAD_STRING) \
-		--eval '(ql:write-asdf-manifest-file "system-index.txt")'
+		--eval "(ql:quickload '(quilc ${POST_LOAD_ASDF_SYSTEMS}))" \
+		--eval "(ql:write-asdf-manifest-file \"system-index.txt\")"
 
 ###############################################################################
 # DEPENDENCIES
@@ -76,7 +70,8 @@ endif
 
 .PHONY: quilc
 quilc: system-index.txt
-	$(SBCL) $(FOREST_SDK_FEATURE) \
+	ASDF_SYSTEMS_TO_LOAD="quilc ${POST_LOAD_ASDF_SYSTEMS}" \
+        $(SBCL) $(FOREST_SDK_FEATURE) \
 	        --eval "(setf sb-ext:\*on-package-variance\* '(:warn (:swank :swank-backend :swank-repl) :error t))" \
 		--load "build-app.lisp" \
 		$(FOREST_SDK_OPTION) \
