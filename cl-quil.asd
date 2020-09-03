@@ -84,6 +84,7 @@
                              (:file "translators")
                              (:file "modifiers")
                              (:file "linear-paulis")
+                             (:file "ansatz-search")
                              ;; attic'd files / pedagogical purposes only
                              (:static-file "optimal-2q")
                              (:static-file "cs-compile")))

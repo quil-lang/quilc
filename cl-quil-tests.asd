@@ -45,6 +45,7 @@
                (:file "rewrite-tests")
                (:file "state-prep-tests")
                (:file "compiler-hook-tests")
+               (:file "ansatz-search-tests")
                (:file "benchmarking-procedures-tests")
                (:file "typed-memory-tests")
                (:file "approximation-tests")
