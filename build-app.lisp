@@ -44,11 +44,9 @@
     ;; Load systems defined by environment variable $ASDF_SYSTEMS_TO_LOAD,
     ;; or if that does not exist just load quilc
     (let ((systems (uiop:getenv "ASDF_SYSTEMS_TO_LOAD")))
-      (map nil (lambda (sys)
-                 (unless (uiop:emptyp sys)
-                   (asdf:load-system sys)))
-           (uiop:split-string (or systems "quilc")
-                              :separator " ")))
+      (dolist (sys (uiop:split-string (or systems "quilc") :separator " "))
+        (unless (uiop:emptyp sys)
+          (asdf:load-system sys))))
     ;; TODO Fix tweedledum
     ;; #-win32
     ;; (asdf:load-system "cl-quil/tweedledum")
