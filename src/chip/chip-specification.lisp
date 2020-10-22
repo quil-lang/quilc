@@ -300,11 +300,12 @@ used to specify CHIP-SPEC."
                                   (hardware-object-gate-information obj))
                          (make-gate-record :duration 150
                                            :fidelity fidelity)))))
-      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.89d0)
+      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.95d0)
                       (:iswap  "ISWAP"  ()  (_ _) 0.91d0)
-                      (:cphase "CPHASE" (_) (_ _) 0.80d0)
-                      (:piswap "PISWAP" (_) (_ _) 0.80d0)
-                      (:cnot   "CNOT"   ()  (,qubit0 ,qubit1) 0.90d0)))
+                      (:cphase "CPHASE" (_) (_ _) 0.98d0)
+                      (:piswap "PISWAP" (_) (_ _) 0.98d0)
+                      (:xy     "XY"     (_) (_ _) 0.98d0)
+                      (:cnot   "CNOT"   ()  (,qubit0 ,qubit1) 0.95d0)))
         (destructuring-bind (atom gate-name parameters arguments fidelity) data
           (stash-gate-record atom gate-name parameters arguments fidelity))))
     (when (member ':cnot type)

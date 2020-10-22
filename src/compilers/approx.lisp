@@ -41,7 +41,7 @@
 ;;       routines immediately following this definition.
 (deftype optimal-2q-target-atom ()
   "An enumerative type describing the two-qubit operators required by a particular two-qubit decomposition template."
-  '(member :cz :iswap :piswap :cphase :cnot))
+  '(member :cz :iswap :piswap :xy :cphase :cnot))
 
 (defun sequence-of-optimal-2q-target-atoms-p (seq)
   (and (typep seq 'sequence)
@@ -60,6 +60,7 @@
         (requirementsl (a:ensure-list requirements)))
     (when (member ':cphase targetl) (push ':cz targetl))
     (when (member ':piswap targetl) (push ':iswap targetl))
+    (when (member ':xy targetl) (push ':iswap targetl))
     (when (member ':cnot targetl) (push ':cz targetl))
     (subsetp requirementsl targetl)))
 
@@ -73,6 +74,7 @@
                     (:cz       (string= name "CZ"))
                     (:iswap    (string= name "ISWAP"))
                     (:piswap   (string= name "PISWAP"))
+                    (:xy       (string= name "XY"))
                     (:cphase   (string= name "CPHASE"))
                     (otherwise nil))))
            (some #'good requirements)))))
