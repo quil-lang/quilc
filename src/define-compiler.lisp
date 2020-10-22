@@ -471,8 +471,7 @@ N.B. This is *NOT* the same as COMPILER-OPTIONS.")
   (format stream "~%  NAME: ~A~%~%  INPUT:~%~{    ~/cl-quil::binding-fmt/~%~}~%  OUTPUT FREQUENCY:~%"
           (compiler-name obj)
           (compiler-bindings obj))
-  (dohash ((binding count) (compiler-output-gates obj))
-    (format stream "    ~/cl-quil::binding-fmt/: ~A~%" binding count)))
+  (print-object (compiler-output-gates obj) stream))
 
 (defun record-compiler (name)
   "Record (possibly overwriting) the existence of the compiler named by NAME."
