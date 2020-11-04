@@ -23,7 +23,7 @@
   "CL-QUIL version of MAGICL:RAND"
   (magicl:rand shape :type type :layout layout :distribution distribution))
 
-(defun eye (shape &key (value #C(1d0 0d0)) (type +default-magicl-type+) layout)
+(defun eye (shape &key value (type +default-magicl-type+) layout)
   "CL-QUIL version of MAGICL:EYE"
   (magicl:eye shape :value value :type type :layout layout))
 
