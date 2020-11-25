@@ -354,6 +354,9 @@
            (cl-syslog:rfc-log (*logger* :warning "--backend and --output-file/-o options ~
                                                   don't make sense when using server mode. ~
                                                   Ignoring them.")))
+         (when verbose
+           (setf quil::*compiler-noise* *error-output*)
+           (warn "--verbose output is not appropriate for production multithreaded environments, and should b used when debugging and with care"))
          ;; launch the polling loop
          (start-rpc-server :host host
                            :port port
@@ -375,7 +378,7 @@
            (multiple-value-bind (processed-program statistics)
                (process-program program chip-spec
                                 :protoquil protoquil
-                                :verbose verbose
+                                :verbose (if verbose *human-readable-stream* (make-broadcast-stream))
                                 :gate-whitelist (and gate-whitelist
                                                      (split-sequence:split-sequence
                                                       #\,
@@ -386,6 +389,7 @@
                                                       #\,
                                                       (remove #\Space gate-blacklist)
                                                       :remove-empty-subseqs t)))
+
 
              ;; NOTE: This flow is deprecated and will be merged with
              ;; quil-backend in the future.
@@ -475,7 +479,7 @@ Note: PROGRAM is mutated by the compilation process. To avoid this, use COPY-INS
 
 Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM is the compiled program, and STATISTICS is a HASH-TABLE whose keys are the slots of the RPCQ::|NativeQuilMetadata| class."
   (let* ((statistics (make-hash-table :test #'equal))
-         (quil::*compiler-noise* (and verbose *human-readable-stream*))
+         (quil::*compiler-noise* verbose)
          (*random-state* (make-random-state t))
          (quil::*enable-state-prep-compression* state-aware))
     ;; do the compilation
