@@ -68,7 +68,8 @@
     (multiple-value-bind (processed-program statistics-dict)
         (process-program quil-program chip-specification
                          :protoquil protoquil
-                         :state-aware state-aware)
+                         :state-aware state-aware
+                         :verbose quil::*compiler-noise*)
       (when protoquil
         (setf (gethash "qpu_runtime_estimation" statistics-dict)
               (runtime-estimation processed-program)))
