@@ -45,6 +45,21 @@
                  :|topological_swaps| (gethash "topological_swaps" statistics)
                  :|qpu_runtime_estimation| (gethash "qpu_runtime_estimation" statistics)))
 
+;; TODO(notmgsk): Is it really this complicated to create a structured
+;; log? In most other implementations, the logger just takes an
+;; arbitrary set of key/val pairs at run time. Feels very awkward to
+;; have to define a datatype-type thing for each different log.
+(cl-syslog:define-structured-data-id |rigetti@0001| ()
+  |protoquil|
+  |state-aware|
+  |qubits-used|
+  |live-qubits-on-chip|
+  |dead-qubits-on-chip|)
+
+(defun jsonify (thing)
+  (with-output-to-string (s)
+    (yason:encode thing s)))
+
 ;; TODO: rework the structure of process-program so that the JSON junk is only
 ;;       done in web-server.lisp, and this doesn't have to do back-translation.
 (defun quil-to-native-quil-handler (request &key protoquil state-aware)
@@ -65,6 +80,12 @@
                         ((nil) *state-aware*)
                         (:false nil)
                         (t t))))
+    (cl-syslog:rfc-log (*logger* :info "quil-to-native-quil-handler")
+      (|rigetti@0001|
+       |protoquil| (jsonify protoquil)
+       |state-aware| (jsonify state-aware)
+       |live-qubits-on-chip| (jsonify (quil::chip-spec-live-qubits chip-specification))
+       |dead-qubits-on-chip| (jsonify (quil::chip-spec-dead-qubits chip-specification))))
     (multiple-value-bind (processed-program statistics-dict)
         (process-program quil-program chip-specification
                          :protoquil protoquil
