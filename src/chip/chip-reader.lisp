@@ -135,7 +135,7 @@
 
 (defun deforestify-fidelity (fidelity)
   "The fidelity values recorded in Forest DB are subject to various quirks. This \"parser\" un-quirks them."
-  (cond 
+  (cond
     ((double= fidelity +forest-error-sentinel+)
      (warn "Chip specification contains a fidelity field populated by the Forest error sentinel. Replacing it with the default ~A." +totally-awful-fidelity+)
      +totally-awful-fidelity+)
@@ -144,9 +144,11 @@
      +near-perfect-fidelity+)
     ((> fidelity +near-perfect-fidelity+)
      ;; Silent truncation.
-     +near-perfect-fidelity+)
+     (- 1d0 double-float-epsilon))
     ((minusp fidelity)
      (error "Chip specification contained negative fidelity ~A. I don't know what to do with this value." fidelity))
+    ((zerop fidelity)
+     double-float-epsilon)
     (t
      fidelity)))
 
@@ -450,6 +452,3 @@
       (when (typep blk 'preserved-block)
         (check-instructions-skip-dead-qubits (basic-block-code blk) dead-qubits
                                              :condition-class 'illegal-qubits-used-in-preserved-block-error)))))
-
-
-
