@@ -41,7 +41,7 @@
 ;;       routines immediately following this definition.
 (deftype optimal-2q-target-atom ()
   "An enumerative type describing the two-qubit operators required by a particular two-qubit decomposition template."
-  '(member :cz :iswap :piswap :cphase :cnot))
+  '(member :cz :iswap :piswap :xy :cphase :cnot))
 
 (defun sequence-of-optimal-2q-target-atoms-p (seq)
   (and (typep seq 'sequence)
@@ -60,6 +60,7 @@
         (requirementsl (a:ensure-list requirements)))
     (when (member ':cphase targetl) (push ':cz targetl))
     (when (member ':piswap targetl) (push ':iswap targetl))
+    (when (member ':xy targetl) (push ':iswap targetl))
     (when (member ':cnot targetl) (push ':cz targetl))
     (subsetp requirementsl targetl)))
 
@@ -73,6 +74,7 @@
                     (:cz       (string= name "CZ"))
                     (:iswap    (string= name "ISWAP"))
                     (:piswap   (string= name "PISWAP"))
+                    (:xy       (string= name "XY"))
                     (:cphase   (string= name "CPHASE"))
                     (otherwise nil))))
            (some #'good requirements)))))
@@ -417,7 +419,7 @@ Both CENTER-CIRCUIT and the return value are lists of GATE-APPLICATIONs; A, D, a
       (match-matrix-to-an-e-basis-diagonalization
        (make-matrix-from-quil center-circuit :relabeling (standard-qubit-relabeler `(,q1 ,q0)))
        a d b)
-    
+
     (multiple-value-bind (b1 b0) (convert-su4-to-su2x2 ub)
       (multiple-value-bind (a1 a0) (convert-su4-to-su2x2 ua)
         (values
@@ -468,7 +470,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                                    :class approximate-compiler
                                    :permit-binding-mismatches-when *enable-approximate-compilation*)
              ,docstring
-	     ,@decls
+             ,@decls
              (let ((,circuit (with-inst () ,@body))
                    (,coord (mapcar #'constant-value (application-parameters ,instr-name)))
                    (,q1 (qubit-index (first (application-arguments ,instr-name))))
@@ -483,7 +485,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 
 (defmacro define-searching-approximate-template (name (coord q1 q0 parameter-array)
                                                  (&key predicate
-                                                       parameter-count)
+                                                    parameter-count)
                                                  &body parametric-circuit)
   "Defines an approximate template that uses an inexact (and possibly imperfect) search algorithm (e.g., a Nelder-Mead solver).  In addition to the documentation of DEFINE-CANONICAL-CIRCUIT-APPROXIMATION, this macro takes the extra value PARAMETER-COUNT which controls how many variables the searcher will optimize over."
   (a:with-gensyms (instr a d b in goodness template-values)
@@ -494,7 +496,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
                     ;; this is here to throw the compiler hunter off the scent
                     :where t))
          ,@(when docstring (list docstring))
-	 ,@decls
+         ,@decls
          (labels
              ((circuit-template (,parameter-array ,q1 ,q0)
                 (with-inst ()
@@ -552,7 +554,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
     ((instr ("CAN" (alpha 0 0) q1 q0)))
   (inst "CPHASE" (list (* 2 alpha)) q1 q0))
 
-(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-2 
+(define-canonical-circuit-approximation nearest-ISWAP-circuit-of-depth-2
     ((instr ("CAN" (alpha beta 0) q1 q0)))
   (inst "ISWAP" ()           q1 q0)
   (inst "RY"    (list alpha) q1)
@@ -646,7 +648,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
   (inst "PISWAP" (list (aref array 3))     q1 q0))
 
 (define-canonical-circuit-approximation nearest-CZ-circuit-of-depth-2
-    ((instr ("CAN" (alpha beta 0d0) q1 q0)))    
+    ((instr ("CAN" (alpha beta 0d0) q1 q0)))
   (inst "CZ" () q1 q0)
   (inst "RY" (list alpha) q1)
   (inst "RY" (list beta) q0)
@@ -694,7 +696,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMATE-COMPILER* is NIL."
   (check-type instr gate-application)
   (check-type context compilation-context)
-  
+
   (unless (= 2 (length (application-arguments instr)))
     (give-up-compilation))
 
@@ -704,7 +706,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
           (q0 (qubit-index (second (application-arguments instr))))
           (candidate-pairs nil)
           (chip-spec (compilation-context-chip-specification context)))
-      
+
       ;; now we manufacture a bunch of candidate circuits
       (dolist (circuit-crafter crafters)
         (unless (and (first candidate-pairs)
@@ -731,7 +733,7 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
                   (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
                         candidate-pairs)))
             (compiler-does-not-apply () nil))))
-      
+
       ;; now vomit the results
       (when (endp candidate-pairs)
         (give-up-compilation))

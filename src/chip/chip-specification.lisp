@@ -286,11 +286,11 @@ used to specify CHIP-SPEC."
                                      (t
                                       600)))
                         (hardware-object-permutation-gates obj))
-    
+
     ;; this is the new model for setting up gate data
     (when gate-information
       (setf (hardware-object-gate-information obj) gate-information))
-    
+
     ;; this is the legacy model for setting up gate data
     (flet ((stash-gate-record (atom gate-name parameters arguments fidelity)
              (when (member atom type) #+ignore (optimal-2q-target-meets-requirements type atom)
@@ -300,10 +300,11 @@ used to specify CHIP-SPEC."
                                   (hardware-object-gate-information obj))
                          (make-gate-record :duration 150
                                            :fidelity fidelity)))))
-      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.89d0)
-                      (:iswap  "ISWAP"  ()  (_ _) 0.91d0)
-                      (:cphase "CPHASE" (_) (_ _) 0.80d0)
-                      (:piswap "PISWAP" (_) (_ _) 0.80d0)
+      (dolist (data `((:cz     "CZ"     ()  (_ _) 0.95d0)
+                      (:iswap  "ISWAP"  ()  (_ _) 0.97d0)
+                      (:cphase "CPHASE" (_) (_ _) 0.93d0)
+                      (:piswap "PISWAP" (_) (_ _) 0.97d0)
+                      (:xy     "XY"     (_) (_ _) 0.97d0)
                       (:cnot   "CNOT"   ()  (,qubit0 ,qubit1) 0.90d0)))
         (destructuring-bind (atom gate-name parameters arguments fidelity) data
           (stash-gate-record atom gate-name parameters arguments fidelity))))
