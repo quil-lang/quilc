@@ -874,7 +874,7 @@ Compilers matching gates which don't have parameters don't count as accepting pa
              (let* ((input-fidelity (calculate-fidelity-of-concrete-gates gates))
                     (output (apply compiler gates))
                     (output-fidelity (calculate-fidelity-of-concrete-gates output)))
-               (>= output-fidelity input-fidelity))
+               (> output-fidelity input-fidelity))
            (no-binding-match () nil)
            (compiler-does-not-apply () nil)
            (cannot-concretize-binding () nil)))
@@ -907,7 +907,7 @@ Compilers matching gates which don't have parameters don't count as accepting pa
                                                           (when (typep b 'gate-binding)
                                                             (binding-subsumes-p (copy-binding b :options nil) g)))
                                                       (setf in-fidelity (* in-fidelity gate-fidelity)))))
-                  (>= out-fidelity in-fidelity)))
+                  (> out-fidelity in-fidelity)))
            ;; if that falls through, try the exhaustive match
            (let ((matches (loop :for binding :in (compiler-bindings compiler)
                                 :for match := (gates-that-match-binding binding gateset)

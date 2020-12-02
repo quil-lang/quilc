@@ -240,10 +240,10 @@ other's."
                                           context)
   "Applies peephole rewriter rules from a CHIP-SPECIFICATION to a sequence of INSTRUCTIONS, using CONTEXT to activate context-sensitive rules."
   (labels
-      ( ;; utility for calculating how many instructions a rewriting rule requests
+      (;; utility for calculating how many instructions a rewriting rule requests
        (rewriting-rule-count (compiler)
          (length (compiler-bindings compiler)))
-       
+
        ;; let the context know that we've passed inspection of NODE, so that the
        ;; effect of that instruction is visible during inspection of the next node
        (update-context (node)
@@ -303,7 +303,7 @@ other's."
        ;; successfully, we rewind by the peephole window and try again. if it
        ;; fails, we fall through, step through to the next node, and try again.
        (outer-instruction-loop (node)
-         (do ( ;; for each instruction...
+         (do (;; for each instruction...
               (node #1=(peephole-rewriter-node-next node) #1#))
              ((null node))
            (update-context node)
