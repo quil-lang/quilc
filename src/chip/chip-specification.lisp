@@ -8,7 +8,7 @@
 ;;;
 ;;; Use MAKE-ADJUSTABLE-VECTOR and VNTH for these objects.
 
-(defconstant +near-perfect-fidelity+ 0.99999d0
+(defconstant +near-perfect-fidelity+ (- 1d0 double-float-epsilon)
   "Even perfect operations are typically limited in their physical realization by, say, the granularity of control electronics. (For instance, waveform IQ values might be stored as complex fixnums of some specified depth.) This constant is a mnemonic for \"supposedly perfect\" and captures some of the loss incurred by these imperfections.")
 
 ;; TODO: actually put a small value here.

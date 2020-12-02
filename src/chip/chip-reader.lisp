@@ -144,7 +144,7 @@
      +near-perfect-fidelity+)
     ((> fidelity +near-perfect-fidelity+)
      ;; Silent truncation.
-     (- 1d0 double-float-epsilon))
+     +near-perfect-fidelity+)
     ((minusp fidelity)
      (error "Chip specification contained negative fidelity ~A. I don't know what to do with this value." fidelity))
     ((zerop fidelity)
