@@ -240,13 +240,14 @@ CNOT 4 8
          (progm (parse "RX(pi/2) 0; RX(pi/2) 0"))
          (comp (compiler-hook progm chip))
          (code (%filter-halt comp)))
-    (is (m= (parsed-program-to-logical-matrix
-             (parse "RX(pi) 0"))
-            (parsed-program-to-logical-matrix comp)))
+    (is (quil::matrix-equals-dwim
+         (parsed-program-to-logical-matrix
+          (parse "RX(pi) 0"))
+         (parsed-program-to-logical-matrix comp)))
     (is (= 1 (length code)))
     (is (string= "RX" (quil::application-operator-root-name (elt code 0))))
     (is (quil::double= pi
-                       (constant-value (first (application-parameters (elt code 0))))))))
+                       (abs (constant-value (first (application-parameters (elt code 0)))))))))
 
 (defun %random-rz-rx-program (length)
   (make-instance 'parsed-program
