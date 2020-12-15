@@ -82,7 +82,7 @@
   (let* ((p (quil::parse-quil "X 0;JUMP @END;LABEL @END"))
          (cfg (quil::program-cfg p))
          (to-remove (first (quil::cfg-blocks cfg))))
-    
+
     ;; Arbitrarily remove a block that is not the exit, and assert that the blocks are still valid
     (quil::remove-block to-remove cfg :update-edges t)
     (assert-cfg-edge-invariant cfg)))
@@ -194,3 +194,20 @@ This is a regression test for https://github.com/rigetti/quilc/issues/244"
   (dolist (jump-instr '("JUMP-WHEN" "JUMP-UNLESS"))
     (let ((p (quil::parse-quil (format nil "DECLARE ro BIT;LABEL @START;~A @START ro[0]" jump-instr))))
       (not-signals error (quil::program-cfg p :dce t :simplify t)))))
+
+(deftest test-consecutive-reset-blocks-collapse ()
+  "Verify that consecutive RESET instructions are collapsed into a single block in the graph."
+  (let ((program-and-length
+          '(("RESET" . 1)
+            ("RESET; RESET; X 0" . 1)
+            ("RESET; RESET; X 0; RESET" . 2)
+            ("RESET; RESET; X 0; RESET; RESET" . 2))))
+    (loop :for (program . length) :in program-and-length
+          :for cfg := (quil::program-cfg (parse program)) :do
+             (is (= (length (quil::cfg-blocks cfg))
+                    length)))))
+
+(deftest test-reset-block-survives-preserve-block-pragma ()
+  (let* ((program (parse "RESET; PRAGMA PRESERVE_BLOCK; X 0; PRAGMA END_PRESERVE_BLOCK"))
+         (cfg (quil::program-cfg program)))
+    (is (typep (quil::entry-point cfg) 'quil::reset-block))))

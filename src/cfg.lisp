@@ -176,9 +176,15 @@ Return the following values:
   (values blk nil nil))
 
 (defmethod process-instruction (cfg blk (instr pragma-preserve-block))
-  (if (= 0 (length (basic-block-code blk)))
-      ;; we don't need to make a new empty block. just change the current one
-      ;; to be preserved
+  (if (and
+       ;; RESET-BLOCK is treated somewhat specially. If a RESET-BLOCK
+       ;; immediately precedes a PRESERVED-BLOCK then it will contain
+       ;; no code. So we need to prevent it being dropped from the
+       ;; graph in that case.
+       (not (typep blk 'reset-block))
+       ;; we don't need to make a new empty block. just change the current one
+       ;; to be preserved
+       (= 0 (length (basic-block-code blk))))
       (progn
         (change-class blk 'preserved-block)
         (values blk nil nil))
@@ -414,7 +420,7 @@ Return the following values:
                       (not (basic-block-out-rewiring blk))
                       (equalp (basic-block-in-rewiring parent)
                               (basic-block-out-rewiring blk))))
-                 
+
                  ;; update the rewiring data
                  (setf (basic-block-in-rewiring parent) (or (basic-block-in-rewiring parent)
                                                             (basic-block-out-rewiring parent))
@@ -488,7 +494,7 @@ Return the following values:
       ;; there should not, however, be a label if this is the entry block
       (unless (eq blk (entry-point cfg))
         (add-to-section (make-instance 'jump-target :label (get-label-from-block blk))))
-      
+
       ;; if this block is of type RESET-BLOCK, add back the implicit RESET instruction
       (when (typep blk 'reset-block)
         (add-to-section (make-instance 'reset)))
