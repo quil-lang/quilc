@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+jobs:
+  test-cl-quil:
+    name: Test cl-quil
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run a multi-line script
+        run: |
+          sudo apt install sbcl
+          make quicklisp
+          sudo make install-test-deps
+          make test-cl-quil
+
+  test-quilc:
+    name: Test quilc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run a multi-line script
+        run: |
+          sudo apt install sbcl
+          make quicklisp
+          sudo make install-test-deps
+          make test-quilc
+
+  test-quilt:
+    name: Test quilt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run a multi-line script
+        run: |
+          sudo apt install sbcl
+          make quicklisp
+          sudo make install-test-deps
+          make test-quilt
+
