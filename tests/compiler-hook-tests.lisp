@@ -555,3 +555,14 @@ CCNOT 0 1 2")
         (signals quil::illegal-qubits-used-in-preserved-block-error (compiler-hook bad-preserve chip-bad))
         (signals quil::illegal-qubits-used-in-preserved-block-error (compiler-hook bad-preserve-measure chip-bad))
         (signals quil::illegal-qubits-used-in-preserved-block-error (compiler-hook bad-preserve-reset chip-bad))))))
+
+(deftest test-compiler-accounts-for-readout-fidelity ()
+  "Test that the compiler accounts for poor readout fidelity. In this example, an RZ operation is run on qubit 2 rather than qubit 1 as specified in raw quil because of qubit 2's superior readout fidelity."
+  (let* (
+         (quil (quil::parse-quil "RZ(pi/6) 1"))
+         (chip-spec (quil::read-chip-spec-file (asdf:system-relative-pathname ':cl-quil-tests "tests/qpu-test-files/Aspen-4-2Q-B.qpu")))
+         (parsed-program (quil::compiler-hook quil chip-spec))
+	 (rz (quil::nth-instr 0 parsed-program))
+	 (qubit-argument (first (quil::application-arguments rz))))
+    (is (= 2 (quil::qubit-index qubit-argument))))
+  )
