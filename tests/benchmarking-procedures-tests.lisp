@@ -100,17 +100,18 @@
                                  :always (pauli-matrix-p (magicl:scale pauli (* 2 phase)))))))))
 
 (defmacro time-it (&body body)
+  ;; Time evaluation of BODY, and return two values: (1) the first
+  ;; value returned by body, and (2) elapsed internal runtime.
   (let ((start (gensym "START"))
         (end (gensym "END"))
         (body-value (gensym "BODY-VALUE")))
-    `(let ((,start (get-internal-real-time))
+    `(let ((,start (get-internal-run-time))
            (,end nil)
            (,body-value nil))
        (setf ,body-value (progn ,@body)
-             ,end (get-internal-real-time))
+             ,end (get-internal-run-time))
        (values ,body-value
-               (round (* 1000 (- ,end ,start))
-                      internal-time-units-per-second)))))
+               (- ,end ,start)))))
 
 (deftest test-memoize-pauli-basis-matrices ()
   ;; Test that making many calls to the memoized function is cheaper than making many unmemoized calls.
@@ -123,8 +124,12 @@
          (memo-times
            (loop :for i :from 0 :upto num-calls
                  :sum (nth-value 1 (time-it (n-qubit-pauli-basis-matrices basis-size)))))
-         (diff (- non-memo-times memo-times)))
-    (is (plusp diff))))
+         (diff (- non-memo-times memo-times))
+         ;; Require at least 8x faster, reasonable considering a 2020
+         ;; Macbook pro experimentally resulted in around 100X.
+         (min-slow-to-fast-ratio 8))
+    (is (plusp diff))
+    (is (>= non-memo-times (* memo-times min-slow-to-fast-ratio)))))
 
 (deftest test-clifford-from-quil ()
   (let ((clifford-quil (format nil "~{~A~%~}" (list "CNOT 0 1" "H 5" "CNOT 0 5" "X 3" "Y 1"))))
