@@ -22,7 +22,7 @@
              :type list)
    (lschedule :accessor addresser-state-logical-schedule
               :documentation "The logical schedule of not-yet-processed instructions."
-              :type logical-schedule)
+              :type logical-scheduler)
    (chip-sched :accessor addresser-state-chip-schedule
                :documentation "The outgoing schedule of processed instructions."
                :type chip-schedule)
