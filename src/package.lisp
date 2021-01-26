@@ -505,6 +505,7 @@
   (:export
    #:ilog2                              ; FUNCTION
    #:rotate-byte                        ; FUNCTION
+   #:program-fidelity                   ; FUNCTION
    #:with-output-to-quil                ; MACRO
    )
 

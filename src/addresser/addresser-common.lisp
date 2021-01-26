@@ -572,7 +572,6 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
     (let ((locations (or locations qubit-cc)))
       (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
               "Qubit ~a already assigned" logical)
-
       (let ((best-cost (build-worst-cost state))
             (best-physical nil))
         (dolist (physical locations)

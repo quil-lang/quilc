@@ -555,3 +555,56 @@ CCNOT 0 1 2")
         (signals quil::illegal-qubits-used-in-preserved-block-error (compiler-hook bad-preserve chip-bad))
         (signals quil::illegal-qubits-used-in-preserved-block-error (compiler-hook bad-preserve-measure chip-bad))
         (signals quil::illegal-qubits-used-in-preserved-block-error (compiler-hook bad-preserve-reset chip-bad))))))
+
+(deftest test-compiler-accounts-for-readout-fidelity ()
+  "Test that the compiler includes readout fidelity when optimizing for program fidelity."
+  ;; readout-a.qpu has two qubits: q0 and q1. Both support RZ and MEASURE.
+  ;;
+  ;;   - q0: RZ has OK fidelity (0.99) and MEASURE has great fidelity (0.999)
+  ;;   - q1: RZ has great fidelity (0.999) and MEASURE has terrible fidelity (0.09)
+  ;;
+  ;; Compiling an RZ on q0 should *not* produce a program using q1 because its
+  ;; readout fidelity is so poor.
+  (let* ((chip (quil::read-chip-spec-file (asdf:system-relative-pathname ':cl-quil-tests "tests/qpu-test-files/readout-a.qpu")))
+         (program (parse "RZ(pi) 0; MEASURE 0"))
+         (program-fidelity (program-fidelity program chip))
+         (compiled (compiler-hook program chip :rewiring-type ':partial))
+         (compiled-fidelity (program-fidelity compiled chip)))
+    (let* ((rz (quil::nth-instr 0 compiled))
+           (qubit (first (application-arguments rz))))
+      ;; Use q0
+      (is (= 0 (qubit-index qubit)))
+      ;; Compiled fidelity is at least as good as the input program fidelity
+      (is (>= compiled-fidelity program-fidelity))))
+  ;; Same chip as above, but with no MEASURE. Then we should use the qubit with
+  ;; the best RZ (q1).
+  (let* ((chip (quil::read-chip-spec-file (asdf:system-relative-pathname ':cl-quil-tests "tests/qpu-test-files/readout-a.qpu")))
+         (program (parse "RZ(pi) 0"))
+         (program-fidelity (program-fidelity program chip))
+         (compiled (compiler-hook program chip :rewiring-type ':partial))
+         (compiled-fidelity (program-fidelity compiled chip)))
+    (let* ((rz (quil::nth-instr 0 compiled))
+           (qubit (first (application-arguments rz))))
+      ;; Use q1
+      (is (= 1 (qubit-index qubit)))
+      ;; Compiled fidelity is at least as good as the input program fidelity
+      (is (>= compiled-fidelity program-fidelity))))
+
+  ;; readout-b.qpu has two qubits: q0 and q1. Both support RZ and MEASURE.
+  ;;
+  ;;   - q0: RZ has OK fidelity (0.99) and MEASURE has great fidelity (0.999)
+  ;;   - q1: RZ has great fidelity (0.999) and MEASURE has great fidelity (0.999)
+  ;;
+  ;; Compiling an RZ on q0 should produce a program using q1 because it has
+  ;; great RZ and MEASURE fidelity.
+  (let* ((chip (quil::read-chip-spec-file (asdf:system-relative-pathname ':cl-quil-tests "tests/qpu-test-files/readout-b.qpu")))
+         (program (parse "RZ(pi) 0; MEASURE 0"))
+         (program-fidelity (program-fidelity program chip))
+         (compiled (compiler-hook program chip :rewiring-type ':partial))
+         (compiled-fidelity (program-fidelity compiled chip)))
+    (let* ((rz (quil::nth-instr 0 compiled))
+           (qubit (first (application-arguments rz))))
+      ;; Use q1
+      (is (= 1 (qubit-index qubit)))
+      ;; Compiled fidelity is at least as good as the input program fidelity
+      (is (>= compiled-fidelity program-fidelity)))))
