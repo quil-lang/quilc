@@ -607,3 +607,12 @@
 
   (:export
    #:parse-qasm))
+
+(defpackage #:cl-quil.chip-builder
+  (:nicknames #:quil.chip-builder)
+  (:use #:cl #:quil)
+  (:local-nicknames (:a :alexandria))
+  (:shadowing-import-from #:cl-quil #:pi #:pi/2 #:-pi #:pi/2)
+
+  (:export
+   #:chip))

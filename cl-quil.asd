@@ -107,7 +107,8 @@
                (:module "chip"
                 :serial t
                 :components ((:file "chip-specification")
-                             (:file "chip-reader")))
+                             (:file "chip-reader")
+                             (:file "builder")))
                (:module "backends"
                 :serial t
                 :components ((:file "common")
