@@ -76,13 +76,14 @@
       (mapcar #'relabel-instruction quil-block))))
 
 (defun instantiate-definition-body (defn body defn-params params defn-args args)
-  "Fill in the body BODY of a definition DEFN, binding DEFN-PARAMS to PARAMS and DEFN-ARGS to ARGS."
+  "Returns a list of instructions which are the instructions in the BODY of DEFN instantiated with PARAMS and ARGS for DEFN-PARAMs and DEFN-ARGS respectively. Does not mutate its input."
   (assert (= (length params)
              (length defn-params)))
   (assert (= (length args)
              (length defn-args)))
 
-  (let ((*expansion-depth* (1+ *expansion-depth*)))
+  (let ((*expansion-depth* (1+ *expansion-depth*))
+        (body (mapcar #'copy-instance body)))
     (unless (<= *expansion-depth* *expansion-limit*)
       (quil-expansion-error
        "Exceeded recursion limit of ~D. Current object being expanded is ~A."

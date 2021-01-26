@@ -13,7 +13,7 @@
     (is (string= "CNOT" (quil::application-operator-name cnot)))
     (is (= 0 (quil:qubit-index (elt (quil:application-arguments cnot) 0))))
     (is (= 1 (quil:qubit-index (elt (quil:application-arguments cnot) 1))))
-    
+
     (is (= 0 (quil::qubit-index (quil::reset-qubit-target reset))))))
 
 (defun verify-rx-code (code)
@@ -248,7 +248,20 @@
                            #'quil:application-operator)
                 (coerce code 'list))
       (is (string= "DAGGER CNOT" instr-cnot))
-      (is (string= "DAGGER H" instr-h)))))
+      (is (string= "DAGGER H" instr-h))))
+  ;; https://github.com/rigetti/quilc/issues/586
+  (let* ((p (with-output-to-quil
+              "DEFCIRCUIT FOOBAR:"
+              "    X 0"
+              "FOOBAR"
+              "DAGGER FOOBAR"))
+         (code (quil:parsed-program-executable-code p)))
+    (destructuring-bind (instr-x instr-dagger-x)
+        (mapcar (a:compose #'quil::operator-description-string
+                           #'quil:application-operator)
+                (coerce code 'list))
+      (is (string= "X" instr-x))
+      (is (string= "DAGGER X" instr-dagger-x)))))
 
 (deftest test-defcircuit-dagger-nested ()
   "Test application of DAGGER modifier on a circuit application that itself contains a DAGGER."
