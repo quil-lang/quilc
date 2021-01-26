@@ -40,10 +40,11 @@
              (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
                (rewire-l2p-instruction l2p instr-copy))
              (expand-to-native-instructions (list instr-copy) chip-spec))))
+    ;; (when (= 1 (length (application-arguments instr)))
+    ;;   (setf instruction-expansion (append instruction-expansion (list (make-instance 'measure-discard :qubit (qubit (apply-rewiring-l2p l2p (qubit-index (first (application-arguments instr))))))))))
 
     ;; compute the naive cost
-    (let ((instr-cost (calculate-instructions-log-fidelity instruction-expansion
-                                                     chip-spec)))
+    (let ((instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec)))
       ;; then, see if there's a non-naive cost available
       (a:when-let*
           ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
@@ -125,7 +126,17 @@
                (when any-assigned?
                  (a:when-let ((cost (2q-cost gate logical-qubits physical-qubits tier-index)))
                    (incf gate-count)
-                   (incf gate-weights-cost cost)))))))))
+                   (incf gate-weights-cost cost)))))))
+        (when (typep gate 'measurement)
+          (let* ((logical-qubit (measurement-qubit gate))
+                 (physical-qubit (apply-rewiring-l2p rewiring (qubit-index logical-qubit)))
+                 (assigned? physical-qubit)
+                 (measure (and assigned? (make-instance 'measure-discard :qubit (qubit physical-qubit)))))
+            (when assigned?
+              (let* ((fidelity (calculate-instructions-fidelity (list measure) (addresser-state-chip-specification state)))
+                     (cost (- (log fidelity))))
+                (incf gate-count)
+                (incf gate-weights-cost cost)))))))
     ;; clean up the rewiring
     (dolist (qubit assigned-qubits)
       (rewiring-unassign rewiring qubit))
@@ -142,7 +153,7 @@
       (setf instr-cost (application-fidelity-cost state instr)))
 
     (when gate-weights
-      (setf gate-weights-cost (gate-weights-temporal-cost state gate-weights)))
+      (setf gate-weights-cost (gate-weights-fidelity-cost state gate-weights)))
 
     (fidelity-cost (+ instr-cost gate-weights-cost))))
 
@@ -217,4 +228,3 @@
                   (cost-function instance
                                  :gate-weights (weighted-future-gates instance))))))
     (warm-up-addresser-state instance #'fill-cost-bound)))
-

@@ -569,13 +569,15 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                     (return-from get-fidelity 0d0)))
            (let (fidelity)
              (typecase instr
-               (measure
-                (let* ((qubit-obj (chip-spec-nth-qubit chip-spec (measurement-qubit instr)))
-                       (specs-obj (gethash (make-measure-binding :qubit '_ :target '_)
-                                           (hardware-object-gate-information qubit-obj))))
+               (measurement
+                (let* ((qubit-index (qubit-index (measurement-qubit instr)))
+                       (qubit-obj (chip-spec-nth-qubit chip-spec qubit-index))
+                       (specs-obj (gethash (make-measure-binding :qubit qubit-index :target '_)
+                                           (hardware-object-gate-information qubit-obj)))
+                       (measure-fidelity (and specs-obj (gate-record-fidelity specs-obj))))
                   (unless specs-obj
                     (warn-and-skip instr))
-                  (setf fidelity (gate-record-fidelity specs-obj))))
+                  (setf fidelity measure-fidelity)))
                (application
                 (let ((obj (lookup-hardware-object chip-spec instr)))
                   (unless obj
@@ -601,7 +603,7 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
 
 (defun lscheduler-calculate-fidelity (lschedule chip-spec)
   "Calculate fidelity as the minimum fidelity of the individual instructions.
-  
+
   This relies on the fact that the function $\exp\{-\sqrt{\log(x)^2 + \log(y)^2}\}$ is approximately equal to $\min\{x, y\}$ for $x, y \in (0, 1]$."
   (multiple-value-bind (max-value value-hash)
       (lscheduler-calculate-log-fidelity lschedule chip-spec)

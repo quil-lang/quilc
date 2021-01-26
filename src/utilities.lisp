@@ -256,3 +256,11 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
                   :collect `(write-line ,form)
                 :else
                   :collect form)))))
+
+(defun program-fidelity (program chip)
+  "Compute the expected fidelity of PROGRAM if executed on CHIP."
+  (check-type program parsed-program)
+  (check-type chip chip-specification)
+  (calculate-instructions-fidelity
+   (coerce (parsed-program-executable-code program) 'list)
+   chip))

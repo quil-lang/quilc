@@ -1,0 +1,179 @@
+{
+    "isa": {
+        "1Q": {
+            "0": {
+                "gates": [
+                    {
+                        "operator": "MEASURE",
+                        "qubit": 0,
+                        "target": "_",
+                        "duration": 2000,
+                        "fidelity": 0.999,
+                    },
+                    {
+                        "operator": "MEASURE",
+                        "qubit": 0,
+                        "target": null,
+                        "duration": 2000,
+                        "fidelity": 0.999,
+                    },
+                    {
+                        "operator": "RZ",
+                        "parameters": [
+                            "_"
+                        ],
+                        "arguments": [
+                            0
+                        ],
+                        "fidelity": 0.99,
+                        "duration": 0.01
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            0.0
+                        ],
+                        "arguments": [
+                            0
+                        ],
+                        "fidelity": 1.0,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            3.141592653589793
+                        ],
+                        "arguments": [
+                            0
+                        ],
+                        "fidelity": 0.995048041389577,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            -3.141592653589793
+                        ],
+                        "arguments": [
+                            0
+                        ],
+                        "fidelity": 0.995048041389577,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            1.5707963267948966
+                        ],
+                        "arguments": [
+                            0
+                        ],
+                        "fidelity": 0.995048041389577,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            -1.5707963267948966
+                        ],
+                        "arguments": [
+                            0
+                        ],
+                        "fidelity": 0.995048041389577,
+                        "duration": 50
+                    }
+                ]
+            },
+            "1": {
+                "gates": [
+                    {
+                        "operator": "MEASURE",
+                        "qubit": 1,
+                        "target": "_",
+                        "duration": 2000,
+                        "fidelity": 0.999,
+                    },
+                    {
+                        "operator": "MEASURE",
+                        "qubit": 1,
+                        "target": null,
+                        "duration": 2000,
+                        "fidelity": 0.999,
+                    },
+                    {
+                        "operator": "RZ",
+                        "parameters": [
+                            "_"
+                        ],
+                        "arguments": [
+                            1
+                        ],
+                        "fidelity": 0.999,
+                        "duration": 0.01
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            0.0
+                        ],
+                        "arguments": [
+                            1
+                        ],
+                        "fidelity": 1.0,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            3.141592653589793
+                        ],
+                        "arguments": [
+                            1
+                        ],
+                        "fidelity": 0.999592016493133,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            -3.141592653589793
+                        ],
+                        "arguments": [
+                            1
+                        ],
+                        "fidelity": 0.999592016493133,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            1.5707963267948966
+                        ],
+                        "arguments": [
+                            1
+                        ],
+                        "fidelity": 0.999592016493133,
+                        "duration": 50
+                    },
+                    {
+                        "operator": "RX",
+                        "parameters": [
+                            -1.5707963267948966
+                        ],
+                        "arguments": [
+                            1
+                        ],
+                        "fidelity": 0.999592016493133,
+                        "duration": 50
+                    }
+                ]
+            },
+        },
+        "2Q": {
+            "0-1": {},
+        }
+    },
+    "specs": {
+    }
+}
