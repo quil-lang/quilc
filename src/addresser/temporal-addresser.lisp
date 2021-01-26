@@ -203,9 +203,6 @@
         (declare (ignore max-value))
         (or value-hash (make-hash-table))))))
 
-(defvar *compute-tight-recombination-bound* nil
-  "If T, use the compressor to try to precompute a tighter recombination bound.")
-
 (defmethod select-and-embed-a-permutation ((state temporal-addresser-state) rewirings-tried)
   ;; randomize cost function weights to break
   ;; symmetry when swap selection fails and we rerun?

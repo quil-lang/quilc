@@ -75,6 +75,9 @@ SWAPping qubits into place.")
 (defvar *addresser-use-1q-queues* nil
   "A flag indicating whether the addresser should ignore unscheduled 1Q gates for the purposes of computing 2Q costs.")
 
+(defvar *compute-tight-recombination-bound* nil
+  "If T, use the compressor to try to precompute a tighter recombination bound.")
+
 ;;; The different search strategies implement methods for the following generics
 
 (defgeneric select-swaps-for-rewiring (search-type rewiring target-rewiring addresser-state rewirings-tried)
