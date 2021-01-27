@@ -263,46 +263,57 @@ A logical line may be introduced either as the result of a :NEWLINE or a :SEMICO
          (pieces-last pieces))
     (declare (type cons pieces pieces-last))
     (labels ((doit (start last end)
+               ;; This was recursive, but it's been made iterative,
+               ;; but we've kept the function around, just to minimize
+               ;; change.
                (declare (type list start last end))
-               (cond
-                 ;; Done
-                 ((null end)
-                  (unless (eq start end)
-                    (rplacd pieces-last (cons start nil))
-                    (setf pieces-last (cdr pieces-last)))
-                  pieces)
-                 ;; Split off a newline
-                 ((eq ':NEWLINE (car end))
-                  (cond
-                    ((eq start end)
-                     (let ((next (cdr start)))
-                       (doit next next next)))
-                    (t
-                     (rplacd pieces-last (cons start nil))
-                     (setf pieces-last (cdr pieces-last))
-                     (setf start (cdr end))
-                     (rplacd last nil)
-                     (doit start start start))))
-                 ;; A semicolon also results in a new line being split, but we
-                 ;; also inherit the preceding indentation.
-                 ((eq ':SEMICOLON (car end))
-                  (cond
-                    ((eq start end)
-                     (let ((next (cdr start)))
-                       (doit next next next)))
-                    (t
-                     (rplacd pieces-last (cons start nil))
-                     (setf pieces-last (cdr pieces-last))
-                     ;; Prepend appropriate indentation
-                     (setf start (if (eq ':INDENTATION (token-type (car start)))
-                                     (cons (car start)  ; Copy the indentation (line number on this token is irrelevant)
-                                           (cdr end))
-                                     (cdr end)))
-                     (rplacd last nil)
-                     (doit start start start))))
-                 ;; Keep on truckin'.
-                 (t
-                  (doit start end (cdr end))))))
+               (loop :when (null end)
+                       ;; Done
+                       :do (unless (eq start end)
+                             (rplacd pieces-last (cons start nil))
+                             (setq pieces-last (cdr pieces-last))) ; unnec, but consistent
+                           (return pieces)
+                     :do
+                        (cond
+                          ;; Split off a newline
+                          ((eq ':NEWLINE (car end))
+                           (cond
+                             ((eq start end)
+                              (let ((next (cdr start)))
+                                (setq start next)
+                                (setq last next)
+                                (setq end next)))
+                             (t
+                              (rplacd pieces-last (cons start nil))
+                              (setq pieces-last (cdr pieces-last))
+                              (setq start (cdr end))
+                              (rplacd last nil)
+                              (setq last start)
+                              (setq end start))))
+                          ;; A semicolon also results in a new line being split, but we
+                          ;; also inherit the preceding indentation.
+                          ((eq ':SEMICOLON (car end))
+                           (cond
+                             ((eq start end)
+                              (let ((next (cdr start)))
+                                (setq start next)
+                                (setq last next)
+                                (setq end next)))
+                             (t
+                              (rplacd pieces-last (cons start nil))
+                              (setq pieces-last (cdr pieces-last))
+                              ;; Prepend appropriate indentation
+                              (setq start (if (eq ':INDENTATION (token-type (car start)))
+                                              (cons (car start) ; Copy the indentation (line number on this token is irrelevant)
+                                                    (cdr end))
+                                              (cdr end)))
+                              (rplacd last nil)
+                              (setq last start)
+                              (setq end start))))
+                          ;; Keep on truckin'.
+                          (t
+                           (setq last end)
+                           (setq end (cdr end)))))))
       (cdr (doit tokens tokens tokens)))))
 
 (defun tokenize (string)
