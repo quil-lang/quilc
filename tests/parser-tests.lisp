@@ -246,3 +246,139 @@ DEFCIRCUIT FOO(%a) q:
         (parse-quil (read-quil-file path1) :originating-file path1))
       (signals quil-parse-error
         (parse-quil (read-quil-file path1))))))
+
+
+
+
+
+;;;; Tests for Split-Lines
+
+;;; Test various odd corners of the split-lines subfunction of the
+;;; parser.  Split-lines takes a list of the form
+;;;
+;;;   ( { token | break-symbol }* )
+;;;
+;;; where token is a token structure, and break-symbol is either of
+;;; the symbols :NEWLINE or :SEMICOLON.
+;;;
+;;; The returned result is a list of sublists of every subseries of
+;;; tokens up to a break symbol. The resulting sublists do not include
+;;; any break symbols. The main tricky bit is when break-symbol is
+;;; :SEMICOLON. In that case, it prepends the appropriate indentation.
+;;;
+;;; For purposes of testing, split-lines doesn't care what the tokens
+;;; are, so test it with a couple of dummy tokens, one for a regular
+;;; token and one for the special case of an indentation token. 
+
+(defparameter *test-cases-for-split-lines*
+  (let ((token (cl-quil::tok ':nop))
+        (indentation (cl-quil::tok ':indentation 13)))
+    ;; Use the same identical token for all the test lists
+    `(;; lists of the form (input expected)
+
+      ;; trivial no-token cases that result in an empty list
+      (() ())
+      ((:newline) ())
+      ((:semicolon) ())
+      ((:newline :newline) ())
+      ((:newline :semicolon) ())
+
+      ;; basic cases with tokens but without a break symbol
+      ((,token) ((,token)))
+      ((,token ,token) ((,token ,token)))
+      ((,token ,token ,token) ((,token ,token  ,token)))
+      ((,token ,indentation) ((,token ,indentation)))
+      ((,indentation ,token) ((,indentation ,token)))
+
+      ;; cases with a newline break
+      ((:newline ,token) ((,token)))
+      ((:newline :newline ,token) ((,token)))
+      ((,token :newline) ((,token)))
+      ((,token :newline :newline) ((,token)))
+      ((:newline :newline ,token :newline :newline) ((,token)))
+      ((:newline ,token :newline ,token) ((,token) (,token)))
+      ((:newline ,token :newline ,token :newline ,token :newline :newline)
+       ((,token) (,token) (,token)))
+      ((,token ,token ,token :newline)
+       ((,token ,token ,token)))
+      ((:newline ,token  ,token  ,token
+        :newline ,token ,token
+        :newline :newline ,token
+        :newline)
+       ((,token ,token ,token)
+        (,token ,token)
+        (,token)))
+
+      ;; cases with a semicolon break
+      ((:semicolon ,token) ((,token)))
+      ((:semicolon :semicolon ,token) ((,token)))
+      ((,token :semicolon) ((,token)))
+      ((,token :semicolon :semicolon) ((,token)))
+      ((:semicolon :semicolon ,token :semicolon :semicolon) ((,token)))
+      ((:semicolon ,token :semicolon ,token) ((,token) (,token)))
+      ((:semicolon ,token :semicolon ,token :semicolon ,token)
+       ((,token) (,token) (,token)))
+      ((,token ,token ,token :semicolon)
+       ((,token ,token ,token)))
+      ((:semicolon ,token  ,token  ,token
+        :semicolon ,token ,token
+        :semicolon :semicolon ,token
+        :semicolon)
+       ((,token ,token ,token)
+        (,token ,token)
+        (,token)))
+
+      ;; cases with a semicolon break and indentation
+      ((:semicolon ,indentation ,token) ((,indentation ,token)))
+      ((:semicolon :semicolon ,token ,indentation) ((,token ,indentation)))
+      ((,indentation ,token :semicolon)
+       ((,indentation ,token)
+        (,indentation)))
+      ((,indentation ,token :semicolon :semicolon)
+       ((,indentation ,token)
+        (,indentation)
+        (,indentation)))
+
+      ;; Here are cases that involve mixing of break characters and
+      ;; indentation. The interesting case is where a subsequence that
+      ;; ends in a semicolon starts with an indentation token, and
+      ;; there's a following subsequence. In that case, the
+      ;; indentation token is copied into the following subsequence by
+      ;; consing it onto the front.
+      ((:semicolon :semicolon ,indentation ,token :semicolon :semicolon)
+       ((,indentation ,token) (,indentation) (,indentation)))
+      ((:semicolon :semicolon ,indentation ,token
+        :semicolon ,token ,token ,token
+        :semicolon ,token)
+       ((,indentation ,token)
+        (,indentation ,token ,token ,token)
+        (,indentation ,token)))
+      ((:semicolon :semicolon ,indentation ,token
+        :semicolon ,token ,token ,token
+        :newline ,token ,token ,token
+        :semicolon ,token
+        :newline ,indentation ,token ,token
+        :semicolon ,token)
+       ((,indentation ,token) ; leading semicolons discarded, new indentation
+        (,indentation ,token ,token ,token) ; previous indentation carried over
+        (,token ,token ,token)              ; previous indentation discarded
+        (,token)                            ; no indentation
+        (,indentation ,token ,token)        ; new indentation
+        (,indentation ,token))))))          ; indentation carried over
+
+(deftest test-split-lines (&optional verbose)
+  (loop :for (tokens expect) :in *test-cases-for-split-lines*
+        :as actual  ; split-lines mutates list structure, so copy list
+          := (cl-quil::split-lines (copy-list tokens))
+        :as i :from 1
+        :do (when verbose
+              (let ((*print-circle* nil)) ; don't print #1#, say
+                (format t "~%[~d:] parse-lines:~%  ~s" i tokens)
+                (cond
+                  ((equal actual expect)
+                   (format t "~%  Actual/expect:~%  ~s~%" actual))
+                  (t
+                   (format t "~%  ** TEST FAIL **~%")
+                   (format t "~%  Actual:~%  ~s" actual)
+                   (format t "~%  Expect:~%  ~s~%" expect)))))
+            (is (equal actual expect))))
