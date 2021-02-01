@@ -174,9 +174,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     (a:when-let ((frame (pulse-operation-frame instr)))
       (let* ((start-time (local-time clocks frame))
              (end-time (+ start-time (quilt-instruction-duration instr))))
-        
         (setf (local-time clocks frame) end-time)
-
         (if (nonblocking-p instr)
             nil
             (loop :for f :in (remove-if-not (lambda (f)
