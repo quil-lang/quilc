@@ -187,17 +187,17 @@ CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) iq
            (is (not (typep instr 'fence))))
          (parsed-program-executable-code pp))
     (let ((instr (quil::nth-instr 1 pp)))
-      (is (and (typep instr 'delay)
-               (= 1.0 (constant-value  (delay-duration instr)))
-               ;; we can't say which kind of delay is inserted,
-               ;; so we just check either
-               (typecase instr
-                 (delay-on-frames
-                  (every (lambda (f)
-                           (frame= f
-                                   (frame (list (qubit 1)) "xy")))
-                         (delay-frames instr)))
-                 (delay-on-qubits
-                  (every (lambda (q)
-                           (= 1 (qubit-index q)))
-                         (delay-qubits instr)))))))))
+      (is (typep instr 'delay))
+      (is (= 1.0 (constant-value  (delay-duration instr))))
+      (is (typecase instr
+            ;; there are two possible delays which could be emitted
+            ;; we check both
+            (delay-on-frames
+             (every (lambda (f)
+                      (frame= f
+                              (frame (list (qubit 1)) "xy")))
+                    (delay-frames instr)))
+            (delay-on-qubits
+             (every (lambda (q)
+                      (= 1 (qubit-index q)))
+                    (delay-qubits instr))))))))

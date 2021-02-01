@@ -174,7 +174,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
     (a:when-let ((frame (pulse-operation-frame instr)))
       (let* ((start-time (local-time clocks frame))
              (end-time (+ start-time (quilt-instruction-duration instr))))
-
+        
         (setf (local-time clocks frame) end-time)
 
         (if (nonblocking-p instr)
@@ -184,7 +184,8 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
                                             (tracked-frames clocks))
                   :for lag := (- end-time (local-time clocks f))
                   ;; handle implicit delays
-                  :when (plusp lag)
+                  :when (and (not (frame= frame f))
+                             (plusp lag))
                     :do (incf (local-time clocks f) lag)
                     :and :collect (make-instance 'delay-on-frames
                                                  :frames (list f)
