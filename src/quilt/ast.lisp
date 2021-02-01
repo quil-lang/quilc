@@ -20,11 +20,16 @@
        (quil::list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
 (defun frame-hash (f)
+  "Return a hash for frame F. This is to frame= as sxhash is to equal, i.e., (frame= a b) implies (= (frame-hash a) (frame-hash b))."
   (check-type f frame)
-  #+sbcl
-  (sb-int:mix (sxhash (frame-name f)) (sxhash (frame-qubits f)))
-  #-sbcl
-  (logxor (sxhash (frame-name f)) (sxhash (frame-qubits f))))
+  (let* ((name (frame-name f))
+         (qubits (frame-qubits f))
+         (hash (sxhash name)))
+    (dolist (qubit qubits hash)
+      (setq hash
+            (#+sbcl sb-int:mix #-sbcl logxor
+             hash
+             (qubit-index qubit))))))
 
 (defmethod print-instruction-generic ((thing frame) (stream stream))
   (format stream "~{~/quil:instruction-fmt/ ~}\"~A\""
