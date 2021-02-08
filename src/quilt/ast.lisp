@@ -17,7 +17,7 @@
   (check-type a frame)
   (check-type b frame)
   (and (string= (frame-name a) (frame-name b))
-       (quil::list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
+       (quil.si:list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
 (defun frame-hash (f)
   "Return a hash for frame F. This is to frame= as sxhash is to equal, i.e., (frame= a b) implies (= (frame-hash a) (frame-hash b))."
@@ -361,7 +361,7 @@
 
 (defun make-waveform-definition (name parameters entries sample-rate &key context)
   (check-type name string)
-  (check-type parameters quil::symbol-list)
+  (check-type parameters quil.si:symbol-list)
   (if (not (endp parameters))
       (make-instance 'parameterized-waveform-definition
                      :name name
@@ -387,9 +387,9 @@
                     (with-output-to-string (s)
                       (etypecase z
                         (number
-                         (quil::format-complex z s))
+                         (quil.si:format-complex z s))
                         ((or list symbol)
-                         (print-instruction (quil::make-delayed-expression nil nil z) s)))))
+                         (print-instruction (quil.si:make-delayed-expression nil nil z) s)))))
                   (waveform-definition-entries defn)))
   (terpri stream))
 
@@ -430,7 +430,7 @@
     (format stream "~{ ~/quil:instruction-fmt/~}"
             (calibration-definition-arguments defn)))
   (format stream ":~%")
-  (quil::print-instruction-sequence (calibration-definition-body defn)
+  (quil.si:print-instruction-sequence (calibration-definition-body defn)
                                     :stream stream
                                     :prefix "    "))
 
@@ -459,7 +459,7 @@
           (if (typep defn 'measure-calibration-definition)
               (measure-calibration-address defn)
               nil))
-  (quil::print-instruction-sequence (calibration-definition-body defn)
+  (quil.si:print-instruction-sequence (calibration-definition-body defn)
                                     :stream stream
                                     :prefix "    "))
 
@@ -499,4 +499,4 @@
     (print-definitions (parsed-program-gate-definitions pp))
     (print-definitions (parsed-program-circuit-definitions pp))
 
-    (quil::print-instruction-sequence (parsed-program-executable-code pp) :stream stream)))
+    (quil.si:print-instruction-sequence (parsed-program-executable-code pp) :stream stream)))
