@@ -97,14 +97,14 @@
    #:copy-instance                      ; GENERIC, METHOD
 
    #:qubit                              ; STRUCTURE
-   #:qubit-index                        ; READER
+   #:qubit-index                        ; ACCESSOR
    #:qubit=                             ; FUNCTION
    #:qubit-p                            ; FUNCTION
 
    #:constant                           ; STRUCTURE
    #:constant-value                     ; READER
    #:constant=                          ; FUNCTION
-   #:is-constant                        ; FUNCTION
+   #:is-constant                        ; FUNCTION (PREDICATE)
 
    #:label                              ; STRUCTURE
    #:label-name                         ; ACCESSOR
@@ -319,9 +319,9 @@
    #:print-operator-description         ; FUNCTION
 
    #:application                        ; ABSTRACT CLASS
-   #:application-operator               ; READER
-   #:application-parameters             ; READER
-   #:application-arguments              ; READER
+   #:application-operator               ; ACCESSOR
+   #:application-parameters             ; ACCESSOR
+   #:application-arguments              ; ACCESSOR
 
    #:unresolved-application             ; CLASS
 
@@ -350,7 +350,7 @@
    #:parsed-program-gate-definitions        ; READER
    #:parsed-program-circuit-definitions     ; READER
    #:parsed-program-memory-definitions      ; READER
-   #:parsed-program-executable-code         ; READER
+   #:parsed-program-executable-code         ; ACCESSOR
    #:print-parsed-program                   ; FUNCTION
 
    #:*print-parsed-program-text*        ; PARAMETER
@@ -398,9 +398,9 @@
 
   ;; parser.lisp
   (:export
-   #:tok
-   #:token-type
-   #:token-payload
+   #:tok                                ; FUNCTION (CONSTRUCTOR)
+   #:token-type                         ; ACCESSOR
+   #:token-payload                      ; ACCESSOR
    #:parse-quil-into-raw-program        ; FUNCTION
    #:quil-parse-error                   ; CONDITION
    #:resolve-safely                     ; FUNCTION
@@ -608,3 +608,160 @@
 
   (:export
    #:parse-qasm))
+
+
+
+
+
+;;;; The CL-Quil.SI Package
+
+;;; This package is special: it "exports" symbols internal to the
+;;; CL-Quil package for "system internal" use.  Note that these
+;;; symbols are intended only to be used by various "friends" of the
+;;; implementation. These symbols should be considered INTERNAL and
+;;; are *not* to be considered exported in the usual sense. They are
+;;; not supported for general use. Rather, they are for use only by
+;;; closely-related systems that extend cl-quil and therefore need to
+;;; access "internal" symbols.  Having such symbols cataloged here is
+;;; preferable to simply accessing any symbol whatsoever via full
+;;; qualification, ala the use of package name "quil" with double
+;;; colons (quil::).
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun pre-intern-exposed-symbols (symbols package-name)
+  "This is a subfunction of define-exposing-package, used to ensure all of the symbols are interned in the 'from' package ahead of time.
+   They're expected to be interned by the reader when the actual source files are processed later, but this is not guaranteed."
+  (let* ((pkg (find-package package-name))
+         name)
+    (dolist (symbol symbols)
+      (setq name (string symbol))
+      (multiple-value-bind (found-symbol status)
+          (find-symbol name pkg)
+        (cond
+          (found-symbol
+           (when (eq status ':external)
+             (uiop:style-warn
+              "The symbol named ~A is external in ~A. Why re-expose it?"
+              name package-name)))
+          (t
+           (intern name pkg)))))))
+)  ; closes (eval-when ...)
+
+
+
+(defmacro define-exposing-package (name (from &rest options) &body symbols)
+  "Define a package named NAME that exposes the symbols from a package named FROM as exported symbols.
+   This creates package NAME, interns SYMBOLS in package FROM, imports SYMBOLS into package NAME, and exports SYMBOLS from package NAME.
+   Any additional options to defpackage can be specified as OPTIONS, e.g., (:nicknames ...)."
+  `(progn
+     ;; The following must run at least at compile and load
+     ;; times. (Defpackage can automatically be expected to run at
+     ;; those times.)
+     (eval-when (:compile-toplevel :load-toplevel :execute)
+       ;; Do we have the FROM package?
+       (when (null (find-package ',from))
+         (error "Unknown package: ~A" ',from))
+       (pre-intern-exposed-symbols ',symbols ',from))
+     (defpackage ,name
+       ,@options
+       (:import-from ,from ,@symbols)
+       (:export ,@symbols))))
+
+
+
+(define-exposing-package #:cl-quil.si (#:cl-quil (:nicknames #:quil.si))
+  
+  ;; cl-quil.lisp
+  #:ambiguous-definition-condition      ; CONDITION
+
+  ;; parser.lisp
+  #:apply-modifiers-to-operator         ; FUNCTION
+  #:*arithmetic-parameters*             ; VARIABLE
+  #:*definitions-allowed*               ; VARIABLE
+  #:disappointing-token-error           ; FUNCTION
+  #:*formal-arguments-allowed*          ; VARIABLE
+  #:gate-modifier-token-p               ; FUNCTION
+  #:match-line                          ; MACRO
+  #:parse-arithmetic-tokens             ; FUNCTION
+  #:*parse-context*                     ; VARIABLE
+  #:parse-indented-body                 ; FUNCTION
+  #:parse-indented-entries              ; FUNCTION
+  #:parse-memory-or-formal-token        ; FUNCTION
+  #:parse-parameter-or-expression       ; FUNCTION
+  #:parse-parameters                    ; FUNCTION
+  #:parse-program-lines                 ; FUNCTION
+  #:parse-qubit                         ; FUNCTION
+  #:*segment-encountered*               ; VARIABLE
+  #:take-until                          ; FUNCTION
+  #:take-while-from-end                 ; FUNCTION
+  #:token                               ; STRUCTURE
+  #:token-pathname                      ; ACCESSOR
+
+  ;; analysis/type-safety.lisp
+
+  #:check-mref                          ; FUNCTION
+  #:enforce-mref-bounds                 ; FUNCTION
+  #:find-descriptor-for-mref            ; FUNCTION
+  #:memory-segment-length               ; FUNCTION
+  #:type-check                          ; FUNCTION
+
+  ;; ast.lisp
+  #:delayed-expression-p                ; FUNCTION
+  #:evaluate-delayed-expression         ; FUNCTION
+  #:format-complex                      ; FUNCTION
+  #:make-delayed-expression             ; FUNCTION
+  #:map-de-params                       ; FUNCTION
+  #:operator-description-string         ; FUNCTION
+  #:print-instruction-sequence          ; FUNCTION
+  #:gate-application-resolution         ; READER
+  #:name-resolution                     ; SLOT NAME
+
+  ;; analysis/expand-circuits.lisp
+  #:expand-circuits                     ; FUNCTION, transform
+
+  ;; analysis/expansion.lisp
+  #:*expansion-context*                 ; VARIABLE
+  #:*expansion-depth*                   ; VARIABLE
+  #:*expansion-limit*                   ; VARIABLE
+  #:flag-on-update                      ; MACRO
+  #:instantiate-definition-body         ; FUNCTION
+  #:instantiate-instruction             ; GENERIC FUNCTION, METHOD
+  #:substitute-parameter                ; FUNCTION
+  #:transform-if                        ; FUNCTION
+
+  ;; analysis/resolve-objects.lisp
+  #:*in-definition-body*                ; VARIABLE
+  #:resolve-objects                     ; GENERIC FUNCTION, METHOD
+
+  ;; utilities.lisp
+  #:list=                               ; FUNCTION
+
+  ;; cl-quil.lisp
+  #:%parse-quil                         ; FUNCTION
+
+  ;; types.lisp
+  #:symbol-list                         ; TYPE
+
+  ;; classical-memory.lisp
+  #:quil-type-string                    ; FUNCTION
+
+  ;; gates.lisp
+  #:operator-description-gate-lifter    ; FUNCTION
+
+  ;; compilation-methods.lisp
+  #:give-up-compilation                 ; FUNCTION
+
+  ;; chip/chip-specification.lisp
+  #:*global-compilers*                  ; VARIABLE
+
+  ;; analysis/compress-qubits.lisp
+  #:%relabel-qubits                     ; GENERIC FUNCTION, METHOD
+  )
+
+;; After all the dust settles, you should be able to see in a REPL:
+;; 
+;; (find-symbol "PARSE-PARAMETERS" (find-package "QUIL"))
+;;   => CL-QUIL::PARSE-PARAMETERS, :INTERNAL
+;; (find-symbol "PARSE-PARAMETERS" (find-package "QUIL.SI"))
+;;   => CL-QUIL::PARSE-PARAMETERS, :EXTERNAL
+

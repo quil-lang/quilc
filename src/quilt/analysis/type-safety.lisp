@@ -17,11 +17,11 @@
 ;; CAPTURE must target a REAL[2]
 (defmethod type-check-instr ((instr capture) memory-regions)
   (let* ((mref (capture-memory-ref instr))
-         (mdesc (quil::find-descriptor-for-mref mref memory-regions)))
-    (quil::enforce-mref-bounds mref mdesc)
+         (mdesc (quil.si:find-descriptor-for-mref mref memory-regions)))
+    (quil.si:enforce-mref-bounds mref mdesc)
     (adt:match quil-type (memory-descriptor-type mdesc)
       (quil-real
-       (if (> 2 (quil::memory-segment-length mdesc :offset mref))
+       (if (> 2 (quil.si:memory-segment-length mdesc :offset mref))
            (quil-type-error "CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
                             vector of length no less than 2."
                             mref)
@@ -30,19 +30,19 @@
        (quil-type-error "CAPTURE instruction target must be of type ~
                         REAL, but got ~/quil:instruction-fmt/ of type ~A."
                         mref
-                        (quil::quil-type-string (memory-descriptor-type mdesc)))))))
+                        (quil.si:quil-type-string (memory-descriptor-type mdesc)))))))
 
 ;; RAW-CAPTURE must target a REAL[n] where n is 2*(the number of iq values)
 (defmethod type-check-instr ((instr raw-capture) memory-regions)
   (let* ((mref (raw-capture-memory-ref instr))
-         (mdesc (quil::find-descriptor-for-mref mref memory-regions))
+         (mdesc (quil.si:find-descriptor-for-mref mref memory-regions))
          (frame-defn (frame-name-resolution
                       (raw-capture-frame instr))))
-    (quil::enforce-mref-bounds mref mdesc)
+    (quil.si:enforce-mref-bounds mref mdesc)
     (adt:match quil-type (memory-descriptor-type mdesc)
       (quil-real
        (a:if-let ((samples (raw-capture-num-real-samples instr)))
-         (if (> samples (quil::memory-segment-length mdesc :offset mref))
+         (if (> samples (quil.si:memory-segment-length mdesc :offset mref))
              (quil-type-error "RAW-CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
                               vector of length no less than ~A."
                               mref
@@ -53,4 +53,4 @@
        (quil-type-error "RAW-CAPTURE instruction target must be of type ~
                         REAL, but got ~/quil:instruction-fmt/ of type ~A."
                         mref
-                        (quil::quil-type-string (memory-descriptor-type mdesc)))))))
+                        (quil.si:quil-type-string (memory-descriptor-type mdesc)))))))

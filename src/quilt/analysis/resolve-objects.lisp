@@ -64,7 +64,7 @@
   ;; they do not involve formal arguments). The motivation for this is twofold:
   ;; i) it's sometimes convenient to parse calibrations separately from frame definitions
   ;; ii) we prefer to handle this resolution uniformly at expansion time
-  (unless quil::*in-definition-body*
+  (unless quil.si:*in-definition-body*
     (a:if-let ((formal-qubit (find-if #'is-formal (frame-qubits frame))))
       ;; time to get rowdy...
       (quil-parse-error "Unable to resolve formal ~A outside of definition body." formal-qubit)
@@ -72,7 +72,7 @@
                              :key #'frame-definition-frame
                              :test #'frame=)))
         (setf (frame-name-resolution frame) defn)
-        (quil-parse-error "No frame definition found for referenced frame ~/quil::instruction-fmt/."
+        (quil-parse-error "No frame definition found for referenced frame ~/quil.si:instruction-fmt/."
                           frame))))
   frame)
 
@@ -83,7 +83,7 @@
   instr)
 
 (defmethod resolve-instruction ((instr swap-phase) parsed-program)
-  (unless quil::*in-definition-body*
+  (unless quil.si:*in-definition-body*
     (let ((defns (parsed-program-frame-definitions parsed-program)))
       (resolve-frame (swap-phase-left-frame instr) defns)
       (resolve-frame (swap-phase-right-frame instr) defns)))
@@ -94,13 +94,13 @@
   instr)
 
 (defmethod resolve-instruction ((instr delay-on-frames) parsed-program)
-  (unless quil::*in-definition-body*
+  (unless quil.si:*in-definition-body*
     (dolist (frame (delay-frames instr))
       (resolve-frame frame (parsed-program-frame-definitions parsed-program))))
   instr)
 
 (defmethod resolve-instruction ((instr pulse) parsed-program)
-  (unless quil::*in-definition-body*
+  (unless quil.si:*in-definition-body*
     (resolve-frame (pulse-frame instr)
                    (parsed-program-frame-definitions parsed-program)))
   (resolve-waveform-reference (pulse-waveform instr)
@@ -108,7 +108,7 @@
   instr)
 
 (defmethod resolve-instruction ((instr capture) parsed-program)
-  (unless quil::*in-definition-body*
+  (unless quil.si:*in-definition-body*
     (resolve-frame (capture-frame instr)
                    (parsed-program-frame-definitions parsed-program)))
   (resolve-waveform-reference (capture-waveform instr)
@@ -116,7 +116,7 @@
   instr)
 
 (defmethod resolve-instruction ((instr raw-capture) parsed-program)
-  (unless quil::*in-definition-body*
+  (unless quil.si:*in-definition-body*
     (resolve-frame (raw-capture-frame instr)
                    (parsed-program-frame-definitions parsed-program)))
   instr)
@@ -134,7 +134,7 @@
                 seq)))
     ;; resolve calibration definitions
     (map nil (lambda (cd)
-               (let ((quil::*in-definition-body* t))
+               (let ((quil.si:*in-definition-body* t))
                  (resolve-instruction-sequence
                   (calibration-definition-body cd))))
          (parsed-program-calibration-definitions unresolved-program))
