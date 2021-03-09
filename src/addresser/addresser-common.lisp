@@ -339,6 +339,8 @@ Two other values are returned: a list of fully rewired instructions for later sc
                                     state
                                     :use-free-swaps *addresser-use-free-swaps*)
          (setf dirty-flag t))
+        ((typep instr 'unresolved-application)
+         (push (list instr) ready-instrs))
         ;; is it a small-Q gate?
         ((<= (length (application-arguments instr))
              (length (chip-specification-objects chip-spec)))
@@ -418,6 +420,8 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
         ;; otherwise, the lschedule is nonempty, so we try to dequeue instructions
         (dolist (instr (lscheduler-topmost-instructions lschedule))
+          (when (typep instr 'unresolved-application)
+            (error "cannot dequeue unresolved gate application ~/quil:instruction-fmt/" instr))
           (multiple-value-bind (dirtied ready partial)
               (if (typep instr 'application)
                   (dequeue-gate-application state instr dry-run-escape)

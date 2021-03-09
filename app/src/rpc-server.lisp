@@ -50,7 +50,7 @@
 (defun quil-to-native-quil-handler (request &key protoquil state-aware)
   "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA."
   (check-type request rpcq::|NativeQuilRequest|)
-  (let* ((quil-program (safely-parse-quil (rpcq::|NativeQuilRequest-quil| request)))
+  (let* ((quil-program (safely-parse-quil (rpcq::|NativeQuilRequest-quil| request) :allow-unresolved-applications nil))
          (target-device (rpcq::|NativeQuilRequest-target_device| request))
          (qpu-hash (a:plist-hash-table (list "isa" (rpcq::|TargetDevice-isa| target-device)
                                              "specs" (rpcq::|TargetDevice-specs| target-device))

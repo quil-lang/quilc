@@ -264,10 +264,11 @@ In the presence of multiple definitions with a common signature, a signal is rai
 
 (defun safely-parse-quil (string &key originating-file
                                    (transforms *standard-post-process-transforms*)
-                                   (ambiguous-definition-handler #'continue))
+                                   (ambiguous-definition-handler #'continue)
+                                   (allow-unresolved-applications t))
   "Safely parse a Quil string STRING."
   (flet ((parse-it (string)
-           (let ((*allow-unresolved-applications* t))
+           (let ((*allow-unresolved-applications* allow-unresolved-applications))
              (parse string
                     :originating-file originating-file
                     :transforms transforms
