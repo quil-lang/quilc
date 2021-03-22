@@ -206,9 +206,13 @@
 
 (defun apply-pauli-to-wavefunction (ph index q wf)
   "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
+  (assert (quil::positive-power-of-two-p (length wf))
+          (wf)
+          "The provided wavefunction must have a positive power-of-two length.")
   (multiple-value-bind (b a) (floor index 2)
     (let* ((phase (expt #C(0.0d0 1.0d0) (b* a b)))
            (n (quil::ilog2 (length wf))))
+      (declare (type (integer 1) n))    ; Due to ASSERT above.
       (flet ((xz (w0 w1)
                (setf w0 (* ph phase w0))
                (setf w1 (* ph phase w1 (expt #C(-1.0d0 0.0d0) b)))
