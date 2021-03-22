@@ -13,7 +13,8 @@
                #:yacc                   ; Arithmetic parsing
                #:alexandria             ; Utilities
                #:parse-float            ; Float parsing
-               (:version #:magicl "0.7.0")
+               (:version #:magicl/core "0.9.0")
+               #:magicl/ext-lapack      ; for CSD
                                         ; internal linear algebra library
                #:cl-grnm                ; nelder-mead implementation
                #:singleton-classes
@@ -137,7 +138,7 @@
 
 ;;; Contribs
 
-;; Adapted from magicl's magicl-transcendental adapted from commonqt's
+;; Adapted from magicl's MAGICL/EXT-EXPOKIT adapted from commonqt's
 ;; qt.asd.
 
 ;; NOTE: The following contrib requires a C++17 compiler, and is untested on
