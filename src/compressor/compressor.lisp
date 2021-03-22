@@ -348,15 +348,13 @@ other's."
 
     ;; strip out all the NOPs.
     (let* ((instructions (remove-if (lambda (x) (typep x 'no-operation)) instructions))
-           (head (instrs->peephole-rewriter-nodes instructions))
-           (node head))
+           (head (instrs->peephole-rewriter-nodes instructions)))
 
       ;; actually, we need to prepend a dummy head
       (setf head (make-peephole-rewriter-node :instr (build-gate "Z" () 0)
                                               :next head
                                               :context context))
       (setf (peephole-rewriter-node-prev (peephole-rewriter-node-next head)) head)
-      (setf node head)
 
       (outer-instruction-loop head)
       ;; when we make it to this point, no rewrite rules apply, so quit.
