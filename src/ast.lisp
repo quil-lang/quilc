@@ -1289,14 +1289,6 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
                        :documentation "The definition of the circuit used in this application."))
   (:documentation "An instruction representing an application of a known circuit."))
 
-(defvar *print-fractional-radians* t
-  "When true, FORMAT-COMPLEX pretty-prints some common fractions of pi in a more human-readable form.
-
-N.B., The fractions of pi will be printed up to a certain precision!")
-
-(defvar *print-polar-form* nil
-  "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
-
 (declaim (type (vector rational) **reasonable-rationals**))
 (global-vars:define-global-var **reasonable-rationals**
     (coerce (nconc (a:iota 10 :start 1)

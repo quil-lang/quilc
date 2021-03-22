@@ -237,6 +237,14 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (dohash ((key val) hash)
     (format stream "~A -> ~A~%" key val)))
 
+(defmacro format-noise (str &rest args)
+  "FORMAT-NOISE checks to see whether *COMPILER-NOISE* has been set and, if so, formats it according to the passed format string and arguments."
+  `(progn
+     (when *compiler-noise*
+       (format *compiler-noise* ,str ,@args)
+       (fresh-line *compiler-noise*))
+     (values)))
+
 ;;; Cribbed from QVM-TESTS
 (defmacro with-output-to-quil (&body body)
   "Collect all data sent to *STANDARD-OUTPUT* and return it parsed as as a Quil program."
