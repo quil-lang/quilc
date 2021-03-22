@@ -154,7 +154,13 @@ See also http://www.netlib.org/lapack/explore-html/de/d0d/zuncsd_8f.html."
                     v2h
                     theta)))))))
 
-(defvar *lapack-csd* (if (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_" 'magicl.foreign-libraries:liblapack)
-                         #'magicl:lapack-csd
-                         #'csd)
+;;; We use symbols below to allow redefinition.
+;;;
+;;; TODO: Just use MAGICL:CSD as soon as we conform to its interface.
+(defvar *lapack-csd*
+  (if (magicl.foreign-libraries:foreign-symbol-available-p
+       "zuncsd_"
+       'magicl.foreign-libraries:liblapack)
+      'magicl-lapack:lapack-csd
+      'csd)
   "Implementation of the CS decomposition suitable for use in Quilc. Allows us to replace ZUNCSD on systems whose LAPACK does not provide it.")

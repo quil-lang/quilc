@@ -8,8 +8,8 @@
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
                (:version #:qvm "1.9.0")
-               #:magicl
-               #:magicl-transcendental
+               (:version #:magicl/core "0.9.0")
+               #:magicl/ext-expokit
                #:alexandria
                #:fiasco
                #:uiop

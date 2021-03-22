@@ -106,7 +106,7 @@
             :while (< n (* num-qubits 50))
             :for p := (random-pauli num-qubits)
             :for x := (1- (random 1.0d0))
-            :for reference := (magicl-transcendental:expm
+            :for reference := (magicl:expm
                                (magicl:scale (quil:parsed-program-to-logical-matrix
                                               (pauli-to-parsed-program p))
                                              (* #c(0.0d0 -1.0d0) x)))
@@ -318,7 +318,7 @@
         (phased-bell-tab (cl-quil.clifford::make-tableau-zero-state 2)))
     ;; zero state wavefunction
     (setf (aref zero-wf 0) 1)
-    (is (cl-quil.clifford::global-phase~ 
+    (is (cl-quil.clifford::global-phase~
          zero-wf
          (cl-quil.clifford::tableau-wavefunction zero-tab)))
     ;; bell state wavefunction
