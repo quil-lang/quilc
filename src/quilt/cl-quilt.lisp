@@ -92,19 +92,19 @@ This also signals ambiguous definitions, which may be handled as needed."
 
 
 (defun parse-quilt (string &key originating-file
-                             (transforms *standard-quilt-transforms*)
-                             (ambiguous-definition-handler #'continue))
+                                (transforms *standard-quilt-transforms*)
+                                (ambiguous-definition-handler #'continue))
   "Parse and process the Quilt string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string.
 
 In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
 "
   (quil.si:%parse-quil string
-                     #'raw-quilt-to-unresolved-program
-                     :originating-file originating-file
-                     :transforms transforms
-                     :ambiguous-definition-handler ambiguous-definition-handler
-                     :parser-extensions (list #'parse-quilt-program-lines)
-                     :lexer-extensions (list #'quilt-keyword-lexer)))
+                       #'raw-quilt-to-unresolved-program
+                       :originating-file originating-file
+                       :transforms transforms
+                       :ambiguous-definition-handler ambiguous-definition-handler
+                       :parser-extensions (list #'parse-quilt-program-lines)
+                       :lexer-extensions (list #'quilt-keyword-lexer)))
 
 (defun read-quilt-file (filespec)
   "Read the Quilt file designated by FILESPEC, and parse it as if by PARSE-QUIL."

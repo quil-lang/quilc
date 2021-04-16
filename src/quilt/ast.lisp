@@ -431,8 +431,8 @@
             (calibration-definition-arguments defn)))
   (format stream ":~%")
   (quil.si:print-instruction-sequence (calibration-definition-body defn)
-                                    :stream stream
-                                    :prefix "    "))
+                                      :stream stream
+                                      :prefix "    "))
 
 (defclass measurement-calibration-definition (calibration-definition)
   ((qubit :initarg :qubit
@@ -460,8 +460,8 @@
               (measure-calibration-address defn)
               nil))
   (quil.si:print-instruction-sequence (calibration-definition-body defn)
-                                    :stream stream
-                                    :prefix "    "))
+                                      :stream stream
+                                      :prefix "    "))
 
 ;;;;;;;;;;;;;;;;;;;;;; Program Representations ;;;;;;;;;;;;;;;;;;;;;;;
 
