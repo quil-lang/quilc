@@ -96,8 +96,8 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 (defun frame-on-p (frame qubits)
   "Does FRAME involve exactly the specified QUBITS in the specified order?"
   (quil.si:list= (frame-qubits frame)
-               qubits
-               :test #'qubit=))
+                 qubits
+                 :test #'qubit=))
 
 ;;; Frame Clocks
 ;;;

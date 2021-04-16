@@ -46,7 +46,7 @@
   "Parse a frame from the list of tokens TOKS. Returns the frame and the remaining tokens."
   (multiple-value-bind (qubit-toks rest-toks)
       (quil.si:take-until (lambda (tok) (eq ':STRING (quil:token-type tok)))
-                        toks)
+                          toks)
     (let ((qubits (mapcar #'quil.si:parse-qubit qubit-toks)))
       (when (endp rest-toks)
         (quil-parse-error "Expected a frame name in ~A, but none were found. Did you forget quotes?"
@@ -75,9 +75,9 @@
 (defun parse-waveform-parameter-and-value (toks)
   "Parse a <param>:<value> pair, consuming TOKS."
   (quil.si:match-line ((name :NAME) (colon :COLON) &rest value-expr) (list toks)
-      (cons
-       (param (quil:token-payload name))
-       (quil.si:parse-parameter-or-expression value-expr))))
+    (cons
+     (param (quil:token-payload name))
+     (quil.si:parse-parameter-or-expression value-expr))))
 
 (defun parse-waveform-parameter-alist (params-args)
   "Parse waveform parameters and their assigned values from the list of tokens PARAMS-ARGS. Returns an association list and the remaining tokens."
@@ -90,7 +90,7 @@
   ;; Parse out the parameters enclosed.
   (multiple-value-bind (found-params rest-line)
       (quil.si:take-while-from-end (lambda (x) (eq ':RIGHT-PAREN (quil:token-type x)))
-                                 params-args)
+                                   params-args)
 
     ;; Error if we didn't find a right parenthesis.
     (when (endp rest-line)
@@ -132,8 +132,8 @@
 
       (multiple-value-bind (qubit-toks remaining)
           (quil.si:take-until (lambda (tok)
-                              (not (member (quil:token-type tok) '(:NAME :INTEGER))))
-                            rest-toks)
+                                (not (member (quil:token-type tok) '(:NAME :INTEGER))))
+                              rest-toks)
         (when (endp qubit-toks)
           (quil-parse-error "Expected one or more qubits specified in DELAY instruction."))
         (setf qubits (mapcar #'quil.si:parse-qubit qubit-toks))
@@ -141,8 +141,8 @@
 
       (multiple-value-bind (frame-name-toks duration-toks)
           (quil.si:take-until (lambda (tok)
-                              (not (eq ':STRING (quil:token-type tok))))
-                            rest-toks)
+                                (not (eq ':STRING (quil:token-type tok))))
+                              rest-toks)
         (when (endp duration-toks)
           (quil-parse-error "Expected a duration in DELAY instruction."))
         (setf frame-names (mapcar #'quil:token-payload frame-name-toks))
@@ -181,7 +181,7 @@
         (unless (endp (rest rest-toks))
           (quil-parse-error "Unexpected token ~A in CAPTURE" (cadr rest-toks)))
         (let ((address-obj (quil.si:parse-memory-or-formal-token (first rest-toks)
-                                                               :ensure-valid t)))
+                                                                 :ensure-valid t)))
           (make-instance 'capture
                          :frame frame
                          :waveform waveform-ref
@@ -223,7 +223,7 @@
 
     (multiple-value-bind (op-instr rest-lines)
         (quil.si:parse-program-lines (cons (rest line)
-                                         (rest tok-lines)))
+                                           (rest tok-lines)))
       (setf (nonblocking-p op-instr) t)
       (values op-instr
               rest-lines))))

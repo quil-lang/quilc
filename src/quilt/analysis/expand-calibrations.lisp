@@ -118,7 +118,7 @@
   "Instantiate FRAME with respect to the argument values represented by ARG-VALUE, constructing a new frame if needed."
   (let* ((remake nil)
          (qubits (mapcar (quil.si:flag-on-update remake
-                                               (lambda (q) (ensure-instantiated q :arg-value arg-value)))
+                                                 (lambda (q) (ensure-instantiated q :arg-value arg-value)))
                          (frame-qubits frame))))
     (if remake
         (let ((instantiated (frame qubits (frame-name frame))))
@@ -236,7 +236,7 @@
          (duration (ensure-instantiated (delay-duration instr)
                                         :param-value param-value))
          (frames (mapcar (quil.si:flag-on-update remake
-                                               (lambda (f) (instantiate-frame f arg-value)))
+                                                 (lambda (f) (instantiate-frame f arg-value)))
                          (delay-frames instr))))
     (if (and (eq duration (delay-duration instr))
              (not remake))
@@ -248,7 +248,7 @@
 (defmethod instantiate-instruction ((instr fence) param-value arg-value)
   (let* ((remake nil)
          (qubits (mapcar (quil.si:flag-on-update remake
-                                               (lambda (q) (ensure-instantiated q :arg-value arg-value)))
+                                                 (lambda (q) (ensure-instantiated q :arg-value arg-value)))
                          (fence-qubits instr))))
     (if remake
         (make-instance 'fence :qubits qubits)
@@ -257,28 +257,28 @@
 ;;; Calibrations instantiate to their bodies, with parameters and formals substituted
 (defmethod instantiate-instruction ((instr gate-calibration-definition) param-value arg-value)
   (quil.si:instantiate-definition-body instr
-                                     (calibration-definition-body instr)
-                                     (calibration-definition-parameters instr)
-                                     param-value
-                                     (calibration-definition-arguments instr)
-                                     arg-value))
+                                       (calibration-definition-body instr)
+                                       (calibration-definition-parameters instr)
+                                       param-value
+                                       (calibration-definition-arguments instr)
+                                       arg-value))
 
 (defmethod instantiate-instruction ((instr measure-calibration-definition) param-value arg-value)
   (quil.si:instantiate-definition-body instr
-                                     (calibration-definition-body instr)
-                                     nil
-                                     param-value
-                                     (list (measurement-calibration-qubit instr)
-                                           (measure-calibration-address instr))
-                                     arg-value))
+                                       (calibration-definition-body instr)
+                                       nil
+                                       param-value
+                                       (list (measurement-calibration-qubit instr)
+                                             (measure-calibration-address instr))
+                                       arg-value))
 
 (defmethod instantiate-instruction ((instr measure-discard-calibration-definition) param-value arg-value)
   (quil.si:instantiate-definition-body instr
-                                     (calibration-definition-body instr)
-                                     nil
-                                     param-value
-                                     (list (measurement-calibration-qubit instr))
-                                     arg-value))
+                                       (calibration-definition-body instr)
+                                       nil
+                                       param-value
+                                       (list (measurement-calibration-qubit instr))
+                                       arg-value))
 
 (defgeneric instantiate-applicable-calibration (instr gate-cals measure-cals measure-discard-cals)
   (:documentation "If INSTR has an associated calibration, return a list of instructions instantiated from the body of the calibration definition. Otherwise, return NIL.")
@@ -292,8 +292,8 @@
       (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                                 (gethash op gate-cals))))
         (quil.si:instantiate-instruction defn
-                                       (application-parameters instr)
-                                       (application-arguments instr))
+                                         (application-parameters instr)
+                                         (application-arguments instr))
         nil)))
 
   (:method ((instr measure) gate-cals measure-cals measure-discard-cals)
@@ -301,9 +301,9 @@
     (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                               measure-cals)))
       (quil.si:instantiate-instruction defn
-                                     nil
-                                     (list (measurement-qubit instr)
-                                           (measure-address instr)))
+                                       nil
+                                       (list (measurement-qubit instr)
+                                             (measure-address instr)))
       nil))
 
   (:method ((instr measure-discard) gate-cals measure-cals measure-discard-cals)
@@ -311,8 +311,8 @@
     (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                               measure-discard-cals)))
       (quil.si:instantiate-instruction defn
-                                     nil
-                                     (list (measurement-qubit instr)))
+                                       nil
+                                       (list (measurement-qubit instr)))
       nil))
 
   (:method (instr gate-cals measure-cals measure-discard-cals)
