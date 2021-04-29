@@ -301,7 +301,7 @@ OPENQASM 2.0;"))
 
 // and this a comment, and that should be ok
 // and the next line is only whitespace
-    
+
 
   OPENQASM 2.0;"))
   (is (not (quil::%check-for-qasm-header "")))
@@ -314,3 +314,40 @@ OPENQASM 2.0;"))
 # and thus cannot be a qasm program
 
 OPENQASM 2.0"))))
+
+(cl-quil-tests::2q-coded)
+
+(deftest test-qasm-pragmas ()
+  "Require that OpenQASM #pragma directives are respected
+
+In particular, this test requires that a CZ 0 1 be compiled to CZ 0 1 when a naive strategy is used, and CZ 1 2 when a partial strategy is used."
+  (let ((program-naive "
+OPENQASM 2.0;
+include \"qelib1.inc\"
+#pragma INITIAL_REWIRING \"NAIVE\"
+qreg q[3];
+cz q[0], q[1];
+")
+        (program-partial "
+OPENQASM 2.0;
+include \"qelib1.inc\"
+#pragma INITIAL_REWIRING \"PARTIAL\"
+qreg q[3];
+cz q[0], q[1];
+")
+        (chip (%read-test-chipspec "3q.qpu")))
+    (let* ((compiled-program-naive (compiler-hook (parse program-naive) chip))
+           (naive-2q (program-2q-instructions compiled-program-naive))
+           (compiled-program-partial (compiler-hook (parse program-partial) chip))
+           (partial-2q (program-2q-instructions compiled-program-partial)))
+      (is (= 1 (length naive-2q)))
+      (let ((2q (elt naive-2q 0)))
+        (is (string= "CZ" (quil::application-operator-root-name 2q)))
+        (is (subsetp (mapcar #'qubit-index (application-arguments 2q))
+                     '(0 1))))
+
+      (is (= 1 (length partial-2q)))
+      (let ((2q (elt partial-2q 0)))
+        (is (string= "CZ" (quil::application-operator-root-name 2q)))
+        (is (subsetp (mapcar #'qubit-index (application-arguments 2q))
+                     '(1 2)))))))

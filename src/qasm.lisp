@@ -142,6 +142,8 @@
    (return (tok :ARROW)))
   ("OPENQASM|qreg|creg|barrier|measure|reset|opaque|include|if|gate"
    (return (tok (intern (string-upcase $@) :keyword))))
+  ("#pragma"
+   (return (tok :PRAGMA)))
   ("pi"
    (return (tok ':PI (quil:constant quil::pi))))
   ((eager "\\+") (return (tok :PLUS "+")))
@@ -157,7 +159,7 @@
   ((eager "{{INT}}")
    (return (tok :NNINTEGER (parse-integer $@))))
   ("{{IDENT}}"
-   (return (tok :ID $@)))
+   (return (tok :NAME $@)))
   ("[^\\S\\n\\r]+"
    nil))
 
@@ -254,6 +256,9 @@
       ((:INCLUDE)
        (parse-include tok-lines))
 
+      ((:PRAGMA)
+       (quil::parse-pragma tok-lines))
+
       ((:QREG)
        (parse-qreg-definition tok-lines))
 
@@ -285,7 +290,7 @@
                        (parse-qregister (rest line)))
         (rest tok-lines)))
 
-      ((:ID)
+      ((:NAME)
        (parse-application tok-lines))
 
       ((:IF)
@@ -330,7 +335,7 @@
 
   (destructuring-bind (creg-toks . rest-toks)
       tok-lines
-    (destructuring-token-bind ((_ :CREG) (name-tok :ID) (_ :LEFT-SQUARE-BRACKET)
+    (destructuring-token-bind ((_ :CREG) (name-tok :NAME) (_ :LEFT-SQUARE-BRACKET)
                                (length-tok :NNINTEGER) (_ :RIGHT-SQUARE-BRACKET))
         creg-toks
       (let ((name (token-payload name-tok))
@@ -347,7 +352,7 @@
 
   (destructuring-bind (qreg-toks . rest-toks)
       tok-lines
-    (destructuring-token-bind ((_ :QREG) (name :ID) (_ :LEFT-SQUARE-BRACKET)
+    (destructuring-token-bind ((_ :QREG) (name :NAME) (_ :LEFT-SQUARE-BRACKET)
                                (length :NNINTEGER) (_ :RIGHT-SQUARE-BRACKET))
         qreg-toks
       (let ((name (token-payload name))
@@ -420,8 +425,8 @@
 (defun parse-register (tokens reg-ctor)
   (let* ((id (first tokens))
          (id-type (token-type id)))
-    (unless (eql id-type ':ID)
-      (qasm-parse-error "Expected a token of type :ID, got ~A." id-type))
+    (unless (eql id-type ':NAME)
+      (qasm-parse-error "Expected a token of type :NAME, got ~A." id-type))
     (let ((next (second tokens)))
       (if (and next
                (eql (token-type next) ':LEFT-SQUARE-BRACKET))
@@ -525,7 +530,7 @@
   (check-qasm-unexpected-eof tokens "gate application")
 
   (let ((name-tok (first tokens)))
-    (check-qasm-token-type name-tok :ID)
+    (check-qasm-token-type name-tok :NAME)
     (multiple-value-bind (params rest-toks)
         (maybe-parse-params (rest tokens))
       (multiple-value-bind (registers rest-toks)
