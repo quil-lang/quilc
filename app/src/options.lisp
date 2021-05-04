@@ -90,7 +90,7 @@
      :type boolean
      :optional t
      :documentation "prints matrix representations for comparison  Requires -P.  This is deprecated and will eventually be removed.")
-    
+
     (("help" #\h)
      :type boolean
      :optional t
@@ -168,7 +168,13 @@
     (("swank-port")
      :type integer
      :optional t
-     :documentation "port to start a Swank server on"))
+     :documentation "port to start a Swank server on.")
+
+    (("chip-cache")
+     :type integer
+     :optional t
+     :initial-value 10
+     :documentation "The number of chips to cache when in server mode. Least-recently-used chips are removed when this limit is reached."))
   "Supported and non-deprecated options.")
 
 (defparameter *deprecated-option-spec*
@@ -191,17 +197,17 @@
      :type boolean
      :optional t
      :documentation "prints approximate compiled circuit fidelity.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
+
     (("compute-2Q-gate-depth" #\2)
      :type boolean
      :optional t
      :documentation "prints compiled circuit multiqubit gate depth; ignores white/blacklists. Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
+
     (("compute-unused-qubits" #\u)
      :type boolean
      :optional t
      :documentation "prints unused qubits.  Requires -P.  This is deprecated and will eventually be removed.  See --print-statistics.")
-    
+
     (("show-topological-overhead" #\t)
      :type boolean
      :optional t
@@ -213,7 +219,7 @@
      :type boolean
      :optional t
      :documentation "include logically parallelized schedule in output.  Requires -P.  This is inactive and will eventually be removed.")
-    
+
     (("json-serialize" #\j)
      :type boolean
      :optional t
