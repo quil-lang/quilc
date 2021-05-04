@@ -31,7 +31,7 @@
 
 (defun load-libraries (libraries)
   "Loads all foreign libraries in LIBRARIES"
-  (pushnew #P"/usr/local/lib/rigetti/" (symbol-value (find-symbol "*FOREIGN-LIBRARY-DIRECTORIES*" :cffi))
+  (pushnew #P"/usr/local/lib/rigetti/" (symbol-value (find-symbol "*foreign-library-directories*" :cffi))
            :test #'equal)
   (map nil (find-symbol "LOAD-FOREIGN-LIBRARY" :cffi) libraries)
   nil)
