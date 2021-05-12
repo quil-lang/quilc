@@ -315,7 +315,6 @@ OPENQASM 2.0;"))
 
 OPENQASM 2.0"))))
 
-(cl-quil-tests::2q-coded)
 
 (deftest test-qasm-pragmas ()
   "Require that OpenQASM #pragma directives are respected
