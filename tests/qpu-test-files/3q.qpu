@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "name": "3Q example chip",
+    "version": 1,
+    "timestamp": ""
+  },
+  "isa": {
+    "1Q": {
+      "0": {
+        "gates": [
+          {
+            "operator": "RZ",
+            "parameters": [],
+            "arguments": [
+              "_"
+            ],
+            "duration": 100,
+            "fidelity": 0.99
+          },
+          {
+            "operator": "RX",
+            "parameters": [
+              "_"
+            ],
+            "arguments": [
+              "_"
+            ],
+            "duration": 100,
+            "fidelity": 0.9
+          }
+        ]
+      },
+      "1": {
+        "gates": [
+          {
+            "operator": "RZ",
+            "parameters": [],
+            "arguments": [
+              "_"
+            ],
+            "duration": 100,
+            "fidelity": 0.99
+          },
+          {
+            "operator": "RX",
+            "parameters": [
+              "_"
+            ],
+            "arguments": [
+              "_"
+            ],
+            "duration": 100,
+            "fidelity": 0.9
+          }
+        ]
+      },
+      "2": {
+        "gates": [
+          {
+            "operator": "RZ",
+            "parameters": [],
+            "arguments": [
+              "_"
+            ],
+            "duration": 100,
+            "fidelity": 0.99
+          },
+          {
+            "operator": "RX",
+            "parameters": [
+              "_"
+            ],
+            "arguments": [
+              "_"
+            ],
+            "duration": 100,
+            "fidelity": 0.9
+          }
+        ]
+      }
+    },
+    "2Q": {
+      "0-1": {
+        "gates": [
+          {
+            "operator": "CZ",
+            "parameters": [],
+            "arguments": [
+              "_",
+              "_"
+            ],
+            "fidelity": 0.9,
+            "duration": 200
+          }
+        ]
+      },
+      "1-2": {
+        "gates": [
+          {
+            "operator": "CZ",
+            "parameters": [],
+            "arguments": [
+              "_",
+              "_"
+            ],
+            "fidelity": 0.999,
+            "duration": 200
+          }
+        ]
+      }
+    }
+  }
+}
