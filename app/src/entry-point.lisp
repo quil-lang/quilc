@@ -97,12 +97,6 @@
   #+sbcl
   (format t "Loaded libraries:~%~{  ~A~%~}~%"
           (mapcar 'sb-alien::shared-object-pathname sb-sys:*shared-objects*))
-  (unless (magicl.foreign-libraries:foreign-symbol-available-p "zuncsd_"
-                                                               'magicl.foreign-libraries:liblapack)
-    (format t "The loaded version of LAPACK is missing ~
-    functionality. The compiler will still work with your current ~
-    LAPACK but it is advisable to install a more complete version.~%")
-    (uiop:quit 1))
   (format t "Library check passed.~%")
   (uiop:quit 0))
 

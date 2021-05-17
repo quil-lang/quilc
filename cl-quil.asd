@@ -13,8 +13,7 @@
                #:yacc                   ; Arithmetic parsing
                #:alexandria             ; Utilities
                #:parse-float            ; Float parsing
-               (:version #:magicl/core "0.9.0")
-               #:magicl/ext-lapack      ; for CSD
+               #:magicl/core
                                         ; internal linear algebra library
                #:cl-grnm                ; nelder-mead implementation
                #:singleton-classes
@@ -49,7 +48,6 @@
                (:file "magicl-constructors")
                (:file "relabeling")
                (:file "matrix-operations")
-               (:file "csd")
                (:file "transformable-mixin")
                (:file "classical-memory")
                (:file "ast")

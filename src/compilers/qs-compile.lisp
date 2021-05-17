@@ -31,7 +31,7 @@
            (prefactor (expt (magicl:det matrix) (- (/ row-count))))
            (m (magicl:scale matrix prefactor)))
       ;; it starts the same as CSC: build the Cosine-Sine decomposition
-      (multiple-value-bind (u0 u1 v0 v1 thetas) (funcall *lapack-csd* m (/ row-count 2) (/ row-count 2))
+      (multiple-value-bind (u0 u1 v0 v1 thetas) (magicl:csd-blocks m (/ row-count 2) (/ row-count 2))
         ;; rebalance the u and v matrices so that u0 (+) u1 and v0 (+) v1
         ;; are special unitary.
         (let* ((neg-nth-root-detu

@@ -8,8 +8,7 @@
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
                (:version #:qvm "1.9.0")
-               (:version #:magicl/core "0.9.0")
-               #:magicl/ext-expokit
+               #:magicl/core
                #:alexandria
                #:fiasco
                #:uiop
@@ -49,5 +48,4 @@
                (:file "benchmarking-procedures-tests")
                (:file "typed-memory-tests")
                (:file "approximation-tests")
-               (:file "csd-tests")
                (:file "addresser-tests")))
