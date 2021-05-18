@@ -320,20 +320,20 @@ OPENQASM 2.0"))))
   "Require that OpenQASM #pragma directives are respected
 
 In particular, this test requires that a CZ 0 1 be compiled to CZ 0 1 when a naive strategy is used, and CZ 1 2 when a partial strategy is used."
-  (let ((program-naive "
+  (let ((program-naive (format nil "
 OPENQASM 2.0;
-include \"qelib1.inc\"
+include ~S;
 #pragma INITIAL_REWIRING \"NAIVE\"
 qreg q[3];
 cz q[0], q[1];
-")
-        (program-partial "
+" (namestring *qasm-qelib.inc-path*)))
+        (program-partial (format nil "
 OPENQASM 2.0;
-include \"qelib1.inc\"
+include ~S;
 #pragma INITIAL_REWIRING \"PARTIAL\"
 qreg q[3];
 cz q[0], q[1];
-")
+" (namestring *qasm-qelib.inc-path*)))
         (chip (%read-test-chipspec "3q.qpu")))
     (let* ((compiled-program-naive (compiler-hook (parse program-naive) chip))
            (naive-2q (program-2q-instructions compiled-program-naive))
