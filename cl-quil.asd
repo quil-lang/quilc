@@ -293,7 +293,8 @@
 (asdf:defsystem #:cl-quil/tools
   :description "Tools for cl-quil developers."
   :license "Apache License 2.0 (See LICENSE.txt)"
-  :depends-on (#:cl-quil)
+  :depends-on (#:cl-quil
+               #:common-lisp-jupyter)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/tools-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
@@ -301,7 +302,8 @@
   :pathname "src/tools/"
   :serial t
   :components ((:file "package")
-               (:file "hasse-schedule")))
+               (:file "hasse-schedule")
+               (:file "circuit-diagram")))
 
 (asdf:defsystem #:cl-quil/tools-tests
   :description "Regression tests for tools for cl-quil developers."

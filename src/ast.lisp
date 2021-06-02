@@ -1301,6 +1301,9 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
             'vector)
   "The list of RATIONAL multiples of PI that are checked by FORMAT-REAL when *PRINT-FRACTIONAL-RADIANS* is T.")
 
+(defparameter *pi-literal* "pi"
+  "String representation of a PI literal.")
+
 (defun format-real (r stream)
   "Print the real number R nicely to the stream STREAM."
   (check-type r real)
@@ -1315,8 +1318,8 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
            :for denom := (denominator rr)
            :when (double~ r-abs (/ (* pi numer) denom)) :do
              ;; Pretty-print "reasonable" integer and fractional multiples of pi.
-             (format stream "~:[~;-~]~:[~D*~;~*~]pi~:[/~D~;~*~]"
-                     (minusp r) (= 1 numer) numer (= 1 denom) denom)
+             (format stream "~:[~;-~]~:[~D*~;~*~]~A~:[/~D~;~*~]"
+                     (minusp r) (= 1 numer) numer *pi-literal* (= 1 denom) denom)
              (return-from format-real))
      ;; If we cannot find a nice fraction of pi, just print the real number.
      (format stream "~F" r))))
