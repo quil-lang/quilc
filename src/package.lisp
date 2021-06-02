@@ -312,6 +312,7 @@
    #:named-operator                     ; ADT CONSTRUCTOR
    #:controlled-operator                ; ADT CONSTRUCTOR
    #:dagger-operator                    ; ADT CONSTRUCTOR
+   #:forked-operator                    ; ADT CONSTRUCTOR
    #:operator-description-root-name     ; FUNCTION
    #:operator-description=              ; FUNCTION
    #:operator-description-hash          ; FUNCTION
