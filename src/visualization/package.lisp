@@ -5,4 +5,4 @@
 (defpackage #:cl-quil.visualization
   (:use #:common-lisp
         #:cl-quil)
-  (:export #:plot-circuit-diagram))
+  (:export #:plot-circuit))
