@@ -21,6 +21,11 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
 (defparameter *qubit-line-open-wire-length* 1
   "The length by which qubit lines should be extended with open wires at the right of the diagram.")
 
+(deftype layout-strategy ()
+  '(member ':increasing ':any-linear))
+
+(defparameter *layout-strategy* ':any-linear)
+
 (defparameter *pdflatex-exe*
   "pdflatex"
   "The 'pdflatex' executable.")
@@ -95,30 +100,79 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
   ((qubit-lines :initarg :qubit-lines
                 :initform (make-hash-table)
                 :reader qubit-lines
-                :documentation "The lines of the diagram."))
+                :documentation "The lines of the diagram.")
+   (layout :initarg :layout
+           :initform (make-hash-table)
+           :reader diagram-layout
+           :documentation "A mapping from qubits indices to positions in the diagram."))
   (:documentation "An abstract circuit diagram."))
 
+(defun qubit-line (diagram q)
+  (gethash q (qubit-lines diagram)))
+
+(defun (setf qubit-line) (new-line diagram q)
+  (setf (gethash q (qubit-lines diagram)) new-line))
+
+(defun qubit-position (diagram q)
+  (gethash q (diagram-layout diagram)))
+
+(defun (setf qubit-position) (new-pos diagram q)
+  (setf (gethash q (diagram-layout diagram)) new-pos))
 
 (defun diagram-qubits (diagram)
   "The qubit indices associated with DIAGRAM."
-  (sort (loop :for q :being :the :hash-keys :of (qubit-lines diagram)
-              :collect q)
-        #'<))
+  (loop :for q :being :the :hash-keys :of (qubit-lines diagram)
+        :collect q))
 
-(defun add-qubit-line (diagram q)
-  "Add a line for qubit Q in DIAGRAM."
-  (when (gethash q (qubit-lines diagram))
+(defun adjacent-lines-p (diagram qubits)
+  "Do the QUBITS index adjacent lines in DIAGRAM?"
+  (let ((positions
+          (sort
+           (mapcar (lambda (q) (qubit-position diagram q))
+                   qubits)
+           #'<)))
+    (loop :with offset := (first positions)
+          :for pos :in positions
+          :if (not (= pos offset))
+            :do (return-from adjacent-lines-p nil)
+          :else
+            :do (incf offset))
+    t))
+
+(defun qubits-in-interval (diagram i j)
+  "Get all qubit indices between qubits I and J."
+  (loop :with layout := (diagram-layout diagram)
+        :with min := (min (gethash i layout) (gethash j layout))
+        :with max := (max (gethash i layout) (gethash j layout))
+        :for q :in (diagram-qubits diagram)
+        :when (<= min
+                  (qubit-position diagram q)
+                  max)
+          :collect q))
+
+(defun add-qubit-line (diagram q &optional pos)
+  "Add a line for qubit Q in DIAGRAM, at position POS."
+  (when (qubit-line diagram q)
     (error "Attempted to overwrite existing qubit line on ~D" q))
-  (setf (gethash q (qubit-lines diagram))
-        (make-instance 'qubit-line)))
+  (when (and pos (member pos (mapcar (lambda (q) (qubit-position diagram q))
+                                     (diagram-qubits diagram))))
+    (error "Attempted to add line at position ~D, which is already spoken for." pos))
+  (let* ((existing-qubits (diagram-qubits diagram))
+         (pos (or pos
+                  (if existing-qubits
+                      (1+ (apply #'max (mapcar (lambda (q) (qubit-position diagram q))
+                                               existing-qubits)))
+                      0)))
+        (line (make-instance 'qubit-line)))
+    (setf (qubit-line diagram q)     line
+          (qubit-position diagram q) pos)
+    line))
 
 (defun append-to-diagram (diagram q value)
   "Append VALUE to line Q of DIAGRAM."
-  (unless (gethash q (qubit-lines diagram))
-    (add-qubit-line diagram q))
   (push-onto-qubit-line
    value
-   (gethash q (qubit-lines diagram))))
+   (qubit-line diagram q)))
 
 (defun extend-lines-to-common-edge (diagram qubits &optional (offset 0))
   "Advance the lines of DIAGRAM on the indicated QUBITS to a common length.
@@ -127,22 +181,13 @@ OFFSET indicates the number of additional no-operations to append to each of the
   (let ((max-length
           (+ offset
              (loop :for q :in qubits
-                   :for line := (gethash q (qubit-lines diagram))
+                   :for line := (qubit-line diagram q)
                    :maximizing (qubit-line-length line)))))
     (loop :for q :in qubits
-          :for line := (or (gethash q (qubit-lines diagram))
-                           (add-qubit-line q diagram))
+          :for line := (qubit-line diagram q)
           :for length := (qubit-line-length line)
           :do (loop :repeat (- max-length length)
                     :do (push-onto-qubit-line (tikz-nop) line)))))
-
-(defun interval-indices (diagram i j)
-  "Get all qubit indices between I and J."
-  (loop :with min := (min i j)
-        :with max := (max i j)
-        :for q :being :the :hash-keys :of (qubit-lines diagram)
-        :when (<= min q max)
-          :collect q))
 
 
 (defvar custom-source-target-ops
@@ -163,8 +208,9 @@ The convention is that the source operation takes two arguments: the qubit index
       (gethash name custom-source-target-ops)
     (unless (and source-op target-op)
       (error "Unknown source-target operation ~A" name))
-    (let* ((displaced (interval-indices diagram source target))
-           (offset (if (< target source)
+    (let* ((displaced (qubits-in-interval diagram source target))
+           (offset (if (< (qubit-position diagram target)
+                          (qubit-position diagram source))
                        (- (1- (length displaced)))
                        (1- (length displaced)))))
       (extend-lines-to-common-edge diagram displaced)
@@ -242,17 +288,61 @@ The convention is that the source operation takes two arguments: the qubit index
                     :do (append-to-diagram diagram q (tikz-nop))))))))))
 
 
-(defun adjacent-lines-p (diagram qubits)
-  "Do the QUBITS index adjacent lines in DIAGRAM?"
-  (search (sort qubits #'<)
-          (diagram-qubits diagram)))
+(defun qubit-interaction-adjacency-list (instructions)
+  "Get a hash table mapping qubits to lists of qubits which they interact with in INSTRUCTIONS."
+  (loop :with adjacency-list := (make-hash-table)
+        :for instr :in instructions
+        :do (typecase instr
+              (application
+               (loop :for (q1 q2) :on (mapcar #'qubit-index (application-arguments instr))
+                     :until (null q2)
+                     :do (pushnew q1 (gethash q2 adjacency-list))
+                         (pushnew q2 (gethash q1 adjacency-list))))
+              (measurement
+               (let ((q (qubit-index (measurement-qubit instr))))
+                 (when (null (nth-value 1 (gethash q adjacency-list)))
+                   (setf (gethash q adjacency-list) nil)))))
+        :finally (return adjacency-list)))
+
+
+(defgeneric resolve-qubit-positions (instructions strategy)
+  (:documentation "Compute an alist mapping qubits to line positions (with 0 denoting the topmost line).")
+  (:method (instrs (strategy (eql ':increasing)))
+    (loop :for q :in (sort (cl-quil::qubits-in-instr-list instrs)
+                           #'<)
+          :for pos :from 0
+          :collect (cons q pos)))
+  (:method (instructions (strategy (eql ':any-linear)))
+    (let ((adjacency-list (qubit-interaction-adjacency-list instructions))
+          (processed-qubits (make-hash-table)))
+      (let ((pos 0)
+            (results nil))
+        (labels ((visit-qubit (q)
+                   (when (gethash q processed-qubits)
+                     (return-from visit-qubit))
+                   (push (cons q pos) results)
+                   (incf pos)
+                   (setf (gethash q processed-qubits) t)
+                   (dolist (q2 (gethash q adjacency-list))
+                     (visit-qubit q2))))
+          (loop :for q :being :the :hash-keys :of adjacency-list
+                  :using (hash-value neighbors)
+                :do (case (length neighbors)
+                      ((0 1) (visit-qubit q))
+                      ((2) nil)
+                      (otherwise
+                       (error "Unable to resolve qubit positions for non-line graph.")))))
+        ;; if we've missed any qubits, it's because there was no degree 1 vertex in
+        ;; their connected component...
+        (unless (= pos (hash-table-count adjacency-list))
+          (error "Cycle detected"))
+        results))))
 
 
 (defun build-diagram (instructions)
   "Construct a DIAGRAM from the provided INSTRUCTIONS."
   (let* ((instructions (coerce instructions 'list))
          (terminal-measurements nil)
-         (diagram (make-instance 'circuit-diagram))
          (qubits
            (cl-quil::qubits-in-instr-list
             instructions)))
@@ -270,32 +360,35 @@ The convention is that the source operation takes two arguments: the qubit index
             :finally (setf instructions gates
                            terminal-measurements measurements)))
     
-    (dolist (q qubits)
-      (add-qubit-line diagram q))
-    
-    ;; draw left fringe
-    (cond (*label-qubit-lines*
-           (dolist (q qubits)
-             (append-to-diagram diagram q (tikz-left-ket q))))
-          (t
-           (extend-lines-to-common-edge diagram qubits 1)))
+    (let ((diagram (make-instance 'circuit-diagram)))
 
-    ;; handle instructions
-    (dolist (instr instructions)
-      (render-instruction diagram instr))
+      ;; add lines and initialize layout
+      (loop :for (q . pos) :in (resolve-qubit-positions instructions *layout-strategy*)
+            :do (add-qubit-line diagram q pos))
+      
+      ;; draw left fringe
+      (cond (*label-qubit-lines*
+             (dolist (q qubits)
+               (append-to-diagram diagram q (tikz-left-ket q))))
+            (t
+             (extend-lines-to-common-edge diagram qubits 1)))
 
-    ;; align and draw measure ops
-    (when terminal-measurements
-      (extend-lines-to-common-edge diagram qubits)
-      (dolist (instr terminal-measurements)
-        (render-instruction diagram instr)))
+      ;; handle instructions
+      (dolist (instr instructions)
+        (render-instruction diagram instr))
+
+      ;; align and draw measure ops
+      (when terminal-measurements
+        (extend-lines-to-common-edge diagram qubits)
+        (dolist (instr terminal-measurements)
+          (render-instruction diagram instr)))
 
 
-    (extend-lines-to-common-edge diagram
-                                 qubits
-                                 (max *qubit-line-open-wire-length* 0))
+      (extend-lines-to-common-edge diagram
+                                   qubits
+                                   (max *qubit-line-open-wire-length* 0))
 
-    diagram))
+      diagram)))
 
 
 (defun print-quantikz-header (&optional stream)
@@ -319,10 +412,14 @@ The convention is that the source operation takes two arguments: the qubit index
 
 
 (defun print-quantikz-diagram (diagram &optional stream)
-  (loop :for q :in (diagram-qubits diagram)
-        :for line := (gethash q (qubit-lines diagram))
-        :do (format stream "~{ ~A~^ & ~} \\\\~%"
-                    (reverse (qubit-line-data line)))))
+  (let ((ordered-qubits
+          (sort (diagram-qubits diagram)
+                #'<
+                :key (lambda (q) (qubit-position diagram q)))))
+    (loop :for q :in ordered-qubits
+          :for line := (qubit-line diagram q)
+          :do (format stream "~{ ~A~^ & ~} \\\\~%"
+                      (reverse (qubit-line-data line))))))
 
 
 (defun print-parsed-program-as-quantikz (pp &optional (stream *standard-output*))
@@ -335,11 +432,11 @@ The convention is that the source operation takes two arguments: the qubit index
 
 ;;; entry point
 
-
-(defun plot-circuit-diagram (pp &key svg-file
-                                  (label-qubit-lines *label-qubit-lines*)
-                                  (right-align-measurements *right-align-measurements*)
-                                  (qubit-line-open-wire-length *qubit-line-open-wire-length*))
+(defun plot-circuit (pp &key svg-file
+                          (label-qubit-lines *label-qubit-lines*)
+                          (right-align-measurements *right-align-measurements*)
+                          (qubit-line-open-wire-length *qubit-line-open-wire-length*)
+                          (layout-strategy *layout-strategy*))
   "Plot a parsed program PP as a circuit diagram. 
 
 Returns a JUPYTER:SVG value, which may be rendered by a Jupyter notebook.
@@ -348,10 +445,12 @@ Keyword Arguments:
   * SVG-FILE: if not null, then output is saved here.
   * LABEL-QUBIT-LINES: If T, then the qubit lines will be labeled with qubit indices.
   * RIGHT-ALIGN-MEASUREMENTS: If T, attempt to align all measurements at the right of the diagram.
-  * QUBIT-LINE-OPEN-WIRE-LENGTH: The amount of extra space to attach to qubit lines, at the right."
+  * QUBIT-LINE-OPEN-WIRE-LENGTH: The amount of extra space to attach to qubit lines, at the right.
+  * LAYOUT-STRATEGY: The strategy to employ when determining positions for new qubit lines."
   (let ((*label-qubit-lines* label-qubit-lines)
         (*right-align-measurements* right-align-measurements)
-        (*qubit-line-open-wire-length* qubit-line-open-wire-length))
+        (*qubit-line-open-wire-length* qubit-line-open-wire-length)
+        (*layout-strategy* layout-strategy))
     (uiop:with-current-directory ((uiop:temporary-directory))    
       (uiop:with-temporary-file (:stream tex-stream :pathname tex-file :directory (uiop:temporary-directory))
         (flet ((filename-by-extension (ext)
