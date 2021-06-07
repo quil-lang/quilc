@@ -12,8 +12,12 @@
 
 For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1, 2.")
 
-(defparameter *label-qubit-lines* t
-  "Add labels to qubit lines.")
+(deftype line-labels ()
+  '(or (member nil :indices :kets)
+       hash-table))
+
+(defparameter *line-labels* ':kets
+  "The method used for labeling qubit lines. See the documentation of PLOT-CIRCUIT for more information.")
 
 (defparameter *right-align-measurements* nil
   "Align measurement operations at the right of the diagram.")
@@ -22,9 +26,10 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
   "The length by which qubit lines should be extended with open wires at the right of the diagram.")
 
 (deftype layout-strategy ()
-  '(member ':increasing ':any-linear))
+  '(member :increasing :any-linear))
 
-(defparameter *layout-strategy* ':any-linear)
+(defparameter *layout-strategy* ':any-linear
+  "The strategy used for resolving line layout. See the documentation of PLOT-CIRCUIT for more information.")
 
 (defparameter *pdflatex-exe*
   "pdflatex"
@@ -338,6 +343,20 @@ The convention is that the source operation takes two arguments: the qubit index
           (error "Cycle detected"))
         results))))
 
+(defgeneric resolve-line-label (q strategy)
+  (:documentation "Compute a label for the line of qubit Q.")
+  (:method (q (strategy (eql nil)))
+    (tikz-nop))
+  (:method (q (strategy (eql ':kets)))
+    (tikz-left-ket q))
+  (:method (q (strategy (eql ':indices)))
+    (format nil "~D" q))
+  (:method (q (label-map hash-table))
+    (cond  ((null (gethash q label-map))
+            (warn "Line label for qubit ~D missing" q)
+            (tikz-nop))
+           (t
+            (gethash q label-map)))))
 
 (defun build-diagram (instructions)
   "Construct a DIAGRAM from the provided INSTRUCTIONS."
@@ -366,12 +385,10 @@ The convention is that the source operation takes two arguments: the qubit index
       (loop :for (q . pos) :in (resolve-qubit-positions instructions *layout-strategy*)
             :do (add-qubit-line diagram q pos))
       
-      ;; draw left fringe
-      (cond (*label-qubit-lines*
-             (dolist (q qubits)
-               (append-to-diagram diagram q (tikz-left-ket q))))
-            (t
-             (extend-lines-to-common-edge diagram qubits 1)))
+      ;; draw labels
+      (loop :for q :in qubits
+            :for label := (resolve-line-label q *line-labels*)
+            :do (append-to-diagram diagram q label))
 
       ;; handle instructions
       (dolist (instr instructions)
@@ -433,24 +450,35 @@ The convention is that the source operation takes two arguments: the qubit index
 ;;; entry point
 
 (defun plot-circuit (pp &key svg-file
-                          (label-qubit-lines *label-qubit-lines*)
                           (right-align-measurements *right-align-measurements*)
                           (qubit-line-open-wire-length *qubit-line-open-wire-length*)
-                          (layout-strategy *layout-strategy*))
+                          (layout-strategy *layout-strategy*)
+                          (line-labels *line-labels*))
   "Plot a parsed program PP as a circuit diagram. 
 
 Returns a JUPYTER:SVG value, which may be rendered by a Jupyter notebook.
 
 Keyword Arguments:
   * SVG-FILE: if not null, then output is saved here.
-  * LABEL-QUBIT-LINES: If T, then the qubit lines will be labeled with qubit indices.
   * RIGHT-ALIGN-MEASUREMENTS: If T, attempt to align all measurements at the right of the diagram.
   * QUBIT-LINE-OPEN-WIRE-LENGTH: The amount of extra space to attach to qubit lines, at the right.
-  * LAYOUT-STRATEGY: The strategy to employ when determining positions for new qubit lines."
-  (let ((*label-qubit-lines* label-qubit-lines)
-        (*right-align-measurements* right-align-measurements)
+  * LAYOUT-STRATEGY: The strategy to employ when determining positions for new qubit lines. Supported
+      strategies are
+        :INCREASING to order qubit lines by sorting qubit indices from smallest to largest
+        :ANY-LINEAR to search for any ordering providing linear nearest-neighbor connectivity.
+  * LINE-LABELS: The method to employ when resolving line labels. Supported are
+        NIL to not add line labels
+        :INDICES to label lines by qubit indices
+        :KETS to label lines by ket vectors of the form |q_i> for qubit i
+        or a HASH-TABLE mapping qubit indices to their labels."
+  (unless (typep layout-strategy 'layout-strategy)
+    (error "Unknown layout strategy ~A" layout-strategy))
+  (unless (typep line-labels 'line-labels)
+    (error "Unknown line label specification ~A" line-labels))
+  (let ((*right-align-measurements* right-align-measurements)
         (*qubit-line-open-wire-length* qubit-line-open-wire-length)
-        (*layout-strategy* layout-strategy))
+        (*layout-strategy* layout-strategy)
+        (*line-labels* line-labels))
     (uiop:with-current-directory ((uiop:temporary-directory))    
       (uiop:with-temporary-file (:stream tex-stream :pathname tex-file :directory (uiop:temporary-directory))
         (flet ((filename-by-extension (ext)
