@@ -1,0 +1,29 @@
+digraph G {
+    rankdir=BT;
+    "MEASURE 2 ro[2] [8]" [label = "MEASURE 2 ro[2]"]
+    "MEASURE 1 ro[1] [7]" [label = "MEASURE 1 ro[1]"]
+    "X 0 [6]" [label = "X 0"]
+    "X 2 [5]" [label = "X 2"]
+    "SWAP 0 2 [4]" [label = "SWAP 0 2"]
+    "SWAP 0 1 [3]" [label = "SWAP 0 1"]
+    "MEASURE 0 ro[0] [2]" [label = "MEASURE 0 ro[0]"]
+    "X 3 [1]" [label = "X 3"]
+    "MEASURE 2 ro[2]" -> "SWAP 0 2"
+    "MEASURE 1 ro[1]" -> "SWAP 0 1"
+    "SWAP 0 1" -> "X 0"
+    "SWAP 0 2" -> "SWAP 0 1"
+    "SWAP 0 2" -> "X 2"
+    "MEASURE 0 ro[0]" -> "SWAP 0 2"
+    "MEASURE 0 ro[0]" -> "SWAP 0 1"
+    "X 3"
+}
+
+# DECLARE ro BIT[3]
+# X 0
+# X 2
+# X 3
+# SWAP 0 1
+# SWAP 0 2
+# MEASURE 0 ro[0]
+# MEASURE 1 ro[1]
+# MEASURE 2 ro[2]

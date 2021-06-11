@@ -9,11 +9,11 @@
 
 (defpackage #:cl-quil.tools
   (:nicknames #:tools)
-  (:use #:cl
-        #:cl-quil)
+  (:use #:cl)
   #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
 
+  ;; hasse-schedule.lisp
   (:export
-   )
-  )
+   #:write-hasse-for-quil
+   #:write-hasse-for-logical-scheduler))

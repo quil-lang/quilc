@@ -514,7 +514,7 @@
    #:standard-qubit-relabeler           ; FUNCTION
    )
 
-  ;; from utilities.lisp
+  ;; utilities.lisp
   (:export
    #:-pi                                ; CONSTANT
    #:pi/2                               ; CONSTANT
@@ -522,6 +522,7 @@
    #:2pi                                ; CONSTANT
    #:4pi                                ; CONSTANT
    )
+
   (:shadow
    #:pi))
 
@@ -756,6 +757,12 @@
 
   ;; analysis/compress-qubits.lisp
   #:%relabel-qubits                     ; GENERIC FUNCTION, METHOD
+
+  ;; logical-schedule.lisp
+  #:append-instructions-to-lschedule    ; FUNCTION
+  #:lscheduler-earlier-instrs           ; ACCESSOR
+  #:lscheduler-last-instrs              ; ACCESSOR
+  #:make-lscheduler                     ; FUNCTION
   )
 
 ;; After all the dust settles, you should be able to see in a REPL:
