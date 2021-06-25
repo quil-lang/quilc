@@ -289,3 +289,28 @@
                (:file "suite")
                (:file "stabilizer-group-tests")
                (:file "cleve-gottesman-tests")))
+
+(asdf:defsystem #:cl-quil/tools
+  :description "Tools for cl-quil developers."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil)
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/tools-tests)))
+  :around-compile (lambda (compile)
+                    (let (#+sbcl (sb-ext:*derive-function-types* t))
+                      (funcall compile)))
+  :pathname "src/tools/"
+  :serial t
+  :components ((:file "package")))
+
+(asdf:defsystem #:cl-quil/tools-tests
+  :description "Regression tests for CL-Quil tools for developers."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil-tests
+               #:cl-quil/tools)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.tools-tests
+                                           '#:run-tools-tests))
+  :pathname "tests/tools/"
+  :serial t
+  :components ((:file "package")
+               (:file "suite")))
