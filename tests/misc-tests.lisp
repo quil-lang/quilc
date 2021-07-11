@@ -297,11 +297,10 @@
   "Make a DENSITY-QVM that is initialized in the basis state described by BASIS-INDEX.
 
 To put the density matrix into the basis state, e.g., |01><11|, we would choose BASIS-INDEX = 7. In general, the basis state |a><b| is prepared by choosing BASIS-INDEX = (2^N * a + b)."
-  (let ((amps (make-array (expt 2 (* 2 num-qubits))
-                          :element-type 'qvm:cflonum
-                          :initial-element (qvm:cflonum 0))))
-    (setf (aref amps basis-index) (qvm:cflonum 1))
-    (qvm:make-density-qvm num-qubits :amplitudes amps)))
+  (let ((qvm (qvm:make-density-qvm num-qubits)))
+    (setf (aref (qvm::amplitudes qvm) 0) (qvm:cflonum 0)
+          (aref (qvm::amplitudes qvm) basis-index) (qvm:cflonum 1))
+    qvm))
 
 ;; Our test below is built on the following idea: rather than directly
 ;; calculating the entire superoperator encoding the pre- and post-compilation
