@@ -15,9 +15,9 @@ test-cl-quil:
     - branches
   image: docker:stable
   script:
-    - docker build -t rigetti/quilc:${CI_COMMIT_SHORT_SHA} .
+    - docker build -t rigetti/quilc:${GITHUB_SHA} .
     - docker run --rm --entrypoint=make rigetti/quilc:${CI_COMMIT_SHORT_SHA} test-cl-quil
-    - docker rmi rigetti/quilc:${CI_COMMIT_SHORT_SHA}
+    - docker rmi rigetti/quilc:${GITHUB_SHA}
 
 test-quilt:
   stage: test
