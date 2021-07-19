@@ -1,4 +1,4 @@
-;;;; tests/quilt/package.lisp
+;;;; tests/tools/package.lisp
 ;;;;
 ;;;; Author: Mark David
 
@@ -10,7 +10,7 @@
 (fiasco:define-test-package #:cl-quil.tools-tests
   #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
-  (:use #:cl-quil #:cl-quil.quilt)
+  (:use #:cl)
 
   ;; suite.lisp
   (:export

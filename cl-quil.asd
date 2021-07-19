@@ -300,10 +300,11 @@
                       (funcall compile)))
   :pathname "src/tools/"
   :serial t
-  :components ((:file "package")))
+  :components ((:file "package")
+               (:file "hasse-schedule")))
 
 (asdf:defsystem #:cl-quil/tools-tests
-  :description "Regression tests for CL-Quil tools for developers."
+  :description "Regression tests for tools for cl-quil developers."
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil-tests
                #:cl-quil/tools)
@@ -313,4 +314,5 @@
   :pathname "tests/tools/"
   :serial t
   :components ((:file "package")
-               (:file "suite")))
+               (:file "suite")
+               (:file "hasse-diagram-tests")))
