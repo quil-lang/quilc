@@ -60,7 +60,8 @@
             :do (quil::append-instruction-to-lschedule lschedule instr)
           :finally (return (quil::lscheduler-calculate-depth lschedule)))))
 
-(defun benchmark-qasm-suite (&key (timeout 30))
+(defun benchmark-qasm-suite (&key (timeout 30) named)
+  "Run benchmarks from qasm suite. If NAMED is not nil, the specified test(s) will be the ONLY one(s) run; otherwise, all the tests are run. NAMED should be a short name (as shown in the output) of a test, either as a symbol or string, or a list thereof (i.e., matching mutiple tests), to be compared using string-equal. TIMEOUT specifies a timeout in seconds, defaulting to 30 seconds."
   (let ((timed-out nil))
     (flet ((print-rule ()
              (format t "+------------------+----------+-------+----------+~%")))
@@ -73,28 +74,33 @@
             (quil::*addresser-use-1q-queues* t)
             (quil::*safe-include-directory* (asdf:system-relative-pathname :cl-quil "tests/qasm-files/")))
         (dolist (file (qasm-test-files))
-          (format t "| ~Va " 16 (trim-long-string (pathname-name file) 16))
-          (finish-output)
-          (handler-case
-              (let ((text (alexandria:read-file-into-string file)))
-                (tg:gc :full t)
-                (bordeaux-threads:with-timeout (timeout)
-                  (with-stopwatch elapsed-time
-                    (multiple-value-bind (cpp swaps)
-                        (quil::compiler-hook (quil::parse text
-                                                          :originating-file file)
-                                             chip
-                                             :protoquil t
-                                             :destructive t)
-                      (format t "| ~Vf | ~Vd | ~Vd |~%"
-                              8 (/ elapsed-time 1000)
-                              5 swaps
-                              8 (calculate-multiqubit-gate-depth (parsed-program-executable-code cpp)))))))
-            (bt:timeout ()
-              (format t "| ~8,'>d | ????? | ???????? |~%"
-                      timeout)
-              (push (pathname-name file) timed-out)))
-          (finish-output)))
+          (let ((short-name (trim-long-string (pathname-name file) 16)))
+            (when (or (null named)
+                      (if (atom named)
+                          (string-equal named short-name)
+                          (member short-name named :test 'string-equal)))
+              (format t "| ~Va " 16 short-name)
+              (finish-output)
+              (handler-case
+                  (let ((text (alexandria:read-file-into-string file)))
+                    (tg:gc :full t)
+                    (bordeaux-threads:with-timeout (timeout)
+                      (with-stopwatch elapsed-time
+                        (multiple-value-bind (cpp swaps)
+                            (quil::compiler-hook (quil::parse text
+                                                              :originating-file file)
+                                                 chip
+                                                 :protoquil t
+                                                 :destructive t)
+                          (format t "| ~Vf | ~Vd | ~Vd |~%"
+                                  8 (/ elapsed-time 1000)
+                                  5 swaps
+                                  8 (calculate-multiqubit-gate-depth (parsed-program-executable-code cpp)))))))
+                (bt:timeout ()
+                  (format t "| ~8,'>d | ????? | ???????? |~%"
+                          timeout)
+                  (push (pathname-name file) timed-out)))
+              (finish-output)))))
       (print-rule)
       (terpri)
       (when timed-out
