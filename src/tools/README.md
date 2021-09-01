@@ -13,9 +13,11 @@ A short summary of what follows in this README is indicated below.
 
 ## Circuit Diagrams
 
+Render a Quil `parsed-program` object as a circuit diagram. This uses `common-lisp-jupyter` for inline rendering in Jupyter notebooks, but is also usable outside of a Jupyter session (e.g. the results can be saved to an SVG file).
+
 ### Usage
 
-To generate a Jupyter object capable of rendering inline,
+To generate a Jupyter SVG object capable of rendering inline,
 ```
 (plot-circuit <parsed-program>)
 ```
