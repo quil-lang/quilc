@@ -1,6 +1,7 @@
 ;;;; src/tools/package.lisp
 ;;;;
-;;;; Author: Mark David
+;;;; Authors: Mark David
+;;;           Erik Davis
 
 ;;; Allegro (and other Lisps) don't support the non-standard "package
 ;;; local nicknames".
@@ -16,4 +17,9 @@
   ;; hasse-schedule.lisp
   (:export
    #:write-hasse-for-quil
-   #:write-hasse-for-logical-scheduler))
+   #:write-hasse-for-logical-scheduler)
+
+  ;; circuit-diagram.lisp
+  (:export
+   #:plot-circuit)
+  )

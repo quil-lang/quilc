@@ -2,7 +2,7 @@
 ;;;
 ;;; Author: Erik Davis
 
-(in-package #:cl-quil.visualization)
+(in-package #:cl-quil.tools)
 
 ;;; This file contains routines to render a subset of Quil programs as
 ;;; quantikz circuits (cf. https://ctan.org/pkg/quantikz).
@@ -231,23 +231,23 @@ The convention is that the source operation takes two arguments: the qubit index
   (:method (diagram instr)
     (error "Unable to update diagram with instruction ~A" instr))
   
-  (:method (diagram (instr measurement))
+  (:method (diagram (instr quil:measurement))
     (append-to-diagram diagram
-                       (qubit-index (measurement-qubit instr))
+                       (quil:qubit-index (quil:measurement-qubit instr))
                        (tikz-measure)))
   
-  (:method (diagram (instr pragma))
+  (:method (diagram (instr quil:pragma))
     nil)
 
-  (:method (diagram (instr reset))
+  (:method (diagram (instr quil:reset))
     nil)
 
-  (:method (diagram (instr gate-application))
-    (let ((qubits (mapcar #'qubit-index
-                          (application-arguments instr))))
+  (:method (diagram (instr quil:gate-application))
+    (let ((qubits (mapcar #'quil:qubit-index
+                          (quil:application-arguments instr))))
       ;; special case: 2Q operator with special SOURCE-TARGET structure
-      (adt:match operator-description (application-operator instr)
-        ((named-operator name)
+      (adt:match quil:operator-description (quil:application-operator instr)
+        ((quil:named-operator name)
          (when (gethash name custom-source-target-ops)
            (destructuring-bind (source target) qubits
              (append-custom-source-target-gate diagram name source target))
@@ -259,19 +259,19 @@ The convention is that the source operation takes two arguments: the qubit index
       (let ((dagger nil)
             (num-controls 0))
         (labels ((destruct-application (od)
-                   (adt:match operator-description od
-                     ((named-operator name)
+                   (adt:match quil:operator-description od
+                     ((quil:named-operator name)
                       name)
-                     ((dagger-operator inner-od)
+                     ((quil:dagger-operator inner-od)
                       (setf dagger (not dagger))
                       (destruct-application inner-od))
-                     ((controlled-operator inner-od)
+                     ((quil:controlled-operator inner-od)
                       (incf num-controls)
                       (destruct-application inner-od))
-                     ((forked-operator _)
+                     ((quil:forked-operator _)
                       (error "LaTeX output does not currently support FORKED modifiers: ~A" instr)))))
           (let ((name
-                  (destruct-application (application-operator instr))))
+                  (destruct-application (quil:application-operator instr))))
             (let ((control-qubits (subseq qubits 0 num-controls))
                   (target-qubits (subseq qubits num-controls)))
               (when (not (adjacent-lines-p diagram target-qubits))
@@ -286,7 +286,7 @@ The convention is that the source operation takes two arguments: the qubit index
                                  (first target-qubits)
                                  (tikz-gate name
                                             :size (length target-qubits)
-                                            :params (application-parameters instr)
+                                            :params (quil:application-parameters instr)
                                             :dagger dagger))
               ;; and then NOP on the rest
               (loop :for q :in (rest target-qubits)
@@ -298,13 +298,13 @@ The convention is that the source operation takes two arguments: the qubit index
   (loop :with adjacency-list := (make-hash-table)
         :for instr :in instructions
         :do (typecase instr
-              (application
-               (loop :for (q1 q2) :on (mapcar #'qubit-index (application-arguments instr))
+              (quil:application
+               (loop :for (q1 q2) :on (mapcar #'quil:qubit-index (quil:application-arguments instr))
                      :until (null q2)
                      :do (pushnew q1 (gethash q2 adjacency-list))
                          (pushnew q2 (gethash q1 adjacency-list))))
-              (measurement
-               (let ((q (qubit-index (measurement-qubit instr))))
+              (quil:measurement
+               (let ((q (quil:qubit-index (quil:measurement-qubit instr))))
                  (when (null (nth-value 1 (gethash q adjacency-list)))
                    (setf (gethash q adjacency-list) nil)))))
         :finally (return adjacency-list)))
@@ -369,7 +369,7 @@ The convention is that the source operation takes two arguments: the qubit index
     (when *right-align-measurements*
       (loop :with seen-measure := nil
             :for instr :in instructions
-            :if (typep instr 'measurement)
+            :if (typep instr 'quil:measurement)
               :do (setf seen-measure t)
               :and :collect instr :into measurements
             :else
@@ -441,7 +441,7 @@ The convention is that the source operation takes two arguments: the qubit index
 
 (defun print-parsed-program-as-quantikz (pp &optional (stream *standard-output*))
   (let ((diagram
-          (build-diagram (parsed-program-executable-code pp))))    
+          (build-diagram (quil:parsed-program-executable-code pp))))    
     (print-quantikz-header stream)
     (print-quantikz-diagram diagram stream)
     (print-quantikz-footer stream)))
@@ -449,7 +449,9 @@ The convention is that the source operation takes two arguments: the qubit index
 
 ;;; entry point
 
-(defun plot-circuit (pp &key svg-file
+(defun plot-circuit (pp &key
+                          (output-file nil)
+                          (latex-only nil)
                           (right-align-measurements *right-align-measurements*)
                           (qubit-line-open-wire-length *qubit-line-open-wire-length*)
                           (layout-strategy *layout-strategy*)
@@ -459,7 +461,8 @@ The convention is that the source operation takes two arguments: the qubit index
 Returns a JUPYTER:SVG value, which may be rendered by a Jupyter notebook.
 
 Keyword Arguments:
-  * SVG-FILE: if not null, then output is saved here.
+  * OUTPUT-FILE: if not null, then output is written here.
+  * LATEX-ONLY: if true, then plots are not actually rendered. Returns the generated latex string.
   * RIGHT-ALIGN-MEASUREMENTS: If T, attempt to align all measurements at the right of the diagram.
   * QUBIT-LINE-OPEN-WIRE-LENGTH: The amount of extra space to attach to qubit lines, at the right.
   * LAYOUT-STRATEGY: The strategy to employ when determining positions for new qubit lines. Supported
@@ -479,26 +482,35 @@ Keyword Arguments:
         (*qubit-line-open-wire-length* qubit-line-open-wire-length)
         (*layout-strategy* layout-strategy)
         (*line-labels* line-labels))
-    (uiop:with-current-directory ((uiop:temporary-directory))    
-      (uiop:with-temporary-file (:stream tex-stream :pathname tex-file :directory (uiop:temporary-directory))
-        (flet ((filename-by-extension (ext)
-                 (namestring (merge-pathnames (make-pathname :type ext) tex-file))))
-          (print-parsed-program-as-quantikz pp tex-stream)
-          (finish-output tex-stream)
-          (let ((%pdf-file (filename-by-extension "pdf")) ; generated by pdflatex
-                (%aux-file (filename-by-extension "aux")) ; generated by pdflatex
-                (%log-file (filename-by-extension "log")) ; generated by pdflatex
-                (%svg-file (or svg-file (filename-by-extension "svg"))))
-            (unwind-protect
-                 (progn
-                   (uiop:run-program (list *pdflatex-exe* "-halt-on-error" (namestring tex-file)))
-                   (assert (uiop:file-exists-p %pdf-file))
-                   (uiop:run-program (list *pdf2svg-exe*
-                                           %pdf-file
-                                           %svg-file))
-                   (jupyter:svg
-                    (alexandria:read-file-into-string %svg-file)))
-              (dolist (file (list %aux-file %log-file %pdf-file))
-                (uiop:delete-file-if-exists file))
-              (unless svg-file
-                (uiop:delete-file-if-exists %svg-file)))))))))
+    (cond (latex-only
+           (let ((output
+                   (with-output-to-string (tex-stream)
+                     (print-parsed-program-as-quantikz pp tex-stream)
+                     (finish-output tex-stream))))
+             (when output-file
+               (alexandria:write-string-into-file output output-file))
+             output))
+          (t           
+           (uiop:with-current-directory ((uiop:temporary-directory))    
+             (uiop:with-temporary-file (:stream tex-stream :pathname tex-file :directory (uiop:temporary-directory))
+               (flet ((filename-by-extension (ext)
+                        (namestring (merge-pathnames (make-pathname :type ext) tex-file))))
+                 (print-parsed-program-as-quantikz pp tex-stream)
+                 (finish-output tex-stream)
+                 (let ((%pdf-file (filename-by-extension "pdf")) ; generated by pdflatex
+                       (%aux-file (filename-by-extension "aux")) ; generated by pdflatex
+                       (%log-file (filename-by-extension "log")) ; generated by pdflatex
+                       (%output-file (or output-file (filename-by-extension "svg"))))
+                   (unwind-protect
+                        (progn
+                          (uiop:run-program (list *pdflatex-exe* "-halt-on-error" (namestring tex-file)))
+                          (assert (uiop:file-exists-p %pdf-file))
+                          (uiop:run-program (list *pdf2svg-exe*
+                                                  %pdf-file
+                                                  %output-file))
+                          (jupyter:svg
+                           (alexandria:read-file-into-string %output-file)))
+                     (dolist (file (list %aux-file %log-file %pdf-file))
+                       (uiop:delete-file-if-exists file))
+                     (unless output-file
+                       (uiop:delete-file-if-exists %output-file)))))))))))
