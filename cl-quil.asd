@@ -317,4 +317,5 @@
   :serial t
   :components ((:file "package")
                (:file "suite")
-               (:file "hasse-diagram-tests")))
+               (:file "hasse-diagram-tests")
+               (:file "circuit-diagram-tests")))
