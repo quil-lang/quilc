@@ -13,9 +13,12 @@ A short summary of what follows in this README is indicated below.
 
 ## Circuit Diagrams
 
-Render a Quil `parsed-program` object as a circuit diagram. This uses `common-lisp-jupyter` for inline rendering in Jupyter notebooks, but is also usable outside of a Jupyter session (e.g. the results can be saved to an SVG file).
+Render a Quil `parsed-program` object as a circuit diagram. There are a few possible backends:
+- `:jupyter-svg` (default) render to SVG and show inline in a Jupyter notebook
+- `:slime-png` render to a PNG and show inline in a Slime session
+- `:latex` just produce quantikz source for the diagram
 
-### Usage
+### Example Usage
 
 To generate a Jupyter SVG object capable of rendering inline,
 ```
@@ -29,7 +32,9 @@ An example Jupyter session is shown below.
 ![Example PLOT-CIRCUIT usage in a Jupyter notebook](images/plot-circuit-example.png)
 
 
-### Dependencies
+### Installation Instructions
+
+#### `:jupyter-svg`
 
 You will need `pdflatex` and `pdf2svg` in your path. On macOS, `pdflatex` is part of the `mactex` distribution. Both of these may be installed with homebrew:
 ```
@@ -41,6 +46,16 @@ These executables are referred to in `cl-quil.tools` by `*pdflatex-exe*` and `*p
 
 To use this in a Jupyter notebook, you should use [common-lisp-jupyter](https://github.com/yitzchak/common-lisp-jupyter). As an installation note, some users have found that on macOS the default SBCL path associated with the jupyter kernel (e.g. in `~/Library/Jupyter/kernels/common-lisp/kernel.json`) is incorrect; this will result in `jupyter` being unable to start the Common Lisp kernel.
 
+#### `:slime-png`
+
+You need `pdflatex` (cf. above) and `convert` (from ImageMagick) in your path. These executables are referred to in `cl-quil.tools` by `*pdflatex-exe*` and `*convert-exe*`, should you wish to override them.
+
+The Slime interaction requires two SLIME contribs: `slime-media` and `slime-repl` (which is included in `slime-fancy`). In addition, you must enable SLIME evaluation in Emacs. This all can be done, for example, by the following (from `config.el`):
+
+```
+(slime-setup '(slime-fancy slime-media))
+(setq slime-enable-evaluate-in-emacs t)
+```
 
 
 ## Hasse Schedule

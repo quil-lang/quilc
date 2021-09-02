@@ -294,7 +294,8 @@
   :description "Tools for cl-quil developers."
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
-               #:common-lisp-jupyter)
+               #:common-lisp-jupyter
+               #:swank)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/tools-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
