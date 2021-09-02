@@ -10,7 +10,7 @@
 (deftest test-plot-circuit-raw-latex-example ()
   (let* ((pp (quil:parse-quil "DECLARE ro BIT[2]; H 0; CNOT 0 1; RX(pi) 1; CNOT 1 2; MEASURE 0 ro[0]; MEASURE 2 ro[1]"))
          (actual (cl-quil.tools:plot-circuit pp
-                                             :latex-only t
+                                             :backend :latex
                                              :right-align-measurements t))
          ;; the following has been validated by hand....
          ;; we will need to update this after any changes to latex codegen.
