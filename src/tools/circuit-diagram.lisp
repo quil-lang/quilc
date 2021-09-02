@@ -303,27 +303,49 @@ The convention is that the source operation takes two arguments: the qubit index
                     :do (append-to-diagram diagram q (tikz-nop))))))))))
 
 
+(defun qubits-in-applications-or-measurements (instrs)
+  "Get a list of qubit indices appearing in a list of application or measure instructions."
+  (delete-duplicates
+   (mapcan (lambda (instr)
+             (typecase instr
+               (quil::application
+                (mapcar #'quil:qubit-index
+                        (quil:application-arguments instr)))
+               (quil::measurement
+                (list (quil:qubit-index
+                       (quil:measurement-qubit instr))))))
+           instrs)))
+
+
 (defun qubit-interaction-adjacency-list (instructions)
   "Get a hash table mapping qubits to lists of qubits which they interact with in INSTRUCTIONS."
-  (loop :with adjacency-list := (make-hash-table)
-        :for instr :in instructions
-        :do (typecase instr
-              (quil:application
-               (loop :for (q1 q2) :on (mapcar #'quil:qubit-index (quil:application-arguments instr))
-                     :until (null q2)
-                     :do (pushnew q1 (gethash q2 adjacency-list))
-                         (pushnew q2 (gethash q1 adjacency-list))))
-              (quil:measurement
-               (let ((q (quil:qubit-index (quil:measurement-qubit instr))))
-                 (when (null (nth-value 1 (gethash q adjacency-list)))
-                   (setf (gethash q adjacency-list) nil)))))
-        :finally (return adjacency-list)))
+  (let ((adjacency-list (make-hash-table)))
+    (flet ((ensure-present (q)
+             (when (null (nth-value 1 (gethash q adjacency-list)))
+               (setf (gethash q adjacency-list) nil))))   
+      (loop :for instr :in instructions
+            :do (typecase instr
+                  (quil:application
+                   (cond ((= 1 (length (quil:application-arguments instr)))
+                          (ensure-present (quil:qubit-index (first (quil:application-arguments instr)))))
+                          (t
+                           (loop :for q1 :in (quil:application-arguments instr)
+                                 :for i1 := (quil:qubit-index q1)
+                                 :do (loop :for q2 :in (quil:application-arguments instr)
+                                           :for i2 := (quil:qubit-index q2)
+                                           :unless (= i1 i2)
+                                             :do (pushnew i1 (gethash i2 adjacency-list)))))))
+                  (quil:measurement
+                   (let ((q (quil:qubit-index (quil:measurement-qubit instr))))
+                     (when (null (nth-value 1 (gethash q adjacency-list)))
+                       (setf (gethash q adjacency-list) nil)))))
+            :finally (return adjacency-list)))))
 
 
 (defgeneric resolve-qubit-positions (instructions strategy)
   (:documentation "Compute an alist mapping qubits to line positions (with 0 denoting the topmost line).")
   (:method (instrs (strategy (eql ':increasing)))
-    (loop :for q :in (sort (cl-quil::qubits-in-instr-list instrs)
+    (loop :for q :in (sort (qubits-in-applications-or-measurements instrs)
                            #'<)
           :for pos :from 0
           :collect (cons q pos)))
@@ -373,32 +395,33 @@ The convention is that the source operation takes two arguments: the qubit index
   (let* ((instructions (coerce instructions 'list))
          (terminal-measurements nil)
          (qubits
-           (cl-quil::qubits-in-instr-list
+           (qubits-in-applications-or-measurements
             instructions)))
 
-    (when *right-align-measurements*
-      (loop :with seen-measure := nil
-            :for instr :in instructions
-            :if (typep instr 'quil:measurement)
-              :do (setf seen-measure t)
-              :and :collect instr :into measurements
-            :else
-              :do (when seen-measure
-                    (error "Instruction ~A follows a nonterminal MEASURE" instr))
-              :and :collect instr :into gates
-            :finally (setf instructions gates
-                           terminal-measurements measurements)))
     
     (let ((diagram (make-instance 'circuit-diagram)))
 
       ;; add lines and initialize layout
       (loop :for (q . pos) :in (resolve-qubit-positions instructions *layout-strategy*)
             :do (add-qubit-line diagram q pos))
-      
+
       ;; draw labels
       (loop :for q :in qubits
             :for label := (resolve-line-label q *line-labels*)
             :do (append-to-diagram diagram q label))
+
+      (when *right-align-measurements*
+        (loop :with seen-measure := nil
+            :for instr :in instructions
+              :if (typep instr 'quil:measurement)
+                :do (setf seen-measure t)
+                :and :collect instr :into measurements
+              :else
+                :do (when seen-measure
+                      (error "Instruction ~A follows a nonterminal MEASURE" instr))
+                :and :collect instr :into gates
+              :finally (setf instructions gates
+                             terminal-measurements measurements)))
 
       ;; handle instructions
       (dolist (instr instructions)
