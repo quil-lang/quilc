@@ -20,17 +20,23 @@ Render a Quil `parsed-program` object as a circuit diagram. There are a few poss
 
 ### Example Usage
 
+#### Jupyter
+
 To generate a Jupyter SVG object capable of rendering inline,
 ```
 (plot-circuit <parsed-program>)
 ```
 
-To save SVG output, use `:output-file <filename>`. To generate plain LaTeX source, add the `:latex-only t` option. See the docstring for more information about keyword options.
+To save SVG output, use `:output-file <filename>`.
 
 An example Jupyter session is shown below.
 
 ![Example PLOT-CIRCUIT usage in a Jupyter notebook](images/plot-circuit-example.png)
 
+
+#### SLIME
+
+![Example PLOT-CIRCUIT usage in SLIME](images/plot-circuit-slime.png)
 
 ### Installation Instructions
 
