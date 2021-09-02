@@ -50,6 +50,11 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
   "The 'convert' executable.")
 
 
+(defparameter *convert-density*
+  144
+  "The default PNG density for use by 'convert'.")
+
+
 ;;; quantikz commands
 
 (defun tikz-left-ket (q)
@@ -534,6 +539,8 @@ The convention is that the source operation takes two arguments: the qubit index
                      (or output-file
                          (swank:eval-in-emacs `(make-temp-file "circuit" nil ".png")))))
                (uiop:run-program (list *convert-exe*
+                                       "-density"
+                                       (format nil "~A" *convert-density*)
                                        pdf-file
                                        "-flatten"
                                        output-file))
