@@ -179,13 +179,21 @@
    (last-instrs :initform nil
                 :accessor lscheduler-last-instrs
                 :documentation "List of the instructions appearing at the \"bottom\" of a logical scheduler.  These are sorted topologically ascending: earlier items in the list come logically after deeper items in the list.")
-   (later-instrs :initform (make-hash-table :test #'eql)
+   (later-instrs :initform (make-instr-hash-table)
                  :accessor lscheduler-later-instrs
                  :documentation "Hash table mapping instruction to a list of instructions after it.")
-   (earlier-instrs :initform (make-hash-table :test #'eql)
+   (earlier-instrs :initform (make-instr-hash-table)
                    :accessor lscheduler-earlier-instrs
                    :documentation "Hash table mapping instruction to a list of instructions before it."))
   (:documentation "Data structure used to track the logical precedence of instructions in a straight-line Quil program."))
+
+(defun make-instr-hash-table (&optional size)
+  "Make a hash table for which each key is an instruction (instr),
+i.e., an EQ hash table. If SIZE is optionally given, it's passed along
+as the size keyword arg to make-hash-table."
+  (if size 
+      (make-hash-table :test #'eq :size size)
+      (make-hash-table :test #'eq)))
 
 (defun make-lscheduler ()
   (make-instance 'logical-scheduler))
@@ -489,6 +497,119 @@ use RESOURCE."
 ;;; read-only statistical routines for logical-scheduler objects
 ;;;
 
+
+
+(defun map-in-reverse-topological-order (adjacencies start-nodes function)
+  "For a DAG in hash-table ADJACENCIES and a list of START-NODES, call
+   FUNCTION on every node in reverse topological order. Nodes are
+   assumed to be instruction (instr) instances."
+  ;; This runs a depth-first search with an explicit stack as opposed
+  ;; to using a recursive function. A recursive function might be
+  ;; clearer and even a bit faster, but we use the iterative approach
+  ;; because the function calling stack is typically limited in our
+  ;; Lisp implementations (e.g., SBCL), and this may be called with
+  ;; very large graphs (many 100,000's of nodes).
+  (let* ((visitations (make-instr-hash-table (hash-table-count adjacencies)))
+         (topo-stack start-nodes)
+         node)
+    (loop :until (null topo-stack)
+          :do (setq node (first topo-stack))
+              (let* ((visitation (gethash node visitations))
+                     ;; visitation: nil => never visited; T => visited
+                     ;; and now done w/chilren; or cons (list of
+                     ;; unvisited children)
+                     (children
+                       (cond
+                         ((null visitation)
+                          (let ((children? (gethash node adjacencies)))
+                            (setf (gethash node visitations)
+                                  (or children? t))
+                            children?))
+                         ((consp visitation) visitation)
+                         (t             ; i.e., visitation is T
+                          '()))))
+                (loop :while children
+                      :do (let ((child (pop children)))
+                            (when (null (gethash child visitations))
+                              ;; fix up node's entry in visitations,
+                              ;; to be children, if non-nil, else T:
+                              (setf (gethash node visitations)
+                                    (or children t))
+                              ;; push child for further processing
+                              ;; (we're not done with node)
+                              (push child topo-stack)
+                              (return)))
+                      :finally
+                         ;; done w/every child of node
+                         (funcall function node)
+                         (pop topo-stack))))))
+
+
+;;; About lscheduler-absolutely-latest-instrs in comparison with
+;;; lscheduler-last-instrs:
+;;; 
+;;;   lscheduler-last-instrs is a list such that, for any resource
+;;;   used, the last instruction on that resource is in the list.
+;;;
+;;;   lscheduler-absolutely-latest-instrs is a list such that no
+;;;   instructions in it have any later instructions
+;;;
+;;; There is currently (Sept 2021) some uncertainty about whether this
+;;; should remain the case; see issue
+;;; https://github.com/quil-lang/quilc/issues/728. So for now, work
+;;; around this by using lscheduler-absolutely-latest-instrs when you
+;;; need the true last instrs, i.e., the terminals of the DAG. In
+;;; particular, therefore, lscheduler-absolutely-latest-instrs is
+;;; supplied as start-nodes arg of map-in-reverse-topological-order.
+
+(defun lscheduler-absolutely-latest-instrs (lschedule)
+  (let ((last-instrs (lscheduler-last-instrs lschedule))
+        (laters (lscheduler-later-instrs lschedule)))
+    (if (loop :for instr :in (lscheduler-last-instrs lschedule)
+                :thereis (gethash instr laters))
+        (loop :for instr :in (lscheduler-last-instrs lschedule)
+              :unless (gethash instr laters)
+                :collect instr)
+        ;; Otherwise, last-instrs is just fine to return.
+        last-instrs)))
+
+(defun map-lschedule-in-topological-order (lschedule function)
+  "Call FUNCTION on every instr in LSCHEDULE in topological order."
+  ;; Here's the idea: LSCHEDULE holds a directed acyclic graph (DAG)
+  ;; with start nodes being the value of
+  ;; (lscheduler-absolutely-latest-instrs LSCHEDULE) and adjacency
+  ;; mappings in its earlier-instrs slot. We can call this DAG a
+  ;; "reverse DAG" as it is the reverse of the DAG with starts and
+  ;; adjacency mappings in first-instrs and later-instrs slots,
+  ;; respectively.  Thus, by mapping in reverse topological order on
+  ;; the "reverse DAG", we are actually mapping in topological order
+  ;; on the DAG. We could have simply created a topologically sorted
+  ;; list and then mapcar'd on it, but when no list is required per
+  ;; se, using this avoids one extra pass over the list as well as
+  ;; saving the space and time required to cons up the list and later
+  ;; GC it.
+  (map-in-reverse-topological-order
+   (lscheduler-earlier-instrs lschedule)
+   (lscheduler-absolutely-latest-instrs lschedule)
+   function))
+
+
+(defun topo-list-lschedule (lschedule)
+  "Return a list of the instructions of LSCHEDULE in topological order."
+  (let ((result-list '()))
+    (map-lschedule-in-topological-order
+     lschedule #'(lambda (instr) (push instr result-list)))
+    result-list))
+
+;; The above is not currently used but perhaps could be one day. Note:
+;; consider as an optimization storing topo lists on lschedules so
+;; they could be used directly, e.g., in the walker below. It could be
+;; cached and, for most operations, be easily maintained incrementally
+;; in constant time. Also consider storing the exact count of
+;; instructions so that it would not need to be computed. The size is
+;; passed to make-hash-table as size to avoid need to rehash.
+
+
 (defun lscheduler-walk-graph (lschedule
                               &key
                                 (base-value 0)
@@ -501,35 +622,29 @@ use RESOURCE."
 All instructions begin with a value of BASE-VALUE. When we visit an instruction INSTR, we first compute SOURCE-BUMP, which is obtained by applying COMBINE-VALUES to the values associated with all instructions with a directed edge to INSTR. Finally, INSTR's value is overwritten by (BUMP-VALUE INSTR SOURCE-BUMP).
 
 Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table mapping instructions to their values. "
-  (when (endp (lscheduler-topmost-instructions lschedule))
-    (return-from lscheduler-walk-graph (values base-value (make-hash-table :test #'eql))))
-  (let ((max-distance base-value)
-        (distance-hash-table (make-hash-table :test #'eql))
-        (visited-hash-table (make-hash-table :test #'eql)))
-    (labels ((candidate-has-no-ancestors (candidate)
-               (every (lambda (ancestor) (gethash ancestor visited-hash-table))
-                      (gethash candidate (lscheduler-earlier-instrs lschedule))))
-             (walk-graph-with-candidates (candidates)
-               (do* (;; TODO: use a queue to make this more like a normal topological sort
-                     (candidates candidates
-                                 (append (gethash candidate (lscheduler-later-instrs lschedule))
-                                         (remove candidate candidates)))
-                     (candidate (find-if #'candidate-has-no-ancestors candidates)
-                                (find-if #'candidate-has-no-ancestors candidates)))
-                    ((null candidates))
-                 (setf (gethash candidate visited-hash-table) t)
-                 (let ((bumped-value (funcall bump-value candidate (gethash candidate distance-hash-table))))
-                   (setf max-distance
-                         (funcall combine-values max-distance bumped-value))
-                   (dolist (child (gethash candidate (lscheduler-later-instrs lschedule)))
-                     (setf (gethash child distance-hash-table)
-                           (if (gethash child distance-hash-table)
-                               (funcall combine-values bumped-value (gethash child distance-hash-table))
-                               bumped-value)))))))
-      (dolist (instr (lscheduler-topmost-instructions lschedule))
-        (setf (gethash instr distance-hash-table) base-value))
-      (walk-graph-with-candidates (lscheduler-topmost-instructions lschedule))
-      (values max-distance distance-hash-table))))
+  (let* ((max-distance base-value)
+         (laters (lscheduler-later-instrs lschedule))
+         (distances (make-instr-hash-table (hash-table-count laters))))
+    ;; Initialize distances of start instrs to base-value, leaving
+    ;; distances of other instrs nil.
+    (dolist (instr (lscheduler-first-instrs lschedule))
+      (setf (gethash instr distances) base-value))
+    ;; Process instrs in the topological order.
+    (map-lschedule-in-topological-order
+     lschedule
+     #'(lambda (instr)
+         (let* ((d (gethash instr distances))
+                (bumped-value (funcall bump-value instr d)))
+           (setq max-distance
+                 (funcall combine-values max-distance bumped-value))
+           (loop :for later :in (gethash instr laters)
+                 :as later-d := (gethash later distances)
+                 :do (setf (gethash later distances)
+                           (if (null later-d)
+                               bumped-value
+                               (funcall
+                                combine-values bumped-value later-d)))))))
+    (values max-distance distances)))
 
 (defun lscheduler-calculate-duration (lschedule chip-spec)
   (flet ((duration-bumper (instr value)
@@ -558,6 +673,7 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
       0))
 
 (defun lscheduler-calculate-volume (lschedule)
+  "Compute the count of instructions in LSCHEDULE."
   (+ (length (lscheduler-topmost-instructions lschedule))
      (hash-table-count (lscheduler-earlier-instrs lschedule))))
 
@@ -584,9 +700,11 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                     (warn-and-skip instr))
                   (let ((specs-hash (hardware-object-gate-information obj)))
                     (unless specs-hash (warn-and-skip instr))
-                    (dohash ((key val) specs-hash)
-                      (when (binding-subsumes-p key (binding-from-instr instr))
-                        (setf fidelity (gate-record-fidelity val))))
+                    (when (> (hash-table-count specs-hash) 0)
+                      (let ((binding (binding-from-instr instr)))
+                        (dohash ((key val) specs-hash)
+                          (when (binding-subsumes-p key binding)
+                            (setf fidelity (gate-record-fidelity val))))))
                     (unless fidelity (warn-and-skip instr)))))
                (otherwise
                 (warn-and-skip instr)))
@@ -610,4 +728,12 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
     (values (exp (- max-value)) value-hash)))
 
 (defun lscheduler-all-instructions (lschedule)
-  (a:hash-table-keys (nth-value 1 (lscheduler-walk-graph lschedule))))
+  "Return a list of the instructions of LSCHEDULE."
+  (let* ((laters (lscheduler-later-instrs lschedule))
+         (result-list (a:hash-table-keys laters)))
+    ;; Last instrs may not be in laters, so add here.
+    (dolist (instr (lscheduler-last-instrs lschedule))
+      (unless (gethash instr laters)
+        (push instr result-list)))
+    result-list))
+    
