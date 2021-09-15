@@ -144,7 +144,50 @@
 ;; Forward declaration from compressor.lisp
 (declaim (special *compressor-passes*))
 
+
+
+
+;;;; Making Addresser States and the Addresser-State Cache
+
+;;; Caching of addresser states depends on the assumption that once a
+;;; chip specification is made, it cannot change, or at least any
+;;; slots that could affect the creation of its corresponding
+;;; addresser state cannot change.
+
 (defvar *default-addresser-state-class* 'fidelity-addresser-state)
+
+(defparameter *enable-addresser-state-cache* t
+  "If true, get-addresser-state-for-chip addresser-state caches
+  certain addresser-state slot values on the chip specification keyed
+  off the class of addresser state. Otherwise, i.e., when nil (=
+  disabled), a fresh addresser state is created each time from
+  scratch.")
+
+(defun make-addresser-state-for-chip (class chip-specification initial-l2p)
+  (make-instance class :chip-spec chip-specification :initial-l2p initial-l2p))
+
+(defvar *state-addresser-cache* (make-hash-table :test 'eq)
+  "Hash table mapping a chip-specification instance to a plist mapping
+   names of addresser-state subclasses to prototype addresser states,
+   as managed by get-addresser-state-for-chip. This is all assuming
+   cache is enabled; otherwise, this does not get used.")
+
+(defun get-prototype-addresser-state-for-chip (class chip-specification initial-l2p)
+  (or (getf (gethash chip-specification *state-addresser-cache* '()) class)
+      (setf (getf (gethash chip-specification *state-addresser-cache* '()) class)
+            (make-addresser-state-for-chip class chip-specification initial-l2p))))
+
+(defun get-addresser-state-for-chip (class chip-specification initial-l2p)
+  (if *enable-addresser-state-cache*
+      (let ((prototype-addresser-state
+              (get-prototype-addresser-state-for-chip
+               class chip-specification initial-l2p)))
+        (copy-prototype-addresser-state prototype-addresser-state initial-l2p))
+      (make-addresser-state-for-chip
+       class chip-specification initial-l2p)))
+
+
+  
 
 ;; TODO: deal with classical control and basic-blocks
 (defun compiler-hook (parsed-program
@@ -282,11 +325,12 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-addressing
-                   (make-instance *default-addresser-state-class*
-                                  :chip-spec chip-specification
-                                  :initial-l2p (if registrant
-                                                   (basic-block-in-rewiring blk)
-                                                   initial-rewiring))
+                   (get-addresser-state-for-chip
+                    *default-addresser-state-class*
+                    chip-specification
+                    (if registrant
+                        (basic-block-in-rewiring blk)
+                        initial-rewiring))
                  (coerce (basic-block-code blk) 'list)
                  :initial-rewiring (if registrant
                                        (basic-block-in-rewiring blk)
@@ -314,10 +358,12 @@ Returns a value list: (processed-program, of type parsed-program
            ;; actually process this block
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-addressing
-                   (make-instance *default-addresser-state-class*
-                                  :chip-spec chip-specification
-                                  :initial-l2p (prog-initial-rewiring parsed-program chip-specification
-                                                                      :type rewiring-type))
+                   (get-addresser-state-for-chip 
+                    *default-addresser-state-class*
+                    chip-specification
+                    (prog-initial-rewiring
+                     parsed-program chip-specification
+                     :type rewiring-type))
                  (coerce (basic-block-code blk) 'list)
                  :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
                                                           :type rewiring-type))

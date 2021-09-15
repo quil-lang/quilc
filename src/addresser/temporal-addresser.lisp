@@ -214,21 +214,30 @@
                                        &rest initargs
                                        &key
                                          chip-spec
+                                         prototype
                                        &allow-other-keys)
   (declare (ignore initargs))
-  ;; set up the qq-distances slot to use runtime as the basic unit
-  (setf (addresser-state-qq-distances instance)
-        (compute-qubit-qubit-distances
-         chip-spec
-         (lambda (object)
-           ;; TODO: is there a good reason this uses floats over COST objects?
-           (if (hardware-object-dead-p object)
-               most-positive-fixnum
-               ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
-               (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object)))))))
-  ;; warm the cost-bounds slot
-  (flet ((fill-cost-bound (hw)
-           (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
-                 (temporal-cost-heuristic-value
-                  (cost-function instance :gate-weights (weighted-future-gates instance))))))
-    (warm-up-addresser-state instance #'fill-cost-bound)))
+  (cond
+    (prototype
+     (setf (addresser-state-qq-distances instance)
+           (addresser-state-qq-distances prototype))
+     (setf (temporal-addresser-state-cost-bounds instance)
+           (temporal-addresser-state-cost-bounds prototype)))
+    (t
+          
+     ;; set up the qq-distances slot to use runtime as the basic unit
+     (setf (addresser-state-qq-distances instance)
+           (compute-qubit-qubit-distances
+            chip-spec
+            (lambda (object)
+              ;; TODO: is there a good reason this uses floats over COST objects?
+              (if (hardware-object-dead-p object)
+                  most-positive-fixnum
+                  ;; TODO: prefer the FLEX computation below to digging into RECORD-DURATION?
+                  (permutation-record-duration (vnth 0 (hardware-object-permutation-gates object)))))))
+     ;; warm the cost-bounds slot
+     (flet ((fill-cost-bound (hw)
+              (setf (gethash hw (temporal-addresser-state-cost-bounds instance))
+                    (temporal-cost-heuristic-value
+                     (cost-function instance :gate-weights (weighted-future-gates instance))))))
+       (warm-up-addresser-state instance #'fill-cost-bound)))))

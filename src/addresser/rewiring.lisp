@@ -45,12 +45,12 @@ INVERSE."
 
 (defun make-rewiring (n)
   "Initialize a rewiring of length N."
-  (let ((id
-          (coerce
-           (loop :for j :below n :collect j)
-           'vector)))
+  (let* ((id (make-array n))
+         (id-copy (make-array n)))
+    (dotimes (j n)
+      (setf (svref id j) (setf (svref id-copy j) j)))
     ;; Store two copies of the identity mapping to start
-    (init-rewiring :l2p id :p2l (copy-seq id))))
+    (init-rewiring :l2p id :p2l id-copy)))
 
 (defun generate-random-rewiring (n)
   "Generate a random rewiring of length N."

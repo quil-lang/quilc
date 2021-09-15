@@ -34,6 +34,37 @@
               :documentation "The family of queues where not-yet-scheduled 1Q instructions live, while we get them out of the way to process 2Q instructions."))
   (:documentation "Common state to be manipulated by addressing routines. Implementations may often opt for more, but this represents the minimum that is expectred."))
 
+
+
+;;; The purpose of method copy-prototype-addresser-state is to create
+;;; a new addresser state based on a "prototype", and addresser-state
+;;; instance presumed to have certain slot values that may be
+;;; incorporated into the result addresser state.  This works in
+;;; collaboration with the :after initialize-instance method by
+;;; passing in the prototype to make-instance as :prototype keyword
+;;; arg. This is called by get-addresser-state-for-chip when
+;;; *enable-addresser-state-cache* is true to propagate cached
+;;; addresser-state slots that are expensive to compute to new
+;;; instances. Certain subclasses, i.e., to date,
+;;; temporal-addresser-state and fidelity-addresser-state, implement
+;;; special handling to dispatch off the prototype arg; see those
+;;; methods on those classes for details.
+
+(defmethod copy-prototype-addresser-state ((prototype-addresser-state addresser-state) initial-l2p)
+  "Supplies PROTOTYPE-ADDRESSER-STATE as :prototype keyword arg and
+  INITIAL-L2P as :initial-l2p arg to make-instance.  Specialized
+  methods are not required, but :after
+  :initialized methods may fruitfully make use of this arg, i.e., to
+  avoid expensive reinitialization of certain slots; c.f.,
+  initialize-instance :after methods for temporal-addresser-state and
+  fidelity-addresser-state."
+  (make-instance
+   (class-name (class-of prototype-addresser-state))
+   :prototype prototype-addresser-state
+   :chip-spec (addresser-state-chip-specification prototype-addresser-state)
+   :initial-l2p initial-l2p))
+
+
 (defmethod initialize-instance :after ((instance addresser-state)
                                        &rest initargs
                                        &key
@@ -155,9 +186,19 @@ INSTR is the \"active instruction\".
                     (aref dist j i) (+ ik kj)))))))
     dist))
 
+
+
+
+
+
 (defun warm-up-addresser-state (state hardware-op)
   "'Warm up' the addresser STATE by iterating over each hardware object on the chip, initializing a random gate on the object and then calling HARDWARE-OP with it."
-  ;; We snag some of the addresser state here, and restore it after the loop.
+  ;; We snag some of the addresser state here, and restore it after
+  ;; the loop. Note that it's assumed that this function can only be
+  ;; called on a new, unshared STATE instance. Therefore, we do need
+  ;; not unwind-protect the (loop ...) body: if the body is aborted,
+  ;; e.g., say, via a timeout while running benchmarks, there would
+  ;; not have been any pointers to STATE, and it is simply discarded.
   (let ((initial-l2p (addresser-state-initial-l2p state))
         (working-l2p (addresser-state-working-l2p state))
         (lscheduler (addresser-state-logical-schedule state))

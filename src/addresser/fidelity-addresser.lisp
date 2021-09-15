@@ -212,19 +212,28 @@
                                        &rest initargs
                                        &key
                                          chip-spec
+                                         prototype
                                        &allow-other-keys)
   (declare (ignore initargs))
-  ;; set up the qq-distances slot to use log-infidelity as the basic unit
-  (setf (addresser-state-qq-distances instance)
-        (compute-qubit-qubit-distances chip-spec
-                                       (lambda (object)
-                                         (if (hardware-object-dead-p object)
-                                             most-positive-fixnum
-                                             (- (log (swap-fidelity chip-spec object)))))))
-  ;; fill the cost-bounds slot
-  (flet ((fill-cost-bound (hw)
-           (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
-                 (fidelity-cost-value
-                  (cost-function instance
-                                 :gate-weights (weighted-future-gates instance))))))
-    (warm-up-addresser-state instance #'fill-cost-bound)))
+  (cond
+    (prototype
+     (setf (addresser-state-qq-distances instance)
+           (addresser-state-qq-distances prototype))
+     (setf (fidelity-addresser-state-cost-bounds instance)
+           (fidelity-addresser-state-cost-bounds prototype)))
+    (t
+     ;; set up the qq-distances slot to use log-infidelity as the basic unit
+     (setf (addresser-state-qq-distances instance)
+           (compute-qubit-qubit-distances chip-spec
+                                          (lambda (object)
+                                            (if (hardware-object-dead-p object)
+                                                most-positive-fixnum
+                                                (- (log (swap-fidelity chip-spec object)))))))
+     ;; fill the cost-bounds slot
+     (flet ((fill-cost-bound (hw)
+              (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
+                    (fidelity-cost-value
+                     (cost-function instance
+                                    :gate-weights (weighted-future-gates instance))))))
+       (warm-up-addresser-state instance #'fill-cost-bound)))))
+  
