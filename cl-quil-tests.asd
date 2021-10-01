@@ -51,4 +51,5 @@
                (:file "approximation-tests")
                (:file "csd-tests")
                (:file "addresser-tests")
+               (:file "linear-reversible-circuit-tests")
                (:file "permutation-tests")))
