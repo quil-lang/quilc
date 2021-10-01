@@ -384,6 +384,7 @@ used to specify CHIP-SPEC."
         ;; we happen to have better CCNOT translations for specific target
         ;; gate sets.
         (constantly 'ccnot-to-cnot)
+        (constantly 'permutation-gate-to-mcx)
         (constantly 'phase-to-rz)
         (lambda (chip-spec arch)
           (declare (ignore chip-spec))

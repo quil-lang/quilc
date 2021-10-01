@@ -128,7 +128,7 @@
                                  target)
                      circuit))
             (t
-             (push (build-multiple-controlled-gate
+             (push (apply #'build-multiple-controlled-gate
                     "X" () (append translated-controls (list target)))
                    circuit))))))
     (nreverse circuit)))
@@ -137,3 +137,35 @@
   (let ((permutation (make-array (length permutation) :initial-contents permutation)))
     (reduce #'append (mapcar #'simple-single-target-gate-synthesize
                              (single-target-gate-decomposition! permutation)))))
+
+(defun permutation-gate-to-mcx (instr &key context)
+  "Compile instructions representing permutation gates to n-qubit Toffoli gates."
+  (declare (ignore context))
+  (unless (slot-boundp instr 'name-resolution)
+    (give-up-compilation))
+  (let ((res (gate-application-resolution instr)))
+    (when (typep res 'gate-definition)
+      (setf res (gate-definition-to-gate res)))
+    (let* ((perm-gate (funcall
+                       (operator-description-gate-lifter
+                        (application-operator instr))
+                       res))
+           (qubits (reverse (application-arguments instr))))
+      (cond
+        ((and (typep perm-gate 'permutation-gate)
+              (> (length qubits) 2))
+         (let* ((perm (permutation-gate-permutation perm-gate))
+                (code (synthesize-permutation perm))
+                (relabler (lambda (q)
+                            (setf (quil::qubit-index q)
+                                  (quil::qubit-index (nth (quil::qubit-index q) qubits))))))
+           (map nil (a:rcurry #'quil::%relabel-qubits relabler) code)
+           ;; If synthesis produces a 1 instruction sequence, that
+           ;; means that the original instruction represents a n-qubit
+           ;; controlled Toffoli gate, so we didn't do anything and
+           ;; should give up.
+           (when (and code (null (rest code)))
+             (give-up-compilation))
+           code))
+        (t
+         (give-up-compilation))))))
