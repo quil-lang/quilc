@@ -88,6 +88,7 @@
                              (:file "linear-paulis")
                              (:file "ansatz-search")
                              (:file "truth-table")
+                             (:file "linear-reversible-circuits")
                              (:file "permutation")
                              ;; attic'd files / pedagogical purposes only
                              (:static-file "optimal-2q")
