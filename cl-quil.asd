@@ -87,6 +87,8 @@
                              (:file "modifiers")
                              (:file "linear-paulis")
                              (:file "ansatz-search")
+                             (:file "truth-table")
+                             (:file "permutation")
                              ;; attic'd files / pedagogical purposes only
                              (:static-file "optimal-2q")
                              (:static-file "cs-compile")))
