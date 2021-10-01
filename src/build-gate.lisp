@@ -98,6 +98,16 @@ Comes in two flavors:
   (apply #'build-gate (repeatedly-fork (named-operator roll-name) (length qubits))
          params qubit qubits))
 
+(defun repeatedly-control (op n)
+  (loop :repeat n
+        :do (setf op (controlled-operator op))
+        :finally (return op)))
+
+;;; Build a multiple controlled gate.
+(defun build-multiple-controlled-gate (gate params qubit &rest qubits)
+  (apply #'build-gate (repeatedly-control (named-operator gate) (length qubits))
+         params qubit qubits))
+
 ;;; functions for dealing with mixed constant vs delayed-expression types
 
 (defun param-binary-op (op arg1 arg2)

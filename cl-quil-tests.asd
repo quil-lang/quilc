@@ -50,4 +50,5 @@
                (:file "typed-memory-tests")
                (:file "approximation-tests")
                (:file "csd-tests")
-               (:file "addresser-tests")))
+               (:file "addresser-tests")
+               (:file "permutation-tests")))
