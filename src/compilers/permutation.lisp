@@ -81,11 +81,12 @@
   (let ((length (length perm)))
     (assert (power-of-two-p length))
     (let ((n-qubits (1- (integer-length length)))
-          (single-target-gates '()))
+          (left-gates '())
+          (right-gates '()))
       (dotimes (qubit n-qubits)
         (multiple-value-bind (left right)
             (decompose! perm qubit)
-          (flet ((add-single-target-gate (permutation)
+          (flet ((single-target-gate-from-permutation (permutation)
                    (multiple-value-bind (truth-table vars)
                        (truth-table-minimize-base!
                         (make-truth-table n-qubits
@@ -95,14 +96,21 @@
                                                 collect (if (= value row) 0 1))))
                      (unless (truth-table-zero-p truth-table)
                        (assert (not (member qubit vars)))
-                       (push (make-single-target-gate
-                              :function truth-table
-                              :control-lines (coerce (sort vars #'<) 'vector)
-                              :target qubit)
-                             single-target-gates)))))
-            (add-single-target-gate left)
-            (add-single-target-gate right))))
-      (nreverse single-target-gates))))
+                       (make-single-target-gate
+                        :function truth-table
+                        :control-lines (coerce (sort vars #'<) 'vector)
+                        :target qubit)))))
+            (let ((left-gate (single-target-gate-from-permutation left))
+                  (right-gate (single-target-gate-from-permutation right)))
+              (when left-gate (push left-gate left-gates))
+              (when right-gate (push right-gate right-gates))))))
+      ;; Combine the left and right gates in the right order. It's
+      ;; possible as an additional optimization to merge the
+      ;; right-most left gate and the left-most right gate (assuming
+      ;; neither is the identity) because they act on the same
+      ;; target. In fact, probably any consecutive gates acting on the
+      ;; same target can be merged iteratively.
+      (nconc (nreverse left-gates) right-gates))))
 
 ;; Synthesize a single target gate by using PPRM (positive polarity
 ;; Reed-Mueller form).
