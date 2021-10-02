@@ -74,9 +74,9 @@
   (control-lines (missing-arg) :type vector :read-only t)
   (target (missing-arg) :type fixnum :read-only t))
 
-;; PERM permutes computational basis to computational basis. This
-;; algorithm produces at most 2n-1 single target gates where n is the
-;; number of bits, which is nearly optimal.
+;;; PERM permutes computational basis to computational basis. This
+;;; algorithm produces at most 2n-1 single target gates where n is the
+;;; number of bits, which is nearly optimal.
 (defun single-target-gate-decomposition! (perm)
   (let ((length (length perm)))
     (assert (power-of-two-p length))
@@ -112,8 +112,8 @@
       ;; same target can be merged iteratively.
       (nconc (nreverse left-gates) right-gates))))
 
-;; Synthesize a single target gate by using PPRM (positive polarity
-;; Reed-Mueller form).
+;;; Synthesize a single target gate by using PPRM (positive polarity
+;;; Reed-Mueller form).
 (defun simple-single-target-gate-synthesize (gate)
   (let ((control-lines (single-target-gate-control-lines gate))
         (target (single-target-gate-target gate))
@@ -165,9 +165,9 @@
          (let* ((perm (permutation-gate-permutation perm-gate))
                 (code (synthesize-permutation perm))
                 (relabler (lambda (q)
-                            (setf (quil::qubit-index q)
-                                  (quil::qubit-index (nth (quil::qubit-index q) qubits))))))
-           (map nil (a:rcurry #'quil::%relabel-qubits relabler) code)
+                            (setf (qubit-index q)
+                                  (qubit-index (nth (qubit-index q) qubits))))))
+           (map nil (a:rcurry #'%relabel-qubits relabler) code)
            ;; If synthesis produces a 1 instruction sequence, that
            ;; means that the original instruction represents a n-qubit
            ;; controlled Toffoli gate, so we didn't do anything and
