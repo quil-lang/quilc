@@ -14,7 +14,7 @@
 ;;; We provide a few kinds of chips and Quil programs and several
 ;;; methods of benchmarking as a function of nQ.
 ;;;
-;;; The chip types: :fully-connectes, :linear 
+;;; The chip types: :fully-connected, :linear 
 ;;;
 ;;; The program types:
 ;;;
@@ -48,7 +48,14 @@
 (defvar *benchmark-quilc-perf-series* '()
   "Initially an empty list, gets set to the list of results by each
   run of benchmark-nq, provided as a developer convenience for later
-  perusal, e.g., in a REPL.")
+  perusal, e.g., in a REPL.  These results are in a list of sublists
+  of the form
+
+    ((program-type chip-type) . timings)
+
+  where timings is a list of lists of the form (nQ time), where time
+  is an integer as a multiple of internal-time-units-per-second. Each
+  sublist has the same length and contains the same nQ values.")
 
 (defun benchmark-nq ()
   (setq *benchmark-quilc-perf-series*
@@ -56,9 +63,9 @@
          :start *default-benchmark-nq-start*
          :step *default-benchmark-nq-step*
          :end *default-benchmark-nq-end*))
-  (csv-raw-timings *benchmark-quilc-perf-series*)
+  (csv-timings *benchmark-quilc-perf-series*)
   (terpri)
-  (csv-max-of-series-style *benchmark-quilc-perf-series*)
+  (csv-timings *benchmark-quilc-perf-series* :max-of-series-style t)
   *benchmark-quilc-perf-series*)
 
 (defparameter *benchmark-program-types*
@@ -219,27 +226,49 @@
                                          `(((,Program-type ,chip-type)
                                             ,@perf-series)))))))
 
-(defun csv-raw-timings (x)
-  ;; Arrange like so:
-  ;; header row:
-  ;; "nQ", program1/chip1, ..., programn, chipn"
-  ;; rest of rows:
-  ;; <nQ>, <time of program1/chip1>, ..., <time of programn/chipn>
+(defun csv-timings (x &key max-of-series-style)
+  "Output timing data X as comma-separated values like so
 
+header row:
+  \"nQ\", program/chip-1, ..., program/chip-n
+data rows:
+  <nQ>, <time of program/chip-1>, ..., <time of program/chip-n>
+
+In the header row, each program/chip pair is the name of the program
+type and chip type, respectively. In the data rows each row represents
+a series of program/chip timings, each written as a floating point
+number.  MAX-OF-SERIES-STYLE defaults to false, but if specified true,
+each timing is converted to be a ratio of the origin timing to the
+maximum timing of the series.
+
+X's format is as documented for *benchmark-quilc-perf-series*.
+
+Besides outputting the rows as described, this returns a list of the
+data rows only, each row being of the form (nQ . timings), where nQ is
+a fixnum and timings is a list of floats."
   ;; header row:
   (princ "nQ")
   (loop :with rows := '()
         :for ((chip-type program-type) . timings) :in x
+        :as max-of-series
+          := (and max-of-series-style
+                  (loop :for (nil time) :in timings
+                        :maximize time))
         :do (format t ", ~(~a/~a~)" chip-type program-type)
             (loop :for (nq time) :in timings
-                  :as time-in-seconds-float
-                    := (internal-time-to-seconds time)
+                  :as time-as-float
+                    := (if max-of-series-style
+                           ;; time/max ratio
+                           (transform-val-to-ratio-of-max time max-of-series)
+                           ;; time in seconds
+                           (internal-time-to-seconds time))
                   :as row := (assoc nq rows)
                   :when (null row)
                     :do (setq row (list nq))
                         (setq rows (nconc rows (list row)))
-                  :do (nconc row (list time-in-seconds-float)))
+                  :do (nconc row (list time-as-float)))
         :finally (terpri)
+                 ;; data rows:
                  (loop :for (nq . times) :in rows
                        :do (format t "~d" nq)
                            (loop :for time :in times
@@ -249,37 +278,6 @@
 
 (defun transform-val-to-ratio-of-max (original-val max-of-series)
   (/ (float original-val) max-of-series))
-
-(defun csv-max-of-series-style (x)
-  ;; Arrange like so:
-  ;; header row:
-  ;; "nQ", program1/chip1, ..., programn, chipn"
-  ;; rest of rows:
-  ;; <nQ>, <time of program1/chip1>, ..., <time of programn/chipn>
-
-  ;; header row:
-  (princ "nQ")
-  (loop :with rows := '()
-        :for ((chip-type program-type) . timings) :in x
-        :as max-of-series
-          := (loop :for (nil time) :in timings
-                   :maximize time)
-        :do (format t ", ~(~a/~a~)" chip-type program-type)
-            (loop :for (nq time) :in timings
-                  :as time-ratio
-                    := (transform-val-to-ratio-of-max time max-of-series)
-                  :as row := (assoc nq rows)
-                  :when (null row)
-                    :do (setq row (list nq))
-                        (setq rows (nconc rows (list row)))
-                  :do (nconc row (list time-ratio)))
-        :finally (terpri)
-                 (loop :for (nq . times) :in rows
-                       :do (format t "~d" nq)
-                           (loop :for time :in times
-                                 :do (format t ", ~,3f" time))
-                           (terpri))
-                 (return rows)))
 
 
 

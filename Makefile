@@ -147,7 +147,7 @@ test-ccl:
 ###############################################################################
 # BENCHMARKS
 ###############################################################################
-.PHONY: benchmark-qasm benchmark-qasm-big
+.PHONY: benchmark-qasm benchmark-nq benchmark-nq-2x
 
 benchmark-qasm:
 	$(QUICKLISP) \

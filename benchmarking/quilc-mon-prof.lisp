@@ -9,7 +9,11 @@
 ;;;; Monitoring and Profiling
 
 ;; This builds on quilc-perf.lisp and is for monitoring and profiling,
-;; as opposed to simple benchmarks, and is a WIP.
+;; as opposed to simple benchmarks, and is a WIP in that we have not
+;; established a makefile entry to run this. That is because, while
+;; it's been useful to run for probing and experimenting in a REPL, we
+;; so far lack really good theory of operation and associated modes of
+;; running. We hope with time to get there.
 
 
 (defparameter *monitor-types*
@@ -17,6 +21,16 @@
 
 (defun monitor-run (program-type chip-type nq repeats monitor
                     &optional report-type sample-interval)
+  "Do REPEATS perf runs for PROGRAM-TYPE and CHIP-TYPE (as documented
+   at the top of QUILC-PERF module) using the specified MONITOR, which
+   must be one of those in the list *monitor-types*.  Optional args
+   REPORT-TYPE and SAMPLE-INTERVAL are only relevant when MONITOR is
+   :SB-SPROF in which case REPORT-TYPE is passed as the same-named arg
+   to SB-SPROF:REPORT, and SAMPLE-INTERVAL is passed as the same-named
+   arg to SB-SPROF:START-PROFILING. Note as well that for :SB-SPROF
+   monitor, only the current thread is profiled. This returns no
+   useful value. It's just run in order to get output from the
+   monitor."
   (when (not (member monitor *monitor-types*))
     (unless (null monitor) ; if so, just silently default with no warning
       (warn "unrecognized monitor, should be one of ~s; using ~s"
@@ -55,8 +69,7 @@
          (progn
            (sb-sprof:reset)
            (sb-sprof:start-profiling
-            ;; :sample-interval (or sample-interval 0.005)    ; default = 0.01
-            :sample-interval 0.0001
+            :sample-interval (or sample-interval 0.005)    ; default = 0.01
             :threads (list sb-thread:*current-thread*))
            (funcall thunk)
            (sb-sprof:report
@@ -113,34 +126,6 @@
                               :reset t
                               :sample-interval 0.01) ; default .01
       (benchmark-one-quilc-perf-run program chip))))
-
-
-
-
-;;;; depth check
-
-(defun quil-parse-to-logical-schedule (parse)
-  (let* ((instructions-vector (quil:parsed-program-executable-code parse))
-         (instructions-list (concatenate 'list instructions-vector))
-         (lsched (quil.si:make-lscheduler)))
-    (quil.si:append-instructions-to-lschedule lsched instructions-list)
-    lsched))
-
-(defun depth-check (nq)
-  (let* ((parse (build-benchmark-program nq :hadamard))
-         (logical-schedule (quil-parse-to-logical-schedule parse)))
-    (depth-check-1 logical-schedule)))
-
-(defun depth-check-1 (logical-schedule)
-  (let* ((old-walk-depth
-           (let ((quil::*new-walk* nil))
-             (quil::lscheduler-calculate-depth logical-schedule)))
-         (new-walk-depth
-           (let ((quil::*new-walk* t))
-             (quil::lscheduler-calculate-depth logical-schedule))))
-    (list
-     (= old-walk-depth new-walk-depth)
-     old-walk-depth new-walk-depth logical-schedule)))
 
 
 
