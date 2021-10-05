@@ -118,13 +118,46 @@ JUMP @a")))
   `(progn
      (handler-bind ((quil::state-prep-compression-tolerance-error
                       (lambda (c)
-                        (with-slots (compilation-tolerance compilation-precision) c
-                          (when (< compilation-tolerance
-                                   compilation-precision
-                                   quil::+double-comparison-threshold-loose+)
-                            (let ((r (find-restart 'continue c)))
-                              (when r (invoke-restart r))))))))
+                        (when (< (quil::state-prep-compression-tolerance-error-tolerance c)
+                                 (quil::state-prep-compression-tolerance-error-precision c)
+                                 quil::+double-comparison-threshold-loose+)
+                          (let ((r (find-restart 'continue c)))
+                            (when r (invoke-restart r)))))))
        ,@body)))
+
+(deftest test-%with-loose-state-prep-compression-736 ()
+  "Test macro %with-loose-state-prep-compression macro. Note that this
+   macro is actually part of the test machinery, not quil code to be
+   tested per se."
+  ;; For issue: "compiler hook test gets 2nd-level error:
+  ;; COMPILATION-TOLERANCE slot missing #736"
+  (labels ((test-continue-restart (tolerance precision)
+             (let ((continue-happened nil))
+               (multiple-value-bind (result condition)
+                   (ignore-errors
+                    (restart-case 
+                        (%with-loose-state-prep-compression
+                          (error 'quil::state-prep-compression-tolerance-error
+                                 :compilation-tolerance tolerance
+                                 :compilation-precision precision))
+                      (continue ()
+                        (setq continue-happened t))))
+                 (declare (ignore result))
+                 (values continue-happened condition)))))
+    (multiple-value-bind (continue-happened condition)
+        (test-continue-restart -2 -1)
+      (is continue-happened)
+      (is (null condition)))
+    (multiple-value-bind (continue-happened condition)
+        (test-continue-restart 2 1)
+      (is (not continue-happened))
+      (is (not (null condition)))
+      (is (typep condition 'QUIL::STATE-PREP-COMPRESSION-TOLERANCE-ERROR))
+      (is (= (quil::state-prep-compression-tolerance-error-tolerance condition)
+             2))
+      (is (= (quil::state-prep-compression-tolerance-error-precision condition)
+             1)))))
+
 
 (deftest test-compiler-hook (&key print-stats)
   "Test whether the compiler hook preserves semantic equivalence for
