@@ -15,9 +15,7 @@
   (let ((dylibs-to-replace '("libblas.dylib"
                              "liblapack.dylib"
                              "libzmq.dylib"
-                             "libzmq.so"
-                             "libtweedledum.so"
-                             "libtweedledum.dylib"))
+                             "libzmq.so"))
         (original-path (sb-alien::shared-object-pathname shared-object)))
     (let ((dylib (first (member (file-namestring original-path)
                                 dylibs-to-replace

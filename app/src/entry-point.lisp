@@ -125,14 +125,6 @@
   (disable-debugger))
 
 (defun entry-point (argv)
-  ;; TODO Both figure out how to distribute tweedledum that works
-  ;; everywhere (or almost everywhere), and enable some sort of
-  ;; "contrib" architecture that can be used to selectively
-  ;; enable/disable these not-strictly-mandatory features.
-
-  ;; #-win32
-  ;; (handler-bind ((warning #'muffle-warning))
-  ;;   (uiop:symbol-call ':cl-quil.tweedledum '#:load-tweedledum))
   (handler-case
       (%entry-point argv)
     (interactive-interrupt (c)
