@@ -70,9 +70,6 @@
       (dolist (sys (uiop:split-string (or systems "quilc") :separator " "))
         (unless (uiop:emptyp sys)
           (asdf:load-system sys))))
-    ;; TODO Fix tweedledum
-    ;; #-win32
-    ;; (asdf:load-system "cl-quil/tweedledum")
     (funcall (find-symbol "SETUP-DEBUGGER" :quilc))
     (when (option-present-p "--quilc-sdk")
       (load "app/src/mangle-shared-objects.lisp"))

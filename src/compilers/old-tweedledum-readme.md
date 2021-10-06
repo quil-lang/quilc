@@ -1,3 +1,6 @@
+The following README used to be included with the Tweedledum contrib, which we used to efficiently compile classical logic gates. This functionality has since been replaced with native quilc (Common Lisp) code,replacing our only use of Tweedledum, however this exposition of how quilc handles classical logic gates with and without a specialized permutation gate synthesis routine is still valuable.
+
+====================================================================
 # Efficient compilation of classical logic gates
 
 The Quil compiler (quilc), being a compiler of quantum programs, must be able to

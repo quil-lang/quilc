@@ -56,16 +56,6 @@ else
 	echo "Non-Linux-based platforms unsupported"
 endif
 
-
-ifeq ($(UNAME_S),Darwin)
-LIBTWEEDLEDUM := libtweedledum.dylib
-else
-LIBTWEEDLEDUM := libtweedledum.so
-endif
-#.PHONY: install-tweedledum
-#install-tweedledum:
-#	install src/contrib/tweedledum/$(LIBTWEEDLEDUM) /usr/local/lib
-
 ###############################################################################
 # BUILD
 ###############################################################################
@@ -146,13 +136,6 @@ test-quilec:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil/quilec-tests)" \
 		--eval "(asdf:test-system :cl-quil/quilec)"
-
-# You can specify a different c++17-compatible compiler via the CXX
-# variable. For example: make CXX=/usr/bin/clang++ test-tweedledum
-test-tweedledum:
-	$(QUICKLISP) \
-		--eval "(ql:quickload :cl-quil/tweedledum-tests)" \
-		--eval "(asdf:test-system :cl-quil/tweedledum-tests)"
 
 test-ccl:
 	ccl -n --batch --load $(QUICKLISP_HOME)/setup.lisp \
