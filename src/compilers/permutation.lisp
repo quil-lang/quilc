@@ -173,7 +173,7 @@
            ;; controlled Toffoli gate, so we didn't do anything and
            ;; should give up.
            (when (and code (null (rest code)))
-             (give-up-compilation))
+             (give-up-compilation :acts-trivially))
            code))
         (t
-         (give-up-compilation))))))
+         (give-up-compilation :invalid-domain))))))
