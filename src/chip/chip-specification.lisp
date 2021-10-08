@@ -318,7 +318,7 @@ used to specify CHIP-SPEC."
 (defun build-qubit (q &key type gate-information)
   "Constructs a template qubit. The native gates for this qubit can be specified by one of two mutually exclusive means:
 
- * The TYPE keyword can consist of (lists of) ':RZ, ':X/2, ':MEASURE.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
+ * The TYPE keyword can consist of (lists of) ':RZ, ':X/2, ':MEASURE.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :RZ indicates that `RZ _` is native for this qubit.
 
  * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
   (check-type gate-information (or null hash-table))
