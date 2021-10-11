@@ -50,7 +50,7 @@
   (labels ((make-pattern (row start)
              ;; create a fixnum from the sub-row elements
              (let ((number 0))
-               (loop for i from start below (+ start sections) do
+               (loop :for i :from start :below (+ start sections) :do
                  (setf number (+ (ash number 1)
                                  (magicl:tref a row i))))
                number)))
