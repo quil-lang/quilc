@@ -364,6 +364,9 @@ If no exit rewiring is found, return NIL."
 (defgeneric gate-definition-qubits-needed (gate)
   (:documentation "The number of qubits needed by GATE."))
 
+(defgeneric gate-definition-parameters-needed (gate)
+  (:documentation "The number of calling parameters needed by GATE."))
+
 (defclass matrix-gate-definition (gate-definition)
   ((entries :initarg :entries
             :reader gate-definition-entries))
@@ -408,11 +411,23 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
   prefactor
   arguments)
 
-(defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
-  (length (exp-pauli-sum-gate-definition-arguments gate)))
+(defmethod gate-definition-parameters-needed ((g static-gate-definition))
+  0)
 
-(defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
-  (ilog2 (length (permutation-gate-definition-permutation gate))))
+(defmethod gate-definition-parameters-needed ((g parameterized-gate-definition))
+  (length gate-definition-parameters))
+
+(defmethod gate-definition-qubits-needed ((g exp-pauli-sum-gate-definition))
+  (length (exp-pauli-sum-gate-definition-arguments g)))
+
+(defmethod gate-definition-parameters-needed ((g exp-pauli-sum-gate-definition))
+  (length (exp-pauli-sum-gate-definition-parameters g)))
+
+(defmethod gate-definition-qubits-needed ((g permutation-gate-definition))
+  (ilog2 (length (permutation-gate-definition-permutation g))))
+
+(defmethod gate-definition-parameters-needed ((g permutation-gate-definition))
+  0)
 
 (defun permutation-from-gate-entries (entries)
   "Create the permutation (list of natural numbers) that represents the input matrix ENTRIES. Return nil if ENTRIES cannot be represented as a permutation."
@@ -1678,7 +1693,8 @@ For example,
         (%print-indented-string (with-output-to-string (s)
                                   (print-parsed-program parsed-program s))
                                 stream)))))
-(defun combine-programs (a b &key (if-memory-definitions-conflict ':error))
+(defun combine-programs (a b &key (if-memory-definitions-conflict ':error)
+                                  (if-gate-definitions-conflict ':prefer-a))
   "Given two PARSED-PROGRAMS A and B, combine them into a new program object.
 
 In the event there are conflicting memory definition names, there are the following available policies that can be supplied for IF-MEMORY-DEFINITIONS-CONFLICT:
@@ -1687,27 +1703,18 @@ In the event there are conflicting memory definition names, there are the follow
     - :PREFER-LARGER: Keep the larger of the two memories.
     - :PREFER-A: Prefer the definitions for A. (Note that this may be unsafe!)
     - :PREFER-B: Prefer the definitions for B. (Note that this may be unsafe!)
+
+Gate definitions cannot always be checked for equality (but they can be checked for dimension and arity). As such, we have the following options for FOR-GATE-DEFINITIONS:
+
+    - :PREFER-A: Use A's named gates before B.
+    - :PREFER-B: Use B's named gates before A.
+    - :ERROR: Signal an error.
 "
-  ;; gate def names might overlap
-  ;;     - perhaps the names clobber
-  ;;     - otherwise just a union
-  ;;
   ;; circ defs simlar
-  ;;
-  ;; memory defs
-  ;;     - a little more sensitive, esp. with sizes
-  ;;
-  ;;     - ERROR
-  ;;     - PREFER A
-  ;;     - PREFER B
-  ;;     - KEEP LARGER
-  ;;     - GROW MEMORY  [won't do]
-  ;;     - RENAME [maybe later]
-  ;;
-  ;; GOAL: try to factor out PREFER-A, PREFER-B, and ERROR among all cases
   (let ((code-a (parsed-program-executable-code a))
         (code-b (parsed-program-executable-code b))
-        (final-memdefs '()))
+        (final-memdefs '())
+        (final-gatedefs '()))
     (labels ((register-memory-definition (memdef)
                (let ((found? (member (memory-descriptor-name memdef) final-memdefs
                                      :key #'memory-descriptor-name
@@ -1739,11 +1746,48 @@ In the event there are conflicting memory definition names, there are the follow
                          ;; Do nothing, because we already processed A.
                          nil)
                         (:PREFER-B
-                         (rplaca found? memdef)))))))))
+                         (rplaca found? memdef))))))))
+             (register-gate-definition (gatedef)
+               (let ((found? (member (gate-definition-name gatedef) final-gatedefs
+                                     :key #'gate-definition-name
+                                     :test #'string=)))
+                 (cond
+                   ;; There is no conflict.
+                   ((not found?)
+                    (push gatedef final-gatedefs))
+                   ;; User specified they want to error.
+                   ((eq ':ERROR if-gate-definitions-conflict)
+                    (error "Trying to combine programs with two gate definitions of the same name ~S, ~
+                            and the policy was to error."
+                           (gate-definition-name gatedef)))
+                   ;; Some other conflict resolution policy.
+                   (t                   ; name conflict to resolve
+                    (let ((found (first found?)))
+                      ;; First, sanity check that the gates represent the same dimension.
+                      (unless (= (gate-definition-qubits-needed gatedef)
+                                 (gate-definition-qubits-needed found))
+                        (error "Trying to combine programs with gate definitions called ~S which ~
+                                have different dimensions."
+                               (gate-definition-name gatedef)))
+                      ;; Check arity.
+                      (unless (= (gate-definition-parameters-needed gatedef)
+                                 (gate-definition-parameters-needed found))
+                        (error "Trying to combine programs with gate definitions called ~S which ~
+                                have different parameter arities."
+                               (gate-definition-name gatedef)))
+                      ;; Enact the policy
+                      (ecase if-gate-definitions-conflict
+                        (:PREFER-A
+                         ;; Do nothing, because we already processed A.
+                         nil)
+                        (:PREFER-B
+                         (rplaca found? gatedef)))))))))
       (map nil #'register-memory-definition (parsed-program-memory-definitions a))
       (map nil #'register-memory-definition (parsed-program-memory-definitions b))
+      (map nil #'register-gate-definition (parsed-program-gate-definitions a))
+      (map nil #'register-gate-definition (parsed-program-gate-definitions b))
       (make-instance 'parsed-program
-                     ;;:gate-definitions ???
+                     :gate-definitions final-gatedefs
                      ;;:circuit-definitions ???
                      :memory-definitions final-memdefs
                      :executable-code (concatenate 'vector code-a code-b)))))
