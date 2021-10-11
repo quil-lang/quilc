@@ -7,18 +7,19 @@
 (defun missing-arg ()
   (error "Required argument missing."))
 
-;;; This representation is not efficient.
+;;; This representation is not particularly optimized for efficiency.
 (defstruct (truth-table
             (:constructor make-truth-table
                 (n-vars
                  &key initial-contents
                  &aux (bits (make-array (ash 1 n-vars) :element-type 'bit :initial-contents initial-contents)))))
+  "This structure represents a boolean function {0...2^n-1} -> {0, 1} using a bit vector."
   ;; Is this slot actually necessary?
   (n-vars (missing-arg) :type fixnum)
   (bits (missing-arg) :type simple-bit-vector))
 
-;; Check if truth table depends on VAR.
 (defun truth-table-has-var (truth-table var)
+  "Check if truth table depends on VAR."
   (declare (type truth-table truth-table))
   (let ((bits (truth-table-bits truth-table)))
     (dotimes (i (length bits) nil)
@@ -38,10 +39,8 @@
                                            (ash 1 var2)))))))))
   truth-table)
 
-;; Return the minimal functional support indices of TRUTH-TABLE and
-;; reorder the truth table such that the support are indexed by 0...k
-;; where k is the amount of support.
 (defun truth-table-minimize-base! (truth-table)
+  "Return the minimal functional support indices of TRUTH-TABLE and reorder the truth table such that the support are indexed by 0...k where k is the amount of support."
   (declare (type truth-table truth-table))
   (let ((supports '())
         (k 0))
@@ -57,18 +56,18 @@
                         (ash 1 k)))
     (values truth-table supports)))
 
-;;; Check if the truth table represents the constant 0 function.
 (defun truth-table-zero-p (truth-table)
+  "Check if the truth table represents the constant 0 function."
   (declare (type truth-table truth-table))
   (not (find 1 (truth-table-bits truth-table))))
 
-;;; Check if the truth table represents the constant 1 function.
 (defun truth-table-one-p (truth-table)
+  "Check if the truth table represents the constant 1 function."
   (declare (type truth-table truth-table))
   (not (find 0 (truth-table-bits truth-table))))
 
-;;; Find the 0-cofactor of TRUTH-TABLE with respect to INDEX.
 (defun truth-table-cofactor0 (truth-table index)
+  "Find the 0-cofactor of TRUTH-TABLE with respect to INDEX."
   (declare (type truth-table truth-table))
   (make-truth-table
    (truth-table-n-vars truth-table)
@@ -77,8 +76,8 @@
      (loop for k from 0 below (length bits)
            collect (aref bits (logandc2 k (ash 1 index)))))))
 
-;;; Find the 1-cofactor of the TRUTH-TABLE with respect to INDEX.
 (defun truth-table-cofactor1 (truth-table index)
+  "Find the 1-cofactor of the TRUTH-TABLE with respect to INDEX."
   (declare (type truth-table truth-table))
   (make-truth-table
    (truth-table-n-vars truth-table)
@@ -96,8 +95,9 @@
      :initial-contents (bit-xor (truth-table-bits truth-table1)
                                 (truth-table-bits truth-table2)))))
 
-;;; 0 means not present, +/-1 represent polarity.
-(defun make-cube () (make-array 0))
+(defun make-cube ()
+  "Create a cube, representing the product of boolean variables. 0 means not present, +/-1 represent polarity or sign of the boolean variable in the cube."
+  (make-array 0))
 
 (defun cube-add-literal (cube index polarity)
   (declare (type (member -1 1) polarity))
@@ -109,10 +109,12 @@
     (setf (aref new-cube index) polarity)
     new-cube))
 
-;; This algorithm applies recursively the positive Davio decomposition
-;; which eventually leads into the PPRM representation of a
-;; function. An ESOP is represented by a list of cubes.
+;;; This algorithm applies recursively the positive Davio decomposition
+;;; which eventually leads into the PPRM representation of a
+;;; function. An ESOP (Exclusive Sum Of Products) is represented by a
+;;; list of cubes.
 (defun truth-table-esop-from-pprm (truth-table)
+  "Given a truth table, return a list of cubes which when disjoined represent the PPRM representation of the boolean function encoded by TRUTH-TABLE."
   (let ((cubes (make-hash-table :test #'equalp)))
     (labels ((decompose (table index cube)
                ;; terminal cases

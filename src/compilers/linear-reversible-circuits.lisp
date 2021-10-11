@@ -4,8 +4,8 @@
 
 (in-package #:cl-quil)
 
-;;; Arithmetic in F_2.
 (defmacro incf-mod-2 (place &optional (delta 1) &environment environment)
+  "INCF, but in F_2."
   (multiple-value-bind (vars vals store-vals writer-form reader-form)
       (get-setf-expansion place environment)
     `(let* (,@(mapcar #'list vars vals)
@@ -16,12 +16,12 @@
 ;;; elementary row operations over F_2 (i.e. synthesizing the matrix
 ;;; into an equivalent CNOT circuit). However, it relies on an
 ;;; arbitrarily chosen parameter SECTIONS which is chosen to be
-;;; log_2(n)/2 by Patel et al. They note this parameter could be
-;;; optimized but no optimal solution for it is known yet. The matrix
-;;; A represents a linear reversible classical circuit's turth table
-;;; on its standard basis inputs. In particular it is a matrix of size
-;;; number of bits rather than the much larger permutation matrix used
-;;; to represent general quantum gates.
+;;; log_2(n)/2 by Patel et al (arXiv:quant-ph/0302002). They note this
+;;; parameter could be optimized but no optimal solution for it is
+;;; known yet. The matrix A represents a linear reversible classical
+;;; circuit's turth table on its standard basis inputs. In particular
+;;; it is a matrix of size number of bits rather than the much larger
+;;; permutation matrix used to represent general quantum gates.
 (defun cnot-synth! (a)
   (let ((shape (magicl:shape a)))
     (assert (and (= (length shape) 2)
@@ -94,9 +94,8 @@
                 (push (build-gate "CNOT" () col row) circuit))))))
       circuit)))
 
-;; given a list of CNOT gates and the total number of bits, produce
-;; the matrix encoding its truth table.
 (defun cnot-circuit-matrix (gates bits)
+  "Given a list of CNOT gates and the total number of bits, produce the matrix encoding its truth table."
   (let ((state (magicl:eye (list bits bits) :type 'bit)))
     (dotimes (bit bits)
       (dolist (gate gates)
