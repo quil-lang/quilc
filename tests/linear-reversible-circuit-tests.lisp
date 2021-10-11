@@ -29,9 +29,9 @@
 
 (deftest test-linear-reversible-circuit-cnot-decomposition ()
   (macrolet ((test (square-matrix)
-               `(is (magicl:deep-copy-tensor ,square-matrix)
-                    (quil::cnot-circuit-matrix (quil::cnot-synth! ,square-matrix)
-                                               (first (magicl:shape ,square-matrix))))))
+               `(is (magicl:= (magicl:deep-copy-tensor ,square-matrix)
+                              (quil::cnot-circuit-matrix (quil::cnot-synth! ,square-matrix)
+                                                         (first (magicl:shape ,square-matrix)))))))
     (test *fig-2-matrix*)
     (test *fig-3-matrix*)
     (test *swap-matrix*)))
