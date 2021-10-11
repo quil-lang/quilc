@@ -6,11 +6,11 @@
 
 ;;;; young group decomposition based algorithm for permutation gates
 
-;;; This subroutine breaks up the permutation into left and right
-;;; pieces f = g1 o f' o g2 where g1 and g2 can be realized with a
-;;; single target gate on the wire W labelled by INDEX and f' is a
-;;; reversible function which does not change on wire W.
+;;; This algorithm follows the description given in "Young Subgroups
+;;; for reversible computers", by De Vos and Van Rentergem
+;;; (https://www.aimsciences.org/article/exportPdf?id=76a62a03-1559-4506-8945-7b987a5489f4).
 (defun decompose! (perm index)
+  "This subroutine breaks up the permutation into left and right pieces f = g1 o f' o g2 where g1 and g2 can be realized with a single target gate on the wire W labelled by INDEX and f' is a reversible function which does not change on wire W."
   (let* ((size (length perm))
          (left (make-array size :initial-element 0
                                 :element-type '(unsigned-byte 32)))
@@ -65,19 +65,15 @@
                    (aref old-perm i))))
       (values left right))))
 
-;;; A reversible single target gate whose action on the target bit is
-;;; specified by FUNCTION in the following manner: Invert the target
-;;; bit when (and only when) FUNCTION on the control lines is 1.
 (defstruct single-target-gate
+  "A reversible single target gate whose action on the target bit is specified by FUNCTION in the following manner: Invert the target bit when (and only when) FUNCTION on the control lines is 1."
   (function (missing-arg) :type truth-table :read-only t)
   ;; sorted list of qubits
   (control-lines (missing-arg) :type vector :read-only t)
   (target (missing-arg) :type fixnum :read-only t))
 
-;;; PERM permutes computational basis to computational basis. This
-;;; algorithm produces at most 2n-1 single target gates where n is the
-;;; number of bits, which is nearly optimal.
 (defun single-target-gate-decomposition! (perm)
+  "PERM permutes computational basis to computational basis. This algorithm produces at most 2n-1 single target gates where n is the number of bits, which is nearly optimal."
   (let ((length (length perm)))
     (assert (power-of-two-p length))
     (let ((n-qubits (1- (integer-length length)))
