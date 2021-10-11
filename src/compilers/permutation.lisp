@@ -110,7 +110,7 @@
       ;; neither is the identity) because they act on the same
       ;; target. In fact, probably any consecutive gates acting on the
       ;; same target can be merged iteratively.
-      (nconc (nreverse left-gates) right-gates))))
+      (nreconc left-gates right-gates))))
 
 ;;; Synthesize a single target gate by using PPRM (positive polarity
 ;;; Reed-Mueller form).
