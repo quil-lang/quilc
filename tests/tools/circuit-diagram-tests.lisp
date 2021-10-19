@@ -48,3 +48,30 @@
                  (cl-quil.tools:plot-circuit pp
                                              :backend :latex
                                              :right-align-measurements t)))))
+
+(deftest test-plot-circuit-nq-gate-layout ()
+  (let ((pp (quil:parse-quil "
+DEFGATE FOO p q r AS PAULI-SUM:
+    X(pi) p
+    Y(pi) q
+    Z(pi) r
+
+FOO 3 2 1"))
+        (expected
+          "\\documentclass[convert={density=300,outext=.png}]{standalone}
+\\usepackage[margin=1in]{geometry}
+\\usepackage{tikz}
+\\usepackage{quantikz}
+
+\\begin{document}
+\\begin{tikzcd}
+ \\lstick{\\ket{q_1}} &  \\gate[wires=3]{FOO} &  \\qw \\\\
+ \\lstick{\\ket{q_2}} &  \\qw &  \\qw \\\\
+ \\lstick{\\ket{q_3}} &  \\qw &  \\qw \\\\
+\\end{tikzcd}
+\\end{document}
+"))
+    (is (string= expected
+                 (cl-quil.tools:plot-circuit pp
+                                             :backend :latex
+                                             :layout-strategy ':increasing)))))

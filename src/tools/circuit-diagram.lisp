@@ -297,15 +297,24 @@ The convention is that the source operation takes two arguments: the qubit index
                     :for offset := (- (first target-qubits) q)
                     :do (append-to-diagram diagram q (tikz-control q offset)))
               ;; per quantikz: we put the gate on first target line, with correct size
-              (append-to-diagram diagram
-                                 (first target-qubits)
-                                 (tikz-gate name
-                                            :size (length target-qubits)
-                                            :params (quil:application-parameters instr)
-                                            :dagger dagger))
-              ;; and then NOP on the rest
-              (loop :for q :in (rest target-qubits)
-                    :do (append-to-diagram diagram q (tikz-nop))))))))))
+              (let ((actual-target
+                      (resolve-gate-target target-qubits (diagram-layout diagram))))
+                (append-to-diagram diagram
+                                   actual-target
+                                   (tikz-gate name
+                                              :size (length target-qubits)
+                                              :params (quil:application-parameters instr)
+                                              :dagger dagger))
+                ;; and then NOP on the rest
+                (loop :for q :in target-qubits
+                      :unless (= q actual-target)
+                        :do (append-to-diagram diagram q (tikz-nop)))))))))))
+
+
+(defun resolve-gate-target (qubits layout)
+  (flet ((qubit-line (q)
+           (gethash q layout)))
+    (a:extremum qubits #'< :key #'qubit-line)))
 
 
 (defun qubits-in-applications-or-measurements (instrs)
