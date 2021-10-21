@@ -100,3 +100,26 @@
                    (quil::chip-contiguous-subschedule-from-last-instructions
                     sched (quil::make-qubit-resource 0 2))
                    expected-subschedule))))))
+
+(deftest test-fidelity-addresser-subschedule-on-deep-circuit ()
+  (let* ((chip (quil::build-nq-fully-connected-chip 3))
+         (sched (quil::make-chip-schedule chip))
+         (h0 (build-gate "H" nil 0))
+         (circuit-depth 25000))
+    (loop :for i :from 1 :to circuit-depth :do
+      (progn 
+        ;; these gates will exercise depth in the outer dfs, ie in 
+        ;; chip-contiguous-subschedule-from-last-instructions.
+        (quil::chip-schedule-append sched (build-gate "H" nil 0))
+        ;; these gates will exercise depth in the inner dfs, ie in
+        ;; mark-predecessors-seen.
+        (quil::chip-schedule-append sched (build-gate "H" nil 1))))
+    (flet ((is-h0 (gate)
+             (and (string= (quil::application-operator-root-name gate)
+                         (quil::application-operator-root-name h0))
+                (equalp (quil::application-parameters gate)
+                        (quil::application-parameters h0)))))
+      (let ((result (quil::chip-contiguous-subschedule-from-last-instructions sched (quil::make-qubit-resource 0))))
+        (is (= (length result) circuit-depth))
+        (is (every #'is-h0 result))))))
+
