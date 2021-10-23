@@ -12,9 +12,11 @@
                   *human-readable-stream*))
 
 (defun print-matrix-comparision (m1 m2 &optional (stream *human-readable-stream*))
-  (format stream "~%#Matrix read off from input code~%")
+  (format stream "~%#Matrix read off from input code (~:[not ~;~]unitary)~%"
+          (magicl:unitary-matrix-p m1))
   (print-matrix-with-comment-hashes m1 stream)
-  (format stream "~%#Matrix read off from compiled code~%")
+  (format stream "~%#Matrix read off from compiled code (~:[not ~;~]unitary)~%"
+          (magicl:unitary-matrix-p m2))
   (print-matrix-with-comment-hashes m2 stream)
   (format stream "~%#Matrices are~:[ not~;~] equal~%" (quil::matrix-equals-dwim m1 m2))
   (finish-output stream))
