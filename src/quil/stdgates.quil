@@ -157,3 +157,8 @@ DEFGATE CAN(%alpha, %beta, %gamma):
     0, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, 0
     0, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, 0
     (cis((%alpha-%beta+%gamma)/2)-cis((%alpha+%beta-%gamma)/2))/2, 0, 0, (cis((%alpha+%beta-%gamma)/2)+cis((%alpha-%beta+%gamma)/2))/2
+
+DEFGATE BLOCH(%alpha, %beta, %gamma) q AS PAULI-SUM:
+    X(%alpha) q
+    Y(%beta) q
+    Z(%gamma) q
