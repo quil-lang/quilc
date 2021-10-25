@@ -13,7 +13,7 @@
                #:yacc                   ; Arithmetic parsing
                #:alexandria             ; Utilities
                #:parse-float            ; Float parsing
-               (:version #:magicl/core "0.9.0")
+               (:version #:magicl/core "0.10.0")
                #:magicl/ext-lapack      ; for CSD
                                         ; internal linear algebra library
                #:cl-grnm                ; nelder-mead implementation
@@ -190,8 +190,7 @@
   :author "Juan M. Bello-Rivas <jbellorivas@rigetti.com>"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:alexandria
-               #:cl-quil
-               #:magicl)
+               #:cl-quil)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/quilec-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
