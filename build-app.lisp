@@ -54,9 +54,16 @@
              (with-open-file (stream "system-index.txt")
                (loop
                  :for system-file := (read-line stream nil)
+                 :for name := (and system-file (pathname-name system-file))
+                 :for lookup := (gethash name system-table)
                  :while system-file
-                 :do (setf (gethash (pathname-name system-file) system-table)
-                           (merge-pathnames system-file)))))
+                 ;; assuming entries are produced with QL:WRITE-ASDF-MANIFEST-FILE,
+                 ;; which sorts by descending QL-DIST:PREFERENCE
+                 :if lookup
+                   :do (warn "Duplicate system ~A detected. Preferring ~A over ~A." name lookup system-file)
+                 :else
+                   :do (setf (gethash (pathname-name system-file) system-table)
+                             (merge-pathnames system-file)))))
            (local-system-search (name)
              (values (gethash name system-table)))
            (strip-version-githash (version)
