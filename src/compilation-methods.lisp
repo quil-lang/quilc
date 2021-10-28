@@ -156,7 +156,7 @@
 
 (defvar *default-addresser-state-class* 'fidelity-addresser-state)
 
-(defparameter *enable-addresser-state-cache* t
+(defvar *enable-addresser-state-cache* t
   "If true, get-addresser-state-for-chip addresser-state caches
   certain addresser-state slot values on the chip specification keyed
   off the class of addresser state. Otherwise, i.e., when nil (=
@@ -195,7 +195,8 @@
                       &key
                         (protoquil nil)
                         (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification))
-                        (destructive nil))
+                        (destructive nil)
+                        (addresser-class *default-addresser-state-class*))
   "Runs a full compiler pass on a parsed-program object.
 
 Arguments:
@@ -211,6 +212,8 @@ Keyword arguments:
   - REWIRING-TYPE: The scheme by which logical qubits are mapped (rewired) to physical qubits
 
   - DESTRUCTIVE: Default NIL. If T, the input program is mutated and after compilation contains the compiled program. Otherwise, a copy is made of the input program and the compiled copy is returned. Note that for large programs you may prefer to mutate the original program rather than waste time copying it. For example, the server interface will mutate the program since it has no use for the unmolested original program after compilation.
+
+  - ADDRESSER-CLASS: Defaults to value of *default-addresser-state-class*. The name of a subclass of ADDRESSER-STATE to use for the addresser. 
 
 Returns a value list: (processed-program, of type parsed-program
                        topological-swaps, of type integer
@@ -326,7 +329,7 @@ Returns a value list: (processed-program, of type parsed-program
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-addressing
                    (get-addresser-state-for-chip
-                    *default-addresser-state-class*
+                    addresser-class
                     chip-specification
                     (if registrant
                         (basic-block-in-rewiring blk)
@@ -359,7 +362,7 @@ Returns a value list: (processed-program, of type parsed-program
            (multiple-value-bind (chip-schedule initial-l2p final-l2p)
                (do-greedy-addressing
                    (get-addresser-state-for-chip 
-                    *default-addresser-state-class*
+                    addresser-class
                     chip-specification
                     (prog-initial-rewiring
                      parsed-program chip-specification
