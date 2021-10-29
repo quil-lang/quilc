@@ -21,10 +21,10 @@
                  (entries (second testcase))
                  (n (length entries))
                  (p (if (stringp input) (quil:parse-quil input) input))
-                 (actual (parsed-program-to-logical-matrix p))
+                 (actual (quil:parsed-program-to-logical-matrix p))
                  (expected (quil::from-list (a:flatten entries) (list n n)))
                  (compiled (quil::matrix-rescale
-                            (parsed-program-to-logical-matrix
+                            (quil:parsed-program-to-logical-matrix
                              (quil:compiler-hook p (quil::build-nq-linear-chip
                                                     (quil:qubits-needed p))))
                             expected)))

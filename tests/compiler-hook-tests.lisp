@@ -34,8 +34,8 @@
 (defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)
   (dolist (compress-qubits '(nil t))
     (is (quil::operator=
-         (parsed-program-to-logical-matrix pp-a)
-         (parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
+         (quil:parsed-program-to-logical-matrix pp-a)
+         (quil:parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
 
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
   "Test whether parsed-program-to-logical-matrix converts equivalent
@@ -108,8 +108,8 @@ JUMP @a")))
                                                  (cl-quil::read-quil-file file))
                                 (quil::build-nQ-linear-chip 5 :architecture architecture)
                                 :protoquil t)))
-    (is (quil::matrix-equals-dwim (parsed-program-to-logical-matrix orig-prog)
-                                  (parsed-program-to-logical-matrix proc-prog)))
+    (is (quil::matrix-equals-dwim (quil:parsed-program-to-logical-matrix orig-prog)
+                                  (quil:parsed-program-to-logical-matrix proc-prog)))
     (list
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
@@ -210,12 +210,12 @@ RX(pi) 2
        (quil::set-up-compilation-context :qubit-count 4 :simulate t)))))
 
 (defun shuffle-list (l &optional (k nil))
-        (let* ((elt (nth (random (length l)) l))
-               (l (remove elt l))
-               (k (cons elt k)))
-          (if (zerop (length l))
-              k
-              (shuffle-list l k))))
+  (let* ((elt (nth (random (length l)) l))
+         (l (remove elt l))
+         (k (cons elt k)))
+    (if (zerop (length l))
+        k
+        (shuffle-list l k))))
 
 (deftest test-compiler-hook-random-4Q ()
   (finish-output)
@@ -229,19 +229,19 @@ RX(pi) 2
                  (v (quil::random-special-unitary (expt 2 num-qubits)))
                  (args (shuffle-list (a:iota num-qubits :start (1- num-qubits) :step -1)))
                  (parsed-prog (make-instance
-                               'quil::parsed-program
-                               :executable-code (make-array 1
-                                                            :initial-element (make-instance
-                                                                              'quil::gate-application
-                                                                              :operator (named-operator "RANDO-GATE")
-                                                                              :gate v
-                                                                              :arguments (mapcar #'qubit args)))))
+                                  'quil::parsed-program
+                                :executable-code (make-array 1
+                                                             :initial-element (make-instance
+                                                                                  'quil::gate-application
+                                                                                :operator (named-operator "RANDO-GATE")
+                                                                                :gate v
+                                                                                :arguments (mapcar #'qubit args)))))
                  (processed-program
                    (%with-loose-state-prep-compression
                      (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
                                                                                   :architecture architecture)))))
             (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
-                                          (parsed-program-to-logical-matrix processed-program)))))))))
+                                          (quil:parsed-program-to-logical-matrix processed-program)))))))))
 
 
 (deftest test-compiler-hook-preserves-RESETs ()
@@ -279,8 +279,8 @@ CZ 5 6
            (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                  :count (and (typep instr 'quil::gate-application)
                              (adt:match quil:operator-description (application-operator instr)
-                               ((named-operator name) (string= "CZ" name))
-                               (_ nil))))))))
+                                        ((named-operator name) (string= "CZ" name))
+                                        (_ nil))))))))
 
 (deftest test-compiler-hook-reset-partial-rewiring ()
   (let* ((pp (quil::parse-quil "
@@ -295,8 +295,8 @@ CZ 2 7
            (loop :for instr :across (quil::parsed-program-executable-code processed-program)
                  :count (and (typep instr 'quil::gate-application)
                              (adt:match quil:operator-description (application-operator instr)
-                               ((named-operator name) (string= "CZ" name))
-                               (_ nil))))))))
+                                        ((named-operator name) (string= "CZ" name))
+                                        (_ nil))))))))
 
 (deftest test-compiling-empty-program ()
   "Test that an empty program goes through the pipes correctly."
@@ -332,8 +332,8 @@ CZ 2 7
            (orig-pp (make-pp)))
       (substitute-params orig-pp segment-table)
       (substitute-params processed-pp segment-table)
-      (is (quil::matrix-equals-dwim (parsed-program-to-logical-matrix orig-pp :compress-qubits t)
-                                    (parsed-program-to-logical-matrix processed-pp :compress-qubits t))))))
+      (is (quil::matrix-equals-dwim (quil:parsed-program-to-logical-matrix orig-pp :compress-qubits t)
+                                    (quil:parsed-program-to-logical-matrix processed-pp :compress-qubits t))))))
 
 (deftest test-parametric-compiler-cphase ()
   (dolist (quil::*enable-state-prep-compression* '(nil t))
@@ -362,7 +362,7 @@ RX(pi/5) 0
 RZ(pi/6) 0
 RX(pi/3) 0
 "
-                              (list (cons (mref "angle" 0) (random 1d0)))))))
+                                (list (cons (mref "angle" 0) (random 1d0)))))))
 
 (deftest test-gapped-qpu ()
   (dolist (state-prep '(nil)) ; TODO XXX compression disabled until QUILC-119 is resolved
@@ -374,10 +374,10 @@ RX(pi/3) 0
              (pp (quil::parse-quil "
 H 1
 CNOT 1 2"))
-             (old-matrix (parsed-program-to-logical-matrix pp))
+             (old-matrix (quil:parsed-program-to-logical-matrix pp))
              (cpp (%with-loose-state-prep-compression
                     (quil::compiler-hook pp chip-spec :protoquil t)))
-             (new-matrix (parsed-program-to-logical-matrix cpp)))
+             (new-matrix (quil:parsed-program-to-logical-matrix cpp)))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
@@ -447,11 +447,11 @@ PRAGMA END_PRESERVE_BLOCK
 "))
          ;; Strip out pragmas and halt
          (cp (remove-if (lambda (instr) (or (typep instr 'pragma)
-                                       (typep instr 'halt)))
+                                            (typep instr 'halt)))
                         (parsed-program-executable-code (compiler-hook pp (build-8q-chip)))))
          (ph (parse-quil "H 0"))
          (ch (remove-if (lambda (instr) (or (typep instr 'pragma)
-                                       (typep instr 'halt)))
+                                            (typep instr 'halt)))
                         (parsed-program-executable-code (compiler-hook ph (build-8q-chip))))))
     ;; Check first H 0 *has not* been preseved
     (is (every #'string=
@@ -540,8 +540,8 @@ MEASURE 1
          (p (quil::compiler-hook (quil::parse-quil "
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
-                                (quil::build-8Q-chip)))
-        (ls (quil::make-lscheduler)))
+                                 (quil::build-8Q-chip)))
+         (ls (quil::make-lscheduler)))
     (quil::append-instructions-to-lschedule ls (coerce (quil::parsed-program-executable-code p)
                                                        'list))
     (flet

@@ -85,7 +85,7 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
 
 (defun tikz-gate (name &key (size 1) params dagger)
   ;; TeXify names
-  (let* ((cl-quil::*pi-literal* "\\pi")
+  (let* ((cl-quil.frontend::*pi-literal* "\\pi")
          (texified-name
            (format nil "~A~:[~;^{\\dagger}~]~@[(~{~/quil:instruction-fmt/~^, ~})~]"
                    (cond

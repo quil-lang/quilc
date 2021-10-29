@@ -7,7 +7,7 @@
 (deftest test-partition-sequence-into-segments ()
   (flet ((test-it (expected-first expected-segments input-sequence)
            (multiple-value-bind (segments first?)
-               (cl-quil::partition-sequence-into-segments #'evenp input-sequence)
+               (cl-quil.frontend::partition-sequence-into-segments #'evenp input-sequence)
              (is (eq first? expected-first))
              (is (equalp segments expected-segments)))))
     (test-it nil nil nil)
@@ -157,48 +157,48 @@
 (deftest test-check-permutation ()
   "Test that CHECK-PERMUTATION signals error iff input is not valid."
   ;; Duplicates
-  (signals simple-error (quil::check-permutation '(0 0)))
-  (signals simple-error (quil::check-permutation '(0 0 1)))
-  (signals simple-error (quil::check-permutation '(0 1 0)))
-  (signals simple-error (quil::check-permutation '(1 0 0)))
-  (signals simple-error (quil::check-permutation '(0 1 2 3 4 5 2)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 0)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 0 1)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 1 0)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(1 0 0)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 1 2 3 4 5 2)))
   ;; Out of range values
-  (signals simple-error (quil::check-permutation '(1)))
-  (signals simple-error (quil::check-permutation '(-1)))
-  (signals simple-error (quil::check-permutation '(0 2)))
-  (signals simple-error (quil::check-permutation '(2 0)))
-  (signals simple-error (quil::check-permutation '(0 1 3)))
-  (signals simple-error (quil::check-permutation '(0 3 1)))
-  (signals simple-error (quil::check-permutation '(3 1 0)))
-  (signals simple-error (quil::check-permutation '(0 1 2 5 3)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(1)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(-1)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 2)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(2 0)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 1 3)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 3 1)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(3 1 0)))
+  (signals simple-error (cl-quil.frontend::check-permutation '(0 1 2 5 3)))
   ;; Valid permutations. Grows as n!, so don't get too crazy here.
   (dotimes (n 6)
     (a:map-permutations
      (lambda (permutation)
-       (not-signals simple-error (quil::check-permutation permutation)))
+       (not-signals simple-error (cl-quil.frontend::check-permutation permutation)))
      (a:iota n))))
 
 (deftest test-quil<->lisp-bridge ()
   "Test that the functions for mapping between quil<->lisp work."
-  (loop :for (quil-string . lisp-symbol) :in quil::+quil<->lisp-prefix-arithmetic-operators+ :do
+  (loop :for (quil-string . lisp-symbol) :in cl-quil.frontend::+quil<->lisp-prefix-arithmetic-operators+ :do
     (progn
-      (is (quil::valid-quil-function-or-operator-p lisp-symbol))
-      (is (eq lisp-symbol (quil::quil-prefix-operator->lisp-symbol quil-string)))
-      (is (string= quil-string (quil::lisp-symbol->quil-prefix-operator lisp-symbol)))
-      (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol)))))
+      (is (cl-quil.frontend::valid-quil-function-or-operator-p lisp-symbol))
+      (is (eq lisp-symbol (cl-quil.frontend::quil-prefix-operator->lisp-symbol quil-string)))
+      (is (string= quil-string (cl-quil.frontend::lisp-symbol->quil-prefix-operator lisp-symbol)))
+      (is (string= quil-string (cl-quil.frontend::lisp-symbol->quil-function-or-prefix-operator lisp-symbol)))))
 
-  (loop :for (quil-string . lisp-symbol) :in quil::+quil<->lisp-infix-arithmetic-operators+ :do
+  (loop :for (quil-string . lisp-symbol) :in cl-quil.frontend::+quil<->lisp-infix-arithmetic-operators+ :do
     (progn
-      (is (quil::valid-quil-function-or-operator-p lisp-symbol))
-      (is (eq lisp-symbol (quil::quil-infix-operator->lisp-symbol quil-string)))
-      (is (string= quil-string (quil::lisp-symbol->quil-infix-operator lisp-symbol)))))
+      (is (cl-quil.frontend::valid-quil-function-or-operator-p lisp-symbol))
+      (is (eq lisp-symbol (cl-quil.frontend::quil-infix-operator->lisp-symbol quil-string)))
+      (is (string= quil-string (cl-quil.frontend::lisp-symbol->quil-infix-operator lisp-symbol)))))
 
-  (loop :for (quil-string . lisp-symbol) :in quil::+quil<->lisp-functions+ :do
+  (loop :for (quil-string . lisp-symbol) :in cl-quil.frontend::+quil<->lisp-functions+ :do
     (progn
-      (is (quil::valid-quil-function-or-operator-p lisp-symbol))
-      (is (eq lisp-symbol (quil::quil-function->lisp-symbol quil-string)))
-      (is (string= quil-string (quil::lisp-symbol->quil-function lisp-symbol)))
-      (is (string= quil-string (quil::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
+      (is (cl-quil.frontend::valid-quil-function-or-operator-p lisp-symbol))
+      (is (eq lisp-symbol (cl-quil.frontend::quil-function->lisp-symbol quil-string)))
+      (is (string= quil-string (cl-quil.frontend::lisp-symbol->quil-function lisp-symbol)))
+      (is (string= quil-string (cl-quil.frontend::lisp-symbol->quil-function-or-prefix-operator lisp-symbol))))))
 
 (deftest test-nth-instr ()
   (dolist (pp (list (quil:parse-quil "")
@@ -330,13 +330,13 @@ To put the density matrix into the basis state, e.g., |01><11|, we would choose 
 (defun %test-measure-semantics (p-str)
   (let* ((p (parse-quil p-str))
          (p-comp (quil:compiler-hook (parse-quil p-str) (quil::build-nq-linear-chip 3) :protoquil nil))
-         (rewiring (quil::qubit-relabeler (quil::extract-final-exit-rewiring-vector p-comp))))
+         (rewiring (cl-quil.frontend::qubit-relabeler (quil::extract-final-exit-rewiring-vector p-comp))))
     (loop :for i :below (expt 2 6) :do
       (let* ((qvm (%make-density-qvm-initialized-in-basis 3 i))
              (qvm-comp (%make-density-qvm-initialized-in-basis 3 i)))
         (qvm:load-program qvm p :supersede-memory-subsystem t)
         ;; relabeling is a side-effect
-        (map nil (a:rcurry #'quil::%relabel-qubits rewiring)
+        (map nil (a:rcurry #'cl-quil.frontend::%relabel-qubits rewiring)
              (parsed-program-executable-code p-comp))
         (qvm:load-program qvm-comp p-comp :supersede-memory-subsystem t)
         (qvm:run qvm)

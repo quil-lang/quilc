@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;; Atomic Elements ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -199,6 +199,95 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
   (check-type comment-string string)
   (setf (gethash x **comments**) comment-string))
 
+;;;;;;;;;;;;;;;;;;;;;;;; Rewiring and Rewiring Comments ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; We store both the l2p and p2l vectors so that lookups in both
+;; directions can be constant time. Because all of our qubits are in
+;; the range 0...n-1, we can store these as vectors instead of hashmaps.
+
+(defstruct (rewiring
+            (:constructor init-rewiring)
+            (:copier nil))
+  (l2p #() :type integeropt-vector)
+  (p2l #() :type integeropt-vector))
+
+(defmethod print-object :around ((object rewiring) stream)
+  (let ((*print-pretty* nil))
+    (call-next-method)))
+
+(defun make-rewiring-from-l2p (l2p)
+  "Safely extract a REWIRING from a logical-to-physical array."
+  (let ((p2l (make-array (length l2p) :initial-element nil)))
+    (dotimes (j (length l2p))
+      (let ((loc (aref l2p j)))
+        (when loc
+          (assert (and (< -1 loc (length p2l))) ()
+                  "Malformed rewiring string: value ~A at position ~A is out of range." loc j)
+          (assert (null (aref p2l loc)) ()
+                  "Malformed rewiring string: repeated value ~A at position ~A." loc j)
+          (setf (aref p2l loc) j))))
+    (init-rewiring :l2p l2p :p2l p2l)))
+
+(defun make-rewiring-from-string (str)
+  "Safely extract a REWIRING from a string representation of an integer vector corresponding to the logical-to-physical mapping."
+  (assert (and (eql #\# (aref str 0))
+               (eql #\( (aref str 1))
+               (eql #\) (aref str (1- (length str)))))
+          nil
+          "Malformed rewiring string: input ~A is not of the form #(...)." str)
+  (let* ((stripped-string (string-trim "#()" str))
+         (tokens (first (tokenize stripped-string)))
+         (integer-vec
+           (map 'vector
+                (lambda (token)
+                  (cond
+                    ((equalp (token-payload token) "nil")
+                     nil)
+                    ((eql (token-type token) :integer)
+                     (token-payload token))
+                    (t
+                     (error "Malformed rewiring string: unexpected token ~A." token))))
+                tokens)))
+    (make-rewiring-from-l2p integer-vec)))
+
+(defun make-rewiring-pair-from-string (str)
+  "Safely extract a pair of REWIRINGs from a string representation of a CONS of two integer vectors."
+  (multiple-value-bind (matchedp matches)
+      ;; This monstrosity matches strings of the form "(#(\d+ ...) . #(\d+ ...))"
+      (let ((match-int-vector
+              '(:REGISTER
+                (:SEQUENCE "#("
+                 (:GREEDY-REPETITION 0 NIL
+                  (:GROUP (:SEQUENCE :DIGIT-CLASS (:GREEDY-REPETITION 0 1 #\ ))))
+                 #\)))))
+        (cl-ppcre:scan-to-strings
+         `(:SEQUENCE
+           :START-ANCHOR
+           #\(
+           ,match-int-vector
+           (:GREEDY-REPETITION 0 NIL :WHITESPACE-CHAR-CLASS)
+           #\.
+           (:GREEDY-REPETITION 0 NIL :WHITESPACE-CHAR-CLASS)
+           ,match-int-vector
+           #\)
+           :END-ANCHOR)
+         str))
+    (assert matchedp
+            nil
+            "Malformed rewiring pair string: ~@
+             input ~A is not of the form (#(...) . #(...))."
+            str)
+    (let ((first-rewiring-string (aref matches 0))
+          (second-rewiring-string (aref matches 1)))
+      (assert (= (length first-rewiring-string) (length second-rewiring-string))
+              nil
+              "Malformed rewiring pair string: length of rewirings don't match. ~@
+               first:  ~A~@
+               second: ~A"
+              first-rewiring-string second-rewiring-string)
+      (values (make-rewiring-from-string first-rewiring-string)
+              (make-rewiring-from-string second-rewiring-string)))))
+
 (a:define-constant +entering-rewiring-prefix+
   "Entering rewiring: "
   :test #'string=
@@ -309,9 +398,9 @@ If no exit rewiring is found, return NIL."
   (check-type parsed-program parsed-program)
   (loop :with code := (parsed-program-executable-code parsed-program)
         :for i :from (1- (length code)) :downto 0
-        :for exiting-rewiring := (nth-value 1 (instruction-rewirings (vnth i code)))
+        :for exiting-rewiring := (nth-value 1 (instruction-rewirings (aref code i)))
         :when (not (null exiting-rewiring))
-          :return (quil::rewiring-l2p exiting-rewiring)))
+          :return (rewiring-l2p exiting-rewiring)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; Pseudo-Instructions ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -407,6 +496,11 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
   pauli-word
   prefactor
   arguments)
+
+(defmethod copy-instance ((term pauli-term))
+  (make-pauli-term :pauli-word (pauli-term-pauli-word term)
+                   :prefactor (pauli-term-prefactor term)
+                   :arguments (pauli-term-arguments term)))
 
 (defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
   (length (exp-pauli-sum-gate-definition-arguments gate)))

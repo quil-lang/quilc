@@ -159,9 +159,9 @@ DAGGER BLOCH(-0.1, -0.2, -0.3) 4
 CNOT 1 0
 CNOT 2 1
 CNOT 0 2"))
-         (orig-matrix (parsed-program-to-logical-matrix orig-prog))
+         (orig-matrix (quil:parsed-program-to-logical-matrix orig-prog))
          (proc-prog (quil::compiler-hook orig-prog chip))
-         (proc-matrix (parsed-program-to-logical-matrix proc-prog))
+         (proc-matrix (quil:parsed-program-to-logical-matrix proc-prog))
          (2q-code (program-2q-instructions proc-prog)))
     (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))))
@@ -174,8 +174,8 @@ CNOT 0 2"))
          (ccnot-code (program-2q-instructions ccnot-comp))
          (2q-code (program-2q-instructions ccnot-comp)))
     (is (quil::matrix-equals-dwim
-         (parsed-program-to-logical-matrix ccnot-prog)
-         (parsed-program-to-logical-matrix ccnot-comp)))
+         (quil:parsed-program-to-logical-matrix ccnot-prog)
+         (quil:parsed-program-to-logical-matrix ccnot-comp)))
     (is (every (link-nativep chip) 2q-code))
     (is (= 7 (length ccnot-code)))))
 
@@ -185,9 +185,9 @@ CNOT 0 2"))
          (quil::*addresser-use-1q-queues* t)
          (chip (quil::build-nq-linear-chip 3 :architecture '(:cphase :cz :iswap)))
          (orig-prog (quil::parse-quil "CCNOT 0 1 2"))
-         (orig-matrix (parsed-program-to-logical-matrix orig-prog))
+         (orig-matrix (quil:parsed-program-to-logical-matrix orig-prog))
          (proc-prog (quil::compiler-hook orig-prog chip))
-         (proc-matrix (parsed-program-to-logical-matrix proc-prog))
+         (proc-matrix (quil:parsed-program-to-logical-matrix proc-prog))
          (2q-code (program-2q-instructions proc-prog)))
     (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))
@@ -241,9 +241,9 @@ CNOT 4 8
                                  "Aspen-7-28Q-A.qpu"))))
     ;; An absolute unit of a matrix. Better compress those qubits.
     (is (quil::matrix-equals-dwim
-         (parsed-program-to-logical-matrix pp :compress-qubits t)
-         (parsed-program-to-logical-matrix (compiler-hook pp chip)
-                                           :compress-qubits t)))))
+         (quil:parsed-program-to-logical-matrix pp :compress-qubits t)
+         (quil:parsed-program-to-logical-matrix (compiler-hook pp chip)
+                                                :compress-qubits t)))))
 
 (deftest test-rx-agglutination-with-wildcard-chip ()
   ;; See #567
@@ -254,9 +254,9 @@ CNOT 4 8
          (comp (compiler-hook progm chip))
          (code (%filter-halt comp)))
     (is (quil::matrix-equals-dwim
-         (parsed-program-to-logical-matrix
+         (quil:parsed-program-to-logical-matrix
           (parse "RX(pi) 0"))
-         (parsed-program-to-logical-matrix comp)))
+         (quil:parsed-program-to-logical-matrix comp)))
     (is (= 1 (length code)))
     (is (string= "RX" (quil::application-operator-root-name (elt code 0))))
     (is (quil::double= pi
@@ -264,13 +264,13 @@ CNOT 4 8
 
 (defun %random-rz-rx-program (length)
   (make-instance 'parsed-program
-                 :executable-code
-                 (coerce
-                  (loop :for i :from 0 :below length
-                        :collect (if (evenp i)
-                                     (build-gate "RZ" (list (* (random 1.0) pi)) 0)
-                                     (build-gate "RX" (list (* (random 1.0) pi)) 0)))
-                  'vector)))
+    :executable-code
+    (coerce
+     (loop :for i :from 0 :below length
+           :collect (if (evenp i)
+                        (build-gate "RZ" (list (* (random 1.0) pi)) 0)
+                        (build-gate "RX" (list (* (random 1.0) pi)) 0)))
+     'vector)))
 
 (defun %test-reduction-with-chip (reduced-bound chip)
   (loop :for length :from 1 :to 100
@@ -303,7 +303,7 @@ CNOT 4 8
     (quil:compiler-hook (quil:parse-quil "
 DECLARE theta REAL
 RX(theta) 0")
-                   (quil::build-nq-linear-chip 2)))
+                        (quil::build-nq-linear-chip 2)))
   (not-signals error
     (quil:compiler-hook (quil:parse-quil "
 PRAGMA INITIAL_REWIRING \"NAIVE\"
@@ -329,4 +329,4 @@ MEASURE 3 ro[2]
 MEASURE 4 ro[3]
 MEASURE 5 ro[4]
 ")
-                     (quil::build-nq-linear-chip 6))))
+                        (quil::build-nq-linear-chip 6))))

@@ -7,7 +7,7 @@
 ;;;;
 ;;;; (make-instance 'gate-application :blah 'blah-blah ...) .
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 
 ;;; first, some simple utilities for constructing gate objects
@@ -162,3 +162,25 @@ Comes in two flavors:
     (real
      (- (mod (+ (/ arg2 2) arg1) arg2) (/ arg2 2)))
     (otherwise arg1)))
+
+(defun kq-gate-on-lines (gate-mat n lines)
+  "Writes the gate GATE-MAT as an N-qubit gate by applying it to the qubit lines in LINES."
+  (check-type gate-mat magicl:matrix)
+  (check-type n integer)
+  (let* ((width (expt 2 n))
+         (mask (- -1 (loop :for l :in lines :sum (expt 2 l))))
+         (out-mat (zeros (list width width))))
+    (dotimes (i width)
+      (dotimes (j width)
+        (if (= (logand mask i) (logand mask j))
+            (setf (magicl:tref out-mat i j)
+                  (magicl:tref gate-mat
+                               (loop :for r :below (length lines)
+                                     :sum (if (logbitp (nth r lines) i)
+                                              (ash 1 (- (length lines) 1 r))
+                                              0))
+                               (loop :for s :below (length lines)
+                                     :sum (if (logbitp (nth s lines) j)
+                                              (ash 1 (- (length lines) 1 s))
+                                              0)))))))
+    out-mat))

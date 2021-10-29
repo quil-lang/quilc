@@ -22,7 +22,7 @@
 
 (defmethod definition-signature ((instr gate-calibration-definition))
   (list 'gate-calibration-definition
-        (intern (quil.si:operator-description-string
+        (intern (operator-description-string
                  (calibration-definition-operator instr))
                 :keyword)
         (mapcar #'canonicalize-params-args (calibration-definition-arguments instr))
@@ -54,14 +54,14 @@ This also signals ambiguous definitions, which may be handled as needed."
     (flet ((bin (instr)
              (a:when-let ((signature (definition-signature instr)))
                (let ((originating-file (typecase (lexical-context instr)
-                                         (quil.si:token
-                                          (quil.si:token-pathname (lexical-context instr)))
+                                         (token
+                                          (token-pathname (lexical-context instr)))
                                          (t
                                           (quil-parse-error "Unable to resolve definition context ~/quil:instruction-fmt/" instr)))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."
-                           (make-instance 'quil.si:ambiguous-definition-condition
+                           (make-instance 'ambiguous-definition-condition
                                           :instruction instr
                                           :file originating-file
                                           :conflicts entries)))
@@ -87,7 +87,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                                               'simple-vector)))))
 
 (defvar *standard-quilt-transforms*
-  '(quil.si:expand-circuits expand-calibrations quil.si:type-check)
+  '(expand-circuits expand-calibrations type-check)
   "The standard transforms for using PARSE-QUIL with Quilt code.")
 
 
@@ -98,13 +98,13 @@ This also signals ambiguous definitions, which may be handled as needed."
 
 In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
 "
-  (quil.si:%parse-quil string
-                       #'raw-quilt-to-unresolved-program
-                       :originating-file originating-file
-                       :transforms transforms
-                       :ambiguous-definition-handler ambiguous-definition-handler
-                       :parser-extensions (list #'parse-quilt-program-lines)
-                       :lexer-extensions (list #'quilt-keyword-lexer)))
+  (%parse-quil string
+               #'raw-quilt-to-unresolved-program
+               :originating-file originating-file
+               :transforms transforms
+               :ambiguous-definition-handler ambiguous-definition-handler
+               :parser-extensions (list #'parse-quilt-program-lines)
+               :lexer-extensions (list #'quilt-keyword-lexer)))
 
 (defun read-quilt-file (filespec)
   "Read the Quilt file designated by FILESPEC, and parse it as if by PARSE-QUIL."

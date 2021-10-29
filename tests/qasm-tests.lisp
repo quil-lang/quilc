@@ -68,8 +68,8 @@
     (is bell)
     (is (= 2 (length (quil:circuit-definition-body bell))))
     (is (quil::matrix-equals-dwim
-         (parsed-program-to-logical-matrix quil)
-         (parsed-program-to-logical-matrix
+         (quil:parsed-program-to-logical-matrix quil)
+         (quil:parsed-program-to-logical-matrix
           (quil:parse-quil "H 0; CNOT 0 3;"))))))
 
 (deftest test-qasm-gate-definition-and-application-on-qreg ()
@@ -84,8 +84,8 @@
     (is bell)
     (is (= 2 (length (quil:circuit-definition-body bell))))
     (is (quil::matrix-equals-dwim
-         (parsed-program-to-logical-matrix quil)
-         (parsed-program-to-logical-matrix
+         (quil:parsed-program-to-logical-matrix quil)
+         (quil:parsed-program-to-logical-matrix
           (quil:parse-quil "H 0; CNOT 0 2; H 1; CNOT 1 3;"))))))
 
 (deftest test-qasm-opaque-gate-definition-and-application ()
@@ -288,15 +288,15 @@ qreg q[2]; CX q[0], q[1]; // bye")
     (is (= 1 (qvm::memory-view-ref (gethash "c" mem) 0)))))
 
 (deftest test-qasm-header ()
-  (is (quil::%check-for-qasm-header "OPENQASM 2.0"))
-  (is (quil::%check-for-qasm-header "OPENQASM 2.0; creg c[0];"))
-  (is (quil::%check-for-qasm-header "// this is a comment
+  (is (cl-quil.frontend::%check-for-qasm-header "OPENQASM 2.0"))
+  (is (cl-quil.frontend::%check-for-qasm-header "OPENQASM 2.0; creg c[0];"))
+  (is (cl-quil.frontend::%check-for-qasm-header "// this is a comment
 OPENQASM 2.0;"))
-  (is (quil::%check-for-qasm-header "// this is a comment
+  (is (cl-quil.frontend::%check-for-qasm-header "// this is a comment
 // this is also a comment, and the next line is indented lightly
 // but that should be ok.
   OPENQASM 2.0;"))
-  (is (quil::%check-for-qasm-header "// this is a comment
+  (is (cl-quil.frontend::%check-for-qasm-header "// this is a comment
 // this is also a comment, and the next line is empty
 
 // and this a comment, and that should be ok
@@ -304,13 +304,13 @@ OPENQASM 2.0;"))
 
 
   OPENQASM 2.0;"))
-  (is (not (quil::%check-for-qasm-header "")))
-  (is (not (quil::%check-for-qasm-header " ")))
-  (is (not (quil::%check-for-qasm-header "
+  (is (not (cl-quil.frontend::%check-for-qasm-header "")))
+  (is (not (cl-quil.frontend::%check-for-qasm-header " ")))
+  (is (not (cl-quil.frontend::%check-for-qasm-header "
 ")))
-  (is (not (quil::%check-for-qasm-header "	"))) ; tab char
-  (is (not (quil::%check-for-qasm-header "X 0; OPENQASM 2.0")))
-  (is (not (quil::%check-for-qasm-header "# This is a Quil comment,
+  (is (not (cl-quil.frontend::%check-for-qasm-header "	"))) ; tab char
+  (is (not (cl-quil.frontend::%check-for-qasm-header "X 0; OPENQASM 2.0")))
+  (is (not (cl-quil.frontend::%check-for-qasm-header "# This is a Quil comment,
 # and thus cannot be a qasm program
 
 OPENQASM 2.0"))))

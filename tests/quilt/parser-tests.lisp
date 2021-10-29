@@ -157,7 +157,7 @@ DEFWAVEFORM wf 1.0:
 (deftest test-definition-signature ()
   (flet ((signature (raw-quil &rest args)
            (let ((pp (parse-quilt (apply #'format nil raw-quil args))))
-             (quil::definition-signature
+             (cl-quil.frontend::definition-signature
               (first (append (parsed-program-gate-definitions pp)
                              (parsed-program-circuit-definitions pp)
                              (parsed-program-waveform-definitions pp)

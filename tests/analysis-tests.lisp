@@ -113,10 +113,10 @@ DEFGATE I:
 
 (deftest test-qubit-relabeler ()
   "Test that qubit relabeling seems to be sane."
-  (let ((r1 (quil::qubit-relabeler #(0 1 2)))
-        (r2 (quil::qubit-relabeler #(2 1 0)))
-        (r3 (quil::qubit-relabeler #(5)))
-        (r4 (quil::qubit-relabeler #())))
+  (let ((r1 (cl-quil.frontend::qubit-relabeler #(0 1 2)))
+        (r2 (cl-quil.frontend::qubit-relabeler #(2 1 0)))
+        (r3 (cl-quil.frontend::qubit-relabeler #(5)))
+        (r4 (cl-quil.frontend::qubit-relabeler #())))
     (flet ((test-success (relabeler qubit-input qubit-output)
              (let ((q (quil:qubit qubit-input)))
                (is (eq t (funcall relabeler q)))
@@ -275,27 +275,27 @@ B(b) 0 1
 
 (deftest test-grid-node ()
   "Tests on the grid node data structure and associated functions."
-  (let ((q0 (quil::make-grid-node 'q0 0))
-        (q1 (quil::make-grid-node 'q1 1))
-        (q2 (quil::make-grid-node 'q2 2))
-        (q01 (quil::make-grid-node 'q01 0 1))
-        (q12 (quil::make-grid-node 'q12 1 2))
-        (q02 (quil::make-grid-node 'q02 0 2)))
+  (let ((q0 (cl-quil.frontend::make-grid-node 'q0 0))
+        (q1 (cl-quil.frontend::make-grid-node 'q1 1))
+        (q2 (cl-quil.frontend::make-grid-node 'q2 2))
+        (q01 (cl-quil.frontend::make-grid-node 'q01 0 1))
+        (q12 (cl-quil.frontend::make-grid-node 'q12 1 2))
+        (q02 (cl-quil.frontend::make-grid-node 'q02 0 2)))
     ;; All nodes start as root nodes.
-    (is (every #'quil::root-node-p (list q0 q1 q2 q01 q12 q02)))
+    (is (every #'cl-quil.frontend::root-node-p (list q0 q1 q2 q01 q12 q02)))
     ;; Set succeeding, check preceding.
-    (setf (quil::succeeding-node-on-qubit q0 0) q01)
-    (is (eq q01 (quil::succeeding-node-on-qubit q0 0)))
+    (setf (cl-quil.frontend::succeeding-node-on-qubit q0 0) q01)
+    (is (eq q01 (cl-quil.frontend::succeeding-node-on-qubit q0 0)))
     ;; Set preceding, check succeeding
-    (setf (quil::preceding-node-on-qubit q12 2) q2)
-    (is (eq q2 (quil::preceding-node-on-qubit q12 2)))
+    (setf (cl-quil.frontend::preceding-node-on-qubit q12 2) q2)
+    (is (eq q2 (cl-quil.frontend::preceding-node-on-qubit q12 2)))
     ;; Check that we can't set a preceding or succeeding node on
     ;; invalid qubits.
-    (signals error (setf (quil::succeeding-node-on-qubit q2 0) q02))
-    (signals error (setf (quil::preceding-node-on-qubit q02 1) q1))
+    (signals error (setf (cl-quil.frontend::succeeding-node-on-qubit q2 0) q02))
+    (signals error (setf (cl-quil.frontend::preceding-node-on-qubit q02 1) q1))
     ;; Check trailer dealios.
-    (is (quil::trailer-node-on-qubit-p q01 0))
-    (is (not (quil::trailer-node-on-qubit-p q0 0)))))
+    (is (cl-quil.frontend::trailer-node-on-qubit-p q01 0))
+    (is (not (cl-quil.frontend::trailer-node-on-qubit-p q0 0)))))
 
 (defclass dummy-node ()
   ((value :initarg :value
@@ -314,32 +314,32 @@ B(b) 0 1
   "Test that FUSE-OBJECTS behaves properly in MERGE-GRID-NODES."
   (is (equal '(a b)
              (dummy-node-value
-              (quil::grid-node-tag
-               (quil::merge-grid-nodes
-                (quil::make-grid-node (dummy-node 'a) 1)
-                (quil::make-grid-node (dummy-node 'b) 1)))))))
+              (cl-quil.frontend::grid-node-tag
+               (cl-quil.frontend::merge-grid-nodes
+                (cl-quil.frontend::make-grid-node (dummy-node 'a) 1)
+                (cl-quil.frontend::make-grid-node (dummy-node 'b) 1)))))))
 
 (defun build-grid (&rest proto-nodes)
-  (loop :with pg := (make-instance 'quil::program-grid)
+  (loop :with pg := (make-instance 'cl-quil.frontend::program-grid)
         :for (x . qs) :in proto-nodes
-        :for gn := (apply #'quil::make-grid-node
+        :for gn := (apply #'cl-quil.frontend::make-grid-node
                           (dummy-node x)
                           qs)
-        :do (quil::append-node pg gn)
+        :do (cl-quil.frontend::append-node pg gn)
         :finally (return pg)))
 
 (deftest test-trivial-fusion ()
   "Test that a bunch of trivially fuseable gates can be fused."
   (flet ((test-it (&rest proto-nodes)
-           (let ((output-pg (quil::fuse-trivially (apply #'build-grid proto-nodes))))
-             (is (= 1 (length (quil::roots output-pg))))
-             (let ((root (first (quil::roots output-pg))))
-               (is (quil::root-node-p root))
-               (is (every (a:curry #'eq root) (quil::trailers output-pg)))
-               (is (every #'null (quil::grid-node-back root)))
-               (is (every #'null (quil::grid-node-forward root)))
+           (let ((output-pg (cl-quil.frontend::fuse-trivially (apply #'build-grid proto-nodes))))
+             (is (= 1 (length (cl-quil.frontend::roots output-pg))))
+             (let ((root (first (cl-quil.frontend::roots output-pg))))
+               (is (cl-quil.frontend::root-node-p root))
+               (is (every (a:curry #'eq root) (cl-quil.frontend::trailers output-pg)))
+               (is (every #'null (cl-quil.frontend::grid-node-back root)))
+               (is (every #'null (cl-quil.frontend::grid-node-forward root)))
                (is (equalp (mapcar #'first proto-nodes)
-                           (dummy-node-value (quil::grid-node-tag root))))))))
+                           (dummy-node-value (cl-quil.frontend::grid-node-tag root))))))))
     (test-it '(a 0)
              '(b 0 1)
              '(c 0 1 2)

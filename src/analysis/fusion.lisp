@@ -5,7 +5,7 @@
 ;;;; (Many ideas inspired by Aaron Vontell, who write the first but
 ;;;; altogether different implementation of gate fusion.)
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 ;;; This file has data structures and algorithms for performing "gate
 ;;; fusion", a program transformation to reduce the number of gates by
@@ -408,6 +408,49 @@ The list will actually be a list of lists, where each sublist commutes and can b
                                  ;; sinks. It must be cyclic!
                                  (error "Cannot sort a cyclic graph. ~
                                          The cycles are ~S." needs-sorting)))))))
+
+(define-global-counter **premultiplied-gate-count** incf-premultiplied-gate-count)
+
+;;; NOTE: The QVM needs gate fusion, so we can't use the QVM here. Hence we use MAGICL:@.
+(defun premultiply-gates (instructions)
+  "Given a list of (gate) applications INSTRUCTIONS, construct a new gate application which is their product.
+
+Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
+
+    A
+    B
+    C
+
+or equivalently as
+
+    C * B * A
+
+as matrices."
+  (let ((u (const #C(1d0 0d0) '(1 1)))
+        (qubits (list)))
+    (dolist (instr instructions)
+      (let ((new-qubits (set-difference (mapcar #'qubit-index (application-arguments instr))
+                                        qubits)))
+        (unless (endp new-qubits)
+          (setf u (kq-gate-on-lines u
+                                    (+ (length qubits) (length new-qubits))
+                                    (a:iota (length qubits)
+                                            :start (1- (length qubits))
+                                            :step -1)))
+          (setf qubits (append new-qubits qubits)))
+        (setf u (magicl:@
+                 (kq-gate-on-lines (gate-matrix instr)
+                                   (length qubits)
+                                   (mapcar (lambda (q)
+                                             (- (length qubits) 1 (position (qubit-index q) qubits)))
+                                           (application-arguments instr)))
+                 u))))
+    (make-instance 'gate-application
+                   :gate (make-instance 'simple-gate :matrix u)
+                   :operator (named-operator (format nil "FUSED-GATE-~D"
+                                                     (incf-premultiplied-gate-count)))
+                   :arguments (mapcar #'qubit qubits))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;; Fusion on Real Programs (TM) ;;;;;;;;;;;;;;;;;;;;

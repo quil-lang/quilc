@@ -17,7 +17,7 @@
 
 (define-transform expand-calibrations (expand-calibrations)
   "This transform applies all available calibrations. The result has no gate applications or measurements for which a calibration is defined."
-  quil.si:expand-circuits)
+  expand-circuits)
 
 ;;; Calibration Matching
 
@@ -108,17 +108,17 @@
         ((is-param obj)
          (assert param-value () "Parameter instantiation requires :PARAM-VALUE to be specified.")
          (funcall param-value obj))
-        ((quil.si:delayed-expression-p obj)
-         (quil.si:evaluate-delayed-expression
+        ((delayed-expression-p obj)
+         (evaluate-delayed-expression
           ;; pass the buck upwards
-          (quil.si:map-de-params (quil.si:substitute-parameter param-value) obj)))
+          (map-de-params (substitute-parameter param-value) obj)))
         (t obj)))
 
 (defun instantiate-frame (frame arg-value)
   "Instantiate FRAME with respect to the argument values represented by ARG-VALUE, constructing a new frame if needed."
   (let* ((remake nil)
-         (qubits (mapcar (quil.si:flag-on-update remake
-                                                 (lambda (q) (ensure-instantiated q :arg-value arg-value)))
+         (qubits (mapcar (flag-on-update remake
+                                         (lambda (q) (ensure-instantiated q :arg-value arg-value)))
                          (frame-qubits frame))))
     (if remake
         (let ((instantiated (frame qubits (frame-name frame))))
@@ -137,7 +137,7 @@
                      ;; Remember folks, a CONS saved is a CONS earned.
                      assoc
                      (cons name instantiated-value))))))
-      (let ((updated-alist (mapcar (quil.si:flag-on-update remake #'instantiate-parameter)
+      (let ((updated-alist (mapcar (flag-on-update remake #'instantiate-parameter)
                                    (waveform-ref-parameter-alist waveform))))
         (if remake
             (let ((new-wf (waveform-ref (waveform-ref-name waveform)
@@ -156,8 +156,8 @@
              (eq value (frame-mutation-value instr)))
         instr
         (make-instance (class-of instr)
-                       :frame frame
-                       :value value))))
+          :frame frame
+          :value value))))
 
 (defmethod instantiate-instruction ((instr swap-phase) param-value arg-value)
   (let ((left-frame (instantiate-frame (swap-phase-left-frame instr)
@@ -168,8 +168,8 @@
              (eq right-frame (swap-phase-right-frame instr)))
         instr
         (make-instance 'swap-phase
-                       :left-frame left-frame
-                       :right-frame right-frame))))
+          :left-frame left-frame
+          :right-frame right-frame))))
 
 (defmethod instantiate-instruction ((instr pulse) param-value arg-value)
   (let ((frame (instantiate-frame (pulse-frame instr)
@@ -180,9 +180,9 @@
              (eq waveform (pulse-waveform instr)))
         instr
         (make-instance 'pulse
-                       :frame frame
-                       :waveform waveform
-                       :nonblocking (nonblocking-p instr)))))
+          :frame frame
+          :waveform waveform
+          :nonblocking (nonblocking-p instr)))))
 
 (defmethod instantiate-instruction ((instr capture) param-value arg-value)
   (let ((frame (instantiate-frame (capture-frame instr)
@@ -191,16 +191,16 @@
                                             param-value))
         (memory-ref (ensure-instantiated (capture-memory-ref instr)
                                          :arg-value arg-value)))
-    (quil.si:check-mref memory-ref)
+    (check-mref memory-ref)
     (if (and (eq frame (capture-frame instr))
              (eq waveform (capture-waveform instr))
              (eq memory-ref (capture-memory-ref instr)))
         instr
         (make-instance 'capture
-                       :frame frame
-                       :waveform waveform
-                       :memory-ref memory-ref
-                       :nonblocking (nonblocking-p instr)))))
+          :frame frame
+          :waveform waveform
+          :memory-ref memory-ref
+          :nonblocking (nonblocking-p instr)))))
 
 (defmethod instantiate-instruction ((instr raw-capture) param-value arg-value)
   (let ((frame (instantiate-frame (raw-capture-frame instr)
@@ -209,16 +209,16 @@
                                          :arg-value arg-value))
         (duration (ensure-instantiated (raw-capture-duration instr)
                                        :param-value param-value)))
-    (quil.si:check-mref memory-ref)
+    (check-mref memory-ref)
     (if (and (eq frame (raw-capture-frame instr))
              (eq memory-ref (raw-capture-memory-ref instr))
              (eq duration (raw-capture-duration instr)))
         instr
         (make-instance 'raw-capture
-                       :frame frame
-                       :duration duration
-                       :memory-ref memory-ref
-                       :nonblocking (nonblocking-p instr)))))
+          :frame frame
+          :duration duration
+          :memory-ref memory-ref
+          :nonblocking (nonblocking-p instr)))))
 
 (defmethod instantiate-instruction ((instr delay-on-qubits) param-value arg-value)
   (let ((duration (ensure-instantiated (delay-duration instr)
@@ -227,28 +227,28 @@
              (not (some #'is-formal (delay-qubits instr))))
         instr
         (make-instance 'delay-on-qubits
-                       :duration duration
-                       :qubits (mapcar (quil.si:transform-if #'is-formal arg-value)
-                                       (delay-qubits instr))))))
+          :duration duration
+          :qubits (mapcar (transform-if #'is-formal arg-value)
+                          (delay-qubits instr))))))
 
 (defmethod instantiate-instruction ((instr delay-on-frames) param-value arg-value)
   (let* ((remake nil)
          (duration (ensure-instantiated (delay-duration instr)
                                         :param-value param-value))
-         (frames (mapcar (quil.si:flag-on-update remake
-                                                 (lambda (f) (instantiate-frame f arg-value)))
+         (frames (mapcar (flag-on-update remake
+                                         (lambda (f) (instantiate-frame f arg-value)))
                          (delay-frames instr))))
     (if (and (eq duration (delay-duration instr))
              (not remake))
         instr
         (make-instance 'delay-on-frames
-                       :duration duration
-                       :frames frames))))
+          :duration duration
+          :frames frames))))
 
 (defmethod instantiate-instruction ((instr fence) param-value arg-value)
   (let* ((remake nil)
-         (qubits (mapcar (quil.si:flag-on-update remake
-                                                 (lambda (q) (ensure-instantiated q :arg-value arg-value)))
+         (qubits (mapcar (flag-on-update remake
+                                         (lambda (q) (ensure-instantiated q :arg-value arg-value)))
                          (fence-qubits instr))))
     (if remake
         (make-instance 'fence :qubits qubits)
@@ -256,29 +256,29 @@
 
 ;;; Calibrations instantiate to their bodies, with parameters and formals substituted
 (defmethod instantiate-instruction ((instr gate-calibration-definition) param-value arg-value)
-  (quil.si:instantiate-definition-body instr
-                                       (calibration-definition-body instr)
-                                       (calibration-definition-parameters instr)
-                                       param-value
-                                       (calibration-definition-arguments instr)
-                                       arg-value))
+  (instantiate-definition-body instr
+                               (calibration-definition-body instr)
+                               (calibration-definition-parameters instr)
+                               param-value
+                               (calibration-definition-arguments instr)
+                               arg-value))
 
 (defmethod instantiate-instruction ((instr measure-calibration-definition) param-value arg-value)
-  (quil.si:instantiate-definition-body instr
-                                       (calibration-definition-body instr)
-                                       nil
-                                       param-value
-                                       (list (measurement-calibration-qubit instr)
-                                             (measure-calibration-address instr))
-                                       arg-value))
+  (instantiate-definition-body instr
+                               (calibration-definition-body instr)
+                               nil
+                               param-value
+                               (list (measurement-calibration-qubit instr)
+                                     (measure-calibration-address instr))
+                               arg-value))
 
 (defmethod instantiate-instruction ((instr measure-discard-calibration-definition) param-value arg-value)
-  (quil.si:instantiate-definition-body instr
-                                       (calibration-definition-body instr)
-                                       nil
-                                       param-value
-                                       (list (measurement-calibration-qubit instr))
-                                       arg-value))
+  (instantiate-definition-body instr
+                               (calibration-definition-body instr)
+                               nil
+                               param-value
+                               (list (measurement-calibration-qubit instr))
+                               arg-value))
 
 (defgeneric instantiate-applicable-calibration (instr gate-cals measure-cals measure-discard-cals)
   (:documentation "If INSTR has an associated calibration, return a list of instructions instantiated from the body of the calibration definition. Otherwise, return NIL.")
@@ -291,39 +291,39 @@
 
       (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                                 (gethash op gate-cals))))
-        (quil.si:instantiate-instruction defn
-                                         (application-parameters instr)
-                                         (application-arguments instr))
+        (instantiate-instruction defn
+                                 (application-parameters instr)
+                                 (application-arguments instr))
         nil)))
 
   (:method ((instr measure) gate-cals measure-cals measure-discard-cals)
     (declare (ignore gate-cals measure-discard-cals))
     (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                               measure-cals)))
-      (quil.si:instantiate-instruction defn
-                                       nil
-                                       (list (measurement-qubit instr)
-                                             (measure-address instr)))
+      (instantiate-instruction defn
+                               nil
+                               (list (measurement-qubit instr)
+                                     (measure-address instr)))
       nil))
 
   (:method ((instr measure-discard) gate-cals measure-cals measure-discard-cals)
     (declare (ignore gate-cals measure-cals))
     (a:if-let ((defn (find-if (lambda (defn) (calibration-matches-p defn instr))
                               measure-discard-cals)))
-      (quil.si:instantiate-instruction defn
-                                       nil
-                                       (list (measurement-qubit instr)))
+      (instantiate-instruction defn
+                               nil
+                               (list (measurement-qubit instr)))
       nil))
 
   (:method (instr gate-cals measure-cals measure-discard-cals)
     nil))
 
 (defun recursively-expand-instruction (instr gate-cals measure-cals measure-discard-cals)
-  (let ((quil.si:*expansion-depth* (1+ quil.si:*expansion-depth*)))
-    (unless (<= quil.si:*expansion-depth* quil.si:*expansion-limit*)
+  (let ((*expansion-depth* (1+ *expansion-depth*)))
+    (unless (<= *expansion-depth* *expansion-limit*)
       (quil-parse-error "Exceeded recursion limit of ~D for calibration expansion. ~
                          Current object being expanded is ~A."
-                        quil.si:*expansion-limit*
+                        *expansion-limit*
                         instr))
     (a:if-let ((expanded (instantiate-applicable-calibration instr gate-cals measure-cals measure-discard-cals)))
       ;; Recursively expand the new instructions
@@ -346,8 +346,8 @@
   "Expand all gate applications and measurements in PARSED-PROGRAM for which there is a corresponding calibration definition."
   (multiple-value-bind (gate-cals measure-cals measure-discard-cals)
       (compute-calibration-tables parsed-program)
-    (let ((quil.si:*expansion-context* ':DEFCAL)
-          (quil.si:*expansion-depth* 0))
+    (let ((*expansion-context* ':DEFCAL)
+          (*expansion-depth* 0))
       (let ((expanded
               (loop :for instr :across (parsed-program-executable-code parsed-program)
                     :for expanded-instrs := (recursively-expand-instruction instr

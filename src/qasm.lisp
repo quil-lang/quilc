@@ -502,6 +502,7 @@
              (quil-tokens (first (quil::tokenize str)))
              (quil::*parse-context* ':DEFCIRCUIT)
              (quil::*formal-arguments-allowed* t))
+        (declare (special quil::*parse-context* quil::*formal-arguments-allowed*))
         (quil::simplify-arithmetic (quil::parse-parameter-or-expression quil-tokens)))))
 
 (defun parse-params (tokens)

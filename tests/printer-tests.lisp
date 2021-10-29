@@ -263,7 +263,7 @@ Used as a helper function in TEST-REAL-FMT."
              (+ r loose-threshold epsilon))
            (check (pred r expected)
              (%check-format-single pred "~/quil:real-fmt/" r expected :print-fractional-radians t)))
-      (loop :for rr :across quil::**reasonable-rationals**
+      (loop :for rr :across cl-quil.frontend::**reasonable-rationals**
             :for rr-pi := (* rr quil::pi)
             :for minus-rr-pi := (- rr-pi)
             :for rr-pi-expected := (%pprint-rational-as-pi-multiple rr)

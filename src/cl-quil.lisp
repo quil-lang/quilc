@@ -3,7 +3,7 @@
 ;;;; Authors: Robert Smith
 ;;;           Erik Davis
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 (defvar *standard-post-process-transforms*
   '(expand-circuits type-check simplify-arithmetic)

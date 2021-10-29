@@ -447,38 +447,3 @@ IF-EXISTS has the standard Common Lisp meaning. See http://l1sp.org/cl/open."
          file
          :if-exists if-exists
          :if-does-not-exist ':error)))))
-
-(defun parsed-program-to-logical-matrix (pp &key compress-qubits)
-  "Convert a parsed program PP, consisting of only i) gate
- applications ii) trivial control operations (HALT and NOP), and iii)
- pragmas, to an equivalent matrix. If present, rewiring pragmas will
- be applied so that the resulting matrix acts on 'logical', rather
- than 'physical', qubits. When :COMPRESS-QUBITS is enabled (default:
- nil), qubit indices are permuted to minimize matrix size."
-  (when compress-qubits
-    (setf pp (quil:transform 'compress-qubits pp)))
-
-  (let (initial-rewiring
-	final-rewiring)
-    (loop :for instr :across (parsed-program-executable-code pp)
-	  :do (multiple-value-bind (enter exit) (quil::instruction-rewirings instr)
-		(setf initial-rewiring (or initial-rewiring enter))
-		(setf final-rewiring (or exit final-rewiring))))
-    ;; to handle a l2p rewiring, we need to conjugate the "physical"
-    ;; matrix of a block by the permutation matrix associated with the
-    ;; rewiring. this is somewhat complicated by the fact that rewirings
-    ;; when we enter a block and when we exit a block may differ.
-    
-    ;; TODO: this only works for a single block
-
-    (let ((mat (qvm:parsed-program-unitary-matrix pp)))
-      (when initial-rewiring
-	(setf mat (quil::matrix-rescale-and-multiply
-		   mat
-		   (quil::rewiring-to-permutation-matrix-l2p (quil::trim-rewiring initial-rewiring)))))
-
-      (when final-rewiring
-	(setf mat (quil::matrix-rescale-and-multiply
-		   (quil::rewiring-to-permutation-matrix-p2l (quil::trim-rewiring final-rewiring))
-		   mat)))
-      mat)))

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Eric Peterson
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 (define-condition quil-type-error (simple-error)
   ()

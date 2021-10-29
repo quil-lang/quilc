@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Authors: Lauren Capelluto, Robert Smith
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 ;;; This file contains a transformation to rewrite the given program
 ;;; with general arithmetic in gate arguments each replaced by a
