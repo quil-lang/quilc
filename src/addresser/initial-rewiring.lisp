@@ -3,10 +3,9 @@
 ;;;; Author: Corwin de Boor
 ;;;;
 ;;;; We attempt to make an intelligent guess for what the initial rewiring
-;;;; should be for the quil program. This will either check that the used qubits
-;;;; all appear in a single connected component (do nothing if so, and move them
-;;;; naively if not), or greedily reassign the qubits close to where they will
-;;;; be needed first.
+;;;; should be for the quil program. This does some checks that the used qubits
+;;;; can fit on the chip's connected components compatibly, or greedily
+;;;; reassigns the qubits close to where they will be needed first.
 
 (in-package #:cl-quil)
 
@@ -76,59 +75,48 @@ impossible using that rewiring.")
     :unless (or (chip-spec-qubit-dead? chip-spec qubit) (aref seen qubit))
       :collect (mapcar #'car (chip-spec-live-qubit-bfs chip-spec qubit seen))))
 
-(defun prog-used-qubits (parsed-prog)
-  "Get a ordered set of qubits used by this program in program order."
-  (let ((qubit-seen (make-hash-table)))
-    (loop
-      :for inst :across (parsed-program-executable-code parsed-prog)
-      :for idx := (when (typep inst 'measurement) (qubit-index (measurement-qubit inst)))
-      :when (typep inst 'application)
-        :nconc (loop
-                 :for q :in (application-arguments inst)
-                 :for idx := (qubit-index q)
-                 :unless (gethash idx qubit-seen)
-                   :do (setf (gethash idx qubit-seen) t)
-                   :and :collect idx)
-      :when idx
-        :unless (gethash idx qubit-seen)
-          :do (setf (gethash idx qubit-seen) t)
-          :and :collect idx)))
+(defun instr-used-qubits-ccs (instrs)
+  (prog-used-qubits-ccs
+   (make-instance 'parsed-program :executable-code (coerce instrs 'vector))))
 
-(defun containing-indices (list-of-lists)
-  "Given a list of lists, return a table mapping elements to the index of the last list in which they appear."
-  (let ((tbl (make-hash-table)))
-    (loop
-      :for i :from 0
-      :for cc :in list-of-lists
-      :do (dolist (el cc) (setf (gethash el tbl) i)))
-    tbl))
-
-(defun assign-sequentially (mapping)
-  "Fill in the rest of mapping with the unused indices in the range sequentially."
-  (let* ((size (length mapping))
-        (used (make-array size :initial-element nil)))
-
-    (loop
-      :for dst :across mapping
-      :when dst :do (setf (aref used dst) t))
-
-    (loop
-      :with physical := 0
-      :for idx :from 0 :to (1- size)
-      :when (null (aref mapping idx))
-        :do (setf physical (position nil used :start physical)
-                  (aref mapping idx) physical
-                  (aref used physical) t))
-
-    mapping))
-
-(defun assign-arbitrarily (source dest mapping)
-  "Assign all elements of the set source to elements of the set dest in the mapping."
-  (loop
-    :for logical :in source
-    :for physical :in dest
-    :do (setf (aref mapping logical) physical))
-  mapping)
+(defun prog-used-qubits-ccs (parsed-prog)
+  "Return the connected components of qubits as used by the program."
+  (let* ((n-qubits (qubits-needed parsed-prog))
+         ;; This mapping maps a vertex to an index representing a connected
+         ;; component.
+         (connected-component-map (make-array n-qubits :initial-element -1)))
+    (flet ((ensure-qubit-component (qubit)
+             (let ((index (qubit-index qubit)))
+               ;; Vertices are initially assigned to their own component.
+               (when (minusp (aref connected-component-map index))
+                 (setf (aref connected-component-map index) index))))
+           (merge-qubit-components (qubit1 qubit2)
+             (let ((component1 (aref connected-component-map (qubit-index qubit1)))
+                   (component2 (aref connected-component-map (qubit-index qubit2))))
+               (unless (= component1 component2)
+                 (dotimes (index n-qubits)
+                   (when (= (aref connected-component-map index) component2)
+                     (setf (aref connected-component-map index) component1)))))))
+      (loop :for inst :across (parsed-program-executable-code parsed-prog)
+            :do (typecase inst
+                  (measurement
+                   (ensure-qubit-component (measurement-qubit inst)))
+                  (application
+                   ;; Merge the components of the arguments.
+                   (destructuring-bind (first . rest)
+                       (application-arguments inst)
+                     (ensure-qubit-component first)
+                     (dolist (qubit rest)
+                       (ensure-qubit-component qubit)
+                       (merge-qubit-components first qubit)))))))
+    (let ((component-indices '()))
+      (loop :for component-index :across connected-component-map :do
+        (unless (minusp component-index)
+          (pushnew component-index component-indices)))
+      (loop :for component :in component-indices
+            :collect (loop :for index :from 0 :below n-qubits
+                           :when (= component (aref connected-component-map index))
+                             :collect index)))))
 
 (defparameter *rewiring-adjacency-weight-decay* 2.0
   "Rate of decay on the weight of instruction value for closeness.")
@@ -185,112 +173,95 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
            ':naive)
       *initial-rewiring-default-type*))
 
-;;; We need to find some rewiring that makes sure that connected qubits all
-;;; appear in the same location on the QPU. We make the assumption that
-;;; reasonable programs will have a single connected component of qubits, so all
-;;; of the qubits that are used need to appear in the same connected component
-;;; of the QPU. Note that this effectively limits the size of the QPU to the
-;;; size of the largest connected component on it.
-
-;;; In the future, we should definitely try to parallelize across the connected
-;;; components.
-
-(defun rewire-non-cc-qubits-on-chip-spec (rewiring chip-spec needed cc)
-  "Rewires physical qubits not in CC to logical qubits that are not in
-NEEDED."
-  (loop :for qi-non-cc
-          :in (set-difference (a:iota (chip-spec-n-qubits chip-spec))
-                              cc)
-        :for qi-non-needed
-          :in (set-difference (a:iota (chip-spec-n-qubits chip-spec))
-                              needed) :do
-          (setf (aref (rewiring-p2l rewiring) qi-non-cc) qi-non-needed
-                (aref (rewiring-l2p rewiring) qi-non-needed) qi-non-cc))
-  rewiring)
+;;; Note: This is a classic greedy allocation scheme, so it may not always be
+;;; able to fit all the logical connected components into the given physical
+;;; connected components when possible.
+(defun greedy-prog-ccs-to-chip-ccs (chip-ccs prog-ccs)
+  "Attempt to allocate the connected components of qubits as used in the program onto the chip connected components, and flame if such an allocation is not possible."
+  (let ((chip-ccs (sort chip-ccs #'> :key #'length))
+        (unallocated-prog-ccs (sort prog-ccs #'> :key #'length))
+        (l2p-components (make-hash-table)))
+    (dolist (unallocated-chip-cc chip-ccs)
+      ;; Keep trying to fit the largest unallocated program connected
+      ;; component into the current chip connected component.
+      (let ((free (length unallocated-chip-cc)))
+        (dolist (unallocated-prog-cc unallocated-prog-ccs)
+          (let ((prog-cc-size (length unallocated-prog-cc)))
+            (when (<= prog-cc-size free)
+              (setf unallocated-prog-ccs (delete unallocated-prog-cc
+                                                 unallocated-prog-ccs))
+              (setf (gethash unallocated-prog-cc l2p-components)
+                    unallocated-chip-cc)
+              (decf free prog-cc-size))))))
+    (when unallocated-prog-ccs
+      (error "User program incompatible with chip: The program uses operations ~
+    on qubits that cannot be logically mapped onto the chip topology. This set ~
+    of qubits in the program cannot be assigned to qubits on the chip ~
+    compatibly under a greedy connected component allocation scheme: ~a. The ~
+    chip has the components ~a." prog-ccs chip-ccs))
+    l2p-components))
 
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
-  "Find an initial rewiring for a program that ensures that all used qubits
-appear in the same connected component of the qpu."
-  (let* ((n-qubits (chip-spec-n-qubits chip-spec))
-         (connected-components (chip-spec-live-qubit-cc chip-spec))
-         (indices (containing-indices connected-components))
-         (cc (a:extremum connected-components #'> :key #'length))
-         (needed (prog-used-qubits parsed-prog)))
-    (assert (or (endp needed)
-                (<= (apply #'max needed) n-qubits))
+  "Find an initial rewiring for a program, ensuring all used qubits in the program can fit on the connected components of the QPU compatibly."
+  (let ((n-qubits (chip-spec-n-qubits chip-spec))
+        (chip-connected-components (chip-spec-live-qubit-cc chip-spec))
+        (prog-connected-components (prog-used-qubits-ccs parsed-prog)))
+    (assert (<= (qubits-needed parsed-prog) n-qubits)
             ()
             "User program incompatible with chip: qubit index ~A used and ~A available."
-            (apply #'max needed) n-qubits)
+            (qubits-needed parsed-prog) n-qubits)
+    (case type
+      (:naive
+       ;; Check that every connected component of program qubits is contained
+       ;; in a connected component on the chip.
+       (unless (loop :for prog-connected-component in prog-connected-components
+                     :always (loop :for chip-connected-component in chip-connected-components
+                                     :thereis (subsetp prog-connected-component chip-connected-component)))
+         (error "User program incompatible with chip: naive rewiring crosses chip component boundaries."))
+       (make-rewiring n-qubits))
+      (:partial
+       (make-partial-rewiring n-qubits))
+      (:random
+       (generate-random-rewiring n-qubits))
+      (:greedy
+       ;; TODO: this assumes that the program is sequential
+       (let ((rewiring (make-partial-rewiring n-qubits))
+             (l2p-components (greedy-prog-ccs-to-chip-ccs chip-connected-components
+                                                          prog-connected-components))
+              ;; compute for each qubit pair (q1 q2) the benefit of putting q2 close to q1
+              (l2l-multiplier (map 'vector
+                                   (lambda (order) (compute-adjacency-weights n-qubits order))
+                                   (prog-qubit-pair-order n-qubits parsed-prog)))
 
-    (when (eql type ':naive)
-      (unless (loop
-                :with component
-                :for qubit :in needed
-                :for index := (gethash qubit indices)
-                :when (not component)
-                  :do (setf component index)
-                :always (and index (= index component)))
-        (error "User program incompatible with chip: naive rewiring crosses chip component boundaries."))
-      (return-from prog-initial-rewiring (make-rewiring n-qubits)))
+              ;; physical qubit -> logical qubit -> distance
+              (p2l-distances (make-array n-qubits :initial-element nil)))
+         (flet ((qubit-best-location (qubit prog-cc)
+                  (let ((l-multiplier (aref l2l-multiplier qubit))
+                        best
+                        (best-cost most-positive-double-float))
+                    (dolist (physical-target (gethash prog-cc l2p-components))
+                      (let ((cost (loop :for (placed . distance) :in (aref p2l-distances physical-target)
+                                        :sum (* (aref l-multiplier placed)
+                                                (+ *rewiring-distance-offset* distance)))))
+                        (unless (apply-rewiring-p2l rewiring physical-target)
+                          (when (< cost best-cost)
+                            (setf best physical-target
+                                  best-cost cost)))))
+                    best)))
+           ;; assign all of the needed qubits
+           (dolist (prog-cc prog-connected-components)
+             (dolist (qubit prog-cc)
+               (let ((location (qubit-best-location qubit prog-cc)))
+                 ;; assign the qubit to the best location
+                 (rewiring-assign rewiring qubit location)
 
-    (assert (<= (length needed) (length cc)) ()
-            "User program used too many qubits: ~A used and ~A available in the largest connected component."
-            (length needed) (length cc))
-
-    (when (eql type ':partial)
-      (return-from prog-initial-rewiring
-        (rewire-non-cc-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
-
-    (when (eql type ':random)
-      (return-from prog-initial-rewiring (generate-random-rewiring n-qubits)))
-
-    (assert (eql type ':greedy) (type)
-            "Unexpected rewiring type: ~A." type)
-
-    ;; TODO: this assumes that the program is sequential
-    (let* ((per-qubit-ins (prog-qubit-pair-order n-qubits parsed-prog))
-
-           ;; compute for each qubit pair (q1 q2) the benefit of putting q2 close to q1
-           (l2l-multiplier (map 'vector
-                                (lambda (order) (compute-adjacency-weights n-qubits order))
-                                per-qubit-ins))
-
-           ;; physical qubit -> logical qubit -> distance
-           (p2l-distances (make-array n-qubits :initial-element nil))
-           (rewiring (rewire-non-cc-qubits-on-chip-spec (make-partial-rewiring n-qubits) chip-spec needed cc)))
-
-      (labels
-          ((qubit-best-location (qubit)
-             (loop
-               :with l-multiplier := (aref l2l-multiplier qubit)
-               :with best := nil
-               :with best-cost := most-positive-double-float
-
-               :for physical-target :in cc
-               :for cost
-                 := (loop
-                      :for (placed . distance) :in (aref p2l-distances physical-target)
-                      :sum (* (aref l-multiplier placed)
-                              (+ *rewiring-distance-offset* distance)))
-
-               :unless (apply-rewiring-p2l rewiring physical-target)
-                 :when (< cost best-cost)
-                   :do (setf best physical-target
-                             best-cost cost)
-               :finally (return best))))
-
-        ;; assign all of the needed qubits
-        (dolist (qubit needed)
-          (let ((location (qubit-best-location qubit)))
-            ;; assign the qubit to the best location
-            (rewiring-assign rewiring qubit location)
-
-            ;; update the distances
-            (loop
-              :for (other-location . distance) :in (chip-spec-live-qubit-bfs chip-spec location)
-              :do (push (cons qubit distance) (aref p2l-distances other-location)))))
-
-        rewiring))))
+                 ;; update the distances
+                 (loop
+                   :for (other-location . distance) :in (chip-spec-live-qubit-bfs chip-spec location)
+                   :do (push (cons qubit distance) (aref p2l-distances other-location))))))
+           rewiring)))
+      (t
+       (error "Unexpected rewiring type: ~A." type)))))
 
 (defun prog-qubit-pair-order (n-qubits parsed-prog)
   "For each qubit, find a list of the other qubits it communicates with in order
