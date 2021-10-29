@@ -34,11 +34,11 @@
 (defun %parsed-program-to-logical-matrix-rewiring-test (pp-a pp-b)
   (dolist (compress-qubits '(nil t))
     (is (quil::operator=
-         (quil::parsed-program-to-logical-matrix pp-a)
-         (quil::parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
+         (parsed-program-to-logical-matrix pp-a)
+         (parsed-program-to-logical-matrix pp-b :compress-qubits compress-qubits)))))
 
 (deftest test-parsed-program-to-logical-matrix-cnot-rewiring ()
-  "Test whether quil::parsed-program-to-logical-matrix converts equivalent
+  "Test whether parsed-program-to-logical-matrix converts equivalent
 programs (modulo rewiring) to equivalent matrices."
   (let ((pp (quil::parse-quil "
 CNOT 1 2
@@ -51,7 +51,7 @@ CNOT 0 2
     (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-parsed-program-to-logical-matrix-swap-rewiring ()
-  "Test whether quil::parsed-program-to-logical-matrix converts equivalent
+  "Test whether parsed-program-to-logical-matrix converts equivalent
 programs (modulo rewiring) to equivalent matrices."
   (let ((pp (quil::parse-quil "
 CNOT 0 1
@@ -64,7 +64,7 @@ Z 0")
     (%parsed-program-to-logical-matrix-rewiring-test pp pp-rewired)))
 
 (deftest test-parsed-program-to-logical-matrix-entering-exiting-rewiring ()
-  "Test whether quil::parsed-program-to-logical-matrix handles single-instruction entering/exiting
+  "Test whether parsed-program-to-logical-matrix handles single-instruction entering/exiting
 rewirings correctly."
   (let ((pp (quil::parse-quil "
 CNOT 0 1
@@ -108,8 +108,8 @@ JUMP @a")))
                                                  (cl-quil::read-quil-file file))
                                 (quil::build-nQ-linear-chip 5 :architecture architecture)
                                 :protoquil t)))
-    (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-prog)
-                                  (quil::parsed-program-to-logical-matrix proc-prog)))
+    (is (quil::matrix-equals-dwim (parsed-program-to-logical-matrix orig-prog)
+                                  (parsed-program-to-logical-matrix proc-prog)))
     (list
      (quil::calculate-instructions-2q-depth (coerce (quil::parsed-program-executable-code proc-prog)
                                                     'list)))))
@@ -241,7 +241,7 @@ RX(pi) 2
                      (quil::compiler-hook parsed-prog (quil::build-nQ-linear-chip num-qubits
                                                                                   :architecture architecture)))))
             (is (quil::matrix-equals-dwim (quil::kq-gate-on-lines v num-qubits args)
-                                          (quil::parsed-program-to-logical-matrix processed-program)))))))))
+                                          (parsed-program-to-logical-matrix processed-program)))))))))
 
 
 (deftest test-compiler-hook-preserves-RESETs ()
@@ -332,8 +332,8 @@ CZ 2 7
            (orig-pp (make-pp)))
       (substitute-params orig-pp segment-table)
       (substitute-params processed-pp segment-table)
-      (is (quil::matrix-equals-dwim (quil::parsed-program-to-logical-matrix orig-pp :compress-qubits t)
-                                    (quil::parsed-program-to-logical-matrix processed-pp :compress-qubits t))))))
+      (is (quil::matrix-equals-dwim (parsed-program-to-logical-matrix orig-pp :compress-qubits t)
+                                    (parsed-program-to-logical-matrix processed-pp :compress-qubits t))))))
 
 (deftest test-parametric-compiler-cphase ()
   (dolist (quil::*enable-state-prep-compression* '(nil t))
@@ -374,10 +374,10 @@ RX(pi/3) 0
              (pp (quil::parse-quil "
 H 1
 CNOT 1 2"))
-             (old-matrix (quil::parsed-program-to-logical-matrix pp))
+             (old-matrix (parsed-program-to-logical-matrix pp))
              (cpp (%with-loose-state-prep-compression
                     (quil::compiler-hook pp chip-spec :protoquil t)))
-             (new-matrix (quil::parsed-program-to-logical-matrix cpp)))
+             (new-matrix (parsed-program-to-logical-matrix cpp)))
         (is (quil::matrix-equals-dwim old-matrix new-matrix))))))
 
 (deftest test-rewiring-backfilling ()
