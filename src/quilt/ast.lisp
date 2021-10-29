@@ -17,7 +17,7 @@
   (check-type a frame)
   (check-type b frame)
   (and (string= (frame-name a) (frame-name b))
-       (quil.si:list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
+       (list= (frame-qubits a) (frame-qubits b) :test #'qubit=)))
 
 (defun frame-hash (f)
   "Return a hash for frame F. This is to frame= as sxhash is to equal, i.e., (frame= a b) implies (= (frame-hash a) (frame-hash b))."
@@ -361,19 +361,19 @@
 
 (defun make-waveform-definition (name parameters entries sample-rate &key context)
   (check-type name string)
-  (check-type parameters quil.si:symbol-list)
+  (check-type parameters symbol-list)
   (if (not (endp parameters))
       (make-instance 'parameterized-waveform-definition
-                     :name name
-                     :parameters parameters
-                     :entries entries
-                     :sample-rate sample-rate
-                     :context context)
+        :name name
+        :parameters parameters
+        :entries entries
+        :sample-rate sample-rate
+        :context context)
       (make-instance 'static-waveform-definition
-                     :name name
-                     :entries entries
-                     :sample-rate sample-rate
-                     :context context)))
+        :name name
+        :entries entries
+        :sample-rate sample-rate
+        :context context)))
 
 (defmethod print-instruction-generic ((defn waveform-definition) (stream stream))
   (format stream "DEFWAVEFORM ~A~@[(~{%~A~^, ~})~] ~/quil:instruction-fmt/:"
@@ -387,9 +387,9 @@
                     (with-output-to-string (s)
                       (etypecase z
                         (number
-                         (quil.si:format-complex z s))
+                         (format-complex z s))
                         ((or list symbol)
-                         (print-instruction (quil.si:make-delayed-expression nil nil z) s)))))
+                         (print-instruction (make-delayed-expression nil nil z) s)))))
                   (waveform-definition-entries defn)))
   (terpri stream))
 
@@ -430,9 +430,9 @@
     (format stream "~{ ~/quil:instruction-fmt/~}"
             (calibration-definition-arguments defn)))
   (format stream ":~%")
-  (quil.si:print-instruction-sequence (calibration-definition-body defn)
-                                      :stream stream
-                                      :prefix "    "))
+  (print-instruction-sequence (calibration-definition-body defn)
+                              :stream stream
+                              :prefix "    "))
 
 (defclass measurement-calibration-definition (calibration-definition)
   ((qubit :initarg :qubit
@@ -459,9 +459,9 @@
           (if (typep defn 'measure-calibration-definition)
               (measure-calibration-address defn)
               nil))
-  (quil.si:print-instruction-sequence (calibration-definition-body defn)
-                                      :stream stream
-                                      :prefix "    "))
+  (print-instruction-sequence (calibration-definition-body defn)
+                              :stream stream
+                              :prefix "    "))
 
 ;;;;;;;;;;;;;;;;;;;;;; Program Representations ;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -499,4 +499,4 @@
     (print-definitions (parsed-program-gate-definitions pp))
     (print-definitions (parsed-program-circuit-definitions pp))
 
-    (quil.si:print-instruction-sequence (parsed-program-executable-code pp) :stream stream)))
+    (print-instruction-sequence (parsed-program-executable-code pp) :stream stream))) 

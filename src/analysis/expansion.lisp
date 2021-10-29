@@ -3,7 +3,7 @@
 ;;;; Authors: Robert Smith
 ;;;;          Erik Davis
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 ;;; Since both circuit and calibration expansion rely on some common code, but
 ;;; we would like error messages to be as specific as possible, we choose to

@@ -8,24 +8,6 @@
 
 (in-package #:cl-quil)
 
-
-(defconstant +double-comparison-threshold-loose+  1d-5)
-(defconstant +double-comparison-threshold-strict+ 5d-11)
-(defun double~ (x y)
-  "Loose equality of complex double floats, using the absolute threshold stored in +DOUBLE-COMPARISON-THRESHOLD-LOOSE+.  Use this comparison operator when testing for output correctness."
-  (let ((diff (abs (- x y))))
-    (< diff +double-comparison-threshold-loose+)))
-(defun double= (x y)
-  "Stringent equality of complex double floats, using the absolute threshold stored in +DOUBLE-COMPARISON-THRESHOLD-STRICT+.  Use this comparison operator when testing for substitution viability."
-  (let ((diff (abs (- x y))))
-    (< diff +double-comparison-threshold-strict+)))
-
-(defun double>= (&rest args)
-  (loop :for (x y) :on args
-        :while y
-        :always (>= (+ x +double-comparison-threshold-strict+)
-                    (- y +double-comparison-threshold-strict+))))
-
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
   (check-type y magicl:matrix)
@@ -33,9 +15,6 @@
        (= (magicl:ncols x) (magicl:ncols y))
        (loop :for j :below (magicl:nrows x)
              :always (double~ (magicl:tref x j 0) (magicl:tref y j 0)))))
-
-(defun matrix-equality (x y)
-  (magicl:= x y +double-comparison-threshold-loose+))
 
 (defun scale-out-matrix-phases (mat ref-mat)
   "Attempts to scale out relative phase shifts between the first columns of MAT and REF-MAT."
@@ -90,6 +69,41 @@ with the identity matrix."
 as needed so that they are the same size."
   (multiple-value-bind (mat1 mat2) (matrix-rescale mat1 mat2)
     (magicl:@ mat1 mat2)))
+
+(defun parsed-program-to-logical-matrix (pp &key compress-qubits)
+  "Convert a parsed program PP, consisting of only i) gate
+ applications ii) trivial control operations (HALT and NOP), and iii)
+ pragmas, to an equivalent matrix. If present, rewiring pragmas will
+ be applied so that the resulting matrix acts on 'logical', rather
+ than 'physical', qubits. When :COMPRESS-QUBITS is enabled (default:
+ nil), qubit indices are permuted to minimize matrix size."
+  (when compress-qubits
+    (setf pp (transform 'compress-qubits pp)))
+
+  (let (initial-rewiring
+        final-rewiring)
+    (loop :for instr :across (parsed-program-executable-code pp)
+          :do (multiple-value-bind (enter exit) (instruction-rewirings instr)
+                (setf initial-rewiring (or initial-rewiring enter))
+                (setf final-rewiring (or exit final-rewiring))))
+    ;; to handle a l2p rewiring, we need to conjugate the "physical"
+    ;; matrix of a block by the permutation matrix associated with the
+    ;; rewiring. this is somewhat complicated by the fact that rewirings
+    ;; when we enter a block and when we exit a block may differ.
+    
+    ;; TODO: this only works for a single block
+
+    (let ((mat (qvm:parsed-program-unitary-matrix pp)))
+      (when initial-rewiring
+        (setf mat (matrix-rescale-and-multiply
+                   mat
+                   (rewiring-to-permutation-matrix-l2p (trim-rewiring initial-rewiring)))))
+
+      (when final-rewiring
+        (setf mat (matrix-rescale-and-multiply
+                   (rewiring-to-permutation-matrix-p2l (trim-rewiring final-rewiring))
+                   mat)))
+      mat)))
 
 ;; NOTE: the double~ appearing in this routine is anomalous. the SVD routine
 ;; seems not to reliably return singular values within the double= threshold,
@@ -252,21 +266,6 @@ as needed so that they are the same size."
         kroned-ref-mat
         (scale-out-matrix-phases kroned-mat kroned-ref-mat))))))
 
-(defun matrix-expt (m s &key hermitian?)
-  "Computes EXP(M*S).  Only works for unitarily diagonalizable matrices M."
-  (multiple-value-bind (d u)
-      (if hermitian? (magicl:hermitian-eig m) (magicl:eig m))
-    (when *compress-carefully*
-      (assert (matrix-equality m
-                               (magicl:@ u
-                                         (from-diag d)
-                                         (magicl:conjugate-transpose u)))
-              ()
-              "MATRIX-EXPT failed to diagonalize its input."))
-    (let ((dd (from-diag
-               (mapcar (lambda (z) (exp (* z s))) d))))
-      (magicl:@ u dd (magicl:conjugate-transpose u)))))
-
 (defun print-polar-matrix (m &optional (stream *standard-output*))
   (let ((*print-fractional-radians* nil)
         (*print-polar-form* t)
@@ -282,3 +281,59 @@ as needed so that they are the same size."
         (when (< j (1- width))
           (format stream ", ")))
       (format stream "~%"))))
+
+;;;; some leftover stuff from standard-gates.lisp and elsewhere
+
+(defun apply-gate (m instr)
+  "Constructs the matrix representation associated to an instruction list consisting of gates. Suitable for testing the output of compilation routines."
+  (check-type m magicl:matrix)
+  (check-type instr application)
+  (a:when-let ((defn (gate-matrix instr)))
+    (let* ((mat-size (ilog2 (magicl:nrows m)))
+           (size (max mat-size
+                      (apply #'max
+                             (map 'list (lambda (x) (1+ (qubit-index x)))
+                                  (application-arguments instr)))))
+           (mat (kq-gate-on-lines defn
+                                  size
+                                  (mapcar #'qubit-index (application-arguments instr))))
+           ;; resize m if necessary
+           (m (if (< mat-size size)
+                  (kq-gate-on-lines m
+                                    size
+                                    (a:iota mat-size :start (1- mat-size) :step -1))
+                  m)))
+      (magicl:@ mat m))))
+
+(defun make-matrix-from-quil (instruction-list &key (relabeling #'identity))
+  "If possible, create a matrix out of the instructions INSTRUCTION-LIST using the optional function RELABELING that maps an input qubit index to an output qubit index. If one can't be created, then return NIL.
+
+Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
+
+    A
+    B
+    C
+
+or equivalently as
+
+    C * B * A
+
+as matrices."
+  (flet ((relabel-instr (instr)
+           (cond ((typep instr 'application)
+                  (unless (every #'is-constant (application-parameters instr))
+                    (return-from make-matrix-from-quil nil))
+                  (let ((new-instr (copy-instance instr)))
+                    (setf (application-arguments new-instr)
+                          (mapcar relabeling (application-arguments new-instr)))
+                    new-instr))
+                 (t instr))))
+    (let ((pp (make-instance 'parsed-program
+                             :executable-code (map 'vector #'relabel-instr instruction-list))))
+      (qvm:parsed-program-unitary-matrix pp))))
+
+
+(defun su2-on-line (line m)
+  "Treats m in SU(2) as either m (x) Id or Id (x) m."
+  (kq-gate-on-lines m 2 (list line)))
+

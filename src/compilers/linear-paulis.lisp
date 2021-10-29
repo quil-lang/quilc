@@ -29,14 +29,13 @@
           (position #\Z (pauli-term-pauli-word term))))
 
 (defun clone-exp-pauli-sum-gate (gate &key new-name new-terms)
-  (with-slots (arguments parameters arity dimension name terms) gate
-    (make-instance 'exp-pauli-sum-gate
-                   :arguments arguments
-                   :parameters parameters
-                   :arity arity
-                   :dimension dimension
-                   :name (or new-name name)
-                   :terms (or new-terms terms))))
+  (make-instance 'exp-pauli-sum-gate
+    :arguments (exp-pauli-sum-gate-arguments gate)
+    :parameters (exp-pauli-sum-gate-parameters gate)
+    :arity (dynamic-gate-arity gate)
+    :dimension (gate-dimension gate)
+    :name (or new-name (gate-name gate))
+    :terms (or new-terms (exp-pauli-sum-gate-terms gate))))
 
 (defun find-most-frequent-Z (terms arguments &key except)
   (let ((votes (make-array (length arguments) :initial-element 0)))
@@ -59,7 +58,10 @@
 (define-compiler parametric-diagonal-compiler
     ((instr _ :where (pauli-instr-of-all-Zs-or-Is-p instr)))
   "Decomposes a diagonal Pauli gate by a single step."
-  (with-slots (arguments parameters terms arity dimension) (gate-application-gate instr)
+  (let* ((gate (gate-application-gate instr))
+         (arguments (exp-pauli-sum-gate-arguments gate))
+         (parameters (exp-pauli-sum-gate-parameters gate))
+         (terms (exp-pauli-sum-gate-terms gate)))
     (let ((nonlocal-terms nil))
       ;; first, deal with the words with zero Zs / one Z: they're local gates.
       ;; we'll want to evaluate the gate definition at whatever the gate application says.
@@ -142,7 +144,7 @@
             (let* ((ZZs->ZIs
                      (mapcar (lambda (pair)
                                (destructuring-bind (term Z-pos) pair
-                                 (let ((new-term (copy-pauli-term term)))
+                                 (let ((new-term (copy-instance term)))
                                    (setf (pauli-term-pauli-word new-term)
                                          (coerce (loop :for letter :across (pauli-term-pauli-word term)
                                                        :for j :from 0
@@ -173,7 +175,10 @@
                           (not (typep (first (application-parameters instr)) 'constant)))))
   "Decomposes a gate described by the exponential of a time-independent Hamiltonian into static orthogonal and parametric diagonal components."
   (let ((gate (gate-application-gate instr)))
-    (with-slots (arguments parameters terms dimension) gate
+    (let ((arguments (exp-pauli-sum-gate-arguments gate))
+          (parameters (exp-pauli-sum-gate-parameters gate))
+          (terms (exp-pauli-sum-gate-terms gate))
+          (dimension (gate-dimension gate)))
       
       ;; make sure that all the pauli terms are all scalar multiples of the unknown parameter.
       ;; we track this by making sure that the unknown parameter appears only once and that

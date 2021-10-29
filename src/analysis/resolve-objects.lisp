@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 ;;; Used solely for object resolution to detect if we are resolving things
 ;;; inside of a circuit or calibration.

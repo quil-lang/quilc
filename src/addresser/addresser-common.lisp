@@ -113,9 +113,11 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
 (defmethod initialize-instance :after ((inst application-force-rewiring)
                                        &rest initargs)
   (declare (ignore initargs))
-  (with-slots (operator arguments target-rewiring) inst
-    (setf operator (named-operator "FORCE-REWIRING"))
-    (setf arguments (loop :for i :across (rewiring-l2p target-rewiring) :collect (qubit i)))))
+  (setf (application-operator inst)
+        (named-operator "FORCE-REWIRING")
+        (application-arguments inst)
+        (loop :for i :across (rewiring-l2p (application-force-rewiring-target inst))
+              :collect (qubit i))))
 
 (defun application-other-argument (inst qubit)
   "Assumes that INST is a 2-qubit gate. Will get the index of the other qubit

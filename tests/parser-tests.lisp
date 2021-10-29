@@ -118,7 +118,7 @@
 
 (deftest test-parse-element-list ()
   (let* ((element-list "(1 2.0 3.0e3 4.0i 5+6i 7+8.0i 9.0E-10i -i i pi -pi)")
-         (parsed-list (cl-quil::parse-element-list element-list 11)))
+         (parsed-list (cl-quil.frontend::parse-element-list element-list 11)))
     (is (equalp
          parsed-list
          (list
@@ -208,7 +208,7 @@ DEFGATE FOO:
     1/sqrt(2), -1/sqrt(2)
 
 INCLUDE \"~A\"" path)))
-      (signals quil::ambiguous-definition-condition
+      (signals cl-quil::ambiguous-definition-condition
         (parse-quil test-quil :ambiguous-definition-handler #'identity)))))
 
 (deftest test-parsing-defgate-defcircuit-ambiguity ()
@@ -378,7 +378,7 @@ DEFGATE FOO(%a) q AS PAULI-SUM:
 (deftest test-split-lines (&optional verbose)
   (loop :for (tokens expect) :in *test-cases-for-split-lines*
         :as actual  ; split-lines mutates list structure, so copy list
-          := (cl-quil::split-lines (copy-list tokens))
+          := (cl-quil.frontend::split-lines (copy-list tokens))
         :as i :from 1
         :do (when verbose
               (let ((*print-circle* nil)) ; don't print #1#, say

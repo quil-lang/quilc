@@ -31,7 +31,7 @@
 ;;;; expressions (ones that are linear). However, for the majority of
 ;;;; our use cases at this time, this subset is sufficient.
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.frontend)
 
 (define-condition expression-not-simplifiable (serious-condition)
   ()

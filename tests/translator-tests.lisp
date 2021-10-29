@@ -393,7 +393,7 @@ DEFGATE EXPI(%beta) p AS PAULI-SUM:
 EXPI(2.0) 0
 RZ(-2.0) 0"))
       (let* ((cpp (compiler-hook (parse-quil prog-text) chip))
-             (m (parsed-program-to-logical-matrix cpp)))
+             (m (quil:parsed-program-to-logical-matrix cpp)))
         (is (quil::double= 1d0 (abs (magicl:tref m 0 0))))
         (loop :for j :below (magicl:nrows m)
               :do (is (quil::double= (magicl:tref m 0 0)

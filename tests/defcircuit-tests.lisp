@@ -304,5 +304,5 @@ DEFCIRCUIT ZX q0 q1:
 
 CONTROLLED ZX 2 0 1"))
         (b (quil:safely-parse-quil "CZ 2 0; CONTROLLED X 2 1")))
-    (is (quil::matrix-equals-dwim (parsed-program-to-logical-matrix a)
-                                  (parsed-program-to-logical-matrix b)))))
+    (is (quil::matrix-equals-dwim (quil:parsed-program-to-logical-matrix a)
+                                  (quil:parsed-program-to-logical-matrix b)))))

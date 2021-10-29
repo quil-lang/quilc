@@ -10,28 +10,65 @@
 (defpackage #:cl-quil.quilt
   (:nicknames #:quilt)
   (:use #:cl
-        #:cl-quil
+        #:cl-quil.frontend
         #:abstract-classes
         #:singleton-classes)
-  ;; We define a number of methods on generic functions from CL-QUIL. We import these here.
-  (:import-from #:cl-quil
+  ;; We define a number of methods on generic functions from
+  ;; CL-QUIL. We import these here, as well as other internal symbols
+  ;; that we want to get our hands on.
+  (:import-from #:cl-quil.frontend
+                ;; frontend-utilities.lisp
+                #:list=
                 ;; ast.lisp
                 #:arguments
                 #:mnemonic
+                #:map-de-params
+                #:substitute-parameter
+                #:check-mref
+                #:apply-modifiers-to-operator                
+                #:print-instruction-sequence
                 #:print-instruction-generic
                 #:print-parsed-program-generic
+                #:format-complex
+                ;; parser.lisp
+                #:match-line
+                #:take-until
+                #:take-while-from-end
+                #:gate-modifier-token-p
+                #:*arithmetic-parameters*
+                #:*segment-encountered*
+                #:*definitions-allowed*
+                #:*formal-arguments-allowed*
+                #:parse-qubit                
+                #:parse-parameter-or-expression
+                #:parse-memory-or-formal-token
+                #:parse-parameters
+                #:parse-arithmetic-tokens               
+                #:parse-indented-entries
+                #:parse-indented-body
                 ;; cl-quilt.lisp
                 #:definition-signature
+                #:%parse-quil
                 ;; analysis/resolve-objects.lisp
                 #:resolve-instruction
                 #:resolve-objects
+                #:*in-definition-body*
+                ;; analysis/expansion.lisp
+                #:flag-on-update
+                #:instantiate-definition-body
                 ;; analysis/expand-calibrations.lisp
                 #:instantiate-instruction
                 ;; analysis/type-safety.lisp
                 #:type-check-instr
+                #:enforce-mref-bounds
+                #:find-descriptor-for-mref
+                #:memory-segment-length
                 )
+  (:shadowing-import-from #:cl-quil.frontend
+                          #:pi)
   #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (:a :alexandria)
+                    (:quil :cl-quil.frontend))
 
   (:export
 

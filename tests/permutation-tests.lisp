@@ -23,7 +23,7 @@
 (deftest test-permutation-gates-logical-matrix-equivalent ()
   (flet ((test (permutation)
            (is (quil::operator=
-                (parsed-program-to-logical-matrix
+                (quil:parsed-program-to-logical-matrix
                  (permutation-synthesis-as-parsed-program permutation)
                  :compress-qubits nil)
                 (matrix-from-permutation permutation)))))

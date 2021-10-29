@@ -7,7 +7,7 @@
 (define-transform fill-delays (fill-delays)
   "This transform fills empty time on Quilt frames with explicit DELAY instructions in a greedy fashion."
   expand-calibrations
-  quil.si:resolve-objects)
+  resolve-objects)
 
 ;;; Syntactic conveniences
 
@@ -95,9 +95,9 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
 
 (defun frame-on-p (frame qubits)
   "Does FRAME involve exactly the specified QUBITS in the specified order?"
-  (quil.si:list= (frame-qubits frame)
-                 qubits
-                 :test #'qubit=))
+  (list= (frame-qubits frame)
+         qubits
+         :test #'qubit=))
 
 ;;; Frame Clocks
 ;;;

@@ -145,7 +145,7 @@
 (defun permutation-gate-to-mcx (instr &key context)
   "Compile instructions representing permutation gates to n-qubit Toffoli gates."
   (declare (ignore context))
-  (unless (slot-boundp instr 'name-resolution)
+  (unless (slot-boundp instr 'cl-quil.frontend::name-resolution)
     (give-up-compilation))
   (let ((res (gate-application-resolution instr)))
     (when (typep res 'gate-definition)
@@ -163,7 +163,7 @@
                 (relabler (lambda (q)
                             (setf (qubit-index q)
                                   (qubit-index (nth (qubit-index q) qubits))))))
-           (map nil (a:rcurry #'%relabel-qubits relabler) code)
+           (map nil (a:rcurry #'cl-quil.frontend::%relabel-qubits relabler) code)
            ;; If synthesis produces a 1 instruction sequence, that
            ;; means that the original instruction represents a n-qubit
            ;; controlled Toffoli gate, so we didn't do anything and
