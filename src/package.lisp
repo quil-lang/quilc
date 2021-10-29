@@ -472,11 +472,6 @@
    #:parsed-program-has-preserve-blocks-p ; FUNCTION
    )
 
-  ;; matrix-operations.lisp
-  (:export
-   #:parsed-program-to-logical-matrix   ; FUNCTION
-   )
-
   ;; expansion.lisp
   (:export
    #:quil-expansion-error               ; CONDITION

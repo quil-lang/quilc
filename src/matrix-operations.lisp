@@ -91,60 +91,6 @@ as needed so that they are the same size."
   (multiple-value-bind (mat1 mat2) (matrix-rescale mat1 mat2)
     (magicl:@ mat1 mat2)))
 
-(defun parsed-program-to-logical-matrix (pp &key compress-qubits)
-  "Convert a parsed program PP, consisting of only i) gate
- applications ii) trivial control operations (HALT and NOP), and iii)
- pragmas, to an equivalent matrix. If present, rewiring pragmas will
- be applied so that the resulting matrix acts on 'logical', rather
- than 'physical', qubits. When :COMPRESS-QUBITS is enabled (default:
- nil), qubit indices are permuted to minimize matrix size."
-  (when compress-qubits
-    (setf pp (transform 'compress-qubits pp)))
-  ;; to handle a l2p rewiring, we need to conjugate the "physical"
-  ;; matrix of a block by the permutation matrix associated with the
-  ;; rewiring. this is somewhat complicated by the fact that rewirings
-  ;; when we enter a block and when we exit a block may differ.
-  (loop
-    :with mat := (const #C(1d0 0d0) '(1 1))
-    :with rewiring := (make-rewiring 1)
-    :for instr :across (parsed-program-executable-code pp)
-    :do (progn
-          (flet ((apply-entering-rewiring (raw-rewiring)
-                   (let ((trimmed (trim-rewiring raw-rewiring)))
-                     (setf mat (reduce #'matrix-rescale-and-multiply
-                                       (list (rewiring-to-permutation-matrix-l2p trimmed)
-                                             (rewiring-to-permutation-matrix-p2l rewiring)
-                                             mat))
-                           rewiring trimmed)))
-                 (apply-exiting-rewiring (raw-rewiring)
-                   (setf rewiring (trim-rewiring raw-rewiring)))
-                 (apply-instr (instr)
-                   (typecase instr
-                     (gate-application
-                      (setf mat (apply-gate mat instr)))
-                     (halt
-                      t)
-                     (no-operation
-                      t)
-                     (pragma
-                      t)
-                     (otherwise
-                      (error "Instruction ~A is not a gate application." instr)))))
-
-            (multiple-value-bind (entering-rewiring exiting-rewiring) (instruction-rewirings instr)
-              (when (not (null entering-rewiring))
-                (apply-entering-rewiring entering-rewiring))
-              (apply-instr instr)
-              (when (not (null exiting-rewiring))
-                (apply-exiting-rewiring exiting-rewiring))))
-
-          (when (typep instr 'halt)
-            (loop-finish)))
-
-    :finally (return (matrix-rescale-and-multiply
-                      (rewiring-to-permutation-matrix-p2l rewiring)
-                      mat))))
-
 ;; NOTE: the double~ appearing in this routine is anomalous. the SVD routine
 ;; seems not to reliably return singular values within the double= threshold,
 ;; even though that's the required semantics. so far, this hasn't bitten us.

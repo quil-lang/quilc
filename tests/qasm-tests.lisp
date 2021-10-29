@@ -68,8 +68,8 @@
     (is bell)
     (is (= 2 (length (quil:circuit-definition-body bell))))
     (is (quil::matrix-equals-dwim
-         (quil:parsed-program-to-logical-matrix quil)
-         (quil:parsed-program-to-logical-matrix
+         (parsed-program-to-logical-matrix quil)
+         (parsed-program-to-logical-matrix
           (quil:parse-quil "H 0; CNOT 0 3;"))))))
 
 (deftest test-qasm-gate-definition-and-application-on-qreg ()
@@ -84,8 +84,8 @@
     (is bell)
     (is (= 2 (length (quil:circuit-definition-body bell))))
     (is (quil::matrix-equals-dwim
-         (quil:parsed-program-to-logical-matrix quil)
-         (quil:parsed-program-to-logical-matrix
+         (parsed-program-to-logical-matrix quil)
+         (parsed-program-to-logical-matrix
           (quil:parse-quil "H 0; CNOT 0 2; H 1; CNOT 1 3;"))))))
 
 (deftest test-qasm-opaque-gate-definition-and-application ()
