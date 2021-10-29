@@ -157,20 +157,28 @@
 (defvar *default-addresser-state-class* 'fidelity-addresser-state)
 
 (defvar *enable-addresser-state-cache* t
-  "If true, get-addresser-state-for-chip addresser-state caches
-  certain addresser-state slot values on the chip specification keyed
-  off the class of addresser state. Otherwise, i.e., when nil (=
-  disabled), a fresh addresser state is created each time from
-  scratch.")
+  "If true, get-addresser-state-for-chip caches certain
+  addresser-state slot values on the chip specification keyed off the
+  class of addresser state. Otherwise, i.e., when nil (= disabled), a
+  fresh addresser state is created each time from scratch.")
 
 (defun make-addresser-state-for-chip (class chip-specification initial-l2p)
   (make-instance class :chip-spec chip-specification :initial-l2p initial-l2p))
 
-(defvar *state-addresser-cache* (make-hash-table :test 'eq)
+(defvar *state-addresser-cache* (tg:make-weak-hash-table :test 'eq :weakness ':key)
   "Hash table mapping a chip-specification instance to a plist mapping
    names of addresser-state subclasses to prototype addresser states,
-   as managed by get-addresser-state-for-chip. This is all assuming
-   cache is enabled; otherwise, this does not get used.")
+   as managed by get-addresser-state-for-chip. 
+
+   This is defined as a weak hash table, with entries compared using
+   EQ and weakness on each key. In a long-lived process, e.g., the app
+   server, numerous chip-spec definitions could come and go, and we
+   compare them using EQ, so even if an 'equilalent' spec were
+   defined, this would not rendezvous with it. So the weak hash table
+   prevents needless wasted memory buildup.
+
+   This is all assuming cache is enabled; otherwise, this hash table
+   does not get used.")
 
 (defun get-prototype-addresser-state-for-chip (class chip-specification initial-l2p)
   (or (getf (gethash chip-specification *state-addresser-cache* '()) class)
