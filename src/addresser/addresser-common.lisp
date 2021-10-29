@@ -566,23 +566,22 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
              (lscheduler-replace-instruction lschedule instr compiled-seq)))))
       t)))
 
-(defun best-qubit-position (state gates-in-waiting logical &key locations)
+(defun best-qubit-position (state gates-in-waiting logical)
   "Finds the best location for an unassigned logical under the given future schedule."
-  (with-slots (working-l2p chip-spec qubit-cc) state
-    (let ((locations (or locations qubit-cc)))
-      (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
-              "Qubit ~a already assigned" logical)
-      (let ((best-cost (build-worst-cost state))
-            (best-physical nil))
-        (dolist (physical locations)
-          (unless (or (apply-rewiring-p2l working-l2p physical)
-                      (chip-spec-qubit-dead? chip-spec physical))
-            (let ((cost (with-rewiring-assign working-l2p logical physical
-                          (cost-function state :gate-weights gates-in-waiting))))
-              (when (cost-< cost best-cost)
-                (setf best-cost cost
-                      best-physical physical)))))
-        (values best-physical best-cost)))))
+  (with-slots (working-l2p chip-spec) state
+    (assert (not (apply-rewiring-l2p working-l2p logical)) (logical)
+            "Qubit ~a already assigned" logical)
+    (let ((best-cost (build-worst-cost state))
+          (best-physical nil))
+      (dolist (physical (find-physical-component state logical))
+        (unless (or (apply-rewiring-p2l working-l2p physical)
+                    (chip-spec-qubit-dead? chip-spec physical))
+          (let ((cost (with-rewiring-assign working-l2p logical physical
+                        (cost-function state :gate-weights gates-in-waiting))))
+            (when (cost-< cost best-cost)
+              (setf best-cost cost
+                    best-physical physical)))))
+      (values best-physical best-cost))))
 
 (defun unassigned-qubits (instrs rewiring)
   "Get all qubits referenced in INSTRS which are not assigned in REWIRING."
@@ -640,7 +639,7 @@ Optional arguments:
   (:method (state instrs &key (initial-rewiring nil) (use-free-swaps nil))
     (format-noise "DO-GREEDY-ADDRESSING: entrance.")
     (let ((*addresser-use-free-swaps* (or use-free-swaps (not initial-rewiring))))
-      (with-slots (lschedule working-l2p chip-sched initial-l2p) state
+      (with-slots (chip-spec lschedule working-l2p chip-sched initial-l2p) state
         ;; This is governed by an FSM of the shape
         ;;
         ;; [ do-greedy-addressing ]
@@ -681,6 +680,9 @@ Optional arguments:
                          (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
                                  "Too many SWAP instructions selected in a row: ~a" (length rewirings-tried))
                          (setf rewirings-tried (select-and-embed-a-permutation state rewirings-tried)))))
+          (setf (addresser-state-l2p-components state)
+                (greedy-prog-ccs-to-chip-ccs (chip-spec-live-qubit-cc chip-spec)
+                                             (instr-used-qubits-ccs instrs)))
 
           ;; build the logically parallelized schedule
           (append-instructions-to-lschedule lschedule instrs)
@@ -697,7 +699,7 @@ Optional arguments:
           (format-noise "DO-GREEDY-ADDRESSING: departure.")
           ;; get rid of any floaters
           (when *addresser-use-1q-queues*
-            (dotimes (qubit (chip-spec-n-qubits (addresser-state-chip-specification state)))
+            (dotimes (qubit (chip-spec-n-qubits chip-spec))
               (unless (endp (aref (addresser-state-1q-queues state) qubit))
                 (flush-1q-instructions-after-wiring state qubit))))
           ;; finally, return what we've constructed

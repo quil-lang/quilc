@@ -115,12 +115,12 @@ following swaps."
 (defun flush-1q-instructions-after-wiring (state qubit)
   "Flush the 1Q queue for QUBIT after potentially assigning it to a physical location."
   (check-type state addresser-state)
-  (with-slots (working-l2p chip-sched qubit-cc 1q-queues) state
+  (with-slots (working-l2p chip-sched 1q-queues) state
     (let ((physical (apply-rewiring-l2p working-l2p qubit)))
       (unless physical
         ;; TODO: Should we try to pick the best one?
         (setf physical (loop
-                         :for physical :in qubit-cc
+                         :for physical :in (find-physical-component state qubit)
                          :unless (apply-rewiring-p2l working-l2p physical)
                            :return physical))
         (rewiring-assign working-l2p qubit physical))

@@ -14,12 +14,12 @@
    (working-l2p :accessor addresser-state-working-l2p
                 :documentation "The working / current logical-to-physical rewiring. NOTE: This get mutated a _lot_."
                 :type rewiring)
+   (l2p-components :accessor addresser-state-l2p-components
+                   :documentation "The association of logical to physical components."
+                   :type hash-table)
    (qq-distances :accessor addresser-state-qq-distances
                  :documentation "Precomputed SWAP penalties between separated qubits."
                  :type (array real (* *)))
-   (qubit-cc :accessor addresser-state-qubit-cc
-             :documentation "The connected component where newly-assigned qubits will live."
-             :type list)
    (lschedule :accessor addresser-state-logical-schedule
               :documentation "The logical schedule of not-yet-processed instructions."
               :type logical-scheduler)
@@ -52,9 +52,6 @@
     (setf (addresser-state-initial-l2p instance) initial-l2p
           (addresser-state-working-l2p instance) (copy-rewiring initial-l2p)
           (addresser-state-logical-schedule instance) (make-lscheduler)
-          (addresser-state-qubit-cc instance) (a:extremum (chip-spec-live-qubit-cc chip-spec)
-                                                          #'>
-                                                          :key #'length)
           (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec)
           (addresser-state-chip-specification instance) chip-spec
           (addresser-state-1q-queues instance) (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))))
@@ -121,6 +118,14 @@ INSTR is the \"active instruction\".
     cost))
 
 ;;; Some utilities
+
+(defun find-physical-component (state logical)
+  "Uses STATE to get a physical qubit component from the logical qubit address LOGICAL."
+  (maphash (lambda (logical-component physical-component)
+             (when (member logical logical-component)
+               (return-from find-physical-component physical-component)))
+           (addresser-state-l2p-components state))
+  (error "Unable to find a physical connected component associated with the qubit ~a." logical))
 
 (defun compute-qubit-qubit-distances (chip-spec link-cost)
   "Implements Floyd-Warshall to compute the minimum weighted distance between any pair of qubits on a CHIP-SPECification, weighted by LINK-COST."

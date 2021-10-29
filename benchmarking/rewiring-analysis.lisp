@@ -103,14 +103,13 @@
 (defun quil-file-prefix (file)
   "Gets the information prefix for a quil file"
   (let* ((pp     (quil::read-quil-file file))
-         (used-q (quil::prog-used-qubits pp))
          (instrs (parsed-program-executable-code pp))
          (multiq (loop
                    :for inst :across instrs
                      :thereis (and (typep inst 'application)
                                    (< 1 (length (application-arguments inst)))))))
     (format nil "~4,'0Dq-~7,'0Di-~:[s~;m~]"
-            (1+ (reduce #'max used-q))
+            (quil::qubits-needed pp)
             (length instrs)
             multiq)))
 
@@ -146,9 +145,9 @@
                     (break "~A" e))
                   (return-from by-assignment (list nil nil 1)))))
            (let* ((progm (get-prog prog-source chip))
-                  (max-needed (apply #'max (quil::prog-used-qubits progm))))
-             (when (< max-needed
-                      (quil::chip-spec-n-qubits chip))
+                  (max-needed (qubits-needed progm)))
+             (when (<= max-needed
+                       (quil::chip-spec-n-qubits chip))
                (funcall assn (lambda ()
                                (multiple-value-list
                                 (compiler-hook (get-prog prog-source chip) chip :destructive t))))))))

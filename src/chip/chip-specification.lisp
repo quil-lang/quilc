@@ -783,3 +783,13 @@ Compilers are listed in descending precedence.")
                    (15 0) (15 14) (13 14) (12 13) (12 11) (11 10) (9 10)
                    (1 0) (15 2) (3 14) (13 4) (12 5) (6 11) (7 10) (9 8))))
     (build-chip-from-digraph digraph :architecture ':cnot)))
+
+(defun build-disconnected-chip (n-qubits)
+  "Create a CHIP-SPECIFICATION with no multi-qubit operations."
+  (let ((chip-spec (make-chip-specification
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
+    (install-generic-compilers chip-spec ':cz)
+    (dotimes (j n-qubits)
+      (adjoin-hardware-object (build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (warm-hardware-objects chip-spec)
+    chip-spec))

@@ -100,3 +100,17 @@
                    (quil::chip-contiguous-subschedule-from-last-instructions
                     sched (quil::make-qubit-resource 0 2))
                    expected-subschedule))))))
+
+;;; Check that we can compile "parallel" programs onto disconnected
+;;; chip components.
+(deftest test-addresser-multiple-components ()
+  (let ((program "DECLARE ro BIT[3]
+RX(pi/2) 0
+RX(pi/2) 1
+RX(pi/2) 2
+MEASURE 0 ro[0]
+MEASURE 1 ro[1]
+MEASURE 2 ro[2]"))
+    (not-signals error
+      (quil:compiler-hook (quil:parse-quil program)
+                          (quil::build-disconnected-chip 3)))))
