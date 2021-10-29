@@ -431,24 +431,18 @@ or equivalently as
     C * B * A
 
 as matrices."
-  (let ((u (const #C(1d0 0d0) '(1 1))))
-    (dolist (instr instruction-list u)
-      (assert (not (null u)))
-      ;; TODO: What to do about other quantum-state-transitioning
-      ;; instructions?
-      (when (typep instr 'application)
-        ;; We can't make a matrix if we don't know the gate
-        ;; parameters.
-        (unless (every #'is-constant (application-parameters instr))
-          (return-from make-matrix-from-quil nil))
-        (let ((new-instr (copy-instance instr)))
-          (setf (application-arguments new-instr)
-                (mapcar (lambda (a)
-                          (if (typep a 'formal)
-                              (qubit (parse-integer (formal-name a) :start 1))
-                              (funcall relabeling a)))
-                        (application-arguments new-instr)))
-          (setf u (apply-gate u new-instr)))))))
+  (flet ((relabel-instr (instr)
+	   (cond ((typep instr 'application)
+		  (unless (every #'is-constant (application-parameters instr))
+		    (return-from make-matrix-from-quil nil))
+		  (let ((new-instr (copy-instance instr)))
+		    (setf (application-arguments new-instr)
+			  (mapcar relabeling (application-arguments new-instr)))
+		    new-instr))
+		 (t instr))))
+    (let ((pp (make-instance 'parsed-program
+			     :executable-code (map 'vector #'relabel-instr instruction-list))))
+      (qvm:parsed-program-unitary-matrix pp))))
 
 (defun kq-gate-on-lines (gate-mat n lines)
   "Writes the gate GATE-MAT as an N-qubit gate by applying it to the qubit lines in LINES."

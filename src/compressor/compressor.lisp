@@ -407,7 +407,7 @@ other's."
               (list (make-instance 'gate-application
                                    :operator #.(named-operator "WHOLEPROGRAM")
                                    :arguments (mapcar #'qubit qubits-on-obj)
-                                   :gate matrix))
+                                   :gate (make-instance 'simple-gate :matrix matrix)))
               chip-specification))))
 
       (destructuring-bind (start-wf wf-qc)
