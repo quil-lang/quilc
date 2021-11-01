@@ -114,3 +114,44 @@ MEASURE 2 ro[2]"))
     (not-signals error
       (quil:compiler-hook (quil:parse-quil program)
                           (quil::build-disconnected-chip 3)))))
+
+;;; Check that we can compile a more complicated program on a more
+;;; complicated chip, both with multiple connected components that
+;;; cannot be matched with the identity function.
+(deftest test-addresser-multiple-components-nontrivial ()
+  (let ((program "DECLARE ro BIT[3]
+CZ 0 1
+RX(pi/2) 2
+MEASURE 0 ro[0]
+MEASURE 1 ro[1]
+MEASURE 2 ro[2]"))
+    (not-signals error
+      (quil:compiler-hook (quil:parse-quil program)
+                          (quil::build-chip-from-digraph '((1 2)))))))
+
+;;; Check that we signal the right condition when the naive rewiring
+;;; crosses chip component boundaries.
+(deftest test-addresser-multiple-components-fails ()
+  (let ((program "DECLARE ro BIT[3]
+CZ 0 1
+RX(pi/2) 2
+MEASURE 0 ro[0]
+MEASURE 1 ro[1]
+MEASURE 2 ro[2]"))
+    (signals quil::naive-rewiring-crosses-chip-boundaries
+      (quil:compiler-hook (quil:parse-quil program)
+                          (quil::build-disconnected-chip 3)
+                          :rewiring-type :naive))))
+
+;;; Check that we signal the right condition when there aren't enough qubits on the chip.
+(deftest test-addresser-insufficient-qubits ()
+  (let ((program "DECLARE ro BIT[3]
+RX(pi/2) 0
+RX(pi/2) 1
+RX(pi/2) 2
+MEASURE 0 ro[0]
+MEASURE 1 ro[1]
+MEASURE 2 ro[2]"))
+    (signals quil::chip-insufficient-qubits
+      (quil:compiler-hook (quil:parse-quil program)
+                          (quil::build-disconnected-chip 2)))))

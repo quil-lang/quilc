@@ -81,7 +81,7 @@ HALT
                 "{\"isa\":
         {\"1Q\": {\"1\": {}, \"3\": {}},
          \"2Q\": {\"1-2\": {}, \"2-3\": {}}}}"))))
-    (signals error (compiler-hook progm chip))))
+    (signals quil::connected-components-incompatible (compiler-hook progm chip))))
 
 (deftest test-sohaib-gh-361-regression ()
   "Regression test for github issue #361."
