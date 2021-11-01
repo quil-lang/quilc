@@ -120,7 +120,8 @@
                               :components ((:file "quil-backend")))))
                (:module "addresser"
                 :serial t
-                :components ((:file "rewiring")
+                :components ((:file "conditions")
+                             (:file "rewiring")
                              (:file "initial-rewiring")
                              (:file "logical-schedule")
                              (:file "outgoing-schedule")

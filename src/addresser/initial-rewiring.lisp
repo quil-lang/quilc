@@ -194,11 +194,9 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
                     unallocated-chip-cc)
               (decf free prog-cc-size))))))
     (when unallocated-prog-ccs
-      (error "User program incompatible with chip: The program uses operations ~
-    on qubits that cannot be logically mapped onto the chip topology. This set ~
-    of qubits in the program cannot be assigned to qubits on the chip ~
-    compatibly under a greedy connected component allocation scheme: ~a. The ~
-    chip has the components ~a." prog-ccs chip-ccs))
+      (error 'connected-components-incompatible
+             :program-connected-components prog-ccs
+             :chip-connected-components chip-ccs))
     l2p-components))
 
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
@@ -206,10 +204,10 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
   (let ((n-qubits (chip-spec-n-qubits chip-spec))
         (chip-connected-components (chip-spec-live-qubit-cc chip-spec))
         (prog-connected-components (prog-used-qubits-ccs parsed-prog)))
-    (assert (<= (qubits-needed parsed-prog) n-qubits)
-            ()
-            "User program incompatible with chip: qubit index ~A used and ~A available."
-            (qubits-needed parsed-prog) n-qubits)
+    (when (> (qubits-needed parsed-prog) n-qubits)
+      (error 'chip-insufficient-qubits
+             :needed (qubits-needed parsed-prog)
+             :available n-qubits))
     (case type
       (:naive
        ;; Check that every connected component of program qubits is contained
@@ -217,7 +215,7 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
        (unless (loop :for prog-connected-component in prog-connected-components
                      :always (loop :for chip-connected-component in chip-connected-components
                                      :thereis (subsetp prog-connected-component chip-connected-component)))
-         (error "User program incompatible with chip: naive rewiring crosses chip component boundaries."))
+         (error 'naive-rewiring-crosses-chip-boundaries))
        (make-rewiring n-qubits))
       (:partial
        (make-partial-rewiring n-qubits))
