@@ -40,6 +40,7 @@ dump-version-info:
 		--eval '(format t "~A ~A" (lisp-implementation-type) (lisp-implementation-version))' \
 		--eval '(print (ql-dist:find-system "alexa"))' \
 		--eval '(print (ql-dist:find-system "magicl"))' \
+		--eval '(print (ql-dist:find-system "qvm"))' \
 		--eval '(print (ql-dist:find-system "rpcq"))' \
 		--eval '(terpri)' --quit
 
