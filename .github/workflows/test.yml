@@ -15,11 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Run a multi-line script
+      - name: Run a multi-line script - test-cl-quil
         run: |
-          docker build -t rigetti/quilc:${GITHUB_SHA} .
-          docker run --rm --entrypoint=make rigetti/quilc:${GITHUB_SHA} test-cl-quil
-          docker rmi rigetti/quilc:${GITHUB_SHA}
+          sudo apt install sbcl
+          mkdir -p ${HOME}/quicklisp/local-projects
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/qvm.git
+          make quicklisp
+          sudo make install-test-deps
+          make test-cl-quil
 
   test-quilc:
     name: Test quilc
@@ -27,9 +31,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Run a multi-line script
+      - name: Run a multi-line script - test-quilc
         run: |
           sudo apt install sbcl
+          mkdir -p ${HOME}/quicklisp/local-projects
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/qvm.git
           make quicklisp
           sudo make install-test-deps
           make test-quilc
@@ -40,10 +47,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Run a multi-line script
+      - name: Run a multi-line script - test-quilt
         run: |
           sudo apt install sbcl
+          mkdir -p ${HOME}/quicklisp/local-projects
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/qvm.git
           make quicklisp
           sudo make install-test-deps
           make test-quilt
-
