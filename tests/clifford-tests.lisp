@@ -14,12 +14,12 @@
 
   (is (every (lambda (x) (member x '(a b c))) (quil.clifford::sample-from '(a b c) 10)))
 
-  (let ((q (quil.clifford::make-queue)))
-    (quil.clifford::enqueue q 'A)
-    (quil.clifford::enqueue q 'B)
-    (is (equalp (quil.clifford::dequeue q) 'A))
-    (is (equalp (quil.clifford::dequeue q) 'B))
-    (is (equalp (quil.clifford::dequeue q) nil))))
+  (let ((q (quil:make-queue)))
+    (quil:enqueue q 'A)
+    (quil:enqueue q 'B)
+    (is (equalp (quil:dequeue q) 'A))
+    (is (equalp (quil:dequeue q) 'B))
+    (is (equalp (quil:dequeue q) nil))))
 
 (deftest test-paulis ()
   (is (quil.clifford::pauli-sym-p 'quil.clifford::X))
