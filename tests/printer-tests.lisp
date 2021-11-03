@@ -217,7 +217,7 @@ Used as a helper function in TEST-REAL-FMT."
 
 (deftest test-real-fmt ()
   ;; Test some simple cases which should be unaffected by *PRINT-FRACTIONAL-RADIANS*.
-  (let ((simple-cases `((-1e-5 . "-0.00001")
+  (let ((simple-cases `(#-allegro (-1e-5 . "-0.00001")
                         (-1.1 . "-1.1")
                         (-1.1d0 . "-1.1")
                         (-1 . "-1.0")
@@ -232,7 +232,8 @@ Used as a helper function in TEST-REAL-FMT."
                         (3/2 . "1.5")
                         (2.3 . "2.3")
                         (1234.1234 . "1234.1234")
-                        (2e10 . "20000000000.0"))))
+                        #-allegro (2e10 . "20000000000.0")
+                        )))
     (%check-format #'string= "~/quil:real-fmt/" simple-cases :print-fractional-radians t)
     (%check-format #'string= "~/quil:real-fmt/" simple-cases :print-fractional-radians nil))
 

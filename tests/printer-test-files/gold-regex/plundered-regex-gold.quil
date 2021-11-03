@@ -57,6 +57,7 @@ LT b\[0\] theta\[0\] -pi/2
 LT b\[0\] theta\[0\] 14\.5663\d+
 
 # Input
+# Disable fixed-point check
 # Plundered from ../../good-test-files/good-complex-complex-number.quil
 # Complex number syntax.
 RY(-1.1E-1-1.2e2i) 1

@@ -348,9 +348,10 @@ U(time) 2 1 0"))
   (let* ((qubit-count 3)
          (string-count 6)
          (pauli-strings (loop :for n :below string-count
-                              :collect (format nil "    ~a(~f*%t)~{ q~a~}"
-                                               (random-pauli-word qubit-count) (random pi)
-                                               (a:iota qubit-count))))
+                              :collect (let ((*read-default-float-format* 'double-float))
+                                         (format nil "    ~a(~f*%t)~{ q~a~}"
+                                                 (random-pauli-word qubit-count) (random pi)
+                                                 (a:iota qubit-count)))))
          (program (format nil "
 PRAGMA INITIAL_REWIRING \"NAIVE\"
 DECLARE time REAL
