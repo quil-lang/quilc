@@ -1308,21 +1308,26 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
   "Print the real number R nicely to the stream STREAM."
   (check-type r real)
   (check-type stream stream)
-  (cond
-    ((or (double~ (abs r) 0) (not *print-fractional-radians*))
-     (format stream "~F" r))
-    (t
-     (loop :with r-abs := (abs r)
-           :for rr :across **reasonable-rationals**
-           :for numer := (numerator rr)
-           :for denom := (denominator rr)
-           :when (double~ r-abs (/ (* pi numer) denom)) :do
-             ;; Pretty-print "reasonable" integer and fractional multiples of pi.
-             (format stream "~:[~;-~]~:[~D*~;~*~]~A~:[/~D~;~*~]"
-                     (minusp r) (= 1 numer) numer *pi-literal* (= 1 denom) denom)
-             (return-from format-real))
-     ;; If we cannot find a nice fraction of pi, just print the real number.
-     (format stream "~F" r))))
+  (flet ((%format (r)
+           (if (floatp r)
+               (let ((*read-default-float-format* (type-of r)))
+                 (format stream "~F" r))
+               (format stream "~F" r))))
+    (cond
+      ((or (double~ (abs r) 0) (not *print-fractional-radians*))
+       (%format r))
+      (t
+       (loop :with r-abs := (abs r)
+             :for rr :across **reasonable-rationals**
+             :for numer := (numerator rr)
+             :for denom := (denominator rr)
+             :when (double~ r-abs (/ (* pi numer) denom)) :do
+               ;; Pretty-print "reasonable" integer and fractional multiples of pi.
+               (format stream "~:[~;-~]~:[~D*~;~*~]~A~:[/~D~;~*~]"
+                       (minusp r) (= 1 numer) numer *pi-literal* (= 1 denom) denom)
+               (return-from format-real))
+       ;; If we cannot find a nice fraction of pi, just print the real number.
+       (%format r)))))
 
 (defun real-fmt (stream r &optional colon-modifier at-modifier)
   "Like the function format-real, but is compatible with format strings using the ~/.../ directive.
@@ -1345,18 +1350,22 @@ For example,
        ((zerop (imagpart z))
         (format-real (realpart z) stream))
        (*print-polar-form*
-        (format stream "~F∠" (abs z))
+        (let* ((z-abs (abs z))
+               (*read-default-float-format* (type-of z-abs)))
+          (format stream "~F∠" z-abs))
         (format-real (mod (phase z) (* 2 pi)) stream))
        (t
         (format stream "~A~A~A"
                 (if (zerop (realpart z))
                     ""
-                    (format nil "~F" (realpart z)))
+                    (let ((*read-default-float-format* (type-of (realpart z))))
+                      (format nil "~F" (realpart z))))
                 (if (and (plusp (imagpart z))
                          (not (zerop (realpart z))))
                     (format nil "+")
                     "")
-                (format nil "~Fi" (imagpart z))))))))
+                (let ((*read-default-float-format* (type-of (imagpart z))))
+                  (format nil "~Fi" (imagpart z)))))))))
 
 (defun complex-fmt (stream z &optional colon-modifier at-modifier)
   "Like the function format-complex, but is compatible with format strings using the ~/.../ directive.

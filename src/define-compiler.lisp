@@ -965,8 +965,8 @@ N.B.: This routine is somewhat fragile, and highly creative compiler authors wil
                             (loop :for item :in (case (first param-list)
                                                   ((quote
                                                     ;; generic attempt to detect quasiquotes
-                                                    #+(or sbcl ecl ccl clisp) #.(first (quote `(t)))
-                                                    #-(or sbcl ecl ccl clisp) #.(cerror "Bravely, boldly, stupidly continue." "I don't know how to detect quasiquotes."))
+                                                    #+(or allegro sbcl ecl ccl clisp) #.(first (quote `(t)))
+                                                    #-(or allegro sbcl ecl ccl clisp) #.(cerror "Bravely, boldly, stupidly continue." "I don't know how to detect quasiquotes."))
                                                    (second param-list))
                                                   ((list)
                                                    (rest param-list))

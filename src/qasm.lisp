@@ -471,7 +471,8 @@
           ((eql (token-type token) ':RIGHT-PAREN)
            ")")
           ((typep payload 'quil:constant)
-           (format nil "~F" (quil:constant-value payload)))
+           (let ((*read-default-float-format* (type-of (quil:constant-value payload))))
+             (format nil "~F" (quil:constant-value payload))))
           (t
            (format nil "~A" payload)))))
 
@@ -630,11 +631,14 @@ Note: the above \"expansion\" is not performed when in a gate body."
            (a:if-let ((gate (gethash (%qasm-gate-name name) *gate-names*)))
              (values
               (if (eql gate ':opaque)
-                  (quil::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
-                                     (format nil "(~{~F~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
-                                             (mapcar #'quil:constant-value params)
-                                             (mapcar #'register-to-quil-object
-                                                     registers)))
+                  (let* ((params-constant-values (mapcar #'quil:constant-value params))
+                         (*read-default-float-format* (or (and (null params) 'single-float)
+                                                          (type-of (car params-constant-values)))))
+                    (quil::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
+                                       (format nil "(~{~F~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
+                                               params-constant-values
+                                               (mapcar #'register-to-quil-object
+                                                       registers))))
                   (apply #'map-registers (lambda (&rest qubits)
                                            (make-instance 'quil:unresolved-application
                                                           :operator (quil:named-operator (%qasm-gate-name name))
