@@ -18,62 +18,36 @@ RANDOM: Start with a random rewiring.
 NAIVE: Start with the identity rewiring. This will fail if any 2-qubit gates are
 impossible using that rewiring.")
 
-
-;;; a minimalist queue implementation ;;;
-(defun make-q (&rest items)
-  (let ((dummy (list nil)))
-    (list* (nconc items dummy) dummy)))
-(defun q-empty (q)
-  (eql (car q) (cdr q)))
-(defun q-enq (el q)
-  (setf (cadr q) el
-        (cddr q) (list nil)
-        (cdr q) (cddr q))
-  q)
-(defun q-deq (q)
-  (if (q-empty q) nil (pop (car q))))
-
-
 (defun chip-spec-live-qubit-bfs (chip-spec qubit-index &optional seen)
   "From a given initial qubit, find the distance to every other qubit in the connected component. SEEN is an array of T/NIL for each qubit, indicating whether that qubit has been visited yet."
   (assert (not (chip-spec-qubit-dead? chip-spec qubit-index)) (qubit-index)
           "Cannot BFS from dead qubit ~A."
           qubit-index)
-  (loop
-    :with level := 0
-    :and seen := (or seen (make-array (chip-spec-n-qubits chip-spec) :initial-element nil))
-
-    ;; this uses a trick where a special nil token signifies we have reached the
-    ;; next level of the bfs
-    :and queue := (make-q qubit-index nil)
-           :initially (setf (aref seen qubit-index) t)
-
-    :for cur := (q-deq queue)
-    :until (q-empty queue) ; if empty, only special token was left
-
-    :if cur
-      ;; process a node
-      :do (dolist (adj (chip-spec-adj-qubits chip-spec cur))
-            (unless (or (chip-spec-qubit-dead? chip-spec adj) (aref seen adj))
-              (q-enq adj queue)
-              (setf (aref seen adj) t)))
-      :and :collect (cons cur level) :into distances
-    :else
-      ;; we have reached the end of the level
-      :do (incf level)
-      :and :do (q-enq nil queue)
-
-    :finally (return (values distances seen))))
+  (let ((seen (or seen (make-array (chip-spec-n-qubits chip-spec) :initial-element nil)))
+        (queue (make-queue))
+        (distances (list (cons qubit-index 0))))
+    (enqueue queue (first distances))
+    (setf (aref seen qubit-index) t)
+    (loop
+      (when (queue-empty-p queue)
+        (return (values (nreverse distances) seen)))
+      (destructuring-bind (node . distance)
+          (dequeue queue)
+        (dolist (adj (chip-spec-adj-qubits chip-spec node))
+          (unless (or (chip-spec-qubit-dead? chip-spec adj)
+                      (aref seen adj))
+            (let ((node+distance (cons adj (1+ distance))))
+              (push node+distance distances)
+              (enqueue queue node+distance)
+              (setf (aref seen adj) t))))))))
 
 (defun chip-spec-live-qubit-cc (chip-spec)
   "Get a list of lists of live qubits that are in the same connected component on the chip."
-  (loop
-    :with n-qubits := (chip-spec-n-qubits chip-spec)
-    :with seen := (make-array n-qubits :initial-element nil)
-
-    :for qubit :below n-qubits
-    :unless (or (chip-spec-qubit-dead? chip-spec qubit) (aref seen qubit))
-      :collect (mapcar #'car (chip-spec-live-qubit-bfs chip-spec qubit seen))))
+  (let* ((n-qubits (chip-spec-n-qubits chip-spec))
+         (seen (make-array n-qubits :initial-element nil)))
+    (loop :for qubit :below n-qubits
+          :unless (or (chip-spec-qubit-dead? chip-spec qubit) (aref seen qubit))
+            :collect (mapcar #'car (chip-spec-live-qubit-bfs chip-spec qubit seen)))))
 
 (defun prog-used-qubits-ccs (parsed-prog)
   "Return the connected components of qubits as used by the program."
@@ -125,12 +99,11 @@ impossible using that rewiring.")
 (defun compute-adjacency-weights (n-qubits order)
   "Given the order in which to expect qubits, compute the relative benefit of
 being close to each of the n qubits."
-  (loop
-    :with weights-by-qubit := (make-array n-qubits :initial-element 0d0)
-    :for adj :in order
-    :for weight := 1d0 :then (/ weight *rewiring-adjacency-weight-decay*)
-    :do (incf (aref weights-by-qubit adj) weight)
-    :finally (return weights-by-qubit)))
+  (let ((weights-by-qubit (make-array n-qubits :initial-element 0d0)))
+    (loop :for adj :in order
+          :for weight := 1d0 :then (/ weight *rewiring-adjacency-weight-decay*)
+          :do (incf (aref weights-by-qubit adj) weight))
+    weights-by-qubit))
 
 (defun prog-rewiring-pragma (parsed-prog)
   "Finds a rewiring pragma in the parsed program. This pragma needs to occur
@@ -238,13 +211,13 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
        (let ((rewiring (make-partial-rewiring n-qubits))
              (l2p-components (greedy-prog-ccs-to-chip-ccs chip-connected-components
                                                           prog-connected-components))
-              ;; compute for each qubit pair (q1 q2) the benefit of putting q2 close to q1
-              (l2l-multiplier (map 'vector
-                                   (lambda (order) (compute-adjacency-weights n-qubits order))
-                                   (prog-qubit-pair-order n-qubits parsed-prog)))
+             ;; compute for each qubit pair (q1 q2) the benefit of putting q2 close to q1
+             (l2l-multiplier (map 'vector
+                                  (lambda (order) (compute-adjacency-weights n-qubits order))
+                                  (prog-qubit-pair-order n-qubits parsed-prog)))
 
-              ;; physical qubit -> logical qubit -> distance
-              (p2l-distances (make-array n-qubits :initial-element nil)))
+             ;; physical qubit -> logical qubit -> distance
+             (p2l-distances (make-array n-qubits :initial-element nil)))
          (flet ((qubit-best-location (qubit prog-cc)
                   (let ((l-multiplier (aref l2l-multiplier qubit))
                         best
