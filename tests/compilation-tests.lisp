@@ -140,6 +140,19 @@ ISWAP 5 2"))
          (2q-code (program-2q-instructions cp)))
     (is (every (link-nativep chip) 2q-code))))
 
+(deftest test-bloch-gate-compilation ()
+  (let* ((chip (quil::build-ibm-qx5))
+         (pp (parse-quil "
+BLOCH(0,0,0) 0
+BLOCH(0.1, 0.2, 0.3) 1
+CONTROLLED BLOCH(-pi, pi/2, 0.1) 2 3
+DAGGER BLOCH(-0.1, -0.2, -0.3) 4
+"))
+         (cp (let ((quil::*compress-carefully* nil))
+               (compiler-hook pp chip)))
+         (2q-code (program-2q-instructions cp)))
+    (is (every (link-nativep chip) 2q-code))))
+
 (deftest test-cnot-triangle ()
   (let* ((chip (quil::build-nq-linear-chip 3 :architecture ':cnot))
          (orig-prog (quil::parse-quil "

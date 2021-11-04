@@ -247,6 +247,15 @@ DEFCIRCUIT FOO(%a) q:
       (signals quil-parse-error
         (parse-quil (read-quil-file path1))))))
 
+(deftest test-pauli-sum-parsing ()
+  (let ((p (parse-quil-into-raw-program "
+DEFGATE FOO(%a) q AS PAULI-SUM:
+    X(%a) q
+
+")))
+    (is (listp p))
+    (is (= 1 (length p)))
+    (is (typep (first p) 'cl-quil::exp-pauli-sum-gate-definition))))
 
 
 

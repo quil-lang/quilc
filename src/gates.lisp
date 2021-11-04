@@ -316,15 +316,17 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 ;;; Load all of the standard gates from src/quil/stdgates.quil
 (global-vars:define-global-var **default-gate-definitions**
-    (let ((table (make-hash-table :test 'equal))
-          (gate-defs (remove-if-not (lambda (obj) (typep obj 'gate-definition))
-                      (parse-quil-into-raw-program
-                       (a:read-file-into-string
-                        (asdf:system-relative-pathname
-                         "cl-quil" "src/quil/stdgates.quil"))))))
-      (dolist (gate-def gate-defs table)
-        (setf (gethash (gate-definition-name gate-def) table)
-              gate-def)))
+    (let ((stdgates-file (asdf:system-relative-pathname
+                          "cl-quil" "src/quil/stdgates.quil")))
+      (format t "~&; loading standard gates from ~A~%" stdgates-file)
+      (let ((table (make-hash-table :test 'equal))
+            (gate-defs
+              (remove-if-not (lambda (obj) (typep obj 'gate-definition))
+                             (parse-quil-into-raw-program
+                              (a:read-file-into-string stdgates-file)))))
+        (dolist (gate-def gate-defs table)
+          (setf (gethash (gate-definition-name gate-def) table)
+                gate-def))))
   "A table of default gate definitions, mapping string name to a GATE-DEFINITION object.")
 
 (defun standard-gate-names ()
