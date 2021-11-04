@@ -103,7 +103,7 @@
   (inst "RX" (list (* 2 pi (random 5))) 0))
 
 (define-fuzzer cl-quil::uncontrol-rotation ()
-  (inst (controlled-operator (named-operator "RX")) (list (mref "fuzz" 0)) 0))
+  (inst (controlled-operator (named-operator "RX")) (list (mref "fuzz" 0)) 0 1))
 
 (define-fuzzer cl-quil::undagger-rotation ()
   (inst (dagger-operator (named-operator "RX")) (list (mref "fuzz" 0)) 0))
