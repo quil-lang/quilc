@@ -949,30 +949,36 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
       ;; strip off the indentation.
       (setf body-lines (list* modified-line (rest body-lines)))
       ;; otherwise, iterate til we hit a dedent token.
-      (loop :for line :in body-lines
+      (loop :with parsed-entries := nil
+            :with remaining-lines := nil ; If there's no dedent, this
+                                         ; will remain empty
+            :for line :in body-lines
             :for rest-lines := (rest body-lines) :then (rest rest-lines)
-            :with parsed-entries := nil
             :do (multiple-value-bind (dedented? modified-line)
                     (dedented-line-p line)
-                  ;; if we're done, return the gate definition (and the rest of the lines)
+                  ;; if we're done, return the gate definition (and
+                  ;; the rest of the lines)
                   (when dedented?
-                    (return-from parse-gate-definition-body-into-pauli-sum
-                      (values (make-instance 'exp-pauli-sum-gate-definition
-                                             :name name
-                                             :terms (nreverse parsed-entries)
-                                             :context lexical-context
-                                             :arguments legal-arguments
-                                             :parameters (mapcar (lambda (p)
-                                                                   (or (cadr (assoc p *arithmetic-parameters* :test #'equalp))
-                                                                       (make-symbol (format nil "~a-UNUSED" (param-name p)))))
-                                                                 legal-parameters))
-                              (list* modified-line rest-lines))))
-                  ;; store this word/qubits pair as part of the gate definition
-                  (setf parsed-entries (list* (parse-pauli-sum-line line
-                                                                    :lexical-context lexical-context
-                                                                    :legal-parameters legal-parameters
-                                                                    :legal-arguments legal-arguments)
-                                              parsed-entries)))))))
+                    (setf remaining-lines (cons modified-line rest-lines))
+                    (loop-finish))
+                  ;; store this word/qubits pair as part of the gate
+                  ;; definition
+                  (push (parse-pauli-sum-line line
+                                              :lexical-context lexical-context
+                                              :legal-parameters legal-parameters
+                                              :legal-arguments legal-arguments)
+                        parsed-entries))
+            :finally (return
+                       (values (make-instance 'exp-pauli-sum-gate-definition
+                                 :name name
+                                 :terms (nreverse parsed-entries)
+                                 :context lexical-context
+                                 :arguments legal-arguments
+                                 :parameters (mapcar (lambda (p)
+                                                       (or (cadr (assoc p *arithmetic-parameters* :test #'equalp))
+                                                           (make-symbol (format nil "~a-UNUSED" (param-name p)))))
+                                                     legal-parameters))
+                               remaining-lines))))))
 
 (defun parse-pauli-sum-line (line &key lexical-context legal-arguments legal-parameters)
   "Parses a line inside of a DEFGATE ... AS PAULI-SUM body."
