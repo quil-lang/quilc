@@ -290,9 +290,6 @@ Returns a value list: (processed-program, of type parsed-program
                                                      (basic-block-in-rewiring blk)
                                                      initial-rewiring))
                    (coerce (basic-block-code blk) 'list)
-                   :initial-rewiring (if registrant
-                                         (basic-block-in-rewiring blk)
-                                         initial-rewiring)
                    :use-free-swaps (null registrant))
                (let* ((duration (chip-schedule-duration chip-schedule))
                       (straight-line-quil (chip-schedule-to-straight-quil chip-schedule))
@@ -321,9 +318,7 @@ Returns a value list: (processed-program, of type parsed-program
                                     :l2p-components l2p-components
                                     :initial-l2p (prog-initial-rewiring parsed-program chip-specification
                                                                         :type rewiring-type))
-                   (coerce (basic-block-code blk) 'list)
-                   :initial-rewiring (prog-initial-rewiring parsed-program chip-specification
-                                                            :type rewiring-type))
+                   (coerce (basic-block-code blk) 'list))
                (let* ((duration (chip-schedule-duration chip-schedule))
                       (straight-line-quil (chip-schedule-to-straight-quil chip-schedule))
                       (local-topological-swaps (count-if #'swap-application-p straight-line-quil))

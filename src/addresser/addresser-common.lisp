@@ -623,7 +623,6 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 (defgeneric do-greedy-addressing (state ; initial addresser state
                                   instrs ; list of instructions to schedule
                                   &key
-                                    initial-rewiring ; optionally provide an initial rewiring
                                     use-free-swaps ; treat the initial rewiring as virtual
                                     )
   (:documentation
@@ -638,8 +637,8 @@ Optional arguments:
 ")
   (:method (state instrs &key (initial-rewiring nil) (use-free-swaps nil))
     (format-noise "DO-GREEDY-ADDRESSING: entrance.")
-    (let ((*addresser-use-free-swaps* (or use-free-swaps (not initial-rewiring))))
-      (with-slots (chip-spec lschedule working-l2p chip-sched initial-l2p) state
+    (with-slots (chip-spec lschedule working-l2p chip-sched initial-l2p) state
+      (let ((*addresser-use-free-swaps* (or use-free-swaps initial-l2p)))
         ;; This is governed by an FSM of the shape
         ;;
         ;; [ do-greedy-addressing ]
