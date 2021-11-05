@@ -52,12 +52,15 @@ INVERSE."
     ;; Store two copies of the identity mapping to start
     (init-rewiring :l2p id :p2l (copy-seq id))))
 
-(defun generate-random-rewiring (n)
-  "Generate a random rewiring of length N."
+(defun generate-random-rewiring (n l2p-components)
+  "Generate a random rewiring of length N constrained by the component mapping L2P-COMPONENTS."
   (loop
     :with rewiring := (make-rewiring n)
     :for end :downfrom n :above 1
-    :do (update-rewiring rewiring (1- end) (random end))
+    ;; when a qubit is unused, do not permute it.
+    :when (gethash n l2p-components)
+      :do (update-rewiring rewiring (1- end) (a:random-elt (find-physical-component l2p-components (1- end))))
+            
     :finally (return rewiring)))
 
 (defun copy-rewiring (rewiring)

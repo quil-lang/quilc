@@ -75,10 +75,6 @@ impossible using that rewiring.")
     :unless (or (chip-spec-qubit-dead? chip-spec qubit) (aref seen qubit))
       :collect (mapcar #'car (chip-spec-live-qubit-bfs chip-spec qubit seen))))
 
-(defun instr-used-qubits-ccs (instrs)
-  (prog-used-qubits-ccs
-   (make-instance 'parsed-program :executable-code (coerce instrs 'vector))))
-
 (defun prog-used-qubits-ccs (parsed-prog)
   "Return the connected components of qubits as used by the program."
   (let* ((n-qubits (qubits-needed parsed-prog))
@@ -173,11 +169,23 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
            ':naive)
       *initial-rewiring-default-type*))
 
+(defun naive-prog-ccs-to-chip-ccs (chip-ccs prog-ccs)
+  "Attempt to identically allocate the connected components of qubits as used in the program onto the chip connected components, and flame if such an allocation is not possible."
+  (let ((l2p-components (make-hash-table)))
+    ;; Check that every connected component of program qubits is
+    ;; contained in a connected component on the chip.
+    (dolist (prog-cc prog-ccs)
+      (dolist (chip-cc chip-ccs (error 'naive-rewiring-crosses-chip-boundaries))
+        (when (subsetp prog-cc chip-cc)
+          (setf (gethash prog-cc l2p-components) chip-cc)
+          (return))))
+    l2p-components))
+
 ;;; Note: This is a classic greedy allocation scheme, so it may not always be
 ;;; able to fit all the logical connected components into the given physical
 ;;; connected components when possible.
 (defun greedy-prog-ccs-to-chip-ccs (chip-ccs prog-ccs)
-  "Attempt to allocate the connected components of qubits as used in the program onto the chip connected components, and flame if such an allocation is not possible."
+  "Attempt to greedily allocate the connected components of qubits as used in the program onto the chip connected components, and flame if such an allocation is not possible."
   (let ((chip-ccs (sort chip-ccs #'> :key #'length))
         (unallocated-prog-ccs (sort prog-ccs #'> :key #'length))
         (l2p-components (make-hash-table)))
@@ -200,7 +208,7 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
     l2p-components))
 
 (defun prog-initial-rewiring (parsed-prog chip-spec &key (type *initial-rewiring-default-type*))
-  "Find an initial rewiring for a program, ensuring all used qubits in the program can fit on the connected components of the QPU compatibly."
+  "Find an initial rewiring for a program, ensuring all used qubits in the program can fit on the connected components of the QPU compatibly, and return the connected component assignment."
   (let ((n-qubits (chip-spec-n-qubits chip-spec))
         (chip-connected-components (chip-spec-live-qubit-cc chip-spec))
         (prog-connected-components (prog-used-qubits-ccs parsed-prog)))
@@ -210,17 +218,19 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
              :available n-qubits))
     (case type
       (:naive
-       ;; Check that every connected component of program qubits is contained
-       ;; in a connected component on the chip.
-       (unless (loop :for prog-connected-component in prog-connected-components
-                     :always (loop :for chip-connected-component in chip-connected-components
-                                     :thereis (subsetp prog-connected-component chip-connected-component)))
-         (error 'naive-rewiring-crosses-chip-boundaries))
-       (make-rewiring n-qubits))
+       (values (make-rewiring n-qubits)
+               (naive-prog-ccs-to-chip-ccs chip-connected-components
+                                           prog-connected-components)))
       (:partial
-       (make-partial-rewiring n-qubits))
+       (values (make-partial-rewiring n-qubits)
+               (greedy-prog-ccs-to-chip-ccs chip-connected-components
+                                            prog-connected-components)))
       (:random
-       (generate-random-rewiring n-qubits))
+       (let ((prog-ccs-to-chip-ccs
+               (greedy-prog-ccs-to-chip-ccs chip-connected-components
+                                            prog-connected-components)))
+         (values (generate-random-rewiring n-qubits prog-ccs-to-chip-ccs)
+                 prog-ccs-to-chip-ccs)))
       (:greedy
        ;; TODO: this assumes that the program is sequential
        (let ((rewiring (make-partial-rewiring n-qubits))
@@ -257,7 +267,7 @@ Otherwise, return *INITIAL-REWIRING-DEFAULT-TYPE*."
                  (loop
                    :for (other-location . distance) :in (chip-spec-live-qubit-bfs chip-spec location)
                    :do (push (cons qubit distance) (aref p2l-distances other-location))))))
-           rewiring)))
+           (values rewiring l2p-components))))
       (t
        (error "Unexpected rewiring type: ~A." type)))))
 

@@ -421,20 +421,22 @@ MEASURE 2 ro[2]
          (chip (quil::qpu-hash-table-to-chip-specification
                 (yason:parse "
 {\"isa\":
-{\"1Q\": {\"0\": {}, \"1\": {}, \"2\": {}, \"3\": {}, \"4\": {}, \"5\": {}, \"6\": {}, \"7\": {}, \"8\": {}}, \"2Q\": {\"0-3\": {}, \"0-1\": {}, \"1-4\": {}, \"1-2\": {}, \"2-5\": {}, \"3-6\": {}, \"3-4\": {}, \"4-7\": {}, \"4-5\": {}, \"5-8\": {}, \"6-7\": {}, \"7-8\": {}}}}")))
-         (initial-rewiring (quil::prog-initial-rewiring pp chip)))
-    (multiple-value-bind (code initial final)
-        (quil::do-greedy-addressing
-            (make-instance quil::*default-addresser-state-class*
-                           :chip-spec chip
-                           :initial-l2p initial-rewiring)
-          (coerce (parsed-program-executable-code pp) 'list)
-          :use-free-swaps t)
-      (declare (ignore code))
-      (is (every #'identity (quil::rewiring-l2p initial)))
-      (is (every #'identity (quil::rewiring-p2l initial)))
-      (is (every #'identity (quil::rewiring-l2p final)))
-      (is (every #'identity (quil::rewiring-p2l final))))))
+{\"1Q\": {\"0\": {}, \"1\": {}, \"2\": {}, \"3\": {}, \"4\": {}, \"5\": {}, \"6\": {}, \"7\": {}, \"8\": {}}, \"2Q\": {\"0-3\": {}, \"0-1\": {}, \"1-4\": {}, \"1-2\": {}, \"2-5\": {}, \"3-6\": {}, \"3-4\": {}, \"4-7\": {}, \"4-5\": {}, \"5-8\": {}, \"6-7\": {}, \"7-8\": {}}}}"))))
+    (multiple-value-bind (initial-rewiring l2p-components)
+        (quil::prog-initial-rewiring pp chip)
+      (multiple-value-bind (code initial final)
+          (quil::do-greedy-addressing
+              (make-instance quil::*default-addresser-state-class*
+                             :chip-spec chip
+                             :initial-l2p initial-rewiring
+                             :l2p-components l2p-components)
+            (coerce (parsed-program-executable-code pp) 'list)
+            :use-free-swaps t)
+        (declare (ignore code))
+        (is (every #'identity (quil::rewiring-l2p initial)))
+        (is (every #'identity (quil::rewiring-p2l initial)))
+        (is (every #'identity (quil::rewiring-l2p final)))
+        (is (every #'identity (quil::rewiring-p2l final)))))))
 
 (deftest test-pragma-preserve-block ()
   (let* ((pp (parse-quil "

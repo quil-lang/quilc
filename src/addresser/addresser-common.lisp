@@ -573,7 +573,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
             "Qubit ~a already assigned" logical)
     (let ((best-cost (build-worst-cost state))
           (best-physical nil))
-      (dolist (physical (find-physical-component state logical))
+      (dolist (physical (find-physical-component-in-state state logical))
         (unless (or (apply-rewiring-p2l working-l2p physical)
                     (chip-spec-qubit-dead? chip-spec physical))
           (let ((cost (with-rewiring-assign working-l2p logical physical
@@ -680,9 +680,6 @@ Optional arguments:
                          (assert (> *addresser-max-swap-sequence-length* (length rewirings-tried)) ()
                                  "Too many SWAP instructions selected in a row: ~a" (length rewirings-tried))
                          (setf rewirings-tried (select-and-embed-a-permutation state rewirings-tried)))))
-          (setf (addresser-state-l2p-components state)
-                (greedy-prog-ccs-to-chip-ccs (chip-spec-live-qubit-cc chip-spec)
-                                             (instr-used-qubits-ccs instrs)))
 
           ;; build the logically parallelized schedule
           (append-instructions-to-lschedule lschedule instrs)
