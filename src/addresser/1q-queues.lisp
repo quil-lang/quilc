@@ -120,7 +120,7 @@ following swaps."
       (unless physical
         ;; TODO: Should we try to pick the best one?
         (setf physical (loop
-                         :for physical :in (find-physical-component state qubit)
+                         :for physical :in (find-physical-component-in-state state qubit)
                          :unless (apply-rewiring-p2l working-l2p physical)
                            :return physical))
         (rewiring-assign working-l2p qubit physical))

@@ -15,6 +15,7 @@
                 :documentation "The working / current logical-to-physical rewiring. NOTE: This get mutated a _lot_."
                 :type rewiring)
    (l2p-components :accessor addresser-state-l2p-components
+                   :initarg :l2p-components
                    :documentation "The association of logical to physical components."
                    :type hash-table)
    (qq-distances :accessor addresser-state-qq-distances
@@ -119,12 +120,15 @@ INSTR is the \"active instruction\".
 
 ;;; Some utilities
 
-(defun find-physical-component (state logical)
-  "Uses STATE to get a physical qubit component from the logical qubit address LOGICAL."
+(defun find-physical-component-in-state (state logical)
+  (find-physical-component (addresser-state-l2p-components state) logical))
+
+(defun find-physical-component (l2p-components logical)
+  "Uses L2P-COMPONENTS to get a physical qubit component from the logical qubit address LOGICAL."
   (maphash (lambda (logical-component physical-component)
              (when (member logical logical-component)
                (return-from find-physical-component physical-component)))
-           (addresser-state-l2p-components state))
+           l2p-components)
   (error "Unable to find a physical connected component associated with the qubit ~a." logical))
 
 (defun compute-qubit-qubit-distances (chip-spec link-cost)
