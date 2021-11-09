@@ -372,3 +372,26 @@
                (:file "suite")
                (:file "hasse-diagram-tests")
                (:file "circuit-diagram-tests")))
+
+(asdf:defsystem #:cl-quil/smt
+  :description "Constraint-programming extensions to CL-QUIL."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil #:cl-smt-lib #:named-readtables)
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/smt-tests)))
+  :pathname "src/smt/"
+  :serial t
+  :components ((:file "constraint-addresser")
+               (:file "segment-2q")
+               (:file "tan-cong")))
+
+(asdf:defsystem #:cl-quil/smt-tests
+  :description "Tests for constraint-programming extensions."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil #:cl-quil/smt #:fiasco)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.smt-tests
+                                           '#:run-smt-tests))
+  :pathname "tests/"
+  :serial t
+  :components ((:file "smt-tests")))
+
