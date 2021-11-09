@@ -104,29 +104,25 @@
     (setf (bloch-vector-theta bv) (if (zerop def-theta) (random max-theta) def-theta))
     bv))
 
-(defun matrix-trace (m)
-  (loop :for i :below (magicl:matrix-cols m)
-        :sum (magicl:ref m i i)))
-
 (defun fidelity (m)
-  (let ((p (* 2 (log (magicl:matrix-cols m) 2))))
-    (/ (+ (expt (abs (matrix-trace m)) 2) p)
+  (let ((p (* 2 (log (magicl:ncols m) 2))))
+    (/ (+ (expt (abs (magicl:trace m)) 2) p)
        (+ (expt p 2) p))))
 
 ;;; Charles
 (defun charles-distance (u s)
-  (- 1 (fidelity (m* (magicl:conjugate-transpose s) u))))
+  (- 1 (fidelity (magicl:@ (magicl:conjugate-transpose s) u))))
 
 (defun operator-dist (u s)
   "Returns d(u, s) = ||U - S||, the operator norm of U - S defined in the paper."
-  (let ((sigma (nth-value 1 (magicl:svd (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s))))))
-    (magicl:ref sigma 0 0)))
+  (let ((sigma (nth-value 1 (magicl:svd (magicl:.- (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s))))))
+    (magicl:tref sigma 0 0)))
 
 (defun trace-dist (u s)
   "Returns the trace norm of U - S, equal to Tr[sqrt((U - S)'(U - S))]."
-  (let* ((u-s (magicl:sub-matrix (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s)))
-         (sigma (nth-value 1 (magicl:svd (m* (magicl:dagger u-s) u-s)))))
-    (loop :for i :below (magicl:matrix-rows sigma) :summing (sqrt (magicl:ref sigma i i)) :into norm :finally (return (/ norm 2)))))
+  (let* ((u-s (magicl:.- (bloch-phase-corrected-mat u) (bloch-phase-corrected-mat s)))
+         (sigma (nth-value 1 (magicl:svd (magicl:@ (magicl:dagger u-s) u-s)))))
+    (loop :for i :below (magicl:nrows sigma) :summing (sqrt (magicl:tref sigma i i)) :into norm :finally (return (/ norm 2)))))
 
 (defun find-c-gc (num-trials &key (distance-function #'operator-dist) (decompose-func #'gc-decompose))
   "Numerically tests for the value of c-gc, the upper bound on the ratio between d(V, I) [or d(W, I)] and sqrt(d(U, I)) if V and W are balanced group commutators of U."
@@ -187,8 +183,8 @@
   "Determines the order of MAT, i.e. how many times it has to be multiplied with itself to reach the identity matrix."
   (let ((curr-mat mat))
     (loop :for order :from 2 :to 50
-          :do (setf curr-mat (m* mat curr-mat))
-          :when (magicl:identityp curr-mat)
+          :do (setf curr-mat (magicl:@ mat curr-mat))
+          :when (magicl:identity-matrix-p curr-mat)
             :do (return order)
           :finally (return 0))))
 
@@ -302,7 +298,7 @@
                      (t (loop :for gate :in gates
                               :for i :from 0
                               :if (use-gate i last-idx rep-count)
-                                :do (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))
+                                :do (helper (1+ depth) (cons i seq) (magicl:@ mat gate) i (if (= i last-idx) (1+ rep-count) 1))
                               :else ;; Look at which sequences are being pruned
                               :do (format debug "Nonono! Not using gate ~A on sequence ~A~%" i seq)
                                   (incf neglected))))))
@@ -356,7 +352,7 @@
                            :for i :from 0
                            :for order := (elt (gate-orders decomposer) (floor i 2))
                            :if (use-gate i last-idx rep-count)
-                             :do (let ((found-seq (helper (1+ depth) (cons i seq) (m* mat gate) i (if (= i last-idx) (1+ rep-count) 1))))
+                             :do (let ((found-seq (helper (1+ depth) (cons i seq) (magicl:@ mat gate) i (if (= i last-idx) (1+ rep-count) 1))))
                                    (when found-seq (return found-seq))))
                      nil))))
     (if (< (operator-dist u (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "I")))) epsilon0)
@@ -376,7 +372,7 @@
   (if (zerop n)
       (fetch-base-approximation (base-approximations decomposer) u) #+ignore(gethash (map 'vector #'floor (matrix-to-grid-coord u +ballie-radius+)) base-approximations)
       (let ((next-u (sk-iter decomposer u (1- n))))
-        (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger (decompress-and-multiply decomposer next-u))))
+        (multiple-value-bind (v w) (gc-decompose (magicl:@ u (magicl:dagger (decompress-and-multiply decomposer next-u))))
           (let* ((v-next (sk-iter decomposer v (1- n)))
                  (w-next (sk-iter decomposer w (1- n))))
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
@@ -386,7 +382,7 @@
   (if (zerop n)
       (brute-base u decomposer 18 :epsilon0 epsilon0)
       (let ((next-u (brute-sk-iter decomposer u (1- n) :epsilon0 epsilon0)))
-        (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger (decompress-and-multiply decomposer next-u))))
+        (multiple-value-bind (v w) (gc-decompose (magicl:@ u (magicl:dagger (decompress-and-multiply decomposer next-u))))
           (let* ((v-next (brute-sk-iter decomposer v (1- n) :epsilon0 epsilon0))
                  (w-next (brute-sk-iter decomposer w (1- n) :epsilon0 epsilon0)))
             (cons next-u (list (make-commutator :v v-next :w w-next))))))))
@@ -420,13 +416,13 @@
 (defun decompress-and-multiply (decomposer item)
   "Returns the matrix produced by expanding and multiplying together all the gates represented inside ITEM."
   (if (typep item 'commutator)
-      (m* (decompress-and-multiply decomposer (commutator-v item))
-          (decompress-and-multiply decomposer (commutator-w item))
-          (magicl:dagger (decompress-and-multiply decomposer (commutator-v item)))
-          (magicl:dagger (decompress-and-multiply decomposer (commutator-w item))))
+      (magicl:@ (decompress-and-multiply decomposer (commutator-v item))
+                (decompress-and-multiply decomposer (commutator-w item))
+                (magicl:dagger (decompress-and-multiply decomposer (commutator-v item)))
+                (magicl:dagger (decompress-and-multiply decomposer (commutator-w item))))
       (if (and item (typep (car item) 'list))
-          (m* (decompress-and-multiply decomposer (cadr item)) (decompress-and-multiply decomposer (car item)))
-          (reduce #'m*
+          (magicl:@ (decompress-and-multiply decomposer (cadr item)) (decompress-and-multiply decomposer (car item)))
+          (reduce #'magicl:@
                   (reverse (mapcar (lambda (x) (elt (gates decomposer) x)) item))
                   :initial-value (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "I")))))))
 
@@ -437,14 +433,14 @@
          (curr-depth 0))
     (loop :while (< acc (operator-dist u curr-approx))
           :do (uiop:nest
-               (multiple-value-bind (v w) (gc-decompose (m* u (magicl:dagger curr-approx))))
+               (multiple-value-bind (v w) (gc-decompose (magicl:@ u (magicl:dagger curr-approx))))
                #+ignore(multiple-value-bind (v-approx v-approx-mat) (approximate decomposer v (* +c-approx+ (expt curr-acc 3/2))))
                #+ignore(multiple-value-bind (w-approx w-approx-mat) (approximate decomposer w (* +c-approx+ (e     xpt curr-acc 3/2))))
                (let* ((v-approx (decompose decomposer v :depth 4))
                       (v-approx-mat (decompress-and-multiply decomposer v-approx))
                       (w-approx (decompose decomposer w :depth 4))
                       (w-approx-mat (decompress-and-multiply decomposer w-approx))))
-               (progn (setf curr-approx (m* v-approx-mat w-approx-mat (magicl:dagger v-approx-mat) (magicl:dagger w-approx-mat) curr-approx))
+               (progn (setf curr-approx (magicl:@ v-approx-mat w-approx-mat (magicl:dagger v-approx-mat) (magicl:dagger w-approx-mat) curr-approx))
                       (setf seq (cons seq (list (make-commutator :v v-approx :w w-approx))))
                       (incf curr-depth)))
           :finally (return (values seq curr-approx)))))
@@ -470,10 +466,10 @@
 (defun matrix-to-bloch-vector (mat)
   "Returns the bloch-vector corresponding to the unitary matrix MAT."
   (let* ((phased-mat (bloch-phase-corrected-mat mat))
-         (x-sin (* -1 (imagpart (magicl:ref phased-mat 0 1))))
-         (y-sin (realpart (magicl:ref phased-mat 1 0)))
-         (z-sin (imagpart (/ (- (magicl:ref phased-mat 1 1) (magicl:ref phased-mat 0 0)) 2)))
-         (cos-theta (realpart (/ (+ (magicl:ref phased-mat 0 0) (magicl:ref phased-mat 1 1)) 2)))
+         (x-sin (* -1 (imagpart (magicl:tref phased-mat 0 1))))
+         (y-sin (realpart (magicl:tref phased-mat 1 0)))
+         (z-sin (imagpart (/ (- (magicl:tref phased-mat 1 1) (magicl:tref phased-mat 0 0)) 2)))
+         (cos-theta (realpart (/ (+ (magicl:tref phased-mat 0 0) (magicl:tref phased-mat 1 1)) 2)))
          (sin-theta (sqrt (+ (expt x-sin 2) (expt y-sin 2) (expt z-sin 2))))
          (theta (* 2 (atan sin-theta cos-theta)))
          (axis (make-array 3)))
@@ -490,17 +486,19 @@
          (ny (aref axis 1))
          (nz (aref axis 2))
          (axis-factor (* #C(0 -1) (sin half-theta))))
-    (magicl:add-matrix (magicl:scale (cos half-theta) (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "I"))))
-                       (magicl:scale (* nx axis-factor) (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "X"))))
-                       (magicl:scale (* ny axis-factor) (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "Y"))))
-                       (magicl:scale (* nz axis-factor) (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "Z")))))))
+    (reduce #'magicl:.+
+            (list
+             (magicl:scale (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "I"))) (cos half-theta))
+             (magicl:scale (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "X"))) (* nx axis-factor))
+             (magicl:scale (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "Y"))) (* ny axis-factor) )
+             (magicl:scale (quil:gate-matrix (quil:gate-definition-to-gate (quil:lookup-standard-gate "Z"))) (* nz axis-factor) )))))
 
 (defun bloch-phase-corrected-mat (mat)
   "Returns a matrix equal to MAT with corrected global phase such that it is in bloch-vector matrix form described in the comment above."
-  (let* ((diag-sum (+ (magicl:ref mat 0 0) (magicl:ref mat 1 1)))
-         (off-diag-sum (+ (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
-         (off-diag-diff (- (magicl:ref mat 1 0) (magicl:ref mat 0 1)))
-         (diag-diff (- (magicl:ref mat 0 0) (magicl:ref mat 1 1)))
+  (let* ((diag-sum (+ (magicl:tref mat 0 0) (magicl:tref mat 1 1)))
+         (off-diag-sum (+ (magicl:tref mat 1 0) (magicl:tref mat 0 1)))
+         (off-diag-diff (- (magicl:tref mat 1 0) (magicl:tref mat 0 1)))
+         (diag-diff (- (magicl:tref mat 0 0) (magicl:tref mat 1 1)))
          (phase-nums (list diag-sum off-diag-sum off-diag-diff diag-diff)))
     ;; In a matrix directly obtained from expanding the bloch-vector
     ;; representation, the sum of the diagonal and the difference of
@@ -508,11 +506,11 @@
     ;; difference and the off-diagonal sum should be purely
     ;; imaginary. Thus, we use the first non-zero number in these
     ;; quantities to find our phase correction.
-    (magicl:scale (loop :for i :below 4
+    (magicl:scale mat
+                  (loop :for i :below 4
                         :for num :in phase-nums
                         :when (not (zerop num))
-                          :do (return (* (/ (abs num) num) (if (evenp i) 1 #C(0 -1)))))
-                  mat)))
+                          :do (return (* (/ (abs num) num) (if (evenp i) 1 #C(0 -1))))))))
 
 ;;; ------------------------------------------------------------------
 ;;; -------------FUNCTIONS FOR FINDING GROUP COMMUTATORS--------------
@@ -586,8 +584,8 @@
          (rx-theta (bloch-vector-to-matrix (make-bloch-vector :theta u-theta :axis #(1 0 0))))
          (s (find-transformation-matrix u rx-theta)))
     (multiple-value-bind (b c) (gc-decompose-x-rotation rx-theta)
-      (values (m* s b (magicl:dagger s))
-              (m* s c (magicl:dagger s))))))
+      (values (magicl:@ s b (magicl:dagger s))
+              (magicl:@ s c (magicl:dagger s))))))
 
 (defun gc-decompose-alt (u)
   "Alternative group commutator decomposition."
@@ -595,8 +593,8 @@
          (phi (* 2 (asin (expt (/ (- 1 u-cos-half-theta) 2) 1/4))))
          (v (bloch-vector-to-matrix (make-bloch-vector :theta phi :axis #(1 0 0))))
          (w (bloch-vector-to-matrix (make-bloch-vector :theta phi :axis #(0 1 0))))
-         (s (find-transformation-matrix u (m* v w (magicl:dagger v) (magicl:dagger w)))))
-    (values (m* s v (magicl:dagger s)) (m* s w (magicl:dagger s)))))
+         (s (find-transformation-matrix u (magicl:@ v w (magicl:dagger v) (magicl:dagger w)))))
+    (values (magicl:@ s v (magicl:dagger s)) (magicl:@ s w (magicl:dagger s)))))
 
 ;;; Function for testing the quality of approximations as a function of the base approximation error
 (defun test-base-approximations (decomposer start end &key (depth 3) (step-size 0.1) (trials 100))
