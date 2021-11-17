@@ -51,11 +51,15 @@
   (etypecase obj
     (memory-ref
      (let ((memory-region (find-descriptor-for-mref obj memory-regions)))
-       (apply 'member (memory-descriptor-type memory-region) (a:ensure-list quil-type)
-              #+allegro (list :test 'equalp))))
+       #+allegro
+       (member (memory-descriptor-type memory-region) (a:ensure-list quil-type) :test 'equalp)
+       #-allegro
+       (member (memory-descriptor-type memory-region) (a:ensure-list quil-type))))
     (constant
-     (apply 'member (constant-value-type obj) (a:ensure-list quil-type)
-            #+allegro (list :test 'equalp)))))
+     #+allegro
+     (member (constant-value-type obj) (a:ensure-list quil-type) :test 'equalp)
+     #-allegro
+     (member (constant-value-type obj) (a:ensure-list quil-type)))))
 
 (defun check-mref (obj)
   (unless (typep obj 'memory-ref)
