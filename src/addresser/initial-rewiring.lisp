@@ -95,6 +95,8 @@ impossible using that rewiring.")
                      (setf (aref connected-component-map index) component1)))))))
       (loop :for inst :across (parsed-program-executable-code parsed-prog)
             :do (typecase inst
+                  (reset-qubit
+                   (ensure-qubit-component (reset-qubit-target inst)))
                   (measurement
                    (ensure-qubit-component (measurement-qubit inst)))
                   (application
