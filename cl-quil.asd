@@ -46,6 +46,7 @@
                (:file "options")
                (:file "types")
                (:file "utilities")
+               (:file "queue")
                (:file "magicl-constructors")
                (:file "relabeling")
                (:file "matrix-operations")
