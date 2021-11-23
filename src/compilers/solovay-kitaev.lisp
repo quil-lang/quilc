@@ -74,13 +74,15 @@
 (defun vector-distance (a b)
   "Norm of the vector A - B."
   (assert (= (length a) (length b)))
-  (loop :for ai :across a :for bi :across b
-        :sum (expt (- ai bi) 2) :into dist :finally (return (sqrt dist))))
+  (sqrt
+   (loop :for ai :across a
+         :for bi :across b
+         :sum (expt (- ai bi) 2))))
 
 (defun vector-normalize (v)
   "Normalizes the vector V in-place; returns its norm."
   (let ((norm (vector-norm v)))
-    (assert (> norm 0) nil "ERROR: cannot normalize the zero vector ~A" v)
+    (assert (plusp norm) nil "cannot normalize the zero vector ~A" v)
     (loop :for i :below (length v) :do (setf (aref v i) (/ (aref v i) norm)))
     norm))
 
