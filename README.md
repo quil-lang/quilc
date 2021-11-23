@@ -279,3 +279,4 @@ commit
 [550c4d2](https://sourceforge.net/p/sbcl/sbcl/ci/550c4d23c77cc670fb95d7216e3c6d493bbd76eb/). For
 this reason, it's not possible to use quilc or cl-quil with SBCL
 1.5.6, but any other recent SBCL version should work fine.
+
