@@ -1330,8 +1330,7 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
                                          (application-parameters application))
                      :arguments (mapcar #'copy-instance
                                         (application-arguments application))
-                     :name-resolution (copy-instance (gate-application-resolution
-                                                      application)))
+                     :name-resolution (gate-application-resolution application))
       (make-instance 'gate-application
                      :operator (copy-instance (application-operator application))
                      :parameters (mapcar #'copy-instance
