@@ -29,28 +29,21 @@
 (defun init-chip (&key (architecture ':cz))
   "Initialize a chip from a given architecture with no objects"
   (let ((chip-spec (quil::make-chip-specification
-                    :objects (vector (quil::make-adjustable-vector)
-                                     (quil::make-adjustable-vector))
                     :generic-rewriting-rules (coerce (quil::global-rewriting-rules) 'vector))))
     (quil::install-generic-compilers chip-spec architecture)
     chip-spec))
 
+;;; FIXME: Duplicate of BUILD-CHIP-FROM-DIGRAPH
 (defun make-graph-chip (graph &key (architecture ':cz))
   "Make a chip from a graph"
-  (let* ((chip-spec (init-chip :architecture architecture))
-         (qubits
-           (loop :for i :below (length graph) :collect (quil::build-qubit i :type '(:RZ :X/2 :MEASURE))))
-         (qubit-array (make-array (length graph) :initial-contents qubits))
-         (links
-           (loop
-             :for (a . b) :in (graph-edges graph)
-             :for link-index :from 0
-             :collect (quil::build-link a b :type architecture)
-             :do (vector-push-extend link-index (quil::vnth 1 (quil::hardware-object-cxns (aref qubit-array a))))
-             :do (vector-push-extend link-index (quil::vnth 1 (quil::hardware-object-cxns (aref qubit-array b)))))))
-    (setf (quil::chip-specification-objects chip-spec)
-          (make-array 2 :initial-contents (list qubit-array
-                                                (coerce links 'vector))))
+  (let ((chip-spec (init-chip :architecture architecture)))
+    (loop :for i :below (length graph)
+          :do (quil::adjoin-hardware-object
+               (quil::build-qubit i :type '(:RZ :X/2 :MEASURE))
+               chip-spec))
+    (loop
+      :for (a . b) :in (graph-edges graph)
+      :do (quil::install-link-onto-chip chip-spec a b :architecture architecture))
     (quil:warm-hardware-objects chip-spec)))
 
 ;; 0 -- 1

@@ -16,7 +16,6 @@
                 chip-spec-live-qubit-cc
                 chip-specification
                 chip-specification-objects
-                hardware-object-cxns
                 make-memory-descriptor
                 pragma-end-commuting-blocks
                 pragma-end-block

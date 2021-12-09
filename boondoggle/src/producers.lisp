@@ -120,7 +120,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                                      "This gate spec expects higher order hardware objects to exist.")
                              (elt (quil::chip-specification-objects chip-specification) gate-order)))
                          (device-index (random (length available-devices))))
-                    (quil::vnth 0 (quil::hardware-object-cxns (quil::vnth device-index available-devices)))))
+                    (quil::objects-on-hardware-object 0 (quil::vnth device-index available-devices))))
                  (t
                   (assert (< gate-order qubits-on-device)
                           nil

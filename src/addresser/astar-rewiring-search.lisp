@@ -70,7 +70,7 @@ index at a time, rather than one octet at a time."
 
 (defun next-swap-info (swap)
   (with-slots (link) swap
-    (destructuring-bind (q0 q1) (coerce (vnth 0 (hardware-object-cxns link)) 'list)
+    (destructuring-bind (q0 q1) (coerce (objects-on-hardware-object 0 link) 'list)
       ;; TODO: Eventually this should look up swap in the list. (See cost-function.lisp)
       (values
        (permutation-record-duration (vnth 0 (hardware-object-permutation-gates link)))

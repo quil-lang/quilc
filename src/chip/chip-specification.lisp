@@ -18,7 +18,8 @@
 (defconstant +forest-error-sentinel+ -1
   "The Forest database sometimes stores a fidelity of -1 to indicate that the fidelity estimation routine failed.")
 
-(defstruct chip-specification
+(defstruct (chip-specification
+            (:constructor %make-chip-specification))
   "Houses information about hardware components on a QPU.
 
 OBJECTS is an array. In its nth position, there is a vector of order n hardware objects on the chip.
@@ -28,9 +29,7 @@ GENERIC-COMPILERS is a vector of functions used as fallback compilation methods,
 GENERIC-REWRITING-RULES is a similar vector of REWRITING-RULE structures that the compressor loop can use to generate shorter gate strings when rules specialized to local hardware objects have been exhausted.  Again, the array is sorted by descending preference.
 
 LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.  It gets auto-populated by `WARM-CHIP-SPEC-LOOKUP-CACHE'. This should not be accessed directly; use `LOOKUP-HARDWARE-ADDRESS-BY-QUBITS'."
-  (objects (make-array 2 :initial-contents (list (make-adjustable-vector)
-                                                 (make-adjustable-vector)))
-   :type vector)
+  (objects (missing-arg) :type vector)
   (generic-compilers (make-adjustable-vector) :type vector)
   (generic-rewriting-rules (make-adjustable-vector) :type vector)
   (lookup-cache nil :type (or null hash-table)))
@@ -38,6 +37,14 @@ LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.
 (defmethod print-object ((cs chip-specification) stream)
   (print-unreadable-object (cs stream :type t :identity nil)
     (format stream "of ~{~D~^:~} objects" (map 'list #'length (chip-specification-objects cs)))))
+
+(defun make-chip-specification (&key (order 1) generic-rewriting-rules)
+  "Make a chip specification of order ORDER."
+  (%make-chip-specification
+   :objects (make-array (1+ order)
+                        :initial-contents (loop :repeat (1+ order)
+                                                :collect (make-adjustable-vector)))
+   :generic-rewriting-rules generic-rewriting-rules))
 
 (defstruct permutation-record
   "Houses information about a permutation gate, for ease of lookup by the greedy scheduler.
@@ -112,7 +119,8 @@ DURATION stores the measured gate duration (in nanoseconds)."
                     hardware-object-rewriting-rules
                     hardware-object-cxns
                     hardware-object-misc-data))
-(defstruct hardware-object
+(defstruct (hardware-object
+            (:constructor make-hardware-object (order)))
   "Houses information about a particular hardware object on a QPU.
 
 ORDER is a non-negative integer that counts the number of qubit subsidiaries of this hardware object. Equals (1- (length (vnth 0 (hardware-object-cxns this)))). (If you drew a schematic of a chip, this is also the dimension of the graphical representation of the hardware object: 0 for qubits, 1 for links, ... .)
@@ -130,12 +138,46 @@ CXNS is an array. In its nth position, there is a vector of the order n hardware
 MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
   (order 0 :type unsigned-byte :read-only t)
   (gate-information (make-hash-table :test #'equalp))
-  (compilation-methods (make-adjustable-vector))
-  (permutation-gates (make-adjustable-vector))
-  (rewriting-rules (make-adjustable-vector))
-  (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
-                                              (make-adjustable-vector))))
+  (compilation-methods (make-adjustable-vector) :type vector)
+  (permutation-gates (make-adjustable-vector) :type vector)
+  (rewriting-rules (make-adjustable-vector) :type vector)
+  (cxns (make-array 1 :initial-element nil :adjustable t) :type vector)
   (misc-data (make-hash-table :test #'equal) :type hash-table))
+
+(defun objects-on-hardware-object (order object)
+  "Get the objects of order ORDER connected to OBJECT."
+  ;; Make enough space.
+  (let ((cxns (hardware-object-cxns object)))
+    (when (<= (length cxns) order)
+      (setf (hardware-object-cxns object)
+            (adjust-array cxns (1+ order) :initial-element nil)))
+    (unless (vnth order cxns)
+      (setf (vnth order cxns)
+            (make-adjustable-vector)))
+    (vnth order cxns)))
+
+(defun connect-hardware-objects (chip-spec object1 object2)
+  "Connect hardware objects OBJECT1 onto OBJECT2 on CHIP-SPEC."
+  (let ((order1 (hardware-object-order object1))
+        (order2 (hardware-object-order object2))
+        (cxns1 (hardware-object-cxns object1))
+        (cxns2 (hardware-object-cxns object2))
+        (objects (chip-specification-objects chip-spec)))
+    ;; Make enough space.
+    (when (<= (length cxns1) order2)
+      (setf (hardware-object-cxns object1)
+            (adjust-array cxns1 (1+ order2) :initial-element nil)))
+    (when (<= (length cxns2) order1)
+      (setf (hardware-object-cxns object2)
+            (adjust-array cxns2 (1+ order1) :initial-element nil)))
+    (unless (vnth order2 cxns1)
+      (setf (vnth order2 cxns1) (make-adjustable-vector)))
+    (unless (vnth order1 cxns2)
+      (setf (vnth order1 cxns2) (make-adjustable-vector)))
+    (vector-push-extend (position object2 (vnth order2 objects))
+                        (vnth order2 cxns1))
+    (vector-push-extend (position object1 (vnth order1 objects))
+                        (vnth order1 cxns2))))
 
 (defun hardware-object-native-instruction-p (obj instr)
   "Emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and emits NIL if this instruction does not admit direct translation to a physical pulse.
@@ -173,6 +215,12 @@ Used to be an anonymous function associated to HARDWARE-OBJECT; now computed fro
 (defun chip-spec-links (chip-spec)
   "Get the links (as hardware-objects) for CHIP-SPEC."
   (vnth 1 (chip-specification-objects chip-spec)))
+(defun chip-spec-objects-of-order (chip-spec order)
+  "Get the hardware objects of order N for CHIP-SPEC."
+  (vnth order (chip-specification-objects chip-spec)))
+(defun chip-spec-order (chip-spec)
+  "Get the order the CHIP-SPEC, i.e. the highest order of any present hardware object on this chip."
+  (length (chip-specification-objects chip-spec)))
 
 (defun chip-spec-n-qubits (chip-spec)
   "Get the number of qubits on CHIP-SPEC. Equivalent to the largest qubit index
@@ -181,6 +229,9 @@ used to specify CHIP-SPEC."
 (defun chip-spec-n-links (chip-spec)
   "Get the number of links on CHIP-SPEC."
   (length (chip-spec-links chip-spec)))
+(defun chip-spec-n-objects-of-order (chip-spec order)
+  "Get the number of hardware objects of order ORDER on CHIP-SPEC."
+  (length (chip-spec-objects-of-order chip-spec order)))
 
 (defun chip-spec-nth-qubit (chip-spec n)
   "Get the Nth qubit on chip-spec (as a hardware-object)."
@@ -188,21 +239,33 @@ used to specify CHIP-SPEC."
 (defun chip-spec-nth-link (chip-spec n)
   "Get the Nth link on chip-spec (as a hardware-object)."
   (vnth n (chip-spec-links chip-spec)))
+(defun chip-spec-nth-object-of-order (chip-spec order n)
+  "Get the Nth hardware object of order ORDER on chip-spec (as a hardware-object)."
+  (vnth n (chip-spec-objects-of-order chip-spec order)))
 
+(defun chip-spec-hw-objects-on-qubit (chip-spec order qubit-index)
+  "Get the objects of order ORDER associated with QUBIT-INDEX in CHIP-SPEC."
+  (objects-on-hardware-object order (chip-spec-nth-qubit chip-spec qubit-index)))
 (defun chip-spec-links-on-qubit (chip-spec qubit-index)
   "Get the links associated with QUBIT-INDEX in CHIP-SPEC."
-  (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-spec qubit-index))))
+  (objects-on-hardware-object 1 (chip-spec-nth-qubit chip-spec qubit-index)))
 (defun chip-spec-qubits-on-link (chip-spec link-index)
   "Get the qubits associated with LINK-INDEX in CHIP-SPEC."
-  (vnth 0 (hardware-object-cxns (chip-spec-nth-link chip-spec link-index))))
+  (objects-on-hardware-object 0 (chip-spec-nth-link chip-spec link-index)))
+(defun chip-spec-qubits-on-object (chip-spec order index)
+  "Get the qubits associated with the hardware object of ORDER at INDEX in CHIP-SPEC."
+  (objects-on-hardware-object 0 (chip-spec-nth-object-of-order chip-spec order index)))
 (defun chip-spec-hw-object (chip-spec order address)
   "Get the hardware-object with matching ORDER and ADDRESS."
   (vnth address (vnth order (chip-specification-objects chip-spec))))
 (defun chip-spec-adj-qubits (chip-spec qubit-index)
-  "Get the qubits adjacent (connected by a link) to QUBIT-INDEX in CHIP-SPEC."
-  (loop
-    :for link-index :across (chip-spec-links-on-qubit chip-spec qubit-index)
-    :append (remove qubit-index (coerce (chip-spec-qubits-on-link chip-spec link-index) 'list))))
+  "Get the qubits adjacent (connected via any order hardware object) to QUBIT-INDEX in CHIP-SPEC."
+  (let ((qubits '()))
+    (loop :for order :from 1 to (chip-spec-order chip-spec) :do
+      (loop :for index :across (chip-spec-hw-objects-on-qubit chip-spec order qubit-index)
+            :do (setq qubits
+                      (nunion qubits (coerce (chip-spec-qubits-on-object chip-spec order index) 'list)))))
+    (remove qubit-index qubits)))
 (defun chip-spec-adj-links (chip-spec link-index)
   "Get the links adjacent (connected by a qubit) to LINK-INDEX in CHIP-SPEC."
   (loop
@@ -233,11 +296,15 @@ used to specify CHIP-SPEC."
   (hardware-object-dead-p (chip-spec-nth-link chip-spec link-index)))
 
 (defun lookup-hardware-address-by-qubits (chip-spec args)
+  "Use the qubit list ARGS to find the hardware object acting on those
+qubits."
   (unless (chip-specification-lookup-cache chip-spec)
     (warm-chip-spec-lookup-cache chip-spec))
-  (a:when-let ((hash-value (gethash args (chip-specification-lookup-cache chip-spec))))
-    (destructuring-bind (index obj) hash-value
-      (values (1- (length args)) index obj))))
+  (let ((value (gethash (sort (copy-list args) #'<)
+                        (chip-specification-lookup-cache chip-spec))))
+    (when value
+      (destructuring-bind (index obj) value
+        (values (1- (length args)) index obj)))))
 
 (defun lookup-hardware-address (chip-spec instr)
   "Finds a hardware object OBJ in CHIP-SPEC whose qubit resources match those used by INSTR. Returns the values object (ORDER ADDRESS OBJ), so that OBJ equals (vnth ADDRESS (vnth ORDER (chip-specification-objects CHIP-SPEC)))."
@@ -272,9 +339,7 @@ used to specify CHIP-SPEC."
   (assert (/= qubit0 qubit1))
   (assert (a:xor (null gate-information) (null type)))
   (setf type (a:ensure-list type))
-  (let* ((obj (make-hardware-object
-               :order 1
-               :cxns (vector (vector qubit0 qubit1) #()))))
+  (let* ((obj (make-hardware-object 1)))
     ;; set up the SWAP record
     (vector-push-extend (make-permutation-record
                          :operator #.(named-operator "SWAP")
@@ -314,6 +379,40 @@ used to specify CHIP-SPEC."
     ;; return the link
     obj))
 
+(defun build-hardware-object (qubits &key type gate-information)
+  "Constructs a template Nth order hardware object. The hardware object the ordered subset of interacting qubits this object works with directly.
+
+ * The TYPE keyword can consist of (lists of) :CCNOT.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CCNOT indicates that `CCNOT _ _ _` is native for this object.
+
+ * The GATE-INFORMATION keyword is used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object."
+  (dolist (qubit qubits)
+    (check-type qubit unsigned-byte))
+  (check-type gate-information (or null hash-table))
+  (assert (subsetp qubits (remove-duplicates qubits)))
+  (assert (a:xor (null gate-information) (null type)))
+  (setf type (a:ensure-list type))
+  (let* ((n (length qubits))
+         (obj (make-hardware-object (1- n))))
+
+    ;; this is the new model for setting up gate data
+    (when gate-information
+      (setf (hardware-object-gate-information obj) gate-information))
+
+    ;; this is the legacy model for setting up gate data
+    (flet ((stash-gate-record (atom gate-name parameters arguments fidelity)
+             (when (member atom type)
+                   (setf (gethash (make-gate-binding :operator (named-operator gate-name)
+                                                     :parameters parameters
+                                                     :arguments arguments)
+                                  (hardware-object-gate-information obj))
+                         (make-gate-record :duration 150
+                                           :fidelity fidelity)))))
+      (dolist (data `((:ccnot     "CCNOT"     ()  (_ _ _) 0.95d0)))
+        (destructuring-bind (atom gate-name parameters arguments fidelity) data
+          (stash-gate-record atom gate-name parameters arguments fidelity))))
+    ;; return the object
+    obj))
+
 
 (defun build-qubit (q &key type gate-information)
   "Constructs a template qubit. The native gates for this qubit can be specified by one of two mutually exclusive means:
@@ -323,7 +422,7 @@ used to specify CHIP-SPEC."
  * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
   (check-type gate-information (or null hash-table))
   (assert (a:xor (null gate-information) (null type)))
-  (let ((obj (make-hardware-object :order 0)))
+  (let ((obj (make-hardware-object 0)))
     ;; new style of initialization
     (when gate-information
       (setf (hardware-object-gate-information obj) gate-information))
@@ -437,27 +536,40 @@ Compilers are listed in descending precedence.")
 
 (defun install-link-onto-chip (chip-specification q0 q1 &key (architecture (list ':cz)))
   "Adds a link, built using BUILD-LINK, between qubits Q0 and Q1 on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link."
-  (let ((link (build-link q0 q1 :type architecture))
-        (link-index (chip-spec-n-links chip-specification)))
+  (let ((link (build-link q0 q1 :type architecture)))
     (adjoin-hardware-object link chip-specification)
-    (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q0))))
-    (vector-push-extend link-index (vnth 1 (hardware-object-cxns (chip-spec-nth-qubit chip-specification q1))))
+    (connect-hardware-objects chip-specification
+                              link
+                              (chip-spec-nth-qubit chip-specification q0))
+    (connect-hardware-objects chip-specification
+                              link
+                              (chip-spec-nth-qubit chip-specification q1))
     ;; Return the link.
     link))
+
+(defun install-hardware-object-onto-chip (chip-specification qubits &key (architecture (list ':ccnot)))
+  "Adds a hardware object, built using BUILD-HARDWARE-OBJECT, across QUBITS on the chip described by CHIP-SPECIFICATION.  Returns the HARDWARE-OBJECT instance corresponding to the new link."
+  (let* ((object (build-hardware-object qubits :type architecture))
+         (order (hardware-object-order object)))
+    (adjoin-hardware-object object chip-specification)
+    (dolist (qubit qubits)
+      (connect-hardware-objects chip-specification
+                                object
+                                (chip-spec-nth-qubit chip-specification qubit)))
+    object))
 
 (defun warm-chip-spec-lookup-cache (chip-spec)
   "Warm the lookup cache of the CHIP-SPEC. This sets the table of the chip specification as a side effect. See the documentation of the `CHIP-SPECIFICATION' structure."
   (let ((hash (make-hash-table :test 'equalp)))
-    (loop :for q :across (chip-spec-qubits chip-spec)
-          :for index :from 0
-          :do (setf (gethash (list index) hash)
-                    (list index q)))
-    (loop :for l :across (chip-spec-links chip-spec)
-          :for index :from 0
-          :for pair := (coerce (vnth 0 (hardware-object-cxns l)) 'list)
-          :for other-pair := (reverse pair)
-          :do (setf (gethash pair       hash) (list index l))
-              (setf (gethash other-pair hash) (list index l)))
+    (dotimes (order (length (chip-specification-objects chip-spec)))
+      (dotimes (index (chip-spec-n-objects-of-order chip-spec order))
+        (let ((object (chip-spec-hw-object chip-spec order index)))
+          ;; Ignore ordering, just sort before accesses to this.
+          ;; Hardware objects are undirected.
+          (if (= order 0)
+              (setf (gethash (list index) hash) (list index object))
+              (setf (gethash (sort (coerce (objects-on-hardware-object 0 object) 'list) #'<) hash)
+                    (list index object))))))
     (setf (chip-specification-lookup-cache chip-spec) hash)
     nil))
 
@@ -477,7 +589,7 @@ Compilers are listed in descending precedence.")
               (let ((gate-information (a:copy-hash-table (hardware-object-gate-information obj)
                                                          :test #'equalp)))
                 (dotimes (suborder order)
-                  (loop :for subobject-address :across (vnth suborder (hardware-object-cxns obj))
+                  (loop :for subobject-address :across (objects-on-hardware-object suborder obj)
                         :for subobject := (chip-spec-hw-object chip-specification suborder subobject-address)
                         :do (dohash ((key val) (hardware-object-gate-information subobject))
                               (setf (gethash key gate-information) val))))
@@ -791,5 +903,17 @@ Compilers are listed in descending precedence.")
     (install-generic-compilers chip-spec ':cz)
     (dotimes (j n-qubits)
       (adjoin-hardware-object (build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (warm-hardware-objects chip-spec)
+    chip-spec))
+
+(defun build-ccnot-chip ()
+  "Create a CHIP-SPECIFICATION with a single CCNOT gate. Used for testing >2 native qubit gates."
+  (let ((chip-spec (make-chip-specification
+                    :order 2
+                    :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
+    (install-generic-compilers chip-spec ':cz)
+    (dotimes (j 3)
+      (adjoin-hardware-object (build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
+    (install-hardware-object-onto-chip chip-spec '(0 1 2) :architecture :ccnot)
     (warm-hardware-objects chip-spec)
     chip-spec))

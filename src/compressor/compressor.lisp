@@ -766,7 +766,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                (union ret
                                       (if (zerop order)
                                           (list address)
-                                          (coerce (vnth 0 (hardware-object-cxns obj)) 'list))))))))))
+                                          (coerce (objects-on-hardware-object 0 obj) 'list))))))))))
 
              ;;
              ;; this is a switch block containing all the different governor
@@ -798,8 +798,9 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                      (when (and (eq (first arg) ':global)
                                 (eq (second arg) ':global))
                        (let ((qubit-complex (union (global-queue-qubit-complex)
-                                                   (coerce (vnth 0 (hardware-object-cxns
-                                                                    (chip-spec-hw-object chip-specification order address)))
+                                                   (coerce (objects-on-hardware-object
+                                                            0
+                                                            (chip-spec-hw-object chip-specification order address))
                                                            'list))))
                          (when (> (length qubit-complex) *global-queue-tolerance-threshold*)
                            (transition-governor-state ':global ':global ':flushing))))
@@ -809,8 +810,9 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                        ;; if we're a link, make sure our subgovernors are passing too
                        (when (= 1 order)
                          (let* ((subaddresses
-                                  (vnth 0 (hardware-object-cxns
-                                           (chip-spec-hw-object chip-specification order address))))
+                                  (objects-on-hardware-object
+                                   0
+                                   (chip-spec-hw-object chip-specification order address)))
                                 (left-governor (nth (vnth 0 subaddresses) (first governors)))
                                 (right-governor (nth (vnth 1 subaddresses) (first governors)))
                                 (left-queue-contents
@@ -974,7 +976,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                        (t
                         (let ((obj (chip-spec-hw-object chip-specification order address)))
                           (dotimes (suborder order)
-                            (dolist (subobj-index (coerce (vnth suborder (hardware-object-cxns obj)) 'list))
+                            (dolist (subobj-index (coerce (objects-on-hardware-object suborder obj) 'list))
                               (transition-governor-state suborder subobj-index ':flushing)))))))
                    ;;
                    ;; QUEUEING --> FLUSHING
@@ -996,7 +998,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                       (subgovernor (nth subaddress (nth suborder governors))))
                                   (when (subsetp (if (= suborder 0)
                                                      (list subaddress)
-                                                     (coerce (vnth 0 (hardware-object-cxns subobj)) 'list))
+                                                     (coerce (objects-on-hardware-object 0 subobj) 'list))
                                                  qubit-complex)
                                     (assert (not (typep (first (governed-queue-contents subgovernor)) 'application)))
                                     (set-gq-fields subgovernor ':empty nil (make-null-resource))))))))

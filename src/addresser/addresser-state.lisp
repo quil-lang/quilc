@@ -144,7 +144,7 @@ INSTR is the \"active instruction\".
     (loop :for link :across  (chip-spec-links chip-spec)
           :for value := (funcall link-cost link)
           :do (destructuring-bind (q0 q1)
-                  (coerce (vnth 0 (hardware-object-cxns link)) 'list)
+                  (coerce (objects-on-hardware-object 0 link) 'list)
                 (setf (aref dist q0 q1) value
                       (aref dist q1 q0) value)))
     ;; for each intermediate vertex...
@@ -178,7 +178,7 @@ INSTR is the \"active instruction\".
                 (let ((hw (vnth j order-list)))
                   (unless (hardware-object-dead-p hw)
                     (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
-                                         (or (coerce (vnth 0 (hardware-object-cxns hw)) 'list)
+                                         (or (coerce (objects-on-hardware-object 0 hw) 'list)
                                              (list j))))
                            (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
                            (instrs-compressed (if *compute-tight-recombination-bound*

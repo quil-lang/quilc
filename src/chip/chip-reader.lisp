@@ -256,13 +256,12 @@
               (t
                (setf link (build-link q0 q1 :type '(:CZ)))))
             (when link
-              ;; notify the qubits that they're attached.
-              (dolist (qubit-index (list q0 q1))
-                (vector-push-extend link-index (chip-spec-links-on-qubit chip-spec qubit-index)))
+              (adjoin-hardware-object link chip-spec)
+              ;; set up the connections between the qubits and the links
+              (connect-hardware-objects chip-spec link (chip-spec-nth-qubit chip-spec q0))
+              (connect-hardware-objects chip-spec link (chip-spec-nth-qubit chip-spec q1))
               ;; store the descriptor in the link hardware-object for later reference
-              (setf (hardware-object-misc-data link) link-hash)
-              ;; and store the hardware-object into the chip specification
-              (vector-push-extend link (chip-spec-links chip-spec)))))))))
+              (setf (hardware-object-misc-data link) link-hash))))))))
 
 (defun load-specs-layer (chip-spec specs-hash)
   "Loads the \"specs\" layer into a chip-specification object."
@@ -375,8 +374,6 @@
                     (or (gethash "isa" hash-table)
                         (error 'missing-isa-layer-error))))
          (chip-spec (make-chip-specification
-                     :objects (make-array 2 :initial-contents (list (make-adjustable-vector)
-                                                                    (make-adjustable-vector)))
                      :generic-rewriting-rules (coerce (global-rewriting-rules) 'vector))))
     ;; set up the self-referential compilers
     (install-generic-compilers chip-spec (list ':cz))

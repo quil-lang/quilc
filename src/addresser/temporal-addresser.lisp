@@ -102,7 +102,7 @@
                           (chip-schedule-resource-carving-point
                            (addresser-state-chip-schedule state)
                            (apply #'make-qubit-resource
-                                  (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))))
+                                  (coerce (objects-on-hardware-object 0 hardware-object) 'list))))))
           (setf time (min time intelligent-bound)))
         time))))
 
