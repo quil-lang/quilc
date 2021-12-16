@@ -360,6 +360,22 @@ other's."
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
+;;; TODO: Specify some restarts to rebind the instruction count
+;;; threshold if needed.
+(define-condition expand-instruction-recursion-depth-exceeded ()
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "The instruction expansion threshold has ~
+been reached.
+This probably means that the instruction expander has gone into a cycle.
+Either:
+1) There is no way to nativize this instruction for this chip specification.
+2) The compiler is not able to find such a nativization."))))
+
+(defvar *expand-instruction-count*)
+(defparameter *expand-instruction-count-threshold* 1000) ; arbitrary
+
 (defgeneric expand-instruction-to-native-instructions (instr chip)
   (:documentation "Expand INSTR into a list of instructions native for CHIP by applying nativization routines available on CHIP.")
   (:method ((instr instruction) chip)
@@ -371,7 +387,12 @@ other's."
     nil)
 
   (:method ((instr gate-application) chip)
-    (let ((obj (lookup-hardware-object chip instr)))
+    ;; Instrument the instruction expander so we have a way of bailing
+    ;; out when we reach a certain recursion threshold.
+    (let ((*expand-instruction-count* (1+ *expand-instruction-count*))
+          (obj (lookup-hardware-object chip instr)))
+      (when (> *expand-instruction-count* *expand-instruction-count-threshold*)
+        (error 'expand-instruction-recursion-depth-exceeded))
       (if (and obj (hardware-object-native-instruction-p obj instr))
           (list instr)
           (let ((instructions (apply-translation-compilers instr chip obj)))
@@ -381,7 +402,13 @@ other's."
 
 (defun expand-to-native-instructions (instructions chip)
   "Expand INSTRUCTIONS into a list of instructions that are native for CHIP. Makes no attempt to perform rewiring or simplication."
-  (a:mappend (a:rcurry #'expand-instruction-to-native-instructions chip) instructions))
+  ;; Make sure to bind *EXPAND-INSTRUCTION-COUNT* such that it tracks
+  ;; the recursive depth of EXPAND-INSTRUCTION-TO-NATIVE-INSTRUCTIONS
+  ;; rather than how many times it is called here.
+  (mapcan (lambda (instruction)
+            (let ((*expand-instruction-count* 0))
+              (expand-instruction-to-native-instructions instruction chip)))
+          instructions))
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
   "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
