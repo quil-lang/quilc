@@ -177,20 +177,33 @@ INSTR is the \"active instruction\".
           :do (dotimes (j (length order-list))
                 (let ((hw (vnth j order-list)))
                   (unless (hardware-object-dead-p hw)
-                    (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
-                                         (or (coerce (objects-on-hardware-object 0 hw) 'list)
-                                             (list j))))
-                           (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
-                           (instrs-compressed (if *compute-tight-recombination-bound*
-                                                  (compress-instructions instrs-decomposed chip-spec)
-                                                  instrs-decomposed)))
-                      (setf (addresser-state-initial-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-working-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-logical-schedule state) (make-lscheduler)
-                            (addresser-state-chip-schedule state) (make-chip-schedule chip-spec))
-                      (append-instructions-to-lschedule (addresser-state-logical-schedule state)
-                                                        instrs-compressed)
-                      (funcall hardware-op hw))))))
+                    (unless (gethash "no-compiler-path-found"
+                                     (hardware-object-misc-data hw))
+                      (handler-case
+                        ;; This code is optional; it's only to needed
+                        ;; to help compute a bound on the single
+                        ;; operation cost on this chip. This may be a
+                        ;; source of non-determinism.
+                        (let* ((instr (apply #'anon-gate "FLEX" (random-special-unitary (expt 2 qubits))
+                                             (or (coerce (objects-on-hardware-object 0 hw) 'list)
+                                                 (list j))))
+                               (instrs-decomposed (expand-to-native-instructions (list instr) chip-spec))
+                               (instrs-compressed (if *compute-tight-recombination-bound*
+                                                      (compress-instructions instrs-decomposed chip-spec)
+                                                      instrs-decomposed)))
+                          (setf (addresser-state-initial-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
+                                (addresser-state-working-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
+                                (addresser-state-logical-schedule state) (make-lscheduler)
+                                (addresser-state-chip-schedule state) (make-chip-schedule chip-spec))
+                          (append-instructions-to-lschedule (addresser-state-logical-schedule state)
+                                                            instrs-compressed)
+                          (funcall hardware-op hw))
+                        (expand-instruction-recursion-depth-exceeded (condition)
+                          (declare (ignore condition))
+                          ;; We could have cycles (but the code is
+                          ;; ultimately still compilable) because
+                          ;; there's no way to insert swaps.
+                          (values))))))))
     (setf (addresser-state-initial-l2p state) initial-l2p
           (addresser-state-working-l2p state) working-l2p
           (addresser-state-logical-schedule state) lscheduler

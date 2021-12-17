@@ -584,7 +584,7 @@ Compilers are listed in descending precedence.")
                                      (compute-applicable-compilers (hardware-object-gate-information obj)
                                                                    (1+ order))))
                 (no-compiler-path ()
-                  (setf (gethash "dead" (hardware-object-misc-data obj)) t)))
+                  (setf (gethash "no-compiler-path-found" (hardware-object-misc-data obj)) t)))
               ;; TODO: incorporate child object gatesets too
               (let ((gate-information (a:copy-hash-table (hardware-object-gate-information obj)
                                                          :test #'equalp)))
