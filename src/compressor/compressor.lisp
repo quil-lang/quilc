@@ -806,7 +806,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
              ;; If you don't obey these, you're very likely to introduce subtle bugs.
              (transition-governor-state (order address new-state &optional arg)
                (when (and (typep order 'number) (> order 1))
-                 (format *error-output* "WARNING: No support for higher order hardware objects. Compressor queue may behave badly...~%"))
+                 (error "No support for higher order hardware objects currently. Compressor queue may behave badly...~%"))
                (let* ((governed-queue
                         (if (eq order ':global)
                             global-governor
