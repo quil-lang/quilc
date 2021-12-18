@@ -195,6 +195,13 @@ CNOT 0 2"))
     ;; test on quality of compilation, and not on correctness.
     (is (>= 6 (length 2q-code)))))
 
+(deftest test-native-ccnot-compilation ()
+  "Test that we can compile a trivial program on a chip specification with a native CCNOT gate."
+  (let* ((chip (quil::build-ccnot-chip))
+         (ccnot-prog (parse "CCNOT 0 1 2")))
+    (not-signals error
+                 (compiler-hook ccnot-prog chip))))
+
 (deftest test-cswap-compiles-with-qs ()
   "Test that CSWAP compiles with QS-COMPILER. (Don't test the output's validity.)"
   (let ((result (quil::qs-compiler (quil::build-gate "CSWAP" () 0 1 2))))
