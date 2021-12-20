@@ -53,7 +53,7 @@
            (subschedule (chip-contiguous-subschedule-from-last-instructions
                          (addresser-state-chip-schedule state)
                          (apply #'make-qubit-resource
-                                (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
+                                (coerce (objects-on-hardware-object 0 hardware-object) 'list))))
            (preceding-fidelity
             (calculate-instructions-log-fidelity subschedule
                                                  (addresser-state-chip-specification state))))
@@ -205,7 +205,7 @@
          (swap (apply #'build-gate
                       (permutation-record-operator permutation-record)
                       '()
-                      (coerce (vnth 0 (hardware-object-cxns hardware-object)) 'list))))
+                      (coerce (objects-on-hardware-object 0 hardware-object) 'list))))
     (calculate-instructions-fidelity (expand-to-native-instructions (list swap) chip-spec) chip-spec)))
 
 (defmethod initialize-instance :after ((instance fidelity-addresser-state)

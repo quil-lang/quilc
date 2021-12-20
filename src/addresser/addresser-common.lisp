@@ -469,11 +469,11 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
       (loop
         :for (candidate-hardware-index candidate-instr) :in instrs
-        :for physical-qubits := (coerce (vnth 0
-                                              (hardware-object-cxns
-                                               (chip-spec-hw-object chip-spec (1- (length (application-arguments
-                                                                                           candidate-instr)))
-                                                                    candidate-hardware-index)))
+        :for physical-qubits := (coerce (objects-on-hardware-object
+                                         0
+                                         (chip-spec-hw-object chip-spec (1- (length (application-arguments
+                                                                                     candidate-instr)))
+                                                              candidate-hardware-index))
                                         'list)
 
         :for candidate-cost := (cost-function state :instr candidate-instr)

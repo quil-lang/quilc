@@ -360,6 +360,22 @@ other's."
       ;; when we make it to this point, no rewrite rules apply, so quit.
       (peephole-rewriter-nodes->instrs (peephole-rewriter-node-next head)))))
 
+;;; TODO: Specify some restarts to rebind the instruction count
+;;; threshold if needed.
+(define-condition expand-instruction-recursion-depth-exceeded ()
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "The instruction expansion threshold has ~
+been reached.
+This probably means that the instruction expander has gone into a cycle.
+Either:
+1) There is no way to nativize this instruction for this chip specification.
+2) The compiler is not able to find such a nativization."))))
+
+(defvar *expand-instruction-count*)
+(defparameter *expand-instruction-count-threshold* 1000) ; arbitrary
+
 (defgeneric expand-instruction-to-native-instructions (instr chip)
   (:documentation "Expand INSTR into a list of instructions native for CHIP by applying nativization routines available on CHIP.")
   (:method ((instr instruction) chip)
@@ -371,7 +387,12 @@ other's."
     nil)
 
   (:method ((instr gate-application) chip)
-    (let ((obj (lookup-hardware-object chip instr)))
+    ;; Instrument the instruction expander so we have a way of bailing
+    ;; out when we reach a certain recursion threshold.
+    (let ((*expand-instruction-count* (1+ *expand-instruction-count*))
+          (obj (lookup-hardware-object chip instr)))
+      (when (> *expand-instruction-count* *expand-instruction-count-threshold*)
+        (error 'expand-instruction-recursion-depth-exceeded))
       (if (and obj (hardware-object-native-instruction-p obj instr))
           (list instr)
           (let ((instructions (apply-translation-compilers instr chip obj)))
@@ -381,7 +402,13 @@ other's."
 
 (defun expand-to-native-instructions (instructions chip)
   "Expand INSTRUCTIONS into a list of instructions that are native for CHIP. Makes no attempt to perform rewiring or simplication."
-  (a:mappend (a:rcurry #'expand-instruction-to-native-instructions chip) instructions))
+  ;; Make sure to bind *EXPAND-INSTRUCTION-COUNT* such that it tracks
+  ;; the recursive depth of EXPAND-INSTRUCTION-TO-NATIVE-INSTRUCTIONS
+  ;; rather than how many times it is called here.
+  (mapcan (lambda (instruction)
+            (let ((*expand-instruction-count* 0))
+              (expand-instruction-to-native-instructions instruction chip)))
+          instructions))
 
 (defun decompile-instructions-in-context (instructions chip-specification context)
   "This routine is called by COMPRESS-INSTRUCTIONS-IN-CONTEXT to make a decision about how to prefer 'linear algebraic compression': the list of INSTRUCTIONS can always be rewritten as its associated action matrix, but under certain conditions (governed by CONTEXT) we can sometimes get away with something less."
@@ -766,7 +793,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                (union ret
                                       (if (zerop order)
                                           (list address)
-                                          (coerce (vnth 0 (hardware-object-cxns obj)) 'list))))))))))
+                                          (coerce (objects-on-hardware-object 0 obj) 'list))))))))))
 
              ;;
              ;; this is a switch block containing all the different governor
@@ -779,7 +806,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
              ;; If you don't obey these, you're very likely to introduce subtle bugs.
              (transition-governor-state (order address new-state &optional arg)
                (when (and (typep order 'number) (> order 1))
-                 (format *error-output* "WARNING: No support for higher order hardware objects. Compressor queue may behave badly...~%"))
+                 (error "No support for higher order hardware objects currently. Compressor queue may behave badly...~%"))
                (let* ((governed-queue
                         (if (eq order ':global)
                             global-governor
@@ -798,8 +825,9 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                      (when (and (eq (first arg) ':global)
                                 (eq (second arg) ':global))
                        (let ((qubit-complex (union (global-queue-qubit-complex)
-                                                   (coerce (vnth 0 (hardware-object-cxns
-                                                                    (chip-spec-hw-object chip-specification order address)))
+                                                   (coerce (objects-on-hardware-object
+                                                            0
+                                                            (chip-spec-hw-object chip-specification order address))
                                                            'list))))
                          (when (> (length qubit-complex) *global-queue-tolerance-threshold*)
                            (transition-governor-state ':global ':global ':flushing))))
@@ -809,8 +837,9 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                        ;; if we're a link, make sure our subgovernors are passing too
                        (when (= 1 order)
                          (let* ((subaddresses
-                                  (vnth 0 (hardware-object-cxns
-                                           (chip-spec-hw-object chip-specification order address))))
+                                  (objects-on-hardware-object
+                                   0
+                                   (chip-spec-hw-object chip-specification order address)))
                                 (left-governor (nth (vnth 0 subaddresses) (first governors)))
                                 (right-governor (nth (vnth 1 subaddresses) (first governors)))
                                 (left-queue-contents
@@ -974,7 +1003,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                        (t
                         (let ((obj (chip-spec-hw-object chip-specification order address)))
                           (dotimes (suborder order)
-                            (dolist (subobj-index (coerce (vnth suborder (hardware-object-cxns obj)) 'list))
+                            (dolist (subobj-index (coerce (objects-on-hardware-object suborder obj) 'list))
                               (transition-governor-state suborder subobj-index ':flushing)))))))
                    ;;
                    ;; QUEUEING --> FLUSHING
@@ -996,7 +1025,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                       (subgovernor (nth subaddress (nth suborder governors))))
                                   (when (subsetp (if (= suborder 0)
                                                      (list subaddress)
-                                                     (coerce (vnth 0 (hardware-object-cxns subobj)) 'list))
+                                                     (coerce (objects-on-hardware-object 0 subobj) 'list))
                                                  qubit-complex)
                                     (assert (not (typep (first (governed-queue-contents subgovernor)) 'application)))
                                     (set-gq-fields subgovernor ':empty nil (make-null-resource))))))))

@@ -96,7 +96,7 @@ NOTE: This copies the list first, and so is safe to apply to &REST lists."
             :do (return))
     ;; collect all links between these qubits
     (loop :for link-obj :across (vnth 1 (chip-specification-objects chip-specification))
-          :for qubit-list := (first (hardware-object-cxns link-obj))
+          :for qubit-list := (first (quil::hardware-object-cxns link-obj))
           :when (subsetp qubit-list program-qubits)
             :do (push qubit-list program-links))
     (apply 'qaoa-program-from-graph

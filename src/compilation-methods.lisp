@@ -296,11 +296,14 @@ Returns a value list: (processed-program, of type parsed-program
                       (local-topological-swaps (count-if #'swap-application-p straight-line-quil))
                       (fully-native-quil (expand-to-native-instructions straight-line-quil chip-specification))
                       (processed-quil fully-native-quil))
-                 (dotimes (n *compressor-passes*)
-                   (format-noise "COMPILER-HOOK: Compressing, pass ~D/~D." (1+ n) *compressor-passes*)
-                   (setf processed-quil
-                         (compress-instructions processed-quil chip-specification
-                                                :protoquil (null registrant))))
+                 ;; order >1 hardware objects not yet supported by
+                 ;; compressor.
+                 (when (<= (length (chip-specification-objects chip-specification)) 2)
+                   (dotimes (n *compressor-passes*)
+                     (format-noise "COMPILER-HOOK: Compressing, pass ~D/~D." (1+ n) *compressor-passes*)
+                     (setf processed-quil
+                           (compress-instructions processed-quil chip-specification
+                                                  :protoquil (null registrant)))))
                  ;; we're done processing. store the results back into the CFG block.
                  (setf (basic-block-code blk) processed-quil)
                  (setf (basic-block-in-rewiring blk) initial-l2p)
