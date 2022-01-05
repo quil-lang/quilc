@@ -190,6 +190,17 @@
 (defmethod gate-matrix ((gate parameterized-gate) &rest parameters)
   (apply (parameterized-gate-matrix-function gate) parameters))
 
+(defclass sequence-gate (parameterized-gate)
+  ((parameters :initarg :parameters
+               :reader sequence-gate-parameters)
+   (arguments :initarg :arguments
+              :reader sequence-gate-arguments)
+   (sequence :initarg :sequence ;;<- I dont know about this one
+             :reader sequence-gate-sequence))
+  (:documentation "A gate specified by a sequence of other gates"))
+
+;;probably need to implement initialize-instance?
+
 (defclass exp-pauli-sum-gate (parameterized-gate)
   ((parameters :initarg :parameters
                :reader exp-pauli-sum-gate-parameters)
@@ -393,3 +404,131 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
                    :terms terms
                    :dimension (expt 2 (length arguments))
                    :arity (length arguments))))
+
+(defmethod gate-definition-to-gate ((gate-def sequence-gate-definition))
+;;TODO
+  )
+
+;;;; some leftover stuff from standard-gates.lisp and elsewhere
+
+(defun apply-gate (m instr)
+  "Constructs the matrix representation associated to an instruction list consisting of gates. Suitable for testing the output of compilation routines."
+  (check-type m magicl:matrix)
+  (check-type instr application)
+  (a:when-let ((defn (gate-matrix instr)))
+    (let* ((mat-size (ilog2 (magicl:nrows m)))
+           (size (max mat-size
+                      (apply #'max
+                             (map 'list (lambda (x) (1+ (qubit-index x)))
+                                  (application-arguments instr)))))
+           (mat (kq-gate-on-lines defn
+                                  size
+                                  (mapcar #'qubit-index (application-arguments instr))))
+           ;; resize m if necessary
+           (m (if (< mat-size size)
+                  (kq-gate-on-lines m
+                                    size
+                                    (a:iota mat-size :start (1- mat-size) :step -1))
+                  m)))
+      (magicl:@ mat m))))
+
+(defun make-matrix-from-quil (instruction-list &key (relabeling #'identity))
+  "If possible, create a matrix out of the instructions INSTRUCTION-LIST using the optional function RELABELING that maps an input qubit index to an output qubit index. If one can't be created, then return NIL.
+
+Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
+
+    A
+    B
+    C
+
+or equivalently as
+
+    C * B * A
+
+as matrices."
+  (let ((u (const #C(1d0 0d0) '(1 1))))
+    (dolist (instr instruction-list u)
+      (assert (not (null u)))
+      ;; TODO: What to do about other quantum-state-transitioning
+      ;; instructions?
+      (when (typep instr 'application)
+        ;; We can't make a matrix if we don't know the gate
+        ;; parameters.
+        (unless (every #'is-constant (application-parameters instr))
+          (return-from make-matrix-from-quil nil))
+        (let ((new-instr (copy-instance instr)))
+          (setf (application-arguments new-instr)
+                (mapcar (lambda (a)
+                          (if (typep a 'formal)
+                              (qubit (parse-integer (formal-name a) :start 1))
+                              (funcall relabeling a)))
+                        (application-arguments new-instr)))
+          (setf u (apply-gate u new-instr)))))))
+
+(defun kq-gate-on-lines (gate-mat n lines)
+  "Writes the gate GATE-MAT as an N-qubit gate by applying it to the qubit lines in LINES."
+  (check-type gate-mat magicl:matrix)
+  (check-type n integer)
+  (let* ((width (expt 2 n))
+         (mask (- -1 (loop :for l :in lines :sum (expt 2 l))))
+         (out-mat (zeros (list width width))))
+    (dotimes (i width)
+      (dotimes (j width)
+        (if (= (logand mask i) (logand mask j))
+            (setf (magicl:tref out-mat i j)
+                  (magicl:tref gate-mat
+                              (loop :for r :below (length lines) :sum
+                                 (if (logbitp (nth r lines) i)
+                                     (ash 1 (- (length lines) 1 r))
+                                     0))
+                              (loop :for s :below (length lines) :sum
+                                 (if (logbitp (nth s lines) j)
+                                     (ash 1 (- (length lines) 1 s))
+                                     0)))))))
+    out-mat))
+
+(defun su2-on-line (line m)
+  "Treats m in SU(2) as either m (x) Id or Id (x) m."
+  (kq-gate-on-lines m 2 (list line)))
+
+(define-global-counter **premultiplied-gate-count** incf-premultiplied-gate-count)
+
+(defun premultiply-gates (instructions)
+  "Given a list of (gate) applications INSTRUCTIONS, construct a new gate application which is their product.
+
+Instructions are multiplied out in \"Quil\" order, that is, the instruction list (A B C) will be multiplied as if by the Quil program
+
+    A
+    B
+    C
+
+or equivalently as
+
+    C * B * A
+
+as matrices."
+  (let ((u (const #C(1d0 0d0) '(1 1)))
+        (qubits (list)))
+    (dolist (instr instructions)
+      (let ((new-qubits (set-difference (mapcar #'qubit-index (application-arguments instr))
+                                        qubits)))
+        (unless (endp new-qubits)
+          (setf u (kq-gate-on-lines u
+                                    (+ (length qubits) (length new-qubits))
+                                    (a:iota (length qubits)
+                                                     :start (1- (length qubits))
+                                                     :step -1)))
+          (setf qubits (append new-qubits qubits)))
+        (setf u (magicl:@
+                 (kq-gate-on-lines (gate-matrix instr)
+                                   (length qubits)
+                                   (mapcar (lambda (q)
+                                             (- (length qubits) 1 (position (qubit-index q) qubits)))
+                                           (application-arguments instr)))
+                 u))))
+    (make-instance 'gate-application
+                   :gate (make-instance 'simple-gate :matrix u)
+                   :operator (named-operator (format nil "FUSED-GATE-~D"
+                                                     (incf-premultiplied-gate-count)))
+                   :arguments (mapcar #'qubit qubits))))
+

@@ -941,10 +941,6 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                  (parse-gate-definition-body-into-sequence body-lines name args params :context op))))))))))
 
 (defun parse-gate-definition-body-into-sequence (body-lines name args params &key context)
-  (format t "body-lines ~a~%" body-lines)
-  (format t "name: ~a~%" name)
-  (format t "args ~a~%" args)
-  (format t "params: ~a~%" params)
   (multiple-value-bind (parsed-body rest-lines)
       (let ((*shadowing-formals* args))
         (parse-indented-body body-lines))
