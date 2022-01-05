@@ -1,0 +1,8 @@
+# defgate as sequence with params and args
+
+DEFGATE ARBITRARYSEQ(%theta,%phi) q0 q1 AS SEQUENCE:
+    RX(%theta) q0
+    RZ(%phi) q1
+    CNOT q0 q1
+
+ARBITRARYSEQ(1.0,1.0) 0 1

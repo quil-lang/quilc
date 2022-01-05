@@ -477,6 +477,18 @@ If no exit rewiring is found, return NIL."
                 :reader permutation-gate-definition-permutation))
   (:documentation "A gate definition whose entries can be represented by a permutation of natural numbers."))
 
+(defclass sequence-gate-definition (gate-definition)
+  ((sequence  :initarg :sequence
+              :reader sequence-gate-definition-sequence
+              :documentation "List of gate operations describing the sequence")
+   (arguments :initarg :arguments
+              :reader sequence-gate-definition-arguments
+              :documentation "List of arguments that appear in the sequence")
+   (parameters :initarg :parameters
+               :reader sequence-gate-definition-parameters
+               :documentation "List of parameters to be integrated into the sequence"))
+  (:documentation "Represents a gate definition as a sequence of other gates."))
+
 (defclass exp-pauli-sum-gate-definition (gate-definition)
   ((terms :initarg :terms
           :reader exp-pauli-sum-gate-definition-terms
@@ -504,6 +516,9 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
 
 (defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
   (length (exp-pauli-sum-gate-definition-arguments gate)))
+
+(defmethod gate-definition-qubits-needed ((gate sequence-gate-definition))
+  (length (sequence-gate-definition-arguments gate)))
 
 (defmethod gate-definition-qubits-needed ((gate permutation-gate-definition))
   (ilog2 (length (permutation-gate-definition-permutation gate))))

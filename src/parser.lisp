@@ -38,7 +38,7 @@
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
     :DECLARE :SHARING :OFFSET :PRAGMA
-    :AS :MATRIX :PERMUTATION :PAULI-SUM))
+    :AS :MATRIX :PERMUTATION :PAULI-SUM :SEQUENCE))
 
 (deftype token-type ()
   '(or
@@ -148,7 +148,7 @@ Each lexer extension is a function mapping strings to tokens. They are used to h
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM|SEQUENCE"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -915,7 +915,7 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
               (pop rest-line)
               (let* ((parsed-gate-tok (first rest-line))
                      (parsed-gate-type (token-type parsed-gate-tok)))
-                (unless (find parsed-gate-type '(:MATRIX :PERMUTATION :PAULI-SUM))
+                (unless (find parsed-gate-type '(:MATRIX :PERMUTATION :PAULI-SUM :SEQUENCE))
                   (quil-parse-error "Found unexpected gate type: ~A." (token-payload parsed-gate-tok)))
                 (setf gate-type parsed-gate-type)))
 
@@ -935,7 +935,22 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                  (parse-gate-definition-body-into-pauli-sum body-lines name
                                                             :lexical-context op
                                                             :legal-arguments args
-                                                            :legal-parameters params))))))))))
+                                                            :legal-parameters params)))
+              (:SEQUENCE
+               (let ((*shadowing-formals* args))
+                 (parse-gate-definition-body-into-sequence body-lines name args params :context op))))))))))
+
+(defun parse-gate-definition-body-into-sequence (body-lines name args params &key context)
+  (format t "body-lines ~a~%" body-lines)
+  (format t "name: ~a~%" name)
+  (format t "args ~a~%" args)
+  (format t "params: ~a~%" params)
+  (multiple-value-bind (parsed-body rest-lines)
+      (let ((*shadowing-formals* args))
+        (parse-indented-body body-lines))
+    (values (make-instance 'sequence-gate-definition
+              :name name :parameters params :arguments args :sequence parsed-body :context context)
+            rest-lines)))
 
 (defun parse-gate-definition-body-into-pauli-sum (body-lines name &key lexical-context legal-arguments legal-parameters)
   ;; is the immediate next line indented? if not, error.
