@@ -27,6 +27,13 @@
 (defun seq-contains-only-gate-definitions-p (sequence)
   (every #'gate-application-p sequence))
 
+(define-transform validate-defgate-loops (validate-defgate-loops)
+  "This transform traverses all defgate as sequence objects to verify there are no circular references.")
+
+(defun validate-defgate-loops (parsed-program)
+  (verify-no-loops (graph-of-seq-def parsed-program))
+  parsed-program)
+
 (defgeneric graph-of-seq-def (program)
   (:method ((program parsed-program))
     (graph-of-seq-def (parsed-program-gate-definitions program)))
@@ -50,16 +57,21 @@
     nil))
 
 (defun verify-no-loops (graph &optional (path NIL))
-  (if graph
-      (if path
-          (map nil (lambda (x) (if (member x path)
-                                   (error "graph contains loops")
-                                   (verify-no-loops graph (cons x path))))
-               (neighboors-of graph (car (last path))))
-          (map nil (lambda (x) (verify-no-loops graph (list (first x)))) graph)) NIL))
+  (if (and (not (null (cdr path)))
+           (null (first path)))
+      NIL
+      (if graph
+          (if path
+              (map nil (lambda (x) (if (member x path)
+                                       (error (format nil "Defgate sequence dependencies contain loops: ~a " path))
+                                       (verify-no-loops graph (cons x path))))
+                   (neighboors-of graph (first path)))
+              (map nil (lambda (x) (verify-no-loops graph (list (first x)))) graph))
+          NIL)))
 
 (defun neighboors-of (graph key)
   (if graph
-      (if (= (first (first graph)) key)
+      (if (string= (first (first graph)) key)
           (rest (first graph))
-          (neighboors-of (rest graph) key)) NIL))
+          (neighboors-of (rest graph) key))
+      NIL))
