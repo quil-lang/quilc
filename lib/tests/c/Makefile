@@ -1,0 +1,18 @@
+TEST_SRCS = $(wildcard *.c)
+BUILD_DIR = ../..
+CCFLAGS = -lsbcl -lquilc -L$(BUILD_DIR) -I$(BUILD_DIR)
+
+OS:=$(shell uname -s)
+ifeq ($(UNAME_S), Darwin)
+	CCFLAGS += -pagezero_size 0x100000
+endif
+
+.PHONY: all clean
+
+all: $(TEST_SRCS:.c=)
+
+%: %.c
+	gcc $(CCFLAGS) $< -o $@
+
+clean:
+	rm -f $(TEST_SRCS:.c=)
