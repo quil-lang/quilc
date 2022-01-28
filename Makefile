@@ -115,8 +115,8 @@ uninstall:
 # TEST
 ###############################################################################
 
-.PHONY: test test-cl-quil test-quilc test-quilt test-quilec
-test: test-cl-quil test-quilt test-quilec test-quilc
+.PHONY: test test-cl-quil test-quilc test-quilt test-quilec test-libquilc
+test: test-cl-quil test-quilt test-quilec test-quilc test-libquilc
 
 test-cl-quil:
 	$(QUICKLISP) \
@@ -127,6 +127,11 @@ test-quilc:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :quilc-tests)" \
 		--eval "(asdf:test-system :quilc)"
+
+test-libquilc:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :libquilc-tests)" \
+		--eval "(asdf:test-system :libquilc)"
 
 test-quilt:
 	$(QUICKLISP) \
