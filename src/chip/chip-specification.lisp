@@ -39,6 +39,21 @@ LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.
   (print-unreadable-object (cs stream :type t :identity nil)
     (format stream "of ~{~D~^:~} objects" (map 'list #'length (chip-specification-objects cs)))))
 
+(defun debug-print-link (stream link &optional colon-p at-sign-p)
+  "Print out the two qubits constituting a link."
+  (declare (ignore colon-p at-sign-p))
+  (let* ((cxns (hardware-object-cxns link))
+         (qubit0 (vnth 0 (vnth 0 cxns)))
+         (qubit1 (vnth 1 (vnth 0 cxns))))
+    (format stream "~a -- ~a" qubit0 qubit1)))
+
+(defun debug-print-chip-spec (cs &optional (stream *standard-output*))
+  "Print out a simple, human-readable representation of a chip specification consisting of the number of qubits, the number of links, and a list of the links."
+  (format stream "~a qubits, ~a links~%links:~%~{~/cl-quil::debug-print-link/~%~}~%"
+          (chip-spec-n-qubits cs)
+          (chip-spec-n-links cs)
+          (coerce (chip-spec-links cs) 'list)))
+
 (defstruct permutation-record
   "Houses information about a permutation gate, for ease of lookup by the greedy scheduler.
 
