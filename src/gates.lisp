@@ -406,7 +406,8 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
                    :arity (length arguments))))
 
 (defmethod gate-definition-to-gate ((gate-def sequence-gate-definition))
-;;TODO
+  ;;hack, should change as given new opimizations
+  gate-def
   )
 
 ;;;; some leftover stuff from standard-gates.lisp and elsewhere
@@ -531,4 +532,40 @@ as matrices."
                    :operator (named-operator (format nil "FUSED-GATE-~D"
                                                      (incf-premultiplied-gate-count)))
                    :arguments (mapcar #'qubit qubits))))
+
+
+(defun instantiate-gate-sequence-application (seq-gate-application)
+  "Expands an instantiation of a sequence gate into a list of gate applications"
+  (let* ((params (application-parameters seq-gate-application))
+         (args (application-arguments seq-gate-application))
+         (seq-gate-def (gate-application-resolution seq-gate-application))
+         (lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate-def) args #'formal-name))
+         (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate-def) params #'param-name))
+        (instantiated-list nil))
+    (loop :for gate-app :in (reverse (sequence-gate-definition-sequence seq-gate-def))
+          :do (setf instantiated-list (cons (instantiate-gate-application gate-app lookup-arg lookup-param) instantiated-list)))
+    instantiated-list))
+
+(defun instantiate-gate-application (gate-app lut-args lut-params)
+  (setf (application-parameters gate-app) (instantiate-from-param-name (application-parameters gate-app) lut-params))
+  (setf (application-arguments gate-app) (instantiate-from-formal-name (application-arguments gate-app) lut-args))
+  gate-app)
+
+(defun instantiate-from-formal-name (list-names lut-names)
+  (if (null list-names)
+      nil
+      (cons (gethash (formal-name (first list-names)) lut-names) (instantiate-from-formal-name (rest list-names) lut-names))))
+
+(defun instantiate-from-param-name (list-names lut-names)
+  (if (null list-names)
+      nil
+      (cons (gethash (param-name (first list-names)) lut-names) (instantiate-from-param-name (rest list-names) lut-names))))
+
+(defun make-map-list-to-list (lista listb apply-to-key)
+  "evaluates apply-to-key on elements of lista and maps them to listb by index, result of apply-to-key must be string"
+  (let ((return-table (make-hash-table :test 'equal)))
+    (loop :for key :in lista
+          :for val :in listb
+          :do (setf (gethash (funcall apply-to-key key) return-table) val))
+    return-table))
 

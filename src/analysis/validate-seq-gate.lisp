@@ -19,7 +19,7 @@
                   (error "argument ~a is not in gatedef arguments" arg))
                  (T T))))
       (unless (seq-contains-only-gate-definitions-p seq)
-        (error "sequence gate definition body contains non gate-application"))
+        (error (format nil "Sequence gate definition body (~a) contains non gate-application" (gate-definition-name gate-def) )))
       (loop :for isn :in seq
             :for isn-args := (application-arguments isn)
             :do (map nil #'validate-argument isn-args)))))
