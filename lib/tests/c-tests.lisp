@@ -9,6 +9,7 @@
   (uiop:with-current-directory ("lib/")
     (multiple-value-bind (output error-output exit-code)
         (uiop:run-program "make")
+      (declare (ignore output error-output))
       (is (eql exit-code 0)))))
 
 (deftest test-build-c-tests ()
@@ -16,6 +17,7 @@
   (uiop:with-current-directory ("lib/tests/c/")
     (multiple-value-bind (output error-output exit-code)
         (uiop:run-program "make")
+      (declare (ignore output error-output))
       (is (eql exit-code 0)))))
 
 (deftest test-compile-quil ()
@@ -27,7 +29,10 @@
            (processed-program (cl-quil:compiler-hook parsed-program chip-spec))
            (expected-output (quilc::print-program processed-program nil)))
       (multiple-value-bind (output error-output exit-code)
-          (uiop:run-program "tests/c/compile-quil" :input `(,input-source) :output :string)
+          (uiop:run-program "tests/c/compile-quil"
+                            :input `(,input-source)
+                            :output :string)
+        (declare (ignore error-output exit-code))
         (is (string= output expected-output))))))
 
 (deftest test-compile-protoquil ()
@@ -36,10 +41,15 @@
     (let* ((input-source "H 0")
            (parsed-program (cl-quil:safely-parse-quil input-source))
            (chip-spec (cl-quil::build-nq-linear-chip 8))
-           (processed-program (cl-quil:compiler-hook parsed-program chip-spec :protoquil t))
+           (processed-program (cl-quil:compiler-hook parsed-program
+                                                     chip-spec
+                                                     :protoquil t))
            (expected-output (quilc::print-program processed-program nil)))
       (multiple-value-bind (output error-output exit-code)
-          (uiop:run-program "tests/c/compile-protoquil" :input `(,input-source) :output :string)
+          (uiop:run-program "tests/c/compile-protoquil"
+                            :input `(,input-source)
+                            :output :string)
+        (declare (ignore error-output exit-code))
         (is (string= output expected-output))))))
 
 (deftest test-print-chip-spec ()
@@ -48,7 +58,10 @@
     (let ((chip-spec1 (cl-quil::build-nq-linear-chip 8))
           (chip-spec2 (quilc::lookup-isa-descriptor-for-name "8Q")))
       (multiple-value-bind (output error-output exit-code)
-          (uiop:run-program "tests/c/print-chip-spec" :output :string)
-        (is (string= output (concatenate 'string
-                                         (cl-quil::debug-print-chip-spec chip-spec1 nil)
-                                         (cl-quil::debug-print-chip-spec chip-spec2 nil))))))))
+          (uiop:run-program "tests/c/print-chip-spec"
+                            :output :string)
+        (declare (ignore error-output exit-code))
+        (is (string= output
+                     (concatenate 'string
+                                  (cl-quil::debug-print-chip-spec chip-spec1 nil)
+                                  (cl-quil::debug-print-chip-spec chip-spec2 nil))))))))
