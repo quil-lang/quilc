@@ -1,9 +1,9 @@
 (require '#:asdf)
 
-(asdf:load-system '#:quilc)
+(asdf:load-system '#:libquilc)
 (asdf:load-system '#:sbcl-librarian)
 
-(in-package #:quilc)
+(in-package #:libquilc)
 
 (sbcl-librarian:define-handle-type quil-program "quil_program")
 (sbcl-librarian:define-handle-type chip-specification "chip_specification")
@@ -24,13 +24,13 @@
   (:type quil-program chip-specification error-type)
   (:literal "/* functions */")
   (:function
-   (("parse_quil" safely-parse-quil) quil-program ((source :string)))
-   (("print_program" print-program) :void ((program quil-program)))
-   (("compile_quil" compiler-hook) quil-program ((program quil-program) (chip-spec chip-specification)))
+   (("parse_quil" quil:safely-parse-quil) quil-program ((source :string)))
+   (("print_program" quilc::print-program) :void ((program quil-program)))
+   (("compile_quil" quil:compiler-hook) quil-program ((program quil-program) (chip-spec chip-specification)))
    (("compile_protoquil" compile-protoquil) quil-program ((program quil-program) (chip-spec chip-specification)))
-   (("build_nq_linear_chip" cl-quil::build-nq-linear-chip) chip-specification ((n :int)))
-   (("chip_spec_from_isa_descriptor" lookup-isa-descriptor-for-name) chip-specification ((descriptor :string)))
-   (("print_chip_spec" cl-quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))))
+   (("build_nq_linear_chip" quil::build-nq-linear-chip) chip-specification ((n :int)))
+   (("chip_spec_from_isa_descriptor" quilc::lookup-isa-descriptor-for-name) chip-specification ((descriptor :string)))
+   (("print_chip_spec" quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))))
 
 (sbcl-librarian:build-bindings libquilc ".")
 (sbcl-librarian:build-python-bindings libquilc ".")

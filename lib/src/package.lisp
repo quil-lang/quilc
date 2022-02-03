@@ -5,4 +5,4 @@
 (in-package #:cl-user)
 
 (defpackage #:libquilc
-  (:use #:cl #:quilc))
+  (:use #:cl #:cl-quil))
