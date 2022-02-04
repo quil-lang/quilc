@@ -81,7 +81,7 @@
 
 (defun do-monitor-runs (&key start step end
                              repeats monitor
-                             report-type sam sample-interval)
+                             report-type sample-interval)
   (or repeats (setq repeats 3))
   (loop :for nq := (or start 10)
           :then (+ nq (or step 10))
@@ -94,38 +94,9 @@
                                  program-type chip-type nq repeats monitor 
                                  report-type sample-interval)))))
 
-;; Try this on SBCL: (do-monitor-runs :monitor ':sb-sprof) 
+;; Try this on SBCL: (do-monitor-runs :monitor ':sb-sprof)
 
 
-
-
-(defun do-one (nq)
-  (do-one-nq-program-chip nq :hadamard :fully-connected))
-
-(defparameter *min-sb-sprof-perf-pct* 1)
-
-(defun do-one-nq-program-chip (nq program-type chip-type)
-  (let ((program (build-benchmark-program nq :hadamard))
-        (chip (build-benchmark-chip nq :fully-connected)))
-    (sb-sprof:reset)
-    (tg:gc :full t)
-    (sb-sprof:start-profiling :threads (list sb-thread:*current-thread*))
-    (time (benchmark-one-quilc-perf-run program chip))
-    (sb-sprof:stop-profiling)
-    (sb-sprof:report :type :graph :min-percent *min-sb-sprof-perf-pct*)
-    (sb-sprof:report :type :flat :min-percent *min-sb-sprof-perf-pct*)))
-
-(defun do-one-mon (nq &optional program-type)
-  (let ((program (build-benchmark-program nq (or program-type :hadamard)))
-        (chip (build-benchmark-chip nq :fully-connected)))
-    (tg:gc :full t)
-    (sb-sprof:with-profiling (:max-samples 1000
-                              :report :flat
-                              :loop nil
-                                   
-                              :reset t
-                              :sample-interval 0.01) ; default .01
-      (benchmark-one-quilc-perf-run program chip))))
 
 
 
