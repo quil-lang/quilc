@@ -23,7 +23,7 @@
 (deftest test-python-compile-protoquil ()
   "Test compiling ProtoQuil from Python."
   (uiop:with-current-directory ("lib/")
-    (let* ((input-source "H 0")
+    (let* ((input-source "DECLARE ro BIT; H 0; MEASURE 0 ro")
            (parsed-program (cl-quil:safely-parse-quil input-source))
            (chip-spec (cl-quil::build-nq-linear-chip 8))
            (processed-program (cl-quil:compiler-hook parsed-program chip-spec :protoquil t))
@@ -35,6 +35,20 @@
                             :output :string)
         (declare (ignore error-output exit-code))
         (is (string= output expected-output))))))
+
+(deftest test-python-compile-protoquil-bad-program ()
+  "Test compiling an invalid ProtoQuil program from Python. Should throw an error."
+  (uiop:with-current-directory ("lib/")
+    (let* ((input-source "DECLARE ro BIT; MEASURE 0 ro; H 0"))
+      (multiple-value-bind (output error-output exit-code)
+          (uiop:run-program '("python3" "tests/python/compile_protoquil.py")
+                            :ignore-error-status t
+                            :env '((:PYTHONPATH . "."))
+                            :input `(,input-source)
+                            :output :string)
+        (declare (ignore error-output))
+        (is (eql exit-code 1)
+            (string= output "unable to compile program"))))))
 
 (deftest test-python-print-chip-spec ()
   "Test printing chip specifications from Python."

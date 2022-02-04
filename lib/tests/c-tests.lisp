@@ -38,7 +38,7 @@
 (deftest test-compile-protoquil ()
   "Test compiling ProtoQuil from C."
   (uiop:with-current-directory ("lib/")
-    (let* ((input-source "H 0")
+    (let* ((input-source "DECLARE ro BIT; H 0; MEASURE 0 ro")
            (parsed-program (cl-quil:safely-parse-quil input-source))
            (chip-spec (cl-quil::build-nq-linear-chip 8))
            (processed-program (cl-quil:compiler-hook parsed-program
@@ -51,6 +51,19 @@
                             :output :string)
         (declare (ignore error-output exit-code))
         (is (string= output expected-output))))))
+
+(deftest test-compile-protoquil-bad-program ()
+  "Test compiling an invalid ProtoQuil program from C. Should throw an error."
+  (uiop:with-current-directory ("lib/")
+    (let* ((input-source "DECLARE ro BIT; MEASURE 0 ro; H 0"))
+      (multiple-value-bind (output error-output exit-code)
+          (uiop:run-program "tests/c/compile-protoquil"
+                            :ignore-error-status t
+                            :input `(,input-source)
+                            :output :string)
+        (declare (ignore error-output))
+        (is (and (eql exit-code 1))
+            (string= output "unable to compile program"))))))
 
 (deftest test-print-chip-spec ()
   "Test printing chip specifications from C."
