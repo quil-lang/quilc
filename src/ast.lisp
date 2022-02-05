@@ -1695,7 +1695,15 @@ For example,
     (print-instruction-sequence (circuit-definition-body defn)
                                 :stream stream
                                 :prefix "    "))
-
+  
+  (:method ((gate sequence-gate-definition) (stream stream))
+    (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS SEQUENCE:~%"
+            (gate-definition-name gate)
+            (mapcar #'param-name (sequence-gate-definition-parameters gate))
+            (mapcar #'formal-name (sequence-gate-definition-arguments gate)))
+    (dolist (operation (sequence-gate-definition-sequence gate))
+      (format stream "    ~a~%" (print-instruction-to-string operation))))
+  
   (:method ((gate exp-pauli-sum-gate-definition) (stream stream))
     (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS PAULI-SUM:~%"
             (gate-definition-name gate)

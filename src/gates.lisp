@@ -190,6 +190,12 @@
 (defmethod gate-matrix ((gate parameterized-gate) &rest parameters)
   (apply (parameterized-gate-matrix-function gate) parameters))
 
+
+;;; SEQUENCE GATE
+;;;  
+;;;  Ordinarilly we would define a class like the following
+;;;
+#+ignore
 (defclass sequence-gate (parameterized-gate)
   ((parameters :initarg :parameters
                :reader sequence-gate-parameters)
@@ -199,7 +205,75 @@
              :reader sequence-gate-sequence))
   (:documentation "A gate specified by a sequence of other gates"))
 
-;;probably need to implement initialize-instance?
+
+;;; we dont think this is neccesary because seq gate definition
+;;; essentially contains all the data we need as such, we will use seq
+;;; gate definitions to represent the actual gate objects
+;;;
+;;; perhaps we should multiply inheret from seq gate definition and
+;;; parameterized gate in order to construct a sequence gate
+;;;
+
+(defun instantiate-sequence-gate (seq-gate parameters arguments)
+  "Expands an instantiation of a sequence gate into a list of gate applications"
+  (let* (
+         (lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate) arguments #'formal-name))
+         (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate) parameters #'param-name))
+         (instantiated-list nil))
+    (loop :for gate-app :in (reverse (sequence-gate-definition-sequence seq-gate))
+          :do (setf instantiated-list (cons (instantiate-gate-application gate-app lookup-arg lookup-param) instantiated-list)))
+    instantiated-list))
+
+(defun instantiate-gate-sequence-application (seq-gate-application)
+  "Expands an instantiation of a sequence gate into a list of gate applications"
+  (instantiate-sequence-gate  (gate-application-resolution seq-gate-application)
+                              (application-parameters seq-gate-application)
+                              (application-arguments seq-gate-application)))
+
+(defun instantiate-gate-application (gate-app lut-args lut-params)
+  (setf gate-app (copy-instance gate-app))
+  (setf (application-parameters gate-app) (instantiate-from-param-name (application-parameters gate-app) lut-params))
+  (setf (application-arguments gate-app) (instantiate-from-formal-name (application-arguments gate-app) lut-args))
+  gate-app)
+
+(defun instantiate-from-formal-name (list-names lut-names)
+  (if (null list-names)
+      nil
+      (cons (gethash (formal-name (first list-names)) lut-names) (instantiate-from-formal-name (rest list-names) lut-names))))
+
+(defun instantiate-from-param-name (list-names lut-names)
+  (if (null list-names)
+      nil
+      (cons (gethash (param-name (first list-names)) lut-names) (instantiate-from-param-name (rest list-names) lut-names))))
+
+(defun make-map-list-to-list (lista listb apply-to-key)
+  "evaluates apply-to-key on elements of lista and maps them to listb by index, result of apply-to-key must be string"
+  (let ((return-table (make-hash-table :test 'equal)))
+    (loop :for key :in lista
+          :for val :in listb
+          :do (setf (gethash (funcall apply-to-key key) return-table) val))
+    return-table))
+
+(defmethod gate-matrix ((gate sequence-gate-definition) &rest parameters)
+  (let ((n (length (sequence-gate-definition-arguments gate))))
+    (simple-gate-matrix
+     (gate-application-gate
+      (premultiply-gates
+       (append
+        ;; premultiply gates will not be aware of unused qubits, which
+        ;; will cause the dimension of the resulting gate-application
+        ;; to not contain qubits that might be arguments of the
+        ;; sequence gate
+        (loop :for i :below n :collect (build-gate "I" () i))
+        (instantiate-sequence-gate
+         gate
+         (mapcar #'constant parameters)
+         (loop :for i :from (1- n) :downto 0 :collect (qubit i)))))))))
+
+(defmethod gate-dimension ((gate sequence-gate-definition))
+  (expt 2 (length (sequence-gate-definition-arguments gate))))
+
+;;; END SEQUENCE GATE
 
 (defclass exp-pauli-sum-gate (parameterized-gate)
   ((parameters :initarg :parameters
@@ -534,38 +608,5 @@ as matrices."
                    :arguments (mapcar #'qubit qubits))))
 
 
-(defun instantiate-gate-sequence-application (seq-gate-application)
-  "Expands an instantiation of a sequence gate into a list of gate applications"
-  (let* ((params (application-parameters seq-gate-application))
-         (args (application-arguments seq-gate-application))
-         (seq-gate-def (gate-application-resolution seq-gate-application))
-         (lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate-def) args #'formal-name))
-         (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate-def) params #'param-name))
-        (instantiated-list nil))
-    (loop :for gate-app :in (reverse (sequence-gate-definition-sequence seq-gate-def))
-          :do (setf instantiated-list (cons (instantiate-gate-application gate-app lookup-arg lookup-param) instantiated-list)))
-    instantiated-list))
 
-(defun instantiate-gate-application (gate-app lut-args lut-params)
-  (setf (application-parameters gate-app) (instantiate-from-param-name (application-parameters gate-app) lut-params))
-  (setf (application-arguments gate-app) (instantiate-from-formal-name (application-arguments gate-app) lut-args))
-  gate-app)
-
-(defun instantiate-from-formal-name (list-names lut-names)
-  (if (null list-names)
-      nil
-      (cons (gethash (formal-name (first list-names)) lut-names) (instantiate-from-formal-name (rest list-names) lut-names))))
-
-(defun instantiate-from-param-name (list-names lut-names)
-  (if (null list-names)
-      nil
-      (cons (gethash (param-name (first list-names)) lut-names) (instantiate-from-param-name (rest list-names) lut-names))))
-
-(defun make-map-list-to-list (lista listb apply-to-key)
-  "evaluates apply-to-key on elements of lista and maps them to listb by index, result of apply-to-key must be string"
-  (let ((return-table (make-hash-table :test 'equal)))
-    (loop :for key :in lista
-          :for val :in listb
-          :do (setf (gethash (funcall apply-to-key key) return-table) val))
-    return-table))
 
