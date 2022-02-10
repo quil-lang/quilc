@@ -57,21 +57,21 @@
     nil))
 
 (defun verify-no-loops (graph &optional (path NIL))
-  (if (and (not (null (cdr path)))
-           (null (first path)))
-      NIL
-      (if graph
-          (if path
-              (map nil (lambda (x) (if (member x path)
+  "Accepts a graph of structure ((node1 neighboora neighboorb ..) (node2 ..)) and verifies no loops exist. If path is provided, it prunes the search space to verify no loops exist for all unique paths in the graph beginning with that path."
+  (when (and graph
+             (or (null (cdr path))
+                 (first path)))
+    (if path
+        (map nil (lambda (x) (if (member x path)
                                        (error (format nil "Defgate sequence dependencies contain loops: ~a " path))
                                        (verify-no-loops graph (cons x path))))
-                   (neighboors-of graph (first path)))
-              (map nil (lambda (x) (verify-no-loops graph (list (first x)))) graph))
-          NIL)))
+             (neighbors-of graph (first path)))
+        (map nil (lambda (x) (verify-no-loops graph (list (first x)))) graph))))
 
-(defun neighboors-of (graph key)
-  (if graph
+
+(defun neighbors-of (graph key)
+  "Returns all neighboors of a node (KEY) for a GRAPH of structure ((node1 neighboora neighboorb ..) (node2 ..))"
+  (when graph
       (if (string= (first (first graph)) key)
           (rest (first graph))
-          (neighboors-of (rest graph) key))
-      NIL))
+          (neighboors-of (rest graph) key))))

@@ -193,7 +193,7 @@
 
 ;;; SEQUENCE GATE
 ;;;  
-;;;  Ordinarilly we would define a class like the following
+;;;  Ordinarilly we would define a class like the following:
 ;;;
 #+ignore
 (defclass sequence-gate (parameterized-gate)
@@ -206,16 +206,16 @@
   (:documentation "A gate specified by a sequence of other gates"))
 
 
-;;; we dont think this is neccesary because seq gate definition
-;;; essentially contains all the data we need as such, we will use seq
-;;; gate definitions to represent the actual gate objects
+;;; We do not think this is necessary because seq gate definition
+;;; essentially contains all the data we need. As such, we will use seq
+;;; gate definitions to represent the actual gate objects.
 ;;;
-;;; perhaps we should multiply inheret from seq gate definition and
-;;; parameterized gate in order to construct a sequence gate
+;;; Perhaps we should multiply inheret from seq gate definition and
+;;; parameterized gate in order to construct a sequence gate.
 ;;;
 
 (defun instantiate-sequence-gate (seq-gate parameters arguments)
-  "Expands an instantiation of a sequence gate into a list of gate applications"
+  "Expands a sequence gate definition, parameters, and arguments into a list of gate applications."
   (let* (
          (lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate) arguments #'formal-name))
          (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate) parameters #'param-name))
@@ -225,7 +225,7 @@
     instantiated-list))
 
 (defun instantiate-gate-sequence-application (seq-gate-application)
-  "Expands an instantiation of a sequence gate into a list of gate applications"
+  "Expands an instantiation of a sequence gate into a list of gate applications."
   (instantiate-sequence-gate  (gate-application-resolution seq-gate-application)
                               (application-parameters seq-gate-application)
                               (application-arguments seq-gate-application)))
