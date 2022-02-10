@@ -57,7 +57,7 @@
     nil))
 
 (defun verify-no-loops (graph &optional (path NIL))
-  "Accepts a graph of structure ((node1 neighboora neighboorb ..) (node2 ..)) and verifies no loops exist. If path is provided, it prunes the search space to verify no loops exist for all unique paths in the graph beginning with that path."
+  "Accepts a graph of structure ((node1 neighbora neighborb ..) (node2 ..)) and verifies no loops exist. If path is provided, it prunes the search space to verify no loops exist for all unique paths in the graph beginning with that path."
   (when (and graph
              (or (null (cdr path))
                  (first path)))
@@ -70,8 +70,8 @@
 
 
 (defun neighbors-of (graph key)
-  "Returns all neighboors of a node (KEY) for a GRAPH of structure ((node1 neighboora neighboorb ..) (node2 ..))"
+  "Returns all neighbors of a node (KEY) for a GRAPH of structure ((node1 neighbora neighborb ..) (node2 ..))"
   (when graph
       (if (string= (first (first graph)) key)
           (rest (first graph))
-          (neighboors-of (rest graph) key))))
+          (neighbors-of (rest graph) key))))
