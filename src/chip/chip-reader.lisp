@@ -244,6 +244,7 @@
                             ((null string) nil)
                             ((string= "CZ" string) ':cz)
                             ((string= "ISWAP" string) ':iswap)
+                            ((string= "SWAP" string) ':swap)
                             ((string= "CPHASE" string) ':cphase)
                             ((string= "PISWAP" string) ':piswap)
                             ((string= "XY" string) ':xy)
