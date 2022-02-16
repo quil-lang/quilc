@@ -330,3 +330,25 @@ MEASURE 4 ro[3]
 MEASURE 5 ro[4]
 ")
                         (quil::build-nq-linear-chip 6))))
+
+(deftest test-swap-native-compile ()
+  "Test that SWAP can be compiled natively."
+  (let* ((chip (quil::build-8q-chip :architecture '(:cz :swap)))
+         (compiled-prog-code
+           (quil::parsed-program-executable-code
+            (quil::compiler-hook (quil::parse-quil "SWAP 0 1")
+                                 chip))))
+    (is (quil::swap-application-p (aref compiled-prog-code 0)))
+    (is (quil::haltp (aref compiled-prog-code 1)))))
+
+(deftest test-swap-native-compile-chip-reader ()
+  "Test that SWAP is recognized as a type in a chip file."
+  (let* ((chip (quil::read-chip-spec-file
+                (merge-pathnames *qpu-test-file-directory*
+                                 "swap.qpu")))
+         (compiled-prog-code
+           (quil::parsed-program-executable-code
+            (quil::compiler-hook (quil::parse-quil "SWAP 0 1")
+                                 chip))))
+    (is (quil::swap-application-p (aref compiled-prog-code 0)))
+    (is (quil::haltp (aref compiled-prog-code 1)))))

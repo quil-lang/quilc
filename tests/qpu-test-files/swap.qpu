@@ -1,0 +1,16 @@
+{
+	"metadata": {
+	    "name": "Chip with swap",
+	    "version": "0.0",
+	},
+	"isa": {
+            "metadata": {},
+	    "1Q": {
+	        "0": { "type": "Xhalves" },
+                "1": { "type": "Xhalves" },
+	    },
+	    "2Q": {
+                "0-1": { "type": ["SWAP", "CZ"] },
+            }
+	},
+}

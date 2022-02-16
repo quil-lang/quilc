@@ -278,7 +278,7 @@ used to specify CHIP-SPEC."
 (defun build-link (qubit0 qubit1 &key type gate-information)
   "Constructs a template link. The native gates for this link can be specified by one of two mutually exclusive means:
 
- * The TYPE keyword can consist of (lists of) :CZ, :CPHASE, :ISWAP, :PISWAP, :CNOT.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
+ * The TYPE keyword can consist of (lists of) :CZ, :CPHASE, :ISWAP, :SWAP, :PISWAP, :CNOT.  This routine constructs a table of native gates based on 'templates' associated to each of these atoms, e.g., :CZ indicates that `CZ _ _` is native for this link.
 
  * The GATE-INFORMATION keyword can be used to directly supply a hash table to be installed in the GATE-INFORMATION slot on the hardware object, allowing completely custom gateset control."
   (check-type qubit0 unsigned-byte)
@@ -317,6 +317,7 @@ used to specify CHIP-SPEC."
                                            :fidelity fidelity)))))
       (dolist (data `((:cz     "CZ"     ()  (_ _) 0.95d0)
                       (:iswap  "ISWAP"  ()  (_ _) 0.97d0)
+                      (:swap   "SWAP"   ()  (_ _) 0.97d0)
                       (:cphase "CPHASE" (_) (_ _) 0.93d0)
                       (:piswap "PISWAP" (_) (_ _) 0.97d0)
                       (:xy     "XY"     (_) (_ _) 0.97d0)
