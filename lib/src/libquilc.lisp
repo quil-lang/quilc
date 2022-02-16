@@ -1,8 +1,3 @@
-(require '#:asdf)
-
-(asdf:load-system '#:libquilc)
-(asdf:load-system '#:sbcl-librarian)
-
 (in-package #:libquilc)
 
 (sbcl-librarian:define-handle-type quil-program "quil_program")
@@ -17,9 +12,8 @@
 (defun compile-protoquil (parsed-program chip-specification)
   (compiler-hook parsed-program chip-specification :protoquil t))
 
-(sbcl-librarian:define-library libquilc (:error-map error-map
-                                         :function-linkage "QUILC_API"
-                                         :function-prefix "quilc_")
+(sbcl-librarian:define-api quilc (:error-map error-map
+                                  :function-prefix "quilc_")
   (:literal "/* types */")
   (:type quil-program chip-specification error-type)
   (:literal "/* functions */")
@@ -32,6 +26,3 @@
    (("chip_spec_from_isa_descriptor" quilc::lookup-isa-descriptor-for-name) chip-specification ((descriptor :string)))
    (("print_chip_spec" quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))))
 
-(sbcl-librarian:build-bindings libquilc ".")
-(sbcl-librarian:build-python-bindings libquilc ".")
-(sbcl-librarian:build-core-and-die libquilc ".")

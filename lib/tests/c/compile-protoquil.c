@@ -28,9 +28,9 @@ int main(int argc, char **argv) {
     die("unable to compile program");
 
   quilc_print_program(processed_program);
-  quilc_release_handle(program);
-  quilc_release_handle(processed_program);
-  quilc_release_handle(chip_spec);
+  lisp_release_handle(program);
+  lisp_release_handle(processed_program);
+  lisp_release_handle(chip_spec);
 
   return 0;
 }

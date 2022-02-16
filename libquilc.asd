@@ -13,4 +13,5 @@
                )
   :in-order-to ((asdf:test-op (asdf:test-op #:libquilc-tests)))
   :serial t
-  :components ((:file "package")))
+  :components ((:file "package")
+               (:file "libquilc")))
