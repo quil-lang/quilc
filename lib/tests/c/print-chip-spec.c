@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     die("unable to build chip");
 
   quilc_print_chip_spec(chip_spec);
-  quilc_release_handle(chip_spec);
+  lisp_release_handle(chip_spec);
 
   return 0;
 }
