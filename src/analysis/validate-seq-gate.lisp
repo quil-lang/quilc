@@ -31,47 +31,18 @@
   "This transform traverses all defgate as sequence objects to verify there are no circular references.")
 
 (defun validate-defgate-loops (parsed-program)
-  (verify-no-loops (graph-of-seq-def parsed-program))
+  (verify-no-loops-in-gate-defs (parsed-program-gate-definitions parsed-program))
   parsed-program)
 
-(defgeneric graph-of-seq-def (program)
-  (:method ((program parsed-program))
-    (graph-of-seq-def (parsed-program-gate-definitions program)))
-  (:method ((program null))
-    nil)
-  (:method ((program sequence-gate-definition))
-    (list (sequence-gate-def-to-graph-node program)))
-  (:method ((program list))
-    (append (graph-of-seq-def (first program)) (graph-of-seq-def (rest program))))
-  (:method ((program t))
-    nil)
-  )
+(defun verify-no-loops-in-gate-defs (gate-defs &optional (path NIL))
+  "Takes list of gate defs, verifys there are no circular dependencies between sequence gate defs."
+  (mapcar (lambda (x) (when (typep x 'SEQUENCE-GATE-DEFINITION)
+                        (let ((gate-name (gate-definition-name x)))
+                          (if (member gate-name path)
+                              (error (format nil "Defgate sequence dependencies contains a loop: ~a " (reverse (cons gate-name path))))
+                              (verify-no-loops-in-gate-defs (neighbors-of-sequence-gate-def x) (cons gate-name path))))))
+          gate-defs))
 
-(defgeneric sequence-gate-def-to-graph-node (gate-def)
-  (:method ((gate-def sequence-gate-definition))
-    (cons (gate-definition-name gate-def) (sequence-gate-def-to-graph-node (sequence-gate-definition-sequence gate-def))))
-  (:method ((gate-def list))
-    (cons (operator-description-name (application-operator (first gate-def)))
-            (sequence-gate-def-to-graph-node (rest gate-def))))
-  (:method ((gate-def null))
-    nil))
-
-(defun verify-no-loops (graph &optional (path NIL))
-  "Accepts a graph of structure ((node1 neighbora neighborb ..) (node2 ..)) and verifies no loops exist. If path is provided, it prunes the search space to verify no loops exist for all unique paths in the graph beginning with that path."
-  (when (and graph
-             (or (null (cdr path))
-                 (first path)))
-    (if path
-        (map nil (lambda (x) (if (member x path)
-                                       (error (format nil "Defgate sequence dependencies contain loops: ~a " path))
-                                       (verify-no-loops graph (cons x path))))
-             (neighbors-of graph (first path)))
-        (map nil (lambda (x) (verify-no-loops graph (list (first x)))) graph))))
-
-
-(defun neighbors-of (graph key)
-  "Returns all neighbors of a node (KEY) for a GRAPH of structure ((node1 neighbora neighborb ..) (node2 ..))"
-  (when graph
-      (if (string= (first (first graph)) key)
-          (rest (first graph))
-          (neighbors-of (rest graph) key))))
+(defun neighbors-of-sequence-gate-def (gate-def)
+  "Returns all sequence gate defs that another sequence gate def depends on."
+  (mapcar #'gate-application-gate (sequence-gate-definition-sequence gate-def)))
