@@ -12,14 +12,14 @@
              (validate-argument (arg)
                (cond
                  ((qubit-p arg)
-                  (error "argument cannot be qubit"))
+                  (quil-parse-error "argument cannot be qubit"))
                  ((not (is-formal arg))
-                  (error "argument is not formal"))
+                  (quil-parse-error "argument is not formal"))
                  ((not (find arg args :test #'formal=))
-                  (error "argument ~a is not in gatedef arguments" arg))
+                  (quil-parse-error "argument ~a is not in gatedef arguments" arg))
                  (T T))))
       (unless (seq-contains-only-gate-definitions-p seq)
-        (error (format nil "Sequence gate definition body (~a) contains non gate-application" (gate-definition-name gate-def) )))
+        (quil-parse-error (format nil "Sequence gate definition body (~a) contains non gate-application" (gate-definition-name gate-def) )))
       (loop :for isn :in seq
             :for isn-args := (application-arguments isn)
             :do (map nil #'validate-argument isn-args)))))
@@ -34,14 +34,13 @@
   (verify-no-loops-in-gate-defs (parsed-program-gate-definitions parsed-program))
   parsed-program)
 
-(defun verify-no-loops-in-gate-defs (gate-defs &optional (path NIL))
+(defun verify-no-loops-in-gate-defs (gate-defs &optional (ancestors NIL))
   "Takes list of gate defs, verifys there are no circular dependencies between sequence gate defs."
-  (mapcar (lambda (x) (when (typep x 'SEQUENCE-GATE-DEFINITION)
-                        (let ((gate-name (gate-definition-name x)))
-                          (if (member gate-name path)
-                              (error (format nil "Defgate sequence dependencies contains a loop: ~a " (reverse (cons gate-name path))))
-                              (verify-no-loops-in-gate-defs (neighbors-of-sequence-gate-def x) (cons gate-name path))))))
-          gate-defs))
+  (dolist (gate-def gate-defs) (when (typep gate-def 'SEQUENCE-GATE-DEFINITION)
+                                 (let ((gate-name (gate-definition-name gate-def)))
+                                   (if (member gate-name ancestors)
+                                       (quil-parse-error (format nil "Defgate sequence dependencies contains a loop: ~a " (reverse (cons gate-name ancestors))))
+                                       (verify-no-loops-in-gate-defs (neighbors-of-sequence-gate-def gate-def) (cons gate-name ancestors)))))))
 
 (defun neighbors-of-sequence-gate-def (gate-def)
   "Returns all sequence gate defs that another sequence gate def depends on."

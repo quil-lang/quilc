@@ -1,0 +1,18 @@
+# multiple defgates as sequence that reference each other
+
+DEFGATE GATEA(%theta,%phi,%tau) q0 q1 q2 q3 AS SEQUENCE:
+    GATEB(%theta) q0 q1
+    CNOT q0 q3
+    GATEC q1 q2
+    GATEA(%theta,%phi,%tau) q0 q1 q3 q2
+
+DEFGATE GATEB(%theta) q0 q1 AS SEQUENCE:
+    CNOT q0 q1
+    CZ(%theta) q0 q1 
+    GATEC q0 q1
+
+DEFGATE GATEC q0 q1 AS SEQUENCE:
+    H q0
+    CNOT q0 q1
+
+GATEA(1.0,1.0,0.5) 2 0 1 3

@@ -237,10 +237,10 @@
   gate-app)
 
 (defun instantiate-from-formal-name (list-names lut-names)
-  (mapcar #'(lambda (name) (gethash (formal-name name) lut-names)) list-names))
+  (mapcar (lambda (name) (gethash (formal-name name) lut-names)) list-names))
 
 (defun instantiate-from-param-name (list-names lut-names)
-  (mapcar #'(lambda (name) (gethash (param-name name) lut-names)) list-names))
+  (mapcar (lambda (name) (gethash (param-name name) lut-names)) list-names))
 
 (defun make-map-list-to-list (lista listb apply-to-key)
   "evaluates apply-to-key on elements of lista and maps them to listb by index, result of apply-to-key must be string"
@@ -477,8 +477,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 (defmethod gate-definition-to-gate ((gate-def sequence-gate-definition))
   ;;hack, should change as given new opimizations
-  gate-def
-  )
+  gate-def)
 
 
 
