@@ -8,8 +8,7 @@
   (declare (type sequence-gate-definition gate-def))
   (let ((seq (sequence-gate-definition-sequence gate-def))
         (args (sequence-gate-definition-arguments gate-def)))
-    (labels (
-             (validate-argument (arg)
+    (labels ((validate-argument (arg)
                (cond
                  ((qubit-p arg)
                   (quil-parse-error "argument cannot be qubit"))
@@ -36,11 +35,12 @@
 
 (defun verify-no-loops-in-gate-defs (gate-defs &optional (ancestors NIL))
   "Takes list of gate defs, verifys there are no circular dependencies between sequence gate defs."
-  (dolist (gate-def gate-defs) (when (typep gate-def 'SEQUENCE-GATE-DEFINITION)
-                                 (let ((gate-name (gate-definition-name gate-def)))
-                                   (if (member gate-name ancestors)
-                                       (quil-parse-error (format nil "Defgate sequence dependencies contains a loop: ~a " (reverse (cons gate-name ancestors))))
-                                       (verify-no-loops-in-gate-defs (neighbors-of-sequence-gate-def gate-def) (cons gate-name ancestors)))))))
+  (dolist (gate-def gate-defs)
+    (when (typep gate-def 'SEQUENCE-GATE-DEFINITION)
+      (let ((gate-name (gate-definition-name gate-def)))
+        (if (member gate-name ancestors)
+            (quil-parse-error (format nil "Defgate sequence dependencies contains a loop: ~a " (reverse (cons gate-name ancestors))))
+            (verify-no-loops-in-gate-defs (neighbors-of-sequence-gate-def gate-def) (cons gate-name ancestors)))))))
 
 (defun neighbors-of-sequence-gate-def (gate-def)
   "Returns all sequence gate defs that another sequence gate def depends on."
