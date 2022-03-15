@@ -216,8 +216,7 @@
 
 (defun instantiate-sequence-gate (seq-gate parameters arguments)
   "Expands a sequence gate definition, parameters, and arguments into a list of gate applications."
-  (let* (
-         (lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate) arguments #'formal-name))
+  (let* ((lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate) arguments #'formal-name))
          (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate) parameters #'param-name))
          (instantiated-list nil))
     (loop :for gate-app :in (reverse (sequence-gate-definition-sequence seq-gate))

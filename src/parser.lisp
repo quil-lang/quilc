@@ -944,7 +944,11 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
   (multiple-value-bind (parsed-body rest-lines) 
     (parse-indented-body body-lines)
     (values (make-instance 'sequence-gate-definition
-              :name name :parameters params :arguments args :sequence parsed-body :context context)
+              :name name
+              :parameters params
+              :arguments args
+              :sequence parsed-body
+              :context context)
             rest-lines)))
 
 (defun parse-gate-definition-body-into-pauli-sum (body-lines name &key lexical-context legal-arguments legal-parameters)
