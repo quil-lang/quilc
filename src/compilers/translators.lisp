@@ -367,3 +367,27 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
   (inst "RZ"    (list -pi/2) q1)
   (inst "XY"    (list pi) q0 q1)
   (inst "H"     () q0))
+
+
+;;; Daggered Parametric Gates
+
+(defmacro define-parametric-dagger-compiler (name &rest qubits)
+  (let* ((theta         (gensym "THETA"))
+         (compiler-name (alexandria:format-symbol ':cl-quil "DAGGER-~A" name))
+         (op            (dagger-operator (named-operator name))))
+    `(define-compiler ,compiler-name
+         ((_ (,op (,theta) ,@qubits) ,@qubits))
+       (inst ,name (list (param-* -1 ,theta)) ,@qubits))))
+
+(define-parametric-dagger-compiler "RX" p)
+(define-parametric-dagger-compiler "RY" p)
+(define-parametric-dagger-compiler "RZ" p)
+(define-parametric-dagger-compiler "PHASE" p)
+(define-parametric-dagger-compiler "CPHASE00" p q)
+(define-parametric-dagger-compiler "CPHASE01" p q)
+(define-parametric-dagger-compiler "CPHASE10" p q)
+(define-parametric-dagger-compiler "CPHASE" p q)
+(define-parametric-dagger-compiler "PSWAP" p q)
+(define-parametric-dagger-compiler "PISWAP" p q)
+(define-parametric-dagger-compiler "XY" p q)
+
