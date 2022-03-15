@@ -345,6 +345,18 @@ CPHASE(angle) 0 1
 "
                                 (list (cons (mref "angle" 0) (random 1d0)))))))
 
+(deftest test-daggered-parametric-compilation ()
+  (dolist (quil::*enable-state-prep-compression* '(nil t))
+    (%with-loose-state-prep-compression
+      (parametric-compiler-test "
+DECLARE angle REAL
+
+DAGGER RX(angle) 0
+DAGGER CPHASE(angle) 0 1
+DAGGER XY(angle) 0 1
+"
+                                (list (cons (mref "angle" 0) (random 1d0)))))))
+
 (deftest test-parametric-compiler-extended ()
   (dolist (quil::*enable-state-prep-compression* '(nil t))
     (%with-loose-state-prep-compression
