@@ -1,4 +1,4 @@
-;;;; validate-seq-gate.lisp
+;;;; validate-sequence-gate.lisp
 ;;;;
 ;;;; Author: Parker Williams
 
