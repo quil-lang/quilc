@@ -2,7 +2,8 @@
 ;;;;
 ;;;; Author: Peter Karalekas
 ;;;;
-;;;; This file defines the SIMPLIFY-ARITHMETIC transform, which when
+;;;; This file defines a SIMPLIFY-ARITHMETIC function which gets used
+;;;; in the SIMPLIFY-INDIVIDUAL-INSTRUCTIONS transform, which when
 ;;;; applied to a PARSED-PROGRAM will iterate through all the
 ;;;; instructions in its executable code, attempting to reduce the
 ;;;; complexity of the arithmetic expressions contained in each
@@ -14,13 +15,13 @@
 ;;;;    RZ(3.0*theta[1] - theta[1]/2.0 + 5.0) 1
 ;;;;
 ;;;; However, clearly some of the arithmetic in the parameters of the
-;;;; RX and RZ gates could be made simpler. The SIMPLIFY-ARITHMETIC
-;;;; transform takes these expressions and stores them in their
+;;;; RX and RZ gates could be made simpler. SIMPLIFY-ARITHMETIC takes
+;;;; these expressions and stores them in their
 ;;;; AFFINE-REPRESENTATIONs, which give a canonical form for
 ;;;; equivalent linear arithmetic expressions. Then, these structures
 ;;;; can be unpacked once again into (potentially) simpler arithmetic
-;;;; expressions. For example, after applying the transform to the
-;;;; above Quil program, we get the following (simpler) program:
+;;;; expressions. For example, after applying the simplifications to
+;;;; the above Quil program, we get the following (simpler) program:
 ;;;;
 ;;;;    DECLARE theta REAL[2]
 ;;;;    RX(theta[0]) 0
@@ -40,9 +41,6 @@
 (define-condition expression-not-linear (expression-not-simplifiable)
   ()
   (:documentation "A condition that is signaled any time an expression cannot be simplified due to being non-linear."))
-
-(define-transform simplify-arithmetic (simplify-arithmetic)
-  "A transform which converts a parsed program with potentially complicated arithmetic to one that has simplified arithmetic expressions.")
 
 (defstruct (affine-representation (:constructor %affine-representation (constant coefficients)))
   "This data structure represents linear arithmetic expressions of the form
@@ -159,10 +157,17 @@ AFFINE-REPRESENTATION                       (* 2.0 theta[0])
 "
   (let ((expr nil))
     (dohash ((ref coefficient) (affine-representation-coefficients rep))
-      (unless (double= 0 coefficient)
-        (setf expr (if expr
+      (cond
+        ((double= 0 coefficient)        ; skip
+         nil)
+        ((double= 1 coefficient)        ; don't add '1 *` factor
+         (setf expr (if expr
+                       `(+ ,ref ,expr)
+                       ref)))
+        (t
+         (setf expr (if expr
                        `(+ (* ,coefficient ,ref) ,expr)
-                       `(* ,coefficient ,ref)))))
+                       `(* ,coefficient ,ref))))))
     (cond
       ((null expr)
        (affine-representation-constant rep))
@@ -181,7 +186,7 @@ AFFINE-REPRESENTATION                       (* 2.0 theta[0])
                               (delayed-expression-expression de))))))
 
 (defgeneric simplify-arithmetic (thing)
-  (:documentation "Generic function that defines the underlying mechanics for the SIMPLIFY-ARITHMETIC transform. If this function is given a PARSED-PROGRAM, it recursively applies itself to the program's exectuable code. Otherwise, if this function is given a GATE-APPLICATION, it attempts to simplify the gate parameters by canonicalizing the arithmetic expressions they (potentially) contain.")
+  (:documentation "Generic function that defines the underlying mechanics for the SIMPLIFY-INDIVIDUAL-INSTRUCTIONS transform. If this function is given a PARSED-PROGRAM, it recursively applies itself to the program's exectuable code. Otherwise, if this function is given a GATE-APPLICATION, it attempts to simplify the gate parameters by canonicalizing the arithmetic expressions they (potentially) contain.")
   (:method ((thing t))
     thing)
   (:method ((thing constant))
