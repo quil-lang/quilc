@@ -165,7 +165,8 @@
                              (:file "rewrite-arithmetic")
                              (:file "fusion")
                              (:file "simplify-arithmetic")
-                             (:file "validate-sequence-gate")))))
+                             (:file "validate-sequence-gate")
+                             (:file "simplification-grab-bag")))))
 
 ;;; Contribs
 

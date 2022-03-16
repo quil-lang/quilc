@@ -812,4 +812,4 @@ Note: the above \"expansion\" is not performed when in a gate body."
   (let ((pp (quil::resolve-objects (parse-qasm-into-raw-program string))))
     (setf pp (quil::transform 'quil::expand-circuits pp))
     (setf pp (quil::transform 'quil::type-check pp))
-    (setf pp (quil::transform 'quil::simplify-arithmetic pp))))
+    (setf pp (quil::transform 'quil::simplify-individual-instructions pp))))

@@ -720,6 +720,11 @@
    #:fuse-objects                       ; GENERIC
    )
 
+  ;; analysis/simplification-grab-bag.lisp
+  (:export
+   #:simplify-individual-instructions   ; TRANSFORM
+   )
+
   (:shadow
    #:pi)
   )
