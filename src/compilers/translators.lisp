@@ -391,3 +391,29 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
 (define-parametric-dagger-compiler "PISWAP" p q)
 (define-parametric-dagger-compiler "XY" p q)
 
+
+;;; Common Controlled Gates
+
+(define-compiler C-Z-to-CZ
+    ((_ (#.(controlled-operator (named-operator "Z")) () p q)))
+  (inst "CZ" () p q))
+
+(define-compiler C-PHASE-to-CZ
+    ((_ (#.(controlled-operator (named-operator "PHASE")) (alpha) p q)))
+  (inst "CPHASE" (list alpha) p q))
+
+(define-compiler C-X-to-CNOT
+    ((_ (#.(controlled-operator (named-operator "X")) () p q)))
+  (inst "CNOT" () p q))
+
+(define-compiler CC-X-to-CCNOT
+    ((_ (#.(controlled-operator (controlled-operator (named-operator "X"))) () p q r)))
+  (inst "CCNOT" () p q r))
+
+(define-compiler C-CNOT-to-CCNOT
+    ((_ (#.(controlled-operator (named-operator "CNOT")) () p q r)))
+  (inst "CCNOT" () p q r))
+
+(define-compiler C-SWAP-to-CSWAP
+    ((_ (#.(controlled-operator (named-operator "SWAP")) () p q r)))
+  (inst "CSWAP" () p q r))
