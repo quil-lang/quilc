@@ -166,6 +166,7 @@ INSTR is the \"active instruction\".
 
 (defun warm-up-addresser-state (state hardware-op)
   "'Warm up' the addresser STATE by iterating over each hardware object on the chip, initializing a random gate on the object and then calling HARDWARE-OP with it."
+  (format-noise "WARM-UP-ADDRESSER-STATE: Warming...")
   ;; We snag some of the addresser state here, and restore it after the loop.
   (let ((initial-l2p (addresser-state-initial-l2p state))
         (working-l2p (addresser-state-working-l2p state))
@@ -191,6 +192,7 @@ INSTR is the \"active instruction\".
                       (append-instructions-to-lschedule (addresser-state-logical-schedule state)
                                                         instrs-compressed)
                       (funcall hardware-op hw))))))
+    (format-noise "WARM-UP-ADDRESSER-STATE: Done.")
     (setf (addresser-state-initial-l2p state) initial-l2p
           (addresser-state-working-l2p state) working-l2p
           (addresser-state-logical-schedule state) lscheduler

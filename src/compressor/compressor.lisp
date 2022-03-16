@@ -614,12 +614,30 @@ other's."
       ;; compare their respective runtimes and return the shorter one
       (let ((result-instructions
               (cond
-                ((and decompiled-instructions
-                      (>= (calculate-instructions-fidelity reduced-decompiled-instructions chip-specification)
-                          (calculate-instructions-fidelity reduced-instructions chip-specification)))
-                 reduced-decompiled-instructions)
+                ((null decompiled-instructions)
+                 reduced-instructions)
                 (t
-                 reduced-instructions))))
+                 (let ((decompiled-fidelity
+                         (calculate-instructions-fidelity reduced-decompiled-instructions chip-specification))
+                       (original-fidelity
+                         (calculate-instructions-fidelity reduced-instructions chip-specification)))
+                   (cond
+                     ((> decompiled-fidelity original-fidelity)
+                      reduced-decompiled-instructions)
+                     ((< decompiled-fidelity original-fidelity)
+                      reduced-instructions)
+                     ;; Sometimes the fidelities are the same, but one
+                     ;; sequence is longer. This can happen if, for
+                     ;; instance, a chip has a perfect-fidelity RZ
+                     ;; gate which appears when we decompile. See
+                     ;; issue #801.
+                     (t
+                      ;; Style note: We don't extend the COND above
+                      ;; with this IF condition for clarity.
+                      (if (< (length reduced-instructions)
+                             (length reduced-decompiled-instructions))
+                          reduced-instructions
+                          reduced-decompiled-instructions))))))))
         (when *compiler-noise*
           (format-quil-sequence *compiler-noise*
                                 result-instructions

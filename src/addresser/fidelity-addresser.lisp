@@ -215,12 +215,14 @@
                                        &allow-other-keys)
   (declare (ignore initargs))
   ;; set up the qq-distances slot to use log-infidelity as the basic unit
+  (format-noise "INITIALIZE FIDELITY-ADDRESSER-STATE: Calculating Q-Q distances...")
   (setf (addresser-state-qq-distances instance)
         (compute-qubit-qubit-distances chip-spec
                                        (lambda (object)
                                          (if (hardware-object-dead-p object)
                                              most-positive-fixnum
                                              (- (log (swap-fidelity chip-spec object)))))))
+  (format-noise "INITIALIZE FIDELITY-ADDRESSER-STATE: Q-Q distances calculated.")
   ;; fill the cost-bounds slot
   (flet ((fill-cost-bound (hw)
            (setf (gethash hw (fidelity-addresser-state-cost-bounds instance))
