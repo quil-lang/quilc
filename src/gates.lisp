@@ -191,37 +191,27 @@
   (apply (parameterized-gate-matrix-function gate) parameters))
 
 
+
+
 ;;; SEQUENCE GATE
 ;;;  
-;;;  Ordinarilly we would define a class like the following:
-;;;
-#|
-(defclass sequence-gate (parameterized-gate)
-  ((parameters :initarg :parameters
-               :reader sequence-gate-parameters)
-   (arguments :initarg :arguments
-              :reader sequence-gate-arguments)
-   (sequence :initarg :sequence ;;<- I dont know about this one
-             :reader sequence-gate-sequence)
-  (:documentation "A gate specified by a sequence of other gates"))
+(defclass sequence-gate (gate)
+    ((definition :initarg :definition
+                 :reader sequence-gate-gate-definition)))
 
-|#
-;;; We do not think this is necessary because seq gate definition
-;;; essentially contains all the data we need. As such, we will use seq
-;;; gate definitions to represent the actual gate objects.
-;;;
 ;;; Perhaps we should multiply inheret from seq gate definition and
 ;;; parameterized gate in order to construct a sequence gate.
 ;;;
 
 (defun instantiate-sequence-gate (seq-gate parameters arguments)
-  "Expands a sequence gate definition, parameters, and arguments into a list of gate applications."
-  (let* ((lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate) arguments #'formal-name))
-         (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate) parameters #'param-name))
-         (instantiated-list nil))
-    (loop :for gate-app :in (reverse (sequence-gate-definition-sequence seq-gate))
-          :do (setf instantiated-list (cons (instantiate-gate-application gate-app lookup-arg lookup-param) instantiated-list)))
-    instantiated-list))
+  "Expands a sequence gate, parameters, and arguments into a list of gate applications."
+  (let ((seq-gate-def (sequence-gate-gate-definition seq-gate)))
+    (let* ((lookup-arg (make-map-list-to-list (sequence-gate-definition-arguments seq-gate-def) arguments #'formal-name))
+           (lookup-param (make-map-list-to-list (sequence-gate-definition-parameters seq-gate-def) parameters #'param-name))
+           (instantiated-list nil))
+      (loop :for gate-app :in (reverse (sequence-gate-definition-sequence seq-gate-def))
+            :do (setf instantiated-list (cons (instantiate-gate-application gate-app lookup-arg lookup-param) instantiated-list)))
+      instantiated-list)))
 
 (defun instantiate-gate-sequence-application (seq-gate-application)
   "Expands an instantiation of a sequence gate into a list of gate applications."
@@ -249,8 +239,8 @@
           :do (setf (gethash (funcall apply-to-key key) return-table) val))
     return-table))
 
-(defmethod gate-matrix ((gate sequence-gate-definition) &rest parameters)
-  (let ((n (length (sequence-gate-definition-arguments gate))))
+(defmethod gate-matrix ((gate sequence-gate) &rest parameters)
+  (let ((n (length (sequence-gate-definition-arguments (sequence-gate-gate-definition gate)))))
     (simple-gate-matrix
      (gate-application-gate
       (premultiply-gates
@@ -476,7 +466,9 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 (defmethod gate-definition-to-gate ((gate-def sequence-gate-definition))
   ;;hack, should change as given new opimizations
-  gate-def)
+  (make-instance 'sequence-gate
+    :name (gate-definition-name gate-def)
+    :definition gate-def))
 
 
 

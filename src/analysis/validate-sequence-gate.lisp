@@ -44,4 +44,6 @@
 
 (defun neighbors-of-sequence-gate-def (gate-def)
   "Returns all sequence gate defs that another sequence gate def depends on."
-  (mapcar #'gate-application-gate (sequence-gate-definition-sequence gate-def)))
+  (mapcar (lambda (x) (when (typep x 'sequence-gate) (sequence-gate-gate-definition x) ))
+          (mapcar #'gate-application-gate
+                  (sequence-gate-definition-sequence gate-def))))
