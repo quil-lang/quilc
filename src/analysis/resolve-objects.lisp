@@ -95,4 +95,13 @@
                    (resolve-instruction-sequence
                     (circuit-definition-body cd))))
            (parsed-program-circuit-definitions unresolved-program))
+      ;; resolve defgate as sequence definitions
+      (map nil (lambda (sd)
+                 (when (typep sd 'sequence-gate-definition)
+                   (let ((*in-definition-body* t))
+                     (resolve-instruction-sequence
+                      (sequence-gate-definition-sequence sd)))
+                   (validate-resolved-seq-gate-definition sd)))
+           (parsed-program-gate-definitions unresolved-program))
       unresolved-program)))
+
