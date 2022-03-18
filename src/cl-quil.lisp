@@ -5,9 +5,9 @@
 
 (in-package #:cl-quil.frontend)
 
-(defvar *standard-post-process-transforms*
-  '(validate-defgate-loops expand-circuits type-check simplify-individual-instructions)
-  "The standard transforms that are applied by PARSE-QUIL.")
+(defvar *standard-post-parsing-transforms*
+  '(validate-defgate-loops expand-circuits type-check)
+  "The standard transforms that are applied by PARSE-QUIL after parsing. (See also: *STANDARD-PRE-COMPILATION-TRANSFORMS*)")
 
 (define-condition ambiguous-definition-condition ()
   ((instruction :initarg :instruction
@@ -118,8 +118,9 @@ This also signals ambiguous definitions, which may be handled as needed."
 2. PARSER-EXTENSIONS is a list of parser functions which PARSE-PROGRAM-LINES may dispatch to.
 3. LEXER-EXTENSIONS is a list of lexer functions which LINE-LEXER may dispatch to."
   (handler-bind
-      ;; We disallow multiple declarations of the same memory region (even if equivalent).
-      ;; Otherwise, for gate or circuit definitions, the default choice is to "accept the mystery."
+      ;; We disallow multiple declarations of the same memory region
+      ;; (even if equivalent). Otherwise, for gate or circuit
+      ;; definitions, the default choice is to "accept the mystery."
       ((ambiguous-definition-condition (a:disjoin
                                         #'error-on-ambiguous-memory-declaration
                                         ambiguous-definition-handler)))
@@ -163,7 +164,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                (return nil)))))))
 
 (defun parse (string &key originating-file
-                       (transforms *standard-post-process-transforms*)
+                       (transforms *standard-post-parsing-transforms*)
                        (ambiguous-definition-handler #'continue))
   "Parse the input STRING which can be either Quil or OpenQASM code."
   (if (%check-for-qasm-header string)
@@ -174,7 +175,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                   :ambiguous-definition-handler ambiguous-definition-handler)))
 
 (defun parse-quil (string &key originating-file
-                            (transforms *standard-post-process-transforms*)
+                            (transforms *standard-post-parsing-transforms*)
                             (ambiguous-definition-handler #'continue))
   "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string.
 
@@ -263,7 +264,7 @@ In the presence of multiple definitions with a common signature, a signal is rai
           (read-it filename)))))
 
 (defun safely-parse-quil (string &key originating-file
-                                   (transforms *standard-post-process-transforms*)
+                                   (transforms *standard-post-parsing-transforms*)
                                    (ambiguous-definition-handler #'continue))
   "Safely parse a Quil string STRING."
   (flet ((parse-it (string)
