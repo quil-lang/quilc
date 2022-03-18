@@ -11,6 +11,11 @@
 ;;;; For historical reasons, this entry point has been called
 ;;;; "COMPILER-HOOK".
 
+
+(defvar *standard-pre-compilation-transforms*
+  '(simplify-individual-instructions)
+  "The standard transforms that are applied by COMPILER-HOOK before compilation. (See also: *STANDARD-POST-PARSING-TRANSFORMS*)")
+
 ;; Forward declaration from compressor.lisp
 (declaim (special *compressor-passes*))
 
@@ -22,6 +27,7 @@
                       &key
                         (protoquil nil)
                         (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification))
+                        (transforms *standard-pre-compilation-transforms*)
                         (destructive nil))
   "Runs a full compiler pass on a parsed-program object.
 
@@ -55,8 +61,15 @@ Returns a value list: (processed-program, of type parsed-program
              (> (qubits-needed parsed-program)
                 (length (chip-spec-live-qubits chip-specification)))
              (not (parsed-program-has-preserve-blocks-p parsed-program)))
+    (format-noise "COMPILER-HOOK: Compressing qubits.")
     (setf parsed-program (compress-qubits parsed-program)))
 
+  ;; Apply transforms
+  (dolist (xform transforms)
+    (format-noise "COMPILER-HOOK: Applying transform ~A." xform)
+    (setf parsed-program (transform xform parsed-program)))
+  
+  ;; Warm the lookup cache
   (warm-chip-spec-lookup-cache chip-specification)
 
   ;; we disallow compilation of programs that use memory aliasing
