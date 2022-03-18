@@ -64,6 +64,7 @@
                              (:static-file "cs-compile")))
                (:file "cfg")
                (:file "compilation-methods")
+               (:file "compiler-hook")
                (:module "chip"
                 :serial t
                 :components ((:file "chip-specification")
