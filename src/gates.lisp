@@ -197,11 +197,9 @@
 ;;;  
 (defclass sequence-gate (gate)
     ((definition :initarg :definition
-                 :reader sequence-gate-gate-definition)))
+                 :reader sequence-gate-gate-definition))
+  (:documentation "A gate that is a sequence of other gates, note that there's no practical difference between a sequence-gate and a sequence-gate-definition."))
 
-;;; Perhaps we should multiply inheret from seq gate definition and
-;;; parameterized gate in order to construct a sequence gate.
-;;;
 
 (defun instantiate-sequence-gate (seq-gate parameters arguments)
   "Expands a sequence gate, parameters, and arguments into a list of gate applications."
@@ -240,7 +238,7 @@
     return-table))
 
 (defmethod gate-matrix ((gate sequence-gate) &rest parameters)
-  (let ((n (length (sequence-gate-definition-arguments (sequence-gate-gate-definition gate)))))
+  (let ((n (gate-definition-qubits-needed (sequence-gate-gate-definition gate))))
     (simple-gate-matrix
      (gate-application-gate
       (premultiply-gates

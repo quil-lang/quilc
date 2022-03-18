@@ -1702,7 +1702,7 @@ For example,
             (mapcar #'param-name (sequence-gate-definition-parameters gate))
             (mapcar #'formal-name (sequence-gate-definition-arguments gate)))
     (dolist (operation (sequence-gate-definition-sequence gate))
-      (format stream "    ~a~%" (print-instruction-to-string operation))))
+      (format stream "    ~/quil:instruction-fmt/~%" operation)))
   
   (:method ((gate exp-pauli-sum-gate-definition) (stream stream))
     (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS PAULI-SUM:~%"
