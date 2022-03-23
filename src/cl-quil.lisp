@@ -9,6 +9,9 @@
   '(validate-defgate-loops expand-circuits type-check)
   "The standard transforms that are applied by PARSE-QUIL after parsing. (See also: *STANDARD-PRE-COMPILATION-TRANSFORMS*)")
 
+(defvar *default-ambiguous-definition-handler*
+  'warn-on-ambiguous-gate-or-circuit-definition)
+
 (define-condition ambiguous-definition-condition ()
   ((instruction :initarg :instruction
                 :reader ambiguous-definition-instruction
@@ -43,6 +46,16 @@
 ;;; to a bit more involved for Quilt calibrations (where applicability is
 ;;; generally determined by a pattern matching system, and so we have to
 ;;; consider the arity and values of parameters and arguments).
+
+(defun warn-on-ambiguous-gate-or-circuit-definition (condition)
+  "Handler which prints a warning in the presence of a CONDITION indicating an ambiguous gate or circuit declaration."
+  (check-type condition ambiguous-definition-condition)
+  (let ((instr (ambiguous-definition-instruction condition)))
+    (typecase instr
+      (gate-definition (alexandria:simple-style-warning "Gate ~A has multiple definitions, this leads to ambiguous behavior." (gate-definition-name instr)))
+      (circuit-definition (alexandria:simple-style-warning "Circuit ~A has multiple definitions, this leads to ambiguous behavior." (circuit-definition-name instr)))
+      (t (alexandria:simple-style-warning "Object ~A (of type ~A) represents a duplicate definition." instr (type-of instr))))
+    (continue)))
 
 (defgeneric definition-signature (instr)
   (:documentation "Computes a signature for a Quil definition such that if two definitions are equivalent for the purposes of name resolution, then their signatures are EQUALP.")
@@ -109,7 +122,7 @@ This also signals ambiguous definitions, which may be handled as needed."
 
 (defun %parse-quil (string build-parsed-program &key originating-file
                                                   transforms
-                                                  (ambiguous-definition-handler #'continue)
+                                                  (ambiguous-definition-handler *default-ambiguous-definition-handler*)
                                                   (lexer-extensions '())
                                                   (parser-extensions '()))
   "The actual parsing code. Arguments are as in PARSE-QUIL, except we now have three new ones:
@@ -165,7 +178,7 @@ This also signals ambiguous definitions, which may be handled as needed."
 
 (defun parse (string &key originating-file
                        (transforms *standard-post-parsing-transforms*)
-                       (ambiguous-definition-handler #'continue))
+                       (ambiguous-definition-handler *default-ambiguous-definition-handler*))
   "Parse the input STRING which can be either Quil or OpenQASM code."
   (if (%check-for-qasm-header string)
       (quil.qasm:parse-qasm string)
@@ -176,7 +189,7 @@ This also signals ambiguous definitions, which may be handled as needed."
 
 (defun parse-quil (string &key originating-file
                             (transforms *standard-post-parsing-transforms*)
-                            (ambiguous-definition-handler #'continue))
+                            (ambiguous-definition-handler *default-ambiguous-definition-handler*))
   "Parse and process the Quil string STRING, which originated from the file ORIGINATING-FILE. Transforms in TRANSFORMS are applied in-order to the processed Quil string.
 
 In the presence of multiple definitions with a common signature, a signal is raised, with the default handler specified by AMBIGUOUS-DEFINITION-HANDLER.
