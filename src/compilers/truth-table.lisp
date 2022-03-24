@@ -1,8 +1,11 @@
 ;;;; truth-table.lisp
-;;;; This file contains the data structure representation for
-;;;; manipulating boolean functions.
+;;;;
+;;;; Author: Charles Zhang
 
 (in-package #:cl-quil)
+
+;;;; This file contains the data structure representation for
+;;;; manipulating boolean functions.
 
 (defun missing-arg ()
   (error "Required argument missing."))
@@ -73,8 +76,8 @@
    (truth-table-n-vars truth-table)
    :initial-contents
    (let ((bits (truth-table-bits truth-table)))
-     (loop for k from 0 below (length bits)
-           collect (aref bits (logandc2 k (ash 1 index)))))))
+     (loop :for k :from 0 :below (length bits)
+           :collect (aref bits (logandc2 k (ash 1 index)))))))
 
 (defun truth-table-cofactor1 (truth-table index)
   "Find the 1-cofactor of the TRUTH-TABLE with respect to INDEX."
@@ -83,8 +86,8 @@
    (truth-table-n-vars truth-table)
    :initial-contents
    (let ((bits (truth-table-bits truth-table)))
-     (loop for k from 0 below (length bits)
-           collect (aref bits (logior k (ash 1 index)))))))
+     (loop :for k :from 0 :below (length bits)
+           :collect (aref bits (logior k (ash 1 index)))))))
 
 (defun truth-table-xor (truth-table1 truth-table2)
   (declare (type truth-table truth-table1 truth-table2))
@@ -103,16 +106,16 @@
   (declare (type (member -1 1) polarity))
   (let* ((new-length (max (length cube) (1+ index)))
          (new-cube (make-array new-length :initial-element 0)))
-    (loop for i from 0
-          for trit across cube
-          do (setf (aref new-cube i) trit))
+    (loop :for i :from 0
+          :for trit :across cube
+          :do (setf (aref new-cube i) trit))
     (setf (aref new-cube index) polarity)
     new-cube))
 
-;;; This algorithm applies recursively the positive Davio decomposition
-;;; which eventually leads into the PPRM representation of a
-;;; function. An ESOP (Exclusive Sum Of Products) is represented by a
-;;; list of cubes.
+;;; This algorithm applies recursively the positive Davio
+;;; decomposition which eventually leads into the PPRM representation
+;;; of a function. An ESOP (Exclusive Sum Of Products) is represented
+;;; by a list of cubes.
 (defun truth-table-esop-from-pprm (truth-table)
   "Given a truth table, return a list of cubes which when disjoined represent the PPRM representation of the boolean function encoded by TRUTH-TABLE."
   (let ((cubes (make-hash-table :test #'equalp)))
