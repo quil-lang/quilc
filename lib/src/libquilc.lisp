@@ -7,7 +7,9 @@
   ("ERROR_SUCCESS" 0)
   ("ERROR_FAIL" 1))
 (sbcl-librarian:define-error-map error-map error-type 0
-  (t (condition) (declare (ignore condition)) 1))
+  ((t (lambda (condition)
+        (declare (ignore condition))
+        (return-from error-map 1)))))
 
 (defun compile-protoquil (parsed-program chip-specification)
   (compiler-hook parsed-program chip-specification :protoquil t))
