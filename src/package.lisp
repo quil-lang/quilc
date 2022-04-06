@@ -572,6 +572,9 @@
    #:exp-pauli-sum-gate-arguments       ; READER
    #:exp-pauli-sum-gate-terms           ; READER
 
+   #:sequence-gate                      ; CLASS
+   #:sequence-gate-gate-definition      ; READER
+   
    #:pauli-term                         ; STRUCT
    #:make-pauli-term                    ; FUNCTION
    #:pauli-term-pauli-word              ; FUNCTION

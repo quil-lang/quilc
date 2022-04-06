@@ -167,7 +167,8 @@
                              (:file "fusion")
                              (:file "simplify-arithmetic")
                              (:file "validate-sequence-gate")
-                             (:file "simplification-grab-bag")))))
+                             (:file "simplification-grab-bag")))
+               (:file "initialize-standard-gates")))
 
 ;;; Contribs
 
