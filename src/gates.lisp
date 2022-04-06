@@ -253,8 +253,8 @@
          (mapcar #'constant parameters)
          (loop :for i :from (1- n) :downto 0 :collect (qubit i)))))))))
 
-(defmethod gate-dimension ((gate sequence-gate-definition))
-  (expt 2 (length (sequence-gate-definition-arguments gate))))
+(defmethod gate-dimension ((gate sequence-gate))
+  (expt 2 (length (sequence-gate-definition-arguments (sequence-gate-gate-definition gate)))))
 
 ;;; END SEQUENCE GATE
 
@@ -382,20 +382,9 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 ;;;;;;;;;;;;;;;;;;;;;; Default Gate Definitions ;;;;;;;;;;;;;;;;;;;;;;
 
-;;; Load all of the standard gates from src/quil/stdgates.quil
-(global-vars:define-global-var **default-gate-definitions**
-    (let ((stdgates-file (asdf:system-relative-pathname
-                          "cl-quil" "src/quil/stdgates.quil")))
-      (format t "~&; loading standard gates from ~A~%" stdgates-file)
-      (let ((table (make-hash-table :test 'equal))
-            (gate-defs
-              (remove-if-not (lambda (obj) (typep obj 'gate-definition))
-                             (parse-quil-into-raw-program
-                              (a:read-file-into-string stdgates-file)))))
-        (dolist (gate-def gate-defs table)
-          (setf (gethash (gate-definition-name gate-def) table)
-                gate-def))))
-  "A table of default gate definitions, mapping string name to a GATE-DEFINITION object.")
+;;; This will be initialized to a table of default gate definitions in
+;;; initialize-standard-gates.lisp
+(defvar **default-gate-definitions**)
 
 (defun standard-gate-names ()
   "Query for the list of standard Quil gate names."
