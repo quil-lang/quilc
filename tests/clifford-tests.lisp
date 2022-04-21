@@ -356,3 +356,17 @@
     (is (= (cl-quil.clifford:count-clifford i)
            (perm:group-order (cl-quil.clifford::clifford-group-as-perm-group i))))
     (finish-output)))
+
+
+(deftest test-pauli-term->matrix ()
+  "Check some basic properties of pauli-term->matrix"
+  (let* ((test-X (cl-quil::from-list '(0 1 1 0) '(2 2)))
+         (test-Y (cl-quil::from-list '(0 #C(0 -1) #C(0 1) 0) '(2 2)))
+         (test-Z (cl-quil::from-list '(1 0 0 -1) '(2 2)))
+         (test-I (cl-quil::eye '(2 2))))
+    (is (magicl:= test-I (cl-quil::pauli-term->matrix (cl-quil::make-pauli-term :pauli-word "I" :prefactor 1.0d0 :arguments '(0)) '(0) '(1d0) '(I))))
+    (is (magicl:= test-X (cl-quil::pauli-term->matrix (cl-quil::make-pauli-term :pauli-word "X" :prefactor 1.0d0 :arguments '(0)) '(0) '(1d0) '(X))))
+    (is (magicl:= (magicl:kron test-X test-X) (cl-quil::pauli-term->matrix (cl-quil::make-pauli-term :pauli-word "XX" :prefactor 1.0d0 :arguments '(0 1)) '(0 1) '(1d0) '(XX))))
+    (is (magicl:= (magicl:kron test-X test-Y test-Z test-I) (cl-quil::pauli-term->matrix (cl-quil::make-pauli-term :pauli-word "XYZI" :prefactor 1.0d0 :arguments '(0 1 2 3)) '(0 1 2 3) '(1d0) '(XYZI))))
+    (is (magicl:= (magicl:scale (magicl:kron test-X test-Y test-Z test-I) #C(0 -1)) (cl-quil::pauli-term->matrix (cl-quil::make-pauli-term :pauli-word "XYZI" :prefactor #C(0 -1) :arguments '(0 1 2 3)) '(0 1 2 3) '(C#(0 -1)) '(XYZI))))
+    (is (not (magicl:= (magicl:scale (magicl:kron test-X test-Y test-Z test-I) #C(0 1)) (cl-quil::pauli-term->matrix (cl-quil::make-pauli-term :pauli-word "XYZI" :prefactor #C(0 -1) :arguments '(0 1 2 3)) '(0 1 2 3) '(C#(0 -1)) '(XYZI)))))))

@@ -93,8 +93,7 @@ NOTE: When TYPE is not specified the elemnets in LIST are coerced to +DEFAULT-MA
               :for row-toggle := (ldb (byte 1 arg-position) col)
               :do (ecase letter
                     (#\X
-                     (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
-                     (setf entry (- entry)))
+                     (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row)))
                     (#\Y
                      (setf row (dpb (- 1 row-toggle) (byte 1 arg-position) row))
                      (setf entry (* entry (if (zerop row-toggle) #C(0 1) #C(0 -1)))))
