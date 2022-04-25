@@ -14,8 +14,7 @@ lifting of parsing, compiling, and optimizing Quil code. The second,
 the binary `quilc` application directly, or alternatively by
 communicating with an [RPCQ](https://github.com/rigetti/rpcq/) server.
 
-Quil is the [quantum instruction language](https://arxiv.org/pdf/1608.03355.pdf) developed at
-[Rigetti Computing](https://rigetti.com). In Quil quantum algorithms are expressed using Quil's
+Quil is the [quantum instruction language](https://quil-lang.github.io/), originally developed at Rigetti Computing. In Quil quantum algorithms are expressed using Quil's
 standard gates and instructions. One can also use Quil's `DEFGATE` to
 define new non-standard gates, and `DEFCIRCUIT` to build a named circuit
 that can be referenced elsewhere in Quil code (analogous to a function
@@ -35,7 +34,7 @@ targeting the native gates specified by the ISA.
 To clone the quilc repository and its bundled submodules, run the following command:
 
 ``` shell
-git clone --recurse-submodules https://github.com/rigetti/quilc.git
+git clone --recurse-submodules https://github.com/quil-lang/quilc.git
 ```
 
 ### Building the Quil Compiler
@@ -48,10 +47,10 @@ Prerequisites to building `quilc` are:
 4. [ZeroMQ](http://zeromq.org/intro:get-the-software): Messaging library
    required by RPCQ. Development headers are required at build time.
 
-Follow [these instructions](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md)
+Follow [these instructions](https://github.com/quil-lang/qvm/blob/master/doc/lisp-setup.md)
 to get started from scratch.
 
-One notorious dependency is [MAGICL](https://github.com/rigetti/magicl). It is available on Quicklisp,
+One notorious dependency is [MAGICL](https://github.com/quil-lang/magicl). It is available on Quicklisp,
 but requires you to install some system libraries such as BLAS, LAPACK, and libffi. Follow MAGICL's
 instructions carefully before proceeding with loading CL-QUIL or `make`ing quilc.
 
@@ -140,7 +139,7 @@ section "Running the Quil Compiler with Docker" below. Otherwise, the following 
 will walk you through how to build the compiler from source.
 
 Follow the instructions in QVM's
-[doc/lisp-setup.md](https://github.com/rigetti/qvm/blob/master/doc/lisp-setup.md) to satisfy the
+[doc/lisp-setup.md](https://github.com/quil-lang/qvm/blob/master/doc/lisp-setup.md) to satisfy the
 dependencies required to load the `CL-QUIL` library. Afterwhich, the
 library can be loaded
 
@@ -230,8 +229,8 @@ assigned host ports. You can then inspect the mapping using `docker port CONTAIN
 1. Update `VERSION.txt` and push the commit to `master`.
 2. Push a git tag `vX.Y.Z` that contains the same version number as in `VERSION.txt`.
 3. Verify that the resulting build (triggered by pushing the tag) completes successfully.
-4. Publish a [release](https://github.com/rigetti/quilc/releases) using the tag as the name.
-5. Close the [milestone](https://github.com/rigetti/quilc/milestones) associated with this release,
+4. Publish a [release](https://github.com/quil-lang/quilc/releases) using the tag as the name.
+5. Close the [milestone](https://github.com/quil-lang/quilc/milestones) associated with this release,
    and migrate incomplete issues to the next one.
 6. Update the quilc version of downstream dependencies (if applicable, see next section).
 
@@ -239,7 +238,7 @@ assigned host ports. You can then inspect the mapping using `docker port CONTAIN
 
 Currently, there are a couple different components of the Forest SDK that depend on quilc:
 
-1. [qvm](https://github.com/rigetti/qvm)
+1. [qvm](https://github.com/quil-lang/qvm)
 2. [pyquil](https://github.com/rigetti/pyquil)
 3. [forest-benchmarking](https://github.com/rigetti/forest-benchmarking)
 
@@ -261,9 +260,7 @@ make benchmark-qasm
 
 We welcome and encourage community contributions! Peruse our [guidelines for contributing](CONTRIBUTING.md)
 to get you up to speed on expectations. Once that's clear, a good place to start is the
-[good first issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) section. If you find any bugs, please create an [issue](https://github.com/rigetti/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). If you need help
-with some code or want to discuss some technical issues, you can find us in the `#dev`
-channel on [Slack](https://rigetti-forest.slack.com/) or in the `#qlisp` channel on [freenode IRC](irc.freenode.net).
+[good first issue](https://github.com/quil-lang/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) section. If you find any bugs, please create an [issue](https://github.com/quil-lang/quilc/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 
 We look forward to meeting and working with you!
 
@@ -271,7 +268,7 @@ We look forward to meeting and working with you!
 
 ## SBCL 1.5.6
 
-There is [an issue](https://github.com/rigetti/quilc/issues/401) with
+There is [an issue](https://github.com/quil-lang/quilc/issues/401) with
 SBCL 1.5.6 that results in unhandled memory faults in
 `SB-VM::FUNCALLABLE-INSTANCE-TRAMP` when attempting to run quilc
 compiled with that version of SBCL. The issue was resolved with SBCL
