@@ -4,7 +4,7 @@
 
 (asdf:defsystem #:cl-quil
   :description "A parser and optimizing compiler for the Quantum Instruction Language (Quil)."
-  :author "Robert Smith <robert@rigetti.com>, Eric Peterson <eric@rigetti.com>, Rigetti Computing"
+  :author "Robert Smith, Eric Peterson, Rigetti Computing, and Quil-Lang contributors"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :version (:read-file-form "VERSION.txt")
   :pathname "src/"
@@ -215,9 +215,37 @@
                (:file "calibration-tests")
                (:file "analysis-tests")))
 
+(asdf:defsystem #:cl-quil/discrete
+  :description "Extensions to CL-QUIL to allow compilation to a discrete gate set."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil
+               #:coalton)
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/discrete-tests)))
+  :around-compile (lambda (compile)
+                    (let (#+sbcl (sb-ext:*derive-function-types* t))
+                      (funcall compile)))
+  :pathname "src/discrete/"
+  :serial t
+  :components ((:file "package")
+               (:file "discrete-chip")))
+
+(asdf:defsystem #:cl-quil/discrete-tests
+  :description "Test suite for cl-quil/discrete."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil/discrete
+               #:fiasco)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.discrete-tests
+                                           '#:run-discrete-tests))
+  :pathname "tests/discrete/"
+  :serial t
+  :components ((:file "package")
+               (:file "suite")
+               (:file "tests")))
+
 (asdf:defsystem #:cl-quil/quilec
   :description "Quantum error correction toolkit."
-  :author "Juan M. Bello-Rivas <jbellorivas@rigetti.com>"
+  :author "Juan M. Bello-Rivas"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:alexandria
                #:cl-quil)
@@ -234,7 +262,7 @@
 
 (asdf:defsystem #:cl-quil/quilec-tests
   :description "Test suite for cl-quil/quilec."
-  :author "Juan M. Bello-Rivas <jbellorivas@rigetti.com>"
+  :author "Juan M. Bello-Rivas"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil/quilec
                #:qvm
