@@ -42,9 +42,28 @@
   (inst "RZ" '(#.-pi/2) q))
 
 (define-compiler PHASE-to-RZ ((phase-gate ("PHASE" (alpha) q)))
+  "Convert PHASE into a projective-equivalent RZ."
   (inst "RZ" `(,alpha) q))
 
-;; standard 2Q gate translators
+
+;;; Basic Clifford and T gates
+
+(define-compiler RX-to-H-and-RZ ((rx ("RX" (alpha) q)))
+  (inst "H" () q)
+  (inst "RZ" `(,alpha) q)
+  (inst "H" () q))
+
+(define-compiler collapse-Ts-to-S
+    ((t1 ("T" () q))
+     (t2 ("T" () q)))
+  (inst "S" () q))
+
+(define-compiler collapse-Ss-to-Z
+    ((s1 ("S" () q))
+     (s2 ("S" () q)))
+  (inst "Z" () q))
+
+;;; standard 2Q gate translators
 
 (define-compiler CZ-to-CPHASE ((CZ-gate ("CZ" () q1 q0)))
   (inst "CPHASE" '(#.pi) q1 q0))

@@ -12,6 +12,12 @@
   "Eliminate I gates."
   nil)
 
+(define-compiler sort-S-T
+    ((s1 ("S" () q))
+     (t2 ("T" () q)))
+  (inst "T" () q)
+  (inst "S" () q))
+
 (define-compiler sort-CZs
     ((x ("CZ" () p q))
      (y ("CZ" () r s)
@@ -39,6 +45,7 @@
   (list #'eliminate-identities
         #'sort-CZs
         #'sort-CPHASEs
+        #'sort-S-T
         #'elide-applications-on-eigenvectors))
 
 
@@ -145,6 +152,21 @@
   (inst "RZ" `(,psi)   q)
   (inst "RX" `(,phi)   q)
   (inst "RZ" `(,theta) q))
+
+
+;;; Simple 1Q Reductions
+
+(define-compiler collapse-Hs
+    ((h1 ("H" () q))
+     (h2 ("H" () q)))
+  nil)
+
+(define-compiler collapse-Ss-to-I
+    ((s1 ("S" () q))
+     (s2 ("S" () q))
+     (s3 ("S" () q))
+     (s4 ("S" () q)))
+  nil)
 
 
 ;;; rewriting rules specialized to link type
