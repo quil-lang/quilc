@@ -115,8 +115,8 @@ uninstall:
 # TEST
 ###############################################################################
 
-.PHONY: test test-cl-quil test-quilc test-quilt test-quilec test-libquilc
-test: test-cl-quil test-quilt test-quilec test-quilc test-libquilc
+.PHONY: test test-cl-quil test-quilc test-quilt test-quilec test-discrete test-libquilc
+test: test-cl-quil test-quilt test-quilec test-quilc test-discrete test-libquilc
 
 test-cl-quil:
 	$(QUICKLISP) \
@@ -142,6 +142,11 @@ test-quilec:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil/quilec-tests)" \
 		--eval "(asdf:test-system :cl-quil/quilec)"
+
+test-discrete:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil/discrete-tests)" \
+		--eval "(asdf:test-system :cl-quil/discrete)"
 
 test-ccl:
 	ccl -n --batch --load $(QUICKLISP_HOME)/setup.lisp \
