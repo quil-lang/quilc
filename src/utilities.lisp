@@ -93,3 +93,16 @@ appropriate method of comparison."
   (calculate-instructions-fidelity
    (coerce (parsed-program-executable-code program) 'list)
    chip))
+
+(defun prog-find-top-pragma (parsed-prog pragma)
+  "Finds and returns the first PRAGMA in the PARSED-PROG. PRAGMA may either be a
+symbol of representing the type, or a string equal representing a pragma word.
+This pragma needs to occur before any non-pragma instructions. If no pragma is
+found, then return NIL."
+  (loop :for inst :across (parsed-program-executable-code parsed-prog) :do
+    (if (typep inst 'pragma)
+        (when (or (and (symbolp pragma) (typep inst pragma))
+                  (and (stringp pragma)
+                       (member pragma (pragma-words inst) :test #'equal)))
+          (return-from prog-find-top-pragma inst))
+        (return-from prog-find-top-pragma nil))))

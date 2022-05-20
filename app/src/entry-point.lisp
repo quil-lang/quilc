@@ -404,10 +404,16 @@
                ;; can print the input and output unitary matrix as
                ;; comments at the end of the output.
                (when (and protoquil compute-matrix-reps)
-                 (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t)))
-                   (print-matrix-comparision original-matrix
-                                             (quil::scale-out-matrix-phases processed-program-matrix
-                                                                            original-matrix)))))
+                 (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t))
+                        ;; If a TOLERANCE pragma is found, allow non-zero phase invariant distance
+                        (tolerance (cl-quil::prog-find-top-pragma program "TOLERANCE")))
+                   (if tolerance
+                       (print-matrix-comparision
+                        original-matrix processed-program-matrix
+                        :tolerance t)
+                       (print-matrix-comparision
+                        original-matrix
+                        (quil::scale-out-matrix-phases processed-program-matrix original-matrix))))))
 
              ;; New and improved flow
              (when compile

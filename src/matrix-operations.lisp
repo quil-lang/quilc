@@ -337,3 +337,11 @@ as matrices."
   "Treats m in SU(2) as either m (x) Id or Id (x) m."
   (kq-gate-on-lines m 2 (list line)))
 
+(defun global-phase-invariant-distance (m1 m2)
+  "Measures the 'distance' between two unitary matrices up to a global phase
+(see arXiv:2106.07099). Returns D = sqrt(1-|tr(M1 M2^-1)|/n) where 0<=D<=1 and
+M1 and M2 are n x n."
+  (assert (= (magicl:nrows m1) (magicl:ncols m1)
+             (magicl:nrows m2) (magicl:ncols m2)))
+  (sqrt (- 1 (/ (abs (magicl:trace (magicl:@ m1 (magicl:dagger m2))))
+                (magicl:nrows m1)))))
