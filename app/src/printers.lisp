@@ -11,14 +11,23 @@
 (declaim (special *without-pretty-printing*
                   *human-readable-stream*))
 
-(defun print-matrix-comparision (m1 m2 &optional (stream *human-readable-stream*))
+(defun print-matrix-comparision (m1 m2 &key (stream *human-readable-stream*)
+                                         (tolerance nil))
+  "Given to matrices M1 and M2, print to a STREAM their entries and whether they
+are numerically unitary. If TOLERANCE is nil, check if if they are equal and
+error if they are not in the same projective class. If TOLERANCE is t, instead
+print out their `global-phase-invariant-distance' with no error."
   (format stream "~%#Matrix read off from input code (~:[not ~;~]unitary)~%"
           (magicl:unitary-matrix-p m1))
   (print-matrix-with-comment-hashes m1 stream)
   (format stream "~%#Matrix read off from compiled code (~:[not ~;~]unitary)~%"
           (magicl:unitary-matrix-p m2))
   (print-matrix-with-comment-hashes m2 stream)
-  (format stream "~%#Matrices are~:[ not~;~] equal~%" (quil::matrix-equals-dwim m1 m2))
+  (if tolerance
+      (format stream "~%#Matrices have a global phase invariant distance of ~E~%"
+              (cl-quil::global-phase-invariant-distance m1 m2))
+      (format stream "~%#Matrices are~:[ not~;~] equal~%"
+              (quil::matrix-equals-dwim m1 m2)))
   (finish-output stream))
 
 (defun print-program (processed-program &optional (stream *standard-output*))

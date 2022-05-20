@@ -114,13 +114,9 @@ If no
     PRAGMA INITIAL_REWIRING \"...\"
 
 is found, then return NIL."
-  (loop :for inst :across (parsed-program-executable-code parsed-prog) :do
-    (cond
-      ((typep inst 'pragma)
-       (when (typep inst 'pragma-initial-rewiring)
-         (return-from prog-rewiring-pragma (pragma-rewiring-type inst))))
-      (t
-       (return-from prog-rewiring-pragma nil)))))
+
+  (a:when-let ((pragma (prog-find-top-pragma parsed-prog 'pragma-initial-rewiring)))
+    (pragma-rewiring-type pragma)))
 
 (defun %naively-applicable-p (instr chip-spec
                               &aux (qubit-indices (qubits-used instr)))
