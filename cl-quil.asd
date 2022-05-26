@@ -170,6 +170,34 @@
                              (:file "simplification-grab-bag")))
                (:file "initialize-standard-gates")))
 
+(asdf:defsystem #:cl-quil/chip-library
+  :description "Holds definitions for various chip ISAs."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil)
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/chip-library-tests)))
+  :around-compile (lambda (compile)
+                    (let (#+sbcl (sb-ext:*derive-function-types* t))
+                      (funcall compile)))
+  :pathname "src/chip-library/"
+  :serial t
+  :components ((:file "package")
+               (:file "chip-table")))
+
+(asdf:defsystem #:cl-quil/chip-library-tests
+  :description "Test suite for cl-quil/chip-library."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil
+               #:cl-quil/chip-library
+               #:fiasco)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.chip-library-tests
+                                           '#:run-chip-library-tests))
+  :pathname "tests/chip-library/"
+  :serial t
+  :components ((:file "package")
+               (:file "suite")
+               (:file "chip-table-tests")))
+
 ;;; Contribs
 
 ;; Adapted from magicl's MAGICL/EXT-EXPOKIT adapted from commonqt's

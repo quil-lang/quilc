@@ -133,6 +133,11 @@ test-libquilc:
 		--eval "(ql:quickload :libquilc-tests)" \
 		--eval "(asdf:test-system :libquilc)"
 
+test-chip-library:
+	$(QUICKLISP) \
+		--eval "(ql:quickload :cl-quil/chip-library-tests)" \
+		--eval "(asdf:test-system :cl-quil/chip-library)"
+
 test-quilt:
 	$(QUICKLISP) \
 		--eval "(ql:quickload :cl-quil/quilt-tests)" \

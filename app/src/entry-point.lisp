@@ -30,16 +30,10 @@
            (coerce #(#\Newline #\#) 'string))))
 
 (defun lookup-isa-descriptor-for-name (isa)
-  (a:switch (isa :test #'string=)
-    ("8Q" (quil::build-8Q-chip))
-    ("20Q" (quil::build-skew-rectangular-chip 0 4 5))
-    ("16QMUX" (quil::build-16QMUX-chip))
-    ("bristlecone" (quil::build-bristlecone-chip))
-    ("ibmqx5" (quil::build-ibm-qx5))
-    (t
-     (if (probe-file isa)
-         (quil::read-chip-spec-file isa)
-         (error "ISA descriptor does not name a known template or an extant file.")))))
+  (or (call-chip-builder isa)
+      (if (probe-file isa)
+          (quil::read-chip-spec-file isa)
+          (error "ISA descriptor does not name a known template or an extant file."))))
 
 (defun log-level-string-to-symbol (log-level)
   (a:eswitch (log-level :test #'string=)
@@ -90,6 +84,10 @@
 (defun show-backends ()
   (format t "Available backends:~%")
   (format t "~{  ~(~A~)~^~%~}~%" (mapcar #'quil:backend-name (quil:list-available-backends))))
+
+(defun show-chips ()
+  (format t "Available ISAs:~%")
+  (format t "~{  ~(~A~)~^~%~}~%" (cl-quil.chip-library:available-chips)))
 
 (defun check-libraries ()
   "Check that the foreign libraries are adequate. Exits with status
@@ -197,6 +195,7 @@
                           (backend nil)
                           (backend-option nil)
                           (list-backends nil)
+                          (list-chips nil)
                           (output nil)
 
                           (enable-state-prep-reductions nil)
@@ -241,6 +240,10 @@
 
   (when list-backends
     (show-backends)
+    (uiop:quit 0))
+
+  (when list-chips
+    (show-chips)
     (uiop:quit 0))
 
   (when check-libraries

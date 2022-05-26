@@ -41,7 +41,13 @@
      :type string
      :optional t
      :initial-value "8Q"
-     :documentation "set ISA to one of \"8Q\", \"20Q\", \"16QMUX\", \"bristlecone\", \"ibmqx5\", or path to QPU description file")
+     :documentation "set to an available ISA (see --list-chips) or path to QPU description file")
+
+    (("list-chips")
+     :type boolean
+     :optional t
+     :initial-value nil
+     :documentation "list available ISA that can be passed to --isa")
 
     (("compile" #\c)
      :type boolean
