@@ -84,6 +84,10 @@ quilc-sdk-barebones: quilc-sdk-base
 quilc-unsafe: QUILC_UNSAFE_OPTION=--unsafe
 quilc-unsafe: quilc
 
+quilc-discrete: COALTON_ENV=release
+quilc-discrete: POST_LOAD_ASDF_SYSTEMS="cl-quil/discrete"
+quilc-discrete: quilc
+
 DOCKER_BUILD_TARGET=all
 DOCKER_TAG=rigetti/quilc:$(COMMIT_HASH)
 .PHONY: docker

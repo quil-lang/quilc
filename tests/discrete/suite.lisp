@@ -22,3 +22,7 @@
                                           :describe-failures t
                                           :interactive nil)))
          (uiop:quit (if successp 0 1)))))))
+
+(in-package #:cl-quil.discrete-coalton-tests)
+
+(coalton-fiasco-init :cl-quil.discrete-tests)

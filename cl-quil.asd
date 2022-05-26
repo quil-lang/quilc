@@ -248,7 +248,12 @@
   :description "Extensions to CL-QUIL to allow compilation to a discrete gate set."
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil
-               #:coalton)
+               #:cl-quil/frontend
+               #:cl-quil/chip-library
+               #:closer-mop
+               #:parse-float
+               #:coalton
+               (:feature :sbcl #:coalton/library/big-float))
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/discrete-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
@@ -256,13 +261,45 @@
   :pathname "src/discrete/"
   :serial t
   :components ((:file "package")
-               (:file "discrete-chip")))
+               (:file "discrete-common")
+               (:file "discrete-chip")
+               (:module "numeric"
+                :serial t
+                :components ((:file "utilities")
+                             (:file "linear-algebra")
+                             (:file "naturals")
+                             (:file "modulo")
+                             (:file "interval")
+                             (:file "root2plex")
+                             (:file "cyclotomic8")
+                             (:file "dyadic")
+                             (:file "circle")))
+               (:module "operators"
+                :serial t
+                :components ((:file "utilities")
+                             (:file "mat2")
+                             (:file "sunitary2")
+                             (:file "unitary2")
+                             (:file "hadamardt")
+                             (:file "rz")
+                             (:file "c2root2")
+                             (:file "pauli")
+                             (:file "clifford")
+                             (:file "gates1")
+                             (:file "ma-normal-form")))
+               (:module "rz-approx"
+                :serial t
+                :components ((:file "candidate-generation")
+                             (:file "candidate-verification")
+                             (:file "generate-solution")))
+               (:module "compilers"
+                :serial t
+                :components ((:file "clifford-t")))))
 
 (asdf:defsystem #:cl-quil/discrete-tests
   :description "Test suite for cl-quil/discrete."
   :license "Apache License 2.0 (See LICENSE.txt)"
-  :depends-on (#:cl-quil/discrete
-               #:fiasco)
+  :depends-on (#:cl-quil/discrete #:coalton #:coalton/testing #:fiasco)
   :perform (asdf:test-op (o s)
                          (uiop:symbol-call ':cl-quil.discrete-tests
                                            '#:run-discrete-tests))
@@ -270,7 +307,8 @@
   :serial t
   :components ((:file "package")
                (:file "suite")
-               (:file "tests")))
+               (:file "rz-approx-tests")
+               (:file "compilation-tests")))
 
 (asdf:defsystem #:cl-quil/quilec
   :description "Quantum error correction toolkit."
