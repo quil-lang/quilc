@@ -33,14 +33,6 @@
     (make-array (list size size) :element-type 'bit
                                  :initial-element 0)))
 
-(defun copy-tableau (tab)
-  "Creates a copy of TAB and returns it."
-  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
-    (loop :for i :below (array-total-size copy)
-          :do (setf (row-major-aref copy i)
-                    (row-major-aref tab i)))
-    copy))
-
 (declaim (inline tableau-qubits
                  tableau-x (setf tableau-x)
                  tableau-z (setf tableau-z)
@@ -51,6 +43,14 @@
   "How many qubits does the tableau TAB represent?"
   (declare (type tableau tab))
   (the tableau-index (ash (1- (array-dimension tab 0)) -1)))
+
+(defun copy-tableau (tab)
+  "Creates a copy of TAB and returns it."
+  (let ((copy (make-tableau-zero-state (tableau-qubits tab))))
+    (loop :for i :below (array-total-size copy)
+          :do (setf (row-major-aref copy i)
+                    (row-major-aref tab i)))
+    copy))
 
 (defun tableau-x (tab i j)
   (declare (type tableau tab)
@@ -112,6 +112,7 @@
         ((and (= 0 x) (= 1 z)) (write-string "Z"))
         ((and (= 1 x) (= 1 z)) (write-string "Y"))))))
 
+(declaim (inline tableau-copy-row))
 (defun tableau-copy-row (tab i k)
   "Given a tableau TAB, overwrite row I with row K."
   (declare (type tableau tab)
@@ -436,7 +437,7 @@ Note that no expressions calculating the phase update are created. This is becau
     (xorf (tableau-r tab i) (logand (tableau-x tab i q) (tableau-z tab i q)))
     (xorf (tableau-z tab i q) (tableau-x tab i q))))
 
-(declaim (inline tableau-set-row-to-pauli tableau-copy-row))
+(declaim (inline tableau-set-row-to-pauli))
 (defun tableau-set-row-to-pauli (tab i b)
   "Given a tableau TAB, set row I to be the single qubit Pauli term B, where if 0 <= B < N, the X_B will be set, and if N <= B < 2*N, then Z_(B - N) will be set."
   (declare (type tableau tab)
