@@ -39,50 +39,6 @@ LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.
   (print-unreadable-object (cs stream :type t :identity nil)
     (format stream "of ~{~D~^:~} objects" (map 'list #'length (chip-specification-objects cs)))))
 
-(defun debug-print-link (stream link &optional colon-p at-sign-p)
-  "Print out the two qubits constituting a link."
-  (declare (ignore colon-p at-sign-p))
-  (let* ((cxns (hardware-object-cxns link))
-         (qubit0 (vnth 0 (vnth 0 cxns)))
-         (qubit1 (vnth 1 (vnth 0 cxns))))
-    (format stream "~a -- ~a" qubit0 qubit1)))
-
-(defun debug-print-chip-spec (cs &optional (stream *standard-output*))
-  "Print out a simple, human-readable representation of a chip specification consisting of the number of qubits, the number of links, and a list of the links."
-  (format stream "~a qubits, ~a links~%links:~%~{~/cl-quil::debug-print-link/~%~}~%"
-          (chip-spec-n-qubits cs)
-          (chip-spec-n-links cs)
-          (coerce (chip-spec-links cs) 'list)))
-
-(defstruct permutation-record
-  "Houses information about a permutation gate, for ease of lookup by the greedy scheduler.
-
-OPERATOR is a string that names the permutation gate.
-
-ARGUMENTS is a list of positions into the hardware object's cxns list's 0th level, naming the argument order for the gate application.
-
-PERMUTATION is a list of positions into the hardware object's cxns list's 0th level, indicating the permutation that this gate application has on the qubit data.
-
-DURATION is the time duration in nanoseconds of this gate application."
-  (operator "SWAP")
-  (arguments (list 0 1))
-  (permutation (list 1 0))
-  (duration 600))
-
-(defstruct (gate-record (:copier nil))
-  "Houses information about a hardware instantiation of a gate.
-
-FIDELITY stores the measured gate fidelity.
-
-DURATION stores the measured gate duration (in nanoseconds)."
-  (fidelity +near-perfect-fidelity+ :type (or null real))
-  (duration 1/100 :type (or null real)))
-
-(defun copy-gate-record (record &key fidelity duration)
-  (make-gate-record :fidelity (or fidelity (gate-record-fidelity record))
-                    :duration (or duration (gate-record-duration record))))
-
-
 ;;; The HARDWARE object structure stores a lot of information. It
 ;;; serves many purposes, principally to solve some of the following
 ;;; problems:
@@ -151,6 +107,49 @@ MISC-DATA is a hash-table of miscellaneous data associated to this hardware obje
   (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
                                               (make-adjustable-vector))))
   (misc-data (make-hash-table :test #'equal) :type hash-table))
+
+(defun debug-print-link (stream link &optional colon-p at-sign-p)
+  "Print out the two qubits constituting a link."
+  (declare (ignore colon-p at-sign-p))
+  (let* ((cxns (hardware-object-cxns link))
+         (qubit0 (vnth 0 (vnth 0 cxns)))
+         (qubit1 (vnth 1 (vnth 0 cxns))))
+    (format stream "~a -- ~a" qubit0 qubit1)))
+
+(defun debug-print-chip-spec (cs &optional (stream *standard-output*))
+  "Print out a simple, human-readable representation of a chip specification consisting of the number of qubits, the number of links, and a list of the links."
+  (format stream "~a qubits, ~a links~%links:~%~{~/cl-quil::debug-print-link/~%~}~%"
+          (chip-spec-n-qubits cs)
+          (chip-spec-n-links cs)
+          (coerce (chip-spec-links cs) 'list)))
+
+(defstruct permutation-record
+  "Houses information about a permutation gate, for ease of lookup by the greedy scheduler.
+
+OPERATOR is a string that names the permutation gate.
+
+ARGUMENTS is a list of positions into the hardware object's cxns list's 0th level, naming the argument order for the gate application.
+
+PERMUTATION is a list of positions into the hardware object's cxns list's 0th level, indicating the permutation that this gate application has on the qubit data.
+
+DURATION is the time duration in nanoseconds of this gate application."
+  (operator "SWAP")
+  (arguments (list 0 1))
+  (permutation (list 1 0))
+  (duration 600))
+
+(defstruct (gate-record (:copier nil))
+  "Houses information about a hardware instantiation of a gate.
+
+FIDELITY stores the measured gate fidelity.
+
+DURATION stores the measured gate duration (in nanoseconds)."
+  (fidelity +near-perfect-fidelity+ :type (or null real))
+  (duration 1/100 :type (or null real)))
+
+(defun copy-gate-record (record &key fidelity duration)
+  (make-gate-record :fidelity (or fidelity (gate-record-fidelity record))
+                    :duration (or duration (gate-record-duration record))))
 
 (defun hardware-object-native-instruction-p (obj instr)
   "Emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and emits NIL if this instruction does not admit direct translation to a physical pulse.
