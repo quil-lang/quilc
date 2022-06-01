@@ -465,15 +465,6 @@
     :a*-sum    (:partial :a*           :a*           1d0 :sum)
     ))
 
-(defvar *cost-fn-weight-style-assn*
-    (make-assignments
-        ((*random-state* (seed-random-state))
-         (quil::*compressor-passes* 1))
-        (quil::*cost-fn-weight-style*)
-      :duration   (:duration)
-      :fidelity   (:fidelity)
-      ))
-
 (defvar *addresser-style-assn*
     (make-assignments
         ((*random-state* (seed-random-state))
