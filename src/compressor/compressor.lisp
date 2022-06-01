@@ -38,6 +38,12 @@
 ;; [ instructions  ]        >?<       [ recompiled instructions]
 ;;
 
+(defstruct peephole-rewriter-node
+  "A node housing an instruction and attendant metadata used during peephole rewriting.  Essentially a doubly-linked list."
+  (instr nil :type application)
+  (prev nil :type (or null peephole-rewriter-node))
+  (next nil :type (or null peephole-rewriter-node))
+  (context nil))
 
 ;;; generic helper functions
 
@@ -146,13 +152,6 @@ other's."
             (setf remove (pop peephole))
             (push orig result))
         (incf pos)))))
-
-(defstruct peephole-rewriter-node
-  "A node housing an instruction and attendant metadata used during peephole rewriting.  Essentially a doubly-linked list."
-  (instr nil :type application)
-  (prev nil :type (or null peephole-rewriter-node))
-  (next nil :type (or null peephole-rewriter-node))
-  (context nil)) ; compressor context *after* this instruction is applied
 
 (defun instrs->peephole-rewriter-nodes (instrs)
   "Converts a list of instructions to a doubly-linked list of peephole rewriting nodes."
