@@ -74,15 +74,9 @@ LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.
 ;;; our order. maybe there is a more intelligent data structure to use. something
 ;;; to think about in the future.
 ;;;
-;;; We NOTINLINE here because a previous file "compilation-methods.lisp" uses this
-;;; structure, but the dependency is circular, so moving this doesn't make much sense.
-(declaim (notinline hardware-object-order
-                    hardware-object-native-instruction-p
-                    hardware-object-compilation-methods
-                    hardware-object-permutation-gates
-                    hardware-object-rewriting-rules
-                    hardware-object-cxns
-                    hardware-object-misc-data))
+;;; Note that a previous file "compilation-methods.lisp" uses this structure, but the dependency is circular,
+;;; so moving this doesn't make much sense. To get SBCL to be quiet about it, each usage of one of the struct
+;;; accessors defined here is explicitly declared NOTINLINE at the callsite.
 (defstruct hardware-object
   "Houses information about a particular hardware object on a QPU.
 

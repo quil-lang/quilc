@@ -77,9 +77,16 @@
           (application-thread-invocation-thread instruction)))
       ;; then try the compilers attached to the hardware object
       (when hardware-object
-        (map nil #'try-compiler (hardware-object-compilation-methods hardware-object)))
+        (map nil #'try-compiler
+             (locally
+                 ;; quiet an SBCL warning from invoking an inline struct accessor before its definition
+                 (declare (notinline hardware-object-compilation-methods))
+               (hardware-object-compilation-methods hardware-object))))
       ;; if those fail, try the global compilers
-      (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
+      (map nil #'try-compiler (locally
+                                  ;; quiet an SBCL warning from invoking an inlined struct accessor before its definition.
+                                  (declare (notinline chip-specification-generic-compilers))
+                                (chip-specification-generic-compilers chip-spec)))
       ;; if those failed too, there's really nothing more to do.
       (format-noise
        "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/."
