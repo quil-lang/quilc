@@ -860,7 +860,6 @@ Each addressing mode will be a vector of symbols:
                :for typed-name := (make-typed-name name type-tuple)
                :do (assert (and (= num-args (length type-tuple))
                                 (every #'valid-type-symbol-p type-tuple)))
-               :collect typed-name :into typed-names
                :append (list
                         ;; Leaf class.
                         `(defclass ,typed-name (,name)
