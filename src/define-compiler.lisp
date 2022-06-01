@@ -604,7 +604,11 @@ UNKNOWNS is the number of gates with unknown fidelity in the evaluated occurrenc
          (dohash ((cost-key cost-val) gateset)
            (when (binding-subsumes-p cost-key key)
              (setf (occurrence-table-metric-fidelity ret)
-                   (* (expt (gate-record-fidelity cost-val) val)
+                   (* (expt (locally
+                                ;; quiet an SBCL warning about invoking an inline struct accessor before its definition
+                                (declare (notinline gate-record-fidelity))
+                              (gate-record-fidelity cost-val))
+                            val)
                       (occurrence-table-metric-fidelity ret)))
              (go :SKIP)))
          (incf (occurrence-table-metric-unknowns ret) val)
@@ -615,8 +619,11 @@ UNKNOWNS is the number of gates with unknown fidelity in the evaluated occurrenc
   (check-type occurrence-table occurrence-table)
   (loop :for table-key :being :the :hash-keys :of (occurrence-table-map occurrence-table)
         :always (loop :for gateset-key :being :the :hash-keys :of gateset
-                        :thereis (and (or (gate-record-duration (gethash gateset-key gateset))
-                                          (gate-record-fidelity (gethash gateset-key gateset)))
+                      :thereis (and (locally
+                                        ;; quiet an SBCL warning about invoking inline struct accessors before their definitions
+                                        (declare (notinline gate-record-duration gate-record-fidelity))
+                                      (or (gate-record-duration (gethash gateset-key gateset))
+                                          (gate-record-fidelity (gethash gateset-key gateset))))
                                       (binding-subsumes-p gateset-key table-key)))))
 
 (defun blank-out-qubits (gateset)
@@ -654,6 +661,10 @@ N.B.: The word \"shortest\" here is a bit fuzzy.  In practice it typically means
   (let ((queue (make-instance 'cl-heap:priority-queue :sort-fun (complement #'occurrence-table-metric-worsep))))
     (flet ((collect-bindings (occurrence-table)
              (a:hash-table-keys (occurrence-table-map occurrence-table))))
+      (declare
+       ;; CL-HEAP declares these generic functions as INLINE, but generic functions cannot be inlined. locally
+       ;; NOTINLINE them to quiet an SBCL warning.
+       (notinline cl-heap:dequeue cl-heap:enqueue))
       ;; initial contents: arbitrary gate, no history
       (loop :with visited-nodes := ()
             :for (task . history) := (list occurrence-table)
@@ -865,7 +876,11 @@ Compilers matching gates which don't have parameters don't count as accepting pa
                :do (loop :for binding :being :the :hash-keys :of gateset
                          :for gate-info := (gethash binding gateset)
                          :when (binding-subsumes-gate-p binding gate)
-                           :return (setf fidelity (* fidelity (gate-record-fidelity gate-info)))
+                           :return (setf fidelity (* fidelity
+                                                     (locally
+                                                         ;; quiet an SBCL warning from invoking an inline struct accessor before its definition
+                                                         (declare (notinline gate-record-fidelity))
+                                                       (gate-record-fidelity gate-info))))
                          ;; only executes if no binding subsumes the gate
                          :finally (error 'no-binding-match))
                :finally (return fidelity)))
@@ -901,7 +916,11 @@ Compilers matching gates which don't have parameters don't count as accepting pa
              (and (occurrence-table-in-gateset-p (compiler-output-gates compiler) gateset)
                   (loop :for b :in (compiler-bindings compiler)
                         :always (loop :for g :being :the :hash-keys :of gateset
-                                      :for gate-fidelity := (gate-record-fidelity (gethash g gateset))
+                                      :for gate-fidelity
+                                        := (locally
+                                               ;; quiet an SBCL warning from invoking an inline struct accessor before its definition
+                                               (declare (notinline gate-record-fidelity))
+                                             (gate-record-fidelity (gethash g gateset)))
                                       ;; TODO: revisit this predicate.
                                         :thereis (and (or (binding-subsumes-p g b)
                                                           (when (typep b 'gate-binding)
