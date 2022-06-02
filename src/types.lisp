@@ -20,7 +20,11 @@
                  (format nil "Is OBJECT ~A ~A where every element satisfies (TYPEP element '~A)."
                          article container-type element-type))
                 (deftype-docstring
-                  (format nil "Type of an object that (SATISFIES ~A)." predicate-name)))
+                  (format nil "Type of a ~A that (SATISFIES ~A), i.e. where every element is ~A ~A."
+                          container-type
+                          predicate-name
+                          article
+                          element-type)))
            `(progn
               (defun ,predicate-name (object)
                 ,predicate-docstring
@@ -30,7 +34,7 @@
                             object)))
               (deftype ,type-name ()
                 ,deftype-docstring
-                '(satisfies ,predicate-name))))))
+                '(and ,container-type (satisfies ,predicate-name)))))))
 
     ;; Normally, we'd want ALEXANDRIA:PROPER-LIST in place of LIST in the definitions
     ;; below. However, because the predicate we define calls EVERY on the OBJECT (which will error
