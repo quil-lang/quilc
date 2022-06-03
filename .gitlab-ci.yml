@@ -10,7 +10,7 @@ workflow:
     - linux
   before_script:
     - apt update
-    - apt install -y --no-install-recommends ca-certificates git sbcl make curl gcc pkg-config liblapack-dev libblas-dev libgfortran5 gfortran libffi-dev
+    - apt install -y --no-install-recommends ca-certificates git sbcl make curl gcc pkg-config liblapack-dev libblas-dev libgfortran5 gfortran libffi-dev libffi7 libssl-dev
     - echo "$QUILC_CA_BUNDLE" > /usr/local/share/ca-certificates/my-ca.crt && update-ca-certificates
     - mkdir -p ${HOME}/quicklisp/local-projects
     - git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
