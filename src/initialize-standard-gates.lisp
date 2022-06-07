@@ -11,7 +11,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (defun read-standard-gates-from-file (&optional (stdgates-file (asdf:system-relative-pathname                                                                "cl-quil" "src/quil/stdgates.quil")))
+  (defun read-standard-gates-from-file (stdgates-file)
     "Produces a table of default gate definitions, mapping string name to a GATE-DEFINITION object."
     (let* ((gate-defs
              (remove-if-not (lambda (obj) (typep obj 'gate-definition))
@@ -28,8 +28,14 @@
 
   (defun initialize-standard-gates ()
     (unless (boundp '**default-gate-definitions**)
-      (let ((stdgates-file (asdf:system-relative-pathname
-                            "cl-quil" "src/quil/stdgates.quil")))
+      (let ((stdgates-file
+              #-allegro
+              (asdf:system-relative-pathname "cl-quil" "src/quil/stdgates.quil")
+              #+allegro
+              (cond ((excl:featurep :cl-quil-app)
+                     (merge-pathnames "stdgates.quil" "sys:"))
+                    (t (asdf:system-relative-pathname
+                        "cl-quil" "src/quil/stdgates.quil")))))
         (format t "~&; loading standard gates from ~A~%"
                 stdgates-file)
         (setf **default-gate-definitions**
