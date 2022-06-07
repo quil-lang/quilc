@@ -240,10 +240,14 @@ The keys are typically INSTRUCTION instances and associated values are STRINGs."
          (integer-vec
            (map 'vector
                 (lambda (token)
+                  (declare
+                   ;; quiet an SBCL warning about use before definition of inline struct accessors for `token'
+                   (notinline token-type token-payload))
                   (cond
                     ((equalp (token-payload token) "nil")
                      nil)
-                    ((eql (token-type token) :integer)
+                    ((eql (token-type token)
+                          :integer)
                      (token-payload token))
                     (t
                      (error "Malformed rewiring string: unexpected token ~A." token))))
@@ -860,7 +864,6 @@ Each addressing mode will be a vector of symbols:
                :for typed-name := (make-typed-name name type-tuple)
                :do (assert (and (= num-args (length type-tuple))
                                 (every #'valid-type-symbol-p type-tuple)))
-               :collect typed-name :into typed-names
                :append (list
                         ;; Leaf class.
                         `(defclass ,typed-name (,name)

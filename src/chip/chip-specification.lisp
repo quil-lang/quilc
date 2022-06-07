@@ -39,6 +39,69 @@ LOOKUP-CACHE is a hash table mapping lists of qubit indices to hardware objects.
   (print-unreadable-object (cs stream :type t :identity nil)
     (format stream "of ~{~D~^:~} objects" (map 'list #'length (chip-specification-objects cs)))))
 
+;;; The HARDWARE object structure stores a lot of information. It
+;;; serves many purposes, principally to solve some of the following
+;;; problems:
+;;;
+;;;     1. To address operations on qubits, qubit pairs, qubit
+;;;     triplets, etc. This requires determining a notion of
+;;;     _occupancy_ of resources.
+;;;
+;;;     2. To determine what options are available for compiling
+;;;     operations on that resource.
+;;;
+;;; The first point is particularly important. You should *not* use
+;;; CXNS to determine directed connectivity. (By "directed", we mean
+;;; anything to do with what operations are allowed.) CXNS just
+;;; encodes some physical relationships on physical hardware;
+;;; collections of resources on which a variety of operations can
+;;; possibly act.
+;;;
+;;; To determine available instructions, their validity, etc., the
+;;; information in NATIVE-INSTRUCTIONS and MISC-DATA (namely the
+;;; duration table) are helpful.
+;;;
+;;; Now for some miscellaneous comments about the design.
+
+;;; some design decisions about CXNS:
+;;; + easy to iterate over the objects in positions above ORDER and know when to terminate
+;;; + easy to iterate over the objects in positions below ORDER and know when to terminate
+;;; + easy to tell when there are no objects in any given position
+;;;
+;;; using an array to do this sometimes means some obnoxious array index safety,
+;;; which we wouldn't experience if we were using e.g. a hash-table, but in trade
+;;; we would have a harder time asking for the half of the keys that were below
+;;; our order. maybe there is a more intelligent data structure to use. something
+;;; to think about in the future.
+;;;
+;;; Note that a previous file "compilation-methods.lisp" uses this structure, but the dependency is circular,
+;;; so moving this doesn't make much sense. To get SBCL to be quiet about it, each usage of one of the struct
+;;; accessors defined here is explicitly declared NOTINLINE at the callsite.
+(defstruct hardware-object
+  "Houses information about a particular hardware object on a QPU.
+
+ORDER is a non-negative integer that counts the number of qubit subsidiaries of this hardware object. Equals (1- (length (vnth 0 (hardware-object-cxns this)))). (If you drew a schematic of a chip, this is also the dimension of the graphical representation of the hardware object: 0 for qubits, 1 for links, ... .)
+
+GATE-INFORMATION is a hash table mapping gate bindings to GATE-RECORD objects.
+
+COMPILATION-METHODS is a vector of compilers that can be employed to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.  This slot is typically populated by WARM-HARDWARE-OBJECTS.
+
+PERMUTATION-GATES is a vector of permutation gates that this device can natively compile, stored as PERMUTATION-RECORD structs. This data is used by the event scheduler.
+
+REWRITING-RULES is a vector of compilers that the compressor loop can use to generate shorter gate strings.  This slot is typically populated by WARM-HARDWARE-OBJECTS.
+
+CXNS is an array. In its nth position, there is a vector of the order n hardware objects on the chip that are connected to this one. Among other things, this is used to determine shared resource blocking.
+
+MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
+  (order 0 :type unsigned-byte :read-only t)
+  (gate-information (make-hash-table :test #'equalp))
+  (compilation-methods (make-adjustable-vector))
+  (permutation-gates (make-adjustable-vector))
+  (rewriting-rules (make-adjustable-vector))
+  (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
+                                              (make-adjustable-vector))))
+  (misc-data (make-hash-table :test #'equal) :type hash-table))
+
 (defun debug-print-link (stream link &optional colon-p at-sign-p)
   "Print out the two qubits constituting a link."
   (declare (ignore colon-p at-sign-p))
@@ -81,76 +144,6 @@ DURATION stores the measured gate duration (in nanoseconds)."
 (defun copy-gate-record (record &key fidelity duration)
   (make-gate-record :fidelity (or fidelity (gate-record-fidelity record))
                     :duration (or duration (gate-record-duration record))))
-
-
-;;; The HARDWARE object structure stores a lot of information. It
-;;; serves many purposes, principally to solve some of the following
-;;; problems:
-;;;
-;;;     1. To address operations on qubits, qubit pairs, qubit
-;;;     triplets, etc. This requires determining a notion of
-;;;     _occupancy_ of resources.
-;;;
-;;;     2. To determine what options are available for compiling
-;;;     operations on that resource.
-;;;
-;;; The first point is particularly important. You should *not* use
-;;; CXNS to determine directed connectivity. (By "directed", we mean
-;;; anything to do with what operations are allowed.) CXNS just
-;;; encodes some physical relationships on physical hardware;
-;;; collections of resources on which a variety of operations can
-;;; possibly act.
-;;;
-;;; To determine available instructions, their validity, etc., the
-;;; information in NATIVE-INSTRUCTIONS and MISC-DATA (namely the
-;;; duration table) are helpful.
-;;;
-;;; Now for some miscellaneous comments about the design.
-
-;;; some design decisions about CXNS:
-;;; + easy to iterate over the objects in positions above ORDER and know when to terminate
-;;; + easy to iterate over the objects in positions below ORDER and know when to terminate
-;;; + easy to tell when there are no objects in any given position
-;;;
-;;; using an array to do this sometimes means some obnoxious array index safety,
-;;; which we wouldn't experience if we were using e.g. a hash-table, but in trade
-;;; we would have a harder time asking for the half of the keys that were below
-;;; our order. maybe there is a more intelligent data structure to use. something
-;;; to think about in the future.
-;;;
-;;; We NOTINLINE here because a previous file "compilation-methods.lisp" uses this
-;;; structure, but the dependency is circular, so moving this doesn't make much sense.
-(declaim (notinline hardware-object-order
-                    hardware-object-native-instruction-p
-                    hardware-object-compilation-methods
-                    hardware-object-permutation-gates
-                    hardware-object-rewriting-rules
-                    hardware-object-cxns
-                    hardware-object-misc-data))
-(defstruct hardware-object
-  "Houses information about a particular hardware object on a QPU.
-
-ORDER is a non-negative integer that counts the number of qubit subsidiaries of this hardware object. Equals (1- (length (vnth 0 (hardware-object-cxns this)))). (If you drew a schematic of a chip, this is also the dimension of the graphical representation of the hardware object: 0 for qubits, 1 for links, ... .)
-
-GATE-INFORMATION is a hash table mapping gate bindings to GATE-RECORD objects.
-
-COMPILATION-METHODS is a vector of compilers that can be employed to convert non-native instructions to native ones, sorted in descending order of precedence. An individual method receives an instruction and an environment (typically a PARSED-PROGRAM). The same method returns a list of instructions if successful and NIL if unsuccessful.  This slot is typically populated by WARM-HARDWARE-OBJECTS.
-
-PERMUTATION-GATES is a vector of permutation gates that this device can natively compile, stored as PERMUTATION-RECORD structs. This data is used by the event scheduler.
-
-REWRITING-RULES is a vector of compilers that the compressor loop can use to generate shorter gate strings.  This slot is typically populated by WARM-HARDWARE-OBJECTS.
-
-CXNS is an array. In its nth position, there is a vector of the order n hardware objects on the chip that are connected to this one. Among other things, this is used to determine shared resource blocking.
-
-MISC-DATA is a hash-table of miscellaneous data associated to this hardware object: scratch data, scheduling hints (e.g., qubit coherence time), ... ."
-  (order 0 :type unsigned-byte :read-only t)
-  (gate-information (make-hash-table :test #'equalp))
-  (compilation-methods (make-adjustable-vector))
-  (permutation-gates (make-adjustable-vector))
-  (rewriting-rules (make-adjustable-vector))
-  (cxns (make-array 2 :initial-contents (list (make-adjustable-vector)
-                                              (make-adjustable-vector))))
-  (misc-data (make-hash-table :test #'equal) :type hash-table))
 
 (defun hardware-object-native-instruction-p (obj instr)
   "Emits the physical duration in nanoseconds if this instruction translates to a physical pulse (i.e., if it is a native gate, \"instruction native\"), and emits NIL if this instruction does not admit direct translation to a physical pulse.

@@ -50,11 +50,23 @@
 (defun warn-on-ambiguous-gate-or-circuit-definition (condition)
   "Handler which prints a warning in the presence of a CONDITION indicating an ambiguous gate or circuit declaration."
   (check-type condition ambiguous-definition-condition)
-  (let ((instr (ambiguous-definition-instruction condition)))
+  (with-accessors ((instr ambiguous-definition-instruction)
+                   (file ambiguous-definition-file)
+                   (conflicts ambiguous-definition-conflicts))
+      condition
     (typecase instr
-      (gate-definition (alexandria:simple-style-warning "Gate ~A has multiple definitions, this leads to ambiguous behavior." (gate-definition-name instr)))
-      (circuit-definition (alexandria:simple-style-warning "Circuit ~A has multiple definitions, this leads to ambiguous behavior." (circuit-definition-name instr)))
-      (t (alexandria:simple-style-warning "Object ~A (of type ~A) represents a duplicate definition." instr (type-of instr))))
+      (gate-definition (alexandria:simple-style-warning "Gate ~A has multiple definitions, this leads to ambiguous behavior. Definition in ~a conflicts with ~a"
+                                                        (gate-definition-name instr)
+                                                        file
+                                                        conflicts))
+      (circuit-definition (alexandria:simple-style-warning "Circuit ~A has multiple definitions, this leads to ambiguous behavior. Definition in ~a conflicts with ~a"
+                                                           (circuit-definition-name instr)
+                                                           file
+                                                           conflicts))
+      (t (alexandria:simple-style-warning "Object ~A (of type ~A) represents a duplicate definition. Definition in ~a conflicts with ~a"
+                                          instr (type-of instr)
+                                          file
+                                          conflicts)))
     (continue)))
 
 (defgeneric definition-signature (instr)

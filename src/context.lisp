@@ -22,7 +22,11 @@
 
 (defun update-compilation-context (context instr &key (destructive? nil))
   "This is called when the compressor walks over an instruction in its inner loops, which may in turn modify the active context."
-  (let ((n-qubits (length (antisocial-qvm-wfs (compilation-context-aqvm context))))
+  (let ((n-qubits (length
+                   (locally
+                       ;; quiet an SBCL warning for invoking an inline struct accessor before its definition
+                       (declare (notinline antisocial-qvm-wfs))
+                     (antisocial-qvm-wfs (compilation-context-aqvm context)))))
         (context
           (if destructive?
               context

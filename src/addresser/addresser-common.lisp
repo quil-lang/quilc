@@ -632,12 +632,10 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 values triple (initial-rewiring chip-schedule final-rewiring).
 
 Optional arguments:
- + INITIAL-REWIRING launches with the addresser with a nontrivial qubit
-   permutation.
  + USE-FREE-SWAPS treats the initial rewiring as virtual (able to be changed).
    If INITIAL-REWIRING is not provided this option has no effect.
 ")
-  (:method (state instrs &key (initial-rewiring nil) (use-free-swaps nil))
+  (:method (state instrs &key (use-free-swaps nil))
     (format-noise "DO-GREEDY-ADDRESSING: entrance.")
     (with-slots (chip-spec lschedule working-l2p chip-sched initial-l2p) state
       (let ((*addresser-use-free-swaps* (or use-free-swaps initial-l2p)))
