@@ -509,10 +509,18 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
   prefactor
   arguments)
 
-(defmethod copy-instance ((term pauli-term))
-  (make-pauli-term :pauli-word (pauli-term-pauli-word term)
-                   :prefactor (pauli-term-prefactor term)
-                   :arguments (pauli-term-arguments term)))
+(defmethod copy-instance ((term pauli-term) &key (pauli-word nil overwrite-pauli-word-p)
+                                              (prefactor nil overwrite-prefactor-p)
+                                              (arguments nil overwrite-arguments-p))
+  (make-pauli-term :pauli-word (if overwrite-pauli-word-p
+                                   pauli-word
+                                   (pauli-term-pauli-word term))
+                   :prefactor (if overwrite-prefactor-p
+                                  prefactor
+                                  (pauli-term-prefactor term))
+                   :arguments (if overwrite-arguments-p
+                                  arguments
+                                  (pauli-term-arguments term))))
 
 (defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
   (length (exp-pauli-sum-gate-definition-arguments gate)))
@@ -1337,22 +1345,42 @@ If this slot is not supplied, then the gate is considered *anonymous*. If this i
 N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-GATE, or, if you really know what you're doing, %SET-GATE-APPLICATION-GATE."))
   (:documentation "An instruction representing an application of a known gate."))
 
-(defmethod copy-instance ((application gate-application))
-  (if (slot-boundp application 'name-resolution)
-      (make-instance 'gate-application
-                     :operator (copy-instance (application-operator application))
-                     :parameters (mapcar #'copy-instance
-                                         (application-parameters application))
-                     :arguments (mapcar #'copy-instance
-                                        (application-arguments application))
-                     :name-resolution (gate-application-resolution application))
-      (make-instance 'gate-application
-                     :operator (copy-instance (application-operator application))
-                     :parameters (mapcar #'copy-instance
-                                         (application-parameters application))
-                     :arguments (mapcar #'copy-instance
-                                        (application-arguments application))
-                     :gate (copy-instance (gate-application-gate application)))))
+(defmethod copy-instance ((application gate-application)
+                          &key (operator nil operatorp)
+                            (parameters nil parametersp)
+                            (arguments nil argumentsp)
+                            (name-resolution nil name-resolution-p)
+                            (gate nil gatep))
+  (let* ((copy (make-instance 'gate-application
+                              :operator (if operatorp
+                                            operator
+                                            (copy-instance (application-operator application)))
+                              :parameters (if parametersp
+                                              parameters
+                                              (mapcar #'copy-instance (application-parameters application)))
+                              :arguments (if argumentsp
+                                             arguments
+                                             (mapcar #'copy-instance (application-arguments application))))))
+    (cond ((and name-resolution-p gatep)
+           (error "Mutually exclusive options :NAME-RESOLUTION and :GATE in COPY-INSTANCE GATE-APPLICATION"))
+
+          (gatep
+           (%set-gate-application-gate gate copy))
+
+          (name-resolution-p
+           (setf (slot-value copy 'name-resolution)
+                 name-resolution))
+
+          ((slot-boundp application 'name-resolution)
+           (setf (slot-value copy 'name-resolution)
+                 (gate-application-resolution application)))
+
+          ((slot-boundp application 'gate)
+           (%set-gate-application-gate (copy-instance (gate-application-gate application))
+                                       copy))
+
+          (t (error "Neither :NAME-RESOLUTION nor :GATE supplied in COPY-INSTANCE GATE-APPLICATION")))
+    copy))
 
 (defgeneric gate-application-gate (app)
   ;; See the actual definition of this in gates.lisp.
@@ -1765,21 +1793,32 @@ For example,
    :executable-code #())
   (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
-(defmethod copy-instance ((parsed-program parsed-program))
-  (let ((pp (make-instance 'parsed-program)))
-    (setf (parsed-program-gate-definitions pp)
-          (map 'list #'copy-instance
-               (parsed-program-gate-definitions parsed-program)))
-    (setf (parsed-program-circuit-definitions pp)
-          (map 'list #'copy-instance
-               (parsed-program-circuit-definitions parsed-program)))
-    (setf (parsed-program-memory-definitions pp)
-          (map 'list #'copy-instance
-               (parsed-program-memory-definitions parsed-program)))
-    (setf (parsed-program-executable-code pp)
-          (map 'vector #'copy-instance
-               (parsed-program-executable-code parsed-program)))
-    pp))
+(defmethod copy-instance ((parsed-program parsed-program)
+                          &key (gate-definitions nil gate-definitions-p)
+                            (circuit-definitions nil circuit-definitions-p)
+                            (memory-definitions nil memory-definitions-p)
+                            (executable-code nil executable-code-p))
+  (make-instance 'parsed-program
+                 :gate-definitions
+                 (if gate-definitions-p
+                     gate-definitions
+                     (mapcar #'copy-instance
+                             (parsed-program-gate-definitions parsed-program)))
+                 :circuit-definitions
+                 (if circuit-definitions-p
+                     circuit-definitions
+                     (mapcar #'copy-instance
+                             (parsed-program-circuit-definitions parsed-program)))
+                 :memory-definitions
+                 (if memory-definitions-p
+                     memory-definitions
+                     (mapcar #'copy-instance
+                             (parsed-program-memory-definitions parsed-program)))
+                 :executable-code
+                 (if executable-code-p
+                     executable-code
+                     (map 'vector #'copy-instance
+                          (parsed-program-executable-code parsed-program)))))
 
 (defvar *print-parsed-program-text* nil
   "When T, PRINT-OBJECT on a PARSED-PROGRAM will include the program text. Otherwise, only the number of instructions is printed.")
