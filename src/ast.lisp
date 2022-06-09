@@ -10,6 +10,10 @@
   "A qubit address."
   (index nil :type unsigned-byte))
 
+(define-copy-struct-instance (qubit :constructor qubit
+                                    :boa-constructor t)
+  index)
+
 (defun qubit= (x y)
   "Do the qubits X and Y have equal indices?"
   (check-type x qubit)
@@ -26,6 +30,10 @@
   "A bare offset into a memory region, used for LOAD and STORE operands."
   (offset nil :read-only t :type integer))
 
+(define-copy-struct-instance (memory-offset :constructor memory-offset
+                                            :boa-constructor t)
+  offset)
+
 (defstruct (memory-ref (:constructor mref (name position &optional descriptor))
                        (:predicate is-mref))
   "A reference into classical memory."
@@ -33,6 +41,10 @@
   (position nil :read-only t :type unsigned-byte)
   ;; The originating memory descriptor. Filled in during analysis.
   (descriptor nil :type (or null memory-descriptor)))
+
+(define-copy-struct-instance (memory-ref :constructor mref
+                                         :boa-constructor t)
+  name position descriptor)
 
 (defun memory-ref= (a b)
   "Do the memory refs A and B represent the same memory ref?"
@@ -61,6 +73,10 @@
   (value nil :type number)
   (value-type quil-real :type quil-type))
 
+(define-copy-struct-instance (constant :constructor constant
+                                       :boa-constructor t)
+  value value-type)
+
 (defun constant= (x y)
   "Do the constants X and Y have equal types and values?"
   (check-type x constant)
@@ -81,6 +97,10 @@
   "A formal parameter. Corresponds to names prepended with `%' in Quil. Represents a numerical value or a classical memory reference."
   (name nil :read-only t :type string))
 
+(define-copy-struct-instance (param :constructor param
+                                    :boa-constructor t)
+  name)
+
 (defun param= (x y)
   "Do parameters X and Y have the same name?"
   (check-type x param)
@@ -92,6 +112,10 @@
                    (:predicate is-formal))
   "A formal argument. Represents a placeholder for a qubit or a memory reference."
   (name nil :read-only t :type string))
+
+(define-copy-struct-instance (formal :constructor formal
+                                     :boa-constructor t)
+  name)
 
 (defun formal= (x y)
   "Do formal arguments X and Y have the same name?"
@@ -121,6 +145,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (params nil)
   (lambda-params nil :read-only t)
   (expression nil :read-only t))
+
+(define-copy-struct-instance (delayed-expression :constructor %delayed-expression)
+  params lambda-params expression)
 
 (defun make-delayed-expression (params lambda-params expression)
   "Make a DELAYED-EXPRESSION object initially with parameters PARAMS (probably a list of PARAM objects), lambda parameters LAMBDA-PARAMS, and the form EXPRESSION."
@@ -509,18 +536,8 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
   prefactor
   arguments)
 
-(defmethod copy-instance ((term pauli-term) &key (pauli-word nil overwrite-pauli-word-p)
-                                              (prefactor nil overwrite-prefactor-p)
-                                              (arguments nil overwrite-arguments-p))
-  (make-pauli-term :pauli-word (if overwrite-pauli-word-p
-                                   pauli-word
-                                   (pauli-term-pauli-word term))
-                   :prefactor (if overwrite-prefactor-p
-                                  prefactor
-                                  (pauli-term-prefactor term))
-                   :arguments (if overwrite-arguments-p
-                                  arguments
-                                  (pauli-term-arguments term))))
+(define-copy-struct-instance (pauli-term)
+  pauli-word prefactor arguments)
 
 (defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
   (length (exp-pauli-sum-gate-definition-arguments gate)))
@@ -1170,6 +1187,22 @@ Each addressing mode will be a vector of symbols:
   (dagger-operator     operator-description)
   (forked-operator     operator-description))
 
+(define-copy-struct-instance (named-operator :constructor named-operator
+                                             :boa-constructor t)
+  (_ named-operator%0))
+
+(define-copy-struct-instance (controlled-operator :constructor controlled-operator
+                                                  :boa-constructor t)
+  (_ controlled-operator%0))
+
+(define-copy-struct-instance (dagger-operator :constructor dagger-operator
+                                              :boa-constructor t)
+  (_ dagger-operator%0))
+
+(define-copy-struct-instance (forked-operator :constructor forked-operator
+                                              :boa-constructor t)
+  (_ forked-operator%0))
+
 (setf (documentation 'named-operator 'function)
       "Describes a gate using a string name, which is later looked up in a table of DEFGATE definitions.  In Quil code, this corresponds to a raw gate name, like ISWAP.")
 (setf (documentation 'controlled-operator 'function)
@@ -1351,6 +1384,7 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
                             (arguments nil argumentsp)
                             (name-resolution nil name-resolution-p)
                             (gate nil gatep))
+  "Do a deep copy, and check for errors resulting from inadvisible combos of NAME-RESOLUTION and GATE."
   (let* ((copy (make-instance 'gate-application
                               :operator (if operatorp
                                             operator
@@ -1798,6 +1832,7 @@ For example,
                             (circuit-definitions nil circuit-definitions-p)
                             (memory-definitions nil memory-definitions-p)
                             (executable-code nil executable-code-p))
+  "Do a deep copy."
   (make-instance 'parsed-program
                  :gate-definitions
                  (if gate-definitions-p
