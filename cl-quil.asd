@@ -11,8 +11,6 @@
   :depends-on (#:cl-quil/frontend
                #:alexandria
                (:version #:magicl/core "0.10.0")
-               #:magicl/ext-lapack      ; for CSD
-                                        ; internal linear algebra library
                #:qvm
                #:cl-grnm                ; nelder-mead implementation
                #:singleton-classes
@@ -40,7 +38,6 @@
                (:file "utilities")
                (:file "relabeling")
                (:file "matrix-operations")
-               (:file "csd")
                (:file "resource")
                (:file "context")
                (:file "define-compiler")
