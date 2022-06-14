@@ -81,6 +81,12 @@
                 :always (= i (cl-quil.clifford::pauli-integer
                               (cl-quil.clifford::integer-pauli i n))))))))
 
+(defun m= (a b &key (test #'quil::double=))
+  "Returns T if matrices A and B are sufficiently close, NIL otherwise. The TEST function determines the tolerance for comparison."
+  (flet ((norm-vec-inf (matrix)
+           (reduce #'max (magicl::storage matrix) :key #'abs)))
+    (funcall test 0.0d0 (norm-vec-inf (magicl:.- a b)))))
+
 (deftest test-exp-pauli ()
   (signals simple-error (exp-pauli (pauli-from-symbols '(I) 1) 1.0d0))
   (is (null (exp-pauli (pauli-from-symbols '(I) 0) 1.0d0)))

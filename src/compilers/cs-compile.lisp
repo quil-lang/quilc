@@ -62,7 +62,7 @@
 
     ;; first, a utility function.
     (let ((n (/ (magicl:nrows m) 2)))
-      (multiple-value-bind (u0 u1 v0 v1 thetas) (magicl:lapack-csd m n n)
+      (multiple-value-bind (u0 u1 v0 v1 thetas) (magicl:csd-blocks m n n)
         ;; rebalance the u and v matrices so that u0 (+) u1 and v0 (+) v1
         ;; are special unitary.
         (let ((neg-nth-root-detu
