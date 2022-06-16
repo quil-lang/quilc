@@ -123,8 +123,7 @@ as needed so that they are the same size."
                          (/ (length kernel-entries) (magicl:nrows v)))))))
 
 (defun random-special-unitary (n)
-  (let ((m (random-unitary (list n n))))
-    (magicl:scale! m (expt (magicl:det m) (/ (- n))))))
+  (magicl:random-special-unitary n))
 
 (defun random-wavefunction (n-qubits)
   "Get a random complex unit vector with (EXPT 2 N-QUBITS) entries."
