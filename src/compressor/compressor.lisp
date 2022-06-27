@@ -795,30 +795,27 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
 
              (emit-instruction (instr)
                "Add an instruction to OUTPUT while appropriately updating CONTEXT."
-               (update-compilation-context context instr :destructive? t)
+               (unless context-arg
+                 (update-compilation-context context instr :destructive? t))
                (push instr output))
 
              (emit-queue (queue)
                "Compress and emit all instructions from the queue. Does not attempt to actually clear the queue; it must be deleted manually."
-               (let ((compressed-instructions
-                       (compress-instructions-with-possibly-unknown-params
-                        (compression-queue-contents queue)
-                        chip-specification
-                        context)))
-                 (map nil #'emit-instruction compressed-instructions)))
-
-             (flush-global-queue ()
-               (emit-queue global-queue)
-               (setf global-queue (make-compression-queue)))
-
-             (merge-into-global-queue (queue)
-               "Appropriately merges QUEUE into the variable GLOBAL-QUEUE. If this would cause GLOBAL-QUEUE to become too large, flushes GLOBAL-QUEUE."
-               (let ((combined-qubit-complex
-                       (union (compression-queue-qubit-list queue)
-                              (compression-queue-qubit-list global-queue))))
-                 (when (> (length combined-qubit-complex) *global-queue-tolerance-threshold*)
-                   (flush-global-queue))
-                 (merge-queue global-queue queue)))
+               (let* ((once-compressed-instructions
+                        (compress-instructions-with-possibly-unknown-params
+                         (compression-queue-contents queue)
+                         chip-specification
+                         context))
+                      (recursively-compressed-instructions
+                        (cond
+                          ((>= 1 queue-tolerance-threshold)
+                           once-compressed-instructions)
+                          (t
+                           (compress-instructions once-compressed-instructions chip-specification
+                                                  :protoquil protoquil
+                                                  :queue-tolerance-threshold (1- queue-tolerance-threshold)
+                                                  :context context)))))
+                 (map nil #'emit-instruction recursively-compressed-instructions)))
 
              (instruction-forces-flush-p (instr)
                "Whether all instructions using overlapping resources to this instruction should be flushed before processing this instruction."
@@ -830,8 +827,7 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
 
              (process-instruction (instr)
                (let* ((resources (instruction-resources instr))
-                      (existing-intersecting-queues (find-queues-by-resources resources))
-                      (global? (resources-intersect-p resources (compression-queue-resources global-queue))))
+                      (existing-intersecting-queues (find-queues-by-resources resources)))
 
                  ;; TODO: what if global queue is one of the intersecting queues?
 
@@ -842,8 +838,6 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                    ;; Global or hybrid instruction: Flush and remove all related queues.
                    ((instruction-forces-flush-p instr)
                     (map nil #'emit-queue existing-intersecting-queues)
-                    (when global?
-                      (flush-global-queue))
                     (emit-instruction instr))
 
                    ;; Local pure-quantum instruction: Merge related queues together
@@ -851,17 +845,18 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                     (let* ((new-queue (make-compression-queue :resources (instruction-resources instr)
                                                               :contents (list instr)))
                            (combined-queue (merge-queues `(,@existing-intersecting-queues ,new-queue))))
-                      ;; create a new local queue, or merge into global queue
                       (cond
-                        ((and (queue-corresponds-to-obj-p combined-queue) (not global?))
-                         (push combined-queue compression-queues))
+                        ((< queue-tolerance-threshold (compression-queue-num-qubits combined-queue))
+                         (map nil #'emit-queue existing-intersecting-queues)
+                         ;; can safely assume a single instr doesn't overflow the tolerance
+                         (push new-queue compression-queues))
                         (t
-                         (merge-into-global-queue combined-queue)))))))
-               (clean-up-compilation-context context :destructive? t)))
+                         (push combined-queue compression-queues)))))))
+               (unless context-arg
+                 (clean-up-compilation-context context :destructive? t))))
 
       (map nil #'process-instruction instructions)
       (map nil #'emit-queue compression-queues)
-      (flush-global-queue)
       (format-noise "COMPRESS-INSTRUCTIONS: departure")
       (nreverse output))))
 
