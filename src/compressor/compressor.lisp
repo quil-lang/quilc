@@ -749,6 +749,122 @@ other's."
   (setf (governed-queue-contents queue) contents)
   (setf (governed-queue-resources queue) resources))
 
+(defstruct compression-queue
+  (resources (make-null-resource) :type resource-collection)
+  (contents  nil))
+
+(defun compress-instructions-prime (instructions chip-specification &key protoquil)
+  "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION.
+
+This specific routine is the start of a giant dispatch mechanism. Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
+  (format-noise "COMPRESS-INSTRUCTIONS: entrance.")
+  (let (output             ; instructions to return
+        compression-queues ; Each queue is a list of instructions. Resources used by each queue do not overlap.
+        (global-queue (make-compression-queue)) ; When a queue would be created that does not correspond to a real hardware object, it's added to the global queue instead.
+        ;; TODO: possible optimization:
+        ;; global-resources                ; The full set of resources used in any queue
+        (context (set-up-compilation-context :qubit-count (chip-spec-n-qubits chip-specification)
+                                             :simulate (and *enable-state-prep-compression* protoquil)
+                                             :chip-specification chip-specification)))
+    (labels ((compression-queue-qubit-list (compression-queue)
+               (cl-quil.resource::resource-qubits-list (compression-queue-resources compression-queue)))
+
+             (queue-corresponds-to-obj-p (compression-queue)
+               "Return non-nil when the set of qubits used by COMPRESSION_QUEUE equals those used in some hardware object."
+               (lookup-hardware-address-by-qubits
+                chip-specification (compression-queue-qubit-list compression-queue)))
+
+             (find-queues-by-resources (resources)
+                  "Find all existing queues whose resources intersect with the given ones"
+                  ;; TODO: possible optimization: check global-resources
+                  (remove-if-not (a:curry #'resources-intersect-p resources)
+                                 compression-queues
+                                 :key #'compression-queue-resources))
+
+             (merge-queue (base-queue other-queue)
+               "Merge OTHER-QUEUE into BASE-QUEUE, modifying BASE-QUEUE in place. Places the contents/instructions of OTHER-QUEUE after those of BASE-QUEUE"
+               (a:appendf (compression-queue-contents base-queue) (compression-queue-contents other-queue))
+               (setf (compression-queue-resources base-queue)
+                     (resource-union (compression-queue-resources base-queue)
+                                     (compression-queue-resources other-queue)))
+               base-queue)
+
+             (merge-queues (queues)
+               "Non-destructively merge multiple queues."
+               (reduce #'merge-queue queues :initial-value (make-compression-queue)))
+
+             (emit-instruction (instr)
+               "Add an instruction to OUTPUT while appropriately updating CONTEXT."
+               (update-compilation-context context instr :destructive? t)
+               (push instr output))
+
+             (emit-queue (queue)
+               "Compress and emit all instructions from the queue. Does not attempt to actually clear the queue; it must be deleted manually."
+               (let ((compressed-instructions
+                       (compress-instructions-with-possibly-unknown-params
+                        (compression-queue-contents queue)
+                        chip-specification
+                        context)))
+                 (map nil #'emit-instruction compressed-instructions)))
+
+             (flush-global-queue ()
+               (emit-queue global-queue)
+               (setf global-queue (make-compression-queue)))
+
+             (merge-into-global-queue (queue)
+               "Appropriately merges QUEUE into the variable GLOBAL-QUEUE. If this would cause GLOBAL-QUEUE to become too large, flushes GLOBAL-QUEUE."
+               (let ((combined-qubit-complex
+                       (union (compression-queue-qubit-list queue)
+                              (compression-queue-qubit-list global-queue))))
+                 (when (> (length combined-qubit-complex) *global-queue-tolerance-threshold*)
+                   (flush-global-queue))
+                 (merge-queue global-queue queue)))
+
+             (instruction-forces-flush-p (instr)
+               "Whether all instructions using overlapping resources to this instruction should be flushed before processing this instruction."
+               (or (global-instruction-p instr)
+                   (local-classical-quantum-instruction-p instr)
+                   (local-classical-instruction-p instr)
+                   (typep instr 'measure-discard)
+                   (typep instr 'reset-qubit)))
+
+             (process-instruction (instr)
+               (let* ((resources (instruction-resources instr))
+                      (existing-intersecting-queues (find-queues-by-resources resources))
+                      (global? (resources-intersect-p resources (compression-queue-resources global-queue))))
+
+                 ;; TODO: what if global queue is one of the intersecting queues?
+
+                 ;; Remove existing queues; we'll either flush them or combine and re-add
+                 (setf compression-queues
+                       (set-difference compression-queues existing-intersecting-queues))
+                 (cond
+                   ;; Global or hybrid instruction: Flush and remove all related queues.
+                   ((instruction-forces-flush-p instr)
+                    (map nil #'emit-queue existing-intersecting-queues)
+                    (when global?
+                      (flush-global-queue))
+                    (emit-instruction instr))
+
+                   ;; Local pure-quantum instruction: Merge related queues together
+                   (t
+                    (let* ((new-queue (make-compression-queue :resources (instruction-resources instr)
+                                                              :contents (list instr)))
+                           (combined-queue (merge-queues `(,@existing-intersecting-queues ,new-queue))))
+                      ;; create a new local queue, or merge into global queue
+                      (cond
+                        ((and (queue-corresponds-to-obj-p combined-queue) (not global?))
+                         (push combined-queue compression-queues))
+                        (t
+                         (merge-into-global-queue combined-queue)))))))
+               (clean-up-compilation-context context :destructive? t)))
+
+      (map nil #'process-instruction instructions)
+      (map nil #'emit-queue compression-queues)
+      (flush-global-queue)
+      (format-noise "COMPRESS-INSTRUCTIONS: departure")
+      (nreverse output))))
+
 ;; the broad strokes of this routine is that there is instructions are loaded
 ;; into a queueing system based on what chip resources they use, and these queues
 ;; are coalesced based on the noncommutativity of instructions.  when any queue
