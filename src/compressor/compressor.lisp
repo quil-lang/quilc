@@ -739,7 +739,7 @@ other's."
                                 ((:context context-arg)))
   "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION.
 
-This specific routine is the start of a giant dispatch mechanism. Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
+Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
   (format-noise "COMPRESS-INSTRUCTIONS: entrance.")
   (let* (output             ; instructions to return
          compression-queues ; Each queue is a list of instructions. Resources used by each queue do not overlap.
@@ -772,17 +772,20 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                (reduce #'merge-queue queues :initial-value (make-compression-queue)))
 
              (flush-queue (queue)
-               "Flushes the queue, compressing its contents and recursively passing them back in with lower queue-tolerance-threshold. Returns new sub-queues to add"
+               "Flushes the queue, compressing its contents and then recursively re-compressing them lower queue-tolerance-threshold. This helps apply rewrite rules that work on small numbers of qubits which might fail to match the larger sequence of instructions. Returns a list of queues from recursion which didn't need to be flushed."
                (let* ((once-compressed-instructions
                         (compress-instructions-with-possibly-unknown-params
                          (compression-queue-contents queue)
                          chip-specification
                          context)))
+                 ;; If the queue has width 1, can't hope for more compression, just output
                  (if (or (= 1 (compression-queue-num-qubits queue))
                          (null once-compressed-instructions))
                      (dolist (instr once-compressed-instructions)
                        (update-compilation-context context instr :destructive? t)
                        (push instr output))
+                     ;; Queue has width>1, may make some headway by re-compressing subsequences that
+                     ;; involve fewer qubits
                      (multiple-value-bind (r-output r-queues)
                          (compress-instructions once-compressed-instructions chip-specification
                                                 :protoquil protoquil
@@ -812,14 +815,12 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                    (local-classical-instruction-p instr)
                    (typep instr 'measure-discard)
                    (typep instr 'reset-qubit)
-                   ;; Instruction 
                    (> (length (cl-quil.resource::resource-qubits-list (instruction-resources instr)))
                        queue-tolerance-threshold)))
 
              (process-instruction (instr)
                (let* ((resources (instruction-resources instr))
                       (existing-intersecting-queues (find-queues-by-resources resources)))
-
                  (cond
                    ;; Global or hybrid instruction: Flush and remove all related queues.
                    ((instruction-forces-flush-p instr)
@@ -833,8 +834,14 @@ This specific routine is the start of a giant dispatch mechanism. Its role is to
                                                               :contents (list instr)))
                            (combined-queue (merge-queues `(,@existing-intersecting-queues ,new-queue))))
                       (cond
+                        ;; If this instruction causes a queue to become too large, then flush the
+                        ;; queue (splits it into smaller queues) and retry. If this happens
+                        ;; repeatedly, eventually the old queue will disappear completely, and the
+                        ;; new instruction will fit because we already checked
+                        ;; (instruction-forces-flush-p instr) = nil
                         ((< queue-tolerance-threshold (compression-queue-num-qubits combined-queue))
-                         (map nil #'flush-queue-in-place existing-intersecting-queues)
+                         (flush-queue-in-place (a:extremum existing-intersecting-queues #'>
+                                                           :key #'compression-queue-num-qubits))
                          (process-instruction instr))
                         (t
                          (setf compression-queues (set-difference compression-queues existing-intersecting-queues))
