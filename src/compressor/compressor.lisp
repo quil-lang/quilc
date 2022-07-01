@@ -772,13 +772,13 @@ Its role is to find SHORT SEQUENCES (so that producing their matrix form is not 
                (reduce #'merge-queue queues :initial-value (make-compression-queue)))
 
              (flush-queue (queue)
-               "Flushes the queue, compressing its contents and then recursively re-compressing them lower queue-tolerance-threshold. This helps apply rewrite rules that work on small numbers of qubits which might fail to match the larger sequence of instructions. Returns a list of queues from recursion which didn't need to be flushed."
+               "Compresses the queue's contents, then recursively re-compresses them with a smaller queue-tolerance-threshold. This helps apply rewrite rules that work on small numbers of qubits which might fail to match the larger sequence of instructions. Any instructions which follow the recursion all the way down to the base case are pushed to OUTPUT. FLUSH-QUEUE returns a list of queues of instructions that did not get flushed all the way to OUTPUT as a result of recursion."
                (let* ((once-compressed-instructions
                         (compress-instructions-with-possibly-unknown-params
                          (compression-queue-contents queue)
                          chip-specification
                          context)))
-                 ;; If the queue has width 1, can't hope for more compression, just output
+                 ;; Base case
                  (if (or (= 1 (compression-queue-num-qubits queue))
                          (null once-compressed-instructions))
                      (dolist (instr once-compressed-instructions)
