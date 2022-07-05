@@ -792,7 +792,7 @@ Its role is to find SHORT SEQUENCES (so that producing their matrix form is not 
                     (multiple-value-bind (r-output r-queues)
                         (compress-instructions once-compressed-instructions chip-specification
                                                :protoquil protoquil
-                                               :queue-tolerance-threshold (1- (compression-queue-num-qubits queue))
+                                               :queue-tolerance-threshold (min 2 (1- (compression-queue-num-qubits queue)))
                                                :context context)
                       (dolist (instr r-output)
                         (push instr output))
