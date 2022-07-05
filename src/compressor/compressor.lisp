@@ -778,22 +778,25 @@ Its role is to find SHORT SEQUENCES (so that producing their matrix form is not 
                          (compression-queue-contents queue)
                          chip-specification
                          context)))
-                 ;; Base case
-                 (if (or (= 1 (compression-queue-num-qubits queue))
-                         (null once-compressed-instructions))
-                     (dolist (instr once-compressed-instructions)
-                       (update-compilation-context context instr :destructive? t)
-                       (push instr output))
-                     ;; Queue has width>1, may make some headway by re-compressing subsequences that
-                     ;; involve fewer qubits
-                     (multiple-value-bind (r-output r-queues)
-                         (compress-instructions once-compressed-instructions chip-specification
-                                                :protoquil protoquil
-                                                :queue-tolerance-threshold (1- (compression-queue-num-qubits queue))
-                                                :context context)
-                       (dolist (instr r-output)
-                         (push instr output))
-                       r-queues))))
+                 (cond
+                   ;; Base case
+                   ((or (= 1 (compression-queue-num-qubits queue))
+                        (null once-compressed-instructions))
+                    (dolist (instr once-compressed-instructions)
+                      (update-compilation-context context instr :destructive? t)
+                      (push instr output)))
+
+                   ;; Queue has width>1, may make some headway by re-compressing subsequences that
+                   ;; involve fewer qubits
+                   (t
+                    (multiple-value-bind (r-output r-queues)
+                        (compress-instructions once-compressed-instructions chip-specification
+                                               :protoquil protoquil
+                                               :queue-tolerance-threshold (1- (compression-queue-num-qubits queue))
+                                               :context context)
+                      (dolist (instr r-output)
+                        (push instr output))
+                      r-queues)))))
 
              (flush-queue-in-place (queue)
                "Like FLUSH-QUEUE, but removes queue from COMPRESSION-QUEUES and re-inserts new ones as needed."
@@ -816,7 +819,7 @@ Its role is to find SHORT SEQUENCES (so that producing their matrix form is not 
                    (typep instr 'measure-discard)
                    (typep instr 'reset-qubit)
                    (> (length (cl-quil.resource::resource-qubits-list (instruction-resources instr)))
-                       queue-tolerance-threshold)))
+                      queue-tolerance-threshold)))
 
              (process-instruction (instr)
                (let* ((resources (instruction-resources instr))
