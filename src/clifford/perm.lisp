@@ -3,7 +3,7 @@
 ;;;; Author: Robert Smith (in collab with Charles Hadfield)
 ;;;;
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; This files deals with the permutation group representation of the
 ;;; Clifford group.

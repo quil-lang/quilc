@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil.quilt)
+(in-package #:cl-quil/quilt)
 
 ;;; Standard Waveform Definitions
 ;;;
@@ -47,7 +47,7 @@ Parameters:
     Any other entries in the plist are passed on to the slot specification of the waveform class."
 
   ;; Re: RPCQ-TYPE, note that this is the type which RPCQ expects, but is not
-  ;; necessarily the type that CL-QUIL.QUILT will use place in the slot (for the
+  ;; necessarily the type that CL-QUIL/QUILT will use place in the slot (for the
   ;; latter, generally one of QUIL:CONSTANT or QUIL:PARAM). We do not currently
   ;; make use of this information, but it is informative to readers.
   (check-type quilt-name string)

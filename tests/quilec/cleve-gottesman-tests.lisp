@@ -2,20 +2,20 @@
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 
-(in-package #:cl-quil.quilec-tests)
+(in-package #:cl-quil/quilec-tests)
 
 (defun pauli-to-program (pauli)
   "Return parsed program that applies PAULI to the current wavefunction."
-  (quil:with-output-to-quil
+  (cl-quil:with-output-to-quil
     (loop :for d :from 0
-          :with components := (subseq (cl-quil.clifford::pauli-components pauli) 1)
+          :with components := (subseq (cl-quil/clifford::pauli-components pauli) 1)
           :for l :across components :do
             (format t "~[I~;X~;Z~;RY(pi)~] ~D~%" l d)
           :finally (terpri))))
 
 (defun pauli-to-matrix (pauli)
   "Return matrix corresponding to PAULI (i.e., a Kronecker product of I, X, Z, and Y gates)."
-  (quil:parsed-program-to-logical-matrix (pauli-to-program pauli)))
+  (cl-quil:parsed-program-to-logical-matrix (pauli-to-program pauli)))
 
 (defun dist (u v)
   "Return $\ell_\infty$ distance between vectors U and V."
@@ -39,7 +39,7 @@
 (defun get-amplitudes (qvm)
   (declare (type qvm:pure-state-qvm qvm))
   (let ((amplitudes (qvm::amplitudes (qvm::state qvm))))
-    (quil::from-list (coerce amplitudes 'list) (list (length amplitudes) 1))))
+    (cl-quil::from-list (coerce amplitudes 'list) (list (length amplitudes) 1))))
 
 (defun encode-linear-algebra (stabilizer-group bits)
   "Use STABILIZER-GROUP to encode BITS. Return a vector of amplitudes and a QVM with the corresponding wavefunction."
@@ -47,7 +47,7 @@
          (2^n (expt 2 n)))
 
     (flet ((make-zero-ket ()
-             (let ((vector (quil::zeros (list 2^n 1))))
+             (let ((vector (cl-quil::zeros (list 2^n 1))))
                (setf (magicl:tref vector 0 0) #c(1.0d0 0.0d0))
                vector))
 
@@ -68,7 +68,7 @@
                   (setf ket (magicl:@ matrix ket))))
 
         (loop :with b := (length primary-generators)
-              :with result := (quil::zeros (list 2^n 1))
+              :with result := (cl-quil::zeros (list 2^n 1))
               :for z :below (expt 2 b) :do
                 (loop :with term := (magicl::copy-matrix/complex-double-float ket)
                       :for x :below b
@@ -112,9 +112,9 @@
             (let ((value (dot-product (encode-linear-algebra stabilizer-group c1)
                                       (encode-linear-algebra stabilizer-group c2))))
               (is (if (= c1 c2)
-                      (and (quil::double~ (realpart value) 1.0d0)
-                           (quil::double~ (imagpart value) 0.0d0))
-                      (quil::double~ (abs value) 0.0d0)))))))
+                      (and (cl-quil::double~ (realpart value) 1.0d0)
+                           (cl-quil::double~ (imagpart value) 0.0d0))
+                      (cl-quil::double~ (abs value) 0.0d0)))))))
 
 (defun test-idempotence (stabilizer-group)
   "Ensure that all the codewords are idempotent."
@@ -140,8 +140,8 @@
             (loop :for x :from 0
                   :for matrix :in matrices
                   :for rq := (rayleigh-quotient matrix (magicl:slice vector '(0 0) (list 2^n 1)))
-                  :do (is (and (quil::double~ 1.0d0 (realpart rq))
-                               (quil::double~ 0.0d0 (imagpart rq))))))))
+                  :do (is (and (cl-quil::double~ 1.0d0 (realpart rq))
+                               (cl-quil::double~ 0.0d0 (imagpart rq))))))))
 
 (defun test-eigenspace-linear-algebra (stabilizer-group)
   "Verify that every codeword is in the +1 eigenspace of the generators using linear algebra to create the relevant codewords."
@@ -149,14 +149,14 @@
         (secondary-generators (qec::secondary-generators stabilizer-group)))
 
     (labels ((make-zero-ket (n &optional (value #c(1.0d0 0.0d0)))
-               (let ((vector (quil::zeros (list (expt 2 n)))))
+               (let ((vector (cl-quil::zeros (list (expt 2 n)))))
                  (setf (magicl:tref vector 0) value)
                  vector))
 
              (make-state ()
                (loop :with n := (qec::number-of-physical-qubits stabilizer-group)
                      :with b := (length primary-generators)
-                     :with psi := (quil::zeros (list (expt 2 n)))
+                     :with psi := (cl-quil::zeros (list (expt 2 n)))
                      :for a :below (expt 2 b) :do
                        (loop :with vector := (make-zero-ket n (/ (sqrt (expt 2 b))))
                              :for i :below b
@@ -171,8 +171,8 @@
             :for matrix := (pauli-to-matrix generator)
             :for vector := (make-state) :do
               (let ((rq (rayleigh-quotient matrix vector)))
-                (is (and (quil::double~ 1.0d0 (realpart rq))
-                         (quil::double~ 0.0d0 (imagpart rq)))))))))
+                (is (and (cl-quil::double~ 1.0d0 (realpart rq))
+                         (cl-quil::double~ 0.0d0 (imagpart rq)))))))))
 
 (defun test-commutation (stabilizer-group)
   "Ensure all generators commute."
@@ -188,7 +188,7 @@
     (is (qec::commutes-p new-stabilizer-group))))
 
 (defun make-error-program (gate qubit)
-  (quil:parse-quil (format nil "~A ~D~%" gate qubit)))
+  (cl-quil:parse-quil (format nil "~A ~D~%" gate qubit)))
 
 (defun test-syndromes (stabilizer-group)
   "Verify that the errors lie in the orthogonal complement of the code space and that every error anticommutes with at least one generator."
@@ -230,7 +230,7 @@
             (loop :for j :below n :do
               (loop :with should-break-p := nil
                     :for generator :in (concatenate 'list primary-generators secondary-generators)
-                    :for matrix := (quil:parsed-program-to-logical-matrix (pauli-to-program generator))
+                    :for matrix := (cl-quil:parsed-program-to-logical-matrix (pauli-to-program generator))
                     :unless should-break-p :do
                       (let ((qvm (nth-value 1 (encode-linear-algebra stabilizer-group i))))
                         (load-program-and-run qvm (make-error-program gate j))

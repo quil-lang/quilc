@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(cl:in-package #:cl-quil/discrete/numeric)
 
 ;;; Defines functions on the type representing the form a + b √2
 

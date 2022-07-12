@@ -29,7 +29,7 @@ The processor-two-sample-chi-squared post-process takes all consumers and proces
 
 "
   (let ((boondoggle::*debug-noise-stream* *standard-output*)
-        (chip-spec (quil::build-8q-chip)))
+        (chip-spec (cl-quil::build-8q-chip)))
         (let ((chi-squared-results
                 (boondoggle::pipeline
                   ((producer      ()        (make-instance 'boondoggle::producer-random
@@ -45,11 +45,11 @@ The processor-two-sample-chi-squared post-process takes all consumers and proces
                   (produced-program () (boondoggle::produce-quil-program (producer)))
                   (compiled-program ((i processors))
                                     (progn
-                                      (quil::print-parsed-program (produced-program))
+                                      (cl-quil::print-parsed-program (produced-program))
                                       (boondoggle::apply-process (processors i) (produced-program))))
                   (qvm-results ((i processors))
                                (progn
-                                 (quil::print-parsed-program (compiled-program i))
+                                 (cl-quil::print-parsed-program (compiled-program i))
                                  (boondoggle::consume-quil (consumer) (compiled-program i))))
                   (chi-squared-result ((k processors) (i processors))
                                       (boondoggle::apply-process (post-process) (qvm-results i) (qvm-results k))))))

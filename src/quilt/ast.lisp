@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil.quilt)
+(in-package #:cl-quil/quilt)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Objects ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -32,7 +32,7 @@
              (qubit-index qubit))))))
 
 (defmethod print-instruction-generic ((thing frame) (stream stream))
-  (format stream "~{~/quil:instruction-fmt/ ~}\"~A\""
+  (format stream "~{~/cl-quil:instruction-fmt/ ~}\"~A\""
           (frame-qubits thing)
           (frame-name thing)))
 
@@ -52,7 +52,7 @@
   (declare (ignore colon-modifier at-modifier))
   (let ((param (car alist-entry))
         (value (cdr alist-entry)))
-    (format stream "~A: ~/quil:instruction-fmt/" (param-name param) value)))
+    (format stream "~A: ~/cl-quil:instruction-fmt/" (param-name param) value)))
 
 (defmethod print-instruction-generic ((thing waveform-ref) (stream stream))
   (format stream "~A~@[(~{~/quilt::waveform-parameter-association-fmt/~^, ~})~]"
@@ -120,7 +120,7 @@
 (defmethod print-instruction-generic ((instr simple-frame-mutation) (stream stream))
   (format stream "~A" (mnemonic instr))
   (loop :for arg :across (arguments instr)
-        :do (format stream " ~/quil:instruction-fmt/" arg)))
+        :do (format stream " ~/cl-quil:instruction-fmt/" arg)))
 
 (defclass swap-phase (instruction)
   ((left-frame :initarg :left-frame
@@ -132,7 +132,7 @@
   (:documentation "An instruction representing a phase swap between two frames."))
 
 (defmethod print-instruction-generic ((instr swap-phase) (stream stream))
-  (format stream "SWAP-PHASE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "SWAP-PHASE ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
           (swap-phase-left-frame instr)
           (swap-phase-right-frame instr)))
 
@@ -155,7 +155,7 @@
   (:documentation "A pulse instruction."))
 
 (defmethod print-instruction-generic ((instr pulse) (stream stream))
-  (format stream "~:[~;NONBLOCKING ~]PULSE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "~:[~;NONBLOCKING ~]PULSE ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
           (nonblocking-p instr)
           (pulse-frame instr)
           (pulse-waveform instr)))
@@ -181,7 +181,7 @@
   (:documentation "An instruction expressing the readout and integration of raw IQ values, to be stored in a region of classical memory."))
 
 (defmethod print-instruction-generic ((instr capture) (stream stream))
-  (format stream "~:[~;NONBLOCKING ~]CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "~:[~;NONBLOCKING ~]CAPTURE ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
           (nonblocking-p instr)
           (capture-frame instr)
           (capture-waveform instr)
@@ -208,7 +208,7 @@
   (:documentation "An instruction expressing the readout of raw IQ values, to be stored in a region of classical memory."))
 
 (defmethod print-instruction-generic ((instr raw-capture) (stream stream))
-  (format stream "~:[~;NONBLOCKING ~]RAW-CAPTURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+  (format stream "~:[~;NONBLOCKING ~]RAW-CAPTURE ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
           (nonblocking-p instr)
           (raw-capture-frame instr)
           (raw-capture-duration instr)
@@ -237,7 +237,7 @@
     (assert (every (lambda (frame)
                      (equalp qubits (frame-qubits frame)))
                    frames))
-    (format stream "DELAY~{ ~/quil:instruction-fmt/~}~{ ~S~} ~/quil:instruction-fmt/"
+    (format stream "DELAY~{ ~/cl-quil:instruction-fmt/~}~{ ~S~} ~/cl-quil:instruction-fmt/"
             qubits
             (mapcar #'frame-name (delay-frames instr))
             (delay-duration instr))))
@@ -249,7 +249,7 @@
            :documentation "A list of qubits. Any frame on these qubits will be delayed.")))
 
 (defmethod print-instruction-generic ((instr delay-on-qubits) (stream stream))
-  (format stream "DELAY~{ ~/quil:instruction-fmt/~} ~/quil:instruction-fmt/"
+  (format stream "DELAY~{ ~/cl-quil:instruction-fmt/~} ~/cl-quil:instruction-fmt/"
           (delay-qubits instr)
           (delay-duration instr)))
 
@@ -261,7 +261,7 @@
   (:documentation "A synchronization barrier on a set of qubits, demarcating preceding and succeeding instructions."))
 
 (defmethod print-instruction-generic ((instr fence) (stream stream))
-  (format stream "FENCE~{ ~/quil:instruction-fmt/~}"
+  (format stream "FENCE~{ ~/cl-quil:instruction-fmt/~}"
           (fence-qubits instr)))
 
 (defclass fence-all (instruction)
@@ -311,13 +311,13 @@
 (defmethod print-instruction-generic ((defn frame-definition) (stream stream))
   (with-slots (frame sample-rate initial-frequency direction hardware-object)
       defn
-    (format stream "DEFFRAME ~/quil:instruction-fmt/" frame)
+    (format stream "DEFFRAME ~/cl-quil:instruction-fmt/" frame)
     (when (or sample-rate initial-frequency direction hardware-object)
       (format stream ":")
       (when sample-rate
-        (format stream "~%    SAMPLE-RATE: ~/quil:instruction-fmt/" sample-rate))
+        (format stream "~%    SAMPLE-RATE: ~/cl-quil:instruction-fmt/" sample-rate))
       (when initial-frequency
-        (format stream "~%    INITIAL-FREQUENCY: ~/quil:instruction-fmt/" initial-frequency))
+        (format stream "~%    INITIAL-FREQUENCY: ~/cl-quil:instruction-fmt/" initial-frequency))
       (when direction
         (format stream "~%    DIRECTION: ~S"
                 (ecase direction
@@ -376,7 +376,7 @@
         :context context)))
 
 (defmethod print-instruction-generic ((defn waveform-definition) (stream stream))
-  (format stream "DEFWAVEFORM ~A~@[(~{%~A~^, ~})~] ~/quil:instruction-fmt/:"
+  (format stream "DEFWAVEFORM ~A~@[(~{%~A~^, ~})~] ~/cl-quil:instruction-fmt/:"
           (waveform-definition-name defn)
           (if (typep defn 'static-waveform-definition)
               '()
@@ -424,10 +424,10 @@
   (format stream "DEFCAL ")
   (print-operator-description (calibration-definition-operator defn) stream)
   (unless (endp (calibration-definition-parameters defn))
-    (format stream "(~{~/quil:instruction-fmt/~^, ~})"
+    (format stream "(~{~/cl-quil:instruction-fmt/~^, ~})"
             (calibration-definition-parameters defn)))
   (unless (endp (calibration-definition-arguments defn))
-    (format stream "~{ ~/quil:instruction-fmt/~}"
+    (format stream "~{ ~/cl-quil:instruction-fmt/~}"
             (calibration-definition-arguments defn)))
   (format stream ":~%")
   (print-instruction-sequence (calibration-definition-body defn)
@@ -454,7 +454,7 @@
   (:documentation "A representation of a user-specifieed MEASURE (discard) calibration."))
 
 (defmethod print-instruction-generic ((defn measurement-calibration-definition) (stream stream))
-  (format stream "DEFCAL MEASURE ~/quil:instruction-fmt/~@[ ~/quil:instruction-fmt/~]:~%"
+  (format stream "DEFCAL MEASURE ~/cl-quil:instruction-fmt/~@[ ~/cl-quil:instruction-fmt/~]:~%"
           (measurement-calibration-qubit defn)
           (if (typep defn 'measure-calibration-definition)
               (measure-calibration-address defn)

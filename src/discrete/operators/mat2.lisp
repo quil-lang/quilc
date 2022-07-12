@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/operators)
+(cl:in-package #:cl-quil/discrete/operators)
 
 ;;; Defines 2x2 matrices and its operations
 

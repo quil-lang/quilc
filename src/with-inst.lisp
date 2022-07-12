@@ -6,7 +6,7 @@
 ;;;; Quil instructions. Originally this was written to support
 ;;;; DEFINE-COMPILER, but is useful more generally.
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; Within the dynamic extent of a DEFINE-COMPILER, we publish
 ;;; instructions to output using a DEFINE-VOP-like INST macro, and we

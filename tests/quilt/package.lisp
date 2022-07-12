@@ -2,15 +2,9 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-;;; Allegro (and other Lisps) don't support the non-standard "package
-;;; local nicknames".
-#-(or sbcl ecl ccl)
-(rename-package :alexandria :alexandria '(:a))
-
-(fiasco:define-test-package #:cl-quil.quilt-tests
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
-  (:use #:cl-quil #:cl-quil.quilt)
+(fiasco:define-test-package #:cl-quil/quilt-tests
+  (:use #:cl-quil #:cl-quil/quilt)
+  (:local-nicknames (#:quilt #:cl-quil/quilt))
 
   ;; suite.lisp
   (:export

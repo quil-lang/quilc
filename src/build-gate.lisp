@@ -7,7 +7,7 @@
 ;;;;
 ;;;; (make-instance 'gate-application :blah 'blah-blah ...) .
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 
 ;;; first, some simple utilities for constructing gate objects

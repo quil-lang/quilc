@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; This file doesn't itself have any transforms in it, but rather
 ;;; manages the documentation and recording of transforms that have

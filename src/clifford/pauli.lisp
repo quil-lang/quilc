@@ -3,7 +3,7 @@
 ;;;; Authors: Nik Tezak
 ;;;;          Robert Smith
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; This file implements an efficient representation of the Pauli
 ;;; group.
@@ -28,7 +28,7 @@
     (1- (length (pauli-components p))))
 
   (defun make-components (num-qubits)
-    (declare (type quil::unsigned-fixnum num-qubits))
+    (declare (type cl-quil::unsigned-fixnum num-qubits))
     (make-array (1+ num-qubits) :element-type 'base4
                                 :initial-element 0))
 
@@ -299,7 +299,7 @@ hash-function."
   (declare (optimize speed (safety 0) (debug 0) (space 0))
            (type pauli p))
   (sxhash
-   (loop :with h :of-type quil::unsigned-fixnum := 0
+   (loop :with h :of-type cl-quil::unsigned-fixnum := 0
          :for x :across (pauli-components p)
          :do (setf h (hash-mix h x))
          :finally (return h))))
@@ -341,8 +341,8 @@ hash-function."
         (forward nil))
     (map nil (lambda (from to)
                ;; We make copies because quilc doens't like EQ things.
-               (push (quil:build-gate "CNOT" () from to) reverse)
-               (push (quil:build-gate "CNOT" () from to) forward))
+               (push (cl-quil:build-gate "CNOT" () from to) reverse)
+               (push (cl-quil:build-gate "CNOT" () from to) forward))
          qubits
          (subseq qubits 1))
     (values (nreverse forward)
@@ -361,7 +361,7 @@ Note that this function is somewhat informed by the variable *EXP-PAULI-COLLECT-
                                which isn't allowed in EXP-PAULI."
             phase)
     (setf phase (coerce (realpart phase) 'double-float))
-    (quil:with-inst ()
+    (cl-quil:with-inst ()
       (cond
         ((pauli-identity-p p)
          ;; PyQuil would generate
@@ -382,9 +382,9 @@ Note that this function is somewhat informed by the variable *EXP-PAULI-COLLECT-
                    :unless (eq 'I op)
                      :return (values op (1- i)))
            (ecase op
-             (X (quil:inst "RX" (list (quil::param-* (* 2.0d0 phase) x)) qubit))
-             (Y (quil:inst "RY" (list (quil::param-* (* 2.0d0 phase) x)) qubit))
-             (Z (quil:inst "RZ" (list (quil::param-* (* 2.0d0 phase) x)) qubit)))))
+             (X (cl-quil:inst "RX" (list (cl-quil::param-* (* 2.0d0 phase) x)) qubit))
+             (Y (cl-quil:inst "RY" (list (cl-quil::param-* (* 2.0d0 phase) x)) qubit))
+             (Z (cl-quil:inst "RZ" (list (cl-quil::param-* (* 2.0d0 phase) x)) qubit)))))
 
         ;; The general case.
         (t
@@ -395,15 +395,15 @@ Note that this function is somewhat informed by the variable *EXP-PAULI-COLLECT-
                    :collect qubit :into toggle-qubits
                  ;; This collect builds pairs of basis-changing gates.
                  :when (eq 'X pauli-component)
-                   :collect      (quil:build-gate "H" () qubit) :into to-z
-                   :and :collect (quil:build-gate "H" () qubit) :into from-z
+                   :collect      (cl-quil:build-gate "H" () qubit) :into to-z
+                   :and :collect (cl-quil:build-gate "H" () qubit) :into from-z
                  :when (eq 'Y pauli-component)
-                   :collect      (quil:build-gate "RX" (list quil:pi/2) qubit)  :into to-z
-                   :and :collect (quil:build-gate "RX" (list quil:-pi/2) qubit) :into from-z
+                   :collect      (cl-quil:build-gate "RX" (list cl-quil:pi/2) qubit)  :into to-z
+                   :and :collect (cl-quil:build-gate "RX" (list cl-quil:-pi/2) qubit) :into from-z
                  :finally
                     (multiple-value-bind (forward reverse) (funcall *exp-pauli-toggles* toggle-qubits)
-                      (mapc #'quil:inst to-z)
-                      (mapc #'quil:inst forward)
-                      (quil:inst "RZ" (list (quil::param-* (* 2.0d0 phase) x)) (first (last toggle-qubits)))
-                      (mapc #'quil:inst reverse)
-                      (mapc #'quil:inst from-z)))))))))
+                      (mapc #'cl-quil:inst to-z)
+                      (mapc #'cl-quil:inst forward)
+                      (cl-quil:inst "RZ" (list (cl-quil::param-* (* 2.0d0 phase) x)) (first (last toggle-qubits)))
+                      (mapc #'cl-quil:inst reverse)
+                      (mapc #'cl-quil:inst from-z)))))))))

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith, A.J. Nyquist
 
-(in-package #:cl-quil.discrete)
+(in-package #:cl-quil/discrete)
 
 ;;; A "discrete gate set" is purposefully vague, since the definition
 ;;; may change over time. For now, though, the gate set is {H, S, T,

@@ -3,7 +3,7 @@
 ;;;; Author: Nik Tezak
 ;;;;         Robert Smith
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; This file contains an implementation of a Clifford "God table", a
 ;;; lookup table used to reconstruct Clifford elements from some
@@ -85,7 +85,7 @@ allows to compute a minimal length sequence of generators to invert it."))
 
 (defun make-god-table (gateset)
   "Compute the God table for the closure of some specific generators."
-  (let* ((q (quil:make-queue))
+  (let* ((q (cl-quil:make-queue))
          (n (num-qubits gateset))
          #+#:debug(num-cliffords (count-clifford n))
          (generators (cliffords gateset))
@@ -106,7 +106,7 @@ allows to compute a minimal length sequence of generators to invert it."))
                       g-idx)
                 ;; enqueue the generator to recursively generate more
                 ;; cliffords below
-                (quil:enqueue q g)))
+                (cl-quil:enqueue q g)))
 
     ;; At this point we know all cliffords that are 0 and 1 generator
     ;; applications removed from the identity.
@@ -119,8 +119,8 @@ allows to compute a minimal length sequence of generators to invert it."))
     ;; etc. until we have reached all cliffords.
     (let ((explored 0)
           #+#:debug(time (get-internal-real-time)))
-      (loop :until (quil:queue-empty-p q)
-            :for next := (quil:dequeue q)
+      (loop :until (cl-quil:queue-empty-p q)
+            :for next := (cl-quil:dequeue q)
             :do
                ;; For each clifford one generator removed from NEXT
                ;; check if it has been seen before in which case we have
@@ -146,7 +146,7 @@ allows to compute a minimal length sequence of generators to invert it."))
                                            internal-time-units-per-second))
                             (setf time (get-internal-real-time)))
                           (setf (gethash next-s gt) s-idx)
-                          (quil:enqueue q next-s)))))
+                          (cl-quil:enqueue q next-s)))))
     (make-instance 'god-table
                    :gateset gateset
                    :mapping gt)))

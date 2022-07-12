@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(cl:in-package #:cl-quil/discrete/numeric)
 
 ;;; Common classes, types, and functions for (linear) algebra code (e.g. group
 ;;; actions, modules/vectors, matrices, (linear) transformations, eigenvalues).

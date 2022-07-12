@@ -17,8 +17,8 @@
 
 (defun runtime-estimation (parsed-protoquil-program)
   "Estimated QPU runtime of PARSED-PROTOQUIL-PROGRAM. Likely to be an over-estimate for small depth programs, where runtime is dominated by network latency and compilation, etc. Take these results with a grain of salt."
-  (when (and (typep parsed-protoquil-program 'quil:parsed-program)
-             (quil:protoquil-program-p parsed-protoquil-program))
+  (when (and (typep parsed-protoquil-program 'cl-quil:parsed-program)
+             (cl-quil:protoquil-program-p parsed-protoquil-program))
     ;; These opaque numbers come from an analysis of the runtimes of a
     ;; large number of randomly generated programs targeting a 16Q
     ;; lattice. Those programs were a random mixture of 1- and 2Q
@@ -26,9 +26,9 @@
     (loop :with coeff-oneq := 1.6291
           :with coeff-twoq := 1.701
           :with runtime := 181.89
-          :for instr :across (quil:parsed-program-executable-code parsed-protoquil-program)
-          :when (typep instr 'quil:application) :do
-            (case (length (quil:application-arguments instr))
+          :for instr :across (cl-quil:parsed-program-executable-code parsed-protoquil-program)
+          :when (typep instr 'cl-quil:application) :do
+            (case (length (cl-quil:application-arguments instr))
               (1 (incf runtime coeff-oneq))
               (2 (incf runtime coeff-twoq)))
           :finally (return runtime))))
@@ -69,14 +69,14 @@
                         (t t))))
     (unless (slot-boundp cache 'addresser-state)
       (setf (cached-chip-addresser-state cache)
-            (make-instance quil::*default-addresser-state-class*
+            (make-instance cl-quil::*default-addresser-state-class*
                            :chip-spec chip-specification
-                           :initial-l2p (quil::prog-initial-rewiring quil-program chip-specification))))
+                           :initial-l2p (cl-quil::prog-initial-rewiring quil-program chip-specification))))
     (multiple-value-bind (processed-program statistics-dict)
         (process-program quil-program chip-specification
                          :protoquil protoquil
                          :state-aware state-aware
-                         :verbose quil::*compiler-noise*)
+                         :verbose cl-quil::*compiler-noise*)
       (when protoquil
         (setf (gethash "qpu_runtime_estimation" statistics-dict)
               (runtime-estimation processed-program)))
@@ -108,7 +108,7 @@
       (error "Seed must be a positive integer."))
     (when (> n 2)
       (error "Currently no more than two qubit randomized benchmarking is supported."))
-    (let* ((cliffords (mapcar #'quil.clifford::clifford-from-quil gateset))
+    (let* ((cliffords (mapcar #'cl-quil/clifford::clifford-from-quil gateset))
            (qubits-used (mapcar (a:compose #'qubits-used #'safely-parse-quil)
                                 gateset))
            (qubits-used-by-interleaver
@@ -118,13 +118,13 @@
            (embedded-cliffords (loop :for clifford :in cliffords
                                      :for i :from 0
                                      :collect
-                                     (quil.clifford:embed clifford n
+                                     (cl-quil/clifford:embed clifford n
                                                           ;; See below
                                                           (reverse (loop :for index :in (nth i qubits-used)
                                                                          :collect (position index qubits))))))
            (embedded-interleaver
              (when interleaver
-               (quil.clifford:embed (quil.clifford::clifford-from-quil interleaver)
+               (cl-quil/clifford:embed (cl-quil/clifford::clifford-from-quil interleaver)
                                     n
                                     ;; XXX: the embedding ordering has
                                     ;; been reversed to comply with
@@ -138,11 +138,11 @@
              (let ((*random-state*
                      #+sbcl (if seed (sb-ext:seed-random-state seed) *random-state*)
                      #-sbcl *random-state*))
-               (quil.clifford::rb-sequence k n embedded-cliffords embedded-interleaver)))
+               (cl-quil/clifford::rb-sequence k n embedded-cliffords embedded-interleaver)))
            (gateset-label-sequence
              (loop :for clifford-element :in rb-sequence
                    :collect (loop :for generator :in clifford-element
-                                  :collect (position generator embedded-cliffords :test #'quil.clifford:clifford=)))))
+                                  :collect (position generator embedded-cliffords :test #'cl-quil/clifford:clifford=)))))
       (make-instance 'rpcq::|RandomizedBenchmarkingResponse|
                      :|sequence| gateset-label-sequence))))
 
@@ -155,7 +155,7 @@
          (pauli-terms (coerce (rpcq::|PauliTerm-symbols| pauli) 'list))
          (clifford-indices (sort (cl-quil:qubits-used (cl-quil:safely-parse-quil clifford-program)) #'<))
          (qubits (sort (union (copy-seq pauli-indices) (copy-seq clifford-indices)) #'<))
-         (pauli (quil.clifford:pauli-from-string
+         (pauli (cl-quil/clifford:pauli-from-string
                  ;; XXX: the pauli-from-string and embedding orderings
                  ;; have been reversed to comply with the
                  ;; computational basis convention, hence the reverse
@@ -165,16 +165,16 @@
                               (cond ((member i pauli-indices)
                                      (write-string (nth (position i pauli-indices) pauli-terms) s))
                                     (T (write-string "I" s))))))))
-         (clifford (cl-quil.clifford::embed (quil.clifford::clifford-from-quil clifford-program)
+         (clifford (cl-quil/clifford::embed (cl-quil/clifford::clifford-from-quil clifford-program)
                                             (length qubits)
                                             ;; Likewise to the above.
                                             (reverse (loop :for index :in clifford-indices :collect (position index qubits)))))
-         (pauli-out (quil.clifford:apply-clifford clifford pauli)))
+         (pauli-out (cl-quil/clifford:apply-clifford clifford pauli)))
     (make-instance 'rpcq::|ConjugateByCliffordResponse|
-                   :|phase| (quil.clifford::phase-factor pauli-out)
+                   :|phase| (cl-quil/clifford::phase-factor pauli-out)
                    :|pauli| (apply #'concatenate 'string
-                                   (mapcar (a:compose #'symbol-name #'quil.clifford::base4-to-sym)
-                                           (quil.clifford::base4-list pauli-out))))))
+                                   (mapcar (a:compose #'symbol-name #'cl-quil/clifford::base4-to-sym)
+                                           (cl-quil/clifford::base4-list pauli-out))))))
 
 (defun rewrite-arithmetic-handler (request)
   "Rewrites the request program without arithmetic in gate parameters."
@@ -186,22 +186,22 @@
       (let ((reformatted-rt (make-hash-table)))
         (maphash (lambda (key val)
                    (setf (gethash (make-instance 'rpcq::|ParameterAref|
-                                                 :|name| (quil::memory-ref-name key)
-                                                 :|index| (quil::memory-ref-position key))
+                                                 :|name| (cl-quil::memory-ref-name key)
+                                                 :|index| (cl-quil::memory-ref-position key))
                                   reformatted-rt)
-                         (quil::print-instruction val nil)))
+                         (cl-quil::print-instruction val nil)))
                  recalculation-table)
         (make-instance 'rpcq::|RewriteArithmeticResponse|
                        :|quil|
                        (with-output-to-string (s)
-                         (quil::print-parsed-program rewritten-program s))
+                         (cl-quil::print-parsed-program rewritten-program s))
                        :|original_memory_descriptors|
                        (a:alist-hash-table
                         (mapcar (lambda (memory-defn)
-                                  (cons (quil::memory-descriptor-name memory-defn)
+                                  (cons (cl-quil::memory-descriptor-name memory-defn)
                                         (make-instance 'rpcq::|ParameterSpec|
-                                                       :|type| (quil::quil-type-string (quil::memory-descriptor-type memory-defn))
-                                                       :|length| (quil::memory-descriptor-length memory-defn))))
+                                                       :|type| (cl-quil::quil-type-string (cl-quil::memory-descriptor-type memory-defn))
+                                                       :|length| (cl-quil::memory-descriptor-length memory-defn))))
                                 original-memory-descriptors))
                        :|recalculation_table|
                        reformatted-rt)))))

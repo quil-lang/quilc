@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; This analysis counts the number of qubits needed to run a program.
 

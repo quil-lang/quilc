@@ -20,22 +20,22 @@
           (let* ((input (first testcase))
                  (entries (second testcase))
                  (n (length entries))
-                 (p (if (stringp input) (quil:parse-quil input) input))
-                 (actual (quil:parsed-program-to-logical-matrix p))
-                 (expected (quil::from-list (a:flatten entries) (list n n)))
-                 (compiled (quil::matrix-rescale
-                            (quil:parsed-program-to-logical-matrix
-                             (quil:compiler-hook p (quil::build-nq-linear-chip
-                                                    (quil:qubits-needed p))))
+                 (p (if (stringp input) (cl-quil:parse-quil input) input))
+                 (actual (cl-quil:parsed-program-to-logical-matrix p))
+                 (expected (cl-quil::from-list (a:flatten entries) (list n n)))
+                 (compiled (cl-quil::matrix-rescale
+                            (cl-quil:parsed-program-to-logical-matrix
+                             (cl-quil:compiler-hook p (cl-quil::build-nq-linear-chip
+                                                    (cl-quil:qubits-needed p))))
                             expected)))
             ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion
             ;; succeeds.  Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH
             ;; when/if the associated test assertion actually fails.
-            (is (quil::matrix-equality actual expected)
+            (is (cl-quil::matrix-equality actual expected)
                 "Checking input: ~S~%~/cl-quil-tests::matrix-mismatch-fmt/"
                 input
                 (list actual expected))
-            (is (quil::operator= compiled expected)
+            (is (cl-quil::operator= compiled expected)
                 "Checking compiled input: ~S~%~/cl-quil-tests::matrix-mismatch-fmt/"
                 input
                 (list compiled expected))))
@@ -43,19 +43,19 @@
         ;; matching on them easier. Scroll down to the RY-gate tests to see where a,..,h are used.
         (let* ((i+ #C(0.0 1.0))
                (i- #C(0.0 -1.0))
-               (pi/6 (/ quil::pi 6))
+               (pi/6 (/ cl-quil::pi 6))
                (a+ (cos pi/6))
                (b+ (sin pi/6))
                (b- (- b+))
-               (pi/12 (/ quil::pi 12))
+               (pi/12 (/ cl-quil::pi 12))
                (c+ (cos pi/12))
                (d+ (sin pi/12))
                (d- (- d+))
-               (pi/16 (/ quil::pi 16))
+               (pi/16 (/ cl-quil::pi 16))
                (e+ (cos pi/16))
                (f+ (sin pi/16))
                (f- (- f+))
-               (pi/20 (/ quil::pi 20))
+               (pi/20 (/ cl-quil::pi 20))
                (g+ (cos pi/20))
                (h+ (sin pi/20))
                (h- (- h+)))

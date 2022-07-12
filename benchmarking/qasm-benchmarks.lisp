@@ -53,12 +53,12 @@
                    "...")))
 
 (defun calculate-multiqubit-gate-depth (code-vector)
-  (let ((lschedule (quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lscheduler)))
     (loop :for instr :across code-vector
           :when (and (typep instr 'gate-application)
                      (<= 2 (length (application-arguments instr))))
-            :do (quil::append-instruction-to-lschedule lschedule instr)
-          :finally (return (quil::lscheduler-calculate-depth lschedule)))))
+            :do (cl-quil::append-instruction-to-lschedule lschedule instr)
+          :finally (return (cl-quil::lscheduler-calculate-depth lschedule)))))
 
 (defun benchmark-qasm-suite (&key (timeout 30) named)
   "Run benchmarks from qasm suite. If NAMED is not nil, the specified test(s) will be the ONLY one(s) run; otherwise, all the tests are run. NAMED should be a short name (as shown in the output) of a test, either as a symbol or string, or a list thereof (i.e., matching mutiple tests), to be compared using string-equal. TIMEOUT specifies a timeout in seconds, defaulting to 30 seconds."
@@ -69,10 +69,10 @@
       (print-rule)
       (format t "|       NAME       | TIME (s) | SWAPS | 2Q DEPTH |~%")
       (print-rule)
-      (let ((chip (quil::build-ibm-qx5))
-            (quil::*default-addresser-state-class* 'quil::temporal-addresser-state)
-            (quil::*addresser-use-1q-queues* t)
-            (quil::*safe-include-directory* (asdf:system-relative-pathname :cl-quil "tests/qasm-files/")))
+      (let ((chip (cl-quil::build-ibm-qx5))
+            (cl-quil::*default-addresser-state-class* 'cl-quil::temporal-addresser-state)
+            (cl-quil::*addresser-use-1q-queues* t)
+            (cl-quil::*safe-include-directory* (asdf:system-relative-pathname :cl-quil "tests/qasm-files/")))
         (dolist (file (qasm-test-files))
           (let ((short-name (trim-long-string (pathname-name file) 16)))
             (when (or (null named)
@@ -87,7 +87,7 @@
                     (bordeaux-threads:with-timeout (timeout)
                       (with-stopwatch elapsed-time
                         (multiple-value-bind (cpp swaps)
-                            (quil::compiler-hook (quil::parse text
+                            (cl-quil::compiler-hook (cl-quil::parse text
                                                               :originating-file file)
                                                  chip
                                                  :protoquil t

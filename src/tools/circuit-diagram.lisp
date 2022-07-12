@@ -2,7 +2,7 @@
 ;;;
 ;;; Author: Erik Davis
 
-(in-package #:cl-quil.tools)
+(in-package #:cl-quil/tools)
 
 ;;; This file contains routines to render a subset of Quil programs as
 ;;; quantikz circuits (cf. https://ctan.org/pkg/quantikz).
@@ -85,9 +85,9 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
 
 (defun tikz-gate (name &key (size 1) params dagger)
   ;; TeXify names
-  (let* ((cl-quil.frontend::*pi-literal* "\\pi")
+  (let* ((cl-quil/frontend::*pi-literal* "\\pi")
          (texified-name
-           (format nil "~A~:[~;^{\\dagger}~]~@[(~{~/quil:instruction-fmt/~^, ~})~]"
+           (format nil "~A~:[~;^{\\dagger}~]~@[(~{~/cl-quil:instruction-fmt/~^, ~})~]"
                    (cond
                      ((string= "RX" name) "R_x")
                      ((string= "RY" name) "R_y")
@@ -246,23 +246,23 @@ The convention is that the source operation takes two arguments: the qubit index
   (:method (diagram instr)
     (error "Unable to update diagram with instruction ~A" instr))
   
-  (:method (diagram (instr quil:measurement))
+  (:method (diagram (instr cl-quil:measurement))
     (append-to-diagram diagram
-                       (quil:qubit-index (quil:measurement-qubit instr))
+                       (cl-quil:qubit-index (cl-quil:measurement-qubit instr))
                        (tikz-measure)))
   
-  (:method (diagram (instr quil:pragma))
+  (:method (diagram (instr cl-quil:pragma))
     nil)
 
-  (:method (diagram (instr quil:reset))
+  (:method (diagram (instr cl-quil:reset))
     nil)
 
-  (:method (diagram (instr quil:gate-application))
-    (let ((qubits (mapcar #'quil:qubit-index
-                          (quil:application-arguments instr))))
+  (:method (diagram (instr cl-quil:gate-application))
+    (let ((qubits (mapcar #'cl-quil:qubit-index
+                          (cl-quil:application-arguments instr))))
       ;; special case: 2Q operator with special SOURCE-TARGET structure
-      (adt:match quil:operator-description (quil:application-operator instr)
-        ((quil:named-operator name)
+      (adt:match cl-quil:operator-description (cl-quil:application-operator instr)
+        ((cl-quil:named-operator name)
          (when (gethash name custom-source-target-ops)
            (destructuring-bind (source target) qubits
              (append-custom-source-target-gate diagram name source target))
@@ -274,19 +274,19 @@ The convention is that the source operation takes two arguments: the qubit index
       (let ((dagger nil)
             (num-controls 0))
         (labels ((destruct-application (od)
-                   (adt:match quil:operator-description od
-                     ((quil:named-operator name)
+                   (adt:match cl-quil:operator-description od
+                     ((cl-quil:named-operator name)
                       name)
-                     ((quil:dagger-operator inner-od)
+                     ((cl-quil:dagger-operator inner-od)
                       (setf dagger (not dagger))
                       (destruct-application inner-od))
-                     ((quil:controlled-operator inner-od)
+                     ((cl-quil:controlled-operator inner-od)
                       (incf num-controls)
                       (destruct-application inner-od))
-                     ((quil:forked-operator _)
+                     ((cl-quil:forked-operator _)
                       (error "LaTeX output does not currently support FORKED modifiers: ~A" instr)))))
           (let ((name
-                  (destruct-application (quil:application-operator instr))))
+                  (destruct-application (cl-quil:application-operator instr))))
             (let ((control-qubits (subseq qubits 0 num-controls))
                   (target-qubits (subseq qubits num-controls)))
               (when (not (adjacent-lines-p diagram target-qubits))
@@ -303,7 +303,7 @@ The convention is that the source operation takes two arguments: the qubit index
                                    actual-target
                                    (tikz-gate name
                                               :size (length target-qubits)
-                                              :params (quil:application-parameters instr)
+                                              :params (cl-quil:application-parameters instr)
                                               :dagger dagger))
                 ;; and then NOP on the rest
                 (loop :for q :in target-qubits
@@ -322,12 +322,12 @@ The convention is that the source operation takes two arguments: the qubit index
   (delete-duplicates
    (mapcan (lambda (instr)
              (typecase instr
-               (quil::application
-                (mapcar #'quil:qubit-index
-                        (quil:application-arguments instr)))
-               (quil::measurement
-                (list (quil:qubit-index
-                       (quil:measurement-qubit instr))))))
+               (cl-quil::application
+                (mapcar #'cl-quil:qubit-index
+                        (cl-quil:application-arguments instr)))
+               (cl-quil::measurement
+                (list (cl-quil:qubit-index
+                       (cl-quil:measurement-qubit instr))))))
            instrs)))
 
 
@@ -339,18 +339,18 @@ The convention is that the source operation takes two arguments: the qubit index
                (setf (gethash q adjacency-list) nil))))   
       (loop :for instr :in instructions
             :do (typecase instr
-                  (quil:application
-                   (cond ((= 1 (length (quil:application-arguments instr)))
-                          (ensure-present (quil:qubit-index (first (quil:application-arguments instr)))))
+                  (cl-quil:application
+                   (cond ((= 1 (length (cl-quil:application-arguments instr)))
+                          (ensure-present (cl-quil:qubit-index (first (cl-quil:application-arguments instr)))))
                           (t
-                           (loop :for q1 :in (quil:application-arguments instr)
-                                 :for i1 := (quil:qubit-index q1)
-                                 :do (loop :for q2 :in (quil:application-arguments instr)
-                                           :for i2 := (quil:qubit-index q2)
+                           (loop :for q1 :in (cl-quil:application-arguments instr)
+                                 :for i1 := (cl-quil:qubit-index q1)
+                                 :do (loop :for q2 :in (cl-quil:application-arguments instr)
+                                           :for i2 := (cl-quil:qubit-index q2)
                                            :unless (= i1 i2)
                                              :do (pushnew i1 (gethash i2 adjacency-list)))))))
-                  (quil:measurement
-                   (let ((q (quil:qubit-index (quil:measurement-qubit instr))))
+                  (cl-quil:measurement
+                   (let ((q (cl-quil:qubit-index (cl-quil:measurement-qubit instr))))
                      (when (null (nth-value 1 (gethash q adjacency-list)))
                        (setf (gethash q adjacency-list) nil)))))
             :finally (return adjacency-list)))))
@@ -427,7 +427,7 @@ The convention is that the source operation takes two arguments: the qubit index
       (when *right-align-measurements*
         (loop :with seen-measure := nil
             :for instr :in instructions
-              :if (typep instr 'quil:measurement)
+              :if (typep instr 'cl-quil:measurement)
                 :do (setf seen-measure t)
                 :and :collect instr :into measurements
               :else
@@ -488,7 +488,7 @@ The convention is that the source operation takes two arguments: the qubit index
 
 (defun print-parsed-program-as-quantikz (pp &optional (stream *standard-output*))
   (let ((diagram
-          (build-diagram (quil:parsed-program-executable-code pp))))    
+          (build-diagram (cl-quil:parsed-program-executable-code pp))))    
     (print-quantikz-header stream)
     (print-quantikz-diagram diagram stream)
     (print-quantikz-footer stream)))

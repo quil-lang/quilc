@@ -1,4 +1,4 @@
-(in-package #:cl-quil.quilt-tests)
+(in-package #:cl-quil/quilt-tests)
 
 (deftest test-gate-calibration-matching ()
   (let ((pp (parse-quilt "
@@ -76,7 +76,7 @@ DEFCAL RX(%theta) q:
 X 0")))
     (quilt::expand-calibrations pp)
     (is (= 1 (length (parsed-program-executable-code pp))))
-    (is (typep (elt (parsed-program-executable-code pp) 0) 'quil::no-operation))))
+    (is (typep (elt (parsed-program-executable-code pp) 0) 'cl-quil::no-operation))))
 
 (deftest test-infinitely-recursive-calibrations ()
   (let ((pp (parse-quilt "

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete-coalton-tests)
+(cl:in-package #:cl-quil/discrete-coalton-tests)
 
 ;;; Tests solver found in src/discrete/rz-approx/
 

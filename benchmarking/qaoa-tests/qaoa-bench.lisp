@@ -46,7 +46,7 @@
            (let ((pp (let ((*random-state* (make-random-state
                                             cl-user::*this-random-state*)))
                        (make-program qubits valency)))
-                 (chip (quil::build-nQ-trivalent-chip -1 1 16 16))) ;; 128 qubit chip
+                 (chip (cl-quil::build-nQ-trivalent-chip -1 1 16 16))) ;; 128 qubit chip
              (sb-ext:gc :full t)
              (loop :for count :below repetitions
                    :with runtime := nil

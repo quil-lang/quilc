@@ -1,4 +1,4 @@
-# CL-Quil.Tools
+# CL-QUIL/TOOLS
 
 Tools for cl-quil developers.
 
@@ -48,13 +48,13 @@ brew install mactex
 brew install pdf2svg
 ```
 
-These executables are referred to in `cl-quil.tools` by `*pdflatex-exe*` and `*pdf2svg-exe`, should you wish to override them.
+These executables are referred to in `cl-quil/tools` by `*pdflatex-exe*` and `*pdf2svg-exe`, should you wish to override them.
 
 To use this in a Jupyter notebook, you should use [common-lisp-jupyter](https://github.com/yitzchak/common-lisp-jupyter). As an installation note, some users have found that on macOS the default SBCL path associated with the jupyter kernel (e.g. in `~/Library/Jupyter/kernels/common-lisp/kernel.json`) is incorrect; this will result in `jupyter` being unable to start the Common Lisp kernel.
 
 #### `:slime-png`
 
-You need `pdflatex` (cf. above) and `convert` (from ImageMagick) in your path. These executables are referred to in `cl-quil.tools` by `*pdflatex-exe*` and `*convert-exe*`, should you wish to override them.
+You need `pdflatex` (cf. above) and `convert` (from ImageMagick) in your path. These executables are referred to in `cl-quil/tools` by `*pdflatex-exe*` and `*convert-exe*`, should you wish to override them.
 
 The Slime interaction requires two SLIME contribs: `slime-media` and `slime-repl` (which is included in `slime-fancy`). In addition, you must enable SLIME evaluation in Emacs. This all can be done, for example, by the following (from `config.el`):
 
@@ -96,7 +96,7 @@ dot -Tpng example-1.gv -o g.png
 The resulting image file can then be shown in various software, such as image viewers, PDF viewers, and web browsers.
 
 Here is an example of using this tool:
-In Lisp, if necessary, evaluate the following to load cl-quil.tools:
+In Lisp, if necessary, evaluate the following to load cl-quil/tools:
 ```
 (asdf:load-system :cl-quil/tools)
 ```

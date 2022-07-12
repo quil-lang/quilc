@@ -188,7 +188,7 @@ Returns a value list: (processed-program, of type parsed-program
                      ((null processed-quil)
                       (format-noise "    *empty program*"))
                      (t
-                      (format-noise "~{    ~/quil:instruction-fmt/~%~}" processed-quil))))
+                      (format-noise "~{    ~/cl-quil:instruction-fmt/~%~}" processed-quil))))
                  (dotimes (n *compressor-passes*)
                    (format-noise "COMPILER-HOOK: Compressing, pass ~D/~D." (1+ n) *compressor-passes*)
                    (setf processed-quil
@@ -203,7 +203,7 @@ Returns a value list: (processed-program, of type parsed-program
                      ((null processed-quil)
                       (format-noise "    *empty program*"))
                      (t
-                      (format-noise "~{    ~/quil:instruction-fmt/~%~}" processed-quil))))
+                      (format-noise "~{    ~/cl-quil:instruction-fmt/~%~}" processed-quil))))
                  ;; we're done processing. store the results back into the CFG block.
                  (setf (basic-block-code blk) processed-quil)
                  (setf (basic-block-in-rewiring blk) initial-l2p)

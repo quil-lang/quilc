@@ -79,7 +79,7 @@
   "Test different combinations of lexical analysis."
   (declare (optimize (space 0) debug))
   (loop :for (test-string . expected-types) :in *lexer-tests*
-        :for lexed := (cl-quil.frontend::tokenize-line #'cl-quil.frontend::line-lexer test-string)
+        :for lexed := (cl-quil/frontend::tokenize-line #'cl-quil/frontend::line-lexer test-string)
         :do (is (and (= (length expected-types) (length lexed))
                      (equal expected-types (mapcar #'token-type-or-newline lexed)))
                 "Failed lex for ~S => ~A"

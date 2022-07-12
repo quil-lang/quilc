@@ -21,20 +21,20 @@
 
 (deftest test-process-program ()
   (let ((progm "H 0")
-        (chip (quil::build-nq-fully-connected-chip 2))
+        (chip (cl-quil::build-nq-fully-connected-chip 2))
         (stats '("topological_swaps" "logical_schedule" "gate_depth" "gate_volume"
                  "program_duration" "program_fidelity" "unused_qubits" "multiqubit_gate_depth")))
     ;; Test that a direct call to PROCESS-PROGRAM respects protoquil
     ;; and returns a statistics dictionary.
-    (let ((pp (quil:parse-quil progm)))
+    (let ((pp (cl-quil:parse-quil progm)))
       (multiple-value-bind (processed-program statistics)
           (quilc::process-program pp chip :protoquil t)
-        (is (quil:protoquil-program-p processed-program))
+        (is (cl-quil:protoquil-program-p processed-program))
         (dolist (stat stats)
           (is (nth-value 1 (gethash stat statistics))))))
     ;; Likewise, test that without :PROTOQUIL T there is an empty
     ;; stats dictionary.
-    (let ((pp (quil:parse-quil progm)))
+    (let ((pp (cl-quil:parse-quil progm)))
       (multiple-value-bind (_ statistics)
           (quilc::process-program pp chip :protoquil nil)
         (declare (ignore _))
@@ -49,22 +49,22 @@
 (defun attach-rewirings-at-index (pp index &rest args &key entering exiting)
   ;; Like CL-QUIL-TESTS::ATTACH-REWIRINGS-TO-PROGRAM, but instead of attaching the rewiring on the
   ;; first/last instr of PP, attach the rewiring at the requested INDEX.
-  (check-type entering (or null quil::integer-vector))
-  (check-type exiting (or null quil::integer-vector))
+  (check-type entering (or null cl-quil::integer-vector))
+  (check-type exiting (or null cl-quil::integer-vector))
   (assert (or entering exiting))
-  (setf (quil:comment (quil::nth-instr index pp))
-        (apply #'quil::make-rewiring-comment args))
+  (setf (cl-quil:comment (cl-quil::nth-instr index pp))
+        (apply #'cl-quil::make-rewiring-comment args))
   pp)
 
 (deftest test-strip-final-halt-respecting-rewirings ()
   ;; An empty program produces an empty vector
-  (is (equalp #() (quilc::strip-final-halt-respecting-rewirings (quil:parse-quil ""))))
+  (is (equalp #() (quilc::strip-final-halt-respecting-rewirings (cl-quil:parse-quil ""))))
 
   ;; Only a single final HALT is stripped.
-  (let* ((pp (quil:parse-quil "X 0; HALT; HALT"))
+  (let* ((pp (cl-quil:parse-quil "X 0; HALT; HALT"))
          (stripped-code (quilc::strip-final-halt-respecting-rewirings pp)))
     (is (= 2 (length stripped-code)))
-    (is (quil::haltp (quil::vnth 1 stripped-code))))
+    (is (cl-quil::haltp (cl-quil::vnth 1 stripped-code))))
 
   ;; Mid-program HALTs are ignored.
   (let* ((pp (with-output-to-quil
@@ -74,23 +74,23 @@
                "HALT"))
          (stripped-code (quilc::strip-final-halt-respecting-rewirings pp)))
     (is (= 3 (length stripped-code)))
-    (is (quil::haltp (quil::vnth 1 stripped-code)))
-    (is (not (quil::haltp (quil::vnth 2 stripped-code)))))
+    (is (cl-quil::haltp (cl-quil::vnth 1 stripped-code)))
+    (is (not (cl-quil::haltp (cl-quil::vnth 2 stripped-code)))))
 
   ;; single non-halt instr
-  (let* ((pp (attach-rewirings-at-index (quil:parse-quil "X 0")
+  (let* ((pp (attach-rewirings-at-index (cl-quil:parse-quil "X 0")
                                         0
                                         :entering #(0 1 2)
                                         :exiting #(2 1 0)))
          (stripped-code (quilc::strip-final-halt-respecting-rewirings pp)))
     (is (= 1 (length stripped-code)))
     (multiple-value-bind (entering-rewiring exiting-rewiring)
-        (quil::instruction-rewirings (quil::vnth 0 stripped-code))
-      (is (equalp #(0 1 2) (quil::rewiring-l2p entering-rewiring)))
-      (is (equalp #(2 1 0) (quil::rewiring-l2p exiting-rewiring)))))
+        (cl-quil::instruction-rewirings (cl-quil::vnth 0 stripped-code))
+      (is (equalp #(0 1 2) (cl-quil::rewiring-l2p entering-rewiring)))
+      (is (equalp #(2 1 0) (cl-quil::rewiring-l2p exiting-rewiring)))))
 
   ;; single halt instr
-  (let* ((pp (attach-rewirings-at-index (quil:parse-quil "HALT")
+  (let* ((pp (attach-rewirings-at-index (cl-quil:parse-quil "HALT")
                                         0
                                         :entering #(0 1 2)
                                         :exiting #(2 1 0)))
@@ -98,26 +98,26 @@
     (is (equalp #() stripped-code)))
 
   ;; 2-instr no halts, entering/exiting rewirings untouched
-  (let* ((pp (quil:parse-quil "X 0; Y 1"))
+  (let* ((pp (cl-quil:parse-quil "X 0; Y 1"))
          (pp (attach-rewirings-at-index pp 0 :entering #(0 1 2) :exiting #(2 1 0)))
          (pp (attach-rewirings-at-index pp 1 :entering #(1 2 0) :exiting #(0 2 1)))
          (stripped-code (quilc::strip-final-halt-respecting-rewirings pp)))
     (is (= 2 (length stripped-code)))
     (multiple-value-bind (entering-rewiring exiting-rewiring)
-        (quil::instruction-rewirings (quil::vnth 0 stripped-code))
-      (is (equalp #(0 1 2) (quil::rewiring-l2p entering-rewiring)))
-      (is (equalp #(2 1 0) (quil::rewiring-l2p exiting-rewiring))))
+        (cl-quil::instruction-rewirings (cl-quil::vnth 0 stripped-code))
+      (is (equalp #(0 1 2) (cl-quil::rewiring-l2p entering-rewiring)))
+      (is (equalp #(2 1 0) (cl-quil::rewiring-l2p exiting-rewiring))))
     (multiple-value-bind (entering-rewiring exiting-rewiring)
-        (quil::instruction-rewirings (quil::vnth 1 stripped-code))
-      (is (equalp #(1 2 0) (quil::rewiring-l2p entering-rewiring)))
-      (is (equalp #(0 2 1) (quil::rewiring-l2p exiting-rewiring)))))
+        (cl-quil::instruction-rewirings (cl-quil::vnth 1 stripped-code))
+      (is (equalp #(1 2 0) (cl-quil::rewiring-l2p entering-rewiring)))
+      (is (equalp #(0 2 1) (cl-quil::rewiring-l2p exiting-rewiring)))))
 
   ;; {2,3}-instruction terminal halt
   (dolist (quil '("X 0; HALT" "H 0; CNOT 0 1; HALT"))
     (labels ((attach-rewirings (&key last-entering last-exiting
                                      penultimate-entering penultimate-exiting)
-               (let* ((pp (quil:parse-quil quil))
-                      (last-index (1- (length (quil::parsed-program-executable-code pp))))
+               (let* ((pp (cl-quil:parse-quil quil))
+                      (last-index (1- (length (cl-quil::parsed-program-executable-code pp))))
                       (penultimate-index (1- last-index)))
 
                  ;; attach the rewirings
@@ -137,16 +137,16 @@
                       (stripped-code (quilc::strip-final-halt-respecting-rewirings pp)))
 
                  ;; final HALT was stripped
-                 (is (= (length stripped-code) (1- (length (quil::parsed-program-executable-code pp)))))
+                 (is (= (length stripped-code) (1- (length (cl-quil::parsed-program-executable-code pp)))))
 
                  ;; rewirings were correctly copied
                  (multiple-value-bind (stripped-entering stripped-exiting)
-                     (quil::instruction-rewirings (quil::vnth (1- (length stripped-code))
+                     (cl-quil::instruction-rewirings (cl-quil::vnth (1- (length stripped-code))
                                                               stripped-code))
                    (is (equalp (or last-entering penultimate-entering)
-                               (and stripped-entering (quil::rewiring-l2p stripped-entering))))
+                               (and stripped-entering (cl-quil::rewiring-l2p stripped-entering))))
                    (is (equalp (or last-exiting penultimate-exiting)
-                               (and stripped-exiting (quil::rewiring-l2p stripped-exiting)))))))
+                               (and stripped-exiting (cl-quil::rewiring-l2p stripped-exiting)))))))
 
              (test-incompatible (&rest args &key last-entering last-exiting
                                                  penultimate-entering penultimate-exiting)

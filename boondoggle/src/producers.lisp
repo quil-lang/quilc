@@ -24,7 +24,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
   (error "This producer has not been implemented."))
 
 (defclass producer-random (producer)
-  ((chip-specification :initform (quil::build-8Q-chip)
+  ((chip-specification :initform (cl-quil::build-8Q-chip)
                        :initarg :chip-specification
                        :reader producer-random-chip-specification)
    (program-depth-limit :initform nil
@@ -67,10 +67,10 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
 
 (defun measure-at-close-instrs (chip-specification)
   "Apply MEASURE instructions on all qubits in a chip-specification. Assumes qubits are ordered from 0 to n with no skipped indices."
-  (loop :for j :below (quil::chip-spec-n-qubits chip-specification)
-        :collect (make-instance 'quil:measure
-                                :address (quil:mref "ro" j)
-                                :qubit (quil:qubit j))))
+  (loop :for j :below (cl-quil::chip-spec-n-qubits chip-specification)
+        :collect (make-instance 'cl-quil:measure
+                                :address (cl-quil:mref "ro" j)
+                                :qubit (cl-quil:qubit j))))
 
 (defun random-protoquil (chip-specification   ; chip topology
                          program-depth-limit  ; limit to randomly generated program depth
@@ -81,7 +81,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                          respect-topology     ; place multiqubit gates only on chip-specification links
                          )
   "Generates random Quil strings to the statistics specifications set out by the argument list."
-  (let ((parsed-program (make-instance 'quil::parsed-program))
+  (let ((parsed-program (make-instance 'cl-quil::parsed-program))
         (instruction-list nil)
         (random-gate-count 0))
     (dotimes (j (random program-volume-limit))
@@ -90,7 +90,7 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
              (gate-record
                (unless random-gate-flag
                  (nth (random (length gate-set)) gate-set)))
-             (qubits-on-device (length (aref (quil::chip-specification-objects chip-specification) 0)))
+             (qubits-on-device (length (aref (cl-quil::chip-specification-objects chip-specification) 0)))
              (gate-name
                (cond
                  (random-gate-flag
@@ -115,12 +115,12 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                  (respect-topology
                   (let* ((available-devices
                            (progn
-                             (assert (elt (quil::chip-specification-objects chip-specification) gate-order)
+                             (assert (elt (cl-quil::chip-specification-objects chip-specification) gate-order)
                                      nil
                                      "This gate spec expects higher order hardware objects to exist.")
-                             (elt (quil::chip-specification-objects chip-specification) gate-order)))
+                             (elt (cl-quil::chip-specification-objects chip-specification) gate-order)))
                          (device-index (random (length available-devices))))
-                    (quil::vnth 0 (quil::hardware-object-cxns (quil::vnth device-index available-devices)))))
+                    (cl-quil::vnth 0 (cl-quil::hardware-object-cxns (cl-quil::vnth device-index available-devices)))))
                  (t
                   (assert (< gate-order qubits-on-device)
                           nil
@@ -133,8 +133,8 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                         :finally (return ret)))))
              (gate-definition
                (when random-gate-flag
-                 (let ((gate-matrix (quil::random-special-unitary (expt 2 (1+ gate-order)))))
-                   (quil::make-gate-definition gate-name
+                 (let ((gate-matrix (cl-quil::random-special-unitary (expt 2 (1+ gate-order)))))
+                   (cl-quil::make-gate-definition gate-name
                                                nil
                                                (loop :for i :below (magicl:ncols gate-matrix)
                                                      :nconc (loop :for j :below (magicl:nrows gate-matrix)
@@ -142,36 +142,36 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
              (gate-parameters
                (unless random-gate-flag
                  (mapcar #'random (gate-set-record-parameter-bounds gate-record))))
-             (gate-invocation (make-instance 'quil::gate-application
-                                             :operator (quil:named-operator gate-name)
-                                             :arguments (map 'list #'quil:qubit qubit-indices)
-                                             :parameters (map 'list #'quil:constant gate-parameters))))
+             (gate-invocation (make-instance 'cl-quil::gate-application
+                                             :operator (cl-quil:named-operator gate-name)
+                                             :arguments (map 'list #'cl-quil:qubit qubit-indices)
+                                             :parameters (map 'list #'cl-quil:constant gate-parameters))))
         (push gate-invocation instruction-list)
         ;; check to see if we need to bail because of depth
         (when (and
                program-depth-limit
                (< program-depth-limit
-                  (let ((lschedule (make-instance 'quil::lscheduler-empty)))
-                    (quil::append-instructions-to-lschedule lschedule instruction-list)
-                    (quil::lscheduler-calculate-depth lschedule))))
+                  (let ((lschedule (make-instance 'cl-quil::lscheduler-empty)))
+                    (cl-quil::append-instructions-to-lschedule lschedule instruction-list)
+                    (cl-quil::lscheduler-calculate-depth lschedule))))
           (pop instruction-list)
           (return))
         ;; if we built a random gate, store its definition
         (when random-gate-flag
           (incf random-gate-count)
-          (push gate-definition (quil::parsed-program-gate-definitions parsed-program)))))
-    (setf (quil::parsed-program-executable-code parsed-program)
+          (push gate-definition (cl-quil::parsed-program-gate-definitions parsed-program)))))
+    (setf (cl-quil::parsed-program-executable-code parsed-program)
           (make-array (length instruction-list)
                       :initial-contents instruction-list))
     ;; Add readout memory definitions to the program
-    (push (quil::make-memory-descriptor
+    (push (cl-quil::make-memory-descriptor
                 :name "ro"
-                :type quil::quil-bit
-                :length (quil::chip-spec-n-qubits chip-specification))
-          (quil:parsed-program-memory-definitions parsed-program))
+                :type cl-quil::quil-bit
+                :length (cl-quil::chip-spec-n-qubits chip-specification))
+          (cl-quil:parsed-program-memory-definitions parsed-program))
     ;; Add measure instructions to the end of the program
-    (setf (quil::parsed-program-executable-code parsed-program)
+    (setf (cl-quil::parsed-program-executable-code parsed-program)
           (concatenate 'vector
-                       (quil::parsed-program-executable-code parsed-program)
+                       (cl-quil::parsed-program-executable-code parsed-program)
                        (measure-at-close-instrs chip-specification)))
     parsed-program))

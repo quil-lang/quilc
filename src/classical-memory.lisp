@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (define-condition quil-memory-model-error (a:simple-parse-error)
   ()

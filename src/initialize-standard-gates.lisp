@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Parker Williams
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;; Some standard gates may require specialized processing that
 ;; prohibits them from being defined much earlier. (For example,

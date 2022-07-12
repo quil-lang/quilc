@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/operators)
+(cl:in-package #:cl-quil/discrete/operators)
 
 ;;; Defines SU(2) and its operations
 

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/rz-approx)
+(cl:in-package #:cl-quil/discrete/rz-approx)
 
 ;;; Implements an algorithm for approximating RZ(θ) into a U made up of
 ;;; Clifford+T such that |RZ(θ) - U| is less than or equal to some ɛ. Currently
@@ -52,7 +52,7 @@ Rz(THETA) to be less than or equal to EPSILON using PRECISION bits to calculate"
         (let within = (<= d epsilon))
         (let percent = (abs (* 100 (best-approx (- (/ d epsilon) 1)))))
         (lisp Unit (within percent)
-          (cl-quil.frontend:format-noise
+          (cl-quil/frontend:format-noise
            "Operator norm is ~:[greater~;less~] than epsilon by ~,2f%~%"
            within percent)
           Unit)))
@@ -118,7 +118,7 @@ Rz(THETA) to be less than or equal to EPSILON using PRECISION bits to calculate"
                             (the (Cyclotomic8 Dyadic) (map fromInt t))))
               (match (sunitary2 u-hat t-hat)
                 ((Some s)
-                 (when (lisp Boolean () (to-boolean cl-quil.frontend:*compiler-noise*))
+                 (when (lisp Boolean () (to-boolean cl-quil/frontend:*compiler-noise*))
                    (print-operator-norm precision s epsilon theta))
                  (Some s))
                 ((None) None)))

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(in-package #:cl-quil.chip-library-tests)
+(in-package #:cl-quil/chip-library-tests)
 
 (deftest default-chips ()
   (is (equalp (call-chip-builder "8q") (q::build-8q-chip)))

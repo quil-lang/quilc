@@ -64,9 +64,9 @@
                        (let ((result (funcall compilation-method instruction :context context)))
                          (let ((*print-pretty* nil))
                            (format-noise
-                            "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/quil:instruction-fmt/."
+                            "APPLY-TRANSLATION-COMPILERS: Applying ~A to ~/cl-quil:instruction-fmt/."
                             compilation-method instruction))
-                         (format-noise "~{    ~/quil:instruction-fmt/~%~}" result)
+                         (format-noise "~{    ~/cl-quil:instruction-fmt/~%~}" result)
                          (return-from apply-translation-compilers result))
                      (compiler-does-not-apply () nil))
                  (try-next-compiler ()
@@ -82,7 +82,7 @@
       (map nil #'try-compiler (chip-specification-generic-compilers chip-spec))
       ;; if those failed too, there's really nothing more to do.
       (format-noise
-       "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/quil:instruction-fmt/."
+       "APPLY-TRANSLATION-COMPILERS: Could not find a compiler for ~/cl-quil:instruction-fmt/."
        instruction)
       (give-up-compilation))))
 

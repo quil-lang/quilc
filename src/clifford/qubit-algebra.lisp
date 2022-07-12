@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Nik Tezak
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; This file contains an abstract base class representing "qubit
 ;;; algebras", corresponding to algebras that have some correspondence

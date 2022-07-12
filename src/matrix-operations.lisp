@@ -47,7 +47,7 @@
             "The resulting matrix must have at least ~D rows, but only ~D were requested."
             n
             d)
-    (quil::kq-gate-on-lines
+    (kq-gate-on-lines
      mat
      d
      (loop :for i :from (1- n) :downto 0 :collect i))))

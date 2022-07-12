@@ -10,7 +10,7 @@
    "tests/qpu-test-files/"))
 
 (defun %read-test-chipspec (file-name)
-  (quil::read-chip-spec-file (merge-pathnames file-name *qpu-test-file-directory*)))
+  (cl-quil::read-chip-spec-file (merge-pathnames file-name *qpu-test-file-directory*)))
 
 (deftest test-read-chipspec ()
   "Test that READ-CHIPSPEC can parse some representative Aspen-* qpu files."
@@ -19,7 +19,7 @@
     (is (not (null test-files)))
     (dolist (file test-files)
       (format t "~&    Testing file ~A~%" (pathname-name file))
-      (not-signals error (quil::read-chip-spec-file file)))))
+      (not-signals error (cl-quil::read-chip-spec-file file)))))
 
 (deftest test-gh-378-regression ()
   "Regression test for github issue #378."
@@ -63,25 +63,25 @@
   \"14-15\": {},
   \"15-16\": {},
   \"16-17\": {}}}}"))
-         (chip-spec (quil::qpu-hash-table-to-chip-specification isa)))
-    (is (quil::chip-specification-p chip-spec))
-    (is (= 18 (quil::chip-spec-n-qubits chip-spec)))
+         (chip-spec (cl-quil::qpu-hash-table-to-chip-specification isa)))
+    (is (cl-quil::chip-specification-p chip-spec))
+    (is (= 18 (cl-quil::chip-spec-n-qubits chip-spec)))
     ;; check we got the goods
     (dolist (presumed-dead '(4 8 9 10 11 12))
-      (is (quil::chip-spec-qubit-dead? chip-spec presumed-dead))))) ; RIP in piece
+      (is (cl-quil::chip-spec-qubit-dead? chip-spec presumed-dead))))) ; RIP in piece
 
 (deftest test-bristlecone-chip ()
   "Test construction of Google's Bristlecone 72-qubit chip"
-  (let* ((chip (quil::build-bristlecone-chip))
+  (let* ((chip (cl-quil::build-bristlecone-chip))
          (prgm (parse-quil
                 (with-output-to-string (s)
-                  (loop :for i :below (quil::chip-spec-n-qubits chip)
+                  (loop :for i :below (cl-quil::chip-spec-n-qubits chip)
                         :do (format s "H ~D~%" i)))))
          ;; Bit of a kludge here. Since this is a large number of
          ;; qubits, calculating its matrix representation will be a
          ;; terribly long-winded affair.
-         (quil::*compress-carefully* nil))
-    (is (= 72 (quil::chip-spec-n-qubits chip)))
-    (is (= (* 11 11) (quil::chip-spec-n-links chip)))
+         (cl-quil::*compress-carefully* nil))
+    (is (= 72 (cl-quil::chip-spec-n-qubits chip)))
+    (is (= (* 11 11) (cl-quil::chip-spec-n-links chip)))
     (is (plusp (length (parsed-program-executable-code prgm))))
     (is (plusp (length (parsed-program-executable-code (compiler-hook prgm chip)))))))

@@ -4,7 +4,7 @@
 ;;;;
 ;;;; Collaborators: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; This file aims to provide shims for magicl constructors with
 ;;; '(COMPLEX DOUBLE-FLOAT) as the default tensor type.

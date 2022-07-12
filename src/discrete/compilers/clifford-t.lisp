@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(in-package #:cl-quil.discrete)
+(in-package #:cl-quil/discrete)
 
 ;;; Compilers targeting Clifford+T (i.e. H, S, T)
 

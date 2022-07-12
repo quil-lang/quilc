@@ -6,7 +6,7 @@
 ;;;; algebraic way.  This file contains those methods, except for
 ;;;; FORKED rotation expansion, which lives in ucr-explode.lisp .
 
-(in-package #:quil)
+(in-package #:cl-quil)
 
 (define-compiler undagger-rotation
     ((rotation-gate :where (and (member (operator-description-root-name (application-operator rotation-gate))

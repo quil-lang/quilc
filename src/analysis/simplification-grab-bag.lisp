@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;;; This file contains a grab bag of INDIVIDUAL INSTRUCTION
 ;;;; SIMPLIFICATIONS. The reason for the "grab bag" nature is to avoid

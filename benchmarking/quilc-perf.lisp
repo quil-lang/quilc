@@ -87,7 +87,7 @@
 (defun build-benchmark-program (nq type)
   (ecase type
     (:static
-     (quil:parse "H 0; CNOT 2 0; H 1; CNOT 0 1; X 0"))
+     (cl-quil:parse "H 0; CNOT 2 0; H 1; CNOT 0 1; X 0"))
     (:bell
      (qvm-app::bell-program nq))
     (:qft
@@ -110,7 +110,7 @@
 
 (defun do-one-quilc-perf-run (program chip)
   "Run compiler on PROGRAM for CHIP; see above re required pre-warm."
-  (quil::compiler-hook
+  (cl-quil::compiler-hook
    program chip
    :protoquil t
    :destructive t))
@@ -181,7 +181,7 @@
   makes the compiler go through its paces, e.g., doing any warming or
   caching that may take considerable time and that would normally be
   avoided on subsequent runs. For now, the program is merely \"I 0\"."
-  (quil:parse "I 0"))
+  (cl-quil:parse "I 0"))
 
 (defun prepare-chip-for-benchmarking (chip-spec)
   "Do normal preparations for chip benchmarking, namely, by doing a

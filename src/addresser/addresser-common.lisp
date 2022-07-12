@@ -303,7 +303,7 @@ Returns two values: a list of links, and an updated list of rewirings tried."
 
         ;; otherwise, we don't know what to do
         (t
-         (error "The instruction type of \"~/quil:instruction-fmt/\" is not supported by the addresser." instr)))
+         (error "The instruction type of \"~/cl-quil:instruction-fmt/\" is not supported by the addresser." instr)))
     ;; turns out we're always always dirty
     t))
 
@@ -326,7 +326,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
                                                            (addresser-state-chip-specification state))))
                         (application-arguments instr))
                  nil
-                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 "Instruction qubit indices are out of bounds for target QPU: ~/cl-quil:instruction-fmt/"
                  instr)
          (when dry-run-escape
            (funcall dry-run-escape))
@@ -348,7 +348,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
            (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits chip-spec)))
                           (application-arguments instr))
                    nil
-                   "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                   "Instruction qubit indices are out of bounds for target QPU: ~/cl-quil:instruction-fmt/"
                    instr)
            (let* ((assignments (mapcar (lambda (q) (apply-rewiring-l2p working-l2p (qubit-index q)))
                                        (application-arguments instr)))
@@ -384,10 +384,10 @@ Two other values are returned: a list of fully rewired instructions for later sc
          (assert (every (lambda (q) (< -1 (qubit-index q) (chip-spec-n-qubits chip-spec)))
                         (application-arguments instr))
                  nil
-                 "Instruction qubit indices are out of bounds for target QPU: ~/quil:instruction-fmt/"
+                 "Instruction qubit indices are out of bounds for target QPU: ~/cl-quil:instruction-fmt/"
                  instr)
          (format-noise
-          "DEQUEUE-GATE-APPLICATION: ~/quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling."
+          "DEQUEUE-GATE-APPLICATION: ~/cl-quil:instruction-fmt/ is a ~dQ>2Q instruction, compiling."
           instr
           (length (application-arguments instr)))
          ;; then we know we can't find a hardware object to support
@@ -507,12 +507,12 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
       ;; ... and dispatch it.
       (format-noise
-       "DEQUEUE-BEST-INSTR: Elected to schedule ~/quil:instruction-fmt/."
+       "DEQUEUE-BEST-INSTR: Elected to schedule ~/cl-quil:instruction-fmt/."
        instr)
       (let ((rewired-instr (copy-instance instr)))
         (rewire-l2p-instruction working-l2p rewired-instr)
         (format-noise
-         "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is ~/quil:instruction-fmt/ in the current rewiring."
+         "DEQUEUE-BEST-INSTR: ~/cl-quil:instruction-fmt/ is ~/cl-quil:instruction-fmt/ in the current rewiring."
          instr rewired-instr)
 
         ;; Figure out if we need to compile the instruction,
@@ -521,7 +521,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
           ;; if we found a link and the instruction is native...
           ((hardware-object-native-instruction-p (lookup-hardware-object chip-spec rewired-instr) rewired-instr)
            (format-noise
-            "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing."
+            "DEQUEUE-BEST-INSTR: ~/cl-quil:instruction-fmt/ is native in l2p rewiring ~A, flushing 1Q lines and dequeueing."
             instr
             (rewiring-l2p working-l2p))
            ;; dequeue the instruction so we can push the
@@ -533,7 +533,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
           ;; otherwise, we found a link but the instruction is not native
           (t
            (format-noise
-            "DEQUEUE-BEST-INSTR: ~/quil:instruction-fmt/ is non-native in the current rewiring, compiling."
+            "DEQUEUE-BEST-INSTR: ~/cl-quil:instruction-fmt/ is non-native in the current rewiring, compiling."
             instr)
 
            ;; ...release the hounds
@@ -589,7 +589,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
   "Get all qubits referenced in INSTRS which are not assigned in REWIRING."
   (let ((unassigned-qubits nil))
     (dolist (instr instrs unassigned-qubits)
-      (dolist (qubit (cl-quil.resource::resource-qubits-list
+      (dolist (qubit (cl-quil/resource::resource-qubits-list
                       (instruction-resources instr)))
         (unless (apply-rewiring-l2p rewiring qubit)
           (pushnew qubit unassigned-qubits))))))

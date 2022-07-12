@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 (defun write-gt-stream (gt f)
   "Write out the God table GT to the stream F."

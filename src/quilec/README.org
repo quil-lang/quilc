@@ -2,10 +2,10 @@
 #+AUTHOR: Juan M. Bello-Rivas
 #+EMAIL: jbellorivas@rigetti.com
 
-This document is an introduction to =cl-quil.quilec=, a package that provides
+This document is an introduction to =cl-quil/quilec=, a package that provides
 support for handling stabilizer codes in Quilc.
 
-After loading the =cl-quil.quilec= package, we can create a new stabilizer
+After loading the =cl-quil/quilec= package, we can create a new stabilizer
 group by passing its generators in symbolic form as the arguments of
 =make-stabilizer-group=. Each generator must appear in its own sublist when
 calling =make-stabilizer-group=, as follows:
@@ -44,7 +44,7 @@ As anticipated above, we encode the |1> state by executing an X gate on the
 zeroth qubit.
 
 #+BEGIN_SRC lisp
-  (qvm:load-program *qvm* (quil:parse-quil "X 0"))
+  (qvm:load-program *qvm* (cl-quil:parse-quil "X 0"))
   (qvm:run *qvm*)
 #+END_SRC
 
@@ -75,7 +75,7 @@ Now let us corrupt one of the qubits, say qubit number 4 by shifting its
 phase and measure the syndromes again.
 
 #+BEGIN_SRC lisp
-  (qvm:load-program *qvm* (quil:parse-quil "Z 4"))
+  (qvm:load-program *qvm* (cl-quil:parse-quil "Z 4"))
   (qvm:run *qvm*)
 
   (qvm:load-program *qvm* *syndromes* :supersede-memory-subsystem t)

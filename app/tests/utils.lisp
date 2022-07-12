@@ -2,8 +2,8 @@
 
 ;;; Cribbed from CL-QUIL-TESTs which itself cribbed from QVM-TESTS!
 (defmacro with-output-to-quil (&body body)
-  `(let ((quil:*allow-unresolved-applications* t))
-     (quil:parse-quil
+  `(let ((cl-quil:*allow-unresolved-applications* t))
+     (cl-quil:parse-quil
       (with-output-to-string (*standard-output*)
         ,@(loop :for form :in body
                 :if (stringp form)

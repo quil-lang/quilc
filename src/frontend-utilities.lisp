@@ -3,7 +3,7 @@
 ;;;; Initial author: Eric Peterson
 ;;;; Revised by: Erik Davis
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (defgeneric copy-instance (instance)
   (:documentation
@@ -186,8 +186,8 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 ;;; Cribbed from QVM-TESTS
 (defmacro with-output-to-quil (&body body)
   "Collect all data sent to *STANDARD-OUTPUT* and return it parsed as as a Quil program."
-  `(let ((quil:*allow-unresolved-applications* t))
-     (quil:parse-quil
+  `(let ((cl-quil:*allow-unresolved-applications* t))
+     (cl-quil:parse-quil
       (with-output-to-string (*standard-output*)
         ,@(loop :for form :in body
                 :if (stringp form)

@@ -31,24 +31,24 @@ DEFGATE I:
         (p2 (with-output-to-quil
               (write-line "RESET")
               (write-line "NOP"))))
-    (is (= 7 (quil::qubits-needed p1)))
-    (is (= 0 (quil::qubits-needed p2)))
+    (is (= 7 (cl-quil::qubits-needed p1)))
+    (is (= 0 (cl-quil::qubits-needed p2)))
 
     (is (same-list-p
          '(0 1 6)
-         (quil::qubits-used p1)))
-    (is (null (quil::qubits-used p2)))
+         (cl-quil::qubits-used p1)))
+    (is (null (cl-quil::qubits-used p2)))
 
-    (quil::transform 'quil::compress-qubits p1)
-    (quil::transform 'quil::compress-qubits p2)
+    (cl-quil::transform 'cl-quil::compress-qubits p1)
+    (cl-quil::transform 'cl-quil::compress-qubits p2)
 
-    (is (= 3 (quil::qubits-needed p1)))
-    (is (= 0 (quil::qubits-needed p2)))
+    (is (= 3 (cl-quil::qubits-needed p1)))
+    (is (= 0 (cl-quil::qubits-needed p2)))
 
     (is (same-list-p
          '(0 1 2)
-         (quil::qubits-used p1)))
-    (is (null (quil::qubits-used p2)))))
+         (cl-quil::qubits-used p1)))
+    (is (null (cl-quil::qubits-used p2)))))
 
 (deftest test-repeat-labels ()
   "Test that repeat labels are detected."
@@ -56,7 +56,7 @@ DEFGATE I:
               "LABEL @a"
               "LABEL @a")))
     (signals simple-error
-      (quil::transform 'quil::patch-labels pp))))
+      (cl-quil::transform 'cl-quil::patch-labels pp))))
 
 (defun identity-test-program (quil-instr)
   (with-output-to-string (s)
@@ -108,25 +108,25 @@ DEFGATE I:
                 "ISWAP 0 1"
                 "PSWAP(0.0) 0 1")))
     (is (every (lambda (isn)
-                 (typep isn 'quil:gate-application))
-               (quil:parsed-program-executable-code quil)))))
+                 (typep isn 'cl-quil:gate-application))
+               (cl-quil:parsed-program-executable-code quil)))))
 
 (deftest test-qubit-relabeler ()
   "Test that qubit relabeling seems to be sane."
-  (let ((r1 (cl-quil.frontend::qubit-relabeler #(0 1 2)))
-        (r2 (cl-quil.frontend::qubit-relabeler #(2 1 0)))
-        (r3 (cl-quil.frontend::qubit-relabeler #(5)))
-        (r4 (cl-quil.frontend::qubit-relabeler #())))
+  (let ((r1 (cl-quil/frontend::qubit-relabeler #(0 1 2)))
+        (r2 (cl-quil/frontend::qubit-relabeler #(2 1 0)))
+        (r3 (cl-quil/frontend::qubit-relabeler #(5)))
+        (r4 (cl-quil/frontend::qubit-relabeler #())))
     (flet ((test-success (relabeler qubit-input qubit-output)
-             (let ((q (quil:qubit qubit-input)))
+             (let ((q (cl-quil:qubit qubit-input)))
                (is (eq t (funcall relabeler q)))
-               (is (= qubit-output (quil:qubit-index q)))))
+               (is (= qubit-output (cl-quil:qubit-index q)))))
            (test-choke (relabeler bad-input)
-             (signals simple-error (funcall relabeler (quil:qubit bad-input))))
+             (signals simple-error (funcall relabeler (cl-quil:qubit bad-input))))
            (test-dont-choke (relabeler bad-input)
-             (let ((q (quil:qubit bad-input)))
+             (let ((q (cl-quil:qubit bad-input)))
                (is (eq nil (funcall relabeler q :dont-choke t)))
-               (is (= bad-input (quil:qubit-index q))))))
+               (is (= bad-input (cl-quil:qubit-index q))))))
       ;; Identity map
       (test-success r1 0 0)
       (test-success r1 1 1)
@@ -149,7 +149,7 @@ DEFGATE I:
 
 (deftest test-kraus-stuff-rewritten-properly ()
   "Test that COMPRESS-QUBITS acts correctly on Kraus/POVM PRAGMAs."
-  (let ((p (quil:parse-quil "
+  (let ((p (cl-quil:parse-quil "
 DECLARE ro BIT[6]
 PRAGMA ADD-KRAUS X 0 \"(0 0 0 0)\"
 PRAGMA ADD-KRAUS X 5 \"(5 0 0 0)\"
@@ -158,19 +158,19 @@ PRAGMA READOUT-POVM 5 \"(5 0 0 0)\"
 X 5
 MEASURE 5 ro[5]
 ")))
-    (setf p (quil::compress-qubits p))
-    (let ((code (quil:parsed-program-executable-code p)))
-      (is (typep (aref code 0) 'quil:no-operation))
-      (is (typep (aref code 1) 'quil::pragma-add-kraus))
-      (is (typep (aref code 2) 'quil:no-operation))
-      (is (typep (aref code 3) 'quil::pragma-readout-povm))
-      (is (equal '(0) (quil:pragma-qubit-arguments (aref code 1))))
-      (is (zerop (quil:pragma-qubit-index (aref code 3)))))))
+    (setf p (cl-quil::compress-qubits p))
+    (let ((code (cl-quil:parsed-program-executable-code p)))
+      (is (typep (aref code 0) 'cl-quil:no-operation))
+      (is (typep (aref code 1) 'cl-quil::pragma-add-kraus))
+      (is (typep (aref code 2) 'cl-quil:no-operation))
+      (is (typep (aref code 3) 'cl-quil::pragma-readout-povm))
+      (is (equal '(0) (cl-quil:pragma-qubit-arguments (aref code 1))))
+      (is (zerop (cl-quil:pragma-qubit-index (aref code 3)))))))
 
 (deftest test-parameter-arithmetic-rewriting ()
   "Test rewriting arithmetic for gates with and without parameters."
-  (let ((in-p (let ((quil:*allow-unresolved-applications* t))
-                (quil:parse-quil "
+  (let ((in-p (let ((cl-quil:*allow-unresolved-applications* t))
+                (cl-quil:parse-quil "
 DECLARE a REAL
 DECLARE b REAL[2]
 A(1, 1 + 1, a, 1 + a)
@@ -182,12 +182,12 @@ E(a + 3 * b[1]) 0 1 2 3
     (multiple-value-bind (p mem-descriptors recalc-table)
         (rewrite-arithmetic in-p)
       (let ((__p (find-if (lambda (name) (eql 0 (search "__P" name)))
-                          (quil:parsed-program-memory-definitions p)
-                          :key #'quil::memory-descriptor-name)))
+                          (cl-quil:parsed-program-memory-definitions p)
+                          :key #'cl-quil::memory-descriptor-name)))
         ;; Do we have the memory descriptor?
         (is (not (null __p)))
         ;; Is it the right length?
-        (is (= 3 (quil::memory-descriptor-length __p)))
+        (is (= 3 (cl-quil::memory-descriptor-length __p)))
         ;; Is the recalc table of equal size?
         (is (= 3 (hash-table-count recalc-table)))
         ;; Are the members of the table correct?
@@ -199,8 +199,8 @@ E(a + 3 * b[1]) 0 1 2 3
                      ;; delete the descriptors from any mrefs present in
                      ;; expr
                      (cond
-                       ((typep expr 'quil::memory-ref)
-                        (setf (quil::memory-ref-descriptor expr) nil)
+                       ((typep expr 'cl-quil::memory-ref)
+                        (setf (cl-quil::memory-ref-descriptor expr) nil)
                         expr)
                        ((atom expr)
                         expr)
@@ -208,7 +208,7 @@ E(a + 3 * b[1]) 0 1 2 3
                                 (cleanse-mrefs (cdr expr))))))
                    (get-mref (i)
                      (cleanse-mrefs
-                      (quil::delayed-expression-expression
+                      (cl-quil::delayed-expression-expression
                        (gethash (mref __p-name i) recalc-table)))))
             (let ((A (get-mref 0))
                   (D (get-mref 1))
@@ -220,8 +220,8 @@ E(a + 3 * b[1]) 0 1 2 3
               ;; E should be a[0] + 3 * b[1]
               (is (equalp E `(+ ,(mref "a" 0) (* 3.0d0 ,(mref "b" 1))))))))
         ;; Now we go through the program to make sure that is correct.
-        (let ((old-code (quil:parsed-program-executable-code in-p))
-              (new-code (quil:parsed-program-executable-code p)))
+        (let ((old-code (cl-quil:parsed-program-executable-code in-p))
+              (new-code (cl-quil:parsed-program-executable-code p)))
           ;; Is it the same length as the old one?
           (is (= (length old-code) (length new-code)))
           ;; Are the untouched instructions' parameters the same?
@@ -234,23 +234,23 @@ E(a + 3 * b[1]) 0 1 2 3
                    (let ((rewritten-param
                            (nth parameter-index
                                 (application-parameters (aref new-code program-index)))))
-                     (is (typep rewritten-param 'quil::delayed-expression))
-                     (let ((new-mref (quil::delayed-expression-expression rewritten-param)))
-                       (is (typep new-mref 'quil::memory-ref))
-                       (is (zerop (search "__P" (quil::memory-ref-name new-mref))))
-                       (is (= mref-index (quil::memory-ref-position new-mref)))))))
+                     (is (typep rewritten-param 'cl-quil::delayed-expression))
+                     (let ((new-mref (cl-quil::delayed-expression-expression rewritten-param)))
+                       (is (typep new-mref 'cl-quil::memory-ref))
+                       (is (zerop (search "__P" (cl-quil::memory-ref-name new-mref))))
+                       (is (= mref-index (cl-quil::memory-ref-position new-mref)))))))
             (checkem 0 3 0)
             (checkem 3 0 1)
             (checkem 4 0 2))
           ;; Are our returned memory descriptors the same as the old ones?
-          (let ((old-defs (quil:parsed-program-memory-definitions in-p)))
+          (let ((old-defs (cl-quil:parsed-program-memory-definitions in-p)))
             (is (and (subsetp old-defs mem-descriptors)
                      (subsetp mem-descriptors old-defs)))))))))
 
 (deftest test-plain-arithmetic-rewriting ()
   "Test rewriting arithmetic for a program without any parameters to rewrite."
-  (let ((in-p (let ((quil:*allow-unresolved-applications* t))
-                (quil:parse-quil "
+  (let ((in-p (let ((cl-quil:*allow-unresolved-applications* t))
+                (cl-quil:parse-quil "
 DECLARE a REAL
 DECLARE b REAL[2]
 A(1, 1 + 1, a)
@@ -260,11 +260,11 @@ B(b) 0 1
         (rewrite-arithmetic in-p)
       ;; Is the recalc table empty?
       (is (= 0 (hash-table-count recalc-table)))
-      (let ((old-code (quil:parsed-program-executable-code in-p))
-            (new-code (quil:parsed-program-executable-code p)))
+      (let ((old-code (cl-quil:parsed-program-executable-code in-p))
+            (new-code (cl-quil:parsed-program-executable-code p)))
         ;; Is the old program the same length as the new one?
         (is (= (length old-code) (length new-code))))
-      (let ((old-defs (quil:parsed-program-memory-definitions in-p)))
+      (let ((old-defs (cl-quil:parsed-program-memory-definitions in-p)))
         ;; Are our returned memory descriptors the same as the old ones?
         (is (and (subsetp old-defs mem-descriptors)
                  (subsetp mem-descriptors old-defs)))
@@ -275,27 +275,27 @@ B(b) 0 1
 
 (deftest test-grid-node ()
   "Tests on the grid node data structure and associated functions."
-  (let ((q0 (cl-quil.frontend::make-grid-node 'q0 0))
-        (q1 (cl-quil.frontend::make-grid-node 'q1 1))
-        (q2 (cl-quil.frontend::make-grid-node 'q2 2))
-        (q01 (cl-quil.frontend::make-grid-node 'q01 0 1))
-        (q12 (cl-quil.frontend::make-grid-node 'q12 1 2))
-        (q02 (cl-quil.frontend::make-grid-node 'q02 0 2)))
+  (let ((q0 (cl-quil/frontend::make-grid-node 'q0 0))
+        (q1 (cl-quil/frontend::make-grid-node 'q1 1))
+        (q2 (cl-quil/frontend::make-grid-node 'q2 2))
+        (q01 (cl-quil/frontend::make-grid-node 'q01 0 1))
+        (q12 (cl-quil/frontend::make-grid-node 'q12 1 2))
+        (q02 (cl-quil/frontend::make-grid-node 'q02 0 2)))
     ;; All nodes start as root nodes.
-    (is (every #'cl-quil.frontend::root-node-p (list q0 q1 q2 q01 q12 q02)))
+    (is (every #'cl-quil/frontend::root-node-p (list q0 q1 q2 q01 q12 q02)))
     ;; Set succeeding, check preceding.
-    (setf (cl-quil.frontend::succeeding-node-on-qubit q0 0) q01)
-    (is (eq q01 (cl-quil.frontend::succeeding-node-on-qubit q0 0)))
+    (setf (cl-quil/frontend::succeeding-node-on-qubit q0 0) q01)
+    (is (eq q01 (cl-quil/frontend::succeeding-node-on-qubit q0 0)))
     ;; Set preceding, check succeeding
-    (setf (cl-quil.frontend::preceding-node-on-qubit q12 2) q2)
-    (is (eq q2 (cl-quil.frontend::preceding-node-on-qubit q12 2)))
+    (setf (cl-quil/frontend::preceding-node-on-qubit q12 2) q2)
+    (is (eq q2 (cl-quil/frontend::preceding-node-on-qubit q12 2)))
     ;; Check that we can't set a preceding or succeeding node on
     ;; invalid qubits.
-    (signals error (setf (cl-quil.frontend::succeeding-node-on-qubit q2 0) q02))
-    (signals error (setf (cl-quil.frontend::preceding-node-on-qubit q02 1) q1))
+    (signals error (setf (cl-quil/frontend::succeeding-node-on-qubit q2 0) q02))
+    (signals error (setf (cl-quil/frontend::preceding-node-on-qubit q02 1) q1))
     ;; Check trailer dealios.
-    (is (cl-quil.frontend::trailer-node-on-qubit-p q01 0))
-    (is (not (cl-quil.frontend::trailer-node-on-qubit-p q0 0)))))
+    (is (cl-quil/frontend::trailer-node-on-qubit-p q01 0))
+    (is (not (cl-quil/frontend::trailer-node-on-qubit-p q0 0)))))
 
 (defclass dummy-node ()
   ((value :initarg :value
@@ -304,7 +304,7 @@ B(b) 0 1
 (defun dummy-node (x)
   (make-instance 'dummy-node :value (a:ensure-list x)))
 
-(defmethod quil::fuse-objects ((a dummy-node) (b dummy-node))
+(defmethod cl-quil::fuse-objects ((a dummy-node) (b dummy-node))
   (make-instance 'dummy-node
                  :value (append
                          (a:ensure-list (dummy-node-value a))
@@ -314,32 +314,32 @@ B(b) 0 1
   "Test that FUSE-OBJECTS behaves properly in MERGE-GRID-NODES."
   (is (equal '(a b)
              (dummy-node-value
-              (cl-quil.frontend::grid-node-tag
-               (cl-quil.frontend::merge-grid-nodes
-                (cl-quil.frontend::make-grid-node (dummy-node 'a) 1)
-                (cl-quil.frontend::make-grid-node (dummy-node 'b) 1)))))))
+              (cl-quil/frontend::grid-node-tag
+               (cl-quil/frontend::merge-grid-nodes
+                (cl-quil/frontend::make-grid-node (dummy-node 'a) 1)
+                (cl-quil/frontend::make-grid-node (dummy-node 'b) 1)))))))
 
 (defun build-grid (&rest proto-nodes)
-  (loop :with pg := (make-instance 'cl-quil.frontend::program-grid)
+  (loop :with pg := (make-instance 'cl-quil/frontend::program-grid)
         :for (x . qs) :in proto-nodes
-        :for gn := (apply #'cl-quil.frontend::make-grid-node
+        :for gn := (apply #'cl-quil/frontend::make-grid-node
                           (dummy-node x)
                           qs)
-        :do (cl-quil.frontend::append-node pg gn)
+        :do (cl-quil/frontend::append-node pg gn)
         :finally (return pg)))
 
 (deftest test-trivial-fusion ()
   "Test that a bunch of trivially fuseable gates can be fused."
   (flet ((test-it (&rest proto-nodes)
-           (let ((output-pg (cl-quil.frontend::fuse-trivially (apply #'build-grid proto-nodes))))
-             (is (= 1 (length (cl-quil.frontend::roots output-pg))))
-             (let ((root (first (cl-quil.frontend::roots output-pg))))
-               (is (cl-quil.frontend::root-node-p root))
-               (is (every (a:curry #'eq root) (cl-quil.frontend::trailers output-pg)))
-               (is (every #'null (cl-quil.frontend::grid-node-back root)))
-               (is (every #'null (cl-quil.frontend::grid-node-forward root)))
+           (let ((output-pg (cl-quil/frontend::fuse-trivially (apply #'build-grid proto-nodes))))
+             (is (= 1 (length (cl-quil/frontend::roots output-pg))))
+             (let ((root (first (cl-quil/frontend::roots output-pg))))
+               (is (cl-quil/frontend::root-node-p root))
+               (is (every (a:curry #'eq root) (cl-quil/frontend::trailers output-pg)))
+               (is (every #'null (cl-quil/frontend::grid-node-back root)))
+               (is (every #'null (cl-quil/frontend::grid-node-forward root)))
                (is (equalp (mapcar #'first proto-nodes)
-                           (dummy-node-value (cl-quil.frontend::grid-node-tag root))))))))
+                           (dummy-node-value (cl-quil/frontend::grid-node-tag root))))))))
     (test-it '(a 0)
              '(b 0 1)
              '(c 0 1 2)
@@ -364,42 +364,42 @@ B(b) 0 1
 
 (deftest test-simplify-arithmetic-linear ()
   "Test that a linear expression can simplified"
-  (let ((in-p (quil:parse-quil "
+  (let ((in-p (cl-quil:parse-quil "
 DECLARE theta REAL[1]
 RX(2.0+3.0*theta[0]-3.0*theta[0]/4.0-2.0) 0
 "))
-        (out-p (quil::parse-quil "
+        (out-p (cl-quil::parse-quil "
 DECLARE theta REAL[1]
 RX(2.25*theta[0]) 0
 ")))
-    (setf in-p (quil::simplify-arithmetic in-p))
-    (is (equalp (quil::application-parameters (quil::nth-instr 0 in-p))
-                (quil::application-parameters (quil::nth-instr 0 out-p))))))
+    (setf in-p (cl-quil::simplify-arithmetic in-p))
+    (is (equalp (cl-quil::application-parameters (cl-quil::nth-instr 0 in-p))
+                (cl-quil::application-parameters (cl-quil::nth-instr 0 out-p))))))
 
 (deftest test-simplify-arithmetic-non-linear ()
   "Test that a non-linear expression is left alone"
-  (let ((in-p (quil:parse-quil "
+  (let ((in-p (cl-quil:parse-quil "
 DECLARE theta REAL[1]
 RX(2.0+3.0*cos(theta[0])-3.0*theta[0]-2.0) 0
 "))
-        (out-p (quil:parse-quil "
+        (out-p (cl-quil:parse-quil "
 DECLARE theta REAL[1]
 RX(2.0+3.0*cos(theta[0])-3.0*theta[0]-2.0) 0
 ")))
-    (setf in-p (quil::simplify-arithmetic in-p))
-    (is (equalp (quil::application-parameters (quil::nth-instr 0 in-p))
-                (quil::application-parameters (quil::nth-instr 0 out-p))))))
+    (setf in-p (cl-quil::simplify-arithmetic in-p))
+    (is (equalp (cl-quil::application-parameters (cl-quil::nth-instr 0 in-p))
+                (cl-quil::application-parameters (cl-quil::nth-instr 0 out-p))))))
 
 (deftest test-simplify-arithmetic-negative-references ()
   "Test that simplification works on negative-prefixed memory references e.g. RX(-theta[0] + 2.0*theta[0] + 2.0) 0 -> RX(2.0 + 1.0*theta[0]) 0"
-  (let ((in-p (quil:parse-quil "
+  (let ((in-p (cl-quil:parse-quil "
 DECLARE theta REAL[1]
 RX(-theta[0]+2.0*theta[0]+2.0) 0
 "))
-        (out-p (quil:parse-quil "
+        (out-p (cl-quil:parse-quil "
 DECLARE theta REAL[1]
 RX(2.0+theta[0]) 0
 ")))
-    (setf in-p (quil::simplify-arithmetic in-p))
-    (is (equalp (quil::application-parameters (quil::nth-instr 0 in-p))
-                (quil::application-parameters (quil::nth-instr 0 out-p))))))
+    (setf in-p (cl-quil::simplify-arithmetic in-p))
+    (is (equalp (cl-quil::application-parameters (cl-quil::nth-instr 0 in-p))
+                (cl-quil::application-parameters (cl-quil::nth-instr 0 out-p))))))

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Mark David
 
-(in-package #:cl-quil.tools-tests)
+(in-package #:cl-quil/tools-tests)
 
 (defun run-tools-tests (&key (verbose nil) (headless nil))
   "Run all CL-QUIL/TOOLS tests. If VERBOSE is T, print out lots of test info. If HEADLESS is T, disable interactive debugging and quit on completion."
@@ -11,12 +11,12 @@
                                             *standard-output*))
   (cond
     ((null headless)
-     (run-package-tests :package ':cl-quil.tools-tests
+     (run-package-tests :package ':cl-quil/tools-tests
                         :verbose verbose
                         :describe-failures t
                         :interactive t))
     (t
-     (let ((successp (run-package-tests :package ':cl-quil.tools-tests
+     (let ((successp (run-package-tests :package ':cl-quil/tools-tests
                                         :verbose t
                                         :describe-failures t
                                         :interactive nil)))

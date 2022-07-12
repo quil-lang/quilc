@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(cl:in-package #:cl-quil/discrete/numeric)
 
 ;;; Typed modulo arithmetic where every Modulo type has a unique group order.
 

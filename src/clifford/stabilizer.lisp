@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Authors: Robert Smith, Andrew Shi
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; Most of this is from or inspired by https://arxiv.org/pdf/quant-ph/0406196.pdf
 ;;;
@@ -296,7 +296,7 @@ Note that no expressions calculating the phase update are created. This is becau
                         ;; record the X or Z variable in that bit's
                         ;; running list. In the end, the running list
                         ;; represents a disjunction of contributions.
-                        (when (quil::power-of-two-p i) ; X and Z's will have power of two indexes.
+                        (when (cl-quil::power-of-two-p i) ; X and Z's will have power of two indexes.
                           (let ((var (nth (1- (integer-length i)) variables)))
                             ;; The var that contributes to X- and Z-FACTORS
                             (loop :with bits := (pauli-index cp)

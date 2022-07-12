@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (defun process-includes (raw-quil &optional originating-file)
   "Recursively process all INCLUDE instructions in the list RAW-QUIL. The result is a new sequence with the included quil instructions spliced in."

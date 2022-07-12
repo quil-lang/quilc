@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 
-(in-package #:cl-quil.quilec)
+(in-package #:cl-quil/quilec)
 
 ;;; Data structures for representing and using stabilizer groups.
 
@@ -134,7 +134,7 @@
     :reader seed-generators
     :documentation "Array of seed generators (i.e., logical X gates) for the code.")
    (codeword-circuit
-    :type quil:parsed-program
+    :type cl-quil:parsed-program
     :reader codeword-circuit
     :documentation "Circuit for encoding bitstrings using the code."))
   (:documentation "Stabilizer group. The naming of primary, secondary, and seed generators follows D. Gottesman's nomenclature."))

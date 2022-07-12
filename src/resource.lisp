@@ -3,7 +3,7 @@
 ;;;; Authors: Corwin de Boor
 ;;;;          Erik Davis
 
-(in-package #:cl-quil.resource)
+(in-package #:cl-quil/resource)
 
 
 ;;; Bit Sets

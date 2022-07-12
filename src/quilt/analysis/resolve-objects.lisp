@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil.quilt)
+(in-package #:cl-quil/quilt)
 
 (defun validate-waveform-parameters (waveform-ref expected-parameters)
   "Determines whether the waveform reference WAVEFORM-REF has parameter names conforming to the list of EXPECTED-PARAMETERS."
@@ -72,7 +72,7 @@
                              :key #'frame-definition-frame
                              :test #'frame=)))
         (setf (frame-name-resolution frame) defn)
-        (quil-parse-error "No frame definition found for referenced frame ~/quil:instruction-fmt/."
+        (quil-parse-error "No frame definition found for referenced frame ~/cl-quil:instruction-fmt/."
                           frame))))
   frame)
 

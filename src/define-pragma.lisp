@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Zach Beane
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (defvar *pragma-definitions* (make-hash-table :test 'equal)
   "A table mapping a pragma Quil name to a specialized pragma class.")

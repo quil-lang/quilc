@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 
-(in-package #:cl-quil.quilec-tests)
+(in-package #:cl-quil/quilec-tests)
 
 (deftest test-make-group ()
   (let* ((symbols '((i x y z)
@@ -14,7 +14,7 @@
       (is (= (length generators) (length symbols)))
       (loop :for generator :across generators
             :for symbol :in symbols :do
-              (is (equalp generator (cl-quil.clifford::pauli-from-symbols symbol)))))))
+              (is (equalp generator (cl-quil/clifford::pauli-from-symbols symbol)))))))
 
 (deftest test-group-matrices ()
   (let ((input-code (make-group '((i x y z i x x i)

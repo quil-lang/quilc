@@ -122,7 +122,7 @@ $ git submodule update --init
 You can then load the `cl-quil/tweedledum` package
 ```
 CL-USER> (ql:quickload :cl-quil/tweedledum)
-CL-USER> (cl-quil.tweedledum:synthesis-dbs '(0 1 3 2))
+CL-USER> (cl-quil/tweedledum:synthesis-dbs '(0 1 3 2))
 "H 0
 RZ(1.57079637050628662) 1
 RZ(1.57079637050628662) 0

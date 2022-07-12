@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil.quilt)
+(in-package #:cl-quil/quilt)
 
 (define-transform fill-delays (fill-delays)
   "This transform fills empty time on Quilt frames with explicit DELAY instructions in a greedy fashion."
@@ -204,7 +204,7 @@ If SYNCHRONIZE-AT-END is T, additional delays will be introduced at the end so t
 
     (flet ((process-instr (instr)
              (unless (typep instr 'simple-quilt-instruction)
-               (quil-parse-error "Cannot resolve timing information for non-Quilt instruction ~/quil:instruction-fmt/." instr))
+               (quil-parse-error "Cannot resolve timing information for non-Quilt instruction ~/cl-quil:instruction-fmt/." instr))
              ;; Add delays before the instruction
              (dolist (delay (emit-delays instr frame-clocks))
                (push delay new-instrs))

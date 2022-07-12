@@ -1,4 +1,4 @@
-(in-package #:cl-quil.quilt-tests)
+(in-package #:cl-quil/quilt-tests)
 
 (defparameter *good-quilt-test-file-directory*
   (asdf:system-relative-pathname
@@ -23,23 +23,23 @@
   (dolist (file (uiop:directory-files *bad-quilt-test-file-directory* #P"*.quil"))
     (format t "~&    Testing bad file ~A~%" (pathname-name file))
     (let ((cl-quil:*allow-unresolved-applications* t))
-      (signals quil:quil-parse-error
+      (signals cl-quil:quil-parse-error
         (handler-case (read-quilt-file file)
           ;; Re-signal all of the following errors as
           ;; QUIL-PARSE-ERRORs.
-          (quil:quil-type-error (c)
+          (cl-quil:quil-type-error (c)
             (declare (ignore c))
-            (error 'quil:quil-parse-error))
+            (error 'cl-quil:quil-parse-error))
           (yacc:yacc-parse-error (c)
             (declare (ignore c))
-            (error 'quil:quil-parse-error))
+            (error 'cl-quil:quil-parse-error))
           (alexa:lexer-match-error (c)
             (declare (ignore c))
-            (error 'quil:quil-parse-error)))))))
+            (error 'cl-quil:quil-parse-error)))))))
 
 (deftest test-parser-fail-without-extensions ()
   "Test that Quilt parsing fails with PARSE-QUIL."
-  (signals quil::quil-parse-error
+  (signals cl-quil::quil-parse-error
     (parse-quil "DEFFRAME 0 \"foo\"")))
 
 (deftest test-quilt-defwaveform-sample-rate ()
@@ -59,7 +59,7 @@ DEFWAVEFORM foo 4.0:
             (waveform-definition-sample-rate
              (first (parsed-program-waveform-definitions pp))))))))
 
-(defun prints-as (expected obj &key (accessor #'quil:parsed-program-executable-code))
+(defun prints-as (expected obj &key (accessor #'cl-quil:parsed-program-executable-code))
   "Checks whether OBJ prints as the EXPECTED string. If OBJ is a string, parses OBJ and then checks that the first instruction prints as EXPECTED."
   (typecase obj
     (string
@@ -69,7 +69,7 @@ DEFWAVEFORM foo 4.0:
                      0)))
     (otherwise
      (is (string= expected
-                  (quil::print-instruction-to-string obj))))))
+                  (cl-quil::print-instruction-to-string obj))))))
 
 (deftest test-print-quilt-objects ()
   (prints-as "0 \"xy\""
@@ -157,7 +157,7 @@ DEFWAVEFORM wf 1.0:
 (deftest test-definition-signature ()
   (flet ((signature (raw-quil &rest args)
            (let ((pp (parse-quilt (apply #'format nil raw-quil args))))
-             (cl-quil.frontend::definition-signature
+             (cl-quil/frontend::definition-signature
               (first (append (parsed-program-gate-definitions pp)
                              (parsed-program-circuit-definitions pp)
                              (parsed-program-waveform-definitions pp)

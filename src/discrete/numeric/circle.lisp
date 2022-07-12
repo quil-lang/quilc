@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(cl:in-package #:cl-quil/discrete/numeric)
 
 ;;; Operations on the complex Circle group and its subgroups
 ;;; (e.g. roots of unity)

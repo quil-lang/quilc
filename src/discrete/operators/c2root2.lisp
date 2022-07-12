@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/operators)
+(cl:in-package #:cl-quil/discrete/operators)
 
 ;;; Instead of repeatedly multiplying/dividing by √2, define the asscoiated
 ;;; linear transformation, "compose" it repeadedly, and then apply it.

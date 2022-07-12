@@ -2,15 +2,9 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-;;; Allegro (and other Lisps) don't support the non-standard "package
-;;; local nicknames".
-#-(or sbcl ecl ccl)
-(rename-package :alexandria :alexandria '(:a))
-
-(defpackage #:cl-quil.resource
+(defpackage #:cl-quil/resource
   (:use #:cl)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (#:a    #:alexandria))
   (:export
    #:resource-collection                ; TYPE
    #:make-resource-collection           ; FUNCTION
@@ -30,13 +24,12 @@
    #:resource-all-p                     ; PREDICATE
    ))
 
-(defpackage #:cl-quil.frontend
+(defpackage #:cl-quil/frontend
   (:use #:cl
         #:parse-float
         #:abstract-classes
         #:singleton-classes)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (#:a    #:alexandria))
   ;; frontend-options.lisp
   (:export
    #:*allow-unresolved-applications*    ; VARIABLE
@@ -729,17 +722,23 @@
    )
 
   (:shadow
-   #:pi)
-  )
+   #:pi))
+
+(defpackage #:cl-quil/qasm
+  (:use #:cl)
+  (:local-nicknames (#:a      #:alexandria)
+                    (#:quilfe #:cl-quil/frontend))
+  (:import-from #:cl-quil/frontend #:tok #:token-type #:token-payload)
+
+  (:export
+   #:parse-qasm))
 
 (defpackage #:cl-quil
-  (:nicknames #:quil)
   (:use #:cl
-        #:cl-quil.resource
-        #:cl-quil.frontend
+        #:cl-quil/resource
+        #:cl-quil/frontend
         #:abstract-classes)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (#:a #:alexandria))
   
   ;; options.lisp
   (:export
@@ -1248,16 +1247,13 @@
    #:program-fidelity                   ; FUNCTION
    )
 
-  (:shadowing-import-from #:cl-quil.frontend
+  (:shadowing-import-from #:cl-quil/frontend
                           #:pi))
 
-(defpackage #:cl-quil.clifford
-  (:nicknames #:quil.clifford)
+(defpackage #:cl-quil/clifford
   (:use #:cl
         #:cl-permutation)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria)
-                    (:quil :cl-quil.frontend))
+  (:local-nicknames (#:a    #:alexandria))
 
   ;; clifford/ module
   (:export
@@ -1327,21 +1323,13 @@
    )
   )
 
-(defpackage #:cl-quil.qasm
-  (:nicknames #:quil.qasm)
-  (:use #:cl)
-  (:local-nicknames (:a :alexandria)
-                    (:quil :cl-quil.frontend))
-  (:import-from #:cl-quil.frontend #:tok #:token-type #:token-payload)
-
+(defpackage #:cl-quil-fmt
+  (:use)
   (:export
-   #:parse-qasm))
+   #:reg-fmt)
+  (:documentation "Symbols that can be used in ~/.../ format directives, that can't otherwise be used because a package contains a '/' character in its name."))
 
-
-
-
-
-;;;; The CL-Quil.SI Package
+;;;; The CL-Quil/SI Package
 
 ;;; This package is special: it "exports" symbols internal to the
 ;;; CL-Quil package for "system internal" use.  Note that these
@@ -1353,7 +1341,7 @@
 ;;; access "internal" symbols.  Having such symbols cataloged here is
 ;;; preferable to simply accessing any symbol whatsoever via full
 ;;; qualification, ala the use of package name "quil" with double
-;;; colons (quil::).
+;;; colons (cl-quil::).
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun pre-intern-exposed-symbols (symbols package-name)
@@ -1397,7 +1385,7 @@
 
 
 
-(define-exposing-package #:cl-quil.si (#:cl-quil (:nicknames #:quil.si))
+(define-exposing-package #:cl-quil/si (#:cl-quil)
   
   ;; logical-schedule.lisp
   #:append-instructions-to-lschedule    ; FUNCTION
@@ -1410,5 +1398,5 @@
 ;; 
 ;; (find-symbol "PARSE-PARAMETERS" (find-package "QUIL"))
 ;;   => CL-QUIL::PARSE-PARAMETERS, :INTERNAL
-;; (find-symbol "PARSE-PARAMETERS" (find-package "QUIL.SI"))
+;; (find-symbol "PARSE-PARAMETERS" (find-package "QUIL/SI"))
 ;;   => CL-QUIL::PARSE-PARAMETERS, :EXTERNAL

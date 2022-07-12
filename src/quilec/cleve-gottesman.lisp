@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 
-(in-package #:cl-quil.quilec)
+(in-package #:cl-quil/quilec)
 
 ;;; This file contains an implementation of the algorithm introduced in:
 ;;;

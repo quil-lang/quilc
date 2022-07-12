@@ -1,6 +1,6 @@
 ;;;; pragmas.lisp
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (define-pragma "PRESERVE_BLOCK" pragma-preserve-block
   (:documentation "PRAGMA denoting the start of a basic-block immune to the optimizing compiler.

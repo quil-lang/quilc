@@ -2,15 +2,15 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(in-package #:cl-quil.discrete)
+(in-package #:cl-quil/discrete)
 
-(defvar *tolerance* cl-quil.frontend::+double-comparison-threshold-loose+
+(defvar *tolerance* cl-quil/frontend::+double-comparison-threshold-loose+
   "Holds the value of the TOLERANCE pragma.")
 
 (deftype tolerance-type ()
   '(double-float (0d0) (1.0d0)))
 
-(cl-quil.frontend::define-pragma "TOLERANCE" pragma-tolerance
+(cl-quil/frontend::define-pragma "TOLERANCE" pragma-tolerance
   (:documentation "PRAGMA denoting the target precision for discrete
 compilations that take an operator U and return an approximate U'. That is, for
 any qubit v, the upper limit of the magnitude of (U - U')v. Depending on the

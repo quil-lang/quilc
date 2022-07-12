@@ -27,26 +27,26 @@
   (dolist (file (uiop:directory-files *bad-test-file-directory* #P"*.quil"))
     (format t "~&    Testing bad file ~A~%" (pathname-name file))
     (let ((cl-quil:*allow-unresolved-applications* t))
-      (signals quil:quil-parse-error
+      (signals cl-quil:quil-parse-error
         (handler-case (cl-quil:read-quil-file file)
           ;; Re-signal all of the following errors as
           ;; QUIL-PARSE-ERRORs.
-          (quil:quil-type-error (c)
+          (cl-quil:quil-type-error (c)
             (declare (ignore c))
-            (error 'quil:quil-parse-error))
+            (error 'cl-quil:quil-parse-error))
           (yacc:yacc-parse-error (c)
             (declare (ignore c))
-            (error 'quil:quil-parse-error))
+            (error 'cl-quil:quil-parse-error))
           (alexa:lexer-match-error (c)
             (declare (ignore c))
-            (error 'quil:quil-parse-error)))))))
+            (error 'cl-quil:quil-parse-error)))))))
 
 (deftest test-semicolon-parsing ()
   (let ((pp1 (parse-quil "H 0 ; X 1"))
         (pp2 (parse-quil "DEFCIRCUIT foo:
     X 0 ; H 0")))
     (is (= 2 (length (parsed-program-executable-code pp1))))
-    (is (= 2 (length (quil::circuit-definition-body
+    (is (= 2 (length (cl-quil::circuit-definition-body
                       (first (parsed-program-circuit-definitions pp2))))))))
 
 (deftest test-pragma-parsing ()
@@ -85,40 +85,40 @@
 
     ;; first pragma
     (let ((instr (aref code 0)))
-      (is (typep instr 'quil::pragma-expected-rewiring))
-      (is (and (typep (quil::pragma-rewiring instr) 'quil::rewiring))))
+      (is (typep instr 'cl-quil::pragma-expected-rewiring))
+      (is (and (typep (cl-quil::pragma-rewiring instr) 'cl-quil::rewiring))))
 
     ;; second pragma
     (let ((instr (aref code 1)))
-      (is (typep instr 'quil::pragma-readout-povm))
-      (is (typep (quil::pragma-qubit-index instr) 'integer))
-      (is (and (typep (quil::pragma-matrix-entries instr) 'list)
+      (is (typep instr 'cl-quil::pragma-readout-povm))
+      (is (typep (cl-quil::pragma-qubit-index instr) 'integer))
+      (is (and (typep (cl-quil::pragma-matrix-entries instr) 'list)
                (every (lambda (e) (typep e 'double-float))
-                      (quil::pragma-matrix-entries instr)))))
+                      (cl-quil::pragma-matrix-entries instr)))))
 
     ;; third pragma
     (let ((instr (aref code 2)))
-      (is (typep instr 'quil::pragma-add-kraus))
-      (is (typep (quil::pragma-operator-name instr) 'string))
-      (is (and (typep (quil::pragma-qubit-arguments instr) 'list)
-               (every #'integerp (quil::pragma-qubit-arguments instr))))
-      (is (and (typep (quil::pragma-matrix-entries instr) 'list)
+      (is (typep instr 'cl-quil::pragma-add-kraus))
+      (is (typep (cl-quil::pragma-operator-name instr) 'string))
+      (is (and (typep (cl-quil::pragma-qubit-arguments instr) 'list)
+               (every #'integerp (cl-quil::pragma-qubit-arguments instr))))
+      (is (and (typep (cl-quil::pragma-matrix-entries instr) 'list)
                (every (lambda (e) (typep e '(complex double-float)))
-                      (quil::pragma-matrix-entries instr)))))
+                      (cl-quil::pragma-matrix-entries instr)))))
 
         ;; fourth pragma
     (let ((instr (aref code 3)))
-      (is (typep instr 'quil::pragma-add-kraus))
-      (is (typep (quil::pragma-operator-name instr) 'string))
-      (is (and (typep (quil::pragma-qubit-arguments instr) 'list)
-               (every #'integerp (quil::pragma-qubit-arguments instr))))
-      (is (and (typep (quil::pragma-matrix-entries instr) 'list)
+      (is (typep instr 'cl-quil::pragma-add-kraus))
+      (is (typep (cl-quil::pragma-operator-name instr) 'string))
+      (is (and (typep (cl-quil::pragma-qubit-arguments instr) 'list)
+               (every #'integerp (cl-quil::pragma-qubit-arguments instr))))
+      (is (and (typep (cl-quil::pragma-matrix-entries instr) 'list)
                (every (lambda (e) (typep e '(complex double-float)))
-                      (quil::pragma-matrix-entries instr)))))))
+                      (cl-quil::pragma-matrix-entries instr)))))))
 
 (deftest test-parse-element-list ()
   (let* ((element-list "(1 2.0 3.0e3 4.0i 5+6i 7+8.0i 9.0E-10i -i i pi -pi)")
-         (parsed-list (cl-quil.frontend::parse-element-list element-list 11)))
+         (parsed-list (cl-quil/frontend::parse-element-list element-list 11)))
     (is (equalp
          parsed-list
          (list
@@ -156,7 +156,7 @@ TEST 0")
          (quil-parsed (not-signals quil-parse-error (parse-quil quil))))
     (let ((gates (parsed-program-gate-definitions quil-parsed)))
       (is (= 1 (length gates)))
-      (is (typep (first gates) 'quil::static-gate-definition)))))
+      (is (typep (first gates) 'cl-quil::static-gate-definition)))))
 
 (deftest test-defgate-as-permutation ()
   (let ((quil "
@@ -169,10 +169,10 @@ DEFGATE TEST AS PERMUTATION:
     0, 1, 2, 3, 4, 5, 7, 6, 8
 
 TEST 0 1 2"))
-    (let* ((quil-parsed (not-signals quil-parse-error (quil::parse-quil quil)))
+    (let* ((quil-parsed (not-signals quil-parse-error (cl-quil::parse-quil quil)))
            (gates (parsed-program-gate-definitions quil-parsed)))
       (is (= 1 (length gates)))
-      (is (typep (first gates) 'quil::permutation-gate-definition)))
+      (is (typep (first gates) 'cl-quil::permutation-gate-definition)))
     (signals quil-parse-error (parse-quil quil-bad))))
 
 (deftest test-parsing-process-include ()
@@ -220,7 +220,7 @@ DEFGATE FOO(%a):
 DEFCIRCUIT FOO(%a) q:
     X q
 "))
-    (signals quil::ambiguous-definition-condition
+    (signals cl-quil::ambiguous-definition-condition
       (parse-quil test-quil :ambiguous-definition-handler #'identity))))
 
 (deftest test-parsing-multiple-includes-good ()
@@ -378,7 +378,7 @@ DEFGATE FOO(%a) q AS PAULI-SUM:
 (deftest test-split-lines (&optional verbose)
   (loop :for (tokens expect) :in *test-cases-for-split-lines*
         :as actual  ; split-lines mutates list structure, so copy list
-          := (cl-quil.frontend::split-lines (copy-list tokens))
+          := (cl-quil/frontend::split-lines (copy-list tokens))
         :as i :from 1
         :do (when verbose
               (let ((*print-circle* nil)) ; don't print #1#, say

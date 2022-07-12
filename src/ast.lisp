@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;; Atomic Elements ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -504,7 +504,7 @@ If no exit rewiring is found, return NIL."
 (defstruct (pauli-term)
   "Records a word of Pauli operators, together with an ordered list of qubit formals on which they act, as well as a scalar prefix.  This is part of the internal representation of a EXP-PAULI-SUM-GATE-DEFINITION and probably shouldn't be instantiated otherwise.
 
-This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends it slightly: a Clifford Pauli is constrained to carry a phase which is a fourth root of unity, but the phase of a PAULI-TERM can be arbitrary (indeed, even a delayed expression).  The reader looking for an embodiment of Pauli words is better off using that data structure without CAREFUL CONSIDERATION."
+This replicates some of the behavior of CL-QUIL/CLIFFORD::PAULI, but it extends it slightly: a Clifford Pauli is constrained to carry a phase which is a fourth root of unity, but the phase of a PAULI-TERM can be arbitrary (indeed, even a delayed expression).  The reader looking for an embodiment of Pauli words is better off using that data structure without CAREFUL CONSIDERATION."
   pauli-word
   prefactor
   arguments)
@@ -1572,7 +1572,7 @@ For example,
     (format stream "RESET"))
 
   (:method ((instr reset-qubit) stream)
-    (format stream "RESET ~/quil:instruction-fmt/" (reset-qubit-target instr)))
+    (format stream "RESET ~/cl-quil:instruction-fmt/" (reset-qubit-target instr)))
 
   (:method ((instr wait) (stream stream))
     (format stream "WAIT"))
@@ -1583,7 +1583,7 @@ For example,
   (:method ((instr classical-instruction) (stream stream))
     (format stream "~A" (mnemonic instr))
     (loop :for arg :across (arguments instr)
-          :do (format stream " ~/quil:instruction-fmt/" arg)))
+          :do (format stream " ~/cl-quil:instruction-fmt/" arg)))
 
   (:method ((instr pragma) (stream stream))
     (format stream "PRAGMA ~{~A~^ ~}~@[ ~S~]"
@@ -1591,7 +1591,7 @@ For example,
             (pragma-freeform-string instr)))
 
   (:method ((instr jump-target) (stream stream))
-    (format stream "LABEL ~/quil:instruction-fmt/"
+    (format stream "LABEL ~/cl-quil:instruction-fmt/"
             (jump-target-label instr)))
 
   (:method ((instr jump) (stream stream))
@@ -1600,18 +1600,18 @@ For example,
         ((integerp l)
          (format stream "JUMP {absolute address ~D}" l))
         (t
-         (format stream "JUMP ~/quil:instruction-fmt/"
+         (format stream "JUMP ~/cl-quil:instruction-fmt/"
                  (jump-label instr))))))
 
   (:method ((instr jump-when) (stream stream))
     (let ((l (jump-label instr)))
       (cond
         ((integerp l)
-         (format stream "JUMP-WHEN {absolute address ~D} ~/quil:instruction-fmt/"
+         (format stream "JUMP-WHEN {absolute address ~D} ~/cl-quil:instruction-fmt/"
                  l
                  (conditional-jump-address instr)))
         (t
-         (format stream "JUMP-WHEN ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+         (format stream "JUMP-WHEN ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
                  (jump-label instr)
                  (conditional-jump-address instr))))))
 
@@ -1619,26 +1619,26 @@ For example,
     (let ((l (jump-label instr)))
       (cond
         ((integerp l)
-         (format stream "JUMP-UNLESS {absolute address ~D} ~/quil:instruction-fmt/"
+         (format stream "JUMP-UNLESS {absolute address ~D} ~/cl-quil:instruction-fmt/"
                  l
                  (conditional-jump-address instr)))
         (t
-         (format stream "JUMP-UNLESS ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+         (format stream "JUMP-UNLESS ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
                  (jump-label instr)
                  (conditional-jump-address instr))))))
 
   (:method ((instr measure) (stream stream))
-    (format stream "MEASURE ~/quil:instruction-fmt/ ~/quil:instruction-fmt/"
+    (format stream "MEASURE ~/cl-quil:instruction-fmt/ ~/cl-quil:instruction-fmt/"
             (measurement-qubit instr)
             (measure-address instr)))
 
   (:method ((instr measure-discard) (stream stream))
-    (format stream "MEASURE ~/quil:instruction-fmt/"
+    (format stream "MEASURE ~/cl-quil:instruction-fmt/"
             (measurement-qubit instr)))
 
   (:method ((instr application) (stream stream))
     (print-operator-description (application-operator instr) stream)
-    (format stream "~@[(~{~/quil:instruction-fmt/~^, ~})~]~{ ~/quil:instruction-fmt/~}"
+    (format stream "~@[(~{~/cl-quil:instruction-fmt/~^, ~})~]~{ ~/cl-quil:instruction-fmt/~}"
             (application-parameters instr)
             (application-arguments instr)))
 
@@ -1686,10 +1686,10 @@ For example,
     (format stream "DEFCIRCUIT ~A"
             (circuit-definition-name defn))
     (unless (endp (circuit-definition-parameters defn))
-      (format stream "(~{~/quil:instruction-fmt/~^, ~})"
+      (format stream "(~{~/cl-quil:instruction-fmt/~^, ~})"
               (circuit-definition-parameters defn)))
     (unless (endp (circuit-definition-arguments defn))
-      (format stream "~{ ~/quil:instruction-fmt/~}"
+      (format stream "~{ ~/cl-quil:instruction-fmt/~}"
               (circuit-definition-arguments defn)))
     (format stream ":~%")
     (print-instruction-sequence (circuit-definition-body defn)
@@ -1702,7 +1702,7 @@ For example,
             (mapcar #'param-name (sequence-gate-definition-parameters gate))
             (mapcar #'formal-name (sequence-gate-definition-arguments gate)))
     (dolist (operation (sequence-gate-definition-sequence gate))
-      (format stream "    ~/quil:instruction-fmt/~%" operation)))
+      (format stream "    ~/cl-quil:instruction-fmt/~%" operation)))
   
   (:method ((gate exp-pauli-sum-gate-definition) (stream stream))
     (format stream "DEFGATE ~A~@[(~{%~A~^, ~})~]~{ ~A~} AS PAULI-SUM:~%"

@@ -1,4 +1,4 @@
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;;; Queues, taken with permission from https://bitbucket.org/tarballs_are_good/lisp-random/raw/a595eb662c2dce87f362dd0dd2541a93efe9c902/stack-queue.lisp
 

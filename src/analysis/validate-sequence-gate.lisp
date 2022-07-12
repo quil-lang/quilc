@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Parker Williams
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (defun validate-resolved-seq-gate-definition (gate-def)
   (declare (type sequence-gate-definition gate-def))

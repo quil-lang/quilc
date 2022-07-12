@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; Used solely for object resolution to detect if we are resolving things
 ;;; inside of a circuit or calibration.
@@ -14,7 +14,7 @@
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
-                    "Error in resolving ~/quil:instruction-fmt/: ~@?"
+                    "Error in resolving ~/cl-quil:instruction-fmt/: ~@?"
                     instr
                     ,datum
                     ,@arguments)))

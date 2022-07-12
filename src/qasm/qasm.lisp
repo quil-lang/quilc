@@ -1,6 +1,6 @@
 ;;;; qasm.lisp
 
-(in-package #:cl-quil.qasm)
+(in-package #:cl-quil/qasm)
 
 (defvar *line-start-position*)
 (defvar *line-number*)
@@ -49,7 +49,7 @@
 
 #+sbcl (declaim (sb-ext:freeze-type qasm-register qreg creg))
 
-(defun reg-fmt (stream reg &optional colon-modifier at-modifier)
+(defun cl-quil-fmt:reg-fmt (stream reg &optional colon-modifier at-modifier)
   (declare (ignore colon-modifier at-modifier))
   (let ((name (reg-name reg))
         (index (reg-index reg)))
@@ -61,20 +61,20 @@
   (:method ((qreg qreg))
     (with-slots (name index) qreg
       (if *gate-applications-are-formal*
-          (quil:formal name)
+          (quilfe:formal name)
           (destructuring-bind (offset size)
               (gethash name *qreg-names*)
             (assert (< index size) ()
-                    "The index ~s is out-of-bounds for qreg ~/quil.qasm::reg-fmt/."
+                    "The index ~s is out-of-bounds for qreg ~/cl-quil-fmt:reg-fmt/."
                     index qreg)
-            (quil:qubit (+ offset index))))))
+            (quilfe:qubit (+ offset index))))))
   (:method ((creg creg))
     (with-slots (name index) creg
       (let ((size (gethash name *creg-names*)))
         (assert (< index size) ()
-                "The index ~s is out-of-bounds for creg ~/quil.qasm::reg-fmt/."
+                "The index ~s is out-of-bounds for creg ~/cl-quil-fmt:reg-fmt/."
                 index creg)
-        (quil::mref name index)))))
+        (quilfe::mref name index)))))
 
 (defun register-namespace (register)
   (etypecase register
@@ -145,7 +145,7 @@
   ("#pragma"
    (return (tok :PRAGMA)))
   ("pi"
-   (return (tok ':PI (quil:constant quil::pi))))
+   (return (tok ':PI (quilfe:constant quilfe::pi))))
   ((eager "\\+") (return (tok :PLUS "+")))
   ((eager "\\-") (return (tok :MINUS "-")))
   ((eager "\\*") (return (tok :TIMES "*")))
@@ -257,7 +257,7 @@
        (parse-include tok-lines))
 
       ((:PRAGMA)
-       (quil::parse-pragma tok-lines))
+       (quilfe::parse-pragma tok-lines))
 
       ((:QREG)
        (parse-qreg-definition tok-lines))
@@ -267,9 +267,9 @@
 
       ((:BARRIER)
        ;; TODO Prettier pragma
-       (values (quil::make-pragma
+       (values (quilfe::make-pragma
                 (list "QASM_BARRIER")
-                (format nil "~{~/quil::instruction-fmt/~^, ~}"
+                (format nil "~{~/cl-quil::instruction-fmt/~^, ~}"
                         (let ((*gate-applications-are-formal* t))
                           (mapcar (lambda (qreg) (register-to-quil-object qreg))
                                   (parse-qregisters (rest line))))))
@@ -286,7 +286,7 @@
 
       ((:RESET)
        (values
-        (map-registers (lambda (qub) (make-instance 'quil:reset-qubit :target qub))
+        (map-registers (lambda (qub) (make-instance 'quilfe:reset-qubit :target qub))
                        (parse-qregister (rest line)))
         (rest tok-lines)))
 
@@ -341,9 +341,9 @@
       (let ((name (token-payload name-tok))
             (length (token-payload length-tok)))
         (setf (gethash name *creg-names*) length)
-        (values (quil::make-memory-descriptor
+        (values (quilfe::make-memory-descriptor
                  :name name
-                 :type quil::quil-bit
+                 :type quilfe::quil-bit
                  :length length)
                 rest-toks)))))
 
@@ -384,8 +384,8 @@
         include-toks
       ;; TODO Some error checking.
       (let ((file (uiop:read-file-string
-                   (if quil::*safe-include-directory*
-                       (quil::resolve-safely (token-payload path-tok))
+                   (if quilfe::*safe-include-directory*
+                       (quilfe::resolve-safely (token-payload path-tok))
                        (token-payload path-tok)))))
         (values (parse-qasm-body file)
                 rest-toks)))))
@@ -405,7 +405,7 @@
         (assert (null rest-toks))
 
         (values (map-registers (lambda (src dest)
-                                 (make-instance 'quil:measure
+                                 (make-instance 'quilfe:measure
                                                 :qubit src
                                                 :address dest))
                                qreg creg)
@@ -418,7 +418,7 @@
       tok-lines
     (destructuring-token-bind ((_ :OPENQASM) (version :REAL))
         openqasm-toks
-      (values (quil::make-pragma (list "OPENQASM"
+      (values (quilfe::make-pragma (list "OPENQASM"
                                        (format nil "~A" (token-payload version))))
               rest-toks))))
 
@@ -455,24 +455,26 @@
           :then (multiple-value-list (parse-qregister rest-toks))
         :for next-tok := (first rest-toks)
         :collect register :into registers
-        :if (null next-tok) :do
-          (return-from parse-qregisters registers)
+        :if (null next-tok)
+          :do
+             (return-from parse-qregisters registers)
         :if (and (not (null next-tok))
-                 (eql (token-type next-tok) ':COMMA)) :do
-                   (setf rest-toks (rest rest-toks))))
+                 (eql (token-type next-tok) ':COMMA))
+          :do
+             (setf rest-toks (rest rest-toks))))
 
 (defun %stringify-token-payload (token)
   (let ((payload (token-payload token)))
     (cond ((and *gate-params*
-                (find payload *gate-params* :test #'equalp :key #'quil:param-name))
+                (find payload *gate-params* :test #'equalp :key #'quilfe:param-name))
            (format nil "(%~A)" payload))
           ((eql (token-type token) ':LEFT-PAREN)
            "(")
           ((eql (token-type token) ':RIGHT-PAREN)
            ")")
-          ((typep payload 'quil:constant)
-           (let ((*read-default-float-format* (type-of (quil:constant-value payload))))
-             (format nil "~F" (quil:constant-value payload))))
+          ((typep payload 'quilfe:constant)
+           (let ((*read-default-float-format* (type-of (quilfe:constant-value payload))))
+             (format nil "~F" (quilfe:constant-value payload))))
           (t
            (format nil "~A" payload)))))
 
@@ -483,14 +485,14 @@
       (let* ((param (first tokens))
              (payload (token-payload param)))
         (cond ((member (token-type param) '(:NNINTEGER :REAL))
-               (quil:constant (coerce payload 'double-float)))
+               (quilfe:constant (coerce payload 'double-float)))
               ((eql (token-type param) ':PI)
                payload)
               ((and *gate-params*
                     (find payload *gate-params* :test #'equalp))
                (%formalize payload))
               (t
-               (quil::param payload))))
+               (quilfe::param payload))))
       ;; Otherwise we have a compound expression like lambda/2, in
       ;; which case we need to recombine that into a single string,
       ;; and then pass it through cl-quil's arithmetic parsing stuff.
@@ -499,11 +501,11 @@
       (let* ((str (with-output-to-string (s)
                     (dolist (tok tokens)
                       (write-string (%stringify-token-payload tok) s))))
-             (quil-tokens (first (quil::tokenize str)))
-             (quil::*parse-context* ':DEFCIRCUIT)
-             (quil::*formal-arguments-allowed* t))
-        (declare (special quil::*parse-context* quil::*formal-arguments-allowed*))
-        (quil::simplify-arithmetic (quil::parse-parameter-or-expression quil-tokens)))))
+             (quil-tokens (first (quilfe::tokenize str)))
+             (quilfe::*parse-context* ':DEFCIRCUIT)
+             (quilfe::*formal-arguments-allowed* t))
+        (declare (special quilfe::*parse-context* quilfe::*formal-arguments-allowed*))
+        (quilfe::simplify-arithmetic (quilfe::parse-parameter-or-expression quil-tokens)))))
 
 (defun parse-params (tokens)
   "Parse a list of qasm params (e.g. in the instruction  rx(0.5) q;). Returns a list of parameter values (type float), and a second value which is the remaining tokens (not including closing parenthesis)."
@@ -550,9 +552,9 @@
 (defun build-u-gate (θ ϕ λ qubit)
   "As per the OpenQASM spec: U(θ, ϕ, λ) = RZ(ϕ) . RY(θ) . RZ(λ)."
   (list
-   (quil::build-gate "RZ" `(,λ) qubit)
-   (quil::build-gate "RY" `(,θ) qubit)
-   (quil::build-gate "RZ" `(,ϕ) qubit)))
+   (quilfe::build-gate "RZ" `(,λ) qubit)
+   (quilfe::build-gate "RY" `(,θ) qubit)
+   (quilfe::build-gate "RZ" `(,ϕ) qubit)))
 
 (defun map-registers (function register &rest more-registers)
   "Apply FUNCTION to successive sets of registers.
@@ -617,7 +619,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
           ((string= name "CX")
            (check-number-of-parameters params 0)
            (values (apply #'map-registers (lambda (ctl tgt)
-                                            (quil::build-gate "CNOT" nil ctl tgt))
+                                            (quilfe::build-gate "CNOT" nil ctl tgt))
                           registers)
                    rest-toks))
 
@@ -632,19 +634,19 @@ Note: the above \"expansion\" is not performed when in a gate body."
            (a:if-let ((gate (gethash (%qasm-gate-name name) *gate-names*)))
              (values
               (if (eql gate ':opaque)
-                  (let* ((params-constant-values (mapcar #'quil:constant-value params))
+                  (let* ((params-constant-values (mapcar #'quilfe:constant-value params))
                          (*read-default-float-format* (or (and (null params) 'single-float)
                                                           (type-of (car params-constant-values)))))
-                    (quil::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
-                                       (format nil "(~{~F~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
-                                               params-constant-values
-                                               (mapcar #'register-to-quil-object
-                                                       registers))))
+                    (quilfe::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
+                                         (format nil "(~{~F~^, ~}) ~{~/cl-quil:instruction-fmt/~^, ~}"
+                                                 params-constant-values
+                                                 (mapcar #'register-to-quil-object
+                                                         registers))))
                   (apply #'map-registers (lambda (&rest qubits)
-                                           (make-instance 'quil:unresolved-application
-                                                          :operator (quil:named-operator (%qasm-gate-name name))
-                                                          :parameters params
-                                                          :arguments qubits))
+                                           (make-instance 'quilfe:unresolved-application
+                                             :operator (quilfe:named-operator (%qasm-gate-name name))
+                                             :parameters params
+                                             :arguments qubits))
                          registers))
               rest-toks)
              (qasm-parse-error "Found unknown gate application '~A'."
@@ -667,7 +669,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
             :key (a:compose #'token-type #'first)))
 
 (defun %formalize (param)
-  (quil:param param))
+  (quilfe:param param))
 
 (defun parse-gate-decl (tok-lines)
   (check-qasm-unexpected-eof tok-lines "gate")
@@ -682,10 +684,10 @@ Note: the above \"expansion\" is not performed when in a gate body."
       ;; TODO Store more info about the gate, for later validating an
       ;; application (num params, qubits, etc).
       (setf (gethash (%qasm-gate-name gate-name) *gate-names*) t)
-      (values (quil::make-circuit-definition
+      (values (quilfe::make-circuit-definition
                (%qasm-gate-name gate-name)
                gate-params
-               (mapcar #'quil::formal gate-qargs)
+               (mapcar #'quilfe::formal gate-qargs)
                (parse-gate-body (subseq tok-lines 2 close-pos))
                :context nil)
               (subseq tok-lines (1+ close-pos))))))
@@ -703,10 +705,10 @@ Note: the above \"expansion\" is not performed when in a gate body."
       (let ((*gate-applications-are-formal* t)
             (qregs (parse-qregisters rest-toks)))
         (setf (gethash (%qasm-gate-name (token-payload name-tok)) *gate-names*) ':opaque)
-        (values (quil::make-pragma
+        (values (quilfe::make-pragma
                  (list "QASM_OPAQUE_DEFINITION" (token-payload name-tok))
-                 (format nil "(~{~A~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
-                         (mapcar #'quil:param-name params)
+                 (format nil "(~{~A~^, ~}) ~{~/cl-quil:instruction-fmt/~^, ~}"
+                         (mapcar #'quilfe:param-name params)
                          (mapcar #'register-to-quil-object qregs)))
                 rest-lines)))))
 
@@ -728,11 +730,11 @@ Note: the above \"expansion\" is not performed when in a gate body."
             (parse-application (list rest-toks))
           (assert (null rest-toks))
           (let* ((cmp-name (string (gensym "CMP-")))
-                 (cmp-desc (quil::make-memory-descriptor
+                 (cmp-desc (quilfe::make-memory-descriptor
                             :name cmp-name
-                            :type quil::quil-bit
+                            :type quilfe::quil-bit
                             :length 1))
-                 (jmp-label (quil::label (string (gensym "JMP-")))))
+                 (jmp-label (quilfe::label (string (gensym "JMP-")))))
             (unless (< (token-payload val)
                        (expt 2 (register-size register)))
               (qasm-parse-error "Cannot compare the integer ~A to the creg ~A of size ~A."
@@ -762,18 +764,18 @@ Note: the above \"expansion\" is not performed when in a gate body."
                     :collect
                     ;; TODO Make this more efficient by using AND. See
                     ;; https://github.com/rigetti/quilc/pull/495/files#r353990886
-                    (make-instance 'quil::classical-equality-bit/bit/immediate
+                    (make-instance 'quilfe::classical-equality-bit/bit/immediate
                                    :left (register-to-quil-object reg)
-                                   :right (quil::constant
+                                   :right (quilfe::constant
                                            (if (logbitp i (token-payload val)) 1 0)
-                                           quil::quil-bit)
-                                   :target (quil::mref cmp-name 0))
+                                           quilfe::quil-bit)
+                                   :target (quilfe::mref cmp-name 0))
                     :collect
-                    (make-instance 'quil::jump-unless
-                                   :address (quil::mref cmp-name 0)
+                    (make-instance 'quilfe::jump-unless
+                                   :address (quilfe::mref cmp-name 0)
                                    :label jmp-label))
               gate-application
-              (make-instance 'quil::jump-target
+              (make-instance 'quilfe::jump-target
                              :label jmp-label))
              rest-lines)))))))
 
@@ -799,17 +801,17 @@ Note: the above \"expansion\" is not performed when in a gate body."
          (*gate-params* nil)
          (*gate-names* (make-hash-table :test #'equalp))
          (code (parse-qasm-body string)))
-    (setf code (quil::process-includes code))
+    (setf code (quilfe::process-includes code))
     ;; Return the parsed sequence of objects.
     (values
-     (quil::raw-quil-to-unresolved-program code)
+     (quilfe::raw-quil-to-unresolved-program code)
      *creg-names*
      *qreg-names*
      *qubit-count*)))
 
 (defun parse-qasm (string)
   "Parse STRING into a PARSED-PROGRAM object, applying all transforms."
-  (let ((pp (quil::resolve-objects (parse-qasm-into-raw-program string))))
-    (setf pp (quil::transform 'quil::expand-circuits pp))
-    (setf pp (quil::transform 'quil::type-check pp))
-    (setf pp (quil::transform 'quil::simplify-individual-instructions pp))))
+  (let ((pp (quilfe::resolve-objects (parse-qasm-into-raw-program string))))
+    (setf pp (quilfe::transform 'quilfe::expand-circuits pp))
+    (setf pp (quilfe::transform 'quilfe::type-check pp))
+    (setf pp (quilfe::transform 'quilfe::simplify-individual-instructions pp))))

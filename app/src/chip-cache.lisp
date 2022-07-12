@@ -18,7 +18,7 @@
     :accessor cached-chip-chip)
    (addresser-state
     :initarg :addresser-state
-    :type quil::addresser-state
+    :type cl-quil::addresser-state
     :accessor cached-chip-addresser-state))
   (:documentation "Represents chip and addresser state cached between server requests."))
 
@@ -60,7 +60,7 @@ This function has the added side-effect that it will purge old chips according t
              (get-internal-real-time-seconds))
        cached-chip)
       (t
-       (let* ((chip (quil::qpu-hash-table-to-chip-specification qpu-hash))
+       (let* ((chip (cl-quil::qpu-hash-table-to-chip-specification qpu-hash))
               (cached-chip (make-instance 'cached-chip
                                           :last-accessed (get-internal-real-time-seconds)
                                           :chip chip)))

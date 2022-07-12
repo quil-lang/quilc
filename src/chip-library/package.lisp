@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(defpackage #:cl-quil.chip-library
+(defpackage #:cl-quil/chip-library
   (:use #:cl)
   (:local-nicknames (:q :cl-quil)
                     (:a :alexandria))

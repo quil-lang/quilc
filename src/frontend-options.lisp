@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith, Erik Davis
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; The variables below allow for general configuration of the
 ;;; compiler frontend.

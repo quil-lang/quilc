@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/operators)
+(cl:in-package #:cl-quil/discrete/operators)
 
 ;;; Implements a canonical form for Clifford+T elements for 1 qubit
 

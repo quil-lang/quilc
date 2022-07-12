@@ -27,17 +27,17 @@
 
 (deftest test-euler-translations ()
   "Ensures that the different Euler decompositions all work."
-  (let ((master-matrix (quil::random-special-unitary 2)))
-    (dolist (compiler '(quil::euler-zyz-compiler
-                        quil::euler-zxz-compiler
-                        quil::euler-yzy-compiler
-                        quil::euler-yxy-compiler
-                        quil::euler-xyx-compiler
-                        quil::euler-xzx-compiler))
+  (let ((master-matrix (cl-quil::random-special-unitary 2)))
+    (dolist (compiler '(cl-quil::euler-zyz-compiler
+                        cl-quil::euler-zxz-compiler
+                        cl-quil::euler-yzy-compiler
+                        cl-quil::euler-yxy-compiler
+                        cl-quil::euler-xyx-compiler
+                        cl-quil::euler-xzx-compiler))
       (let* ((compiled-program (funcall compiler
                                         (build-anonymous-gate master-matrix 0)))
-             (compiled-matrix (quil::make-matrix-from-quil compiled-program)))
-        (is (quil::matrix-equals-dwim master-matrix compiled-matrix)
+             (compiled-matrix (cl-quil::make-matrix-from-quil compiled-program)))
+        (is (cl-quil::matrix-equals-dwim master-matrix compiled-matrix)
             "Euler translation test failed: ~A~%" compiler)))))
 
 (global-vars:define-global-var **compiler-fuzzers-available**
@@ -50,24 +50,24 @@
              ,@body))))
 
 (define-fuzzer cl-quil::qs-compiler ()
-  (inst "QS-FUZZ" (quil::random-special-unitary 8) 2 1 0))
+  (inst "QS-FUZZ" (cl-quil::random-special-unitary 8) 2 1 0))
 
 (define-fuzzer cl-quil::recognize-ucr ()
-  (let ((m (quil::make-matrix-from-quil
-            (list (build-gate (quil::forked-operator (quil::forked-operator (quil::named-operator "RZ")))
+  (let ((m (cl-quil::make-matrix-from-quil
+            (list (build-gate (cl-quil::forked-operator (cl-quil::forked-operator (cl-quil::named-operator "RZ")))
                               (loop :repeat 4
                                     :collect (random (* 2 pi)))
                               2 1 0)))))
     (inst "UCR-FUZZ" m 2 1 0)))
 
 (define-fuzzer cl-quil::ucr-compiler-to-iswap ()
-  (inst (quil::forked-operator (quil::forked-operator (quil::named-operator "RZ")))
+  (inst (cl-quil::forked-operator (cl-quil::forked-operator (cl-quil::named-operator "RZ")))
         (loop :repeat 4
               :collect (random (* 2 pi)))
         2 1 0))
 
 (define-fuzzer cl-quil::ucr-compiler-to-cz ()
-  (inst (quil::forked-operator (quil::forked-operator (quil::named-operator "RZ")))
+  (inst (cl-quil::forked-operator (cl-quil::forked-operator (cl-quil::named-operator "RZ")))
         (loop :repeat 4
               :collect (random (* 2 pi)))
         2 1 0))
@@ -120,7 +120,7 @@ DEFGATE U(%alpha) p q AS PAULI-SUM:
     Z(3*%alpha) q
 
 U(time) 1 0"))
-         (inst (quil::vnth 0 (parsed-program-executable-code pp))))
+         (inst (cl-quil::vnth 0 (parsed-program-executable-code pp))))
     (setf (application-parameters inst) (list (mref "fuzz" 0)))
     (finish-compiler (list inst))))
 
@@ -135,7 +135,7 @@ DEFGATE U(%alpha) p q r AS PAULI-SUM:
     Z(%alpha) q
 
 U(time) 2 1 0"))
-         (inst (quil::vnth 0 (parsed-program-executable-code pp))))
+         (inst (cl-quil::vnth 0 (parsed-program-executable-code pp))))
     (setf (application-parameters inst) (list (mref "fuzz" 0)))
     (finish-compiler (list inst))))
 
@@ -173,26 +173,26 @@ U(time) 2 1 0"))
                   (add-clique (rest qubits))))))
       (dolist (binding bindings)
         (etypecase binding
-          (quil::wildcard-binding
+          (cl-quil::wildcard-binding
            (error 'test-case-too-complicated
                   :reason "I don't know how to make tests for permissive compilers."))
-          (quil::measure-binding
+          (cl-quil::measure-binding
            (error 'test-case-too-complicated
                   :reason "I don't know how to make tests for MEASURE compilers."))
-          (quil::gate-binding
-           (when (quil::gate-binding-options binding)
+          (cl-quil::gate-binding
+           (when (cl-quil::gate-binding-options binding)
              (error 'test-case-too-complicated
                     :reason "I don't know how to make test cases for guarded compilers."))
-           (add-clique (quil::gate-binding-arguments binding))
-           (when (listp (quil::gate-binding-parameters binding))
+           (add-clique (cl-quil::gate-binding-arguments binding))
+           (when (listp (cl-quil::gate-binding-parameters binding))
              (setf parameter-names
                    (union parameter-names
-                          (loop :for param :in (quil::gate-binding-parameters binding)
+                          (loop :for param :in (cl-quil::gate-binding-parameters binding)
                                 :when (and (typep param 'symbol)
                                            (not (eql '_ param)))
                                   :collect param)))))))
       ;; color the graph with qubit indices. it'd be :cool: if this were randomized.
-      (quil::dohash ((qubit collision-names) adjacency-table)
+      (cl-quil::dohash ((qubit collision-names) adjacency-table)
         (let ((collision-qubits (mapcar (lambda (name) (gethash name adjacency-table))
                                         collision-names)))
           (loop :for j :from 0
@@ -201,7 +201,7 @@ U(time) 2 1 0"))
                       (return))))
       ;; save the max of the largest instruction qubit number & the k in the k-coloring
       (setf qubit-bound (max (loop :for binding :in bindings
-                                   :maximize (1+ (length (quil::gate-binding-arguments binding))))
+                                   :maximize (1+ (length (cl-quil::gate-binding-arguments binding))))
                              (loop :for name :being :the :hash-keys :of adjacency-table
                                      :using (hash-value qubit-assignment)
                                    :maximize (1+ qubit-assignment))))
@@ -213,7 +213,7 @@ U(time) 2 1 0"))
       ;; walk the instructions, doing parameter/argument instantiation
       (values (loop :for binding :in bindings
                     :collect
-                    (let* ((params (when (listp (quil::gate-binding-parameters binding))
+                    (let* ((params (when (listp (cl-quil::gate-binding-parameters binding))
                                      (mapcar (lambda (param)
                                                (cond
                                                  ((numberp param)
@@ -223,7 +223,7 @@ U(time) 2 1 0"))
                                                  (t
                                                   (error 'test-case-too-complicated
                                                          :reason "I don't know how to generate this parameter."))))
-                                             (quil::gate-binding-parameters binding))))
+                                             (cl-quil::gate-binding-parameters binding))))
                            (qubits (mapcar (lambda (qubit)
                                              (cond
                                                ((numberp qubit)
@@ -232,7 +232,7 @@ U(time) 2 1 0"))
                                                 nil)
                                                ((symbolp qubit)
                                                 (gethash qubit adjacency-table))))
-                                           (quil::gate-binding-arguments binding)))
+                                           (cl-quil::gate-binding-arguments binding)))
                            (occupied-qubits (remove-if #'symbolp qubits))
                            (qubits
                              (let ((output-qubits nil))
@@ -245,44 +245,44 @@ U(time) 2 1 0"))
                                                                   (append output-qubits occupied-qubits))
                                           output-qubits)))))))
                       (cond
-                        ((symbolp (quil::gate-binding-operator binding))
-                         (apply #'quil::anon-gate "ANONYMOUS-INPUT"
-                                (quil::random-special-unitary (ash 1 (length qubits)))
+                        ((symbolp (cl-quil::gate-binding-operator binding))
+                         (apply #'cl-quil::anon-gate "ANONYMOUS-INPUT"
+                                (cl-quil::random-special-unitary (ash 1 (length qubits)))
                                 qubits))
                         (t
-                         (apply #'quil::build-gate (quil::gate-binding-operator binding) params qubits)))))
+                         (apply #'cl-quil::build-gate (cl-quil::gate-binding-operator binding) params qubits)))))
               parameter-assignments))))
 
 (defun %patch-mref-values (instr table)
   (unless (and (typep instr 'gate-application)
-               (quil::application-parameters instr))
+               (cl-quil::application-parameters instr))
     (return-from %patch-mref-values instr))
-  (let ((instr-new (quil::copy-instance instr)))
-    (setf (quil::application-parameters instr-new)
-          (mapcar #'quil::copy-instance
-                  (quil::application-parameters instr-new)))
+  (let ((instr-new (cl-quil::copy-instance instr)))
+    (setf (cl-quil::application-parameters instr-new)
+          (mapcar #'cl-quil::copy-instance
+                  (cl-quil::application-parameters instr-new)))
     (labels ((treesplore (expression)
                (cond ((listp expression)
                       (mapcar #'treesplore expression))
-                     ((quil::delayed-expression-p expression)
-                      (quil::make-delayed-expression
-                       nil nil (treesplore (quil::delayed-expression-expression expression))))
-                     ((typep expression 'quil::memory-ref)
-                      (let* ((name (quil::memory-ref-name expression)))
+                     ((cl-quil::delayed-expression-p expression)
+                      (cl-quil::make-delayed-expression
+                       nil nil (treesplore (cl-quil::delayed-expression-expression expression))))
+                     ((typep expression 'cl-quil::memory-ref)
+                      (let* ((name (cl-quil::memory-ref-name expression)))
                         (gethash name table)))
                      (t
                       expression))))
-      (map-into (quil::application-parameters instr-new)
+      (map-into (cl-quil::application-parameters instr-new)
                 (lambda (param)
                   (typecase param
-                    (quil::delayed-expression
+                    (cl-quil::delayed-expression
                      (let ((res (treesplore param)))
-                       (quil::evaluate-delayed-expression res)))
-                    (quil::memory-ref
+                       (cl-quil::evaluate-delayed-expression res)))
+                    (cl-quil::memory-ref
                      (constant (gethash (memory-ref-name param) table)))
                     (otherwise
                      param)))
-                (quil::application-parameters instr-new))
+                (cl-quil::application-parameters instr-new))
       instr-new)))
 
 (defun %make-de-value-table (quil)
@@ -291,11 +291,11 @@ U(time) 2 1 0"))
         :for params := (application-parameters instr) :do
           (dolist (param (application-parameters instr))
             (typecase param
-              (quil::delayed-expression
-               (let ((name (quil::memory-ref-name (quil::delayed-expression-expression param))))
+              (cl-quil::delayed-expression
+               (let ((name (cl-quil::memory-ref-name (cl-quil::delayed-expression-expression param))))
                  (setf (gethash name table) (random (* 2 pi)))))
-              (quil::memory-ref
-               (let ((name (quil::memory-ref-name param)))
+              (cl-quil::memory-ref
+               (let ((name (cl-quil::memory-ref-name param)))
                  (setf (gethash name table) (random (* 2 pi)))))))
         :finally
            (return table)))
@@ -303,32 +303,32 @@ U(time) 2 1 0"))
 (deftest test-translators ()
   (declare (optimize (debug 3) (speed 0)))
   (labels ((do-compilation (compiler)
-             (unless (quil::compiler-gateset-reducer-p compiler)
+             (unless (cl-quil::compiler-gateset-reducer-p compiler)
                (return-from do-compilation nil))
              (let (test-case test-case-patched input-matrix compiled-output output-matrix table)
                ;; building the test case can throw an error if the compiler itself is
                ;; too complicated. we don't intend for that to break the tests.
                (handler-case (setf test-case (or
                                               (alexandria:when-let*
-                                                  ((name (quil::compiler-name compiler))
+                                                  ((name (cl-quil::compiler-name compiler))
                                                    (fuzzer (gethash name **compiler-fuzzers-available**)))
                                                 (funcall fuzzer))
                                               (generate-translator-test-case-for-simple-compiler
-                                               (quil::compiler-bindings compiler))))
+                                               (cl-quil::compiler-bindings compiler))))
                  (test-case-too-complicated (c)
-                   (format t "~&Compiler ~A not tested because ~A" (quil::compiler-name compiler) (test-case-too-complicated-reason c))
+                   (format t "~&Compiler ~A not tested because ~A" (cl-quil::compiler-name compiler) (test-case-too-complicated-reason c))
                    (return-from do-compilation nil)))
                (setf table (%make-de-value-table test-case))
                (setf test-case-patched (mapcar (a:rcurry #'%patch-mref-values table) test-case))
-               (setf input-matrix (quil::make-matrix-from-quil test-case-patched))
+               (setf input-matrix (cl-quil::make-matrix-from-quil test-case-patched))
                (setf compiled-output (mapcar (a:rcurry #'%patch-mref-values table)
                                              (apply compiler test-case)))
-               (setf output-matrix (quil::make-matrix-from-quil compiled-output))
-               (format t "~&    Testing compiler ~A" (quil::compiler-name compiler))
-               (is (quil::matrix-equals-dwim input-matrix output-matrix))
+               (setf output-matrix (cl-quil::make-matrix-from-quil compiled-output))
+               (format t "~&    Testing compiler ~A" (cl-quil::compiler-name compiler))
+               (is (cl-quil::matrix-equals-dwim input-matrix output-matrix))
                t)))
-    (loop :for compiler :in (remove-if (a:rcurry #'typep 'quil::approximate-compiler)
-                                       quil::**compilers-available**)
+    (loop :for compiler :in (remove-if (a:rcurry #'typep 'cl-quil::approximate-compiler)
+                                       cl-quil::**compilers-available**)
           :count t :into compiler-count
           :count (do-compilation compiler) :into hit-count
           :finally (let ((hit-rate (/ hit-count compiler-count)))
@@ -365,17 +365,17 @@ U(time)~{ ~a~}"
          (patch-table (alexandria:plist-hash-table (list "time" (random 2pi))
                                                    :test #'equalp))
          (pp (parse-quil program))
-         (original-output (quil::make-matrix-from-quil
+         (original-output (cl-quil::make-matrix-from-quil
                            (mapcar (a:rcurry #'%patch-mref-values patch-table)
                                    (coerce (parsed-program-executable-code pp) 'list))))
-         (cpp (compiler-hook pp (quil::build-nq-fully-connected-chip qubit-count)))
-         (compiled-output (quil::make-matrix-from-quil
+         (cpp (compiler-hook pp (cl-quil::build-nq-fully-connected-chip qubit-count)))
+         (compiled-output (cl-quil::make-matrix-from-quil
                            (mapcar (a:rcurry #'%patch-mref-values patch-table)
                                    (coerce (parsed-program-executable-code cpp) 'list)))))
-    (is (quil::matrix-equals-dwim original-output compiled-output))))
+    (is (cl-quil::matrix-equals-dwim original-output compiled-output))))
 
 (deftest test-simple-defexpis ()
-  (let ((chip (quil::build-nq-fully-connected-chip 2)))
+  (let ((chip (cl-quil::build-nq-fully-connected-chip 2)))
     (dolist (prog-text (list "
 PRAGMA INITIAL_REWIRING \"NAIVE\"
 DEFGATE EXPI(%beta) p q AS PAULI-SUM:
@@ -393,10 +393,10 @@ DEFGATE EXPI(%beta) p AS PAULI-SUM:
 EXPI(2.0) 0
 RZ(-2.0) 0"))
       (let* ((cpp (compiler-hook (parse-quil prog-text) chip))
-             (m (quil:parsed-program-to-logical-matrix cpp)))
-        (is (quil::double= 1d0 (abs (magicl:tref m 0 0))))
+             (m (cl-quil:parsed-program-to-logical-matrix cpp)))
+        (is (cl-quil::double= 1d0 (abs (magicl:tref m 0 0))))
         (loop :for j :below (magicl:nrows m)
-              :do (is (quil::double= (magicl:tref m 0 0)
+              :do (is (cl-quil::double= (magicl:tref m 0 0)
                                      (magicl:tref m j j))))))))
 
 (deftest test-parametric-simple-defexpi ()
@@ -409,12 +409,12 @@ DECLARE t REAL
 
 f(t) 0")))
     (is (compiler-hook progm
-                       (quil::build-nq-fully-connected-chip 2)))))
+                       (cl-quil::build-nq-fully-connected-chip 2)))))
 
 (deftest test-horizontal-composition-of-pauli-term->matrix ()
   (flet ((word->matrix (word)
-           (quil::pauli-term->matrix
-            (quil::make-pauli-term :pauli-word word
+           (cl-quil::pauli-term->matrix
+            (cl-quil::make-pauli-term :pauli-word word
                                    :prefactor 1
                                    :arguments (a:iota (length word)))
             (a:iota (length word)) nil nil)))
@@ -424,7 +424,7 @@ f(t) 0")))
            (I (word->matrix "I"))
            (word-size 4)
            (word (random-pauli-word word-size))
-           (m (quil::eye 1)))
+           (m (cl-quil::eye 1)))
       (loop :for char :across word
             :for p := (ecase char
                         (#\X X)
@@ -432,7 +432,7 @@ f(t) 0")))
                         (#\Z Z)
                         (#\I I))
             :do (setf m (magicl:kron m p)))
-      (is (quil::operator= m (word->matrix word))))))
+      (is (cl-quil::operator= m (word->matrix word))))))
 
 (defun random-permutation (list)
   (unless (null list)
@@ -448,14 +448,14 @@ f(t) 0")))
                                  (declare (ignore x))
                                  (constant (random (* 2 pi))))
                                (make-list (expt 2 (1- qubit-count)))))
-           (ucr-instruction (apply #'quil::build-UCR roll-type angle-list argument-list))
-           (ucr-matrix (quil::make-matrix-from-quil (list ucr-instruction)))
-           (anonymous-instr (make-instance 'quil::gate-application
+           (ucr-instruction (apply #'cl-quil::build-UCR roll-type angle-list argument-list))
+           (ucr-matrix (cl-quil::make-matrix-from-quil (list ucr-instruction)))
+           (anonymous-instr (make-instance 'cl-quil::gate-application
                                            :operator #.(named-operator "ANONYMOUS-UCR")
                                            :arguments (mapcar #'qubit (nreverse (a:iota qubit-count)))
                                            :gate ucr-matrix))
-           (recognized-instruction (quil::recognize-ucr anonymous-instr))
-           (recognized-matrix (quil::make-matrix-from-quil recognized-instruction)))
+           (recognized-instruction (cl-quil::recognize-ucr anonymous-instr))
+           (recognized-matrix (cl-quil::make-matrix-from-quil recognized-instruction)))
       (fiasco-assert-matrices-are-equal
        ucr-matrix
        recognized-matrix))))
@@ -472,10 +472,10 @@ f(t) 0")))
                               (list "PISWAP" (list (random 1.0d0)) #'cl-quil::PISWAP-to-native-PISWAPs)))
       (destructuring-bind (operator params expander) instr-type
         (format t "~&    Testing global-to-local ~A expansion~%" operator)
-        (let* ((instr (quil::build-gate operator params 0 3))
+        (let* ((instr (cl-quil::build-gate operator params 0 3))
                (ref-mat (cl-quil::make-matrix-from-quil (list instr)))
                (mat (cl-quil::make-matrix-from-quil (funcall expander instr
-                                                             :context (quil::make-compilation-context
+                                                             :context (cl-quil::make-compilation-context
                                                                        :chip-specification chip-spec)))))
           (is (cl-quil::matrix-equality ref-mat
                                         (cl-quil::scale-out-matrix-phases mat ref-mat))))))))
@@ -507,32 +507,32 @@ f(t) 0")))
 
 (deftest test-phase-compiles-to-rz ()
   "A PHASE gate should trivially compile to a RZ gate, preserving parameters."
-  (let* ((cphase (quil::parse-quil "PHASE(0) 0"))
-         (cphase-compiled (quil::compiler-hook cphase (quil::build-8q-chip)))
-         (cphase-parametric (quil::parse-quil "DECLARE gamma REAL[1]
+  (let* ((cphase (cl-quil::parse-quil "PHASE(0) 0"))
+         (cphase-compiled (cl-quil::compiler-hook cphase (cl-quil::build-8q-chip)))
+         (cphase-parametric (cl-quil::parse-quil "DECLARE gamma REAL[1]
 PHASE(2*gamma[0]) 0"))
-         (cphase-parametric-compiled (quil::compiler-hook cphase-parametric (build-8q-chip)))
-         (rz (quil::compiler-hook (quil::parse-quil "RZ(0) 0") (build-8q-chip)))
-         (rz-parametric (quil::compiler-hook (quil::parse-quil "DECLARE gamma REAL[1]
-RZ(2*gamma[0]) 0") (quil::build-8q-chip))))
+         (cphase-parametric-compiled (cl-quil::compiler-hook cphase-parametric (build-8q-chip)))
+         (rz (cl-quil::compiler-hook (cl-quil::parse-quil "RZ(0) 0") (build-8q-chip)))
+         (rz-parametric (cl-quil::compiler-hook (cl-quil::parse-quil "DECLARE gamma REAL[1]
+RZ(2*gamma[0]) 0") (cl-quil::build-8q-chip))))
     (fiasco-assert-matrices-are-equal
-     (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code cphase-compiled) 'list))
-     (quil::make-matrix-from-quil (coerce (quil::parsed-program-executable-code rz) 'list)))
+     (cl-quil::make-matrix-from-quil (coerce (cl-quil::parsed-program-executable-code cphase-compiled) 'list))
+     (cl-quil::make-matrix-from-quil (coerce (cl-quil::parsed-program-executable-code rz) 'list)))
     ;; one phase should compile to one rz
-    (is (= (length (quil::parsed-program-executable-code cphase-parametric-compiled))
-           (length (quil::parsed-program-executable-code rz-parametric))))))
+    (is (= (length (cl-quil::parsed-program-executable-code cphase-parametric-compiled))
+           (length (cl-quil::parsed-program-executable-code rz-parametric))))))
 
 (deftest test-modifier-compilers ()
   (let ((text "DECLARE theta REAL ; DAGGER CONTROLLED FORKED RZ(1*theta, 2*theta) 1 0 2"))
     (dolist (architecture '(:cz :iswap))
-      (let* ((quil::*compress-carefully* nil)
-             (orig (coerce (parsed-program-executable-code (quil::parse-quil text)) 'list))
-             (cpp (quil::expand-to-native-instructions (coerce (parsed-program-executable-code (quil::parse-quil text)) 'list)
-                                                       (quil::build-nq-fully-connected-chip 3 :architecture architecture)))
+      (let* ((cl-quil::*compress-carefully* nil)
+             (orig (coerce (parsed-program-executable-code (cl-quil::parse-quil text)) 'list))
+             (cpp (cl-quil::expand-to-native-instructions (coerce (parsed-program-executable-code (cl-quil::parse-quil text)) 'list)
+                                                       (cl-quil::build-nq-fully-connected-chip 3 :architecture architecture)))
              (table (a:plist-hash-table (list "theta" (random 2pi))
                                         :test #'equalp)))
-        (is (quil::operator=
-             (quil::make-matrix-from-quil (mapcar (a:rcurry #'%patch-mref-values table)
+        (is (cl-quil::operator=
+             (cl-quil::make-matrix-from-quil (mapcar (a:rcurry #'%patch-mref-values table)
                                                   orig))
-             (quil::make-matrix-from-quil (mapcar (a:rcurry #'%patch-mref-values table)
+             (cl-quil::make-matrix-from-quil (mapcar (a:rcurry #'%patch-mref-values table)
                                                   cpp))))))))

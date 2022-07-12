@@ -18,17 +18,17 @@
   (nreverse (coerce (a:iota n) 'vector)))
 
 (defun permutation-synthesis-as-parsed-program (permutation)
-  (make-instance 'quil::parsed-program
-    :executable-code (coerce (quil::synthesize-permutation
+  (make-instance 'cl-quil::parsed-program
+    :executable-code (coerce (cl-quil::synthesize-permutation
                               permutation
-                              (qubits-in-computational-order (cl-quil.frontend::ilog2 (length permutation))))
+                              (qubits-in-computational-order (cl-quil/frontend::ilog2 (length permutation))))
                              'vector)))
 
 ;;; Test that the synthesized permutation when simulated performs the
 ;;; action of the permutation.
 (defun synthesize-and-check-permutation (permutation)
-  (quil::operator=
-   (quil:parsed-program-to-logical-matrix
+  (cl-quil::operator=
+   (cl-quil:parsed-program-to-logical-matrix
     (permutation-synthesis-as-parsed-program permutation)
     :compress-qubits nil)
    (matrix-from-permutation permutation)))
@@ -60,19 +60,19 @@
                                                internal-time-units-per-second))))
 
 (deftest test-perm-compilation-gh805 ()
-  (let* ((chip (quil::build-nq-linear-chip 3 :architecture ':cnot))
-         (orig-prog (quil::parse-quil "
+  (let* ((chip (cl-quil::build-nq-linear-chip 3 :architecture ':cnot))
+         (orig-prog (cl-quil::parse-quil "
 DEFGATE PERM AS PERMUTATION:
     5, 1, 2, 6, 7, 0, 4, 3
 
 X 0
 PERM 0 1 2
 "))
-         (orig-matrix (quil:parsed-program-to-logical-matrix orig-prog))
-         (proc-prog (quil::compiler-hook orig-prog chip))
-         (proc-matrix (quil:parsed-program-to-logical-matrix proc-prog))
+         (orig-matrix (cl-quil:parsed-program-to-logical-matrix orig-prog))
+         (proc-prog (cl-quil::compiler-hook orig-prog chip))
+         (proc-matrix (cl-quil:parsed-program-to-logical-matrix proc-prog))
          (2q-code (program-2q-instructions proc-prog)))
-    (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
+    (is (cl-quil::matrix-equals-dwim orig-matrix proc-matrix))
     (is (every (link-nativep chip) 2q-code))))
 
 (deftest test-random-3q-perm-compilations ()
@@ -85,16 +85,16 @@ X 0
 PERM 0 1 2
 "
                    perm)))
-    (let ((chip (quil::build-nq-linear-chip 3 :architecture ':cnot))
+    (let ((chip (cl-quil::build-nq-linear-chip 3 :architecture ':cnot))
           (*print-pretty* nil))
       (loop :repeat 16 :do
         (let* ((perm (alexandria:shuffle (alexandria:iota 8)))
-               (orig-prog (quil::parse-quil (perm->prog perm)))
-               (orig-matrix (quil:parsed-program-to-logical-matrix orig-prog))
-               (proc-prog (quil::compiler-hook orig-prog chip))
-               (proc-matrix (quil:parsed-program-to-logical-matrix proc-prog))
+               (orig-prog (cl-quil::parse-quil (perm->prog perm)))
+               (orig-matrix (cl-quil:parsed-program-to-logical-matrix orig-prog))
+               (proc-prog (cl-quil::compiler-hook orig-prog chip))
+               (proc-matrix (cl-quil:parsed-program-to-logical-matrix proc-prog))
                (2q-code (program-2q-instructions proc-prog)))
           (format t "    Testing compiling perm ~A...~%" perm)
-          (is (quil::matrix-equals-dwim orig-matrix proc-matrix))
+          (is (cl-quil::matrix-equals-dwim orig-matrix proc-matrix))
           (is (every (link-nativep chip) 2q-code)))))))
 

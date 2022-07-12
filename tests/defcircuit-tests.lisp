@@ -7,23 +7,23 @@
 (defun verify-h-cnot-code (code)
   (is (= 3 (length code)))
   (destructuring-bind (h cnot reset) (coerce code 'list)
-    (is (string= "H" (quil::application-operator-name h)))
-    (is (= 0 (quil:qubit-index (elt (quil:application-arguments h) 0))))
+    (is (string= "H" (cl-quil::application-operator-name h)))
+    (is (= 0 (cl-quil:qubit-index (elt (cl-quil:application-arguments h) 0))))
 
-    (is (string= "CNOT" (quil::application-operator-name cnot)))
-    (is (= 0 (quil:qubit-index (elt (quil:application-arguments cnot) 0))))
-    (is (= 1 (quil:qubit-index (elt (quil:application-arguments cnot) 1))))
+    (is (string= "CNOT" (cl-quil::application-operator-name cnot)))
+    (is (= 0 (cl-quil:qubit-index (elt (cl-quil:application-arguments cnot) 0))))
+    (is (= 1 (cl-quil:qubit-index (elt (cl-quil:application-arguments cnot) 1))))
 
-    (is (= 0 (quil::qubit-index (quil::reset-qubit-target reset))))))
+    (is (= 0 (cl-quil::qubit-index (cl-quil::reset-qubit-target reset))))))
 
 (defun verify-rx-code (code)
   (is (= 1 (length code)))
   (let ((rx (elt code 0)))
-    (is (string= "RX" (quil::application-operator-name rx)))
-    (is (= 1 (length (quil:application-parameters rx))))
-    (is (= 1 (length (quil:application-arguments rx))))
-    (is (= 0 (quil:qubit-index (elt (quil:application-arguments rx) 0))))
-    (is (zerop (quil:constant-value (elt (quil:application-parameters rx) 0))))))
+    (is (string= "RX" (cl-quil::application-operator-name rx)))
+    (is (= 1 (length (cl-quil:application-parameters rx))))
+    (is (= 1 (length (cl-quil:application-arguments rx))))
+    (is (= 0 (cl-quil:qubit-index (elt (cl-quil:application-arguments rx) 0))))
+    (is (zerop (cl-quil:constant-value (elt (cl-quil:application-parameters rx) 0))))))
 
 (deftest test-alias-defcircuit ()
   "Test a simple parameter-less DEFCIRCUIT expansion."
@@ -34,7 +34,7 @@
              "    RESET 0"
              "BELL"
              )))
-    (verify-h-cnot-code (quil:parsed-program-executable-code p))))
+    (verify-h-cnot-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-arguments ()
   "Test that arguments can be passed to DEFCIRCUIT."
@@ -45,7 +45,7 @@
              "    RESET p"
              "BELL 0 1"
              )))
-    (verify-h-cnot-code (quil:parsed-program-executable-code p))))
+    (verify-h-cnot-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-parameter ()
   "Test that a parameter can be passed to a DEFCIRCUIT."
@@ -54,7 +54,7 @@
              "    RX(%a) p"
              "ROT(0.0) 0"
              )))
-    (verify-rx-code (quil:parsed-program-executable-code p))))
+    (verify-rx-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-simple-indirection ()
   "Test that arguments can be passed from a DEFCIRCUIT to an inner one.."
@@ -66,7 +66,7 @@
              "DEFCIRCUIT INDIRECTION:"
              "    BELL 0 1"
              "INDIRECTION")))
-    (verify-h-cnot-code (quil:parsed-program-executable-code p))))
+    (verify-h-cnot-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-parameter-and-indirection ()
   "Test that a parameter and argument can be passed from a parameter-less DEFCIRCUIT."
@@ -76,7 +76,7 @@
              "DEFCIRCUIT INDIRECTION:"
              "    ROT(0.0) 0"
              "INDIRECTION")))
-    (verify-rx-code (quil:parsed-program-executable-code p))))
+    (verify-rx-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-argument-passing ()
   "Test that arguments get passed from outer DEFCIRCUITs to inner ones."
@@ -88,7 +88,7 @@
              "DEFCIRCUIT INDIRECTION r s:"
              "    BELL s r"
              "INDIRECTION 1 0")))
-    (verify-h-cnot-code (quil:parsed-program-executable-code p))))
+    (verify-h-cnot-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-parameter-passing ()
   "Test that parameters get passed from outer DEFCIRCUITs to inner ones."
@@ -98,7 +98,7 @@
              "DEFCIRCUIT INDIRECTION(%b):"
              "    ROT(%b) 0"
              "INDIRECTION(0.0)")))
-    (verify-rx-code (quil:parsed-program-executable-code p))))
+    (verify-rx-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-simple-defcircuit-with-mixed-parameter-passing ()
   "Test that some parameters in a DEFCIRCUIT can be filled while others not."
@@ -108,15 +108,15 @@
              "DEFCIRCUIT INDIRECTION(%b):"
              "    FOO(0.0, %b) 0"
              "INDIRECTION(1.0)")))
-    (let ((code (quil:parsed-program-executable-code p)))
+    (let ((code (cl-quil:parsed-program-executable-code p)))
       (is (= 1 (length code)))
       (let ((rx (elt code 0)))
-        (is (string= "FOO" (quil::application-operator-name rx)))
-        (is (= 2 (length (quil:application-parameters rx))))
-        (is (= 1 (length (quil:application-arguments rx))))
-        (is (= 0 (quil:qubit-index (elt (quil:application-arguments rx) 0))))
-        (is (zerop (quil:constant-value (elt (quil:application-parameters rx) 0))))
-        (is (= 1 (quil:constant-value (elt (quil:application-parameters rx) 1))))))))
+        (is (string= "FOO" (cl-quil::application-operator-name rx)))
+        (is (= 2 (length (cl-quil:application-parameters rx))))
+        (is (= 1 (length (cl-quil:application-arguments rx))))
+        (is (= 0 (cl-quil:qubit-index (elt (cl-quil:application-arguments rx) 0))))
+        (is (zerop (cl-quil:constant-value (elt (cl-quil:application-parameters rx) 0))))
+        (is (= 1 (cl-quil:constant-value (elt (cl-quil:application-parameters rx) 1))))))))
 
 (deftest test-defcircuit-recursion-limit ()
   "Test that unbounded recursion is detected."
@@ -137,7 +137,7 @@
              "    LEVEL-2(%c - 1)"
              ;; 4 + (-2 * (3 - 1)) = 0
              "LEVEL-3(3)")))
-    (verify-rx-code (quil:parsed-program-executable-code p))))
+    (verify-rx-code (cl-quil:parsed-program-executable-code p))))
 
 (deftest test-chained-defcircuit-other-instructions ()
   "Test recursive DEFCIRCUIT expansion with MEASUREs and JUMPs."
@@ -157,7 +157,7 @@
              "    JUMP-UNLESS @start2 addr"
              "    INNER(%p) qubit addr"
              "OUTER(0.0) 0 ro[0]")))
-    (let ((code (quil:parsed-program-executable-code p)))
+    (let ((code (cl-quil:parsed-program-executable-code p)))
       (is (= 10 (length code)))
       (destructuring-bind (lbl1 meas-dis1 meas1 jw1 ju1 lbl2 meas-dis2 meas2 jw2 ju2)
           (coerce code 'list)
@@ -187,14 +187,14 @@
              "    MOVE a b"
              "    EXCHANGE b a"
              "CLASSICAL ro[0] ro[1]")))
-    (let ((code (quil:parsed-program-executable-code p)))
+    (let ((code (cl-quil:parsed-program-executable-code p)))
       (is (= 5 (length code)))
       (destructuring-bind (not and ior move exchange) (coerce code 'list)
-        (is (typep not 'quil:classical-not))
-        (is (typep and 'quil:classical-and))
-        (is (typep ior 'quil:classical-inclusive-or))
-        (is (typep move 'quil:classical-move))
-        (is (typep exchange 'quil:classical-exchange))
+        (is (typep not 'cl-quil:classical-not))
+        (is (typep and 'cl-quil:classical-and))
+        (is (typep ior 'cl-quil:classical-inclusive-or))
+        (is (typep move 'cl-quil:classical-move))
+        (is (typep exchange 'cl-quil:classical-exchange))
 
         (is (= 0 (memory-ref-position (classical-target not))))
 
@@ -213,8 +213,8 @@
 (deftest test-defcircuit-unique-labels ()
   "Test that DEFCIRCUIT gets unique labels."
   (let* ((p (not-signals simple-error
-              (quil::transform
-               'quil::patch-labels
+              (cl-quil::transform
+               'cl-quil::patch-labels
                (with-output-to-quil
                  "DECLARE ro BIT"
                  "DEFCIRCUIT FOO:"
@@ -224,7 +224,7 @@
                  "    JUMP-UNLESS @INNER ro[0]"
                  "FOO"
                  "FOO"))))
-         (code (quil:parsed-program-executable-code p)))
+         (code (cl-quil:parsed-program-executable-code p)))
     (is (= 6 (length code)))
     (destructuring-bind (j1 jw1 ju1 j2 jw2 ju2) (coerce code 'list)
       (let ((label1 (jump-label j1))
@@ -242,10 +242,10 @@
               "    H 0"
               "    CNOT 0 1"
               "DAGGER BELL"))
-         (code (quil:parsed-program-executable-code p)))
+         (code (cl-quil:parsed-program-executable-code p)))
     (destructuring-bind (instr-cnot instr-h)
-        (mapcar (a:compose #'quil::operator-description-string
-                           #'quil:application-operator)
+        (mapcar (a:compose #'cl-quil::operator-description-string
+                           #'cl-quil:application-operator)
                 (coerce code 'list))
       (is (string= "DAGGER CNOT" instr-cnot))
       (is (string= "DAGGER H" instr-h))))
@@ -255,10 +255,10 @@
               "    X 0"
               "FOOBAR"
               "DAGGER FOOBAR"))
-         (code (quil:parsed-program-executable-code p)))
+         (code (cl-quil:parsed-program-executable-code p)))
     (destructuring-bind (instr-x instr-dagger-x)
-        (mapcar (a:compose #'quil::operator-description-string
-                           #'quil:application-operator)
+        (mapcar (a:compose #'cl-quil::operator-description-string
+                           #'cl-quil:application-operator)
                 (coerce code 'list))
       (is (string= "X" instr-x))
       (is (string= "DAGGER X" instr-dagger-x)))))
@@ -272,12 +272,12 @@
               "DEFCIRCUIT B:"
               "    DAGGER A"
               "DAGGER B"))
-         (code (quil:parsed-program-executable-code p)))
+         (code (cl-quil:parsed-program-executable-code p)))
     ;; Note that here the order of operations is reversed yet again,
     ;; so that the H 0 instruction is back on top.
     (destructuring-bind (instr-h instr-cnot)
-        (mapcar (a:compose #'quil::operator-description-string
-                           #'quil:application-operator)
+        (mapcar (a:compose #'cl-quil::operator-description-string
+                           #'cl-quil:application-operator)
                 (coerce code 'list))
       (is (string= "H" instr-h))
       (is (string= "CNOT" instr-cnot)))))
@@ -285,24 +285,24 @@
 (deftest test-defcircuit-controlled ()
   "Test application of CONTROLLED modifier on a circuit application."
   (signals simple-error
-    (quil:safely-parse-quil "
+    (cl-quil:safely-parse-quil "
 DEFCIRCUIT ZXZ q0 q1:
     Z q0; X q1; Z 2
 
 CONTROLLED ZXZ"))
 
   (signals simple-error
-    (quil:safely-parse-quil "
+    (cl-quil:safely-parse-quil "
 DEFCIRCUIT ZXZ q0 q1:
     Z q0; X q1; Z 2
 
 CONTROLLED ZXZ 2 0 1"))
 
-  (let ((a (quil:safely-parse-quil "
+  (let ((a (cl-quil:safely-parse-quil "
 DEFCIRCUIT ZX q0 q1:
     Z q0; X q1
 
 CONTROLLED ZX 2 0 1"))
-        (b (quil:safely-parse-quil "CZ 2 0; CONTROLLED X 2 1")))
-    (is (quil::matrix-equals-dwim (quil:parsed-program-to-logical-matrix a)
-                                  (quil:parsed-program-to-logical-matrix b)))))
+        (b (cl-quil:safely-parse-quil "CZ 2 0; CONTROLLED X 2 1")))
+    (is (cl-quil::matrix-equals-dwim (cl-quil:parsed-program-to-logical-matrix a)
+                                  (cl-quil:parsed-program-to-logical-matrix b)))))

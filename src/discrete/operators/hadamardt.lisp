@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/operators)
+(cl:in-package #:cl-quil/discrete/operators)
 
 ;;; Defines an exact synthsis algorithm and its output type
 

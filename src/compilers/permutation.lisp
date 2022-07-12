@@ -170,7 +170,7 @@ in accordance with how Quil interprets a gate application."
 (defun permutation-gate-to-mcx (instr &key context)
   "Compile instructions representing permutation gates to n-qubit Toffoli gates."
   (declare (ignore context))
-  (unless (slot-boundp instr 'cl-quil.frontend::name-resolution)
+  (unless (slot-boundp instr 'cl-quil/frontend::name-resolution)
     (give-up-compilation))
   (let ((res (gate-application-resolution instr)))
     (when (typep res 'gate-definition)

@@ -2,12 +2,12 @@
 ;;;;
 ;;;; Author: Robert Smith, A.J. Nyquist
 
-(defpackage #:cl-quil.discrete/numeric
+(defpackage #:cl-quil/discrete/numeric
   (:documentation "Numeric systems")
   (:use #:coalton
         #:coalton-prelude
         #:coalton-library/math
-        #:cl-quil.clifford)
+        #:cl-quil/clifford)
   #+sbcl (:import-from #:coalton-library/big-float #:Big-Float)
   (:shadow #:coalton-library/list #:singleton)
   ;; utilities.lisp
@@ -125,12 +125,12 @@
    #:rootunity4->integer
    ))
 
-(defpackage #:cl-quil.discrete/operators
+(defpackage #:cl-quil/discrete/operators
   (:documentation "Linear operators")
   (:use #:coalton
         #:coalton-prelude
         #:coalton-library/math
-        #:cl-quil.discrete/numeric
+        #:cl-quil/discrete/numeric
         )
   ;; mat2.lisp
   (:export #:Mat2)
@@ -159,13 +159,13 @@
   ;; maform.lisp
   (:export #:MAForm))
 
-(defpackage #:cl-quil.discrete/rz-approx
+(defpackage #:cl-quil/discrete/rz-approx
   (:documentation "Approximator for Rz gates")
   (:use #:coalton
         #:coalton-prelude
         #:coalton-library/math
-        #:cl-quil.discrete/numeric
-        #:cl-quil.discrete/operators
+        #:cl-quil/discrete/numeric
+        #:cl-quil/discrete/operators
         )
   ;; generate-solution.lisp
   (:export
@@ -174,21 +174,19 @@
    )
   #+sbcl (:import-from #:coalton-library/big-float #:Big-Float)
   (:local-nicknames
-   (#:operators #:cl-quil.discrete/operators)))
+   (#:operators #:cl-quil/discrete/operators)))
 
-(defpackage #:cl-quil.discrete
+(defpackage #:cl-quil/discrete
   (:use #:cl
-        #:cl-quil.discrete/operators
-        #:cl-quil.discrete/rz-approx
-        )
-  (:import-from #:cl-quil.discrete/numeric
+        #:cl-quil/discrete/operators
+        #:cl-quil/discrete/rz-approx)
+  (:import-from #:cl-quil/discrete/numeric
                 #:RootUnity8
                 #:Root2plex
-                #:Dyadic
-                )
+                #:Dyadic)
 
   (:local-nicknames (#:q #:cl-quil)
-                    (#:chips #:cl-quil.chip-library))
+                    (#:chips #:cl-quil/chip-library))
   ;; discrete-chip.lisp
   (:export
    #:+discrete-gate-names+              ; CONSTANT
@@ -205,6 +203,6 @@
           (package-local-nicknames parent))
          nil))
 
-  (inherit-local-nicknames "CL-QUIL.DISCRETE/NUMERIC" "COALTON-USER")
-  (inherit-local-nicknames "CL-QUIL.DISCRETE/OPERATORS" "COALTON-USER")
-  (inherit-local-nicknames "CL-QUIL.DISCRETE/RZ-APPROX" "COALTON-USER"))
+  (inherit-local-nicknames "CL-QUIL/DISCRETE/NUMERIC" "COALTON-USER")
+  (inherit-local-nicknames "CL-QUIL/DISCRETE/OPERATORS" "COALTON-USER")
+  (inherit-local-nicknames "CL-QUIL/DISCRETE/RZ-APPROX" "COALTON-USER"))

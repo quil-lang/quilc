@@ -19,8 +19,8 @@
   "Path to directory containing golden files whose expected output sections must be compared via regex.")
 
 (defun parse-and-print-quil-to-string (input
-                                       &key (parser #'quil:parse-quil)
-                                            (printer #'quil::print-parsed-program))
+                                       &key (parser #'cl-quil:parse-quil)
+                                            (printer #'cl-quil::print-parsed-program))
   (with-output-to-string (s)
     (funcall printer (funcall parser input) s)))
 
@@ -49,7 +49,7 @@ See the documentation string for UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS for more inf
       ;; This SETF is ugly, but guarding this in a NOT-SIGNALS aids debugging in case
       ;; PARSE-AND-PRINT-QUIL-TO-STRING chokes on INPUT.
       (not-signals error (setf actual-output (parse-and-print-quil-to-string input)))
-      (not-signals error (quil:parse-quil actual-output))
+      (not-signals error (cl-quil:parse-quil actual-output))
       (is (funcall check-output expected-output actual-output) golden-error-message)
 
       ;; Ensure expected-output is a fixed point of parse -> print. In rare cases, this check
@@ -80,7 +80,7 @@ See the documentation string for UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS for more inf
 
 (deftest test-instruction-fmt ()
   (is (string= "PRAGMA gate_time CNOT \"50 ns\"" (format nil "~/cl-quil:instruction-fmt/"
-                                                         (make-instance 'quil::pragma
+                                                         (make-instance 'cl-quil::pragma
                                                                         :words '("gate_time" "CNOT")
                                                                         :freeform-string "50 ns"))))
   ;; try a operand-free instruction
@@ -88,11 +88,11 @@ See the documentation string for UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS for more inf
 
   ;; try a unary instruction
   (is (string= "NEG ro[3]" (format nil "~/cl-quil:instruction-fmt/"
-                                   (make-instance 'quil::classical-negate
+                                   (make-instance 'cl-quil::classical-negate
                                                   :target (mref "ro" 3)))))
   ;; try a binary instruction
   (is (string= "MEASURE 1 ro[3]" (format nil "~/cl-quil:instruction-fmt/"
-                                         (make-instance 'quil::measure
+                                         (make-instance 'cl-quil::measure
                                                         :address (mref "ro" 3)
                                                         :qubit (qubit 1)))))
   ;; try something fancy
@@ -117,7 +117,7 @@ See the documentation string for UPDATE-GOLDEN-FILE-OUTPUT-SECTIONS for more inf
 
 R 0"))
     (let ((after (parse-and-print-quil-to-string before)))
-      (not-signals error (quil::parse-quil after)))))
+      (not-signals error (cl-quil::parse-quil after)))))
 
 (deftest test-circuit-and-declare-printing ()
   ;; This test relies on not applying the EXPAND-CIRCUITS transform,
@@ -132,26 +132,26 @@ DEFCIRCUIT TEST(%a) b c:
 TEST(0.5) 0 1
 ")
          (after (parse-and-print-quil-to-string before :parser (lambda (string)
-                                                                 (quil::parse-quil string :transforms nil)))))
+                                                                 (cl-quil::parse-quil string :transforms nil)))))
     (is (string= before after))))
 
 (deftest test-jump-to-integer-label-printing ()
   "Ensure that JUMP instructions with integer LABELs are printed correctly."
-  (is (string= (quil::print-instruction-to-string
-                (quil::make-instance 'quil::unconditional-jump :label 42))
+  (is (string= (cl-quil::print-instruction-to-string
+                (cl-quil::make-instance 'cl-quil::unconditional-jump :label 42))
                "JUMP {absolute address 42}"))
-  (is (string= (quil::print-instruction-to-string
-                (quil::make-instance 'quil::jump-when :label 0 :address (quil::mref "ro" 0)))
+  (is (string= (cl-quil::print-instruction-to-string
+                (cl-quil::make-instance 'cl-quil::jump-when :label 0 :address (cl-quil::mref "ro" 0)))
                "JUMP-WHEN {absolute address 0} ro[0]"))
-  (is (string= (quil::print-instruction-to-string
-                (quil::make-instance 'quil::jump-unless :label 1 :address (quil::mref "ro" 2)))
+  (is (string= (cl-quil::print-instruction-to-string
+                (cl-quil::make-instance 'cl-quil::jump-unless :label 1 :address (cl-quil::mref "ro" 2)))
                "JUMP-UNLESS {absolute address 1} ro[2]")))
 
 
 (defun %check-format-single (test-function format-control input expected-output
                              &key print-fractional-radians print-polar-form)
-  (let ((quil::*print-fractional-radians* print-fractional-radians)
-        (quil::*print-polar-form* print-polar-form))
+  (let ((cl-quil::*print-fractional-radians* print-fractional-radians)
+        (cl-quil::*print-polar-form* print-polar-form))
     (is (funcall test-function expected-output (format nil format-control input)))))
 
 (defun %check-format (test-function format-control testcases
@@ -188,8 +188,8 @@ Used as a helper function in TEST-REAL-FMT."
                         (42.42 . "42.42")
                         (42.42d0 . "42.42")
                         (#C(4.2 0) . "4.2"))))
-    (%check-format #'string= "~/quil:complex-fmt/" simple-cases :print-polar-form t)
-    (%check-format #'string= "~/quil:complex-fmt/" simple-cases :print-polar-form nil))
+    (%check-format #'string= "~/cl-quil:complex-fmt/" simple-cases :print-polar-form t)
+    (%check-format #'string= "~/cl-quil:complex-fmt/" simple-cases :print-polar-form nil))
 
   ;; Test some cases with non-zero IMAGPART with *PRINT-POLAR-FORM* = NIL.
   (let ((complex-cases '((#C(0.0 1.0) . "1.0i")
@@ -198,20 +198,20 @@ Used as a helper function in TEST-REAL-FMT."
                          (#C(-1.0 -1.0) . "-1.0-1.0i")
                          (#C(42.42 123.45) . "42.42+123.45i")
                          (#C(42.42d0 123.45d0) . "42.42+123.45i"))))
-    (%check-format #'string= "~/quil:complex-fmt/" complex-cases
+    (%check-format #'string= "~/cl-quil:complex-fmt/" complex-cases
                    :print-polar-form nil :print-fractional-radians t)
-    (%check-format #'string= "~/quil:complex-fmt/" complex-cases
+    (%check-format #'string= "~/cl-quil:complex-fmt/" complex-cases
                    :print-polar-form nil :print-fractional-radians nil))
 
   ;; Test *PRINT-POLAR-FORM* = T and *PRINT-FRACTIONAL-RADIANS* = T.
   (%check-format #'string=
-                 "~/quil:complex-fmt/"
+                 "~/cl-quil:complex-fmt/"
                  `((#C(0.0 1.0) . "1.0∠pi/2")
                    (#C(0.0 -1.0) . "1.0∠3*pi/2")
-                   (,(cis quil::pi) . "1.0∠pi")
-                   (,(cis (- quil::pi)) . "1.0∠pi")
-                   (,(cis (/ quil::pi 2)) . "1.0∠pi/2")
-                   (,(cis (/ quil::pi 4)) . "1.0∠pi/4"))
+                   (,(cis cl-quil::pi) . "1.0∠pi")
+                   (,(cis (- cl-quil::pi)) . "1.0∠pi")
+                   (,(cis (/ cl-quil::pi 2)) . "1.0∠pi/2")
+                   (,(cis (/ cl-quil::pi 4)) . "1.0∠pi/4"))
                  :print-polar-form t
                  :print-fractional-radians t))
 
@@ -234,23 +234,23 @@ Used as a helper function in TEST-REAL-FMT."
                         (1234.1234 . "1234.1234")
                         #-allegro (2e10 . "20000000000.0")
                         )))
-    (%check-format #'string= "~/quil:real-fmt/" simple-cases :print-fractional-radians t)
-    (%check-format #'string= "~/quil:real-fmt/" simple-cases :print-fractional-radians nil))
+    (%check-format #'string= "~/cl-quil:real-fmt/" simple-cases :print-fractional-radians t)
+    (%check-format #'string= "~/cl-quil:real-fmt/" simple-cases :print-fractional-radians nil))
 
   ;; Test *PRINT-FRACTIONAL-RADIANS* = NIL.
   (%check-format #'uiop:string-prefix-p
-                 "~/quil:real-fmt/"
-                 `((,(- quil::pi) . "-3.1415")
-                   (,quil::pi . "3.1415")
-                   (,(* (- 1) (/ quil::pi 2)) . "-1.5707")
-                   (,(* (- 3) (/ quil::pi 2)) . "-4.7123")
-                   (,(* (- 1) (/ quil::pi 3)) . "-1.0471")
-                   (,(* 1 (/ quil::pi 4)) . "0.7853")
-                   (,(* 5 (/ quil::pi 6)) . "2.6179"))
+                 "~/cl-quil:real-fmt/"
+                 `((,(- cl-quil::pi) . "-3.1415")
+                   (,cl-quil::pi . "3.1415")
+                   (,(* (- 1) (/ cl-quil::pi 2)) . "-1.5707")
+                   (,(* (- 3) (/ cl-quil::pi 2)) . "-4.7123")
+                   (,(* (- 1) (/ cl-quil::pi 3)) . "-1.0471")
+                   (,(* 1 (/ cl-quil::pi 4)) . "0.7853")
+                   (,(* 5 (/ cl-quil::pi 6)) . "2.6179"))
                  :print-fractional-radians nil)
 
   ;; Test *PRINT-FRACTIONAL-RADIANS* = T.
-  (let ((loose-threshold quil::+double-comparison-threshold-loose+)
+  (let ((loose-threshold cl-quil::+double-comparison-threshold-loose+)
         ;; fudge-factor of 20x because numerical analysis is hard (let's go shopping)
         (epsilon (* 20 double-float-epsilon)))
     (flet ((in-bounds- (r)
@@ -262,9 +262,9 @@ Used as a helper function in TEST-REAL-FMT."
            (out-of-bounds+ (r)
              (+ r loose-threshold epsilon))
            (check (pred r expected)
-             (%check-format-single pred "~/quil:real-fmt/" r expected :print-fractional-radians t)))
-      (loop :for rr :across cl-quil.frontend::**reasonable-rationals**
-            :for rr-pi := (* rr quil::pi)
+             (%check-format-single pred "~/cl-quil:real-fmt/" r expected :print-fractional-radians t)))
+      (loop :for rr :across cl-quil/frontend::**reasonable-rationals**
+            :for rr-pi := (* rr cl-quil::pi)
             :for minus-rr-pi := (- rr-pi)
             :for rr-pi-expected := (%pprint-rational-as-pi-multiple rr)
             :for minus-rr-pi-expected := (concatenate 'string "-" rr-pi-expected) :do

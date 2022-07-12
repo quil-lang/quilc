@@ -65,17 +65,17 @@
                                             :|quil| quil
                                             :|target_device| target-device))
              (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil t))
-             (pp (quil::parse-quil quil))
-             (cpp (quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
+             (pp (cl-quil::parse-quil quil))
+             (cpp (cl-quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
         (multiple-value-bind (mat1 mat2)
-            (quil::matrix-rescale (quil::make-matrix-from-quil
-                                   (coerce (quil:parsed-program-executable-code pp) 'list))
-                                  (quil::make-matrix-from-quil
-                                   (coerce (quil:parsed-program-executable-code cpp) 'list)))
-          (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
+            (cl-quil::matrix-rescale (cl-quil::make-matrix-from-quil
+                                   (coerce (cl-quil:parsed-program-executable-code pp) 'list))
+                                  (cl-quil::make-matrix-from-quil
+                                   (coerce (cl-quil:parsed-program-executable-code cpp) 'list)))
+          (setf mat1 (cl-quil::scale-out-matrix-phases mat1 mat2))
           (is (> 1d0 (rpcq::|NativeQuilMetadata-program_fidelity|
                             (rpcq::|NativeQuilResponse-metadata| server-response))))
-          (is (quil::matrix-equality mat1 mat2)))))))
+          (is (cl-quil::matrix-equality mat1 mat2)))))))
 
 (deftest test-quil-to-native-quil-protoquil-endpoint ()
   "Test that the \"quil-to-native-quil\" endpoint will compile protoquil when given :PROTOQUIL T."
@@ -96,10 +96,10 @@
                                           :|target_device| target-device))
            (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil nil))
            (server-response-protoquil (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil t))
-           (cpp (quil:parse-quil (rpcq::|NativeQuilResponse-quil| server-response)))
-           (cpp-protoquil (quil:parse-quil (rpcq::|NativeQuilResponse-quil| server-response-protoquil))))
-      (is (not (quil:protoquil-program-p cpp)))
-      (is (quil:protoquil-program-p cpp-protoquil)))))
+           (cpp (cl-quil:parse-quil (rpcq::|NativeQuilResponse-quil| server-response)))
+           (cpp-protoquil (cl-quil:parse-quil (rpcq::|NativeQuilResponse-quil| server-response-protoquil))))
+      (is (not (cl-quil:protoquil-program-p cpp)))
+      (is (cl-quil:protoquil-program-p cpp-protoquil)))))
 
 (deftest test-quil-to-native-quil-endpoint-overrides-server ()
   "Test that the \"quil-to-native-quil\" endpoint can override a server that has been started with -P."
@@ -125,13 +125,13 @@
                                               :|quil| quil
                                               :|target_device| target-device)))
           (flet ((parse-response (protoquil)
-                   (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+                   (cl-quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
             ;; :protoquil nil means defer to server, i.e. this should produce protoquil
-            (is (quil:protoquil-program-p (parse-response nil)))
+            (is (cl-quil:protoquil-program-p (parse-response nil)))
             ;; :protoquil ':false means no protoquil, override server's -P
-            (is (not (quil:protoquil-program-p (parse-response ':false))))
+            (is (not (cl-quil:protoquil-program-p (parse-response ':false))))
             ;; :protoquil t means yes protoquil, regardless of what the server says
-            (is (quil:protoquil-program-p (parse-response t))))))))
+            (is (cl-quil:protoquil-program-p (parse-response t))))))))
 
   ;; Same tests but for *protoquil* = nil
   (quilc::special-bindings-let* ((quilc::*protoquil* nil))
@@ -152,13 +152,13 @@
                                               :|quil| quil
                                               :|target_device| target-device)))
           (flet ((parse-response (protoquil)
-                   (quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
+                   (cl-quil:parse-quil (rpcq::|NativeQuilResponse-quil| (rpcq:rpc-call client "quil-to-native-quil" server-payload :protoquil protoquil)))))
             ;; :protoquil nil means defer to server, i.e. this should not produce protoquil
-            (is (not (quil:protoquil-program-p (parse-response nil))))
+            (is (not (cl-quil:protoquil-program-p (parse-response nil))))
             ;; :protoquil ':false means no protoquil, override server's -P
-            (is (not (quil:protoquil-program-p (parse-response ':false))))
+            (is (not (cl-quil:protoquil-program-p (parse-response ':false))))
             ;; :protoquil t means yes protoquil, regardless of what the server says
-            (is (quil:protoquil-program-p (parse-response t)))))))))
+            (is (cl-quil:protoquil-program-p (parse-response t)))))))))
 
 (deftest test-native-quil-to-binary-endpoint ()
   "Test that the \"native-quil-to-binary\" endpoint works."
@@ -211,10 +211,10 @@ H 0")
            (request (make-instance 'rpcq::|RewriteArithmeticRequest|
                                    :|quil| quil))
            (response (rpcq:rpc-call client "rewrite-arithmetic" request)))
-      (is (quil::matrix-equality
-           (quil:parsed-program-to-logical-matrix (quil:parse-quil quil))
-           (quil:parsed-program-to-logical-matrix
-            (quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
+      (is (cl-quil::matrix-equality
+           (cl-quil:parsed-program-to-logical-matrix (cl-quil:parse-quil quil))
+           (cl-quil:parsed-program-to-logical-matrix
+            (cl-quil:parse-quil (rpcq::|RewriteArithmeticResponse-quil| response))))))))
 (deftest test-quil-to-native-quil-on-nontrivial-features ()
   "Test that non-trivial language features (such as DEFCIRCUIT) are processed correctly."
   (with-random-rpc-client (client)
@@ -234,19 +234,19 @@ TEST 0 1
                                           :|quil| quil
                                           :|target_device| target-device))
            (server-response (rpcq:rpc-call client "quil-to-native-quil" server-payload))
-           (pp (quil::parse-quil quil))
-           (cpp (quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
+           (pp (cl-quil::parse-quil quil))
+           (cpp (cl-quil::parse-quil (rpcq::|NativeQuilResponse-quil| server-response))))
       (multiple-value-bind (mat1 mat2)
-          (quil::matrix-rescale (quil::make-matrix-from-quil
-                                 (coerce (quil:parsed-program-executable-code pp) 'list))
-                                (quil::make-matrix-from-quil
-                                 (coerce (quil:parsed-program-executable-code cpp) 'list)))
-        (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
-        (is (quil::matrix-equality mat1 mat2))))))
+          (cl-quil::matrix-rescale (cl-quil::make-matrix-from-quil
+                                 (coerce (cl-quil:parsed-program-executable-code pp) 'list))
+                                (cl-quil::make-matrix-from-quil
+                                 (coerce (cl-quil:parsed-program-executable-code cpp) 'list)))
+        (setf mat1 (cl-quil::scale-out-matrix-phases mat1 mat2))
+        (is (cl-quil::matrix-equality mat1 mat2))))))
 
 (deftest test-quil-safely-resolve ()
-  "Test that the \"quil-to-native-quil\" endpoint raises an error when including a file outside of quil::*safe-include-directory*."
-  (quilc::special-bindings-let* ((quil::*safe-include-directory* "./"))
+  "Test that the \"quil-to-native-quil\" endpoint raises an error when including a file outside of cl-quil::*safe-include-directory*."
+  (quilc::special-bindings-let* ((cl-quil::*safe-include-directory* "./"))
     (quilc::special-bindings-let* ((bt:*default-special-bindings* bt:*default-special-bindings*))
       (with-random-rpc-client (client)
         (let* ((quil "INCLUDE \"../test\"")

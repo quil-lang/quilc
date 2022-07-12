@@ -3,7 +3,7 @@
 ;;;; Authors: Robert Smith
 ;;;;          Erik Davis
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; Since both circuit and calibration expansion rely on some common code, but
 ;;; we would like error messages to be as specific as possible, we choose to
@@ -185,7 +185,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
                                                 args)))
            (dolist (instr instrs)
              (unless (unitary-instruction-p instr)
-               (error "DAGGER cannot be applied to the impure instruction ~/quil:instruction-fmt/"
+               (error "DAGGER cannot be applied to the impure instruction ~/cl-quil:instruction-fmt/"
                       instr))
              (setf (application-operator instr)
                    (involutive-dagger-operator (application-operator instr))))
@@ -195,12 +195,12 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
         ((simple-controlled-operator-p (application-operator instr))
          (let ((arguments (arguments instr)))
            (when (endp arguments)
-             (error "CONTROLLED requires at least one control qubit in ~/quil:instruction-fmt/." instr))
+             (error "CONTROLLED requires at least one control qubit in ~/cl-quil:instruction-fmt/." instr))
 
            (destructuring-bind (control-qubit . target-qubits) arguments
              (when (member control-qubit target-qubits :test #'argument=)
                (error "CONTROLLED cannot be applied when the control qubit is among the target qubits ~
-                       in ~/quil:instruction-fmt/" instr))
+                       in ~/cl-quil:instruction-fmt/" instr))
 
              (let ((definition (circuit-application-definition instr)))
                ;; Check that the instructions in the body of a given circuit
@@ -223,7 +223,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
                  (dolist (instr instrs instrs)
                    (unless (unitary-instruction-p instr)
                      (error "CONTROLLED cannot be applied to the impure instruction ~
-                            ~/quil:instruction-fmt/" instr))
+                            ~/cl-quil:instruction-fmt/" instr))
                    (setf (application-operator instr) (controlled-operator (application-operator instr))
                          (application-arguments instr) (cons control-qubit (arguments instr)))))))))
 
@@ -232,7 +232,7 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
                                   params
                                   args))
         (t
-         (error "Unable to instantiate the modifiers in the complex instruction ~/quil:instruction-fmt/."
+         (error "Unable to instantiate the modifiers in the complex instruction ~/cl-quil:instruction-fmt/."
                 instr)))))
 
   (:method ((instr application) param-value arg-value)

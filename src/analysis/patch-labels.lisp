@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (define-transform patch-labels (patch-labels)
   "This transform resolves labels. Label positions are calculated, and corresponding JUMP instruction labels are patched with their absolute position in a program.

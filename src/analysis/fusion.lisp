@@ -5,7 +5,7 @@
 ;;;; (Many ideas inspired by Aaron Vontell, who write the first but
 ;;;; altogether different implementation of gate fusion.)
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; This file has data structures and algorithms for performing "gate
 ;;; fusion", a program transformation to reduce the number of gates by

@@ -6,7 +6,7 @@
 ;;;; do not belong here and should live in the file or package where they are most used,
 ;;;; e.g. OPTIMAL-2Q-TARGET-ATOM in compilers/approx.lisp.
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (macrolet

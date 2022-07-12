@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil.quilt)
+(in-package #:cl-quil/quilt)
 
 (defun raw-capture-num-real-samples (instr)
   (check-type instr raw-capture)
@@ -22,13 +22,13 @@
     (adt:match quil-type (memory-descriptor-type mdesc)
       (quil-real
        (if (> 2 (memory-segment-length mdesc :offset mref))
-           (quil-type-error "CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
+           (quil-type-error "CAPTURE instruction target ~/cl-quil:instruction-fmt/ must be a REAL ~
                             vector of length no less than 2."
                             mref)
            t))
       (_
        (quil-type-error "CAPTURE instruction target must be of type ~
-                        REAL, but got ~/quil:instruction-fmt/ of type ~A."
+                        REAL, but got ~/cl-quil:instruction-fmt/ of type ~A."
                         mref
                         (quil-type-string (memory-descriptor-type mdesc)))))))
 
@@ -43,14 +43,14 @@
       (quil-real
        (a:if-let ((samples (raw-capture-num-real-samples instr)))
          (if (> samples (memory-segment-length mdesc :offset mref))
-             (quil-type-error "RAW-CAPTURE instruction target ~/quil:instruction-fmt/ must be a REAL ~
+             (quil-type-error "RAW-CAPTURE instruction target ~/cl-quil:instruction-fmt/ must be a REAL ~
                               vector of length no less than ~A."
                               mref
                               samples))
-         (warn "RAW-CAPTURE on frame ~/quil:instruction-fmt/ with unknown sample rate."
+         (warn "RAW-CAPTURE on frame ~/cl-quil:instruction-fmt/ with unknown sample rate."
                (frame-definition-frame frame-defn))))
       (_
        (quil-type-error "RAW-CAPTURE instruction target must be of type ~
-                        REAL, but got ~/quil:instruction-fmt/ of type ~A."
+                        REAL, but got ~/cl-quil:instruction-fmt/ of type ~A."
                         mref
                         (quil-type-string (memory-descriptor-type mdesc)))))))

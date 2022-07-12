@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; In this file we write some routines to deal with elements of
 ;;; the symplectic group Sp(2n, F_2).

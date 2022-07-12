@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-(in-package #:cl-quil.quilt)
+(in-package #:cl-quil/quilt)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Tokenization ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

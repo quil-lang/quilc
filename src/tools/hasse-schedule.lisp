@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Mark David
 
-(in-package #:cl-quil.tools)
+(in-package #:cl-quil/tools)
 
 ;;; This file implements utilities for creating a Hasse Diagram for a
 ;;; logical-scheduler instance. The resulting diagram indicates the
@@ -89,13 +89,13 @@
 (defun format-hasse-instr-label (format-dest instr counter)
   (format format-dest
           (if *show-instr-instance-counters*
-              "~/quil::instruction-fmt/ [~d]"
-              "~/quil::instruction-fmt/")
+              "~/cl-quil::instruction-fmt/ [~d]"
+              "~/cl-quil::instruction-fmt/")
           instr counter))
 
 (defun format-hasse-instr-name (format-dest instr counter)
   (format format-dest
-          "~/quil::instruction-fmt/ [~d]"
+          "~/cl-quil::instruction-fmt/ [~d]"
           instr counter))
       
 (defun hasse-instr-visited-p (instr)
@@ -156,12 +156,12 @@
 
 (defun quil-text-to-logical-scheduler (source-text)
   "Make a logical scheduler corresponding to SOURCE-TEXT."
-  (quil-parse-to-logical-scheduler (quil:parse-quil source-text)))
+  (quil-parse-to-logical-scheduler (cl-quil:parse-quil source-text)))
 
 
 (defun quil-parse-to-logical-scheduler (parse)
   "Make a logical scheduler corresponding to PARSE."
-  (let* ((instructions-vector (quil:parsed-program-executable-code parse))
+  (let* ((instructions-vector (cl-quil:parsed-program-executable-code parse))
          (instructions-list (concatenate 'list instructions-vector))
          (lsched (quil.si:make-lscheduler)))
     (quil.si:append-instructions-to-lschedule lsched instructions-list)
@@ -173,7 +173,7 @@
 (defun program-to-string (program)
   "Return a string representation of PROGRAM.
 
-PROGRAM should be either a parsed program (i.e., a quil:parsed-program
+PROGRAM should be either a parsed program (i.e., a cl-quil:parsed-program
 instance), a string, or a list of strings.  If a string, it is assumed
 to have its own internal line breaks, and it is returned as is.  If a
 list of strings, each string is assumed to represent a line, and this
@@ -186,9 +186,9 @@ quil:print-parsed-program, to a string that is returned."
       (with-output-to-string (out)
         (loop :for line :in program
               :do (write-line line out))))
-    (quil:parsed-program
+    (cl-quil:parsed-program
       (with-output-to-string (out)
-        (quil:print-parsed-program program out)))))
+        (cl-quil:print-parsed-program program out)))))
 
 
 (defun write-program-to-graphviz-comment (program &key stream comment-line-start)
@@ -286,7 +286,7 @@ default/expected type for a Graphviz DOT file is: gv
 In the case of writing to a file, this returns the true name of the
 resulting file a string.  Otherwise, this returns nil."
   (let* ((program-string (program-to-string program))
-         (parse (quil:parse program-string))
+         (parse (cl-quil:parse program-string))
          (logical-scheduler (quil-parse-to-logical-scheduler parse)))
     (write-hasse-for-logical-scheduler
      logical-scheduler

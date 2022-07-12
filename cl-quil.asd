@@ -1,4 +1,4 @@
-;;;; cl-quil.asd
+;;;; cl-quil/asd
 ;;;;
 ;;;; Author: Robert Smith
 
@@ -136,7 +136,9 @@
                (:file "pragmas")
                (:file "parser")
                (:file "cl-quil")
-               (:file "qasm")
+               (:module "qasm"
+                :serial t
+                :components ((:file "qasm")))
                (:file "gates")
                (:file "build-gate")
                (:file "with-inst")
@@ -190,7 +192,7 @@
                #:cl-quil/chip-library
                #:fiasco)
   :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil.chip-library-tests
+                         (uiop:symbol-call ':cl-quil/chip-library-tests
                                            '#:run-chip-library-tests))
   :pathname "tests/chip-library/"
   :serial t
@@ -234,7 +236,7 @@
   :depends-on (#:cl-quil-tests
                #:cl-quil/quilt)
   :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil.quilt-tests
+                         (uiop:symbol-call ':cl-quil/quilt-tests
                                            '#:run-quilt-tests))
   :pathname "tests/quilt/"
   :serial t
@@ -301,7 +303,7 @@
   :license "Apache License 2.0 (See LICENSE.txt)"
   :depends-on (#:cl-quil/discrete #:coalton #:coalton/testing #:fiasco)
   :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil.discrete-tests
+                         (uiop:symbol-call ':cl-quil/discrete-tests
                                            '#:run-discrete-tests))
   :pathname "tests/discrete/"
   :serial t
@@ -335,7 +337,7 @@
                #:qvm
                #:fiasco)
   :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil.quilec-tests
+                         (uiop:symbol-call ':cl-quil/quilec-tests
                                            '#:run-quilec-tests))
   :pathname "tests/quilec/"
   :serial t
@@ -366,7 +368,7 @@
   :depends-on (#:cl-quil-tests
                #:cl-quil/tools)
   :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil.tools-tests
+                         (uiop:symbol-call ':cl-quil/tools-tests
                                            '#:run-tools-tests))
   :pathname "tests/tools/"
   :serial t

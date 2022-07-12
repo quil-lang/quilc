@@ -5,100 +5,100 @@
 (in-package #:cl-quil-tests)
 
 (deftest test-rewiring-shuffle ()
-  (dolist (quil::*addresser-gates-swap-search-type* '(:a* :greedy-qubit :greedy-path))
+  (dolist (cl-quil::*addresser-gates-swap-search-type* '(:a* :greedy-qubit :greedy-path))
     (not-signals error
       (let ((text "CNOT 2 0"))
-        (is (quil::operator=
-             (quil:parsed-program-to-logical-matrix
-              (quil::parse-quil text))
-             (quil:parsed-program-to-logical-matrix
-              (quil::compiler-hook (quil::parse-quil text) (quil::build-8q-chip)
+        (is (cl-quil::operator=
+             (cl-quil:parsed-program-to-logical-matrix
+              (cl-quil::parse-quil text))
+             (cl-quil:parsed-program-to-logical-matrix
+              (cl-quil::compiler-hook (cl-quil::parse-quil text) (cl-quil::build-8q-chip)
                                    :protoquil nil :rewiring-type ':naive))))))))
 
 (deftest test-addresser-subclasses ()
-  (let* ((chip (quil::build-8q-chip))
+  (let* ((chip (cl-quil::build-8q-chip))
          (text "CNOT 0 1 ; CNOT 0 2 ; CNOT 1 2")
-         (orig-mat (quil:parsed-program-to-logical-matrix (quil::parse-quil text))))
-    (dolist (quil::*default-addresser-state-class*
-             (list 'quil::temporal-addresser-state
-                   'quil::fidelity-addresser-state))
-      (dolist (quil::*addresser-use-1q-queues* (list t nil))
-        (let* ((pp (quil::parse-quil text))
-               (cpp (quil::compiler-hook pp chip :protoquil t)))
-          (is (quil::operator= orig-mat (quil:parsed-program-to-logical-matrix cpp))))))))
+         (orig-mat (cl-quil:parsed-program-to-logical-matrix (cl-quil::parse-quil text))))
+    (dolist (cl-quil::*default-addresser-state-class*
+             (list 'cl-quil::temporal-addresser-state
+                   'cl-quil::fidelity-addresser-state))
+      (dolist (cl-quil::*addresser-use-1q-queues* (list t nil))
+        (let* ((pp (cl-quil::parse-quil text))
+               (cpp (cl-quil::compiler-hook pp chip :protoquil t)))
+          (is (cl-quil::operator= orig-mat (cl-quil:parsed-program-to-logical-matrix cpp))))))))
 
 (deftest test-fidelity-addresser-subschedule ()
   (flet ((gate= (gate-1 gate-2)
-           (and (string= (quil::application-operator-root-name gate-1)
-                         (quil::application-operator-root-name gate-2))
-                (equalp (quil::application-parameters gate-1)
-                        (quil::application-parameters gate-2))
-                (equalp (quil::application-arguments gate-1)
-                        (quil::application-arguments gate-2)))))
+           (and (string= (cl-quil::application-operator-root-name gate-1)
+                         (cl-quil::application-operator-root-name gate-2))
+                (equalp (cl-quil::application-parameters gate-1)
+                        (cl-quil::application-parameters gate-2))
+                (equalp (cl-quil::application-arguments gate-1)
+                        (cl-quil::application-arguments gate-2)))))
 
-    (let* ((chip (quil::build-nq-fully-connected-chip 3)))
+    (let* ((chip (cl-quil::build-nq-fully-connected-chip 3)))
       (let* ((progm (parse "H 0; CNOT 2 0; H 1; CNOT 0 1; X 0"))
-             (sched (quil::make-chip-schedule chip))
+             (sched (cl-quil::make-chip-schedule chip))
              (expected-subschedule
                (list (build-gate "X" nil 0))))
         (loop :for instr :across (parsed-program-executable-code progm) :do
-          (quil::chip-schedule-append sched instr))
+          (cl-quil::chip-schedule-append sched instr))
         (is (every #'gate=
-                   (quil::chip-contiguous-subschedule-from-last-instructions
-                    sched (quil::make-qubit-resource 0))
+                   (cl-quil::chip-contiguous-subschedule-from-last-instructions
+                    sched (cl-quil::make-qubit-resource 0))
                    expected-subschedule))))
 
-    (let* ((chip (quil::build-nq-fully-connected-chip 3)))
+    (let* ((chip (cl-quil::build-nq-fully-connected-chip 3)))
       (let* ((progm (parse "H 0; CNOT 2 0; H 1; CNOT 0 1; X 0"))
-             (sched (quil::make-chip-schedule chip))
+             (sched (cl-quil::make-chip-schedule chip))
              (expected-subschedule
                (list)))
         (loop :for instr :across (parsed-program-executable-code progm) :do
-          (quil::chip-schedule-append sched instr))
+          (cl-quil::chip-schedule-append sched instr))
         (is (every #'gate=
-                   (quil::chip-contiguous-subschedule-from-last-instructions
-                    sched (quil::make-qubit-resource 1))
+                   (cl-quil::chip-contiguous-subschedule-from-last-instructions
+                    sched (cl-quil::make-qubit-resource 1))
                    expected-subschedule))))
     
-    (let* ((chip (quil::build-nq-fully-connected-chip 3)))
+    (let* ((chip (cl-quil::build-nq-fully-connected-chip 3)))
       (let* ((progm (parse "H 0; CNOT 2 0; H 1; CNOT 0 1; X 0"))
-             (sched (quil::make-chip-schedule chip))
+             (sched (cl-quil::make-chip-schedule chip))
              (expected-subschedule
                (list (build-gate "H" nil 1)
                      (build-gate "CNOT" nil 0 1)
                      (build-gate "X" nil 0))))
         (loop :for instr :across (parsed-program-executable-code progm) :do
-          (quil::chip-schedule-append sched instr))
+          (cl-quil::chip-schedule-append sched instr))
         (is (every #'gate=
-                   (quil::chip-contiguous-subschedule-from-last-instructions
-                    sched (quil::make-qubit-resource 0 1))
+                   (cl-quil::chip-contiguous-subschedule-from-last-instructions
+                    sched (cl-quil::make-qubit-resource 0 1))
                    expected-subschedule))))
 
-    (let* ((chip (quil::build-nq-fully-connected-chip 3)))
+    (let* ((chip (cl-quil::build-nq-fully-connected-chip 3)))
       (let* ((progm (parse "H 0; H 1; CNOT 2 0; H 1; CNOT 0 1; X 0"))
-             (sched (quil::make-chip-schedule chip))
+             (sched (cl-quil::make-chip-schedule chip))
              (expected-subschedule
                (list (build-gate "H" nil 1)
                      (build-gate "H" nil 1)
                      (build-gate "CNOT" nil 0 1)
                      (build-gate "X" nil 0))))
         (loop :for instr :across (parsed-program-executable-code progm) :do
-          (quil::chip-schedule-append sched instr))
+          (cl-quil::chip-schedule-append sched instr))
         (is (every #'gate=
-                   (quil::chip-contiguous-subschedule-from-last-instructions
-                    sched (quil::make-qubit-resource 0 1))
+                   (cl-quil::chip-contiguous-subschedule-from-last-instructions
+                    sched (cl-quil::make-qubit-resource 0 1))
                    expected-subschedule))))
 
-    (let* ((chip (quil::build-nq-linear-chip 3)))
+    (let* ((chip (cl-quil::build-nq-linear-chip 3)))
       (let* ((progm (parse "H 0; H 1; CNOT 2 0; H 1; CNOT 0 1; X 0"))
-             (sched (quil::make-chip-schedule chip))
+             (sched (cl-quil::make-chip-schedule chip))
              (expected-subschedule
                (list (build-gate "X" nil 0))))
         (loop :for instr :across (parsed-program-executable-code progm) :do
-          (quil::chip-schedule-append sched instr))
+          (cl-quil::chip-schedule-append sched instr))
         (is (every #'gate=
-                   (quil::chip-contiguous-subschedule-from-last-instructions
-                    sched (quil::make-qubit-resource 0 2))
+                   (cl-quil::chip-contiguous-subschedule-from-last-instructions
+                    sched (cl-quil::make-qubit-resource 0 2))
                    expected-subschedule))))))
 
 ;;; Check that we can compile "parallel" programs onto disconnected
@@ -112,8 +112,8 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
     (not-signals error
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-disconnected-chip 3)))))
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-disconnected-chip 3)))))
 
 ;;; Check that the naive assignment works correctly.
 (deftest test-addresser-multiple-components-naive ()
@@ -125,8 +125,8 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
     (not-signals error
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-disconnected-chip 3)
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-disconnected-chip 3)
                           :rewiring-type :naive))))
 
 ;;; Check that greedy assignments work as well.
@@ -139,8 +139,8 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
     (not-signals error
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-disconnected-chip 3)
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-disconnected-chip 3)
                           :rewiring-type :greedy))))
 
 ;; Check that we can give a random rewiring type and the compiler will satisfy the component constraints.
@@ -153,8 +153,8 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
     (not-signals error
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-disconnected-chip 3)
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-disconnected-chip 3)
                           :rewiring-type :random))))
 
 ;;; Check that we can compile a more complicated program on a more
@@ -168,8 +168,8 @@ MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
     (not-signals error
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-chip-from-digraph '((1 2)))))))
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-chip-from-digraph '((1 2)))))))
 
 ;;; Check that we signal the right condition when the naive rewiring
 ;;; crosses chip component boundaries.
@@ -180,9 +180,9 @@ RX(pi/2) 2
 MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
-    (signals quil::naive-rewiring-crosses-chip-boundaries
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-disconnected-chip 3)
+    (signals cl-quil::naive-rewiring-crosses-chip-boundaries
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-disconnected-chip 3)
                           :rewiring-type :naive))))
 
 ;;; Check that we signal the right condition when there aren't enough qubits on the chip.
@@ -194,6 +194,6 @@ RX(pi/2) 2
 MEASURE 0 ro[0]
 MEASURE 1 ro[1]
 MEASURE 2 ro[2]"))
-    (signals quil::chip-insufficient-qubits
-      (quil:compiler-hook (quil:parse-quil program)
-                          (quil::build-disconnected-chip 2)))))
+    (signals cl-quil::chip-insufficient-qubits
+      (cl-quil:compiler-hook (cl-quil:parse-quil program)
+                          (cl-quil::build-disconnected-chip 2)))))

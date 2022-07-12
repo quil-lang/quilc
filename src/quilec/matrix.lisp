@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Juan M. Bello-Rivas
 
-(in-package #:cl-quil.quilec)
+(in-package #:cl-quil/quilec)
 
 ;;; Linear algebra routines in GF(2).
 

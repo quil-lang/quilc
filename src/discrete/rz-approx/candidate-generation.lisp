@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/rz-approx)
+(cl:in-package #:cl-quil/discrete/rz-approx)
 
 ;;; Implements the candidate generation portion of the algirithm described in
 ;;; arXiv:1212.6253v2. Note that a different candidate generation technique can

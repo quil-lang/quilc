@@ -420,7 +420,7 @@
    (instruction :initarg :instruction :reader illegal-qubits-used-error-instruction))
   (:documentation "Error representing the use of an illegal qubit.")
   (:report (lambda (c s)
-             (format s "Instruction '~/quil:instruction-fmt/' uses the illegal qubits ~{~A~^, ~}."
+             (format s "Instruction '~/cl-quil:instruction-fmt/' uses the illegal qubits ~{~A~^, ~}."
                      (illegal-qubits-used-error-instruction c)
                      (illegal-qubits-used-error-illegal-qubits c)))))
 
@@ -428,7 +428,7 @@
   ()
   (:documentation "Error representing the use of an illegal qubit in a preserved block.")
   (:report (lambda (c s)
-             (format s "Within a preserved block, instruction '~/quil:instruction-fmt/' uses the illegal qubits ~{~A~^, ~}."
+             (format s "Within a preserved block, instruction '~/cl-quil:instruction-fmt/' uses the illegal qubits ~{~A~^, ~}."
                      (illegal-qubits-used-error-instruction c)
                      (illegal-qubits-used-error-illegal-qubits c)))))
 

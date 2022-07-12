@@ -43,7 +43,7 @@ is still being signalled."
                    (decf ,retries-left)
                    (go ,TRY-AGAIN))))))))))
 
-(defun matrix-mismatch (m u &key (test #'quil::double~))
+(defun matrix-mismatch (m u &key (test #'cl-quil::double~))
   "Return a LIST of the (ROW COL) indices of the first mismatch between M and U.
 
 If M and U are equal under TEST, return NIL."
@@ -56,7 +56,7 @@ If M and U are equal under TEST, return NIL."
       (unless (funcall test (magicl:tref m r c) (magicl:tref u r c))
         (return-from matrix-mismatch (list r c))))))
 
-(defun %print-matrix-mismatch (m u &key (test #'quil::double~)
+(defun %print-matrix-mismatch (m u &key (test #'cl-quil::double~)
                                         stream)
   (a:if-let (mismatch-position (matrix-mismatch m u :test test))
     (format stream
@@ -89,7 +89,7 @@ For example,
 (defun fiasco-assert-matrices-are-equal (m u)
   (is (= (magicl:nrows u) (magicl:nrows m)))
   (is (= (magicl:ncols u) (magicl:ncols m)))
-  (setf u (quil::scale-out-matrix-phases u m))
+  (setf u (cl-quil::scale-out-matrix-phases u m))
   (flet ((test~ (a b)
            (< (abs (- a b)) 0.01)))
     (is (loop :for i :below (magicl:nrows m) :always
@@ -113,7 +113,7 @@ For example,
 If PREFIX-P is non-nil, prefix the returned string with DELIMITER.
 
 If SUFFIX-P is non-nil, suffix the returned string with DELIMITER."
-  (check-type strings quil::string-sequence)
+  (check-type strings cl-quil::string-sequence)
   (check-type delimiter (or string character))
   (with-output-to-string (stream)
     (loop :with last := (length strings)

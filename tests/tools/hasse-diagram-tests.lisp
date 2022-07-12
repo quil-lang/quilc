@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Mark David
 
-(in-package #:cl-quil.tools-tests)
+(in-package #:cl-quil/tools-tests)
 
 
 ;;; For now, this tests module provides both an demo/example as well

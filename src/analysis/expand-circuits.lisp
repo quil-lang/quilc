@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 (define-transform expand-circuits (expand-circuits)
   "This transform expands all circuits to create a circuit-free program.")

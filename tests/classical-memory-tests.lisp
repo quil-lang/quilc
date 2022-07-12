@@ -26,9 +26,9 @@
                 :alignment 8
                 :real-bits 64
                 :integer-bits 64)))
-    (is (= 1 (length (quil::memory-model-roots model))))
-    (is (= 254 (length (quil::memory-model-aliases model))))
-    (is (= 255 (hash-table-count (quil::memory-model-names model))))))
+    (is (= 1 (length (cl-quil::memory-model-roots model))))
+    (is (= 254 (length (cl-quil::memory-model-aliases model))))
+    (is (= 255 (hash-table-count (cl-quil::memory-model-names model))))))
 
 (deftest test-bad-inherit-small-from-large ()
   "Test we can't inherit from a smaller memory region to a larger one."
@@ -49,7 +49,7 @@ DECLARE o OCTET[4]
 DECLARE ix INTEGER SHARING o
 ")))
     (dolist (bad baddies)
-      (signals quil:quil-memory-model-error
+      (signals cl-quil:quil-memory-model-error
         (memory-descriptors-to-model
          (parsed-program-memory-definitions
           (parse-quil bad))
@@ -60,11 +60,11 @@ DECLARE ix INTEGER SHARING o
 #+#:ignore                              ; Not sure if this is needed.
 (deftest test-divisible-alignment ()
   "Test that we detect when data types are indivisible in their size to alignment."
-  (signals quil:quil-memory-model-error
+  (signals cl-quil:quil-memory-model-error
     (memory-descriptors-to-model nil :alignment 8
                                      :real-bits 9
                                      :integer-bits 8))
-  (signals quil:quil-memory-model-error
+  (signals cl-quil:quil-memory-model-error
     (memory-descriptors-to-model nil :alignment 8
                                      :real-bits 8
                                      :integer-bits 9)))
@@ -96,7 +96,7 @@ DECLARE y OCTET SHARING x                   # no no
                            )))
     ;; OK
     (dolist (p ok-programs)
-      (not-signals quil:quil-memory-model-error
+      (not-signals cl-quil:quil-memory-model-error
         (memory-descriptors-to-model
          (parsed-program-memory-definitions
           (parse-quil
@@ -106,7 +106,7 @@ DECLARE y OCTET SHARING x                   # no no
          :integer-bits 64)))
     ;; NOT OK
     (dolist (p not-ok-programs)
-      (signals quil:quil-memory-model-error
+      (signals cl-quil:quil-memory-model-error
         (memory-descriptors-to-model
          (parsed-program-memory-definitions
           (parse-quil

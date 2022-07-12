@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-(in-package #:cl-quil.frontend)
+(in-package #:cl-quil/frontend)
 
 ;;; There are three main steps on the journey from Quil string to Quil program,
 ;;; namely lexing, parsing, and analysis.

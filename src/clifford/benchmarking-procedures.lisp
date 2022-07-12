@@ -4,7 +4,7 @@
 ;;;;
 ;;;; Procedures to respond to quilc requests about cliffords, specifically for benchmarking quantum gate sets and circuits.
 
-(in-package :cl-quil.clifford)
+(in-package :cl-quil/clifford)
 
 (defconstant +god-table-cache-limit+ 10)
 (global-vars:define-global-var **god-tables** (make-gateset-hash-table))
@@ -80,24 +80,24 @@
      nil)))
 
 (define-factorize factor-I "I"
-  (quil::double= top-left bottom-right)
-  (and (quil::double= top-right 0)
-       (quil::double= top-right bottom-left)))
+  (cl-quil::double= top-left bottom-right)
+  (and (cl-quil::double= top-right 0)
+       (cl-quil::double= top-right bottom-left)))
 
 (define-factorize factor-X "X"
-  (and (quil::double= top-left 0)
-       (quil::double= top-left bottom-right))
-  (quil::double= top-right bottom-left))
+  (and (cl-quil::double= top-left 0)
+       (cl-quil::double= top-left bottom-right))
+  (cl-quil::double= top-right bottom-left))
 
 (define-factorize factor-Y "Y"
-  (and (quil::double= top-left 0)
-       (quil::double= top-left bottom-right))
-  (quil::double= top-right (- bottom-left)))
+  (and (cl-quil::double= top-left 0)
+       (cl-quil::double= top-left bottom-right))
+  (cl-quil::double= top-right (- bottom-left)))
 
 (define-factorize factor-Z "Z"
-  (quil::double= top-left (- bottom-right))
-  (and (quil::double= top-right 0)
-       (quil::double= top-right bottom-left)))
+  (cl-quil::double= top-left (- bottom-right))
+  (and (cl-quil::double= top-right 0)
+       (cl-quil::double= top-right bottom-left)))
 
 (defun valid-pauli-dim (m n)
   "T if M and N are valid dimensions of a Pauli matrix, NIL otherwise."
@@ -119,16 +119,16 @@
         (phase-wf (copy-seq wfa)))
     (loop :for i :below 8
           :do (map-into phase-wf (lambda (x) (* x phase-factor)) phase-wf)
-          :when (every #'quil::double~ phase-wf wfb)
+          :when (every #'cl-quil::double~ phase-wf wfb)
             :return t
           :finally (return nil))))
 
 (defun phase-to-string (phase)
   "Returns a string representation of a fourth root of unity, given by PHASE, NIL otherwise."
-  (cond ((quil::double~ phase 1) "")
-        ((quil::double~ phase -1) "-")
-        ((quil::double~ phase #C(0 1)) "i")
-        ((quil::double~ phase #C(0 -1)) "-i")
+  (cond ((cl-quil::double~ phase 1) "")
+        ((cl-quil::double~ phase -1) "-")
+        ((cl-quil::double~ phase #C(0 1)) "i")
+        ((cl-quil::double~ phase #C(0 -1)) "-i")
         (t (error "Invalid phase number: ~A~%" phase))))
 
 (defun string-to-phase (phase-str)
@@ -178,15 +178,15 @@
     "Return a list of the n qubit pauli basis matrices. Note that this is the basis for group action, consisting of strings with one X or Z, not the basis for the vector space of complex matrices."
     (or (gethash n memo-table)
         (setf (gethash n memo-table)
-              (let ((X (quil::from-list '(0 1 1 0) '(2 2)))
-                    (Z (quil::from-list '(1 0 0 -1) '(2 2))))
+              (let ((X (cl-quil::from-list '(0 1 1 0) '(2 2)))
+                    (Z (cl-quil::from-list '(1 0 0 -1) '(2 2))))
                 (loop :for i :below n
-                      :collect (quil::kq-gate-on-lines X n `(,i))
-                      :collect (quil::kq-gate-on-lines Z n `(,i))))))))
+                      :collect (cl-quil::kq-gate-on-lines X n `(,i))
+                      :collect (cl-quil::kq-gate-on-lines Z n `(,i))))))))
 
 (defun matrix-to-clifford (gate)
   "Convert a matrix GATE into a CLIFFORD object."
-  (let ((num-qubits (quil:ilog2 (magicl:ncols gate))))
+  (let ((num-qubits (cl-quil:ilog2 (magicl:ncols gate))))
     (make-clifford
      :num-qubits num-qubits
      :basis-map (make-array
@@ -206,12 +206,12 @@
 
 (defun apply-pauli-to-wavefunction (ph index q wf)
   "Apply the pauli specified by index (0 = I, 1 = X, 2 = Z, 3 = Y) to qubit Q of the wavefunction WF, with a phase PH."
-  (assert (quil::positive-power-of-two-p (length wf))
+  (assert (cl-quil::positive-power-of-two-p (length wf))
           (wf)
           "The provided wavefunction must have a positive power-of-two length.")
   (multiple-value-bind (b a) (floor index 2)
     (let* ((phase (expt #C(0.0d0 1.0d0) (b* a b)))
-           (n (quil::ilog2 (length wf))))
+           (n (cl-quil::ilog2 (length wf))))
       (declare (type (integer 1) n))    ; Due to ASSERT above.
       (flet ((xz (w0 w1)
                (setf w0 (* ph phase w0))
@@ -255,7 +255,7 @@
 (defun clifford-to-matrix (cliff)
   "Converts a clifford element into its matrix form, operating on the usual computational basis Bn x B(n-1) x ... x B0."
   (let* ((n (num-qubits cliff))
-         (mat (quil::zeros (list (expt 2 n) (expt 2 n))))
+         (mat (cl-quil::zeros (list (expt 2 n) (expt 2 n))))
          (scratch-wf (make-array (expt 2 n) :element-type '(complex double-float) :initial-element #C(0.0d0 0.0d0)))
          (zero-image-tab (make-tableau-zero-state n))
          (pauli-map (clifford-basis-map cliff)))
@@ -287,21 +287,21 @@
 
 Note: will raise an error if PARSED-QUIL contains instruction types
 other than APPLICATION, PRAGMA, or UNRESOLVED-APPLICATION."
-  (loop :for instr :across (quil:parsed-program-executable-code parsed-quil)
-        :for qubits-used := (quil::qubits-used instr)
-        :unless (or (typep instr 'quil:application)
-                    (typep instr 'quil:pragma)
-                    (and quil::*allow-unresolved-applications*
-                         (typep instr 'quil:unresolved-application))) :do
+  (loop :for instr :across (cl-quil:parsed-program-executable-code parsed-quil)
+        :for qubits-used := (cl-quil::qubits-used instr)
+        :unless (or (typep instr 'cl-quil:application)
+                    (typep instr 'cl-quil:pragma)
+                    (and cl-quil::*allow-unresolved-applications*
+                         (typep instr 'cl-quil:unresolved-application))) :do
                            (error "Cannot extract clifford from the instr ~/cl-quil:instruction-fmt/"
                                   instr)
-        :collect (list (matrix-to-clifford (quil:gate-matrix instr))
+        :collect (list (matrix-to-clifford (cl-quil:gate-matrix instr))
                        qubits-used)))
 
 (defun clifford-circuit-p (parsed-quil)
   "If the parsed circuit PARSED-QUIL is a clifford circuit, return the CLIFFORD corresponding to it. Otherwise return NIL. This will generate a clifford that acts on the number of qubits in the program, rather than a number of qubits that is the difference between the maximum and minimum index."
   (let* ((cliffords (extract-cliffords parsed-quil))
-	 (qubits (sort (quil::qubits-used parsed-quil) #'<))
+	 (qubits (sort (cl-quil::qubits-used parsed-quil) #'<))
 	 (num-qubits (length qubits)))
     (reduce #'group-mul (loop :for (clifford targets) :in (reverse cliffords)
                               :collect (embed clifford num-qubits
@@ -310,4 +310,4 @@ other than APPLICATION, PRAGMA, or UNRESOLVED-APPLICATION."
 
 (defun clifford-from-quil (quil)
   "Given a STRING of quil, produce the associated CLIFFORD element. If QUIL does not represent a Clifford circuit, return NIL. "
-  (clifford-circuit-p (quil::safely-parse-quil quil)))
+  (clifford-circuit-p (cl-quil::safely-parse-quil quil)))

@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: Anthony Polloreno
 
-(in-package #:cl-quil.clifford)
+(in-package #:cl-quil/clifford)
 
 ;;; This file contains functions to explore the Clifford group mod the swap group.
 

@@ -2,21 +2,15 @@
 ;;;;
 ;;;; Author: Erik Davis
 
-;;; Allegro (and other Lisps) don't support the non-standard "package
-;;; local nicknames".
-#-(or sbcl ecl ccl)
-(rename-package :alexandria :alexandria '(:a))
-
-(defpackage #:cl-quil.quilt
-  (:nicknames #:quilt)
+(defpackage #:cl-quil/quilt
   (:use #:cl
-        #:cl-quil.frontend
+        #:cl-quil/frontend
         #:abstract-classes
         #:singleton-classes)
   ;; We define a number of methods on generic functions from
   ;; CL-QUIL. We import these here, as well as other internal symbols
   ;; that we want to get our hands on.
-  (:import-from #:cl-quil.frontend
+  (:import-from #:cl-quil/frontend
                 ;; frontend-utilities.lisp
                 #:list=
                 ;; ast.lisp
@@ -64,11 +58,10 @@
                 #:find-descriptor-for-mref
                 #:memory-segment-length
                 )
-  (:shadowing-import-from #:cl-quil.frontend
+  (:shadowing-import-from #:cl-quil/frontend
                           #:pi)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria)
-                    (:quil :cl-quil.frontend))
+  (:local-nicknames (#:a    #:alexandria)
+                    (#:quil #:cl-quil/frontend))
 
   (:export
 

@@ -1,4 +1,4 @@
-(in-package #:cl-quil.quilt-tests)
+(in-package #:cl-quil/quilt-tests)
 
 (deftest test-quilt-circuit-expansion ()
   (let ((pp (parse-quilt "
@@ -19,7 +19,7 @@ DEFCIRCUIT FOO(%theta) q:
     FENCE q
 
 FOO(1.0) 0"
-                         :transforms '(quil::expand-circuits)))
+                         :transforms '(cl-quil::expand-circuits)))
         (expected-instrs
           (list
            "SET-PHASE 0 \"xy\" 1.0"
@@ -36,7 +36,7 @@ FOO(1.0) 0"
           :for expected :in expected-instrs
           :do
              (is (string= expected
-                          (quil::print-instruction-to-string instr))))))
+                          (cl-quil::print-instruction-to-string instr))))))
 
 (deftest test-quilt-name-resolution ()
   (let ((pp (parse-quilt "
@@ -135,7 +135,7 @@ RAW-CAPTURE 0 \"xy\" 1.0 iqs"))
                       :transforms nil)))
              (= duration
                 (quilt::quilt-instruction-duration
-                 (quil::nth-instr 0 pp))))))
+                 (cl-quil::nth-instr 0 pp))))))
     (is (duration= 1.5 "PULSE 0 \"xy\" flat(duration: 1.5, iq: 1)"))
     (is (duration= 1.5 "CAPTURE 0 \"xy\" flat(duration: 1.5, iq: 1) iq"))
     (is (duration= 1.5 "RAW-CAPTURE 0 \"xy\" 1.5 iq"))
@@ -186,7 +186,7 @@ CAPTURE 1 \"xy\" flat(duration: 1, iq: 1) iq
          (lambda (instr)
            (is (not (typep instr 'fence))))
          (parsed-program-executable-code pp))
-    (let ((instr (quil::nth-instr 1 pp)))
+    (let ((instr (cl-quil::nth-instr 1 pp)))
       (is (and (typep instr 'delay)
                (= 1.0 (constant-value  (delay-duration instr)))
                ;; we can't say which kind of delay is inserted,

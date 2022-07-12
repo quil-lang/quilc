@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(in-package cl-quil.chip-library)
+(in-package cl-quil/chip-library)
 
 ;;; Mutable table that stores functions for defining chips
 
