@@ -436,3 +436,31 @@ Note that if (= START-NODE TARGET-NODE) then (list START-NODE) is returned."
 (define-compiler C-SWAP-to-CSWAP
     ((_ (#.(controlled-operator (named-operator "SWAP")) () p q r)))
   (inst "CSWAP" () p q r))
+
+(define-compiler C-RX-to-CZ-RX
+    ((_ (#.(controlled-operator (named-operator "RX")) (theta) p q)))
+  (inst "CZ" ()                          p q)
+  (inst "RX" (list (param-* -1/2 theta))   q)
+  (inst "CZ" ()                          p q)
+  (inst "RX" (list (param-* 1/2 theta))    q))
+
+(define-compiler C-RY-to-CZ-RY
+    ((_ (#.(controlled-operator (named-operator "RY")) (theta) p q)))
+  (inst "CZ" ()                          p q)
+  (inst "RY" (list (param-* -1/2 theta))   q)
+  (inst "CZ" ()                          p q)
+  (inst "RY" (list (param-* 1/2 theta))    q))
+
+(define-compiler C-RY-to-CNOT-RY
+    ((_ (#.(controlled-operator (named-operator "RY")) (theta) p q)))
+  (inst "CNOT" ()                          p q)
+  (inst "RY"   (list (param-* -1/2 theta))   q)
+  (inst "CNOT" ()                          p q)
+  (inst "RY"   (list (param-* 1/2 theta))    q))
+
+(define-compiler C-RZ-to-CNOT-RZ
+    ((_ (#.(controlled-operator (named-operator "RZ")) (theta) p q)))
+  (inst "CNOT" ()                          p q)
+  (inst "RZ"   (list (param-* -1/2 theta))   q)
+  (inst "CNOT" ()                          p q)
+  (inst "RZ"   (list (param-* 1/2 theta))    q))
