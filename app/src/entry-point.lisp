@@ -471,6 +471,11 @@
                         &key
                           protoquil
                           state-aware
+                          enable-approximate-compilation
+                          compressor-passes
+                          rewriting-peephole-size
+                          global-queue-tolerance-threshold
+                          deterministic
                           verbose
                           gate-whitelist
                           gate-blacklist)
@@ -482,7 +487,12 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
   (let* ((statistics (make-hash-table :test #'equal))
          (cl-quil::*compiler-noise* verbose)
          (*random-state* (make-random-state t))
-         (cl-quil::*enable-state-prep-compression* state-aware))
+         (quil::*enable-state-prep-compression* state-aware)
+         (quil::*enable-approximate-compilation* enable-approximate-compilation)
+         (quil::*compressor-passes* (or compressor-passes quil::*compressor-passes*))
+         (quil::*rewriting-peephole-size* (or rewriting-peephole-size quil::*rewriting-peephole-size*))
+         (quil::*global-queue-tolerance-threshold* (or global-queue-tolerance-threshold quil::*global-queue-tolerance-threshold*))
+         )
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
         (compiler-hook program chip-specification :protoquil protoquil :destructive t)
