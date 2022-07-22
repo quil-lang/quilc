@@ -404,10 +404,7 @@ other's."
                                  instructions
                                  :relabeling (standard-qubit-relabeler qubits-on-obj))))
              (expand-to-native-instructions
-              (list (make-instance 'gate-application
-                                   :operator #.(named-operator "WHOLEPROGRAM")
-                                   :arguments (mapcar #'qubit qubits-on-obj)
-                                   :gate (make-instance 'simple-gate :matrix matrix)))
+              (list (apply 'anon-gate (append (list "UNITARY" matrix) (mapcar #'qubit qubits-on-obj))))
               chip-specification))))
 
       (destructuring-bind (start-wf wf-qc)

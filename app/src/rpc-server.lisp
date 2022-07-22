@@ -45,10 +45,8 @@
                  :|topological_swaps| (gethash "topological_swaps" statistics)
                  :|qpu_runtime_estimation| (gethash "qpu_runtime_estimation" statistics)))
 
-;; TODO: rework the structure of process-program so that the JSON junk is only
-;;       done in web-server.lisp, and this doesn't have to do back-translation.
-(defun quil-to-native-quil-handler (request &key protoquil state-aware)
-  "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA."
+(defun quil-to-native-quil-handler (request &key protoquil state-aware enable-approximate-compilation compressor-passes rewriting-peephole-size global-queue-tolerance-threshold seed)
+  "Traditional QUILC invocation: compiles a Quil program to native Quil, as specified by an ISA but with more options."
   (check-type request rpcq::|NativeQuilRequest|)
   (let* ((quil-program (safely-parse-quil (rpcq::|NativeQuilRequest-quil| request)))
          (target-device (rpcq::|NativeQuilRequest-target_device| request))
@@ -66,7 +64,21 @@
          (state-aware (ecase state-aware
                         ((nil) *state-aware*)
                         (:false nil)
-                        (t t))))
+                        (t t)))
+         (enable-approximate-compilation (ecase enable-approximate-compilation
+                                           ((nil) quil::*enable-approximate-compilation*)
+                                           (:false nil)
+                                           (t t)))
+         (compressor-passes (etypecase compressor-passes
+                              (null quil::*compressor-passes*)
+                              (integer compressor-passes)))
+         (rewriting-peephole-size (etypecase rewriting-peephole-size
+                                    (null quil::*rewriting-peephole-size*)
+                                    (integer rewriting-peephole-size)))
+         (global-queue-tolerance-threshold (etypecase global-queue-tolerance-threshold
+                                    (null quil::*global-queue-tolerance-threshold*)
+                                    (integer global-queue-tolerance-threshold)))
+         )
     (unless (slot-boundp cache 'addresser-state)
       (setf (cached-chip-addresser-state cache)
             (make-instance cl-quil::*default-addresser-state-class*
@@ -76,7 +88,12 @@
         (process-program quil-program chip-specification
                          :protoquil protoquil
                          :state-aware state-aware
-                         :verbose cl-quil::*compiler-noise*)
+                         :enable-approximate-compilation enable-approximate-compilation
+                         :compressor-passes compressor-passes
+                         :rewriting-peephole-size rewriting-peephole-size
+                         :global-queue-tolerance-threshold global-queue-tolerance-threshold
+                         :verbose quil::*compiler-noise*
+                         )
       (when protoquil
         (setf (gethash "qpu_runtime_estimation" statistics-dict)
               (runtime-estimation processed-program)))

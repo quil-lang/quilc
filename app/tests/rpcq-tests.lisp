@@ -77,6 +77,54 @@
                             (rpcq::|NativeQuilResponse-metadata| server-response))))
           (is (quil::matrix-equality mat1 mat2)))))))
 
+(deftest test-quil-to-native-quil-options ()
+  "Test that the \"quil-to-native-quil\" endpoint compiles to a program whose matrix representation is equivalent to the input program for all optional settings." 
+  (flet ((plist-isa-subtable (&rest p) (a:plist-hash-table p :test #'equalp)))
+    (with-random-rpc-client (client)
+      (let* ((quil "H 0")
+             (isa (plist-isa-subtable
+                   "1Q" (plist-isa-subtable
+                         "0" (make-hash-table)
+                         "1" (make-hash-table))
+                   "2Q" (plist-isa-subtable
+                         "0-1" (make-hash-table))))
+             (specs (plist-isa-subtable
+                     "1Q" (plist-isa-subtable
+                           "0" (plist-isa-subtable "f1QRB" 0.98)
+                           "1" (plist-isa-subtable "f1QRB" 0.98))
+                     "2Q" (plist-isa-subtable
+                           "0-1" (make-hash-table))))
+             (target-device (make-instance 'rpcq::|TargetDevice|
+                                           :|isa| isa
+                                           :|specs| specs))
+             (server-payload (make-instance 'rpcq::|NativeQuilRequest|
+                                            :|quil| quil
+                                            :|target_device| target-device))
+             (pp (quil::parse-quil quil))
+             )
+        (labels ((verify-programs-match (candidate-program reference-program)
+                     (multiple-value-bind (mat1 mat2)
+                         (quil::matrix-rescale (quil::make-matrix-from-quil
+                                                (coerce (quil:parsed-program-executable-code reference-program) 'list))
+                                           (quil::make-matrix-from-quil
+                                            (coerce (quil:parsed-program-executable-code candidate-program) 'list)))
+                       (setf mat1 (quil::scale-out-matrix-phases mat1 mat2))
+                       (is (quil::matrix-equality mat1 mat2)))))
+          (and (mapcar (lambda (options)
+                         (destructuring-bind (protoquil state-aware compressor-passes rewriting-peephole-size global-queue-tolerance-threshold) options
+                           (let ((candidate-program 
+                                   (quil::parse-quil 
+                                    (rpcq::|NativeQuilResponse-quil| 
+                                           (rpcq:rpc-call client
+                                                          "quil-to-native-quil" server-payload 
+                                                          :protoquil protoquil 
+                                                          :state-aware state-aware 
+                                                          :compressor-passes compressor-passes 
+                                                          :rewriting-peephole-size rewriting-peephole-size 
+                                                          :global-queue-tolerance-threshold global-queue-tolerance-threshold)))))
+                             (verify-programs-match candidate-program pp)))) 
+                       (a:map-product #'list '(nil t) '(nil t) '(0 1 2) '(0 2 4) '(0 2 4)))))))))
+
 (deftest test-quil-to-native-quil-protoquil-endpoint ()
   "Test that the \"quil-to-native-quil\" endpoint will compile protoquil when given :PROTOQUIL T."
   (with-random-rpc-client (client)
