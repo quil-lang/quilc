@@ -3,11 +3,11 @@
 ;;;; Author: Juan M. Bello-Rivas
 
 (defpackage #:cl-quil.quilec
-  (:nicknames #:qec)
   (:use #:common-lisp
         #:alexandria
         #:cl-quil
         #:cl-quil.clifford)
+  (:local-nicknames (#:quil #:cl-quil))
   (:import-from #:alexandria #:non-negative-fixnum #:if-let #:when-let)
   (:import-from #:cl-quil.clifford #:pauli-components #:print-pauli)
   (:export
