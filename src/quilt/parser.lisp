@@ -346,10 +346,10 @@
      (let ((freq (parse-parameter-or-expression value-toks)))
        (unless (and (is-constant freq)
                     (realp (constant-value freq)))
-         (quil-parse-error "Expected INITIAL-FREQUENCY to be a real number, but got ~/quil:instruction-fmt/."
+         (quil-parse-error "Expected INITIAL-FREQUENCY to be a real number, but got ~/cl-quil:instruction-fmt/."
                            freq))
        (unless (plusp (constant-value freq))
-         (warn "Expected INITIAL-FREQUENCY to be positive, but got ~/quil:instruction-fmt/."
+         (warn "Expected INITIAL-FREQUENCY to be positive, but got ~/cl-quil:instruction-fmt/."
                freq))
        freq))
     (otherwise

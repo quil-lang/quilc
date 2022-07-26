@@ -10,9 +10,9 @@
         :collect k))
 
 (deftest test-clifford-utilities ()
-  (is (= 10 (list-length (quil.clifford::sample-from '(a b c) 10))))
+  (is (= 10 (list-length (cl-quil.clifford::sample-from '(a b c) 10))))
 
-  (is (every (lambda (x) (member x '(a b c))) (quil.clifford::sample-from '(a b c) 10)))
+  (is (every (lambda (x) (member x '(a b c))) (cl-quil.clifford::sample-from '(a b c) 10)))
 
   (let ((q (quil:make-queue)))
     (quil:enqueue q 'A)
@@ -22,48 +22,48 @@
     (is (equalp (quil:dequeue q) nil))))
 
 (deftest test-paulis ()
-  (is (quil.clifford::pauli-sym-p 'quil.clifford::X))
-  (is (quil.clifford::pauli-sym-p 'quil.clifford::Y))
-  (is (quil.clifford::pauli-sym-p 'quil.clifford::Z))
-  (is (quil.clifford::pauli-sym-p 'quil.clifford::I))
-  (is (not (quil.clifford::pauli-sym-p 'quil.clifford::A)))
+  (is (cl-quil.clifford::pauli-sym-p 'cl-quil.clifford::X))
+  (is (cl-quil.clifford::pauli-sym-p 'cl-quil.clifford::Y))
+  (is (cl-quil.clifford::pauli-sym-p 'cl-quil.clifford::Z))
+  (is (cl-quil.clifford::pauli-sym-p 'cl-quil.clifford::I))
+  (is (not (cl-quil.clifford::pauli-sym-p 'cl-quil.clifford::A)))
 
-  (is (quil.clifford::pauli-sym-p 'X))
-  (is (quil.clifford::pauli-sym-p 'Y))
-  (is (quil.clifford::pauli-sym-p 'Z))
-  (is (quil.clifford::pauli-sym-p 'I))
-  (is (not (quil.clifford::pauli-sym-p 'A)))
+  (is (cl-quil.clifford::pauli-sym-p 'X))
+  (is (cl-quil.clifford::pauli-sym-p 'Y))
+  (is (cl-quil.clifford::pauli-sym-p 'Z))
+  (is (cl-quil.clifford::pauli-sym-p 'I))
+  (is (not (cl-quil.clifford::pauli-sym-p 'A)))
 
-  (is (quil.clifford::base4-p 0))
-  (is (quil.clifford::base4-p 1))
-  (is (quil.clifford::base4-p 2))
-  (is (quil.clifford::base4-p 3))
-  (is (not (quil.clifford::base4-p -1)))
-  (is (not (quil.clifford::base4-p 4)))
+  (is (cl-quil.clifford::base4-p 0))
+  (is (cl-quil.clifford::base4-p 1))
+  (is (cl-quil.clifford::base4-p 2))
+  (is (cl-quil.clifford::base4-p 3))
+  (is (not (cl-quil.clifford::base4-p -1)))
+  (is (not (cl-quil.clifford::base4-p 4)))
 
-  (is (equalp (quil.clifford::base4-to-sym 0) 'quil.clifford::I))
-  (is (equalp (quil.clifford::base4-to-sym 1) 'quil.clifford::X))
-  (is (equalp (quil.clifford::base4-to-sym 2) 'quil.clifford::Z))
-  (is (equalp (quil.clifford::base4-to-sym 3) 'quil.clifford::Y))
+  (is (equalp (cl-quil.clifford::base4-to-sym 0) 'cl-quil.clifford::I))
+  (is (equalp (cl-quil.clifford::base4-to-sym 1) 'cl-quil.clifford::X))
+  (is (equalp (cl-quil.clifford::base4-to-sym 2) 'cl-quil.clifford::Z))
+  (is (equalp (cl-quil.clifford::base4-to-sym 3) 'cl-quil.clifford::Y))
 
-  (is (equalp (quil.clifford::pack-base4 3 2) 14))
+  (is (equalp (cl-quil.clifford::pack-base4 3 2) 14))
 
-  (loop :for sym :in '(quil.clifford::I quil.clifford::X quil.clifford::Y quil.clifford::Z)
-        :do (is (equalp (quil.clifford::base4-to-sym (quil.clifford::sym-to-base4 sym)) sym)))
+  (loop :for sym :in '(cl-quil.clifford::I cl-quil.clifford::X cl-quil.clifford::Y cl-quil.clifford::Z)
+        :do (is (equalp (cl-quil.clifford::base4-to-sym (cl-quil.clifford::sym-to-base4 sym)) sym)))
 
 
-  (is (quil.clifford:pauli= (quil.clifford:pauli-identity 3) (quil.clifford:pauli-from-symbols '(I I I))))
-  (is (not (quil.clifford:pauli= (quil.clifford:pauli-identity 3) (quil.clifford:pauli-from-symbols '(I X I)))))
+  (is (cl-quil.clifford:pauli= (cl-quil.clifford:pauli-identity 3) (cl-quil.clifford:pauli-from-symbols '(I I I))))
+  (is (not (cl-quil.clifford:pauli= (cl-quil.clifford:pauli-identity 3) (cl-quil.clifford:pauli-from-symbols '(I X I)))))
 
-  (is (quil.clifford:pauli= (quil.clifford:group-mul (quil.clifford:pauli-from-symbols '(I X Z))
-                                                     (quil.clifford:pauli-from-symbols '(I Y X)))
-                            (quil.clifford:pauli-from-symbols '(I Z Y) 2)))
+  (is (cl-quil.clifford:pauli= (cl-quil.clifford:group-mul (cl-quil.clifford:pauli-from-symbols '(I X Z))
+                                                     (cl-quil.clifford:pauli-from-symbols '(I Y X)))
+                            (cl-quil.clifford:pauli-from-symbols '(I Z Y) 2)))
 
-  (is (quil.clifford:pauli= (quil.clifford:embed (quil.clifford:pauli-from-symbols '(X Y) 2) 4 '(1 2))
-                            (quil.clifford:pauli-from-symbols '(I Y X I) 2)))
+  (is (cl-quil.clifford:pauli= (cl-quil.clifford:embed (cl-quil.clifford:pauli-from-symbols '(X Y) 2) 4 '(1 2))
+                            (cl-quil.clifford:pauli-from-symbols '(I Y X I) 2)))
 
-  (is (quil.clifford:pauli= (quil.clifford:tensor-mul quil.clifford::+X+ quil.clifford::+Z+)
-                            (quil.clifford:pauli-from-symbols '(X Z)))))
+  (is (cl-quil.clifford:pauli= (cl-quil.clifford:tensor-mul cl-quil.clifford::+X+ cl-quil.clifford::+Z+)
+                            (cl-quil.clifford:pauli-from-symbols '(X Z)))))
 
 (deftest test-pauli-integer ()
   (flet ((int (s)
@@ -134,35 +134,35 @@
 
 (deftest test-cliffords ()
   (let (
-        (xyz (quil.clifford:pauli-from-symbols '(X Y Z)))
-        (xyx (quil.clifford:pauli-from-symbols '(X Y X)))
-        (gt1 (quil.clifford:make-god-table (quil.clifford:default-gateset 1)))
-        (gt2 (quil.clifford:make-god-table (quil.clifford:default-gateset 2)))
+        (xyz (cl-quil.clifford:pauli-from-symbols '(X Y Z)))
+        (xyx (cl-quil.clifford:pauli-from-symbols '(X Y X)))
+        (gt1 (cl-quil.clifford:make-god-table (cl-quil.clifford:default-gateset 1)))
+        (gt2 (cl-quil.clifford:make-god-table (cl-quil.clifford:default-gateset 2)))
         )
-    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:clifford-identity 3) xyz)
+    (is (cl-quil.clifford:pauli= (cl-quil.clifford:apply-clifford (cl-quil.clifford:clifford-identity 3) xyz)
                               xyz))
-    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford:hadamard 3 0) xyz)
+    (is (cl-quil.clifford:pauli= (cl-quil.clifford:apply-clifford (cl-quil.clifford:hadamard 3 0) xyz)
                               xyx))
-    (is (quil.clifford:pauli= (quil.clifford:apply-clifford (quil.clifford::clifford-from-pauli (quil.clifford:pauli-from-symbols '(Z Y Z))) xyz)
-                              (quil.clifford:pauli-from-symbols '(X Y Z) 2)))
-    (is (quil.clifford:clifford= (quil.clifford:group-mul (quil.clifford:cnot 3 2 1) (quil.clifford:cnot 3 2 1))
-                                 (quil.clifford:clifford-identity 3)))
-    (is (= (hash-table-count (quil.clifford::mapping gt1)) 24))
-    (is (= (hash-table-count (quil.clifford::mapping gt2)) 11520))
+    (is (cl-quil.clifford:pauli= (cl-quil.clifford:apply-clifford (cl-quil.clifford::clifford-from-pauli (cl-quil.clifford:pauli-from-symbols '(Z Y Z))) xyz)
+                              (cl-quil.clifford:pauli-from-symbols '(X Y Z) 2)))
+    (is (cl-quil.clifford:clifford= (cl-quil.clifford:group-mul (cl-quil.clifford:cnot 3 2 1) (cl-quil.clifford:cnot 3 2 1))
+                                 (cl-quil.clifford:clifford-identity 3)))
+    (is (= (hash-table-count (cl-quil.clifford::mapping gt1)) 24))
+    (is (= (hash-table-count (cl-quil.clifford::mapping gt2)) 11520))
 
-    (let ((gt1-10 (nth 10 (hash-keys (quil.clifford::mapping gt1))))
-          (gt2-1231 (nth 1231 (hash-keys (quil.clifford::mapping gt2)))))
-      (is (typep gt1-10 'quil.clifford::clifford))
-      (is (typep gt2-1231 'quil.clifford::clifford))
+    (let ((gt1-10 (nth 10 (hash-keys (cl-quil.clifford::mapping gt1))))
+          (gt2-1231 (nth 1231 (hash-keys (cl-quil.clifford::mapping gt2)))))
+      (is (typep gt1-10 'cl-quil.clifford::clifford))
+      (is (typep gt2-1231 'cl-quil.clifford::clifford))
 
-      (is (quil.clifford:clifford= gt1-10 (reduce #'quil.clifford:group-mul (quil.clifford:reconstruct gt1-10 gt1))))
-      (is (quil.clifford:clifford= gt2-1231 (reduce  #'quil.clifford:group-mul (quil.clifford:reconstruct gt2-1231 gt2)))))))
+      (is (cl-quil.clifford:clifford= gt1-10 (reduce #'cl-quil.clifford:group-mul (cl-quil.clifford:reconstruct gt1-10 gt1))))
+      (is (cl-quil.clifford:clifford= gt2-1231 (reduce  #'cl-quil.clifford:group-mul (cl-quil.clifford:reconstruct gt2-1231 gt2)))))))
 
 (deftest test-sample ()
   (let ((gt (make-god-table (default-gateset 1))))
-    (dotimes (num-samples 5) (is (= (length (quil.clifford:sample num-samples gt)) num-samples)))
-    (let ((sample (quil.clifford::sample 1 gt)))
-      (is (gethash (car sample) (quil.clifford::mapping gt))))))
+    (dotimes (num-samples 5) (is (= (length (cl-quil.clifford:sample num-samples gt)) num-samples)))
+    (let ((sample (cl-quil.clifford::sample 1 gt)))
+      (is (gethash (car sample) (cl-quil.clifford::mapping gt))))))
 
 (deftest test-count-things ()
   ;;   |Sp(2n, 2)|*|P*(n)|
@@ -232,15 +232,15 @@
 
 (deftest test-canonical-swap-representative ()
   ;;Verify that this map canonizes SWAP to identity
-  ;; (is (quil.clifford:clifford= (canonical-swap-representative (quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))) (SWAP 2 (cl-permutation:perm-identity 2))))
+  ;; (is (cl-quil.clifford:clifford= (canonical-swap-representative (cl-quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))) (SWAP 2 (cl-permutation:perm-identity 2))))
   (let ((gt (make-god-table (default-gateset 2)))
-        (equivalence-classes (quil.clifford::make-clifford-hash-table)))
-    (loop :for key :being :the :hash-keys :of (quil.clifford::mapping gt) :do
+        (equivalence-classes (cl-quil.clifford::make-clifford-hash-table)))
+    (loop :for key :being :the :hash-keys :of (cl-quil.clifford::mapping gt) :do
       ;;Check that each element canonizes to the same representative
       (is (clifford= (canonical-swap-representative key)
                      (canonical-swap-representative
-                      (quil.clifford:group-mul
-                       (quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))
+                      (cl-quil.clifford:group-mul
+                       (cl-quil.clifford:SWAP 2 (cl-permutation:make-perm 2 1))
                        key))))
       (let ((rep (canonical-swap-representative key)))
         (if (not (gethash rep equivalence-classes))

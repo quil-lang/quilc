@@ -57,7 +57,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                                          (token
                                           (token-pathname (lexical-context instr)))
                                          (t
-                                          (quil-parse-error "Unable to resolve definition context ~/quil:instruction-fmt/" instr)))))
+                                          (quil-parse-error "Unable to resolve definition context ~/cl-quil:instruction-fmt/" instr)))))
                  ;; check for conflicts
                  (a:when-let ((entries (gethash signature all-seen-defns)))
                    (cerror "Continue with ambiguous definition."

@@ -30,7 +30,7 @@
 (defmacro generate-rewiring-benchmarks ()
   (labels
       ((enough-qubits-p (chip quil-file)
-         (<= (quil::qubits-needed quil-file) (quil::chip-spec-n-qubits chip)))
+         (<= (cl-quil::qubits-needed quil-file) (cl-quil::chip-spec-n-qubits chip)))
 
        (bench-name (quil-file rewiring chip)
          (intern (string-upcase (concatenate 'string "bench-" quil-file

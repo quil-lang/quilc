@@ -14,7 +14,7 @@
         ((assert-and-print-instruction (test-form &optional places datum &rest arguments)
            `(assert ,test-form
                     ,places
-                    "Error in resolving ~/quil:instruction-fmt/: ~@?"
+                    "Error in resolving ~/cl-quil:instruction-fmt/: ~@?"
                     instr
                     ,datum
                     ,@arguments)))

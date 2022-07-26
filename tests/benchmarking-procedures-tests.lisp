@@ -9,8 +9,8 @@
   (let* ((sequence-length 10)
          (num-qubits1 1)
          (num-qubits2 2)
-         (gateset1 (quil.clifford:default-gateset num-qubits1))
-         (gateset2 (quil.clifford:default-gateset num-qubits2))
+         (gateset1 (cl-quil.clifford:default-gateset num-qubits1))
+         (gateset2 (cl-quil.clifford:default-gateset num-qubits2))
          (cliffords1 (cl-quil.clifford::cliffords gateset1))
          (cliffords2 (cl-quil.clifford::cliffords gateset2))
          (sequence1 (rb-sequence sequence-length num-qubits1 cliffords1))
@@ -31,7 +31,7 @@
 
 (deftest test-interleaved-rb-sequence ()
   (let* ((sequence-length 10)
-         (gateset (quil.clifford:default-gateset 1))
+         (gateset (cl-quil.clifford:default-gateset 1))
          (cliffords (cl-quil.clifford::cliffords gateset))
          (sequence (rb-sequence sequence-length 1 cliffords (first cliffords))))
     ;; Check that they compose to the identity.

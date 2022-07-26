@@ -195,7 +195,7 @@ Returns NIL. This mutates the instruction."
                                       (qubit-index (reset-qubit-target instr))
                                       :assert-wired t))))
     (otherwise
-     (error "Requested to rewire ~/quil:instruction-fmt/, but we don't know how to do this."
+     (error "Requested to rewire ~/cl-quil:instruction-fmt/, but we don't know how to do this."
             instr)))
   ;; Return nil to emphasize side effect.
   nil)

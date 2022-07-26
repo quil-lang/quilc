@@ -25,7 +25,7 @@
   nil)
 
 (defmethod print-instruction-generic ((thing state-prep-application) (s stream))
-  (format s "STATE-PREP[(~{~5$~^, ~}) -> (~{~5$~^, ~})] ~{~/quil:instruction-fmt/~^ ~}"
+  (format s "STATE-PREP[(~{~5$~^, ~}) -> (~{~5$~^, ~})] ~{~/cl-quil:instruction-fmt/~^ ~}"
           (coerce (state-prep-application-source-wf thing) 'list)
           (coerce (state-prep-application-target-wf thing) 'list)
           (application-arguments thing)))

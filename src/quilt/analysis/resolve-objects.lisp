@@ -72,7 +72,7 @@
                              :key #'frame-definition-frame
                              :test #'frame=)))
         (setf (frame-name-resolution frame) defn)
-        (quil-parse-error "No frame definition found for referenced frame ~/quil:instruction-fmt/."
+        (quil-parse-error "No frame definition found for referenced frame ~/cl-quil:instruction-fmt/."
                           frame))))
   frame)
 

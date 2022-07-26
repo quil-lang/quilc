@@ -155,7 +155,7 @@ following swaps."
   (check-type state addresser-state)
   (assert (= 1 (length (application-arguments instr)))
           nil
-          "Attempted to add instruction ~/quil:instruction-fmt/ to 1Q queues."
+          "Attempted to add instruction ~/cl-quil:instruction-fmt/ to 1Q queues."
           instr)
   (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
   (push instr (aref (addresser-state-1q-queues state)

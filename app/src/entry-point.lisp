@@ -32,7 +32,7 @@
 (defun lookup-isa-descriptor-for-name (isa)
   (or (call-chip-builder isa)
       (if (probe-file isa)
-          (quil::read-chip-spec-file isa)
+          (cl-quil::read-chip-spec-file isa)
           (error "ISA descriptor does not name a known template or an extant file."))))
 
 (defun log-level-string-to-symbol (log-level)
@@ -83,7 +83,7 @@
 
 (defun show-backends ()
   (format t "Available backends:~%")
-  (format t "~{  ~(~A~)~^~%~}~%" (mapcar #'quil:backend-name (quil:list-available-backends))))
+  (format t "~{  ~(~A~)~^~%~}~%" (mapcar #'cl-quil:backend-name (cl-quil:list-available-backends))))
 
 (defun show-chips ()
   (format t "Available ISAs:~%")
@@ -266,14 +266,14 @@
 
   (setf *logger*
         (make-instance 'cl-syslog:rfc5424-logger
-                       :app-name "quilc"
-                       :facility ':local0
-                       :maximum-priority *log-level*
-                       :log-writer
-                       #+windows (cl-syslog:stream-log-writer)
-                       #-windows (cl-syslog:tee-to-stream
-                                  (cl-syslog:syslog-log-writer "quilc" :local0)
-                                  *error-output*)))
+          :app-name "quilc"
+          :facility ':local0
+          :maximum-priority *log-level*
+          :log-writer
+          #+windows (cl-syslog:stream-log-writer)
+          #-windows (cl-syslog:tee-to-stream
+                     (cl-syslog:syslog-log-writer "quilc" :local0)
+                     *error-output*)))
 
 
   ;;
@@ -302,149 +302,149 @@
   ;;
 
   (special-bindings-let*
-      ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
-                        *log-level*))
-       (*logger* (make-instance 'cl-syslog:rfc5424-logger
-                                :app-name "quilc"
-                                :facility ':local0
-                                :maximum-priority *log-level*
-                                :log-writer
-                                #+windows (cl-syslog:stream-log-writer)
-                                #-windows (cl-syslog:tee-to-stream
-                                           (cl-syslog:syslog-log-writer "quilc" :local0)
-                                           *error-output*)))
-       (quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
-       (*without-pretty-printing* without-pretty-printing)
-       (quil::*enable-state-prep-compression* enable-state-prep-reductions)
-       ;; Null out the streams. If no server mode is requested, these bindings will be modified
-       ;; before calling run-CLI-mode, below.
-       (*human-readable-stream* (make-broadcast-stream))
-       (*quil-stream* (make-broadcast-stream))
-       (*protoquil* protoquil)
-       (*state-aware* enable-state-prep-reductions)
-       (quil::*safe-include-directory* safe-include-directory)
-       (*chip-cache-max-size* chip-cache))
+   ((*log-level* (or (and log-level (log-level-string-to-symbol log-level))
+                     *log-level*))
+    (*logger* (make-instance 'cl-syslog:rfc5424-logger
+                :app-name "quilc"
+                :facility ':local0
+                :maximum-priority *log-level*
+                :log-writer
+                #+windows (cl-syslog:stream-log-writer)
+                #-windows (cl-syslog:tee-to-stream
+                           (cl-syslog:syslog-log-writer "quilc" :local0)
+                           *error-output*)))
+    (cl-quil::*prefer-ranged-gates-to-SWAPs* prefer-gate-ladders)
+    (*without-pretty-printing* without-pretty-printing)
+    (cl-quil::*enable-state-prep-compression* enable-state-prep-reductions)
+    ;; Null out the streams. If no server mode is requested, these bindings will be modified
+    ;; before calling run-CLI-mode, below.
+    (*human-readable-stream* (make-broadcast-stream))
+    (*quil-stream* (make-broadcast-stream))
+    (*protoquil* protoquil)
+    (*state-aware* enable-state-prep-reductions)
+    (cl-quil::*safe-include-directory* safe-include-directory)
+    (*chip-cache-max-size* chip-cache))
 
-    (when check-sdk-version
-      (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
-    ;;
-    ;; At this point we know we're doing something. Strap in LAPACK.
-    ;;
+   (when check-sdk-version
+     (asynchronously-indicate-update-availability +QUILC-VERSION+ :proxy proxy))
+   ;;
+   ;; At this point we know we're doing something. Strap in LAPACK.
+   ;;
 
-    (magicl:with-blapack
-      (reload-foreign-libraries)
+   (magicl:with-blapack
+     (reload-foreign-libraries)
 
-      (cond
-        ;;
-        ;; RPCQ server mode requested
-        ;;
-        (server-mode-rpc
-         (unless quiet
-           (show-banner))
+     (cond
+       ;;
+       ;; RPCQ server mode requested
+       ;;
+       (server-mode-rpc
+        (unless quiet
+          (show-banner))
 
-         (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
-           (:msgid "LOG0001"))
+        (cl-syslog:rfc-log (*logger* :info "Launching quilc.")
+          (:msgid "LOG0001"))
 
-         (when (or compile backend output)
-           (cl-syslog:rfc-log (*logger* :warning "--backend and --output-file/-o options ~
+        (when (or compile backend output)
+          (cl-syslog:rfc-log (*logger* :warning "--backend and --output-file/-o options ~
                                                   don't make sense when using server mode. ~
                                                   Ignoring them.")))
-         (when verbose
-           (setf quil::*compiler-noise* *error-output*)
-           (warn "--verbose output is not appropriate for production multithreaded environments, and should b used when debugging and with care"))
-         ;; launch the polling loop
-         (start-rpc-server :host host
-                           :port port
-                           :logger *logger*
-                           :time-limit time-limit))
+        (when verbose
+          (setf cl-quil::*compiler-noise* *error-output*)
+          (warn "--verbose output is not appropriate for production multithreaded environments, and should b used when debugging and with care"))
+        ;; launch the polling loop
+        (start-rpc-server :host host
+                          :port port
+                          :logger *logger*
+                          :time-limit time-limit))
 
-        ;;
-        ;; server modes not requested, so continue parsing arguments
-        ;;
-        (t
-         (setf *human-readable-stream* *error-output*)
-         (setf *quil-stream* *standard-output*)
+       ;;
+       ;; server modes not requested, so continue parsing arguments
+       ;;
+       (t
+        (setf *human-readable-stream* *error-output*)
+        (setf *quil-stream* *standard-output*)
 
-         (let* ((program-text (slurp-lines))
-                (program (safely-parse-quil program-text))
-                (original-matrix (when (and protoquil compute-matrix-reps)
-                                   (parsed-program-to-logical-matrix program)))
-                (chip-spec (lookup-isa-descriptor-for-name isa)))
-           (multiple-value-bind (processed-program statistics)
-               (process-program program chip-spec
-                                :protoquil protoquil
-                                :verbose (if verbose *human-readable-stream* (make-broadcast-stream))
-                                :gate-whitelist (and gate-whitelist
-                                                     (split-sequence:split-sequence
-                                                      #\,
-                                                      (remove #\Space gate-whitelist)
-                                                      :remove-empty-subseqs t))
-                                :gate-blacklist (and gate-blacklist
-                                                     (split-sequence:split-sequence
-                                                      #\,
-                                                      (remove #\Space gate-blacklist)
-                                                      :remove-empty-subseqs t)))
+        (let* ((program-text (slurp-lines))
+               (program (safely-parse-quil program-text))
+               (original-matrix (when (and protoquil compute-matrix-reps)
+                                  (parsed-program-to-logical-matrix program)))
+               (chip-spec (lookup-isa-descriptor-for-name isa)))
+          (multiple-value-bind (processed-program statistics)
+              (process-program program chip-spec
+                               :protoquil protoquil
+                               :verbose (if verbose *human-readable-stream* (make-broadcast-stream))
+                               :gate-whitelist (and gate-whitelist
+                                                    (split-sequence:split-sequence
+                                                     #\,
+                                                     (remove #\Space gate-whitelist)
+                                                     :remove-empty-subseqs t))
+                               :gate-blacklist (and gate-blacklist
+                                                    (split-sequence:split-sequence
+                                                     #\,
+                                                     (remove #\Space gate-blacklist)
+                                                     :remove-empty-subseqs t)))
 
 
-             ;; NOTE: This flow is deprecated and will be merged with
-             ;; quil-backend in the future.
-             (unless compile
-               ;; If we want circuit definitons, keep them. Otherwise
-               ;; delete so they don't get printed.
-               (unless print-circuit-definitions
-                 (setf (parsed-program-circuit-definitions processed-program) nil))
+            ;; NOTE: This flow is deprecated and will be merged with
+            ;; quil-backend in the future.
+            (unless compile
+              ;; If we want circuit definitons, keep them. Otherwise
+              ;; delete so they don't get printed.
+              (unless print-circuit-definitions
+                (setf (parsed-program-circuit-definitions processed-program) nil))
 
-               ;; Print the program to stdout
-               (print-program processed-program *quil-stream*)
+              ;; Print the program to stdout
+              (print-program processed-program *quil-stream*)
 
-               ;; If we are using protoquil (no control flow), then we
-               ;; can print statistics about the program as comments at
-               ;; the end of the output.
-               (when (and protoquil print-statistics)
-                 (print-statistics statistics *quil-stream*))
+              ;; If we are using protoquil (no control flow), then we
+              ;; can print statistics about the program as comments at
+              ;; the end of the output.
+              (when (and protoquil print-statistics)
+                (print-statistics statistics *quil-stream*))
 
-               ;; If we are using protoquil (no control flow), then we
-               ;; can print the input and output unitary matrix as
-               ;; comments at the end of the output.
-               (when (and protoquil compute-matrix-reps)
-                 (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t))
-                        ;; If a TOLERANCE pragma is found, allow non-zero phase invariant distance
-                        (tolerance (cl-quil::prog-find-top-pragma program "TOLERANCE")))
-                   (if tolerance
-                       (print-matrix-comparision
-                        original-matrix processed-program-matrix
-                        :tolerance t)
-                       (print-matrix-comparision
-                        original-matrix
-                        (quil::scale-out-matrix-phases processed-program-matrix original-matrix))))))
+              ;; If we are using protoquil (no control flow), then we
+              ;; can print the input and output unitary matrix as
+              ;; comments at the end of the output.
+              (when (and protoquil compute-matrix-reps)
+                (let* ((processed-program-matrix (parsed-program-to-logical-matrix processed-program :compress-qubits t))
+                       ;; If a TOLERANCE pragma is found, allow non-zero phase invariant distance
+                       (tolerance (cl-quil::prog-find-top-pragma program "TOLERANCE")))
+                  (if tolerance
+                      (print-matrix-comparision
+                       original-matrix processed-program-matrix
+                       :tolerance t)
+                      (print-matrix-comparision
+                       original-matrix
+                       (cl-quil::scale-out-matrix-phases processed-program-matrix original-matrix))))))
 
-             ;; New and improved flow
-             (when compile
-               (unless backend
-                 (error "Backend must be provided when compilation is ~
+            ;; New and improved flow
+            (when compile
+              (unless backend
+                (error "Backend must be provided when compilation is ~
                  enabled. For a list of available backends, run 'quilc ~
                  --list-backends'."))
 
-               (unless output
-                 (error "Output must be provided when compilation is ~
+              (unless output
+                (error "Output must be provided when compilation is ~
                  enabled. Specify an output file with -o or ~
                  --output."))
 
-               (let ((backend-class (quil:find-backend backend)))
-                 (unless backend-class
-                   (error "The backend value '~a' does not name an ~
+              (let ((backend-class (cl-quil:find-backend backend)))
+                (unless backend-class
+                  (error "The backend value '~a' does not name an ~
                    available backend. For a list of available ~
                    backends, run 'quilc --list-backends'." backend))
 
-                 ;; TODO: Compute and pass statistics to backend when
-                 ;; using protoquil
-                 (let ((backend
-                         (apply #'make-instance backend-class
-                                (parse-backend-options backend-option))))
-                   (unless (quil:backend-supports-chip-p backend chip-spec)
-                     (error "The backend provided does not support this ISA."))
+                ;; TODO: Compute and pass statistics to backend when
+                ;; using protoquil
+                (let ((backend
+                        (apply #'make-instance backend-class
+                               (parse-backend-options backend-option))))
+                  (unless (cl-quil:backend-supports-chip-p backend chip-spec)
+                    (error "The backend provided does not support this ISA."))
 
-                   (backend-compile-program processed-program chip-spec backend output)))))))))))
+                  (backend-compile-program processed-program chip-spec backend output)))))))))))
 
 (defun parse-backend-options (options)
   "Parse backend options to keyword init-args for making backend."
@@ -464,8 +464,8 @@
                                  :element-type '(unsigned-byte 8)
                                  :if-exists ':supersede
                                  :if-does-not-exist ':create)
-    (let ((executable (quil:backend-compile program chip-spec backend)))
-      (quil:write-executable executable stream))))
+    (let ((executable (cl-quil:backend-compile program chip-spec backend)))
+      (cl-quil:write-executable executable stream))))
 
 (defun process-program (program chip-specification
                         &key
@@ -480,20 +480,21 @@ Note: PROGRAM is mutated by the compilation process. To avoid this, use COPY-INS
 
 Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM is the compiled program, and STATISTICS is a HASH-TABLE whose keys are the slots of the RPCQ::|NativeQuilMetadata| class."
   (let* ((statistics (make-hash-table :test #'equal))
-         (quil::*compiler-noise* verbose)
+         (cl-quil::*compiler-noise* verbose)
          (*random-state* (make-random-state t))
-         (quil::*enable-state-prep-compression* state-aware))
+         (cl-quil::*enable-state-prep-compression* state-aware))
     ;; do the compilation
     (multiple-value-bind (processed-program topological-swaps)
         (compiler-hook program chip-specification :protoquil protoquil :destructive t)
 
       (when protoquil
-        ;; if we're supposed to output protoQuil, we strip circuit and gate definitions
+        ;; if we're supposed to output protoQuil, we strip circuit and
+        ;; gate definitions
         (setf (parsed-program-circuit-definitions processed-program) nil
               (parsed-program-gate-definitions processed-program) nil)
 
-        ;; if we're supposed to output protoQuil, we also need to strip the final HALT
-        ;; instructions from the output
+        ;; if we're supposed to output protoQuil, we also need to
+        ;; strip the final HALT instructions from the output
         (setf (parsed-program-executable-code processed-program)
               (strip-final-halt-respecting-rewirings processed-program))
 
@@ -512,18 +513,18 @@ Returns a values tuple (PROCESSED-PROGRAM, STATISTICS), where PROCESSED-PROGRAM 
 
 This function will have undefined behavior when PROCESSED-PROGRAM is not protoquil."
   (setf (gethash "final_rewiring" statistics)
-        (quil::extract-final-exit-rewiring-vector processed-program))
+        (cl-quil::extract-final-exit-rewiring-vector processed-program))
 
-  (let ((lschedule (quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lscheduler)))
     (loop :for instr :across (parsed-program-executable-code processed-program)
           :unless (typep instr 'pragma)
-            :do (quil::append-instruction-to-lschedule lschedule instr))
+            :do (cl-quil::append-instruction-to-lschedule lschedule instr))
     (setf (gethash "logical_schedule" statistics)
           lschedule))
 
   ;; gate depth, gate volume, duration, and fidelity stats can
   ;; all share an lschedule
-  (let ((lschedule (quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lscheduler)))
     (loop :for instr :across (parsed-program-executable-code processed-program)
           :when (and (typep instr 'gate-application)
                      (not (member (cl-quil::application-operator-root-name instr)
@@ -533,47 +534,47 @@ This function will have undefined behavior when PROCESSED-PROGRAM is not protoqu
                          (member (cl-quil::application-operator-root-name instr)
                                  gate-whitelist
                                  :test #'string=)))
-            :do (quil::append-instruction-to-lschedule lschedule instr))
+            :do (cl-quil::append-instruction-to-lschedule lschedule instr))
 
     (setf (gethash "gate_depth" statistics)
-          (quil::lscheduler-calculate-depth lschedule))
+          (cl-quil::lscheduler-calculate-depth lschedule))
 
     (setf (gethash "gate_volume" statistics)
-          (quil::lscheduler-calculate-volume lschedule))
+          (cl-quil::lscheduler-calculate-volume lschedule))
 
     (setf (gethash "program_duration" statistics)
-          (quil::lscheduler-calculate-duration lschedule chip-specification))
+          (cl-quil::lscheduler-calculate-duration lschedule chip-specification))
 
     (setf (gethash "program_fidelity" statistics)
-          (quil::lscheduler-calculate-fidelity lschedule chip-specification))
+          (cl-quil::lscheduler-calculate-fidelity lschedule chip-specification))
 
     (let* ((lscheduler-resources
-             (let ((collect (quil::make-null-resource)))
-               (quil::lscheduler-walk-graph
+             (let ((collect (cl-quil::make-null-resource)))
+               (cl-quil::lscheduler-walk-graph
                 lschedule
                 :bump-value (lambda (instr value)
                               (setf collect
-                                    (quil::resource-union collect
-                                                          (quil::instruction-resources instr)))
+                                    (cl-quil::resource-union collect
+                                                             (cl-quil::instruction-resources instr)))
                               value))
                collect))
            (unused-qubits
-             (loop :for i :below (quil::chip-spec-n-qubits chip-specification)
-                   :unless (quil::resources-intersect-p (quil::make-qubit-resource i)
-                                                        lscheduler-resources)
+             (loop :for i :below (cl-quil::chip-spec-n-qubits chip-specification)
+                   :unless (cl-quil::resources-intersect-p (cl-quil::make-qubit-resource i)
+                                                           lscheduler-resources)
                      :collect i)))
       (setf (gethash "unused_qubits" statistics)
             unused-qubits)))
 
   ;; multiq gate depth requires a separate lschedule
-  (let ((lschedule (quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lscheduler)))
     (loop :for instr :across (parsed-program-executable-code processed-program)
           :when (and (typep instr 'gate-application)
                      (<= 2 (length (application-arguments instr))))
-            :do (quil::append-instruction-to-lschedule lschedule instr)
+            :do (cl-quil::append-instruction-to-lschedule lschedule instr)
           :finally
              (setf (gethash "multiqubit_gate_depth" statistics)
-                   (quil::lscheduler-calculate-depth lschedule))))
+                   (cl-quil::lscheduler-calculate-depth lschedule))))
 
   statistics)
 
@@ -581,55 +582,65 @@ This function will have undefined behavior when PROCESSED-PROGRAM is not protoqu
   "Remove the final HALT instruction, if any, from PROCESSED-PROGRAM, retaining any attached rewiring comments."
   (let* ((instructions (parsed-program-executable-code processed-program))
          (last-instruction (and (plusp (length instructions))
-                                (quil::nth-instr 0 processed-program :from-end t)))
+                                (cl-quil::nth-instr 0 processed-program :from-end t)))
          (penultimate-instruction (and (< 1 (length instructions))
-                                       (quil::nth-instr 1 processed-program :from-end t)))
+                                       (cl-quil::nth-instr 1 processed-program :from-end t)))
          (must-transfer-comment-p (and (not (null penultimate-instruction))
                                        (comment last-instruction))))
 
-    (unless (quil::haltp last-instruction)
+    (unless (cl-quil::haltp last-instruction)
       (return-from strip-final-halt-respecting-rewirings instructions))
 
     (when must-transfer-comment-p
-      ;; Transfer the rewiring comment from LAST-INSTRUCTION to PENULTIMATE-INSTRUCTION.
+      ;; Transfer the rewiring comment from LAST-INSTRUCTION to
+      ;; PENULTIMATE-INSTRUCTION.
       (multiple-value-bind (last-entering last-exiting)
-          (quil::instruction-rewirings last-instruction)
+          (cl-quil::instruction-rewirings last-instruction)
         (multiple-value-bind (penultimate-entering penultimate-exiting)
-            (quil::instruction-rewirings penultimate-instruction)
+            (cl-quil::instruction-rewirings penultimate-instruction)
           (flet ((assert-rewirings-compatible (rewiring-type last-rewiring penultimate-rewiring)
-                   ;; This bit of hoop-jumping guards against the unlikely event that both
-                   ;; PENULTIMATE-INSTRUCTION and LAST-INSTRUCTION have rewiring comments attached
-                   ;; which might be incompatible. We check to ensure that either one of the
-                   ;; rewirings is NULL, or else they are EQUALP and can safely be merged.
+                   ;; This bit of hoop-jumping guards against the
+                   ;; unlikely event that both PENULTIMATE-INSTRUCTION
+                   ;; and LAST-INSTRUCTION have rewiring comments
+                   ;; attached which might be incompatible. We check
+                   ;; to ensure that either one of the rewirings is
+                   ;; NULL, or else they are EQUALP and can safely be
+                   ;; merged.
                    (assert (or (or (null last-rewiring)
                                    (null penultimate-rewiring))
                                (equalp last-rewiring penultimate-rewiring))
-                           ()
-                           "Failed to strip final HALT. Instructions have incompatible ~A rewirings:~@
+                       ()
+                       "Failed to strip final HALT. Instructions have incompatible ~A rewirings:~@
                            LAST: ~A ~A~@
                            PREV: ~A ~A"
-                           rewiring-type last-instruction last-rewiring
-                           penultimate-instruction penultimate-rewiring)))
+                       rewiring-type last-instruction last-rewiring
+                       penultimate-instruction penultimate-rewiring)))
             (assert-rewirings-compatible ':ENTERING last-entering penultimate-entering)
             (assert-rewirings-compatible ':EXITING last-exiting penultimate-exiting))
-          ;; Consider the following cases for the :ENTERING rewirings (the same case analysis
-          ;; applies to the :EXITING rewiring pair as well).
+          ;; Consider the following cases for the :ENTERING rewirings
+          ;; (the same case analysis applies to the :EXITING rewiring
+          ;; pair as well).
           ;;
-          ;; 1) If both the rewirings are non-NIL, then the ASSERT-REWIRINGS-COMPATIBLE check above
-          ;;    guarantees that they are EQUALP, and it doesn't matter which one we select.
+          ;; 1) If both the rewirings are non-NIL, then the
+          ;;    ASSERT-REWIRINGS-COMPATIBLE check above guarantees
+          ;;    that they are EQUALP, and it doesn't matter which one
+          ;;    we select.
           ;;
           ;; 2) If only one is non-NIL, the OR selects it.
           ;;
-          ;; 3) If both are NIL, then MAKE-REWIRING-COMMENT just ignores that keyword argument, and
-          ;;    returns an :EXITING rewiring.
+          ;; 3) If both are NIL, then MAKE-REWIRING-COMMENT just
+          ;;    ignores that keyword argument, and returns an :EXITING
+          ;;    rewiring.
           ;;
-          ;; Finally, (COMMENT LAST-INSTRUCTION) is non-NIL (otherwise MUST-TRANSFER-COMMENT-P would
-          ;; be NIL), so at least one of LAST-ENTERING and LAST-EXITING is non-NIL, which means that
-          ;; at least one of the :ENTERING and :EXITING keyword args to MAKE-REWIRING-COMMENT is
-          ;; non-NIL and hence the call will produce a rewiring comment.
+          ;; Finally, (COMMENT LAST-INSTRUCTION) is non-NIL (otherwise
+          ;; MUST-TRANSFER-COMMENT-P would be NIL), so at least one of
+          ;; LAST-ENTERING and LAST-EXITING is non-NIL, which means
+          ;; that at least one of the :ENTERING and :EXITING keyword
+          ;; args to MAKE-REWIRING-COMMENT is non-NIL and hence the
+          ;; call will produce a rewiring comment.
           (setf (comment penultimate-instruction)
-                (quil::make-rewiring-comment :entering (or last-entering penultimate-entering)
-                                             :exiting (or last-exiting penultimate-exiting))))))
+                (cl-quil::make-rewiring-comment :entering (or last-entering penultimate-entering)
+                                                :exiting (or last-exiting penultimate-exiting))))))
 
     ;; Strip the final HALT instruction.
     (subseq instructions 0 (1- (length instructions)))))
