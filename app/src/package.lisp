@@ -6,4 +6,4 @@
 
 (defpackage #:quilc
   (:use #:cl #:cl-quil #:cl-quil.chip-library)
-  (:local-nicknames (:a :alexandria)))
+  (:local-nicknames (#:a #:alexandria)))

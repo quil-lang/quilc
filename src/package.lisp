@@ -2,15 +2,9 @@
 ;;;;
 ;;;; Author: Robert Smith
 
-;;; Allegro (and other Lisps) don't support the non-standard "package
-;;; local nicknames".
-#-(or sbcl ecl ccl)
-(rename-package :alexandria :alexandria '(:a))
-
 (defpackage #:cl-quil.resource
   (:use #:cl)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (#:a #:alexandria))
   (:export
    #:resource-collection                ; TYPE
    #:make-resource-collection           ; FUNCTION
@@ -35,8 +29,7 @@
         #:parse-float
         #:abstract-classes
         #:singleton-classes)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (#:a #:alexandria))
   ;; frontend-options.lisp
   (:export
    #:*allow-unresolved-applications*    ; VARIABLE
@@ -733,13 +726,11 @@
   )
 
 (defpackage #:cl-quil
-  (:nicknames #:quil)
   (:use #:cl
         #:cl-quil.resource
         #:cl-quil.frontend
         #:abstract-classes)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
+  (:local-nicknames (#:a #:alexandria))
   
   ;; options.lisp
   (:export
@@ -1252,12 +1243,10 @@
                           #:pi))
 
 (defpackage #:cl-quil.clifford
-  (:nicknames #:quil.clifford)
   (:use #:cl
         #:cl-permutation)
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria)
-                    (:quil :cl-quil.frontend))
+  (:local-nicknames (#:a    #:alexandria)
+                    (#:quil #:cl-quil.frontend))
 
   ;; clifford/ module
   (:export
@@ -1328,10 +1317,9 @@
   )
 
 (defpackage #:cl-quil.qasm
-  (:nicknames #:quil.qasm)
   (:use #:cl)
-  (:local-nicknames (:a :alexandria)
-                    (:quil :cl-quil.frontend))
+  (:local-nicknames (#:a    #:alexandria)
+                    (#:quil #:cl-quil.frontend))
   (:import-from #:cl-quil.frontend #:tok #:token-type #:token-payload)
 
   (:export
@@ -1397,7 +1385,7 @@
 
 
 
-(define-exposing-package #:cl-quil.si (#:cl-quil (:nicknames #:quil.si))
+(define-exposing-package #:cl-quil.si (#:cl-quil)
   
   ;; logical-schedule.lisp
   #:append-instructions-to-lschedule    ; FUNCTION

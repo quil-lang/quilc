@@ -87,7 +87,7 @@ For example, if T, the diagram for `CNOT 0 2` would have three qubit lines: 0, 1
   ;; TeXify names
   (let* ((cl-quil.frontend::*pi-literal* "\\pi")
          (texified-name
-           (format nil "~A~:[~;^{\\dagger}~]~@[(~{~/quil:instruction-fmt/~^, ~})~]"
+           (format nil "~A~:[~;^{\\dagger}~]~@[(~{~/cl-quil:instruction-fmt/~^, ~})~]"
                    (cond
                      ((string= "RX" name) "R_x")
                      ((string= "RY" name) "R_y")

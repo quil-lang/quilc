@@ -636,7 +636,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
                          (*read-default-float-format* (or (and (null params) 'single-float)
                                                           (type-of (car params-constant-values)))))
                     (quil::make-pragma (list "QASM_OPAQUE_APPLICATION" name)
-                                       (format nil "(~{~F~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
+                                       (format nil "(~{~F~^, ~}) ~{~/cl-quil:instruction-fmt/~^, ~}"
                                                params-constant-values
                                                (mapcar #'register-to-quil-object
                                                        registers))))
@@ -705,7 +705,7 @@ Note: the above \"expansion\" is not performed when in a gate body."
         (setf (gethash (%qasm-gate-name (token-payload name-tok)) *gate-names*) ':opaque)
         (values (quil::make-pragma
                  (list "QASM_OPAQUE_DEFINITION" (token-payload name-tok))
-                 (format nil "(~{~A~^, ~}) ~{~/quil:instruction-fmt/~^, ~}"
+                 (format nil "(~{~A~^, ~}) ~{~/cl-quil:instruction-fmt/~^, ~}"
                          (mapcar #'quil:param-name params)
                          (mapcar #'register-to-quil-object qregs)))
                 rest-lines)))))

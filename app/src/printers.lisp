@@ -27,21 +27,21 @@ print out their `global-phase-invariant-distance' with no error."
       (format stream "~%#Matrices have a global phase invariant distance of ~E~%"
               (cl-quil::global-phase-invariant-distance m1 m2))
       (format stream "~%#Matrices are~:[ not~;~] equal~%"
-              (quil::matrix-equals-dwim m1 m2)))
+              (cl-quil::matrix-equals-dwim m1 m2)))
   (finish-output stream))
 
 (defun print-program (processed-program &optional (stream *standard-output*))
   (let ((program-as-string
           (with-output-to-string (s)
-            (let ((quil::*print-fractional-radians* (not *without-pretty-printing*)))
-              (quil::print-parsed-program processed-program s)))))
+            (let ((cl-quil::*print-fractional-radians* (not *without-pretty-printing*)))
+              (cl-quil::print-parsed-program processed-program s)))))
     (if stream
         (write-string program-as-string stream)
         program-as-string)))
 
 ;; custom encoder for rewiring objects
-(defmethod yason:encode ((object quil::rewiring) &optional (stream *standard-output*))
-  (yason:encode (quil::rewiring-l2p object) stream))
+(defmethod yason:encode ((object cl-quil::rewiring) &optional (stream *standard-output*))
+  (yason:encode (cl-quil::rewiring-l2p object) stream))
 
 (defun print-statistics (statistics &optional (stream *human-readable-stream*))
   (format stream

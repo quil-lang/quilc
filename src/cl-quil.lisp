@@ -181,7 +181,7 @@ This also signals ambiguous definitions, which may be handled as needed."
                        (ambiguous-definition-handler *default-ambiguous-definition-handler*))
   "Parse the input STRING which can be either Quil or OpenQASM code."
   (if (%check-for-qasm-header string)
-      (quil.qasm:parse-qasm string)
+      (cl-quil.qasm:parse-qasm string)
       (parse-quil string
                   :originating-file originating-file
                   :transforms transforms
