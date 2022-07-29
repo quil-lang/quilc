@@ -253,7 +253,7 @@
                #:closer-mop
                #:parse-float
                #:coalton
-               (:feature :sbcl #:coalton/library/big-float))
+               #:coalton/library/big-float)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/discrete-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))

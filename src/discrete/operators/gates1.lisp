@@ -138,24 +138,24 @@ simplification see (List Universal1) to MAForm to (List OutputGate1)."
     (define (into c)
       (match (cliffordgates1-get-encoding c)
         ((Tuple4 a b c d)
-         (<> (<> (list:repeat a EGate)
-                 (list:repeat b XGate))
-             (<> (list:repeat c SGate)
-                 (list:repeat d WGate)))))))
+         (<> (<> (list:repeat (fromInt a) EGate)
+                 (list:repeat (fromInt b) XGate))
+             (<> (list:repeat (fromInt c) SGate)
+                 (list:repeat (fromInt d) WGate)))))))
 
   (define-instance (Into CliffordGates1 (List OutputGate1))
     (define (into c)
       (match (cliffordgates1-get-encoding c)
         ((Tuple4 a b c _)
          (<> (list:concat
-              (list:repeat a
+              (list:repeat (fromInt a)
                 ;; E = HSSS (ɷ^3)
                 (make-list Discrete-H Discrete-S Discrete-S Discrete-S)))
              (<> (list:concat
-                  (list:repeat b
+                  (list:repeat (fromInt b)
                     ;; X = HSSH
                     (make-list Discrete-H Discrete-S Discrete-S Discrete-H)))
-                 (list:repeat c Discrete-S)))))))
+                 (list:repeat (fromInt c) Discrete-S)))))))
 
   (define-instance (Into Universal1 (Optional CliffordGates1))
     (define (into ct)

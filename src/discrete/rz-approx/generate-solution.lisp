@@ -34,7 +34,7 @@ where x = X, (SUCC X), (SUCC (SUCC X)), ... "
         None))
 
   (declare print-operator-norm
-           ((Into :a Double-Float) #+sbcl (Into :a Big-float) =>
+           ((toFloat :a) =>
             UFix -> (SUnitary2 (Cyclotomic8 Dyadic)) -> :a -> :a -> Unit))
   (define (print-operator-norm precision solution epsilon theta)
     "Prints debug information about a given SOLUTION operator norm expcted with
@@ -42,8 +42,8 @@ Rz(THETA) to be less than or equal to EPSILON using PRECISION bits to calculate"
     (the UFix precision)
     (let thunk =
       (fn (_)
-        (let theta = (the #+sbcl Big-Float #-sbcl Double-Float (into theta)))
-        (let epsilon = (the #+sbcl Big-Float #-sbcl Double-Float (into epsilon)))
+        (let theta = (toBig theta))
+        (let epsilon = (toBig epsilon))
         (let m1 = (the (Mat2 (Complex :a)) (into (Rz theta))))
         (let m2 = (map cyclotomic8->complex
                        (the (Mat2 (Cyclotomic8 Dyadic))
@@ -57,14 +57,10 @@ Rz(THETA) to be less than or equal to EPSILON using PRECISION bits to calculate"
            within percent)
           Unit)))
     ;; We increase precision to verify our previous precision was enough
-    #+sbcl
-    (coalton-library/big-float:with-precision (+ 2 precision) thunk)
-    #-sbcl
-    (thunk Unit))
+    (coalton-library/big-float:with-precision (+ 2 precision) thunk))
 
   (declare find-candidate
-           ((Rational :a) (Reciprocable :a)
-            (Into :a Double-Float) #+sbcl (Into :a Big-float)
+           ((Rational :a) (Reciprocable :a) (ToFloat :a)
             => (Integer -> :a -> :a ->  Integer
                         -> (Optional (SUnitary2 (Cyclotomic8 Dyadic))))))
   (define (find-candidate attempts epsilon theta)
@@ -78,24 +74,14 @@ Rz(THETA) to be less than or equal to EPSILON using PRECISION bits to calculate"
 
     ;; This value is rounded so a double-float should work
     (let c = (the Double-Float (+ (/ 5 2) (* 2 (log 2 (+ 1 (sqrt 2)))))))
-    (let k = (ceiling (+ c (* 2 (log 2 (^^ (into epsilon) -1))))))
+    (let k = (ceiling (+ c (* 2 (log 2 (^^ (toDouble epsilon) -1))))))
 
     (let next-u =
       (if (> epsilon (^^ 10 -6))
-          (generate-u-candidate
-           best-approx k
-           (the Double-Float (into epsilon))
-           (the Double-Float (into theta)))
-          #+sbcl
+          (generate-u-candidate best-approx k (toDouble epsilon) (toDouble theta))
           (coalton-library/big-float::with-precision precision
             (fn (_)
-              (generate-u-candidate
-               to-fraction
-               k
-               (the Big-Float (into epsilon))
-               (the Big-Float (into theta)))))
-          #-sbcl
-          (error "Epsilon too small for implmented precision.")))
+              (generate-u-candidate to-fraction k (toBig epsilon) (toBig theta))))))
     (fn (n)
       (do
        (let u = (next-u n))
@@ -125,8 +111,7 @@ Rz(THETA) to be less than or equal to EPSILON using PRECISION bits to calculate"
             None))))
 
   (declare generate-solution
-           ((Rational :a) (Elementary :a)
-            (Into :a Double-Float) #+sbcl (Into :a Big-float)
+           ((Rational :a) (Elementary :a) (ToFloat :a)
             => (Integer -> :a -> :a
                         -> (Optional (SUnitary2 (Cyclotomic8 Dyadic))))))
   (define (generate-solution attempts epsilon theta)
@@ -147,8 +132,7 @@ half of Algorithm 23 (arXiv:1212.6253v2)."
     (search 1))
 
   (declare generate-maform-output
-           ((Rational :a) (Reciprocable :a)
-            (Into :a Double-Float) #+sbcl (Into :a Big-float)
+           ((Rational :a) (Reciprocable :a) (ToFloat :a)
             => (Integer -> :a -> :a -> Integer -> (Optional MAForm))))
   (define (generate-maform-output attempts epsilon theta)
     "Facilitates `find-candidate' with various attempts at seeded values."
