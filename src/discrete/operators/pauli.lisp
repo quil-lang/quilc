@@ -35,7 +35,7 @@
     (let bs-base4 = (map rootunity4->integer bs))
     (let p-base4 = (rootunity4->integer p))
     (let nat = single)
-    (if (== (fromInt (list:length bs)) (fromNat nat))
+    (if (== (list:length bs) (fromNat nat))
         (with-singleton nat
           (lisp (Pauli :a) (bs-base4 p-base4)
             (cl-quil.clifford:make-pauli bs-base4 p-base4)))

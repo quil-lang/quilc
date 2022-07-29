@@ -45,6 +45,48 @@ generator that takes an N and returns a value between 0 and 1"
   (define (fraction->reciprocable x)
       (/ (fromInt (numerator x)) (fromInt (denominator x))))
 
+  (define-class (ToFloat :a)
+    (toSingle (:a -> Single-Float))
+    (toDouble (:a -> Double-Float))
+    (toBig (:a -> Big-Float)))
+
+  (define-instance (ToFloat Integer)
+    (define (toSingle x)
+      (fromInt x))
+    (define (toDouble x)
+      (fromInt x))
+    (define (toBig x)
+      (fromInt x)))
+
+  (define-instance (ToFloat Fraction)
+    (define (toSingle x)
+      (fraction->reciprocable x))
+    (define (toDouble x)
+      (fraction->reciprocable x))
+    (define (toBig x)
+      (fraction->reciprocable x)))
+
+  (define-instance (ToFloat Single-Float)
+    (define (toSingle x) x)
+    (define (toDouble x)
+      (lisp Double-Float (x) (cl:coerce x 'cl:double-float)))
+    (define (toBig x)
+      (into x)))
+
+  (define-instance (ToFloat Double-Float)
+    (define (toSingle x)
+      (fraction->reciprocable (to-fraction x)))
+    (define (toDouble x) x)
+    (define (toBig x)
+      (into x)))
+
+  (define-instance (ToFloat Big-Float)
+    (define (toSingle x)
+      (fraction->reciprocable (to-fraction x)))
+    (define (toDouble x)
+      (fraction->reciprocable (to-fraction x)))
+    (define (toBig x) x))
+
   (declare expt-mod (Integer -> Integer -> Integer -> Integer))
   (define (expt-mod a x n)
     "Defines a less naïve (mod (expt A X) N) for non-negative X N."

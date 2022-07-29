@@ -15,9 +15,11 @@
    #:RealFrac
    #:toRational
    #:fraction->reciprocable
-   #:Real
+   #:ToFloat
+   #:toSingle
+   #:toDouble
+   #:toBig
    #:same-type
-   #:approximate
    #:psuedo-random
    #:makeComplex
    #:complexReal
@@ -172,7 +174,7 @@
    #:generate-maform-output-with-double ; FUNCTION
    #:output-T^                          ; FUNCTION
    )
-  #+sbcl (:import-from #:coalton-library/big-float #:Big-Float)
+  (:import-from #:coalton-library/big-float #:Big-Float)
   (:local-nicknames
    (#:operators #:cl-quil.discrete/operators)))
 

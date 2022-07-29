@@ -89,7 +89,7 @@
   (let n-max = (floor (/ (* 4 (sqrt 2)) epsilon)))
   (let y-interval = (Interval (exact/ 1 4) (exact/ 1 2)))
   (let c = (/ (interval-distance y-interval) (fromInt n-max)))
-  (is (> (into c) (/ (^ epsilon 2) 8)))
+  (is (> c (to-fraction (/ (^ epsilon 2) 8))))
 
   (let sub-intervals =
     (map (rz::j-sub-interval (best-approx (/ (^ epsilon 2) 8))
@@ -101,7 +101,7 @@
               (> (interval-distance interval) 0))))
    sub-intervals)
 
-  (is (== n-max (list:length sub-intervals))))
+  (is (== (fromInt n-max) (list:length sub-intervals))))
 
 ;;; Test candidate generation
 
@@ -164,7 +164,7 @@ Corresponds to Lemma 21 (Selinger, 2014)."
            (list:range 1 n-max)))
 
     (map (verify-u-candidate k epsilon theta) candidates)
-    (is (== n-max (list:length candidates)))))
+    (is (== (fromInt n-max) (list:length candidates)))))
 
 (define-test generate-u-candidates ()
   (test-generate-u-candidates 0.5 0.0)
@@ -234,6 +234,7 @@ Corresponds to Lemma 21 (Selinger, 2014)."
               (the (Mat2 (Cyclotomic8 Dyadic))
                    (into a)))))
 
+  (declare candidate-check (Integer -> Double-Float -> Double-Float -> Boolean))
   (define (candidate-check attempts epsilon theta)
     (match (rz::generate-solution attempts epsilon theta)
       ((Some a)
