@@ -261,25 +261,29 @@ as the size keyword arg to make-hash-table."
         (push instr traversed-instructions)))
     (setf (lscheduler-last-instrs lschedule) (nreverse new-bottommost))))
 
+(defun append-instructions-to-lschedule-parallel (lschedule instrs)
+  "Simultaneously add multiple instructions to the lschedule, in the sense that dependency relationships between INSTRS will not be considered, only their dependency relationships to the instructions already in the lschedule."
+  (let (new-top-instrs)
+
+    (dolist (instr instrs)
+      (let ((resources (instruction-resources instr)))
+        ;; Hook up "earlier" and "later" links to each bottom instruction:
+        (dolist (bottom-instr (lscheduler-last-instrs lschedule))
+          (when (or (resource-all-p resources)
+                    (resources-intersect-p resources (instruction-resources bottom-instr)))
+            (push bottom-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
+            (push instr (gethash bottom-instr (lscheduler-later-instrs lschedule)))))
+        ;; Add to "top" if no prerequisites
+        (unless (gethash instr (lscheduler-earlier-instrs lschedule))
+          (push instr new-top-instrs))))
+
+    (a:appendf (lscheduler-first-instrs lschedule) new-top-instrs)
+    (setf (lscheduler-last-instrs lschedule)
+          (append instrs (lscheduler-last-instrs lschedule)))
+    (lscheduler-clean-up-last-instrs lschedule)))
+
 (defun append-instruction-to-lschedule (lschedule instr)
-  ;; if we touch anything in the old bottom, we come after it.
-  (let ((resources (instruction-resources instr)))
-    (cond
-      ((resource-all-p resources)
-       (dolist (bottom-instr (lscheduler-last-instrs lschedule))
-         (push bottom-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
-         (push instr (gethash bottom-instr (lscheduler-later-instrs lschedule)))))
-      (t
-       (dolist (bottom-instr (lscheduler-last-instrs lschedule))
-         (let ((bottom-resources (instruction-resources bottom-instr)))
-           (when (resources-intersect-p resources bottom-resources)
-             (push bottom-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
-             (push instr (gethash bottom-instr (lscheduler-later-instrs lschedule)))))))))
-  ;; are we a topmost instr?
-  (unless (gethash instr (lscheduler-earlier-instrs lschedule))
-    (push instr (lscheduler-first-instrs lschedule)))
-  (push instr (lscheduler-last-instrs lschedule))
-  (lscheduler-clean-up-last-instrs lschedule))
+  (append-instructions-to-lschedule-parallel lschedule (list instr)))
 
 (defun consume-commuting-blocks-region (lschedule instrs)
   "Helper function for APPEND-INSTRUCTIONS-TO-LSCHEDULE, called when the top instruction of INSTRS is an instance of PRAGMA COMMUTING_BLOCKS. Consumes items from INSTRS until PRAGMA END_COMMUTING_BLOCKS is encountered, and inserts the intervening BLOCKs into LSCHEDULE as instances of APPLICATION-THREAD-INVOCATION."
@@ -303,50 +307,27 @@ as the size keyword arg to make-hash-table."
                 (error "No matching PRAGMA END_COMMUTING_BLOCKS found.")))
              (process-blocks-into-lists (rest instrs) acc)))
     (multiple-value-bind (blocks rest) (process-blocks-into-lists instrs nil)
-      (let ((comm-blocks-layer-bottom nil)
-            (comm-blocks-layer-top nil))
-        ;; process blocks into pseudoinstructions
-        (dolist (block blocks)
-          (let* ((resources (make-null-resource))
-                 (arguments (remove-duplicates (apply #'append
-                                                      (mapcar #'application-arguments block))
-                                               :test #'equalp))
-                 (pseudoinstruction (make-instance 'application-thread-invocation
-                                                   :region (first instrs)
-                                                   :thread block
-                                                   :operator #.(named-operator "THREAD")
-                                                   :arguments arguments)))
-            (dolist (instr block)
-              (setf resources (resource-union resources (instruction-resources instr))))
-            (assert (not (resource-all-p resources)) ()
-                    "Unsupported: global instruction encountered inside of COMMUTING_BLOCKS.")
-            (setf (instruction-resources pseudoinstruction) resources)
-            (push pseudoinstruction comm-blocks-layer-bottom)
-            (when (notany (lambda (i) (instruction-resources-intersect-p i pseudoinstruction))
-                          (lscheduler-last-instrs lschedule))
-              (push pseudoinstruction comm-blocks-layer-top))))
-        ;; merge the old top layer with the new top layer
-        (setf (lscheduler-first-instrs lschedule)
-              (append comm-blocks-layer-top
-                      (loop :for instr :in (lscheduler-first-instrs lschedule)
-                            :when (notany (lambda (i) (instruction-resources-intersect-p i instr))
-                                          comm-blocks-layer-top)
-                              :collect instr)))
-        ;; merge the old bottom layer with the new bottom layer
-        (let ((all-resources (make-null-resource))
-              (new-bottom-layer comm-blocks-layer-bottom))
-          (dolist (instr comm-blocks-layer-bottom)
-            (setf all-resources (resource-union all-resources (instruction-resources instr)))
-            (dolist (old-bottom-instr (lscheduler-last-instrs lschedule))
-              (when (instruction-resources-intersect-p instr old-bottom-instr)
-                (push instr (gethash old-bottom-instr (lscheduler-later-instrs lschedule)))
-                (push old-bottom-instr (gethash instr (lscheduler-earlier-instrs lschedule))))))
-          (dolist (instr (lscheduler-last-instrs lschedule))
-            (unless (resource-subsetp (instruction-resources instr) all-resources)
-              (push instr new-bottom-layer)))
-          (setf (lscheduler-last-instrs lschedule) new-bottom-layer)))
-      ;; return the current state
-      (values lschedule rest))))
+      ;; process blocks into pseudoinstructions
+      (let ((pseudoinstructions
+              (loop :for block :in blocks
+                    :collect
+                    (let* ((resources (make-null-resource))
+                           (arguments (remove-duplicates (apply #'append
+                                                                (mapcar #'application-arguments block))
+                                                         :test #'equalp))
+                           (pseudoinstruction (make-instance 'application-thread-invocation
+                                                             :region (first instrs)
+                                                             :thread block
+                                                             :operator #.(named-operator "THREAD")
+                                                             :arguments arguments)))
+                      (dolist (instr block)
+                        (setf resources (resource-union resources (instruction-resources instr))))
+                      (assert (not (resource-all-p resources)) ()
+                              "Unsupported: global instruction encountered inside of COMMUTING_BLOCKS.")
+                      (setf (instruction-resources pseudoinstruction) resources)
+                      pseudoinstruction))))
+        (append-instructions-to-lschedule-parallel lschedule pseudoinstructions)
+        (values lschedule rest)))))
 
 (defun append-instructions-to-lschedule (lschedule instrs)
   (cond
