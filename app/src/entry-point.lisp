@@ -475,7 +475,6 @@
                           compressor-passes
                           rewriting-peephole-size
                           global-queue-tolerance-threshold
-                          deterministic
                           verbose
                           gate-whitelist
                           gate-blacklist)
