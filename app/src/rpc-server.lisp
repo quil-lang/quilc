@@ -66,17 +66,17 @@
                         (:false nil)
                         (t t)))
          (enable-approximate-compilation (ecase enable-approximate-compilation
-                                           ((nil) quil::*enable-approximate-compilation*)
+                                           ((nil) cl-quil::*enable-approximate-compilation*)
                                            (:false nil)
                                            (t t)))
          (compressor-passes (etypecase compressor-passes
-                              (null quil::*compressor-passes*)
+                              (null cl-quil::*compressor-passes*)
                               (integer compressor-passes)))
          (rewriting-peephole-size (etypecase rewriting-peephole-size
-                                    (null quil::*rewriting-peephole-size*)
+                                    (null cl-quil::*rewriting-peephole-size*)
                                     (integer rewriting-peephole-size)))
          (global-queue-tolerance-threshold (etypecase global-queue-tolerance-threshold
-                                    (null quil::*global-queue-tolerance-threshold*)
+                                    (null cl-quil::*global-queue-tolerance-threshold*)
                                     (integer global-queue-tolerance-threshold)))
          )
     (unless (slot-boundp cache 'addresser-state)
@@ -92,7 +92,7 @@
                          :compressor-passes compressor-passes
                          :rewriting-peephole-size rewriting-peephole-size
                          :global-queue-tolerance-threshold global-queue-tolerance-threshold
-                         :verbose quil::*compiler-noise*
+                         :verbose cl-quil::*compiler-noise*
                          )
       (when protoquil
         (setf (gethash "qpu_runtime_estimation" statistics-dict)
