@@ -4,6 +4,12 @@
 
 (in-package #:cl-quil-tests)
 
+(defun sanity-test-name (program-string)
+  (let ((s (substitute #\; #\Newline program-string)))
+    (if (<= (length s) 69)
+        s
+        (concatenate 'string (subseq s 0 66) "..."))))
+
 ;;; The purpose of these tests are to act as a basic sanity-check for
 ;;; PARSED-PROGRAM-TO-LOGICAL-MATRIX.  Specifically these test were motivated by a bug in the way
 ;;; gate modifiers were parsed, resulting in incorrect logical matrices being generated when the
@@ -28,6 +34,12 @@
                              (quil:compiler-hook p (quil::build-nq-linear-chip
                                                     (quil:qubits-needed p))))
                             expected)))
+            (format t "~&    ~A~%" (sanity-test-name
+                                    (if (stringp input)
+                                        input
+                                        (with-output-to-string (s)
+                                          (quil:print-parsed-program input s)))))
+            (finish-output)
             ;; FIASCO:IS always evaluates it's format arguments, even if the test assertion
             ;; succeeds.  Formatting via MATRIX-MISMATCH-FMT will only compute the MATRIX-MISMATCH
             ;; when/if the associated test assertion actually fails.
