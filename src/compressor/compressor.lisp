@@ -726,439 +726,134 @@ other's."
            new-context
            (nconc processed-instructions first-block)))))))
 
-(deftype governor-state ()
-  "Encodes the state of a governed queue."
-  '(member    ; associated contents type:
-    :empty    ; nil
-    :queueing ; list of instructions
-    :passing  ; pair: '(order address), which can be '(:global :global) for global queue
-    :flushing ; nil
-    :fragile  ; nil
-    ))
-
-(defstruct governed-queue
-  (state     ':empty              :type governor-state)
+(defstruct compression-queue
   (resources (make-null-resource) :type resource-collection)
   (contents  nil))
 
-(defun set-gq-fields (queue state contents resources)
-  (setf (governed-queue-state queue) state)
-  (setf (governed-queue-contents queue) contents)
-  (setf (governed-queue-resources queue) resources))
-
-;; the broad strokes of this routine is that there is instructions are loaded
-;; into a queueing system based on what chip resources they use, and these queues
-;; are coalesced based on the noncommutativity of instructions.  when any queue
-;; uses "too many" resources, its content is selected for compression and the
-;; results are piped out.
-(defun compress-instructions (instructions chip-specification &key (protoquil nil))
+(defun compress-instructions (instructions chip-specification
+                              &key protoquil
+                                (queue-tolerance-threshold *global-queue-tolerance-threshold*)
+                                ((:context context-arg)))
   "Compresses a sequence of INSTRUCTIONS based on the routines specified by a CHIP-SPECIFICATION.
 
-This specific routine is the start of a giant dispatch mechanism. Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
+Its role is to find SHORT SEQUENCES (so that producing their matrix form is not too expensive) of instructions WHOSE RESOURCES OVERLAP (so that the peephole rewriter stands a chance of finding instructions that cancel)."
   (format-noise "COMPRESS-INSTRUCTIONS: entrance.")
-  ;; set up the places where our state will live
-  (let* ((output nil)
-         (n-qubits (chip-spec-n-qubits chip-specification))
-         (governors (make-list (length (chip-specification-objects chip-specification))))
-         (global-governor (make-governed-queue))
-         (context (set-up-compilation-context :qubit-count n-qubits
-                                              :simulate (and *enable-state-prep-compression* protoquil)
-                                              :chip-specification chip-specification)))
-    (labels (;; these are some routines that govern the behavior of the massive FSM
-             ;; we're constructing.
-             ;;
-             ;;
-             ;; this is a utility routine that tracks the size of the global queue
-             (global-queue-qubit-complex ()
-               (let ((ret nil))
-                 (dotimes (order (length governors) ret)
-                   (dotimes (address (length (nth order governors)))
-                     (let ((governor (nth address (nth order governors)))
-                           (obj (chip-spec-hw-object chip-specification order address)))
-                       (when (and (eq ':passing (governed-queue-state governor))
-                                  (equal (list ':global ':global) (governed-queue-contents governor)))
-                         (setf ret
-                               (union ret
-                                      (if (zerop order)
-                                          (list address)
-                                          (coerce (vnth 0 (hardware-object-cxns obj)) 'list))))))))))
+  (let* (output             ; instructions to return
+         compression-queues ; Each queue is a list of instructions. Resources used by each queue do not overlap.
+         (toplevel? (not context-arg))
+         (context (if toplevel?
+                      (set-up-compilation-context :qubit-count (chip-spec-n-qubits chip-specification)
+                                                  :simulate (and *enable-state-prep-compression* protoquil)
+                                                  :chip-specification chip-specification)
+                      context-arg)))
+    (labels ((compression-queue-num-qubits (compression-queue)
+               "How many qubits this compression queue's resources involve"
+               (length (cl-quil.resource::resource-qubits-list (compression-queue-resources compression-queue))))
 
-             ;;
-             ;; this is a switch block containing all the different governor
-             ;; transition logic, depending on the old-state -> new-state pair.
-             ;;
-             ;; MAXIMS FOR THESE TRANSITION RULES:
-             ;; (1) state transition comes FIRST, re/introduction of instructions comes SECOND
-             ;; (2) the queue structure should be made sane before and after any recursive call with SETFs.
-             ;;     this might mean making a before/after comparison of queueing system state.
-             ;; If you don't obey these, you're very likely to introduce subtle bugs.
-             (transition-governor-state (order address new-state &optional arg)
-               (when (and (typep order 'number) (> order 1))
-                 (format *error-output* "WARNING: No support for higher order hardware objects. Compressor queue may behave badly...~%"))
-               (let* ((governed-queue
-                        (if (eq order ':global)
-                            global-governor
-                            (nth address (nth order governors))))
-                      (old-state (governed-queue-state governed-queue)))
-                 (a:eswitch ((list old-state new-state) :test #'equal)
-                   ;;
-                   ;; QUEUEING --> PASSING(B)
-                   ;;
-                   ('(:queueing :passing)
-                     (when (and (eq order ':global)
-                                (eq address ':global))
-                       (return-from transition-governor-state))
-                     ;; if we're about to target the global queue, we need to
-                     ;; make sure that there's room for us there.
-                     (when (and (eq (first arg) ':global)
-                                (eq (second arg) ':global))
-                       (let ((qubit-complex (union (global-queue-qubit-complex)
-                                                   (coerce (vnth 0 (hardware-object-cxns
-                                                                    (chip-spec-hw-object chip-specification order address)))
-                                                           'list))))
-                         (when (> (length qubit-complex) *global-queue-tolerance-threshold*)
-                           (transition-governor-state ':global ':global ':flushing))))
-                     ;; now that we're sure we're OK to forward, do so.
-                     (let ((old-contents (governed-queue-contents governed-queue)))
-                       (set-gq-fields governed-queue ':passing arg (make-null-resource))
-                       ;; if we're a link, make sure our subgovernors are passing too
-                       (when (= 1 order)
-                         (let* ((subaddresses
-                                  (vnth 0 (hardware-object-cxns
-                                           (chip-spec-hw-object chip-specification order address))))
-                                (left-governor (nth (vnth 0 subaddresses) (first governors)))
-                                (right-governor (nth (vnth 1 subaddresses) (first governors)))
-                                (left-queue-contents
-                                  (when (eq ':queueing (governed-queue-state left-governor))
-                                    (governed-queue-contents left-governor)))
-                                (right-queue-contents
-                                  (when (eq ':queueing (governed-queue-state right-governor))
-                                    (governed-queue-contents right-governor))))
-                           (set-gq-fields left-governor ':passing '(:global :global) (make-null-resource))
-                           (set-gq-fields right-governor ':passing '(:global :global) (make-null-resource))
-                           (dolist (instr left-queue-contents)
-                             (process-instruction instr '(:global :global)))
-                           (dolist (instr right-queue-contents)
-                             (process-instruction instr '(:global :global)))))
-                       ;; finally, reprocess the contents of this queue
-                       (dolist (instr old-contents)
-                         (process-instruction instr (first arg) (second arg)))))
-                   ;;
-                   ;; EMPTY --> PASSING(B)
-                   ;;
-                   ('(:empty :passing)
-                     (setf (governed-queue-state governed-queue) ':passing)
-                     (setf (governed-queue-contents governed-queue) arg))
-                   ;;
-                   ;; EMPTY --> QUEUEING
-                   ;;
-                   ('(:empty :queueing)
-                     (setf (governed-queue-state governed-queue) ':queueing)
-                     (setf (governed-queue-contents governed-queue) nil)
-                     ;; if we're not the global queue or a bottom queue, then we
-                     ;; have children who we need to transition to passing.
-                     (when (or (eq order ':global)
-                               (= order 0))
-                       (return-from transition-governor-state))
-                     (let* ((qubit-indices (chip-spec-qubits-on-link chip-specification address))
-                            (left-subgovernor (nth (vnth 0 qubit-indices) (nth 0 governors)))
-                            (right-subgovernor (nth (vnth 1 qubit-indices) (nth 0 governors)))
-                            (forwarding-address (list order address))
-                            (qubits-altogether
-                              (remove-duplicates
-                               (append (coerce qubit-indices 'list)
-                                       (when (and (eq ':passing (governed-queue-state left-subgovernor))
-                                                  (not (equal (list ':global ':global)
-                                                              (governed-queue-contents left-subgovernor))))
-                                         (coerce (chip-spec-qubits-on-link chip-specification (second (governed-queue-contents left-subgovernor)))
-                                                 'list))
-                                       (when (and (eq ':passing (governed-queue-state right-subgovernor))
-                                                  (not (equal (list ':global ':global)
-                                                              (governed-queue-contents right-subgovernor))))
-                                         (coerce (chip-spec-qubits-on-link chip-specification (second (governed-queue-contents right-subgovernor)))
-                                                 'list))
-                                       (global-queue-qubit-complex)))))
-                       ;; if this coalescence would burst the global queue, send
-                       ;; the burst signal.
-                       (when (< *global-queue-tolerance-threshold* (length qubits-altogether))
-                         (transition-governor-state 0 (vnth 0 qubit-indices) ':flushing)
-                         (transition-governor-state 0 (vnth 1 qubit-indices) ':flushing))
-                       ;; there's an obnoxious edge case here: if the global queue
-                       ;; is FRAGILE and we are about to cause a coalescing, then
-                       ;; we preempt that with a FLUSH instead.
-                       (when (and (or (eq ':fragile (governed-queue-state global-governor))
-                                      (eq ':flushing (governed-queue-state global-governor)))
-                                  (eq ':passing (governed-queue-state left-subgovernor)))
-                         (transition-governor-state 0 (vnth 0 qubit-indices) ':flushing))
-                       (transition-governor-state 0 (vnth 0 qubit-indices) ':passing forwarding-address)
-                       ;; if just this change caused a coalescence, we need to
-                       ;; update our coalescing target to match.
-                       (when (not (equal forwarding-address (governed-queue-contents left-subgovernor)))
-                         (setf forwarding-address (governed-queue-contents left-subgovernor)))
-                       (when (and (or (eq ':fragile (governed-queue-state global-governor))
-                                      (eq ':flushing (governed-queue-state global-governor)))
-                                  (eq ':passing (governed-queue-state right-subgovernor)))
-                         (transition-governor-state 0 (vnth 1 qubit-indices) ':flushing))
-                       (transition-governor-state 0 (vnth 1 qubit-indices) ':passing forwarding-address)
-                       ;; if this second operation just put us into a weird state,
-                       ;; try the whole operation again.
-                       (when (or (not (equal forwarding-address (governed-queue-contents right-subgovernor)))
-                                 (not (equal forwarding-address (list order address))))
-                         (transition-governor-state order address ':passing (governed-queue-contents right-subgovernor)))))
-                   ;;
-                   ;; PASSING(A) --> PASSING(B)
-                   ;;
-                   ('(:passing :passing)
-                     ;; if this is secretly the trivial transition, do nothing
-                     (when (equal (governed-queue-contents governed-queue) arg)
-                       (return-from transition-governor-state))
-                     ;; tell our current pointer that we're coalescing into the global queue
-                     (let ((address-pair (governed-queue-contents governed-queue)))
-                       ;; set ourselves up
-                       (set-gq-fields governed-queue ':passing arg (make-null-resource))
-                       (transition-governor-state (first address-pair) (second address-pair) ':passing '(:global :global)))
-                     ;; tell our new target that it too is coalescing into the global queue
-                     (transition-governor-state (first arg) (second arg) ':passing '(:global :global))
-                     ;; if we have children...
-                     (when (or (eq order ':global) (= 0 order))
-                       (return-from transition-governor-state))
-                     ;; .. then tell them that they are coalescing into the global queue
-                     (let* ((subaddresses (chip-spec-qubits-on-link chip-specification address))
-                            (left-governor (nth (first subaddresses) (second governors)))
-                            (right-governor (nth (second subaddresses) (second governors)))
-                            (left-queue-contents
-                              (when (eq ':queueing (governed-queue-state left-governor))
-                                (governed-queue-contents left-governor)))
-                            (right-queue-contents
-                              (when (eq ':queueing (governed-queue-state right-governor))
-                                (governed-queue-contents right-governor))))
-                       (set-gq-fields left-governor ':passing '(:global :global) (make-null-resource))
-                       (set-gq-fields right-governor ':passing '(:global :global) (make-null-resource))
-                       (dolist (instr left-queue-contents)
-                         (process-instruction instr ':global ':global))
-                       (dolist (instr right-queue-contents)
-                         (process-instruction instr ':global ':global))))
-                   ;;
-                   ;; PASSING(A) --> FLUSHING
-                   ;;
-                   ('(:passing :flushing)
-                     (let ((address-pair (governed-queue-contents governed-queue)))
-                       (set-gq-fields governed-queue ':empty nil (make-null-resource))
-                       (transition-governor-state (first address-pair) (second address-pair) ':flushing)))
-                   ;;
-                   ;; EMPTY --> FLUSHING
-                   ;;
-                   ('(:empty :flushing)
-                     t)
-                   ;;
-                   ;; FRAGILE --> EMPTY
-                   ;;
-                   ('(:fragile :empty)
-                     (set-gq-fields governed-queue ':empty nil (make-null-resource)))
-                   ;;
-                   ;; EMPTY --> FRAGILE
-                   ;;
-                   ('(:empty :fragile)
-                     (set-gq-fields governed-queue ':fragile nil (make-null-resource)))
-                   ;;
-                   ;; FLUSHING --> FRAGILE
-                   ;;
-                   ('(:flushing :fragile)
-                     (set-gq-fields governed-queue ':fragile nil (make-null-resource)))
-                   ;;
-                   ;; FRAGILE --> FLUSHING
-                   ;;
-                   ('(:fragile :flushing)
-                     (set-gq-fields governed-queue ':flushing nil (make-null-resource))
-                     ;; now we need to flush all our children
-                     (cond
-                       ;; if we are the global pseudodevice...
-                       ((eq order ':global)
-                        ;; flush all of the hardware objects whose qubit complexes are a subset of ours
-                        (let ((qubit-complex (global-queue-qubit-complex)))
-                          (dotimes (suborder (length (chip-specification-objects chip-specification)))
-                            (dotimes (subaddress (length (vnth suborder (chip-specification-objects chip-specification))))
-                              (when (subsetp (cond
-                                               ((= suborder 0)
-                                                (list subaddress))
-                                               ((= suborder 1)
-                                                (chip-spec-qubits-on-link chip-specification subaddress)))
-                                             qubit-complex)
-                                (transition-governor-state suborder subaddress ':flushing))))))
-                       ;; if we are a physical hardware device...
-                       (t
-                        (let ((obj (chip-spec-hw-object chip-specification order address)))
-                          (dotimes (suborder order)
-                            (dolist (subobj-index (coerce (vnth suborder (hardware-object-cxns obj)) 'list))
-                              (transition-governor-state suborder subobj-index ':flushing)))))))
-                   ;;
-                   ;; QUEUEING --> FLUSHING
-                   ;;
-                   ('(:queueing :flushing)
-                     (let ((compressed-instructions
-                             (compress-instructions-with-possibly-unknown-params
-                              (governed-queue-contents governed-queue)
-                              chip-specification
-                              context)))
-                       ;; set all of the hardware devices that we subsume to empty
-                       (cond
-                         ;; if we are the global pseudodevice...
-                         ((eq order ':global)
-                          (let ((qubit-complex (global-queue-qubit-complex)))
-                            (dotimes (suborder (length (chip-specification-objects chip-specification)))
-                              (dotimes (subaddress (length (vnth suborder (chip-specification-objects chip-specification))))
-                                (let ((subobj (chip-spec-hw-object chip-specification suborder subaddress))
-                                      (subgovernor (nth subaddress (nth suborder governors))))
-                                  (when (subsetp (if (= suborder 0)
-                                                     (list subaddress)
-                                                     (coerce (vnth 0 (hardware-object-cxns subobj)) 'list))
-                                                 qubit-complex)
-                                    (assert (not (typep (first (governed-queue-contents subgovernor)) 'application)))
-                                    (set-gq-fields subgovernor ':empty nil (make-null-resource))))))))
-                         ;; otherwise, we are a physical hardware device...
-                         (t
-                          (let ((obj (vnth address (vnth order (chip-specification-objects chip-specification)))))
-                            (dotimes (suborder order)
-                              (dolist (subaddress (coerce (vnth suborder (hardware-object-cxns obj)) 'list))
-                                (let ((subgovernor (nth subaddress (nth suborder governors))))
-                                  (assert (not (typep (first (governed-queue-contents subgovernor)) 'application)))
-                                  (set-gq-fields subgovernor ':empty nil (make-null-resource))))))))
-                       ;; now set us up as fragile and start dumping instructions in
-                       (set-gq-fields governed-queue ':fragile nil (make-null-resource))
-                       (dolist (instr compressed-instructions)
+             (find-queues-by-resources (resources)
+               "Find all existing queues whose resources intersect with the given ones"
+               (remove-if-not (a:curry #'resources-intersect-p resources)
+                              compression-queues
+                              :key #'compression-queue-resources))
+
+             (merge-queue (base-queue other-queue)
+               "Merge OTHER-QUEUE into BASE-QUEUE, modifying BASE-QUEUE in place. Places the contents/instructions of OTHER-QUEUE after those of BASE-QUEUE"
+               (a:appendf (compression-queue-contents base-queue) (compression-queue-contents other-queue))
+               (setf (compression-queue-resources base-queue)
+                     (resource-union (compression-queue-resources base-queue)
+                                     (compression-queue-resources other-queue)))
+               base-queue)
+
+             (merge-queues (queues)
+               "Non-destructively merge multiple queues."
+               (reduce #'merge-queue queues :initial-value (make-compression-queue)))
+
+             (flush-queue (queue)
+               "Compresses the queue's contents, then recursively re-compresses them with a smaller queue-tolerance-threshold. This helps apply rewrite rules that work on small numbers of qubits which might fail to match the larger sequence of instructions. Any instructions which follow the recursion all the way down to the base case are pushed to OUTPUT. FLUSH-QUEUE returns a list of queues of instructions that did not get flushed all the way to OUTPUT as a result of recursion."
+               (let* ((once-compressed-instructions
+                        (compress-instructions-with-possibly-unknown-params
+                         (compression-queue-contents queue)
+                         chip-specification
+                         context)))
+                 (cond
+                   ;; Base case
+                   ((or (= 1 (compression-queue-num-qubits queue))
+                        (null once-compressed-instructions))
+                    (dolist (instr once-compressed-instructions)
+                      (update-compilation-context context instr :destructive? t)
+                      (push instr output)))
+
+                   ;; Queue has width>1, may make some headway by re-compressing subsequences that
+                   ;; involve fewer qubits
+                   (t
+                    (multiple-value-bind (r-output r-queues)
+                        (compress-instructions once-compressed-instructions chip-specification
+                                               :protoquil protoquil
+                                               :queue-tolerance-threshold (min 2 (1- (compression-queue-num-qubits queue)))
+                                               :context context)
+                      (dolist (instr r-output)
+                        (push instr output))
+                      r-queues)))))
+
+             (flush-queue-in-place (queue)
+               "Like FLUSH-QUEUE, but removes queue from COMPRESSION-QUEUES and re-inserts new ones as needed."
+               (setf compression-queues (remove queue compression-queues))
+               (a:appendf compression-queues (flush-queue queue)))
+
+             (fully-flush-queue (queue)
+               "Like FLUSH-QUEUE, but recursively flushes sub-queues instead of returning them."
+               (map nil #'fully-flush-queue (flush-queue queue)))
+
+             (fully-flush-queue-in-place (queue)
+               (setf compression-queues (remove queue compression-queues))
+               (fully-flush-queue queue))
+
+             (instruction-forces-flush-p (instr)
+               "Whether all instructions using overlapping resources to this instruction should be flushed before processing this instruction."
+               (or (global-instruction-p instr)
+                   (local-classical-quantum-instruction-p instr)
+                   (local-classical-instruction-p instr)
+                   (typep instr 'measure-discard)
+                   (typep instr 'reset-qubit)
+                   (> (length (cl-quil.resource::resource-qubits-list (instruction-resources instr)))
+                      queue-tolerance-threshold)))
+
+             (process-instruction (instr)
+               (let* ((resources (instruction-resources instr))
+                      (existing-intersecting-queues (find-queues-by-resources resources)))
+                 (cond
+                   ;; Global or hybrid instruction: Flush and remove all related queues.
+                   ((instruction-forces-flush-p instr)
+                    (map nil #'fully-flush-queue-in-place existing-intersecting-queues)
+                    (update-compilation-context context instr :destructive? t)
+                    (push instr output))
+
+                   ;; Local pure-quantum instruction: Merge related queues together
+                   (t
+                    (let* ((new-queue (make-compression-queue :resources (instruction-resources instr)
+                                                              :contents (list instr)))
+                           (combined-queue (merge-queues `(,@existing-intersecting-queues ,new-queue))))
+                      (cond
+                        ;; If this instruction causes a queue to become too large, then flush the
+                        ;; queue (splits it into smaller queues) and retry. If this happens
+                        ;; repeatedly, eventually the old queue will disappear completely, and the
+                        ;; new instruction will fit because we already checked
+                        ;; (instruction-forces-flush-p instr) = nil
+                        ((< queue-tolerance-threshold (compression-queue-num-qubits combined-queue))
+                         (flush-queue-in-place (a:extremum existing-intersecting-queues #'>
+                                                           :key #'compression-queue-num-qubits))
                          (process-instruction instr))
-                       (set-gq-fields governed-queue ':empty nil (make-null-resource)))))))
+                        (t
+                         (setf compression-queues (set-difference compression-queues existing-intersecting-queues))
+                         (push combined-queue compression-queues)))))))
+               (when toplevel?
+                 (clean-up-compilation-context context :destructive? t))))
 
-             ;;
-             ;; this routine handles the task of adding an instruction to the
-             ;; relevant queue.
-             (process-instruction (instr &optional order address)
-               (cond
-                 ;;
-                 ;; the case of a blocking global instruction
-                 ;;
-                 ((global-instruction-p instr)
-                  ;; flush everybody
-                  (transition-governor-state ':global ':global ':flushing)
-                  (loop
-                    :for order
-                    :from (1- (length (chip-specification-objects chip-specification)))
-                    :downto 0
-                    :do (dotimes (address (length (nth order governors)))
-                          (transition-governor-state order address ':flushing)))
-                  (update-compilation-context context instr :destructive? t)
-                  ;; and output this instruction
-                  (push instr output))
-
-                 ;;
-                 ;; the case of a local instruction with hybrid effects
-                 ;;
-                 ((or (local-classical-quantum-instruction-p instr)
-                      (local-classical-instruction-p instr)
-                      (typep instr 'measure-discard)
-                      (typep instr 'reset-qubit))
-                  ;; flush the relevant hardware objects
-                  (let ((resources (instruction-resources instr)))
-                    (when (resources-intersect-p resources (governed-queue-resources global-governor))
-                      (transition-governor-state ':global ':global ':flushing)
-                      (unless (eq (governed-queue-state global-governor) ':empty)
-                        (transition-governor-state ':global ':global ':flushing)))
-                    (loop :for order
-                          :from (1- (length (chip-specification-objects chip-specification)))
-                          :downto 0
-                          :do (dotimes (address (length (nth order governors)))
-                                (let ((governed-queue (nth address (nth order governors))))
-                                  (when (resources-intersect-p resources
-                                                               (governed-queue-resources
-                                                                governed-queue))
-                                    (transition-governor-state order address ':flushing)
-                                    ;; if we were passing, this might be a two-flusher.
-                                    (unless (eq (governed-queue-state governed-queue) ':empty)
-                                      (transition-governor-state order address ':flushing))))))
-                    (update-compilation-context context instr :destructive? t))
-                  ;; and write out the instruction
-                  (push instr output))
-
-                 ;;
-                 ;; the case of a local purely quantum instruction
-                 ;;
-                 (t
-                  (unless (and order address)
-                    (multiple-value-bind (lookup-order lookup-address)
-                        (lookup-hardware-address chip-specification instr)
-                      (setf order lookup-order)
-                      (setf address lookup-address)))
-                  (let* ((governed-queue
-                           (if (eq order ':global)
-                               global-governor
-                               (nth address (nth order governors))))
-                         (old-state (governed-queue-state governed-queue)))
-                    (ecase old-state
-                      (:empty
-                       (transition-governor-state order address ':queueing)
-                       (process-instruction instr order address))
-                      (:passing
-                       (apply #'process-instruction instr
-                              (governed-queue-contents governed-queue)))
-                      (:flushing
-                       (update-compilation-context context instr :destructive? t)
-                       (push instr output))
-                      (:fragile
-                       (transition-governor-state order address ':flushing)
-                       (process-instruction instr order address)
-                       (transition-governor-state order address ':fragile))
-                      (:queueing
-                       (setf (governed-queue-resources governed-queue)
-                             (resource-union (governed-queue-resources governed-queue)
-                                             (instruction-resources instr)))
-                       (postpend instr (governed-queue-contents governed-queue)))))))))
-
-      ;; set up the queue governors
-      (setf governors
-            (loop
-              :for order :below (length (chip-specification-objects chip-specification))
-              :collect (loop
-                         :repeat (length (vnth order (chip-specification-objects chip-specification)))
-                         :collect (make-governed-queue))))
-      ;; iterate over the incoming instructions
-      (dolist (instr instructions)
-        (process-instruction instr)
-        (clean-up-compilation-context context :destructive? t))
-      ;; we're done processing the instructions, but the queueing system might
-      ;; still have gunk left in it.  flush all of the governors, biggest first
-      (transition-governor-state ':global ':global ':flushing)
-      (loop
-        :for order
-        :from (1- (length (chip-specification-objects chip-specification)))
-        :downto 0
-        :do (dotimes (address (length (nth order governors)))
-              (transition-governor-state order address ':flushing))))
-    (format-noise "COMPRESS-INSTRUCTIONS: departure.")
-    (nreverse output)))
-
-
-
-;; this is a debug routine used to see the current state of the
-;; queueing system.
-(defun print-queue-state (governors global-governor)
-  (dotimes (order (length governors))
-    (dotimes (address (length (nth order governors)))
-      (let ((governor (nth address (nth order governors))))
-        (format *standard-output* "(~A, ~A) : ~A / ~A / ~A~%" order address
-                (governed-queue-resources governor)
-                (governed-queue-state governor)
-                (if (typep (first (governed-queue-contents governor)) 'application)
-                    (with-output-to-string (s)
-                      (dolist (instr (governed-queue-contents governor))
-                        (terpri s)
-                        (print-instruction instr s)))
-                    (governed-queue-contents governor))))))
-  (format *standard-output* "(~A, ~A) : ~A / ~A / ~A ~%" ':global ':global
-          (governed-queue-resources global-governor)
-          (governed-queue-state global-governor)
-          (if (typep (first (governed-queue-contents global-governor)) 'application)
-              (with-output-to-string (s)
-                (dolist (instr (governed-queue-contents global-governor))
-                  (terpri s)
-                  (print-instruction instr s)))
-              (governed-queue-contents global-governor))))
+      (map nil #'process-instruction instructions)
+      (cond
+        (toplevel?
+         (map nil #'fully-flush-queue compression-queues)
+         (format-noise "COMPRESS-INSTRUCTIONS: departure")
+         (nreverse output))
+        (t
+         (values (nreverse output) compression-queues))))))
