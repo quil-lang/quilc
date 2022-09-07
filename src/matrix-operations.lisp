@@ -140,38 +140,54 @@ as needed so that they are the same size."
                                    (mapcar (lambda (c) (* scaling-factor c)) entries))
                                  :element-type '(complex double-float))))))
 
-(defun orthonormalize-matrix (m)
+(defun orthonormalize-matrix! (x)
   "Applies Gram-Schmidt to the columns of a full rank square matrix to produce a unitary matrix."
-  (declare (optimize (speed 3)))
-  ;; consider each column
-  (dotimes (j (magicl:ncols m))
-    ;; consider each preceding column, which together form an orthonormal set
-    (dotimes (jp j)
-      ;; compute the dot product of the columns...
-      (let ((scalar
-              (loop :for i :below (the fixnum (magicl:nrows m))
-                    :sum (the (complex double-float)
-                              (* (the (complex double-float) (magicl:tref m i j))
-                                 (conjugate (the (complex double-float) (magicl:tref m i jp))))))))
-        (declare (type (complex double-float) scalar))
-        ;; ... and do the subtraction.
-        (dotimes (i (the fixnum (magicl:nrows m)))
-          (setf (magicl:tref m i j)
-                (- (the (complex double-float) (magicl:tref m i j))
-                   (* scalar
-                      (the (complex double-float) (magicl:tref m i jp))))))))
-    ;; now j is orthogonal to the things that came before it. normalize it.
-    (let ((scalar
-            (sqrt
-             (loop :for i :below (magicl:nrows m)
-                   :sum (* (abs (the (complex double-float) (magicl:tref m i j)))
-                           (abs (the (complex double-float) (magicl:tref m i j))))))))
-      (declare (type double-float scalar))
-      (dotimes (i (magicl:nrows m))
-        (setf (magicl:tref m i j)
-              (/ (the (complex double-float) (magicl:tref m i j))
-                 scalar)))))
-  m)
+  (declare (optimize speed))
+  (let ((nrows (magicl:nrows x))
+        (ncols (magicl:ncols x)))
+    (declare (type alexandria:array-length nrows ncols))
+    (when (or (zerop nrows) (zerop ncols))
+      (return-from orthonormalize-matrix! x))
+    (labels ((column-norm (m col)
+               (let ((n^2 (dot-columns m col m col)))
+                 (assert (not (double= 0.0d0 n^2)))
+                 (sqrt n^2)))
+             (normalize-column! (m col)
+               (let ((norm (column-norm m col)))
+                 (dotimes (row nrows)
+                   (setf (magicl:tref m row col) (/ (magicl:tref m row col) norm)))))
+             (assign-column! (a b col)
+               ;; a[:,col] = b[:,col]
+               (dotimes (i nrows)
+                 (setf (magicl:tref a i col) (magicl:tref b i col))))
+             (dot-columns (a p b q)
+               (loop :for i :below nrows
+                     :sum (* (conjugate (magicl:tref a i p))
+                             (magicl:tref b i q)))))
+
+      (let ((v (magicl:deep-copy-tensor x))
+            (q (magicl:zeros (list nrows ncols) :type (magicl:element-type x))))
+        (loop :for j :below ncols :do
+          (assign-column! q v j)
+          (normalize-column! q j)
+          (loop :for k :from (1+ j) :below ncols :do
+            (let ((s (dot-columns q j v k)))
+              (loop :for row :below nrows :do
+                (decf (magicl:tref v row k)
+                      (* s (magicl:tref q row j)))))))
+        (when *check-math*
+          (assert (magicl:unitary-matrix-p q) ()
+                  "Matrix is not orthogonal/unitary. ~
+                   Matrix is~%~
+                       ~A~%~
+                   and MM* is~%~
+                       ~A~%~
+                   The original was~%~
+                       ~A"
+                  q
+                  (magicl:@ q (magicl:dagger q))
+                  x))
+        q))))
 
 (defun kron-matrix-up (matrix n)
   "Thinking of a 2^m x 2^m MATRIX as an operator on m qubits, m < N, produces a 2^n x 2^n matrix acting on qubits 0, ..., m, ..., n-1."
