@@ -189,7 +189,7 @@
                                       (* (- 1 rand-coeff) (imagpart z))))
                                  gammag))
              (evecs (ensure-positive-determinant
-                     (orthonormalize-matrix
+                     (orthonormalize-matrix!
                       (nth-value 1 (magicl:eig matrix)))))
              (evals (magicl:diag
                      (magicl:@ (magicl:transpose evecs)

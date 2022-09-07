@@ -70,8 +70,8 @@
               ;; this is OK: the eigenspaces themselves are orthogonal, so we
               ;; can perform gram-schmidt orthogonalization to form a unitary
               ;; matrix that will serve us just as well.
-              (setf uL (orthonormalize-matrix uL))
-              (setf vL (orthonormalize-matrix vL))
+              (setf uL (orthonormalize-matrix! uL))
+              (setf vL (orthonormalize-matrix! vL))
               ;; to compute uD and vD, we take the square roots of the diagonal eigenvalue matrices
               (setf evals-u (mapcar #'sqrt evals-u))
               (setf evals-v (mapcar #'sqrt evals-v))
