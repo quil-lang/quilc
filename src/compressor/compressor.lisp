@@ -787,6 +787,14 @@ Its role is to find SHORT SEQUENCES (so that producing their matrix form is not 
                    ;; involve fewer qubits
                    (t
                     (multiple-value-bind (r-output r-queues)
+                        ;; After running compression at QUEUE-TOLERANCE-THRESHOLD, it's desirable to
+                        ;; shrink the queue width down to 2 immediately because no new
+                        ;; compilers/reducers will be introduced until the queue width is shrunk
+                        ;; down to a hardware object. While it is theoretically possible for a
+                        ;; general compiler to apply at queue width 3 but not at queue width 4,
+                        ;; (because a slightly different set of instructions will be selected for
+                        ;; compilation), it's highly unlikely and generally not worth the large
+                        ;; performance impact
                         (compress-instructions once-compressed-instructions chip-specification
                                                :protoquil protoquil
                                                :queue-tolerance-threshold (min 2 (1- (compression-queue-num-qubits queue)))
