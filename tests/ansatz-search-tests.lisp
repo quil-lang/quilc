@@ -21,7 +21,7 @@
                                        (* 2 pi))))
              ))
          (test-random ()
-           (let* ((a (quil::random-unitary '(2 2)))
+           (let* ((a (quil::random-unitary 2))
                   (zyz (quil::example-matrix->zyz a)))
              (is (quil::matrix-equals-dwim a (magicl:@ (quil::rz-matrix (aref zyz 2))
                                                        (quil::ry-matrix (aref zyz 1))
