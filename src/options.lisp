@@ -15,6 +15,9 @@
 (defvar *compress-carefully* nil
   "Flag that turns on/off a bunch of intermediate correctness checks during compression.  WARNING: this can be *very* costly, since it involves computing explicit matrix presentations.")
 
+(defvar *check-math* t
+  "Flag that turns on even more math correctness checks. This may slow things down considerably.")
+
 (defvar *enable-approximate-compilation* nil
   "When NIL, compression by replacing instructions sequences with approximate sequences is disabled.
 
