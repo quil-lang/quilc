@@ -156,9 +156,15 @@
   :documentation "This is a precomputed Hermitian transpose of +E-BASIS+.")
 
 (defun ensure-positive-determinant (m)
-  (if (double= -1d0 (magicl:det m))
-      (magicl:@ m (from-diag (list -1 1 1 1)))
-      m))
+  (let ((d (magicl:det m)))
+    (when *check-math*
+      (unless (double~ 0.0d0 (imagpart d))
+        (warn "Complex determinant found for a ~
+               matrix expected to be (real) orthogonal: ~
+                   det=~A" d)))
+    (if (double= -1d0 (realpart d))
+        (magicl:@ m (from-diag (list -1 1 1 1)))
+        m)))
 
 (defconstant +diagonalizer-max-attempts+ 16
   "Maximum number of attempts DIAGONALIZER-IN-E-BASIS should make to diagonalize the input matrix using a random perturbation.")
@@ -198,13 +204,18 @@
              (v (magicl:@ evecs
                           (from-diag evals)
                           (magicl:transpose evecs))))
-        (when (magicl:every #'double= gammag v)
-          (assert (magicl:every #'double~
-                                (eye 4 :type 'double-float)
-                                (magicl:@ (magicl:transpose evecs)
-                                          evecs))
-                  (evecs)
-                  "Calculated eigenvectors were not found to be orthonormal.")
+        (when (and (double= 1.0d0 (magicl:det evecs))
+                   (magicl:every #'double= gammag v))
+          (when *check-math*
+            (assert (magicl:every #'double~
+                                  (eye 4 :type 'double-float)
+                                  (magicl:@ (magicl:transpose evecs)
+                                            evecs))
+                (evecs)
+                "The calculated eigenvectors were not found to be orthonormal. ~
+               EE^T =~%~A"
+                (magicl:@ (magicl:transpose evecs)
+                          evecs)))
           (return-from find-diagonalizer-in-e-basis evecs)))))
   (error 'diagonalizer-not-found :matrix m :attempts num-attempts))
 
