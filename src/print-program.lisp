@@ -42,20 +42,17 @@
         (dolist (gate simple-gates)
           (unless (member (slot-value gate 'name) defined-gate-names)
             (push (make-instance 'static-gate-definition :name (slot-value gate 'name) :entries (coerce (slot-value (simple-gate-matrix gate) 'magicl::storage) 'list)) defgates)))
+        
 
-        ;; XXX is this needed???
-        (setf (parsed-program-gate-definitions pp) defgates))
-       
+        (print-definitions (parsed-program-memory-definitions pp))
 
-      (print-definitions (parsed-program-memory-definitions pp))
+        ;; instructions and single-line definitions (e.g. DECLARE) do
+        ;; not introduce newlines so here we add one if needed
+        (unless (endp (parsed-program-memory-definitions pp))
+          (terpri stream))
+        (print-definitions defgates)
+        (print-definitions (parsed-program-circuit-definitions pp))
 
-      ;; instructions and single-line definitions (e.g. DECLARE) do
-      ;; not introduce newlines so here we add one if needed
-      (unless (endp (parsed-program-memory-definitions pp))
-        (terpri stream))
-      (print-definitions (parsed-program-gate-definitions pp))
-      (print-definitions (parsed-program-circuit-definitions pp))
-
-      (print-instruction-sequence (parsed-program-executable-code pp) :stream stream))))
+        (print-instruction-sequence (parsed-program-executable-code pp) :stream stream)))))
 
 
