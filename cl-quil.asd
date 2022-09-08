@@ -165,6 +165,7 @@
                              (:file "simplify-arithmetic")
                              (:file "validate-sequence-gate")
                              (:file "simplification-grab-bag")))
+               (:file "print-program")
                (:file "initialize-standard-gates")))
 
 (asdf:defsystem #:cl-quil/chip-library

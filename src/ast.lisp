@@ -1841,47 +1841,11 @@ Examples:
               (lambda (code normalized-index)
                 (setf (aref code normalized-index) value))))
 
-(defun print-instruction-sequence (seq
-                                   &key
-                                     (stream *standard-output*)
-                                     (prefix ""))
-  (let ((*print-pretty* nil))
-    (flet ((print-one-line (instr)
-             (write-string prefix stream)
-             (print-instruction instr stream)
-             (a:when-let ((c (comment instr)))
-               (format stream "~40T# ~A" c))
-             (terpri stream)))
-      (map nil #'print-one-line seq))))
-
 (defgeneric print-parsed-program-generic (parsed-program stream)
-  (:documentation "Print the program PARSED-PROGRAM nicely to the stream STREAM.")
-  (:method ((pp parsed-program) (stream stream))
-    (flet ((print-definitions (defns)
-             (dolist (defn defns)
-               (print-instruction defn stream)
-               (terpri stream))))
-      
-      ;; Ensure that any non-standard gates in the program are defined
-      ;; TODO: handle non-simple gates
-      (let ((defined-gate-names (append (mapcar #'gate-definition-name (parsed-program-gate-definitions pp)) (loop for k being the hash-key of **default-gate-definitions** collect k)))
-            (defgates (parsed-program-gate-definitions pp))
-            (simple-gates (map 'list #'gate-application-gate (remove-if-not (lambda (inst) (and (typep inst 'gate-application) (typep (gate-application-gate inst) 'simple-gate))) (parsed-program-executable-code pp)))))
-        (loop for gate in simple-gates
-              when (not (member (slot-value gate 'name) defined-gate-names))
-                 do (push (make-instance 'static-gate-definition :name (slot-value gate 'name) :entries (coerce (slot-value (simple-gate-matrix gate) 'magicl::storage) 'list)) defgates))
-        (setf (parsed-program-gate-definitions pp) defgates))
-       
+  (:documentation "Print the program PARSED-PROGRAM nicely to the stream STREAM."))
 
-      (print-definitions (parsed-program-memory-definitions pp))
-      ;; instructions and single-line definitions (e.g. DECLARE) do not introduce newlines
-      ;; so here we add one if needed
-      (unless (endp (parsed-program-memory-definitions pp))
-        (terpri stream))
-      (print-definitions (parsed-program-gate-definitions pp))
-      (print-definitions (parsed-program-circuit-definitions pp))
-
-      (print-instruction-sequence (parsed-program-executable-code pp) :stream stream))))
+;;; An actual method is defined later in print-program.lisp, since
+;;; this function needs to reference things defined later.
 
 (defun print-parsed-program (parsed-program &optional (stream *standard-output*))
   "Print the text of a PARSED-PROGRAM to the stream STREAM."
