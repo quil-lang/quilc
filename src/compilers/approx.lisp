@@ -178,6 +178,17 @@
                      (diagonalizer-not-found-attempts c))))
   (:documentation "The diagonalizer for the given matrix was not found after a number of attempts."))
 
+(defun diagonalizer-number-generator (k)
+  "For integer arguments K = 1, 2, ..., produces distinct numbers within the open interval (0, 1).
+
+This is specifically for use in FIND-DIAGONALIZER-IN-E-BASIS.
+
+This function should be completely deterministic (i.e., produce the same value for a given K)."
+  ;; There is nothing particularly special about this choice of
+  ;; function. It just serves to satisfy the above requirements, at
+  ;; least in theory if we were operating over actual real numbers.
+  (abs (sin (/ k 10.0d0))))
+
 ;; this is a support routine for optimal-2q-compile (which explains the funny
 ;; prefactor multiplication it does).
 ;;
@@ -188,11 +199,11 @@
   (check-type m magicl:matrix)
   (let* ((u (magicl:@ +edag-basis+ m +e-basis+))
          (gammag (magicl:@ u (magicl:transpose u))))
-    (loop :repeat num-attempts :do
-      (let* ((rand-coeff (random 1.0d0))
+    (loop :for attempt :from 1 :to num-attempts :do
+      (let* ((coeff (diagonalizer-number-generator attempt))
              (matrix (magicl:map (lambda (z)
-                                   (+ (* rand-coeff       (realpart z))
-                                      (* (- 1 rand-coeff) (imagpart z))))
+                                   (+ (* coeff       (realpart z))
+                                      (* (- 1 coeff) (imagpart z))))
                                  gammag))
              (evecs (ensure-positive-determinant
                      (orthonormalize-matrix!
