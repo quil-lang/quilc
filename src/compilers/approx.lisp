@@ -166,72 +166,66 @@
         (magicl:@ m (from-diag (list -1 1 1 1)))
         m)))
 
-(defconstant +diagonalizer-max-attempts+ 16
-  "Maximum number of attempts DIAGONALIZER-IN-E-BASIS should make to diagonalize the input matrix using a random perturbation.")
+(defun diagonal-matrix-p (m)
+  (dotimes (i (magicl:nrows m) t)
+    (dotimes (j (magicl:ncols m))
+      (when (and (/= i j)
+                 (not (double~ 0.0d0 (magicl:tref m i j))))
+        (return-from diagonal-matrix-p nil)))))
 
-(define-condition diagonalizer-not-found (error)
-  ((matrix :initarg :matrix :reader diagonalizer-not-found-matrix)
-   (attempts :initarg :attempts :reader diagonalizer-not-found-attempts))
-  (:report (lambda (c s)
-             (format s "Could not find diagonalizer for matrix ~%~A~%after ~D attempt~:P."
-                     (diagonalizer-not-found-matrix c)
-                     (diagonalizer-not-found-attempts c))))
-  (:documentation "The diagonalizer for the given matrix was not found after a number of attempts."))
+(defun real->complex (m)
+  "Convert a real matrix M to a complex one."
+  (let ((cm (magicl:zeros
+             (magicl:shape m)
+             :type `(complex ,(magicl:element-type m)))))
+    (magicl::map-to #'complex m cm)
+    cm))
 
-;; this is a support routine for optimal-2q-compile (which explains the funny
-;; prefactor multiplication it does).
-;;
-;; This implementation is based on the function
-;; _eig_complex_symmetric() in QuantumFlow's decompositions.py.
-(defun find-diagonalizer-in-e-basis (m num-attempts)
-  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T. This function tries NUM-ATTEMPTS to randomly perturb the matrix in an equivalent form."
+(defun diagonalize-uu^t (u)
+  "Given a unitary U, produce an X such that
+
+    X^T Re[UU^T] X,    X^T Im[UU^T] X
+
+are diagonal. Return (VALUES X UU^T).
+"
+  (let* ((uut (magicl:@ u (magicl:transpose u)))
+         (a (magicl:map #'realpart uut))
+         (b (magicl:map #'imagpart uut)))
+    (multiple-value-bind (_ g) (magicl:eig b)
+      (declare (ignore _))
+      (let* ((g-inv (magicl:inv g))
+             (g-inv-transpose (magicl:transpose g-inv))
+             (c (magicl:@ g-inv a g-inv-transpose)))
+        (multiple-value-bind (_ v) (magicl:eig c)
+          (declare (ignore _))
+          (values (magicl:@ g-inv-transpose (magicl:transpose v))
+                  uut))))))
+
+(defun find-diagonalizer-in-e-basis (m)
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
   (check-type m magicl:matrix)
-  (let* ((u (magicl:@ +edag-basis+ m +e-basis+))
-         (gammag (magicl:@ u (magicl:transpose u))))
-    (loop :repeat num-attempts :do
-      (let* ((rand-coeff (random 1.0d0))
-             (matrix (magicl:map (lambda (z)
-                                   (+ (* rand-coeff       (realpart z))
-                                      (* (- 1 rand-coeff) (imagpart z))))
-                                 gammag))
-             (evecs (ensure-positive-determinant
-                     (orthonormalize-matrix!
-                      (nth-value 1 (magicl:eig matrix)))))
-             (evals (magicl:diag
-                     (magicl:@ (magicl:transpose evecs)
-                               gammag
-                               evecs)))
-             (v (magicl:@ evecs
-                          (from-diag evals)
-                          (magicl:transpose evecs))))
-        (when (and (double= 1.0d0 (magicl:det evecs))
-                   (magicl:every #'double= gammag v))
-          (when *check-math*
-            (assert (magicl:every #'double~
-                                  (eye 4 :type 'double-float)
-                                  (magicl:@ (magicl:transpose evecs)
-                                            evecs))
-                (evecs)
-                "The calculated eigenvectors were not found to be orthonormal. ~
+  (let ((u (magicl:@ +edag-basis+ m +e-basis+)))
+    (multiple-value-bind (evecs gammag) (diagonalize-uu^t u)
+      (setf evecs (ensure-positive-determinant (orthonormalize-matrix! evecs)))
+      (when *check-math*
+        (assert (double= 1.0d0 (magicl:det evecs)))
+        (assert (diagonal-matrix-p (magicl:@ (magicl:transpose evecs)
+                                             gammag
+                                             evecs)))
+        (assert (magicl:every #'double~
+                              (eye 4 :type 'double-float)
+                              (magicl:@ (magicl:transpose evecs)
+                                        evecs))
+            (evecs)
+            "The calculated eigenvectors were not found to be orthonormal. ~
                EE^T =~%~A"
-                (magicl:@ (magicl:transpose evecs)
-                          evecs)))
-          (return-from find-diagonalizer-in-e-basis evecs)))))
-  (error 'diagonalizer-not-found :matrix m :attempts num-attempts))
+            (magicl:@ (magicl:transpose evecs)
+                      evecs)))
+      evecs)))
 
 (defun diagonalizer-in-e-basis (m)
-  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T.
-
-Signals DIAGONALIZER-NOT-FOUND if the diagonalizer is not found.
-
-Three self-explanatory restarts are offered: TRY-AGAIN, and GIVE-UP-COMPILATION."
-  (restart-case (find-diagonalizer-in-e-basis m +diagonalizer-max-attempts+)
-    (try-again ()
-      :report "Continue searching for the diagonlizer using random perturbations."
-      (diagonalizer-in-e-basis m))
-    (give-up-compilation ()
-      :report "Give up compilation."
-      (give-up-compilation))))
+  "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
+  (find-diagonalizer-in-e-basis m))
 
 (defun orthogonal-decomposition (m)
   "Extracts from M a decomposition of E^* M E into A * D * B, where A and B are orthogonal and D is diagonal.  Returns the results as the VALUES triple (VALUES A D B)."
