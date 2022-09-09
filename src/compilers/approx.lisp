@@ -212,43 +212,47 @@
     (magicl::map-to #'complex m cm)
     cm))
 
-(defun diagonalize-uu^t (u)
-  "Given a unitary U, produce an X such that
+(defun takagi-decomposition-of-uu^t (u)
+  "Given a unitary U, finds an X such that
 
-    X^T Re[UU^T] X,    X^T Im[UU^T] X
+    X^T (UU^T) X
 
-are diagonal. Return (VALUES X UU^T).
-"
+is a diagonal matrix. Return (VALUES X UU^T)."
   (let* ((uut (magicl:@ u (magicl:transpose u)))
-         (a (magicl:map #'realpart uut))
-         (b (magicl:map #'imagpart uut)))
-    (cond
-      ((or (zero-matrix-p a)
-           (permuted-diagonal-matrix-p a))
-       (values (nth-value 1 (magicl:eig b))
-               uut))
-      ((or (zero-matrix-p b)
-           (permuted-diagonal-matrix-p b))
-       (values (nth-value 1 (magicl:eig a))
-               uut))
-      (t
-       (multiple-value-bind (_ g) (magicl:eig b)
-         (declare (ignore _))
-         (let* ((g-inv (magicl:inv g))
-                (g-inv-transpose (magicl:transpose g-inv))
-                (c (magicl:@ g-inv a g-inv-transpose)))
-           (multiple-value-bind (_ v) (magicl:eig c)
-             (declare (ignore _))
-             (values (magicl:@ g-inv-transpose (magicl:transpose v))
-                     uut))))))))
+         (n (magicl:nrows uut))
+         (a (magicl:.realpart uut))
+         (b (magicl:.imagpart uut))
+         (m (magicl:block-matrix (list (magicl:map #'- a) b b a) '(2 2))))
+    (multiple-value-bind (p d) (magicl:schur m)
+      (let* ((positive-eigs (loop :for i :below (magicl:nrows d)
+                                  :for e := (magicl:tref d i i)
+                                  :when (and (double~ 0.0d0 (imagpart e))
+                                             (plusp (realpart e)))
+                                    :collect i))
+             (diagonalizer (magicl:zeros (list n n) :type '(complex double-float))))
+        (assert (= 4 (length positive-eigs))
+            ()
+            "Expected 4 positive eigenvalues. Got ~D." (length positive-eigs))
+        (dotimes (row n)
+          (loop :for col :below n
+                :for from-col :in positive-eigs :do
+                  (setf (magicl:tref diagonalizer row col)
+                        (complex (magicl:tref p (+ n row) from-col)
+                                 (magicl:tref p row from-col)))))
+        (setf diagonalizer (magicl:transpose (magicl:inv diagonalizer)))
+        (when *check-math*
+          (assert (diagonal-matrix-p (magicl:@ (magicl:transpose diagonalizer)
+                                               uut
+                                               diagonalizer))))
+        (values diagonalizer uut)))))
 
 (defun find-diagonalizer-in-e-basis (m)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
   (check-type m magicl:matrix)
   (assert (magicl:unitary-matrix-p m))
   (let ((u (magicl:@ +edag-basis+ m +e-basis+)))
-    (multiple-value-bind (evecs gammag) (diagonalize-uu^t u)
-      (setf evecs (ensure-positive-determinant (orthonormalize-matrix! evecs)))
+    (multiple-value-bind (evecs gammag) (takagi-decomposition-of-uu^t u)
+      (setf evecs (orthonormalize-matrix! (ensure-positive-determinant evecs)))
       (when *check-math*
         (assert (double= 1.0d0 (magicl:det evecs)))
         (assert (diagonal-matrix-p (magicl:@ (magicl:transpose evecs)
