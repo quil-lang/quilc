@@ -223,10 +223,12 @@ are diagonal. Return (VALUES X UU^T).
          (a (magicl:map #'realpart uut))
          (b (magicl:map #'imagpart uut)))
     (cond
-      ((permuted-diagonal-matrix-p a)
+      ((or (zero-matrix-p a)
+           (permuted-diagonal-matrix-p a))
        (values (nth-value 1 (magicl:eig b))
                uut))
-      ((permuted-diagonal-matrix-p b)
+      ((or (zero-matrix-p b)
+           (permuted-diagonal-matrix-p b))
        (values (nth-value 1 (magicl:eig a))
                uut))
       (t
