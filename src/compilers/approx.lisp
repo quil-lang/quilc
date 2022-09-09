@@ -185,6 +185,25 @@
       (when (not (double~ 0.0d0 (abs (magicl:tref m i j))))
         (return-from zero-matrix-p nil)))))
 
+(defun permuted-diagonal-matrix-p (m)
+  (flet ((make-permutation-matrix (perm)
+           (loop :with p := (magicl:zeros (magicl:shape m) :type (magicl:element-type m))
+                 :for i :below (magicl:nrows m)
+                 :for p_i :in perm
+                 :do (incf (magicl:tref p i p_i))
+                 :finally (return p))))
+    (let ((permutation nil))
+      (dotimes (i (magicl:nrows m) (make-permutation-matrix
+                                    (nreverse permutation)))
+        (let ((found? nil))
+          (dotimes (j (magicl:ncols m))
+            (cond
+              ((not (double~ 0.0d0 (magicl:tref m i j)))
+               (when found?
+                 (return-from permuted-diagonal-matrix-p nil))
+               (setf found? t)
+               (push j permutation)))))))))
+
 (defun real->complex (m)
   "Convert a real matrix M to a complex one."
   (let ((cm (magicl:zeros
@@ -204,10 +223,10 @@ are diagonal. Return (VALUES X UU^T).
          (a (magicl:map #'realpart uut))
          (b (magicl:map #'imagpart uut)))
     (cond
-      ((zero-matrix-p a)
+      ((permuted-diagonal-matrix-p a)
        (values (nth-value 1 (magicl:eig b))
                uut))
-      ((zero-matrix-p b)
+      ((permuted-diagonal-matrix-p b)
        (values (nth-value 1 (magicl:eig a))
                uut))
       (t
