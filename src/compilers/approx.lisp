@@ -212,6 +212,28 @@
     (magicl::map-to #'complex m cm)
     cm))
 
+(defun orthogonal-decomposition-of-UU^T (u)
+  "Given a unitary U, find a decomposition
+    UU^T = O @ D @ O^T
+for a diagonal matrix D and special orthogonal matrix O.
+Return (VALUES O D).
+Despite being special orthogonal, O will be a MAGICL:MATRIX/COMPLEX-*-FLOAT."
+  (multiple-value-bind (diag-re diag-im left right)
+      (magicl:qz (magicl:.realpart u) (magicl:.imagpart u))
+    (declare (ignore right))
+    (let ((diag (magicl:.complex diag-re diag-im)))
+      (when (minusp (magicl:det left))
+        (dotimes (row (magicl:nrows left))
+          (setf (magicl:tref left row 0)
+                (- (magicl:tref left row 0)))))
+      (let ((O (real->complex left))
+            (D (magicl:@ diag diag)))
+        (when *check-math*
+          (assert (magicl:every #'double~
+                                (magicl:@ u (magicl:transpose u))
+                                (magicl:@ O D (magicl:transpose O)))))
+        (values O D)))))
+
 (defun takagi-decomposition-of-uu^t (u)
   "Given a unitary U, finds an X such that
 
