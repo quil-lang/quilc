@@ -166,12 +166,24 @@
         (magicl:@ m (from-diag (list -1 1 1 1)))
         m)))
 
+(defun orthogonalp (m)
+  "Does M appear to be orthogonal?"
+  (magicl:identity-matrix-p
+   (magicl:@ m (magicl:transpose m))
+   +double-comparison-threshold-loose+))
+
 (defun diagonal-matrix-p (m)
   (dotimes (i (magicl:nrows m) t)
     (dotimes (j (magicl:ncols m))
       (when (and (/= i j)
                  (not (double~ 0.0d0 (magicl:tref m i j))))
         (return-from diagonal-matrix-p nil)))))
+
+(defun zero-matrix-p (m)
+  (dotimes (i (magicl:nrows m) t)
+    (dotimes (j (magicl:ncols m))
+      (when (not (double~ 0.0d0 (abs (magicl:tref m i j))))
+        (return-from zero-matrix-p nil)))))
 
 (defun real->complex (m)
   "Convert a real matrix M to a complex one."
@@ -191,19 +203,28 @@ are diagonal. Return (VALUES X UU^T).
   (let* ((uut (magicl:@ u (magicl:transpose u)))
          (a (magicl:map #'realpart uut))
          (b (magicl:map #'imagpart uut)))
-    (multiple-value-bind (_ g) (magicl:eig b)
-      (declare (ignore _))
-      (let* ((g-inv (magicl:inv g))
-             (g-inv-transpose (magicl:transpose g-inv))
-             (c (magicl:@ g-inv a g-inv-transpose)))
-        (multiple-value-bind (_ v) (magicl:eig c)
-          (declare (ignore _))
-          (values (magicl:@ g-inv-transpose (magicl:transpose v))
-                  uut))))))
+    (cond
+      ((zero-matrix-p a)
+       (values (nth-value 1 (magicl:eig b))
+               uut))
+      ((zero-matrix-p b)
+       (values (nth-value 1 (magicl:eig a))
+               uut))
+      (t
+       (multiple-value-bind (_ g) (magicl:eig b)
+         (declare (ignore _))
+         (let* ((g-inv (magicl:inv g))
+                (g-inv-transpose (magicl:transpose g-inv))
+                (c (magicl:@ g-inv a g-inv-transpose)))
+           (multiple-value-bind (_ v) (magicl:eig c)
+             (declare (ignore _))
+             (values (magicl:@ g-inv-transpose (magicl:transpose v))
+                     uut))))))))
 
 (defun find-diagonalizer-in-e-basis (m)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T."
   (check-type m magicl:matrix)
+  (assert (magicl:unitary-matrix-p m))
   (let ((u (magicl:@ +edag-basis+ m +e-basis+)))
     (multiple-value-bind (evecs gammag) (diagonalize-uu^t u)
       (setf evecs (ensure-positive-determinant (orthonormalize-matrix! evecs)))
@@ -211,7 +232,31 @@ are diagonal. Return (VALUES X UU^T).
         (assert (double= 1.0d0 (magicl:det evecs)))
         (assert (diagonal-matrix-p (magicl:@ (magicl:transpose evecs)
                                              gammag
-                                             evecs)))
+                                             evecs))
+            ()
+            "X^T (UU^T) X not diagonal!
+
+X =
+~A
+
+U =
+~A
+
+UU^T =
+~A
+
+X^T(UU^T)X =
+~A
+
+Original M such that U = E^T M E is
+~A"
+            evecs
+            u
+            gammag
+            (magicl:@ (magicl:transpose evecs)
+                                             gammag
+                                             evecs)
+            m)
         (assert (magicl:every #'double~
                               (eye 4 :type 'double-float)
                               (magicl:@ (magicl:transpose evecs)
