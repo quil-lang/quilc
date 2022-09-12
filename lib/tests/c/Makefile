@@ -3,7 +3,7 @@ BUILD_DIR = ../..
 CCFLAGS = -lsbcl -lquilc -L$(BUILD_DIR) -I$(BUILD_DIR)
 
 OS:=$(shell uname -s)
-ifeq ($(UNAME_S), Darwin)
+ifeq ($(OS), Darwin)
 	CCFLAGS += -pagezero_size 0x100000
 endif
 
