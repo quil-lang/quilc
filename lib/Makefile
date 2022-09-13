@@ -3,7 +3,7 @@
 all: libquilc.dylib
 
 libquilc.core libquilc.c libquilc.h libquilc.py: src/libquilc.lisp
-	sbcl --load "$<"
+	sbcl --dynamic-space-size 4096 --load "src/build-image.lisp"
 
 libquilc.dylib: libquilc.core libquilc.c
 	gcc -dynamiclib -o $@ libquilc.c -lsbcl
