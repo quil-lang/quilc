@@ -1,17 +1,39 @@
+;;; constraint-addresser.lisp
+;;;
+;;; Author: Erik Davis
+;;;
+;;; The basic API of a "constraint-based addresser" is here. The main
+;;; entry point is DO-CONSTRAINT-BASED-ADDRESSING, which dispatches
+;;; according to the specified scheme.
+;;;
+;;; Generally speaking, a constraint-based addressing scheme specifies
+;;; how to translate an addressing problem (input program, chip spec,
+;;; options) to a constraint program along with metadata about the
+;;; encoding. A SMT solver can run this program, and if the
+;;; constraints are satisfiable then a `model` (an assignment of
+;;; values to constraint variables) may be recovered. From this model
+;;; and the encoding, the details of addressing can be unpacked.
+;;;
+;;; In general, to add a new scheme, one needs to define appropriate
+;;; methods on the following generics
+;;; - ENCODE-CONSTRAINT-PROGRAM
+;;; - ATTEMPT-TO-RECOVER-MODEL
+;;; - UNPACK-MODEL
+;;;
+;;; Note that in general, DO-CONSTRAINT-BASED-ADDRESSING does not
+;;; nativize instructions. In other words, it is purely concerned with
+;;; questions of resource mapping/layout. In general, the joint
+;;; problem of addressing with nativization is sufficiently
+;;; challenging that we shouldn't rely on SMT or constraint formalisms
+;;; to accomplish it all at once.
+
 (in-package #:cl-quil)
+
+;;; This file contains the basic API for constraint-based addressing.
 
 (defvar *default-constraint-scheme* ':tb-olsq
   "The default scheme to use in the constraint based addresser.")
 
-(defvar *smt-debug-stream* nil
-  "When non-NIL, this indicates the stream at which debug lines get printed.")
-
-(defvar *constraint-solver-command* '("z3" "-in" "-smt2")
-  "The default command for invoking the constraint solver.")
-
-(defun smt-debug-line (ctxt fmt-msg &rest fmt-args)
-  (when *smt-debug-stream*
-    (apply #'format *smt-debug-stream* (format nil "~A: ~A~%" ctxt fmt-msg) fmt-args)))
 
 (define-condition addressing-failed (simple-error)
   ()
@@ -20,14 +42,6 @@
 (defun addressing-failed (format-control &rest format-args)
   (error 'addressing-failed :format-control format-control
                             :format-arguments format-args))
-
-(defun initiate-smt-solver (command)
-  "Get a CL-SMT-LIB:PROCESS-TWO-WAY-STREAM by invoking COMMAND."
-  (smt-debug-line 'initiate-smt-solver "Starting solver:~{ ~A~}" command)
-  (let ((smt (apply #'cl-smt-lib:make-smt command)))
-    (unless (uiop:process-alive-p (cl-smt-lib::process smt))
-      (addressing-failed "Tried~{ ~A~}, but solver process is dead on arrival." command))
-    smt))
 
 (defclass constraint-program ()
   ((declarations :initarg :declarations
@@ -48,7 +62,7 @@
                                  (constraint-program-assertions cp)
                                  `((|check-sat|) (|get-model|)))))
       (smt-debug-line 'write-constraint-program "~%~{    ~A~%~}" full-program)
-      (cl-smt-lib:write-to-smt stream full-program))))
+      (write-smt-forms full-program stream))))
 
 ;;; Encodings
 
@@ -101,6 +115,8 @@ Returns a triple (INSTRS, INITIAL-L2P, FINAL-L2P)."))
                                          (solver-command *constraint-solver-command*)
                                        &allow-other-keys)
   "Address INSTRUCTONS to be compatible with CHIP-SPEC, using the encoding indicated by SCHEME.
+
+Encoding-specific keyword arguments are handed off to ENCODE-CONSTRAINT-PROGRAM.
 
 Returns three values: (ADDRESSED-INSTRUCTIONS, INITIAL-REWIRING, FINAL-REWIRING)."
   ;; check whether instructions are addressable by these means
