@@ -1,5 +1,35 @@
+;;; tan-cong.lisp
+;;;
+;;; Author: Erik Davis
+;;;
+;;; This implements the encoding described in "Optimal Layout
+;;; Synthesis for Quantum Computing" by Tan & Cong (arXiv:2007.15671).
+;;; In particular, we implement their proposed "transition based
+;;; optimal layout synthesis for quantum computing" aka TB-OLSQ.
+;;;
+;;; At a high level, this involves the following assumption:
+;;; instructions can be addressed by a scheme where we alternate
+;;; between sections of gate applications and sections with swaps to
+;;; update the logical-to-physical mapping (the 'transitions' in
+;;; TB-OLSQ). Addressing is therefore a two stage process:
+;;;   1. Identify which section each instruction goes in, and what
+;;;      swaps are needed to transition between sections.
+;;;   2. Solve the easy task of doing addressing within sections (where
+;;;      no swaps should be needed).
+;;;
+;;; The constraint program we produce is used to solve (1), and then (2)
+;;; gets handled in UNPACK-MODEL.
+;;;
+;;; Finally, it's worth noting that since qubit allocation is trivial
+;;; for 1Q gates, we rely on a segmentation of the initial
+;;; instructions into blocks of 2Q pseudoinstructions, representing
+;;; (in general) a 2Q gate along with some adjacent 1Q operators.
+
 (in-package :cl-quil)
 
+;; The following readtable gives access to #! which lets us
+;; do case sensitive reading. This is useful because SMT-LIB
+;; programs are case sensitive.
 (named-readtables:in-readtable :cl-smt-lib)
 
 ;;; smt constructors
