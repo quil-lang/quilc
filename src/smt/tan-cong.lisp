@@ -261,6 +261,9 @@
                                                                                   initial-l2p
                                                                                   final-l2p
                                                                                   num-blocks)
+  (unless num-blocks
+    ;; TODO: eventually do a binary search for this!
+    (addressing-failed "TB-OLSQ requires :NUM-BLOCKS, but none was provided."))
   (let ((cp (make-instance 'constraint-program))
         (encoding (make-tan-cong-encoding instrs chip-spec num-blocks)))
     (setf (constraint-program-declarations cp)
