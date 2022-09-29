@@ -199,36 +199,44 @@ This function should be completely deterministic (i.e., produce the same value f
   (check-type m magicl:matrix)
   (let* ((u (magicl:@ +edag-basis+ m +e-basis+))
          (gammag (magicl:@ u (magicl:transpose u))))
-    (loop :for attempt :from 1 :to num-attempts :do
-      (let* ((coeff (diagonalizer-number-generator attempt))
-             (matrix (magicl:map (lambda (z)
-                                   (+ (* coeff       (realpart z))
-                                      (* (- 1 coeff) (imagpart z))))
-                                 gammag))
-             (evecs (ensure-positive-determinant
-                     (orthonormalize-matrix!
-                      (nth-value 1 (magicl:eig matrix)))))
-             (evals (magicl:diag
-                     (magicl:@ (magicl:transpose evecs)
-                               gammag
-                               evecs)))
-             (v (magicl:@ evecs
-                          (from-diag evals)
-                          (magicl:transpose evecs))))
-        (when (and (double= 1.0d0 (magicl:det evecs))
-                   (magicl:every #'double= gammag v))
-          (when *check-math*
-            (assert (magicl:every #'double~
-                                  (eye 4 :type 'double-float)
-                                  (magicl:@ (magicl:transpose evecs)
-                                            evecs))
-                (evecs)
-                "The calculated eigenvectors were not found to be orthonormal. ~
-               EE^T =~%~A"
-                (magicl:@ (magicl:transpose evecs)
-                          evecs)))
-          (return-from find-diagonalizer-in-e-basis evecs)))))
-  (error 'diagonalizer-not-found :matrix m :attempts num-attempts))
+    (cond
+      ;; XXX: It seems that LAPACK distributions on ARM do not work or
+      ;; are not stable when calculating eigenvectors of a diagonal
+      ;; matrix. We have not closely investigated why, but checking
+      ;; for diagonal matrices as a special case seems to work.
+      ((diagonal-matrix-p gammag)
+       (magicl:eye (magicl:shape m) :type (magicl:element-type m)))
+      (t
+       (loop :for attempt :from 1 :to num-attempts :do
+         (let* ((coeff (diagonalizer-number-generator attempt))
+                (matrix (magicl:map (lambda (z)
+                                      (+ (* coeff       (realpart z))
+                                         (* (- 1 coeff) (imagpart z))))
+                                    gammag))
+                (evecs (ensure-positive-determinant
+                        (orthonormalize-matrix!
+                         (nth-value 1 (magicl:eig matrix)))))
+                (evals (magicl:diag
+                        (magicl:@ (magicl:transpose evecs)
+                                  gammag
+                                  evecs)))
+                (v (magicl:@ evecs
+                             (from-diag evals)
+                             (magicl:transpose evecs))))
+           (when (and (double= 1.0d0 (magicl:det evecs))
+                      (magicl:every #'double= gammag v))
+             (when *check-math*
+               (assert (magicl:every #'double~
+                                     (eye 4 :type 'double-float)
+                                     (magicl:@ (magicl:transpose evecs)
+                                               evecs))
+                       (evecs)
+                       "The calculated eigenvectors were not found to be orthonormal. ~
+                        EE^T =~%~A"
+                       (magicl:@ (magicl:transpose evecs)
+                                 evecs)))
+             (return-from find-diagonalizer-in-e-basis evecs))))
+       (error 'diagonalizer-not-found :matrix m :attempts num-attempts)))))
 
 (defun diagonalizer-in-e-basis (m)
   "For M in SU(4), compute an SO(4) column matrix of eigenvectors of E^* M E (E^* M E)^T.

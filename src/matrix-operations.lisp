@@ -8,6 +8,13 @@
 
 (in-package #:cl-quil)
 
+(defun diagonal-matrix-p (m)
+  "Is M diagonal?"
+  (dotimes (row (magicl:nrows m) t)
+    (dotimes (col (magicl:ncols m))
+      (when (and (/= row col) (not (double~ 0 (magicl:tref m row col))))
+        (return-from diagonal-matrix-p nil)))))
+
 (defun matrix-first-column-equality (x y)
   (check-type x magicl:matrix)
   (check-type y magicl:matrix)
