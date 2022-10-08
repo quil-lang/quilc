@@ -151,115 +151,115 @@
                         :collect (cons i j))))
 
 (defun tan-cong-constraints (encoding chip-spec &key initial-l2p final-l2p)
-      (let ((nb (tan-cong-encoding-num-blocks encoding))
-            (nq (encoding-num-qubits encoding))
-            (nl (encoding-num-links encoding))
-            (ng (encoding-num-gates encoding))
-            (dependencies (initial-gate-dependencies (encoding-gates encoding)))
-            (constraints nil))
-        (labels ((bs (g)
-                   (tan-cong-encoding-bs encoding g))
-                 (xs (g)
-                   (tan-cong-encoding-xs encoding g))
-                 (l2p (b q)
-                   (tan-cong-encoding-l2p encoding b q))
-                 (sigma (b k)
-                   (tan-cong-encoding-sigma encoding b k))
-                 (add-constraint (c)
-                   (push c constraints))
-                 (qubits-on-link (l)
-                   (coerce (chip-spec-qubits-on-link chip-spec l) 'list))
-                 (links-on-qubit (q)
-                   (coerce (chip-spec-links-on-qubit chip-spec q) 'list))
-                 (constrain-l2p-equals (b target-l2p)
-                   (cons '|and|
-                         (loop :for q :from 0
-                               :for p :in (coerce target-l2p 'list)
-                               :collect #!`(= ,(L2P B Q) ,P)))))
+  (let ((nb (tan-cong-encoding-num-blocks encoding))
+        (nq (encoding-num-qubits encoding))
+        (nl (encoding-num-links encoding))
+        (ng (encoding-num-gates encoding))
+        (dependencies (initial-gate-dependencies (encoding-gates encoding)))
+        (constraints nil))
+    (labels ((bs (g)
+               (tan-cong-encoding-bs encoding g))
+             (xs (g)
+               (tan-cong-encoding-xs encoding g))
+             (l2p (b q)
+               (tan-cong-encoding-l2p encoding b q))
+             (sigma (b k)
+               (tan-cong-encoding-sigma encoding b k))
+             (add-constraint (c)
+               (push c constraints))
+             (qubits-on-link (l)
+               (coerce (chip-spec-qubits-on-link chip-spec l) 'list))
+             (links-on-qubit (q)
+               (coerce (chip-spec-links-on-qubit chip-spec q) 'list))
+             (constrain-l2p-equals (b target-l2p)
+               (cons '|and|
+                     (loop :for q :from 0
+                           :for p :in (coerce target-l2p 'list)
+                           :collect #!`(= ,(L2P B Q) ,P)))))
 
-          ;; l2p mapping
-          ;; 1. uses valid physical qubits: 0 <= l2p[b][q] < num_qubits
-          ;; 2. is injective on every block b: l2p[b][q] != l2p[b][q0] for q != q0
-          (loop :for b :to nb
-                :for l2p := (loop :for q :below nq :collect (l2p b q))
-                :do (add-constraint (distinct l2p))
-                    (dolist (p l2p)
-                      (add-constraint (bound-int 0 p))))
+      ;; l2p mapping
+      ;; 1. uses valid physical qubits: 0 <= l2p[b][q] < num_qubits
+      ;; 2. is injective on every block b: l2p[b][q] != l2p[b][q0] for q != q0
+      (loop :for b :to nb
+            :for l2p := (loop :for q :below nq :collect (l2p b q))
+            :do (add-constraint (distinct l2p))
+                (dolist (p l2p)
+                  (add-constraint (bound-int 0 p))))
 
-          ;; gate times
-          ;; 1. are well defined (and not on last time slice)
-          ;; 2. dependencies are weakly satisfied
-          (loop :for g :below ng
-                :do (add-constraint (bound-int 0 (bs g) (tan-cong-encoding-num-blocks encoding))))
-          (loop :for (i . j) :in dependencies
-                :do (add-constraint `(<= ,(bs i) ,(bs j))))
+      ;; gate times
+      ;; 1. are well defined (and not on last time slice)
+      ;; 2. dependencies are weakly satisfied
+      (loop :for g :below ng
+            :do (add-constraint (bound-int 0 (bs g) (tan-cong-encoding-num-blocks encoding))))
+      (loop :for (i . j) :in dependencies
+            :do (add-constraint `(<= ,(bs i) ,(bs j))))
 
-          ;; gate positions
-          ;; 1. are well defined
-          (loop :for g :below ng
-                :do (add-constraint (bound-int 0 (xs g) nl)))
+      ;; gate positions
+      ;; 1. are well defined
+      (loop :for g :below ng
+            :do (add-constraint (bound-int 0 (xs g) nl)))
 
-          ;; swap placements
-          ;; 1. are well defined (i.e. 0 or 1)
-          ;; 2. if two edges overlap in space, then they occur in different blocks
-          (dotimes (b nb)
-            (dotimes (k nl)
-              (add-constraint (bound-int 0 (sigma b k) 2)))
-            (dotimes (l nl)
-              (dolist (lp (chip-spec-adj-links chip-spec l))
-                (add-constraint #!`(=> (< 0 ,(SIGMA B L))
-                                       (= 0 ,(SIGMA B LP)))))))
+      ;; swap placements
+      ;; 1. are well defined (i.e. 0 or 1)
+      ;; 2. if two edges overlap in space, then they occur in different blocks
+      (dotimes (b nb)
+        (dotimes (k nl)
+          (add-constraint (bound-int 0 (sigma b k) 2)))
+        (dotimes (l nl)
+          (dolist (lp (chip-spec-adj-links chip-spec l))
+            (add-constraint #!`(=> (< 0 ,(SIGMA B L))
+                                   (= 0 ,(SIGMA B LP)))))))
 
-          ;; consistency between gate assignment and qubit assignment
-          ;; 1. if a gate is on an edge e, then the logical endpoints of
-          ;;    this gate map to the physical endpoints of e
-          (dotimes (b nb)                   ; TODO: we assume 2Q gates only here
-            (loop :for l :below nl
-                  :for (p0 p1) := (qubits-on-link l)
-                  :do (loop :for i :from 0
-                            :for segment :across (encoding-gates encoding)
-                            :for xi := (xs i)
-                            :for bi := (bs i)
-                            :for (q0 q1) := (2q-segment-qubits segment)
-                            :for pibq0 := (l2p b q0)
-                            :for pibq1 := (l2p b q1)
-                            :do (add-constraint
-                                 #!`(=> (and (= ,BI ,B) (= ,XI ,L))
-                                        (or (and (= ,PIBQ0 ,P0) (= ,PIBQ1 ,P1))
-                                            (and (= ,PIBQ0 ,P1) (= ,PIBQ1 ,P0))))))))
+      ;; consistency between gate assignment and qubit assignment
+      ;; 1. if a gate is on an edge e, then the logical endpoints of
+      ;;    this gate map to the physical endpoints of e
+      (dotimes (b nb)                   ; TODO: we assume 2Q gates only here
+        (loop :for l :below nl
+              :for (p0 p1) := (qubits-on-link l)
+              :do (loop :for i :from 0
+                        :for segment :across (encoding-gates encoding)
+                        :for xi := (xs i)
+                        :for bi := (bs i)
+                        :for (q0 q1) := (2q-segment-qubits segment)
+                        :for pibq0 := (l2p b q0)
+                        :for pibq1 := (l2p b q1)
+                        :do (add-constraint
+                             #!`(=> (and (= ,BI ,B) (= ,XI ,L))
+                                    (or (and (= ,PIBQ0 ,P0) (= ,PIBQ1 ,P1))
+                                        (and (= ,PIBQ0 ,P1) (= ,PIBQ1 ,P0))))))))
 
-          ;; L2P mapping is updated by swaps
-          ;; 1. if there are no swaps touching a qubit q at block b, l2p[b,q] = l2p[b+1,q]
-          ;; 2. if there is a swap on an edge, l2p[b] is related to l2p[b+1] by
-          ;;    a swap on the assigned physical qubits
-          (dotimes (b nb)
-            (dotimes (p nq)
-              (dotimes (q nq)
-                (let ((no-swaps-on-p
-                        `(|and| ,@(loop :for l :in (links-on-qubit p)
-                                        :collect `(= 0 ,(sigma b l))))))
-                  (add-constraint
-                   #!`(=> (and (= ,(L2P B Q) ,P) ,NO-SWAPS-ON-P)
-                          (= ,(L2P (1+ B) Q) ,P))))))
-            (loop :for l :below nl
-                  :for (p0 p1) := (qubits-on-link l)
-                  :do (dotimes (q nq)
-                        (add-constraint
-                         #!`(=> (and (< 0 ,(SIGMA B L))
-                                     (= ,P0 ,(L2P B Q)))
-                                (= ,P1 ,(L2P (1+ B) Q))))
-                        (add-constraint
-                         #!`(=> (and (< 0 ,(SIGMA B L))
-                                     (= ,P1 ,(L2P B Q)))
-                                (= ,P0 ,(L2P (1+ B) Q))))))
+      ;; L2P mapping is updated by swaps
+      ;; 1. if there are no swaps touching a qubit q at block b, l2p[b,q] = l2p[b+1,q]
+      ;; 2. if there is a swap on an edge, l2p[b] is related to l2p[b+1] by
+      ;;    a swap on the assigned physical qubits
+      (dotimes (b nb)
+        (dotimes (p nq)
+          (dotimes (q nq)
+            (let ((no-swaps-on-p
+                    `(|and| ,@(loop :for l :in (links-on-qubit p)
+                                    :collect `(= 0 ,(sigma b l))))))
+              (add-constraint
+               #!`(=> (and (= ,(L2P B Q) ,P) ,NO-SWAPS-ON-P)
+                      (= ,(L2P (1+ B) Q) ,P))))))
+        (loop :for l :below nl
+              :for (p0 p1) := (qubits-on-link l)
+              :do (dotimes (q nq)
+                    (add-constraint
+                     #!`(=> (and (< 0 ,(SIGMA B L))
+                                 (= ,P0 ,(L2P B Q)))
+                            (= ,P1 ,(L2P (1+ B) Q))))
+                    (add-constraint
+                     #!`(=> (and (< 0 ,(SIGMA B L))
+                                 (= ,P1 ,(L2P B Q)))
+                            (= ,P0 ,(L2P (1+ B) Q))))))
 
-            ;; Pin down initial // final L2P
-            (when initial-l2p
-              (add-constraint (constrain-l2p-equals 0 initial-l2p)))
-            (when final-l2p
-              (add-constraint (constrain-l2p-equals nb final-l2p)))))
+        ;; Pin down initial // final L2P
+        (when initial-l2p
+          (add-constraint (constrain-l2p-equals 0 initial-l2p)))
+        (when final-l2p
+          (add-constraint (constrain-l2p-equals nb final-l2p)))))
 
-        (nreverse constraints)))
+    (nreverse constraints)))
 
 (defmethod encode-constraint-program ((scheme (eql ':tb-olsq)) instrs chip-spec &key
                                                                                   initial-l2p
