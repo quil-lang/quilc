@@ -1,11 +1,8 @@
-;;; Allegro (and other Lisps) don't support the non-standard "package
-;;; local nicknames".
-#-(or sbcl ecl ccl)
-(rename-package :alexandria :alexandria '(:a))
+;; smt-tests.lisp
+;;
+;; Author: Erik Davis
 
 (fiasco:define-test-package #:cl-quil.smt-tests
-  #+(or sbcl ecl ccl)
-  (:local-nicknames (:a :alexandria))
   (:use #:cl-quil #:cl-quil.smt)
 
   (:export
