@@ -1,6 +1,6 @@
-(in-package #:cl-quil)
-
-;;; Segments
+;;; segment-2q.lisp
+;;;
+;;; Author: Erik Davis
 ;;;
 ;;; Many constraint-based addressing schemes are entirely concerned
 ;;; with the problem of 2Q gate layout, since the placement of 1Q
@@ -9,6 +9,8 @@
 ;;; ordered sequence of instructions acting on (some subset of) a pair
 ;;; of qubits. In this way, 1Q gates can go 'along for the ride' with
 ;;; some neighboring 2Q gate.
+
+(in-package #:cl-quil.smt)
 
 ;;; TODO: worth making this NQ-SEGMENT? we won't use it, but perhaps someone else might.
 (defclass 2q-segment (instruction)
@@ -21,8 +23,8 @@
            :documentation "An ordered list of instructions associated with this 2Q segment."))
   (:documentation "A pseudoinstruction representing some contiguous segment of instructions acting on at most the indicated pair of qubits."))
 
-(defmethod print-instruction-generic ((instr 2q-segment) stream)
-  (format stream "2Q-SEGMENT {~{~/quil:instruction-fmt/~^;~^ ~}}" (2q-segment-instrs instr)))
+(defmethod cl-quil.frontend::print-instruction-generic ((instr 2q-segment) stream)
+  (format stream "2Q-SEGMENT {~{~/cl-quil:instruction-fmt/~^;~^ ~}}" (2q-segment-instrs instr)))
 
 (defun rewire-2q-segment (segment p0 p1)
   "Rewire the instructions associated with SEGMENT to act on qubits P0 and P1.
@@ -65,7 +67,7 @@ Returns three values: a list of segments, a list of free 1Q gates, and the set o
                    (complex q1 q0)))
              (ensure-queued (instrs q0 q1 &key prepend)
                (let ((k (key q0 q1)))
-                 (a:if-let ((segment (gethash k 2q-queues)))
+                 (alexandria:if-let ((segment (gethash k 2q-queues)))
                    (setf (2q-segment-instrs segment)
                          (if prepend
                              (append (2q-segment-instrs segment) instrs)
@@ -74,7 +76,7 @@ Returns three values: a list of segments, a list of free 1Q gates, and the set o
                                                  :qubits (list q0 q1)
                                                  :instrs instrs)))))
              (flush-queue (q0 q1)
-               (a:when-let ((segment (gethash (key q0 q1) 2q-queues)))
+               (alexandria:when-let ((segment (gethash (key q0 q1) 2q-queues)))
                  (setf (2q-segment-instrs segment) (nreverse (2q-segment-instrs segment)))
                  (push segment segments)
                  (setf (gethash (key q0 q1) 2q-queues) nil)))
@@ -103,7 +105,7 @@ Returns three values: a list of segments, a list of free 1Q gates, and the set o
                (ensure-queued (list instr) q0 q1)
                ;; see if we can steal any free 1q instructions
                (dolist (q (list q0 q1))
-                 (a:when-let ((free (gethash q 1q-free)))
+                 (alexandria:when-let ((free (gethash q 1q-free)))
                    (ensure-queued free q0 q1 :prepend t)
                    (setf (gethash q 1q-free) nil)))))
       (dolist (instr instrs)
@@ -114,11 +116,11 @@ Returns three values: a list of segments, a list of free 1Q gates, and the set o
                (1 (add-1q-instr instr (first args)))
                (2 (add-2q-instr instr (first args) (second args)))
                (otherwise
-                (addressing-failed "Instruction ~/quil:instruction-fmt/ has unsupported arity" instr)))
+                (addressing-failed "Instruction ~/cl-quil:instruction-fmt/ has unsupported arity" instr)))
 	     (dolist (q args)
 	       (pushnew q qubits))))
           (otherwise
-           (addressing-failed "Unsupported instruction ~/quil:instruction-fmt/" instr))))
+           (addressing-failed "Unsupported instruction ~/cl-quil:instruction-fmt/" instr))))
       (flush-all-queues)
       ;; remaining 1qs are free
       (values (nreverse segments)

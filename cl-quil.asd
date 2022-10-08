@@ -380,7 +380,8 @@
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/smt-tests)))
   :pathname "src/smt/"
   :serial t
-  :components ((:file "solver")
+  :components ((:file "package")
+	       (:file "solver")
 	       (:file "constraint-addresser")
                (:file "segment-2q")
                (:file "tan-cong")))

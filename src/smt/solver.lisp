@@ -5,7 +5,7 @@
 ;; This provides an extremely thin layer over CL-SMT-LIB for starting
 ;; a solver and giving it constraints.
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.smt)
 
 (defvar *smt-debug-stream* nil
   "When non-NIL, this indicates the stream at which debug lines get printed.")
@@ -22,9 +22,14 @@
   (smt-debug-line 'initiate-smt-solver "Starting solver:~{ ~A~}" command)
   (let ((smt (apply #'cl-smt-lib:make-smt command)))
     (unless (uiop:process-alive-p (cl-smt-lib::process smt))
-      (addressing-failed "Tried~{ ~A~}, but solver process is dead on arrival." command))
+      (error "Tried~{ ~A~}, but solver process is dead on arrival." command))
     smt))
 
 (defun write-smt-forms (forms &optional (stream *standard-output*))
   "Write constraint FORMS to STREAM."
-  (cl-smt-lib:write-to-smt stream forms))
+  (let ((*package* #.*package*))	; we don't want packages printed in variable names
+    (cl-smt-lib:write-to-smt stream forms)))
+
+(defun read-smt-form (&optional (stream *standard-input*))
+  (let ((*package* #.*package*))
+    (read stream)))

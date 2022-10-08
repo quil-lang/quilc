@@ -25,7 +25,7 @@
 ;;; instructions into blocks of 2Q pseudoinstructions, representing
 ;;; (in general) a 2Q gate along with some adjacent 1Q operators.
 
-(in-package :cl-quil)
+(in-package :cl-quil.smt)
 
 ;; The following readtable gives access to #! which lets us
 ;; do case sensitive reading. This is useful because SMT-LIB
@@ -36,7 +36,7 @@
 
 (defun smt-integer (fmt &rest fmt-args)
   "Construct a SMT integer variable with the indicated name."
-  (intern (apply #'format nil fmt fmt-args)))
+  (intern (apply #'format nil fmt fmt-args) #.*package*))
 
 ;;; constraints
 
@@ -110,8 +110,8 @@
                        (length list))))
              (make-array dims :initial-contents list))))
     (multiple-value-bind (segments free-1qs qubits-used) (segment-instructions instrs)
-      (let ((num-qubits (chip-spec-n-qubits chip-spec))
-            (num-links (chip-spec-n-links chip-spec))
+      (let ((num-qubits (cl-quil::chip-spec-n-qubits chip-spec))
+            (num-links (cl-quil::chip-spec-n-links chip-spec))
             (num-gates (length segments)))
 	(unless (<= (length qubits-used) num-qubits)
 	  (addressing-failed "At least ~D qubits are required, but only ~D are available on the chip."
@@ -141,10 +141,10 @@
 (defun initial-gate-dependencies (gate-vec)
   (loop :for i :from 0 :below (length gate-vec)
         :for gi := (aref gate-vec i)
-        :for ri := (instruction-resources gi)
+        :for ri := (cl-quil::instruction-resources gi)
         :append (loop :for j :from (1+ i) :below (length gate-vec)
                       :for gj := (aref gate-vec j)
-                      :for rj := (instruction-resources gj)
+                      :for rj := (cl-quil::instruction-resources gj)
                       :when (resource-intersection ri rj)
                         :collect (cons i j))))
 
@@ -169,9 +169,9 @@
              (add-constraint (c)
                (push c constraints))
              (qubits-on-link (l)
-               (coerce (chip-spec-qubits-on-link chip-spec l) 'list))
+               (coerce (cl-quil::chip-spec-qubits-on-link chip-spec l) 'list))
              (links-on-qubit (q)
-               (coerce (chip-spec-links-on-qubit chip-spec q) 'list))
+               (coerce (cl-quil::chip-spec-links-on-qubit chip-spec q) 'list))
              (constrain-l2p-equals (b target-l2p)
                (cons '|and|
                      (loop :for q :from 0
@@ -185,7 +185,7 @@
             :for l2p := (loop :for q :below nq :collect (l2p b q))
             :do (add-constraint (distinct l2p))
                 (dolist (p l2p)
-                  (add-constraint (bound-int 0 p))))
+                  (add-constraint (bound-int 0 p nq))))
 
       ;; gate times
       ;; 1. are well defined (and not on last time slice)
@@ -207,7 +207,7 @@
         (dotimes (k nl)
           (add-constraint (bound-int 0 (sigma b k) 2)))
         (dotimes (l nl)
-          (dolist (lp (chip-spec-adj-links chip-spec l))
+          (dolist (lp (cl-quil::chip-spec-adj-links chip-spec l))
             (add-constraint #!`(=> (< 0 ,(SIGMA B L))
                                    (= 0 ,(SIGMA B LP)))))))
 
@@ -281,11 +281,11 @@
 
 (defmethod attempt-to-recover-model ((encoding tan-cong-encoding) smt)
   (declare (ignore encoding))
-  (let ((output (read smt))
+  (let ((output (read-smt-form smt))
         (model (make-hash-table)))
     (case output
       ((SAT)
-       (let ((raw-model (read smt)))
+       (let ((raw-model (read-smt-form smt)))
          (smt-debug-line 'attempt-to-recover-model "~A" raw-model)
          (loop :for defn :in raw-model 	; syntax is (DEFINE-FUN <var> () INT <val>)
                :for var := (second defn)
@@ -306,7 +306,7 @@
              (sigma (b k) (tan-cong-encoding-sigma encoding b k))
              (qubits-on-link (k)
                (map 'list #'identity
-                    (chip-spec-qubits-on-link (encoding-chip-spec encoding) k)))
+                    (cl-quil::chip-spec-qubits-on-link (encoding-chip-spec encoding) k)))
              (wiring-at-block (b)
                (map 'vector #'identity
                     (loop :for q :below (encoding-num-qubits encoding)
@@ -328,8 +328,8 @@
             :for p0 := (model (l2p b q0))
             :for p1 := (model (l2p b q1))
             :do (smt-debug-line 'unpack-model
-                                "scheduling ~/quil:instruction-fmt/ to ~D ~D (block ~A)"
-                                segment p0 p1 b)
+				"scheduling ~/cl-quil:instruction-fmt/ to ~D ~D (block ~A)"
+				segment p0 p1 b)
                 (schedule-instr b l (rewire-2q-segment segment p0 p1)))
 
       ;; get swaps
@@ -340,8 +340,8 @@
                         :do (schedule-instr (+ b 0.5) k
                                             (build-gate 'swap () p0 p1))))
 
-      (let ((sorted-instrs
-              (a:mappend
+      (let* ((sorted-instrs
+              (alexandria:mappend
                (lambda (weighted-instr)
                  (let ((instr (third weighted-instr)))
                    (typecase instr
@@ -352,9 +352,14 @@
                               (or (< (first a) (first b))
                                   (and (= (first a) (first b))
                                        (< (second a) (second b))))))))
-            (initial-l2p (wiring-at-block 0))
-            (final-l2p (wiring-at-block (tan-cong-encoding-num-blocks encoding))))
-        (values (append (tan-cong-encoding-free-1qs encoding)
-                        sorted-instrs)
+             (initial-l2p (wiring-at-block 0))
+             (final-l2p (wiring-at-block (tan-cong-encoding-num-blocks encoding)))
+	     (rewired-1qs
+	       (map 'list (lambda (instr)
+			    (build-gate (application-operator instr)
+					(application-parameters instr)
+					(aref initial-l2p (qubit-index (first (application-arguments instr))))))
+		    (tan-cong-encoding-free-1qs encoding))))
+        (values (append rewired-1qs sorted-instrs)
                 initial-l2p
                 final-l2p)))))

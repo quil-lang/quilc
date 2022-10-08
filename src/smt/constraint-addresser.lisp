@@ -27,7 +27,7 @@
 ;;; challenging that we shouldn't rely on SMT or constraint formalisms
 ;;; to accomplish it all at once.
 
-(in-package #:cl-quil)
+(in-package #:cl-quil.smt)
 
 ;;; This file contains the basic API for constraint-based addressing.
 
@@ -77,10 +77,10 @@
   (:documentation "A base class for encodings which represent the problem of addressing GATES to CHIP."))
 
 (defun encoding-num-qubits (encoding)
-  (chip-spec-n-qubits (encoding-chip-spec encoding)))
+  (cl-quil::chip-spec-n-qubits (encoding-chip-spec encoding)))
 
 (defun encoding-num-links (encoding)
-  (chip-spec-n-links (encoding-chip-spec encoding)))
+  (cl-quil::chip-spec-n-links (encoding-chip-spec encoding)))
 
 (defun encoding-num-gates (encoding)
   (length (encoding-gates encoding)))
@@ -119,7 +119,6 @@ Returns a triple (INSTRS, INITIAL-L2P, FINAL-L2P)."))
 Encoding-specific keyword arguments are handed off to ENCODE-CONSTRAINT-PROGRAM.
 
 Returns three values: (ADDRESSED-INSTRUCTIONS, INITIAL-REWIRING, FINAL-REWIRING)."
-  ;; check whether instructions are addressable by these means
   (multiple-value-bind (cp encoding)
       (apply #'encode-constraint-program
              scheme instrs chip-spec
