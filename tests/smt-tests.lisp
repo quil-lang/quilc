@@ -98,9 +98,14 @@
   (let ((chip (cl-quil::build-nq-linear-chip 3)))
     (dolist (pp (list (parse-quil "X 0") (parse-quil "X 0; X 0") (parse-quil "X 0; X 1")))
       (dotimes (num-blocks 3)
-	(let ((addressed (address-and-reconstitute-program pp chip :scheme ':tb-olsq :num-blocks num-blocks)))
-	  (logical-matrices-agree pp addressed)
-	  (program-satisfies-connectivity-constraints addressed chip))))))
+	(dolist (minimize-swaps (list nil t))
+	  (let ((addressed (address-and-reconstitute-program
+			    pp chip
+			    :scheme ':tb-olsq
+			    :num-blocks num-blocks
+			    :minimize-swaps t)))
+	    (logical-matrices-agree pp addressed)
+	    (program-satisfies-connectivity-constraints addressed chip)))))))
 
 (deftest test-tb-olsq-various-num-blocks ()
   (let ((pp (parse-quil "X 0; CZ 0 1; CZ 0 2; X 1; CZ 1 2; CZ 0 1; X 2; CZ 0 2"))
@@ -116,3 +121,13 @@
 	    (address-and-reconstitute-program pp chip :scheme ':tb-olsq :num-blocks 3)))
       (is (logical-matrices-agree pp addressed))
       (is (program-satisfies-connectivity-constraints addressed chip)))))
+
+(deftest test-tb-olsq-swap-minimization ()
+  (loop :with chip :=(cl-quil::build-nq-linear-chip 3)
+        :for (orig . expected-length) :in (list (cons (parse-quil "CZ 0 2") 1)
+						(cons (parse-quil "CZ 0 1; CZ 1 2; CZ 0 2") 4))
+	:for addressed := (address-and-reconstitute-program
+			   orig chip :scheme ':tb-olsq :num-blocks 10 :minimize-swaps t)
+	:do (is (= expected-length (length (parsed-program-executable-code addressed))))
+	    (logical-matrices-agree orig addressed)
+	    (program-satisfies-connectivity-constraints addressed chip)))

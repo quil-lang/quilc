@@ -46,10 +46,16 @@
 (defclass constraint-program ()
   ((declarations :initarg :declarations
                  :initform nil
-                 :accessor constraint-program-declarations)
+                 :accessor constraint-program-declarations
+		 :documentation "A list of SMT-LIB forms, indicating variable declarations.")
    (assertions :initarg :assertions
                :initform nil
-               :accessor constraint-program-assertions))
+               :accessor constraint-program-assertions
+	       :documentation "A list of SMT-LIB forms, indicating constraints or assertions.")
+   (optimize :initarg :optimize
+	     :initform nil
+	     :accessor constraint-program-optimize
+	     :documentation "An optional list of optimization declarations."))
   (:documentation "A representation of a simple SMT program, with declarations and assertions."))
 
 (defun write-constraint-program (cp &optional (stream *standard-output*))
@@ -60,6 +66,7 @@
                                  (format s "()")))
     (let* ((full-program (append (constraint-program-declarations cp)
                                  (constraint-program-assertions cp)
+				 (constraint-program-optimize cp)
                                  `((|check-sat|) (|get-model|)))))
       (smt-debug-line 'write-constraint-program "~%~{    ~A~%~}" full-program)
       (write-smt-forms full-program stream))))
@@ -138,5 +145,5 @@ Returns three values: (ADDRESSED-INSTRUCTIONS, INITIAL-REWIRING, FINAL-REWIRING)
 ;; need to do several rounds. For example, in the TB-OLSQ encoding, we need to make a
 ;; choice for :NUM-BLOCKS. This might involve picking a small initial guess,
 ;; then exponentially growing this until we have a large enough value that addressing works,
-;; possibly followed by some attempts to shave this down to the smallest value. Unfortunately,
-;; proper tuning of such a search requires a bit of work.
+;; followed by a costlier run with :MINIMIZE-SWAPS set to T. Proper tuning of such a search
+;; does take a bit of work.
