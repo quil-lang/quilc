@@ -132,3 +132,11 @@ Returns three values: (ADDRESSED-INSTRUCTIONS, INITIAL-REWIRING, FINAL-REWIRING)
         (unless model
           (addressing-failed "Unable to recover model; likely your problem is overconstrained."))
         (unpack-model encoding model)))))
+
+;; Note: The above API is not "turnkey" in the sense that DO-CONSTRAINT-BASED-ADDRESSING
+;; represents a single round of constraint generation & solving, whereas in practice we may
+;; need to do several rounds. For example, in the TB-OLSQ encoding, we need to make a
+;; choice for :NUM-BLOCKS. This might involve picking a small initial guess,
+;; then exponentially growing this until we have a large enough value that addressing works,
+;; possibly followed by some attempts to shave this down to the smallest value. Unfortunately,
+;; proper tuning of such a search requires a bit of work.

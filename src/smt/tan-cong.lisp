@@ -139,6 +139,17 @@
 			 :l2p l2p :bs bs :xs xs :sigma sigma))))))
 
 (defun initial-gate-dependencies (gate-vec)
+  "A graphical representation of logical gate dependencies. 
+
+Returns a list of pairs, where (i, j) indicates that the ith gate should precede the jth gate."
+  ;; Note: Technically we could take advantage of commutativity here
+  ;; and get a smaller dependency graph. In Tan & Cong they consider a
+  ;; variant for addressing QAOA programs where the phase separation
+  ;; gates (ZZs) within a round are not constrained in relation to
+  ;; eachother.  But at present, we don't do anything of the sort (and
+  ;; things are also somewhat complicated by our use of 2Q segments,
+  ;; since these are less likely to commute than their constituent
+  ;; gates.
   (loop :for i :from 0 :below (length gate-vec)
         :for gi := (aref gate-vec i)
         :for ri := (cl-quil::instruction-resources gi)
