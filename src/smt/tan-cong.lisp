@@ -273,21 +273,30 @@ Returns a list of pairs, where (i, j) indicates that the ith gate should precede
 
     (nreverse constraints)))
 
+(defun tan-cong-minimize-swaps (encoding)
+  (let ((nb (tan-cong-encoding-num-blocks encoding))
+	(nl (encoding-num-links encoding)))
+    `((|minimize| (+ ,@(loop :for b :below nb
+			     :append (loop :for l :below nl
+					   :collect (tan-cong-encoding-sigma encoding b l))))))))
+
 (defmethod encode-constraint-program ((scheme (eql ':tb-olsq)) instrs chip-spec &key
                                                                                   initial-l2p
                                                                                   final-l2p
-                                                                                  num-blocks)
+                                                                                  num-blocks
+										  (minimize-swaps nil))
   (unless num-blocks
     (addressing-failed "TB-OLSQ requires :NUM-BLOCKS, but none was provided."))
-  (let ((cp (make-instance 'constraint-program))
-        (encoding (make-tan-cong-encoding instrs chip-spec num-blocks)))
-    (setf (constraint-program-declarations cp)
-          (mapcar #'declare-int (tan-cong-encoding-variables encoding))
-          (constraint-program-assertions cp)
-          (mapcar #'smt-assert
-                  (tan-cong-constraints encoding chip-spec
-                                        :initial-l2p initial-l2p
-                                        :final-l2p final-l2p)))
+  (let* ((encoding (make-tan-cong-encoding instrs chip-spec num-blocks))
+	 (cp (make-instance 'constraint-program
+			    :declarations (mapcar #'declare-int (tan-cong-encoding-variables encoding))
+			    :assertions (mapcar #'smt-assert
+						(tan-cong-constraints encoding chip-spec
+								      :initial-l2p initial-l2p
+								      :final-l2p final-l2p))
+			    :optimize (if minimize-swaps
+					  (tan-cong-minimize-swaps encoding)
+					  nil))))
     (values cp encoding)))
 
 (defmethod attempt-to-recover-model ((encoding tan-cong-encoding) smt)
