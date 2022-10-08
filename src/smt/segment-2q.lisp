@@ -53,8 +53,9 @@ For example, H 0; CNOT 0 1; CNOT 1 2; X 0; X 1; Y 3 may get segmented as
 
 with gate Y 3 a 'free 1Q gate', since qubit 3 is not touched by any 2Q operations.
 
-Returns two values: a list of segments, and a list of free 1Q gates."
+Returns three values: a list of segments, a list of free 1Q gates, and the set of logical qubits used."
   (let ((segments nil)
+	(qubits nil)
         (1q-free (make-hash-table))
         (neighbors (make-hash-table))
         (2q-queues (make-hash-table)))
@@ -114,7 +115,9 @@ Returns two values: a list of segments, and a list of free 1Q gates."
                (1 (add-1q-instr instr (first args)))
                (2 (add-2q-instr instr (first args) (second args)))
                (otherwise
-                (addressing-failed "Instruction ~/quil:instruction-fmt/ has unsupported arity" instr)))))
+                (addressing-failed "Instruction ~/quil:instruction-fmt/ has unsupported arity" instr)))
+	     (dolist (q args)
+	       (pushnew q qubits))))
           (otherwise
            (addressing-failed "Unsupported instruction ~/quil:instruction-fmt/" instr))))
       (flush-all-queues)
@@ -122,4 +125,5 @@ Returns two values: a list of segments, and a list of free 1Q gates."
       (values (nreverse segments)
               (loop :for q :being :the :hash-key :of 1q-free
                       :using (hash-value instrs)
-                    :append (nreverse instrs))))))
+                    :append (nreverse instrs))
+	      qubits))))

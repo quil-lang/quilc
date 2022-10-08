@@ -109,32 +109,36 @@
                        (list (length list) (length (first list)))
                        (length list))))
              (make-array dims :initial-contents list))))
-    (multiple-value-bind (segments free-1qs) (segment-instructions instrs)
-      (let* ((num-qubits (chip-spec-n-qubits chip-spec))
-             (num-links (chip-spec-n-links chip-spec))
-             (num-gates (length segments))
-             (l2p (array-from-list
+    (multiple-value-bind (segments free-1qs qubits-used) (segment-instructions instrs)
+      (let ((num-qubits (chip-spec-n-qubits chip-spec))
+            (num-links (chip-spec-n-links chip-spec))
+            (num-gates (length segments)))
+	(unless (<= (length qubits-used) num-qubits)
+	  (addressing-failed "At least ~D qubits are required, but only ~D are available on the chip."
+			     (length qubits-used)
+			     num-qubits))
+	(let ((l2p (array-from-list
                    (loop :for b :to num-blocks ; NOTE: we add a block at the end for final swaps!
                          :collect (loop :for q :below num-qubits
                                         :collect (smt-integer "l2p[~D,~D]" b q)))))
-             (bs (array-from-list
-                  (loop :for l :below num-gates
-                        :collect (smt-integer "bs[~D,]" l))))
-             ;; comma is forcing this to print with bars |bs[0,]|
-             ;; todo: do something better
-             (xs (array-from-list
-                  (loop :for l :below num-gates
-                        :collect (smt-integer "xs[~D,]" l))))
-             (sigma (array-from-list
-                     (loop :for b :below num-blocks
-                           :collect (loop :for l :below num-links
-                                          :collect (smt-integer "sigma[~D,~D]" b l))))))
-        (make-instance 'tan-cong-encoding
-          :gates (map 'vector #'identity segments)
-          :free-1qs free-1qs
-          :chip chip-spec
-          :num-blocks num-blocks
-          :l2p l2p :bs bs :xs xs :sigma sigma)))))
+              (bs (array-from-list
+                   (loop :for l :below num-gates
+                         :collect (smt-integer "bs[~D,]" l))))
+              ;; comma is forcing this to print with bars |bs[0,]|
+              ;; todo: do something better
+              (xs (array-from-list
+                   (loop :for l :below num-gates
+                         :collect (smt-integer "xs[~D,]" l))))
+              (sigma (array-from-list
+                      (loop :for b :below num-blocks
+                            :collect (loop :for l :below num-links
+                                           :collect (smt-integer "sigma[~D,~D]" b l))))))
+          (make-instance 'tan-cong-encoding
+			 :gates (map 'vector #'identity segments)
+			 :free-1qs free-1qs
+			 :chip chip-spec
+			 :num-blocks num-blocks
+			 :l2p l2p :bs bs :xs xs :sigma sigma))))))
 
 (defun initial-gate-dependencies (gate-vec)
   (loop :for i :from 0 :below (length gate-vec)
