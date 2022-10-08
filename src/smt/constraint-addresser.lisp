@@ -127,7 +127,7 @@ Returns three values: (ADDRESSED-INSTRUCTIONS, INITIAL-REWIRING, FINAL-REWIRING)
              :final-l2p final-rewiring
              args)
     (let ((smt (initiate-smt-solver solver-command)))
-      ;; TODO: set options
+      ;; if we wanted to set solver options, now would be the time to do it...
       (write-constraint-program cp smt)
       (let ((model (attempt-to-recover-model encoding smt)))
         (unless model

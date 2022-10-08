@@ -124,8 +124,6 @@
               (bs (array-from-list
                    (loop :for l :below num-gates
                          :collect (smt-integer "bs[~D,]" l))))
-              ;; comma is forcing this to print with bars |bs[0,]|
-              ;; todo: do something better
               (xs (array-from-list
                    (loop :for l :below num-gates
                          :collect (smt-integer "xs[~D,]" l))))
@@ -151,6 +149,9 @@
                         :collect (cons i j))))
 
 (defun tan-cong-constraints (encoding chip-spec &key initial-l2p final-l2p)
+  ;; All of the constraints we generate are described in Tan & Cong. It's probably
+  ;; a good idea to have a copy of that at hand if you're trying to make sense of
+  ;; this....
   (let ((nb (tan-cong-encoding-num-blocks encoding))
         (nq (encoding-num-qubits encoding))
         (nl (encoding-num-links encoding))
@@ -213,7 +214,7 @@
       ;; consistency between gate assignment and qubit assignment
       ;; 1. if a gate is on an edge e, then the logical endpoints of
       ;;    this gate map to the physical endpoints of e
-      (dotimes (b nb)                   ; TODO: we assume 2Q gates only here
+      (dotimes (b nb)
         (loop :for l :below nl
               :for (p0 p1) := (qubits-on-link l)
               :do (loop :for i :from 0
@@ -266,7 +267,6 @@
                                                                                   final-l2p
                                                                                   num-blocks)
   (unless num-blocks
-    ;; TODO: eventually do a binary search for this!
     (addressing-failed "TB-OLSQ requires :NUM-BLOCKS, but none was provided."))
   (let ((cp (make-instance 'constraint-program))
         (encoding (make-tan-cong-encoding instrs chip-spec num-blocks)))
@@ -287,9 +287,7 @@
       ((SAT)
        (let ((raw-model (read smt)))
          (smt-debug-line 'attempt-to-recover-model "~A" raw-model)
-         (loop :for defn :in raw-model
-               ;; (DEFINE-FUN <var> () INT <val>)
-               ;; TODO: use pattern matching for this
+         (loop :for defn :in raw-model 	; syntax is (DEFINE-FUN <var> () INT <val>)
                :for var := (second defn)
                :for val := (car (last defn))
                :do (setf (gethash var model) val)
