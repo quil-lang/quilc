@@ -11,7 +11,6 @@
 ;;; some neighboring 2Q gate.
 
 ;;; TODO: worth making this NQ-SEGMENT? we won't use it, but perhaps someone else might.
-
 (defclass 2q-segment (instruction)
   ((qubits :initarg :qubits
            :accessor 2q-segment-qubits
