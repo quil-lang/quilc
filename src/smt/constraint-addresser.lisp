@@ -120,6 +120,7 @@ Returns a triple (INSTRS, INITIAL-L2P, FINAL-L2P)."))
                                          final-rewiring
                                          (scheme *default-constraint-scheme*)
                                          (solver-command *constraint-solver-command*)
+					 (timeout-ms nil)
                                        &allow-other-keys)
   "Address INSTRUCTONS to be compatible with CHIP-SPEC, using the encoding indicated by SCHEME.
 
@@ -134,6 +135,8 @@ Returns three values: (ADDRESSED-INSTRUCTIONS, INITIAL-REWIRING, FINAL-REWIRING)
              args)
     (let ((smt (initiate-smt-solver solver-command)))
       ;; if we wanted to set solver options, now would be the time to do it...
+      (when timeout-ms
+	(write-smt-forms `((|set-option| :|timeout| ,(ceiling timeout-ms))) smt))
       (write-constraint-program cp smt)
       (let ((model (attempt-to-recover-model encoding smt)))
         (unless model
