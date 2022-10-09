@@ -304,7 +304,7 @@ Returns a list of pairs, where (i, j) indicates that the ith gate should precede
   (let ((output (read-smt-form smt))
         (model (make-hash-table)))
     (case output
-      ((SAT)
+      (SAT
        (let ((raw-model (read-smt-form smt)))
          (smt-debug-line 'attempt-to-recover-model "~A" raw-model)
          (loop :for defn :in raw-model 	; syntax is (DEFINE-FUN <var> () INT <val>)
@@ -312,6 +312,9 @@ Returns a list of pairs, where (i, j) indicates that the ith gate should precede
                :for val := (car (last defn))
                :do (setf (gethash var model) val)
                :finally (return model))))
+      (UNSAT nil)
+      (UNKNOWN
+       (addressing-failed "Satisfiability unknown. Most likely you hit a timeout."))      
       (t
        (warn "Unable to recover model: expected SAT but got ~A" output)
        nil))))
