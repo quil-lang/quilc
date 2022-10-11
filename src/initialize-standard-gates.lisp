@@ -11,36 +11,36 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (defun read-standard-gates-from-file (&optional (stdgates-file (asdf:system-relative-pathname                                                                "cl-quil" "src/quil/stdgates.quil")))
+  (defun read-standard-gates-from-file (stdgates-file)
     "Produces a table of default gate definitions, mapping string name to a GATE-DEFINITION object."
     (let* ((gate-defs
              (remove-if-not (lambda (obj) (typep obj 'gate-definition))
                             (parse-quil-into-raw-program
                              (a:read-file-into-string stdgates-file))))
-           (parsed-program (make-instance 'parsed-program :executable-code #()
-                                          :memory-definitions '()
-                                          :circuit-definitions '()
-                                          :gate-definitions gate-defs)))
+           (parsed-program (make-instance 'parsed-program
+                             :executable-code #()
+                             :memory-definitions '()
+                             :circuit-definitions '()
+                             :gate-definitions gate-defs)))
 
       (resolve-objects parsed-program)
       (validate-defgate-loops parsed-program)
       (parsed-program-gate-definitions parsed-program)))
 
-  (defun initialize-standard-gates ()
-    (unless (boundp '**default-gate-definitions**)
-      (let ((stdgates-file (asdf:system-relative-pathname
-                            "cl-quil" "src/quil/stdgates.quil")))
-        (format t "~&; loading standard gates from ~A~%"
-                stdgates-file)
-        (setf **default-gate-definitions**
-              (let ((table (make-hash-table :test 'equal)))
-                (dolist (gate-def (read-standard-gates-from-file stdgates-file) table)
-                  (setf (gethash (gate-definition-name gate-def) table)
-                        gate-def)))))))
+  (defun initialize-standard-gates (&key (stdgates-file *default-standard-gates-file*)
+                                         (force nil))
+    "Initialize the standard gates from the file STDGATES-FILE, which defaults to *DEFAULT-STANDARD-GATES-FILE*.
+
+The standard gates won't be re-initialized if they already are, unless FORCE is true."
+    (when (or force (not (boundp '**default-gate-definitions**)))
+      (format t "~&; loading standard gates from ~A~%"
+              stdgates-file)
+      (setf **default-gate-definitions**
+            (let ((table (make-hash-table :test 'equal)))
+              (dolist (gate-def (read-standard-gates-from-file stdgates-file) table)
+                (setf (gethash (gate-definition-name gate-def) table)
+                      gate-def))))))
 
   (initialize-standard-gates)
   
 ) ; eval-when
-
-
-

@@ -29,3 +29,8 @@ N.B., The fractions of pi will be printed up to a certain precision!")
 
 (defvar *print-polar-form* nil
   "When true, FORMAT-COMPLEX prints out complex numbers in polar form with syntax AMPLITUDE∠PHASE.")
+
+(defvar *default-standard-gates-file*
+  (or (uiop:getenv "QUILC_STANDARD_GATES_FILE")
+      (asdf:system-relative-pathname "cl-quil" "src/quil/stdgates.quil"))
+  "The default location of the \"stdgates.quil\" file. The environment variable QUILC_STANDARD_GATES_FILE will be checked first, otherwise the path into this project's source code will be used.")
