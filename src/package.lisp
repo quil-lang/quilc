@@ -37,6 +37,7 @@
    #:*print-fractional-radians*         ; VARIABLE
    #:*print-polar-form*                 ; VARIABLE
    #:*compiler-noise*                   ; VARIABLE
+   #:*default-standard-gates-file*      ; VARIABLE
    )
 
   ;; types.lisp
@@ -535,6 +536,11 @@
    #:*safe-include-directory*           ; VARIABLE
 
    #:ambiguous-definition-condition     ; CONDITION
+   )
+
+  ;; initialize-standard-gates.lisp
+  (:export
+   #:initialize-standard-gates          ; FUNCTION
    )
 
   ;; gates.lisp
