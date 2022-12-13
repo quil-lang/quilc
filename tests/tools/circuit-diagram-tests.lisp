@@ -8,9 +8,9 @@
 ;;; we generate reasonable-looking latex source.
 
 (deftest test-plot-circuit-raw-latex-example ()
-  (let ((pp (quil:parse-quil "DECLARE ro BIT[2]; H 0; CNOT 0 1; RX(pi) 1; CNOT 1 2; MEASURE 0 ro[0]; MEASURE 2 ro[1]"))
-         ;; the following has been validated by hand....
-         ;; we will need to update this after any changes to latex codegen.
+  (let ((pp (cl-quil:parse-quil "DECLARE ro BIT[2]; H 0; CNOT 0 1; RX(pi) 1; CNOT 1 2; MEASURE 0 ro[0]; MEASURE 2 ro[1]"))
+        ;; the following has been validated by hand....
+        ;; we will need to update this after any changes to latex codegen.
         (expected "\\documentclass[convert={density=300,outext=.png}]{standalone}
 \\usepackage[margin=1in]{geometry}
 \\usepackage{tikz}
@@ -30,7 +30,7 @@
                                              :right-align-measurements t)))))
 
 (deftest test-plot-circuit-loose-measure-sanity-check ()
-  (let ((pp (quil:parse-quil "H 0; MEASURE 3"))
+  (let ((pp (cl-quil:parse-quil "H 0; MEASURE 3"))
         (expected
           "\\documentclass[convert={density=300,outext=.png}]{standalone}
 \\usepackage[margin=1in]{geometry}
@@ -50,7 +50,7 @@
                                              :right-align-measurements t)))))
 
 (deftest test-plot-circuit-nq-gate-layout ()
-  (let ((pp (quil:parse-quil "
+  (let ((pp (cl-quil:parse-quil "
 DEFGATE FOO p q r AS PAULI-SUM:
     X(pi) p
     Y(pi) q

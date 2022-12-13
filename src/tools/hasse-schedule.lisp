@@ -89,82 +89,82 @@
 (defun format-hasse-instr-label (format-dest instr counter)
   (format format-dest
           (if *show-instr-instance-counters*
-              "~/quil::instruction-fmt/ [~d]"
-              "~/quil::instruction-fmt/")
+              "~/cl-quil::instruction-fmt/ [~d]"
+              "~/cl-quil::instruction-fmt/")
           instr counter))
 
 (defun format-hasse-instr-name (format-dest instr counter)
   (format format-dest
-          "~/quil::instruction-fmt/ [~d]"
+          "~/cl-quil::instruction-fmt/ [~d]"
           instr counter))
       
 (defun hasse-instr-visited-p (instr)
   (gethash instr *hasse-hash-table*))
 
 (defun get-hasse-node-statements (logical-scheduler)
-   (let* ((*hasse-counter* 1)
-          (*hasse-hash-table* (make-hash-table))
-          (queue '())
-          (result '())
-          (earliers-hash-table
-            (quil.si:lscheduler-earlier-instrs logical-scheduler)))
-     ;; Go through all the last instructions. Any that have no
-     ;; earliers go into the graph as singleton nodes. The rest get
-     ;; pushed onto the queue of instructions.
-     (loop :for instr :in (quil.si:lscheduler-last-instrs logical-scheduler)
-           :as earliers := (gethash instr earliers-hash-table)
-           :do (cond
-                 ((null earliers)
-                  (push (format nil "~s" (hasse-instr-to-name instr)) result))
-                 (t
-                  (push instr queue))))
-     ;; While there's a queue of instructions, pop one instruction
-     ;; INSTR and for each of its earliers E:
-     ;; 
-     ;;   - unless E's been done already, push E onto the queue
-     ;;   
-     ;;   - add INSTR and E to the graph with an edge from INSTR to E
-     (loop :while queue
-           :do (loop :with instr := (pop queue)
-                     :with earliers := (gethash instr earliers-hash-table)
-                     :as earlier :in earliers
-                     :do (when (not (hasse-instr-visited-p earlier))
-                           (push earlier queue))
-                         (push
-                          (format
-                           nil
-                           "~s -> ~s"
-                           (hasse-instr-to-name instr)
-                           (hasse-instr-to-name earlier))
-                          result)))
-     ;; Now all the nodes have been added to the graph, go through the
-     ;; hash table and add label instructions so that labels show
-     ;; rather than node names.  (Node names are graph-wide unique
-     ;; because they contain a unique integer, but that should not
-     ;; normally be seen by users. Therefore, we show a label instead
-     ;; that is without the integer.)
-     (maphash
-      #'(lambda (instr label-info)
-          (declare (ignore instr))
-          (push
-           (format nil "~s [label = ~s]"
-                   (hasse-label-info-name label-info)
-                   (hasse-label-info-label label-info))
-           result))
-      *hasse-hash-table*)
-     result))
+  (let* ((*hasse-counter* 1)
+         (*hasse-hash-table* (make-hash-table))
+         (queue '())
+         (result '())
+         (earliers-hash-table
+           (cl-quil.si:lscheduler-earlier-instrs logical-scheduler)))
+    ;; Go through all the last instructions. Any that have no
+    ;; earliers go into the graph as singleton nodes. The rest get
+    ;; pushed onto the queue of instructions.
+    (loop :for instr :in (cl-quil.si:lscheduler-last-instrs logical-scheduler)
+          :as earliers := (gethash instr earliers-hash-table)
+          :do (cond
+                ((null earliers)
+                 (push (format nil "~s" (hasse-instr-to-name instr)) result))
+                (t
+                 (push instr queue))))
+    ;; While there's a queue of instructions, pop one instruction
+    ;; INSTR and for each of its earliers E:
+    ;; 
+    ;;   - unless E's been done already, push E onto the queue
+    ;;   
+    ;;   - add INSTR and E to the graph with an edge from INSTR to E
+    (loop :while queue
+          :do (loop :with instr := (pop queue)
+                    :with earliers := (gethash instr earliers-hash-table)
+                    :as earlier :in earliers
+                    :do (when (not (hasse-instr-visited-p earlier))
+                          (push earlier queue))
+                        (push
+                         (format
+                          nil
+                          "~s -> ~s"
+                          (hasse-instr-to-name instr)
+                          (hasse-instr-to-name earlier))
+                         result)))
+    ;; Now all the nodes have been added to the graph, go through the
+    ;; hash table and add label instructions so that labels show
+    ;; rather than node names.  (Node names are graph-wide unique
+    ;; because they contain a unique integer, but that should not
+    ;; normally be seen by users. Therefore, we show a label instead
+    ;; that is without the integer.)
+    (maphash
+     #'(lambda (instr label-info)
+         (declare (ignore instr))
+         (push
+          (format nil "~s [label = ~s]"
+                  (hasse-label-info-name label-info)
+                  (hasse-label-info-label label-info))
+          result))
+     *hasse-hash-table*)
+    result))
 
 (defun quil-text-to-logical-scheduler (source-text)
   "Make a logical scheduler corresponding to SOURCE-TEXT."
-  (quil-parse-to-logical-scheduler (quil:parse-quil source-text)))
+  (quil-parse-to-logical-scheduler (cl-quil:parse-quil source-text)))
 
 
 (defun quil-parse-to-logical-scheduler (parse)
   "Make a logical scheduler corresponding to PARSE."
-  (let* ((instructions-vector (quil:parsed-program-executable-code parse))
+  (let* ((instructions-vector (cl-quil:parsed-program-executable-code parse))
          (instructions-list (concatenate 'list instructions-vector))
-         (lsched (quil.si:make-lscheduler)))
-    (quil.si:append-instructions-to-lschedule lsched instructions-list)
+         (lsched (cl-quil.si:make-lscheduler)))
+    (cl-quil.si:append-instructions-to-lschedule lsched instructions-list)
     lsched))
 
 ;; Note: this was patterned after: calculate-instructions-2q-depth
@@ -173,22 +173,22 @@
 (defun program-to-string (program)
   "Return a string representation of PROGRAM.
 
-PROGRAM should be either a parsed program (i.e., a quil:parsed-program
+PROGRAM should be either a parsed program (i.e., a cl-quil:parsed-program
 instance), a string, or a list of strings.  If a string, it is assumed
 to have its own internal line breaks, and it is returned as is.  If a
 list of strings, each string is assumed to represent a line, and this
 returns a string that contains the contents of each string in the list
 followed by a line break. A parsed program is printed, using
-quil:print-parsed-program, to a string that is returned."
+cl-quil:print-parsed-program, to a string that is returned."
   (etypecase program
     (string program)
     (list
-      (with-output-to-string (out)
-        (loop :for line :in program
-              :do (write-line line out))))
-    (quil:parsed-program
-      (with-output-to-string (out)
-        (quil:print-parsed-program program out)))))
+     (with-output-to-string (out)
+       (loop :for line :in program
+             :do (write-line line out))))
+    (cl-quil:parsed-program
+     (with-output-to-string (out)
+       (cl-quil:print-parsed-program program out)))))
 
 
 (defun write-program-to-graphviz-comment (program &key stream comment-line-start)
@@ -286,7 +286,7 @@ default/expected type for a Graphviz DOT file is: gv
 In the case of writing to a file, this returns the true name of the
 resulting file a string.  Otherwise, this returns nil."
   (let* ((program-string (program-to-string program))
-         (parse (quil:parse program-string))
+         (parse (cl-quil:parse program-string))
          (logical-scheduler (quil-parse-to-logical-scheduler parse)))
     (write-hasse-for-logical-scheduler
      logical-scheduler
@@ -297,21 +297,21 @@ resulting file a string.  Otherwise, this returns nil."
 
 (defun write-hasse-for-logical-scheduler (logical-scheduler
                                           &key stream
-                                               output-file
-                                               program)
+                                            output-file
+                                            program)
   "Wrote a Hasse diagram for LOGICAL-SCHEDULER to the designated output.
 
 Details are as for WRITE-HASSE-FOR-QUIL, except that if PROGRAM is
 nil, the program text is not emitted to the DOT file as a comment. See
 above."
-    (flet ((emit (stream)
-             (write-hasse-dot logical-scheduler :stream stream)
-             (when program
-               (write-program-to-graphviz-comment program :stream stream))))
-      (if stream
-          (emit stream)
-          (with-open-file (out output-file
-                               :direction :output
-                               :if-exists :supersede)
-            (emit out)
-            (namestring (truename out))))))
+  (flet ((emit (stream)
+           (write-hasse-dot logical-scheduler :stream stream)
+           (when program
+             (write-program-to-graphviz-comment program :stream stream))))
+    (if stream
+        (emit stream)
+        (with-open-file (out output-file
+                             :direction :output
+                             :if-exists :supersede)
+          (emit out)
+          (namestring (truename out))))))
