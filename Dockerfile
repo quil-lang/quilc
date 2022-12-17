@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:20.04 as dev
 
 # Build variables
 ARG QUICKLISP_VERSION=2022-04-01
@@ -42,6 +42,9 @@ RUN git clone https://github.com/quil-lang/magicl.git
 # Copy the source code
 RUN mkdir /usr/src/quilc
 WORKDIR /usr/src/quilc
+
+FROM dev as app
+
 COPY . .
 RUN make dump-version-info install-test-deps
 
