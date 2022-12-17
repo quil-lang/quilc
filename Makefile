@@ -103,6 +103,10 @@ docker-sdk-barebones: DOCKER_BUILD_TARGET=quilc-sdk-barebones
 docker-sdk-barebones: DOCKER_TAG=quilc-sdk-barebones
 docker-sdk-barebones: docker
 
+# Start a dockerized sbcl for development
+docker-sbcl:
+	docker compose up
+
 ###############################################################################
 # INSTALL/UNINSTALL
 ###############################################################################

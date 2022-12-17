@@ -2,16 +2,6 @@ version: '3.5'
 
 # TODO: non-root user
 
-# docker run -it --rm --name sbcl-slime
-# -p 127.0.0.1:4005:4005
-# -v /path/to/slime:/usr/src/slime
-# -v "$PWD":/usr/src/app
-# -w /usr/src/app
-# daewok/sbcl:latest
-# sbcl --load /usr/src/slime/swank-loader.lisp
-# --eval '(swank-loader:init)'
-# --eval '(swank:create-server :dont-close t :interface "0.0.0.0")'
-
 services:
   sbcl:
     build:
@@ -20,6 +10,7 @@ services:
       args:
         UID: 1000
         GID: 1000
+      target: dev
     stdin_open: true
     tty: true
     volumes:
