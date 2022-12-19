@@ -704,7 +704,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
 (define-compiler canonical-decomposition
     ((instr (_ _ q1 q0)))
   (handler-case
-      (let* ((m (or (gate-matrix instr) (give-up-compilation :because ':invalid-domain)))
+      (let* ((m (or (gate-matrix instr) (give-up-compilation 'compiler-invalid-domain)))
              (m (magicl:scale m (expt (magicl:det m) -1/4))))
         (multiple-value-bind (a d b) (orthogonal-decomposition m)
           (let ((canonical-coords (get-canonical-coords-from-diagonal d)))
@@ -718,7 +718,7 @@ Additionally, if PREDICATE evaluates to false and *ENABLE-APPROXIMATE-COMPILATIO
               (inst "A0"  (gate-matrix a0) q0)
               (inst "A1"  (gate-matrix a1) q1)))))
     (unknown-gate-parameter ()
-      (give-up-compilation :because ':invalid-domain))))
+      (give-up-compilation 'compiler-invalid-domain))))
 
 (defun approximate-2Q-compiler (crafters instr &key context)
   "Generic logic for performing (approximate) two-qubit compilation.  This consumes an instruction INSTR to compile, an optional CHIP-SPEC of type CHIP-SPECIFICATION which records fidelity information, and a list of circuit template manufacturers CRAFTERS to run through.

@@ -43,11 +43,8 @@
   (:documentation "This is signaled when a rewriting rule cannot be applied to an instruction sequence."))
 
 
-(defun give-up-compilation (&key (because ':unknown))
-  (ecase because
-    (:invalid-domain         (error 'compiler-invalid-domain))
-    (:acts-trivially         (error 'compiler-acts-trivially))
-    (:unknown                (error 'compiler-does-not-apply))))
+(defun give-up-compilation (&optional (condition 'compiler-does-not-apply))
+  (error condition))
 
 
 ;;; Core routines governing how a chip-specification's compiler list is walked
