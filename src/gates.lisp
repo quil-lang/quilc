@@ -289,6 +289,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 (defclass controlled-gate ()
   ((target :initarg :target
            :reader target
+           :type gate
            :documentation "The targeted gate of a single qubit control.")))
 
 (defmethod gate-matrix ((gate controlled-gate) &rest parameters)
@@ -301,7 +302,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 (defgeneric control-gate (target)
   (:documentation "Construct a controlled gate out of TARGET. (This representation may be more efficient than an instance of CONTROLLED-GATE.")
-  (:method ((target t))
+  (:method ((target gate))
     (make-instance 'controlled-gate :target target))
   (:method ((target permutation-gate))
     (let* ((permutation (permutation-gate-permutation target))
@@ -315,6 +316,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 (defclass forked-gate ()
   ((target :initarg :target
            :reader target
+           :type gate
            :documentation "The targeted gate of a single qubit \"fork\", where a \"fork\" is a special case of multiplexing where the same gate is used to form both blocks, with different parameters passed to the gate constructor.")))
 
 (defmethod gate-matrix ((gate forked-gate) &rest parameters)
@@ -338,6 +340,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 (defclass dagger-gate ()
   ((target :initarg :target
            :reader target
+           :type gate
            :documentation "The gate being daggered.")))
 
 (defmethod gate-matrix ((gate dagger-gate) &rest parameters)
@@ -349,7 +352,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 (defgeneric dagger-gate (target)
   (:documentation "Construct a daggered gate out of TARGET. (This representation may be more efficient than an instance of DAGGER-GATE.")
-  (:method ((target t))
+  (:method ((target gate))
     (make-instance 'dagger-gate :target target))
   (:method ((target permutation-gate))
     (let ((permutation (permutation-gate-permutation target)))
