@@ -286,7 +286,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 ;;; Controlled Gates
 
-(defclass controlled-gate ()
+(defclass controlled-gate (gate)
   ((target :initarg :target
            :reader target
            :type gate
@@ -313,7 +313,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 ;;; Forked Gates
 
-(defclass forked-gate ()
+(defclass forked-gate (gate)
   ((target :initarg :target
            :reader target
            :type gate
@@ -337,7 +337,7 @@ The Pauli sum is recorded as a list of PAULI-TERM objects, stored in the TERMS s
 
 ;;; Daggered Gates
 
-(defclass dagger-gate ()
+(defclass dagger-gate (gate)
   ((target :initarg :target
            :reader target
            :type gate
