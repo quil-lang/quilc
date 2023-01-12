@@ -27,6 +27,12 @@
                (cpp (quil::compiler-hook pp chip :protoquil t)))
           (is (quil::operator= orig-mat (quil:parsed-program-to-logical-matrix cpp))))))))
 
+(deftest test-unknown-instruction ()
+  (let ((program (safely-parse-quil "a"))
+	    (chip (cl-quil::build-nq-fully-connected-chip 2)))
+	(signals cl-quil::invalid-instruction-condition
+	  (cl-quil:compiler-hook program chip))))
+
 (deftest test-fidelity-addresser-subschedule ()
   (flet ((gate= (gate-1 gate-2)
            (and (string= (quil::application-operator-root-name gate-1)

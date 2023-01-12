@@ -49,6 +49,16 @@ impossible using that rewiring.")
           :unless (or (chip-spec-qubit-dead? chip-spec qubit) (aref seen qubit))
             :collect (mapcar #'car (chip-spec-live-qubit-bfs chip-spec qubit seen)))))
 
+(define-condition invalid-instruction-condition ()
+  ((instruction :initarg :instruction
+                :reader invalid-instruction-instruction
+                :type instruction
+                :documentation "An unrecognized instruction."))
+  (:documentation "A condition indicating the presence of an unrecognized instruction.")
+  (:report (lambda (condition stream)
+             (format stream "Unrecognized instruction: ~A."
+                     (invalid-instruction-instruction condition)))))
+
 (defun prog-used-qubits-ccs (parsed-prog)
   "Return the connected components of qubits as used by the program."
   (let* ((n-qubits (qubits-needed parsed-prog))
@@ -75,12 +85,14 @@ impossible using that rewiring.")
                    (ensure-qubit-component (measurement-qubit inst)))
                   (application
                    ;; Merge the components of the arguments.
-                   (destructuring-bind (first . rest)
-                       (application-arguments inst)
-                     (ensure-qubit-component first)
-                     (dolist (qubit rest)
-                       (ensure-qubit-component qubit)
-                       (merge-qubit-components first qubit)))))))
+                   (let ((inst-arguments (application-arguments inst)))
+                     (when (zerop (list-length inst-arguments))
+                       (error 'invalid-instruction-condition :instruction inst))
+                     (destructuring-bind (first . rest) inst-arguments
+                       (ensure-qubit-component first)
+                       (dolist (qubit rest)
+                         (ensure-qubit-component qubit)
+                         (merge-qubit-components first qubit))))))))
     (let ((component-indices '()))
       (loop :for component-index :across connected-component-map :do
         (unless (minusp component-index)
