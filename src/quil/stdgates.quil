@@ -162,3 +162,10 @@ DEFGATE BLOCH(%alpha, %beta, %gamma) q AS PAULI-SUM:
     X(%alpha) q
     Y(%beta) q
     Z(%gamma) q
+
+DEFGATE SQISW:
+    1, 0,         0,         0
+    0, 1/sqrt(2), i/sqrt(2), 0
+    0, i/sqrt(2), 1/sqrt(2), 0
+    0, 0,         0,         1
+

@@ -72,6 +72,8 @@
    #:-pi                                ; CONSTANT
    #:pi/2                               ; CONSTANT
    #:-pi/2                              ; CONSTANT
+   #:pi/8                               ; CONSTANT 
+   #:-pi/8                              ; CONSTANT 
    #:2pi                                ; CONSTANT
    #:4pi                                ; CONSTANT
    #:double-float-positive-infinity     ; CONSTANT
