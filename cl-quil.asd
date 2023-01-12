@@ -56,6 +56,7 @@
                              (:file "truth-table")
                              (:file "linear-reversible-circuits")
                              (:file "permutation")
+                             (:file "sqisw-decomposition")
                              ;; attic'd files / pedagogical purposes only
                              (:static-file "optimal-2q")
                              (:static-file "cs-compile")))

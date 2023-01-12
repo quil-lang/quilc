@@ -35,7 +35,7 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
                          (sqrt (/ (* 4 cos-x-sq cos-z-sq sin-y-sq)
                                   (+ (* 4 cos-x-sq cos-z-sq sin-y-sq)
                                      (* cos2x cos2y cos2z))))))))
-    (values
+    (list
      (list (build-gate "RZ" (list gamma) q0)
            (build-gate "RX" (list alpha) q0 )
            (build-gate "RZ" (list gamma) q0))
@@ -51,7 +51,6 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
 
 (defun canonicalize-for-sqisw (x0 y0 z0 q0 q1)
   "x0 y0 and z0 are canonical parameters in the Weyl chamber satisfying pi/4 >= x >= |z|. q0 and q1 are qubit indices.
-
   
 Returns 9 values. x y z A0 A1 B0 B1 C0 C1 with the following interpretation.  
 If x0,y0,z0 are canonical paramters for an arbitrary 2 qubit gate, then that gate is equivalent to 
