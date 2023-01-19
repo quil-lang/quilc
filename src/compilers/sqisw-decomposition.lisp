@@ -15,20 +15,37 @@
 ;;
 ;; Let  CAN(a,b,c) be the standard quil CAN gate.
 ;; Let Coords(M) be the canonical coordinates (a,b,c) such that M = A·CAN(a,b,c)·B
-;; Then Coords(L(a/2,b/2,c/2)) = (a,b,c):
+;; Then Coords(L(a/2,b/2,c/2)) = (a,b,c). See the following numerical demonstration:
 ;;
-;; (loop repeat 10000
-;;       for coords = (canonical-coords (random-unitary 4) 1 0)
-;;       for repcoords = (canonical-coords
-;;                        (apply 'canonical-representative-huang-et-al
-;;                               (mapcar (lambda (x) (/ x 2)) coords))
-;;                        1 0)
-;;       always (every 'double= coords repcoords))
+;;
+;; (assert
+;;  (loop repeat 10000
+;;        for coords = (canonical-coords (random-unitary 4) 1 0)
+;;        for repcoords = (canonical-coords
+;;                         (apply 'canonical-representative-huang-et-al
+;;                                (mapcar (lambda (x) (/ x 2)) coords))
+;;                         1 0)
+;;        always (every 'double= coords repcoords)))
 ;;
 ;; Hence L(a/2,b/2,c/2) = A·CAN(a,b,c)·B for some A,B ∈ SU(2)⊗SU(2)
 ;;
 ;; Let ~ denote "local equivalence".
 
+;; A function I use while hacking
+
+;; (defun canonical-coords (gate &rest params-and-qubits)
+;;   "Pluck the parameters from the canonical gate found in the
+;; decomposition of GATE."
+;;   (let ((gate
+;;           (etypecase gate
+;;             (gate-application gate)
+;;             (magicl:matrix/complex-double-float
+;;              (apply #'anon-gate "ANON" gate params-and-qubits))
+;;             (string
+;;              (apply #'build-gate gate params-and-qubits)))))
+;;     (mapcar #'constant-value
+;;             (application-parameters
+;;              (third (canonical-decomposition gate))))))
 
 (defun interleaving-1-qubit-gates (x y z q0 q1)
   "x y and z are canonical parameters in the Weyl chamber satisfying
@@ -98,6 +115,17 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
       (inst (anon-gate "D1t" (magicl:conjugate-transpose (gate-matrix d1)) q1)))))
 
 ;; A little inline test of the canonical to 2 swisw compiler
+
+;; (defun quil-canonical-p (x y z)
+;;   (and (>= pi/2 x y (abs z))
+;;        (>= pi (+ x y))))
+
+;; The following collects 1000 valid canonical coordinates as befits
+;; canononical-decomposition's conventions. With each one it builds a
+;; CAN gate, decomposes it with the canonical-to-2-sqisw compilre, and
+;; checks that the matrices are in the same projective class. This
+;; should true 100% of the time.
+;;
 ;; (loop
 ;;   for (a b c) = (list (random pi/2) (random pi/2) (random pi/2))
 ;;   for should-apply? =  (and (quil-canonical-p a b c)
@@ -230,17 +258,37 @@ matrix is the conjugate transpose of G's matrix. "
           (inst (dagger-inst c1))
           (inst a1))))))
 
-;; (loop
-;;   repeat 1000
-;;   for m = (random-unitary 4)
-;;   when (matrix-equals-dwim
-;;         m
-;;         (make-matrix-from-quil (sqisw-decompose (anon-gate "ANON" m 1 0))))
-;;     count 1)
+(loop
+  repeat 1000
+  for m = (random-unitary 4)
+  when (matrix-equals-dwim
+        m
+        (make-matrix-from-quil (sqisw-decompose (anon-gate "ANON" m 1 0))))
+    count 1)
 
 
+(a:define-constant pauli-x
+  (magicl:from-list
+   '(0 1
+     1 0)
+   '(2 2)
+   :type '(complex double-float)))
+
+(a:define-constant pauli-y
+  (magicl:from-list
+   (list 0 (- (sqrt -1))
+         (sqrt -1) 0)
+   '(2 2)
+   :type '(complex double-float)))
+
+(a:define-constant pauli-z
+  (magicl:from-list
+   (list 1 0 0 -1)
+   '(2 2)
+   :type '(complex double-float)))
 
 
+;; NOTE: this function adds a dependency on magicl/ext-expokit
 (defun canonical-representative-huang-et-al (x y z)
   (let ((sigma (mapcar #'magicl:kron
                        (list pauli-x pauli-y pauli-z)
@@ -254,5 +302,5 @@ matrix is the conjugate transpose of G's matrix. "
 
 (defun canonical-gate-haung-et-al (x y z q1 q0)
   (anon-gate (format nil "L(~a,~a,~a)" x y z)
-             (canonical-representative x y z)
+             (canonical-representative-huang-et-al x y z)
              q1 q0))
