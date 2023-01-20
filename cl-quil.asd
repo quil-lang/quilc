@@ -27,7 +27,7 @@
                #:cl-heap
                #:cl-permutation
                #:queues.priority-queue
-               )
+               #:magicl/ext-expokit)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))

@@ -11,12 +11,11 @@
 ;; L(p,q,r) is the canonical representative of the class with
 ;; coordinates are p,q,r.  Specifically, Huang et al define this to be
 ;;
-;; L(p,q,r) = exp(i[p,q,r]·Σ)  where Σ = [X⊗X, Y⊗Y, Z⊗Z]
+;; L(p,q,r) = exp(i[p,q,r]·Σ)  where Σ = [X⊗X,Y⊗Y,Z⊗Z]
 ;;
 ;; Let  CAN(a,b,c) be the standard quil CAN gate.
 ;; Let Coords(M) be the canonical coordinates (a,b,c) such that M = A·CAN(a,b,c)·B
 ;; Then Coords(L(a/2,b/2,c/2)) = (a,b,c). See the following numerical demonstration:
-;;
 ;;
 ;; (assert
 ;;  (loop repeat 10000
@@ -89,10 +88,9 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
            (build-gate "RZ" (list gamma) q0))
      (list (build-gate "RX" (list beta) q1)))))
 
-
 (define-compiler canonical-to-2-sqisw
     ((instr ("CAN" (x y z) q1 q0)
-            :where (<= (abs z) (- x y))))
+            :where (<= (abs z) (- x y)))) ; this will be true for ≅ 80% of all coordinates x y z
   (destructuring-bind
       (c0 c1) (interleaving-1-qubit-gates (/ x 2.0d0) (/ y 2.0d0) (/ z 2.0d0) q0 q1) ; L(v/2) ~ CAN(v)
     (destructuring-bind
@@ -114,18 +112,13 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
       (inst (anon-gate "D0t" (magicl:conjugate-transpose (gate-matrix d0)) q0))
       (inst (anon-gate "D1t" (magicl:conjugate-transpose (gate-matrix d1)) q1)))))
 
-;; A little inline test of the canonical to 2 swisw compiler
-
-;; (defun quil-canonical-p (x y z)
-;;   (and (>= pi/2 x y (abs z))
-;;        (>= pi (+ x y))))
 
 ;; The following collects 1000 valid canonical coordinates as befits
 ;; canononical-decomposition's conventions. With each one it builds a
 ;; CAN gate, decomposes it with the canonical-to-2-sqisw compilre, and
 ;; checks that the matrices are in the same projective class. This
 ;; should true 100% of the time.
-;;
+
 ;; (loop
 ;;   for (a b c) = (list (random pi/2) (random pi/2) (random pi/2))
 ;;   for should-apply? =  (and (quil-canonical-p a b c)
@@ -133,13 +126,17 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
 ;;   for gate = (build-gate "CAN" (list a b c) 1 0)
 ;;   when should-apply?
 ;;     count 1 into samples
-;;   when (and  should-apply?
+;;   when (and should-apply?
 ;;              (matrix-equals-dwim
 ;;               (gate-matrix gate)
 ;;               (make-matrix-from-quil (canonical-to-2-sqisw gate))))
 ;;     count 1 into matches
 ;;   until (= 1000 samples)
 ;;   finally (assert (= samples matches)))
+;; 
+;; (defun quil-canonical-p (x y z)
+;;   (and (>= pi/2 x y (abs z))
+;;        (>= pi (+ x y))))
 
 
 
@@ -186,8 +183,8 @@ the span of two SQiSW applications."
 
     (when (< (abs y) (abs z))
       (let ((tmp y))
-        (setf y (* -1d0 z)
-              z (* -1d0 tmp)
+        (setf y (- z)
+              z (- tmp)
               A0 (list (build-gate "RX" (list pi/2) q0))
               A1 (list (build-gate "RX" (list -pi/2) q1))
               B0 (nconc B0 (list (build-gate "RX" (list -pi/2) q0)))
@@ -195,101 +192,149 @@ the span of two SQiSW applications."
 
     (when (minusp z0)
       (setf z (* -1d0 z)
-            A0 (when A0 (append (list (build-gate "Z" () q0)) A0 (list (build-gate "Z" () q0))))
+            A0 (append (list (build-gate "Z" () q0)) A0 (list (build-gate "Z" () q0)))
             B0 (append (list (build-gate "Z" () q0)) B0 (list (build-gate "Z" () q0)))
             C0 (append (list (build-gate "Z" () q1)) C0 (list (build-gate "Z" () q1 )))))
 
     (list x y z A0 A1 B0 B1 C0 C1)))
 
 
+;; Test that, when x y z is known to be in the 3 span case, that the
+;; output coordinates are in the 2 span case.  When x y and z are NOT
+;; in the 3 span case, this does not always hold (it seems to fail
+;; about 3% of the time):
 
-(defun dagger-inst-name (g)
-  (let ((name (application-operator-name g)))
-   (format nil "DAGGER-~a"
-           (subseq name 0
-                   (1+ (position-if #'alpha-char-p name :from-end t))))))
+;; (assert
+;;  (loop
+;;    repeat 10000
+;;    for (x0 y0 z0) = (make-non-2-sqisw-coord)
+;;    for (x y z . _) = (canonicalize-for-sqisw x0 y0 z0 0 1)
+;;    always (in-2-sqisw-span (list x y z))))
 
-(defun dagger-inst (g)
-  "G should be a gate application. Creates an anonymouse gate whose
-matrix is the conjugate transpose of G's matrix. "
-  (apply 'anon-gate (dagger-inst-name g)
-         (magicl:dagger (gate-matrix g))
-         (application-arguments g)))
 
-(define-compiler sqisw-decompose
-    ((instr (_ _ q1 q0)))
+;; test that L(x0,y0,z0) =  [A0 ⊗ A1]·L(x,y,z)·[B0 ⊗ B1]·SQiSW·[C0 ⊗ C1]
+;; !!!!!!!!!!!!! THIS DOESN'T PASS YET !!!!!!!!!
+;; (loop
+;;   for (x0 y0 z0) = (make-non-2-sqisw-coord ) 
+;;   for (x y z a0 a1 b0 b1 c0 c1) = (canonicalize-for-sqisw x0 y0 z0 0 1) 
+;;   repeat 1000 
+;;   do (matrix-equals-dwim
+;;       (canonical-representative-huang-et-al x0 y0 z0)
+;;       (make-matrix-from-quil
+;;        (append c1 c0
+;;                (list (build-gate "SQISW" () 1 0))
+;;                b1 b0
+;;                (list (anon-gate "L" (canonical-representative-huang-et-al x y z) 1 0))
+;;                a1 a0))))
+
+;; Some support functions and tests for the above test:
+
+;; (defun make-non-2-sqisw-coord ()
+;;   (let* ((x (random (/ pi 4.0d0)))
+;;          (y (random x))
+;;          (x-y (- x y))
+;;          (r (if (<= y x-y) (return-from make-non-2-sqisw-coord (make-non-2-sqisw-coord))
+;;                 (+ x-y (random (- y x-y)))))
+;;          (z (* r (if (zerop (random 2)) 1 -1))))
+;;     (list x y z)))
+
+;; (defun make-2-sqisw-coord ()
+;;   (let* ((x (random (/ pi 4.0d0)))
+;;          (y (random x))
+;;          (z0 (random (min (- x y) y)))
+;;          (z (* z0 (if (zerop (random 2)) 1 -1))))
+;;     (the (cons double-float)  (list x y z))))
+
+;; (defun in-weyl-chamber (coord)
+;;   (destructuring-bind (x y z) coord
+;;     (>= (/ pi 4.0d0) x y (abs z))))
+
+;; (defun in-2-sqisw-span (coord)
+;;   (destructuring-bind (x y z) coord
+;;     (double>=  (- x y) (abs z))))
+
+;; (assert
+;;  (loop repeat 1000 for coord = (make-non-2-sqisw-coord)
+;;        always (in-weyl-chamber coord)
+;;        never (in-2-sqisw-span coord)))
+
+;; (assert
+;;  (loop repeat 1000 for coord = (make-2-sqisw-coord)
+;;        always (and (in-2-sqisw-span coord)
+;;                    (in-weyl-chamber coord))))
+
+
+
+(define-compiler canonical-to-3-sqisw
+    ((instr ("CAN" (x y z) q1 q0)
+            :where (> (abs z) (- x  y))))
   (destructuring-bind
-      (b0 b1 can a0 a1) (canonical-decomposition instr)
-    (destructuring-bind (x y z) (mapcar #'constant-value (application-parameters can))
-      ;; M = (A0 ⊗ A1)·CAN(x,y,z)·(B0 ⊗ B1)
-      (destructuring-bind
-          (cx cy cz F0 F1 G0 G1 H0 H1) (canonicalize-for-sqisw (/ x 2.0d0) (/ y 2.0d0) (/ z 2.0d0) q0 q1)
-        ;; L(x/2,y/2,z/2) = (F0 ⊗ F1)·L(cx,cy,cz)·(G0 ⊗ G1)·SQISW·(H0 ⊗ H1)
-        ;; so we need to get the decomposition of these L(-) terms.
-        (destructuring-bind
-            (D0 D1 _can C0 C1) (canonical-decomposition
-                                (canonical-gate-haung-et-al
-                                 (/ x 2.0d0) (/ y 2.0d0) (/ z 2.0d0)
-                                 1 0))
-          (declare (ignore _can)) ;; same CAN as above
-          ;; So that
-          ;; CAN(x,y,z) = (C0 ⊗ C1)⁺L(x/2,y/2,z/2)·(D0 ⊗ D1)⁺
-          ;; hence
-          ;; M = (A0 ⊗ A1)·(C0 ⊗ C1)⁺·(F0 ⊗ F1)·L(cx,cy,cz)·(G0 ⊗ G1)·SQISW·(H0 ⊗ H1)·(D0 ⊗ D1)⁺·(B0 ⊗ B1)
-          ;;   = (A0C0⁺F0 ⊗ A1C1⁺F1)·L(cx,cy,cz)·(G0 ⊗ G1)·SQISW·(H0D0⁺B0 ⊗ H1D1⁺B1)
-          (inst b0)
-          (inst (dagger-inst d0))
-          (mapc #'inst h0)
-          (inst b1)
-          (inst (dagger-inst d1))
-          (mapc #'inst h1)
-          (inst "SQISW" () q1 q0)
-          (mapc #'inst g0)
-          (mapc #'inst g1)
-
-          (mapc #'inst (canonical-decomposition
-                        (canonical-gate-haung-et-al
-                         cx cy cz 1 0)))
-
-          (mapc #'inst f0)
-          (inst (dagger-inst c0))
-          (inst a0)
-          (mapc #'inst f1)
-          (inst (dagger-inst c1))
-          (inst a1))))))
-
-(loop
-  repeat 1000
-  for m = (random-unitary 4)
-  when (matrix-equals-dwim
-        m
-        (make-matrix-from-quil (sqisw-decompose (anon-gate "ANON" m 1 0))))
-    count 1)
+      (cx cy cz f0 f1 g0 g1 h0 h1) (canonicalize-for-sqisw (/ x 2.0d0) (/ y 2.0d0) (/ z 2.0d0) q0 q1)
+    ;; L(x/2,y/2,z/2) = (F0 ⊗ F1)·L(cx,cy,cz)·(G0 ⊗ G1)·SQISW·(H0 ⊗ H1)
+    ;; so we need to get the decomposition of these L(-) terms.
+    (destructuring-bind
+        (D0 D1 _can C0 C1) (canonical-decomposition (canonical-gate-haung-et-al
+                                                     (/ x 2.0d0) (/ y 2.0d0) (/ z 2.0d0)
+                                                     q1 q0))
+      (declare (ignore _can)) ;; same CAN as above
+      ;; So that
+      ;; CAN(x,y,z) = (C0 ⊗ C1)⁺L(x/2,y/2,z/2)·(D0 ⊗ D1)⁺
+      ;; hence
+      ;; M = (C0 ⊗ C1)⁺·(F0 ⊗ F1)·L(cx,cy,cz)·(G0 ⊗ G1)·SQISW·(H0 ⊗ H1)·(D0 ⊗ D1)⁺
+      ;;   = (C0⁺F0 ⊗ C1⁺F1)·L(cx,cy,cz)·(G0 ⊗ G1)·SQISW·(H0D0⁺ ⊗ H1D1⁺)
+      (inst (dagger-inst d0))
+      (mapc #'inst h0)
+      (inst (dagger-inst d1))
+      (mapc #'inst h1)
+      (inst "SQISW" () q1 q0)
+      (mapc #'inst g0)
+      (mapc #'inst g1)
+      
+      (mapc #'inst (canonical-decomposition
+                    (canonical-gate-haung-et-al
+                     cx cy cz q1 q0)))
+      
+      (mapc #'inst f0)
+      (inst (dagger-inst c0))
+      (mapc #'inst f1)
+      (inst (dagger-inst c1)))))
 
 
-(a:define-constant pauli-x
+;; !!!!!!!!! DOESN'T PASS YET !!!!!!!
+;; (loop
+;;   repeat 1000
+;;   for can = (third (canonical-decomposition (anon-gate "ANON" (random-unitary 4) 1 0)))
+;;   for (x y z) = (canonical-coords can)
+;;   do (assert (and (> (abs z) (- x y))
+;;             (matrix-equals-dwim
+;;              (gate-matrix can)
+;;              (make-matrix-from-quil (canonical-to-3-sqisw can))))))
+
+
+(defparameter pauli-x
   (magicl:from-list
    '(0 1
      1 0)
    '(2 2)
    :type '(complex double-float)))
 
-(a:define-constant pauli-y
+(defparameter pauli-y
   (magicl:from-list
    (list 0 (- (sqrt -1))
          (sqrt -1) 0)
    '(2 2)
    :type '(complex double-float)))
 
-(a:define-constant pauli-z
+(defparameter pauli-z
   (magicl:from-list
    (list 1 0 0 -1)
    '(2 2)
    :type '(complex double-float)))
 
-
 ;; NOTE: this function adds a dependency on magicl/ext-expokit
 (defun canonical-representative-huang-et-al (x y z)
+  "Calculates exp(i[p,q,r]·Σ)  where Σ = [X⊗X,Y⊗Y,Z⊗Z]"
+  (declare (type double-float x y z))
   (let ((sigma (mapcar #'magicl:kron
                        (list pauli-x pauli-y pauli-z)
                        (list pauli-x pauli-y pauli-z))))
@@ -301,6 +346,7 @@ matrix is the conjugate transpose of G's matrix. "
                                 sigma))))))
 
 (defun canonical-gate-haung-et-al (x y z q1 q0)
+  (declare (type double-float x y z))
   (anon-gate (format nil "L(~a,~a,~a)" x y z)
              (canonical-representative-huang-et-al x y z)
              q1 q0))
