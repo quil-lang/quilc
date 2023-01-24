@@ -36,6 +36,7 @@
                                #'gate-application-gate
                                (remove-if-not (lambda (inst)
                                                 (and (typep inst 'gate-application)
+                                                     (slot-boundp inst 'name-resolution) ; TODO: this shouldn't be necessary
                                                      (typep (gate-application-gate inst)
                                                             'simple-gate)))
                                               (parsed-program-executable-code pp)))))

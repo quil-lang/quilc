@@ -20,11 +20,11 @@
 
 (defmethod apply-process ((processor processor-quilc) &rest data)
   (let ((data (first data)))
-    (quil::parse-quil
+    (cl-quil::parse-quil
      (uiop:run-program (processor-quilc-executable-path processor)
                        :input (make-string-input-stream
                                (with-output-to-string (s)
-                                 (quil::print-parsed-program data s)))
+                                 (cl-quil::print-parsed-program data s)))
                        :output :string))))
 
 (defclass processor-identity (processor)
