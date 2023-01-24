@@ -5,7 +5,7 @@
 ;;; The main job of this file is to provide interfaces to different
 ;;; execution environments for Quil, currently just the local QVM.  We
 ;;; provide a generic `consume-quil` method that takes a
-;;; `quil::parsed-program` object and returns probability amplitudes
+;;; `cl-quil::parsed-program` object and returns probability amplitudes
 ;;; as sterilized output.
 
 (in-package #:boondoggle)
@@ -31,10 +31,10 @@
   (:documentation "Returns a list of amplitude registered associated to a consumer.")
   (:method ((consumer consumer-local-qvm) parsed-program)
     (remove-duplicates
-    (loop :for instr :across (quil::parsed-program-executable-code parsed-program)
-          :when (typep instr 'quil::measure)
-            :collect (quil::memory-ref-position
-                      (quil::measure-address
+    (loop :for instr :across (cl-quil::parsed-program-executable-code parsed-program)
+          :when (typep instr 'cl-quil::measure)
+            :collect (cl-quil::memory-ref-position
+                      (cl-quil::measure-address
                        instr))))))
 
 (defmethod consume-quil ((consumer consumer-local-qvm) parsed-program)
@@ -45,7 +45,7 @@ For a program constructing a bell state with a large sampling count, the returne
     (:http
      (let* ((quil-instructions
               (with-output-to-string (s)
-                (quil::print-parsed-program parsed-program s)))
+                (cl-quil::print-parsed-program parsed-program s)))
             (classical-addresses
               (a:plist-hash-table
                 (list "ro" (get-consumer-registers consumer parsed-program))))
