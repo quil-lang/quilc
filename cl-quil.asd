@@ -26,8 +26,7 @@
                #:flexi-streams          ; For executable writing
                #:cl-heap
                #:cl-permutation
-               #:queues.priority-queue
-               )
+               #:queues.priority-queue)
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
@@ -56,6 +55,7 @@
                              (:file "truth-table")
                              (:file "linear-reversible-circuits")
                              (:file "permutation")
+                             (:file "sqisw-decomposition")
                              ;; attic'd files / pedagogical purposes only
                              (:static-file "optimal-2q")
                              (:static-file "cs-compile")))

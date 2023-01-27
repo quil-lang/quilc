@@ -154,8 +154,10 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (define-self-documenting-constant -pi   (- pi))
   (define-self-documenting-constant pi/2  (/ pi 2))
   (define-self-documenting-constant -pi/2 (/ pi -2))
+  (define-self-documenting-constant pi/8  (/ pi 8))
+  (define-self-documenting-constant -pi/8 (/ pi -8))
   (define-self-documenting-constant 2pi   (* 2 pi))
-  (define-self-documenting-constant 4pi   (* 4 pi)))
+  (define-self-documenting-constant 4pi   (* 4 pi))) 
 
 ;;; some of the analysis code uses this, otherwise this might belong in cl-quil proper
 (defconstant +double-comparison-threshold-loose+  1d-5)
