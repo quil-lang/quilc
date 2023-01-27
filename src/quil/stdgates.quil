@@ -130,6 +130,13 @@ DEFGATE ISWAP:
     0, i, 0, 0
     0, 0, 0, 1
 
+DEFGATE SQISWAP:
+    1, 0,         0,         0
+    0, 1/sqrt(2), i/sqrt(2), 0
+    0, i/sqrt(2), 1/sqrt(2), 0
+    0, 0,         0,         1
+
+
 DEFGATE PSWAP(%theta):
     1, 0,           0,           0
     0, 0,           cis(%theta), 0
