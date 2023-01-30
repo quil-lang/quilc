@@ -1,29 +1,54 @@
-# specify the dependency versions (can be overriden with --build_arg)
-ARG rpcq_version=3.2.0
-ARG qvm_version=1.17.0
-ARG quicklisp_version=2021-04-11
+FROM ubuntu:20.04 as dev
 
-# use multi-stage builds to independently pull dependency versions
-FROM rigetti/rpcq:$rpcq_version as rpcq
-FROM rigetti/qvm:$qvm_version as qvm
-FROM rigetti/lisp:$quicklisp_version
+# Build variables
+ARG QUICKLISP_VERSION=2022-04-01
+ARG QUICKLISP_URL=http://beta.quicklisp.org/dist/quicklisp/${QUICKLISP_VERSION}/distinfo.txt
 
-# copy over rpcq source from the first build stage
-COPY --from=rpcq /src/rpcq /src/rpcq
+# Dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y \
+    emacs \
+    curl \
+    wget \
+    git \
+    build-essential \
+    cmake \
+    libblas-dev \
+    libffi-dev \
+    liblapack-dev \
+    libz-dev \
+    libzmq3-dev \
+    rlwrap \
+    sbcl \
+    gfortran \
+    ca-certificates
 
-# copy over qvm source from the second build stage (needed for unit tests)
-COPY --from=qvm /src/qvm /src/qvm
+WORKDIR /usr/src
 
-ARG build_target
+# Quicklisp setup
+RUN wget -P /tmp/ 'https://beta.quicklisp.org/quicklisp.lisp' \
+    && sbcl --noinform --non-interactive --load /tmp/quicklisp.lisp \
+            --eval "(quicklisp-quickstart:install :dist-url \"${QUICKLISP_URL}\")" \
+    && sbcl --noinform --non-interactive --load ~/quicklisp/setup.lisp \
+            --eval '(ql-util:without-prompting (ql:add-to-init-file))' \
+    && echo '#+quicklisp(push (truename "/usr/src") ql:*local-project-directories*)' >> ~/.sbclrc \
+    && rm -f /tmp/quicklisp.lisp
 
-# install build dependencies
-COPY Makefile /src/quilc/Makefile
-WORKDIR /src/quilc
+# Get the latest versions of QVM and Magicl
+RUN git clone https://github.com/quil-lang/qvm.git
+RUN git clone https://github.com/quil-lang/magicl.git
+
+# Copy the source code
+RUN mkdir /usr/src/quilc
+WORKDIR /usr/src/quilc
+
+FROM dev as app
+
+COPY . .
 RUN make dump-version-info install-test-deps
 
-# build the quilc app
-ADD . /src/quilc
-WORKDIR /src/quilc
+# Build
 RUN git clean -fdx && make ${build_target} install && ldconfig
 
 EXPOSE 5555

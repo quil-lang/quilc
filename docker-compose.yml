@@ -1,0 +1,21 @@
+version: '3.5'
+
+# TODO: non-root user
+
+services:
+  sbcl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: 1000
+        GID: 1000
+      target: dev
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/usr/src/quilc
+      - ~/.emacs.d/elpa/slime-20221003.936/:/usr/src/slime/
+    ports:
+      - 4005:4005
+    command: sbcl --load /usr/src/slime/swank-loader.lisp --eval '(swank-loader:init)' --eval '(swank:create-server :dont-close t :interface "0.0.0.0")'
