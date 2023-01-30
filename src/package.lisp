@@ -1246,7 +1246,12 @@
    )
 
   (:shadowing-import-from #:cl-quil.frontend
-                          #:pi))
+                          #:pi)
+   
+
+  ;; addresser/initial-rewiring.lisp
+  (:export
+   #:invalid-instruction-condition))
 
 (defpackage #:cl-quil.clifford
   (:use #:cl
