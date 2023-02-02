@@ -86,7 +86,7 @@ impossible using that rewiring.")
                   (application
                    ;; Merge the components of the arguments.
                    (let ((inst-arguments (application-arguments inst)))
-                     (when (zerop (list-length inst-arguments))
+                     (when (endp inst-arguments)
                        (error 'invalid-instruction-condition :instruction inst))
                      (destructuring-bind (first . rest) inst-arguments
                        (ensure-qubit-component first)
