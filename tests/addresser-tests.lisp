@@ -29,9 +29,9 @@
 
 (deftest test-unknown-instruction ()
   (let ((program (safely-parse-quil "a"))
-	    (chip (cl-quil::build-nq-fully-connected-chip 2)))
-	(signals cl-quil:invalid-instruction-condition
-	  (cl-quil:compiler-hook program chip))))
+        (chip (cl-quil::build-nq-fully-connected-chip 2)))
+    (signals cl-quil:invalid-instruction-condition
+      (cl-quil:compiler-hook program chip))))
 
 (deftest test-fidelity-addresser-subschedule ()
   (flet ((gate= (gate-1 gate-2)
