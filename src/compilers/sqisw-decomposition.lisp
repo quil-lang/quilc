@@ -15,21 +15,11 @@
 ;;;
 ;;; Let  CAN(a,b,c) be the standard quil CAN gate.
 ;;; Let Coords(M) be the canonical coordinates (a,b,c) such that M = A·CAN(a,b,c)·B
-;;; Then Coords(L(a/2,b/2,c/2)) = (a,b,c). See the following numerical demonstration:
-
-;; (assert
-;;  (loop :repeat 1000
-;;        :for coords = (canonical-coords (random-unitary 4) 1 0)
-;;        :for repcoords = (canonical-coords
-;;                          (apply 'canonical-representative-huang-et-al
-;;                                 (mapcar (lambda (x) (/ x 2)) coords))
-;;                          1 0)
-;;        :always (every 'double= coords repcoords)))
-
+;;; Then Coords(L(a/2,b/2,c/2)) = (a,b,c).  See tests/sqisw-decomp-tests.lisp
+;;;
 ;;; Hence L(a/2,b/2,c/2) = A·CAN(a,b,c)·B for some A,B ∈ SU(2)⊗SU(2)
 ;;;
 ;;; Let ~ denote "local equivalence".
-
 
 ;;; 2 SQISWAP CASE
 
@@ -98,18 +88,6 @@ Where L(x,y,z) is the canonical representative of the class with coordinates x,y
       (inst "SQISWAP" () q1 q0)
       (inst (anon-gate "D0t" (magicl:conjugate-transpose (gate-matrix d0)) q0))
       (inst (anon-gate "D1t" (magicl:conjugate-transpose (gate-matrix d1)) q1)))))
-
-
-;; Demonstration that canonical-to-2-sqiswap works:
-
-;; (assert
-;;  (loop
-;;    :repeat 1000
-;;    :for (a b c) = (make-2-sqiswap-coord)
-;;    :for can = (build-gate "CAN" (list (* 2.0d0 a) (* 2.0d0 b) (* 2.0d0 c)) 1 0)
-;;    :always (matrix-equals-dwim
-;;             (gate-matrix can)
-;;             (make-matrix-from-quil (canonical-to-2-sqiswap can)))))
 
 
 ;;; 3 SQISWAP CASE
@@ -198,34 +176,9 @@ where M is the interaction matrix.
 (defun rxx (theta) (interaction-matrix theta +xx+))
 
 ;; A felicitous property of these rzz rxx ryy is that they all commute
-;; with one another:
+;; with one another. 
 ;;
-;; (assert
-;;  (loop :repeat 1000
-;;        :for a1 = (random pi/2)
-;;        :for a2 = (random pi/2)
-;;        :for m1 = (funcall (elt '(rxx ryy rzz) (random 3)) a1)
-;;        :for m2 = (funcall (elt '(rxx ryy rzz) (random 3)) a2)
-;;        :always (matrix-equals-dwim
-;;                 (magicl:@ m1 m2)
-;;                 (magicl:@ m2 m1))))
-;;
-;; A second lucky break  is that (rii theta) and (rjj theta)
-;; have the same canonical coodinates:
-;;
-;; (loop :repeat 1000
-;;       :for theta = (random pi/2)
-;;       :for coords1 = (canonical-coords
-;;                       (funcall (elt '(rxx ryy rzz) (random 3)) theta)
-;;                       1 0)
-;;       :for coords2 = (canonical-coords
-;;                       (funcall (elt '(rxx ryy rzz) (random 3)) theta)
-;;                       1 0)
-;;       :always (every #'double= coords1 coords2))
-;;
-;; Hence, they're all locally equivalent.
-;;
-;; And a final nice property is that
+;; And a second lucky break is that:
 ;;
 ;;    Rᵦᵦ(±π/4)⊗Rᵧᵧ(±π/4) ~ SQISWAP
 ;;    when β ≠ γ and β,γ ∈ {X,Y,Z}
@@ -240,13 +193,13 @@ where M is the interaction matrix.
    (interaction-matrix (* -2 y) +yy+)
    (interaction-matrix (* -2 z) +zz+)))
 
-(defun canonical-gate-haung-et-al (x y z q1 q0)
+(defun canonical-gate-huang-et-al (x y z q1 q0)
   (declare (type double-float x y z))
   (anon-gate (format nil "L(~a,~a,~a)" x y z)
              (canonical-representative-huang-et-al x y z)
              q1 q0))
 
-(defun shift-into-sqiswap-depth-2 (x0 y0 z0)
+(defun shift-into-sqiswap-span-2 (x0 y0 z0)
   "Given x0 y0 z0 in W\W' return a list 7 values (x y z x1 y1 z1 M) such that
 
 L(x1,y1,z1) = L(x,y,z)·M 
@@ -294,27 +247,6 @@ L(x0,y0,z0) ~ L(x1,y1,z1)
           (* yz-sign-change (if yz-flip (- y0) (abs z0)))
           (magicl:dagger (magicl:@ (rxx xfactor) (ryy yfactor) (rzz zfactor))))))
 
-;; Test that M ~ SQISWAP, L(x0,y0,z0) ~ L(x1,y1,z1) and (x,y,z) in W' and L(v1) = L(v).M:
-
-;; (assert
-;;  (loop :repeat 10
-;;        :for (x0 y0 z0) = (make-non-2-sqiswap-coord)
-;;        :for (x y z x1 y1 z1 M) = (shift-into-sqiswap-depth-2 x0 y0 z0)
-;;        :always (in-2-sqiswap-span (list x y z))
-       
-;;        :always (every #'double=
-;;                       (canonical-coords (canonical-gate-haung-et-al x0 y0 z0 1 0))
-;;                       (canonical-coords (canonical-gate-haung-et-al x1 y1 z1 1 0)))
-       
-;;        :always (every #'double=
-;;                       (canonical-coords M 1 0)
-;;                       (canonical-coords (build-gate "SQISWAP" () 1 0)))
-
-;;        :always (matrix-equals-dwim
-;;                 (canonical-representative-huang-et-al x1 y1 z1)
-;;                 (magicl:@ (canonical-representative-huang-et-al x y z)
-;;                           m))))
-
 (defun same-can-p (can1 can2)
   (every #'double=
          (mapcar #'constant-value (application-parameters can1))
@@ -348,25 +280,14 @@ L(x0,y0,z0) ~ L(x1,y1,z1)
                             (magicl:dagger (gate-matrix C1)))
                   q1)))))
 
-;; Check that M = A.SQISWAP.B
-
-;; (assert
-;;  (loop :repeat 1000
-;;        :for m = (seventh (apply 'shift-into-sqiswap-depth-2 (make-non-2-sqiswap-coord)))
-;;        :for (b0 b1 a0 a1) = (express-m-as-sqiswap m 1 0)
-;;        :always (matrix-equals-dwim
-;;                 m
-;;                 (make-matrix-from-quil
-;;                  (list b0 b1 (build-gate "SQISWAP" () 1 0) a0 a1)))))
-
 (define-compiler canonical-to-3-sqiswap
     ((instr ("CAN" (x0 y0 z0) q1 q0)
             :where (> (abs z0) (- x0  y0))))
   (destructuring-bind
-      (x y z x1 y1 z1 M) (shift-into-sqiswap-depth-2 (/ x0 2.0d0) (/ y0 2.0d0) (/ z0 2.0d0))
+      (x y z x1 y1 z1 M) (shift-into-sqiswap-span-2 (/ x0 2.0d0) (/ y0 2.0d0) (/ z0 2.0d0))
     ;; CAN(x0,y0,z0) ~ L(x0/2,y0/2,z0/2) ~ L(x1,y1,z1)
     (destructuring-bind
-        (B0 B1 can A0 A1) (canonical-decomposition (canonical-gate-haung-et-al x1 y1 z1 q1 q0))
+        (B0 B1 can A0 A1) (canonical-decomposition (canonical-gate-huang-et-al x1 y1 z1 q1 q0))
       (assert (same-can-p instr can))
       ;; L(x1,y1,z1) = A.CAN(x0,y0,z0).B => CAN(x0,y0,z0) = At.L(x1,y1,z1).Bt
       ;; But L(x1,y1,z1) = L(x,y,z).M
@@ -376,7 +297,7 @@ L(x0,y0,z0) ~ L(x1,y1,z1)
         ;; M = SA.SQISWAP.SB
         ;; Giving us CAN(x0,y0,z0) = At.L(x,y,z).SA.SQISWAP.SB.Bt
         ;; Finally, we want to emit a CAN gate,so  we decompse L(x,y,z)
-        (let ((L-decomp (canonical-decomposition (canonical-gate-haung-et-al x y z q1 q0))))
+        (let ((L-decomp (canonical-decomposition (canonical-gate-huang-et-al x y z q1 q0))))
           ;; Leaving us with:
           (inst (anon-gate "B0t" (magicl:dagger (gate-matrix B0)) q0))
           (inst (anon-gate "B1t" (magicl:dagger (gate-matrix B1)) q1))
@@ -389,76 +310,4 @@ L(x0,y0,z0) ~ L(x1,y1,z1)
           (inst (anon-gate "A0t" (magicl:dagger (gate-matrix A0)) q0))
           (inst (anon-gate "A1t" (magicl:dagger (gate-matrix A1)) q1)))))))
 
-;; (assert
-;;  (loop :repeat 1000
-;;        :for can = (build-gate "CAN" (make-non-2-sqiswap-coord) 1 0)
-;;        :for decomp = (canonical-to-3-sqiswap can)
-;;        :always (safe-m=
-;;                 (gate-matrix can)
-;;                 (make-matrix-from-quil decomp))))
 
-;;; UTILITIES FOR TESTS
-
-;; (defun make-non-2-sqiswap-coord ()
-;;   "Make a coordinate in the Weyl chamber as defined by Huang et al
-;; that cannot be covered by 2 SQISWAP gates."
-;;   (let* ((x (random (/ pi 4.0d0)))
-;;          (y (random x))
-;;          (x-y (- x y))
-;;          (r (if (<= y x-y) (return-from make-non-2-sqiswap-coord (make-non-2-sqiswap-coord))
-;;                 (+ x-y (random (- y x-y)))))
-;;          (z (* r (if (zerop (random 2)) 1 -1))))
-;;     (list x y z)))
-
-;; (defun make-2-sqiswap-coord ()
-;;   "Make a coordinate in the Weyl chamber as defined by Huang et al that
-;; can be covered by 2 SQISWAP gates."
-;;   (let* ((x (random (/ pi 4.0d0)))
-;;          (y (random x))
-;;          (z0 (random (min (- x y) y)))
-;;          (z (* z0 (if (zerop (random 2)) 1 -1))))
-;;     (the (cons double-float)  (list x y z))))
-
-;; (defun in-weyl-chamber (coord)
-;;   "COORD is a list of 3 numbers. Returns T if those numbers represent a
-;; canonical coordinate in the Weyl chamber as defined by Huang et al. "
-;;   (destructuring-bind (x y z) coord
-;;     (>= (/ pi 4.0d0) x y (abs z))))
-
-;; (defun in-2-sqiswap-span (coord)
-;;   "COORD is a list of three numbers. Returns T if those numbers
-;; represent a coordinate in the Weyl chamber as defined by Huang et al
-;; such the canonical representative whose coordinates are COORD can be
-;; covered by two SQISWAP gates. "
-;;   (destructuring-bind (x y z) coord
-;;     (double>=  (- x y) (abs z))))
-
-;; (assert
-;;  (loop :repeat 1000 for coord = (make-non-2-sqiswap-coord)
-;;        :always (in-weyl-chamber coord)
-;;        :never (in-2-sqiswap-span coord)))
-
-;; (assert
-;;  (loop :repeat 1000 for coord = (make-2-sqiswap-coord)
-;;        :always (and (in-2-sqiswap-span coord)
-;;                     (in-weyl-chamber coord))))
-
-;; (defun canonical-coords (gate &rest params-and-qubits)
-;;   "Pluck the parameters from the canonical gate found in the
-;; decomposition of GATE. These are NOT the coordinates defined by Huang
-;; et al."
-;;   (let ((gate
-;;           (etypecase gate
-;;             (gate-application gate)
-;;             (magicl:matrix/complex-double-float
-;;              (apply #'anon-gate "ANON" gate params-and-qubits))
-;;             (string
-;;              (apply #'build-gate gate params-and-qubits)))))
-;;     (mapcar #'constant-value
-;;             (application-parameters
-;;              (third (canonical-decomposition gate))))))
-
-;; (defun safe-m= (m1 m2)
-;;   (handler-case
-;;       (matrix-equals-dwim m1 m2)
-;;     (error () nil)))
