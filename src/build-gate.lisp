@@ -16,6 +16,8 @@
   (typecase arg
     (integer
      (qubit arg))
+    (null
+     (error "Formal arguments should not be named \"nil\". If you MUST use \"nil\", pass :NIL instead."))
     (symbol
      (formal (string-downcase (symbol-name arg))))
     (otherwise
