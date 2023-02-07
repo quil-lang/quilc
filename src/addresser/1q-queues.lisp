@@ -78,7 +78,7 @@ preemptively disconnected."
              hi-inst (loop
                        :with earliest-inst := nil
                        :with resource := (make-qubit-resource qubit)
-                       :for inst :in (gethash hi-inst (lscheduler-later-instrs lschedule))
+                       :for inst :in (gethash hi-inst (lschedule-later-instrs lschedule))
                        :when (and (resources-intersect-p resource (instruction-resources inst))
                                   (or (not earliest-inst)
                                       (> (chip-schedule-start-time chip-sched earliest-inst)
@@ -157,6 +157,6 @@ following swaps."
           nil
           "Attempted to add instruction ~/cl-quil:instruction-fmt/ to 1Q queues."
           instr)
-  (lscheduler-dequeue-instruction (addresser-state-logical-schedule state) instr)
+  (lschedule-dequeue-instruction (addresser-state-logical-schedule state) instr)
   (push instr (aref (addresser-state-1q-queues state)
                     (qubit-index (first (application-arguments instr))))))

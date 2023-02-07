@@ -4,7 +4,7 @@
 
 (in-package #:cl-quil)
 
-;;; This file implements the LOGICAL-SCHEDULER data structure, which is used by the addresser
+;;; This file implements the LOGICAL-SCHEDULE data structure, which is used by the addresser
 ;;; to organize and manage resource dependencies between instructions on 'logical' qubits.
 ;;;
 ;;; Quil instructions rely on some mixture of classical (memory regions) and
@@ -36,7 +36,7 @@
 ;;; left fringe, i.e. CNOT 1 3), as well as hash tables storing information on
 ;;; the dependencies. It works almost as a queue: instructions may be added to
 ;;; the left fringe via APPEND-INSTRUCTIONS-TO-LSCHEDULE, and may be removed
-;;; from the right fringe by LSCHEDULER-DEQUEUE-INSTRUCTION.
+;;; from the right fringe by LSCHEDULE-DEQUEUE-INSTRUCTION.
 
 (defgeneric instruction-resources (instr)
   (:documentation "Returns the resources used by INSTR."))
@@ -172,18 +172,18 @@
 ;;; the core logical scheduler class and some of its utilities
 ;;;
 
-(defclass logical-scheduler ()
+(defclass logical-schedule ()
   ((first-instrs :initform nil
-                 :accessor lscheduler-first-instrs
+                 :accessor lschedule-first-instrs
                  :documentation "List of the instructions appearing at the \"top\" of a logical scheduler.  Excepting COMMUTING_BLOCKS threads, these instructions are guaranteed to occupy disjoint collections of resources.")
    (last-instrs :initform nil
-                :accessor lscheduler-last-instrs
+                :accessor lschedule-last-instrs
                 :documentation "List of the instructions appearing at the \"bottom\" of a logical scheduler.  These are sorted topologically ascending: earlier items in the list come logically after deeper items in the list.")
    (later-instrs :initform (make-instr-hash-table)
-                 :accessor lscheduler-later-instrs
+                 :accessor lschedule-later-instrs
                  :documentation "Hash table mapping instruction to a list of instructions after it.")
    (earlier-instrs :initform (make-instr-hash-table)
-                   :accessor lscheduler-earlier-instrs
+                   :accessor lschedule-earlier-instrs
                    :documentation "Hash table mapping instruction to a list of instructions before it."))
   (:documentation "Data structure used to track the logical precedence of instructions in a straight-line Quil program."))
 
@@ -195,35 +195,35 @@ as the size keyword arg to make-hash-table."
       (make-hash-table :test #'eq :size size)
       (make-hash-table :test #'eq)))
 
-(defun make-lscheduler ()
-  (make-instance 'logical-scheduler))
+(defun make-lschedule ()
+  (make-instance 'logical-schedule))
 
 (defun print-lschedule (lschedule &optional (stream *standard-output*))
   (format stream "First instructions:~%")
-  (dolist (instr (lscheduler-first-instrs lschedule))
+  (dolist (instr (lschedule-first-instrs lschedule))
     (format stream "    ~/cl-quil:instruction-fmt/~%" instr))
   (format stream "Last instructions:~%")
-  (dolist (instr (lscheduler-last-instrs lschedule))
+  (dolist (instr (lschedule-last-instrs lschedule))
     (format stream "    ~/cl-quil:instruction-fmt/~%" instr))
-  (dohash ((key val) (lscheduler-later-instrs lschedule))
+  (dohash ((key val) (lschedule-later-instrs lschedule))
     (format stream "Instrs beneath ~/cl-quil:instruction-fmt/: ~{~/cl-quil:instruction-fmt/~^, ~}~%"
             key
             val))
-  (dohash ((key val) (lscheduler-earlier-instrs lschedule))
+  (dohash ((key val) (lschedule-earlier-instrs lschedule))
     (format stream "Instrs above ~/cl-quil:instruction-fmt/: ~{~/cl-quil:instruction-fmt/~^, ~}~%"
             key
             val)))
 
 ;;;
-;;; routines for incrementally forming a logical-scheduler object
+;;; routines for incrementally forming a logical-schedule object
 ;;;
 
-(defun lscheduler-clean-up-last-instrs (lschedule)
-  "Removes instructions from (lscheduler-later-instructions LSCHEDULE) whose resources are fully covered by preceding instructions in the list."
+(defun lschedule-clean-up-last-instrs (lschedule)
+  "Removes instructions from (lschedule-later-instructions LSCHEDULE) whose resources are fully covered by preceding instructions in the list."
   (let ((new-bottommost nil)
         (traversed-instructions nil)
         (traversed-resources (make-null-resource)))
-    (dolist (instr (lscheduler-last-instrs lschedule))
+    (dolist (instr (lschedule-last-instrs lschedule))
       (let ((resources (instruction-resources instr)))
         (cond
           ;; in the global case, we're definitely done
@@ -259,7 +259,7 @@ as the size keyword arg to make-hash-table."
            (setf traversed-resources (resource-union traversed-resources resources))
            (push instr new-bottommost)))
         (push instr traversed-instructions)))
-    (setf (lscheduler-last-instrs lschedule) (nreverse new-bottommost))))
+    (setf (lschedule-last-instrs lschedule) (nreverse new-bottommost))))
 
 (defun append-instructions-to-lschedule-parallel (lschedule instrs)
   "Simultaneously add multiple instructions to the lschedule, in the sense that dependency relationships between INSTRS will not be considered, only their dependency relationships to the instructions already in the lschedule."
@@ -268,19 +268,19 @@ as the size keyword arg to make-hash-table."
     (dolist (instr instrs)
       (let ((resources (instruction-resources instr)))
         ;; Hook up "earlier" and "later" links to each bottom instruction:
-        (dolist (bottom-instr (lscheduler-last-instrs lschedule))
+        (dolist (bottom-instr (lschedule-last-instrs lschedule))
           (when (or (resource-all-p resources)
                     (resources-intersect-p resources (instruction-resources bottom-instr)))
-            (push bottom-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
-            (push instr (gethash bottom-instr (lscheduler-later-instrs lschedule)))))
+            (push bottom-instr (gethash instr (lschedule-earlier-instrs lschedule)))
+            (push instr (gethash bottom-instr (lschedule-later-instrs lschedule)))))
         ;; Add to "top" if no prerequisites
-        (unless (gethash instr (lscheduler-earlier-instrs lschedule))
+        (unless (gethash instr (lschedule-earlier-instrs lschedule))
           (push instr new-top-instrs))))
 
-    (a:appendf (lscheduler-first-instrs lschedule) new-top-instrs)
-    (setf (lscheduler-last-instrs lschedule)
-          (append instrs (lscheduler-last-instrs lschedule)))
-    (lscheduler-clean-up-last-instrs lschedule)))
+    (a:appendf (lschedule-first-instrs lschedule) new-top-instrs)
+    (setf (lschedule-last-instrs lschedule)
+          (append instrs (lschedule-last-instrs lschedule)))
+    (lschedule-clean-up-last-instrs lschedule)))
 
 (defun append-instruction-to-lschedule (lschedule instr)
   (append-instructions-to-lschedule-parallel lschedule (list instr)))
@@ -341,99 +341,99 @@ as the size keyword arg to make-hash-table."
      (append-instruction-to-lschedule lschedule (first instrs))
      (append-instructions-to-lschedule lschedule (rest instrs)))))
 
-(defun lscheduler-dequeue-instruction (lschedule instr)
+(defun lschedule-dequeue-instruction (lschedule instr)
   "Removes INSTR from the top of LSCHEDULE."
   ;; remove us from the topmost and bottommost
-  (setf (lscheduler-first-instrs lschedule)
-        (remove instr (lscheduler-first-instrs lschedule)))
-  (setf (lscheduler-last-instrs lschedule)
-        (remove instr (lscheduler-last-instrs lschedule)))
+  (setf (lschedule-first-instrs lschedule)
+        (remove instr (lschedule-first-instrs lschedule)))
+  (setf (lschedule-last-instrs lschedule)
+        (remove instr (lschedule-last-instrs lschedule)))
   ;; for each later instruction
-  (dolist (later-instr (gethash instr (lscheduler-later-instrs lschedule)))
+  (dolist (later-instr (gethash instr (lschedule-later-instrs lschedule)))
     ;; remove the upward link
     (let ((stripped-uplinks (remove instr
                                     (gethash later-instr
-                                             (lscheduler-earlier-instrs lschedule)))))
+                                             (lschedule-earlier-instrs lschedule)))))
       (cond
         ((endp stripped-uplinks)
-         (remhash later-instr (lscheduler-earlier-instrs lschedule)))
+         (remhash later-instr (lschedule-earlier-instrs lschedule)))
         (t
-         (setf (gethash later-instr (lscheduler-earlier-instrs lschedule))
+         (setf (gethash later-instr (lschedule-earlier-instrs lschedule))
                stripped-uplinks))))
     ;; if there are no other upward links
-    (unless (gethash later-instr (lscheduler-earlier-instrs lschedule))
+    (unless (gethash later-instr (lschedule-earlier-instrs lschedule))
       ;; YTMND
-      (push later-instr (lscheduler-first-instrs lschedule))))
+      (push later-instr (lschedule-first-instrs lschedule))))
   ;; clear the later instructions
-  (remhash instr (lscheduler-later-instrs lschedule)))
+  (remhash instr (lschedule-later-instrs lschedule)))
 
-(defun lscheduler-topmost-instructions (lschedule)
-  (lscheduler-first-instrs lschedule))
+(defun lschedule-topmost-instructions (lschedule)
+  (lschedule-first-instrs lschedule))
 
-(defun lscheduler-replace-instruction (lschedule instr new-sequence)
+(defun lschedule-replace-instruction (lschedule instr new-sequence)
   "Replaces a topmost instruction INSTR in LSCHEDULE with a nonempty NEW-SEQUENCE of instructions.
 
 NOTE: Assumes that the resource utilization of NEW-SEQUENCE is no more than that of INSTR.
 NOTE: Assumes no nested COMMUTING_BLOCKS regions."
   ;; special behavior: if NEW-SEQUENCE contains just a NOP, then this method
-  ;; should behave identically to lscheduler-dequeue-instruction
+  ;; should behave identically to lschedule-dequeue-instruction
   (when (or (zerop (length new-sequence))
             (and (= 1 (length new-sequence))
                  (typep (first new-sequence) 'no-operation)))
-    (return-from lscheduler-replace-instruction
-      (lscheduler-dequeue-instruction lschedule instr)))
+    (return-from lschedule-replace-instruction
+      (lschedule-dequeue-instruction lschedule instr)))
   ;; push instr above all its peers in the topmost instrs
-  (dolist (top-instr (lscheduler-first-instrs lschedule))
+  (dolist (top-instr (lschedule-first-instrs lschedule))
     (when (and (not (equal instr top-instr))
                (instruction-resources-intersect-p instr top-instr))
-      (push instr (gethash top-instr (lscheduler-earlier-instrs lschedule)))
-      (push top-instr (gethash instr (lscheduler-later-instrs lschedule)))
-      (setf (lscheduler-first-instrs lschedule)
-            (remove top-instr (lscheduler-first-instrs lschedule)))))
+      (push instr (gethash top-instr (lschedule-earlier-instrs lschedule)))
+      (push top-instr (gethash instr (lschedule-later-instrs lschedule)))
+      (setf (lschedule-first-instrs lschedule)
+            (remove top-instr (lschedule-first-instrs lschedule)))))
   ;; make a new lschedule out of the incoming sequence
-  (let ((new-lschedule (make-lscheduler)))
+  (let ((new-lschedule (make-lschedule)))
     (append-instructions-to-lschedule new-lschedule new-sequence)
     ;; sew together the new lschedule and the old one along instr
-    (dohash ((key val) (lscheduler-earlier-instrs new-lschedule))
-             (setf (gethash key (lscheduler-earlier-instrs lschedule)) val))
-    (dohash ((key val) (lscheduler-later-instrs new-lschedule))
-             (setf (gethash key (lscheduler-later-instrs lschedule)) val))
-    (setf (lscheduler-first-instrs lschedule)
-          (append (lscheduler-first-instrs new-lschedule)
-                  (loop :for i :in (lscheduler-first-instrs lschedule)
+    (dohash ((key val) (lschedule-earlier-instrs new-lschedule))
+             (setf (gethash key (lschedule-earlier-instrs lschedule)) val))
+    (dohash ((key val) (lschedule-later-instrs new-lschedule))
+             (setf (gethash key (lschedule-later-instrs lschedule)) val))
+    (setf (lschedule-first-instrs lschedule)
+          (append (lschedule-first-instrs new-lschedule)
+                  (loop :for i :in (lschedule-first-instrs lschedule)
                         :unless (instruction-resources-intersect-p i instr)
                           :collect i)))
-    (loop :for i :in (lscheduler-last-instrs new-lschedule)
-          :do (push instr (gethash i (lscheduler-later-instrs lschedule)))
-              (push i (gethash instr (lscheduler-earlier-instrs lschedule))))
+    (loop :for i :in (lschedule-last-instrs new-lschedule)
+          :do (push instr (gethash i (lschedule-later-instrs lschedule)))
+              (push i (gethash instr (lschedule-earlier-instrs lschedule))))
     ;; patch the up/down links through the old instruction
-    (dolist (earlier-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
-      (dolist (later-instr (gethash instr (lscheduler-later-instrs lschedule)))
+    (dolist (earlier-instr (gethash instr (lschedule-earlier-instrs lschedule)))
+      (dolist (later-instr (gethash instr (lschedule-later-instrs lschedule)))
         (when (instruction-resources-intersect-p earlier-instr later-instr)
-          (push earlier-instr (gethash later-instr (lscheduler-earlier-instrs lschedule)))
-          (push later-instr (gethash earlier-instr (lscheduler-later-instrs lschedule))))))
+          (push earlier-instr (gethash later-instr (lschedule-earlier-instrs lschedule)))
+          (push later-instr (gethash earlier-instr (lschedule-later-instrs lschedule))))))
     ;; unlink earlier instructions from instr
-    (dolist (earlier-instr (gethash instr (lscheduler-earlier-instrs lschedule)))
-      (setf (gethash earlier-instr (lscheduler-later-instrs lschedule))
-            (remove instr (gethash earlier-instr (lscheduler-later-instrs lschedule)))))
+    (dolist (earlier-instr (gethash instr (lschedule-earlier-instrs lschedule)))
+      (setf (gethash earlier-instr (lschedule-later-instrs lschedule))
+            (remove instr (gethash earlier-instr (lschedule-later-instrs lschedule)))))
     ;; unlink later instructions from instr
-    (dolist (later-instr (gethash instr (lscheduler-later-instrs lschedule)))
+    (dolist (later-instr (gethash instr (lschedule-later-instrs lschedule)))
       (let ((punctured-seq (remove instr (gethash later-instr
-                                                  (lscheduler-earlier-instrs lschedule)))))
-        (setf (gethash later-instr (lscheduler-earlier-instrs lschedule))
+                                                  (lschedule-earlier-instrs lschedule)))))
+        (setf (gethash later-instr (lschedule-earlier-instrs lschedule))
               punctured-seq)
         ;; prevent anyone from getting orphaned
         (when (endp punctured-seq)
-          (push later-instr (lscheduler-first-instrs lschedule)))))
+          (push later-instr (lschedule-first-instrs lschedule)))))
     ;; remove the old instruction from lschedule
-    (remhash instr (lscheduler-later-instrs lschedule))
-    (remhash instr (lscheduler-earlier-instrs lschedule))
-    (setf (lscheduler-last-instrs lschedule)
-          (remove instr (lscheduler-last-instrs lschedule)))
+    (remhash instr (lschedule-later-instrs lschedule))
+    (remhash instr (lschedule-earlier-instrs lschedule))
+    (setf (lschedule-last-instrs lschedule)
+          (remove instr (lschedule-last-instrs lschedule)))
     ;; see if any sequence instrs need to be added to the bottommost list
     (dolist (instr new-sequence)
-      (unless (gethash instr (lscheduler-later-instrs lschedule))
-        (push instr (lscheduler-last-instrs lschedule))))))
+      (unless (gethash instr (lschedule-later-instrs lschedule))
+        (push instr (lschedule-last-instrs lschedule))))))
 
 (defun lschedule-splice-1q-instruction (lschedule lo-inst new-inst hi-inst)
   "Insert the 1Q NEW-INST between LO-INST and HI-INST.
@@ -459,7 +459,7 @@ use RESOURCE."
        (push lo-inst (gethash new-inst earlier-instrs))
        ;; connect after
        (push new-inst last-instrs)
-       (lscheduler-clean-up-last-instrs lschedule))
+       (lschedule-clean-up-last-instrs lschedule))
       (hi-inst
        ;; connect after
        (push new-inst (gethash hi-inst earlier-instrs))
@@ -472,10 +472,10 @@ use RESOURCE."
        (push new-inst first-instrs)
        ;; connect after
        (push new-inst last-instrs)
-       (lscheduler-clean-up-last-instrs lschedule)))))
+       (lschedule-clean-up-last-instrs lschedule)))))
 
 ;;;
-;;; read-only statistical routines for logical-scheduler objects
+;;; read-only statistical routines for logical-schedule objects
 ;;;
 
 
@@ -526,29 +526,29 @@ use RESOURCE."
                          (pop topo-stack))))))
 
 
-;;; About lscheduler-absolutely-latest-instrs in comparison with
-;;; lscheduler-last-instrs:
+;;; About lschedule-absolutely-latest-instrs in comparison with
+;;; lschedule-last-instrs:
 ;;; 
-;;;   lscheduler-last-instrs is a list such that, for any resource
+;;;   lschedule-last-instrs is a list such that, for any resource
 ;;;   used, the last instruction on that resource is in the list.
 ;;;
-;;;   lscheduler-absolutely-latest-instrs is a list such that no
+;;;   lschedule-absolutely-latest-instrs is a list such that no
 ;;;   instructions in it have any later instructions
 ;;;
 ;;; There is currently (Sept 2021) some uncertainty about whether this
 ;;; should remain the case; see issue
 ;;; https://github.com/quil-lang/quilc/issues/728. So for now, work
-;;; around this by using lscheduler-absolutely-latest-instrs when you
+;;; around this by using lschedule-absolutely-latest-instrs when you
 ;;; need the true last instrs, i.e., the terminals of the DAG. In
-;;; particular, therefore, lscheduler-absolutely-latest-instrs is
+;;; particular, therefore, lschedule-absolutely-latest-instrs is
 ;;; supplied as start-nodes arg of map-in-reverse-topological-order.
 
-(defun lscheduler-absolutely-latest-instrs (lschedule)
-  (let ((last-instrs (lscheduler-last-instrs lschedule))
-        (laters (lscheduler-later-instrs lschedule)))
-    (if (loop :for instr :in (lscheduler-last-instrs lschedule)
+(defun lschedule-absolutely-latest-instrs (lschedule)
+  (let ((last-instrs (lschedule-last-instrs lschedule))
+        (laters (lschedule-later-instrs lschedule)))
+    (if (loop :for instr :in (lschedule-last-instrs lschedule)
                 :thereis (gethash instr laters))
-        (loop :for instr :in (lscheduler-last-instrs lschedule)
+        (loop :for instr :in (lschedule-last-instrs lschedule)
               :unless (gethash instr laters)
                 :collect instr)
         ;; Otherwise, last-instrs is just fine to return.
@@ -558,7 +558,7 @@ use RESOURCE."
   "Call FUNCTION on every instr in LSCHEDULE in topological order."
   ;; Here's the idea: LSCHEDULE holds a directed acyclic graph (DAG)
   ;; with start nodes being the value of
-  ;; (lscheduler-absolutely-latest-instrs LSCHEDULE) and adjacency
+  ;; (lschedule-absolutely-latest-instrs LSCHEDULE) and adjacency
   ;; mappings in its earlier-instrs slot. We can call this DAG a
   ;; "reverse DAG" as it is the reverse of the DAG with starts and
   ;; adjacency mappings in first-instrs and later-instrs slots,
@@ -570,8 +570,8 @@ use RESOURCE."
   ;; saving the space and time required to cons up the list and later
   ;; GC it.
   (map-in-reverse-topological-order
-   (lscheduler-earlier-instrs lschedule)
-   (lscheduler-absolutely-latest-instrs lschedule)
+   (lschedule-earlier-instrs lschedule)
+   (lschedule-absolutely-latest-instrs lschedule)
    function))
 
 
@@ -591,7 +591,7 @@ use RESOURCE."
 ;; passed to make-hash-table as size to avoid need to rehash.
 
 
-(defun lscheduler-walk-graph (lschedule
+(defun lschedule-walk-graph (lschedule
                               &key
                                 (base-value 0)
                                 (bump-value (lambda (instr value)
@@ -604,11 +604,11 @@ All instructions begin with a value of BASE-VALUE. When we visit an instruction 
 
 Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table mapping instructions to their values. "
   (let* ((max-distance base-value)
-         (laters (lscheduler-later-instrs lschedule))
+         (laters (lschedule-later-instrs lschedule))
          (distances (make-instr-hash-table (hash-table-count laters))))
     ;; Initialize distances of start instrs to base-value, leaving
     ;; distances of other instrs nil.
-    (dolist (instr (lscheduler-first-instrs lschedule))
+    (dolist (instr (lschedule-first-instrs lschedule))
       (setf (gethash instr distances) base-value))
     ;; Process instrs in the topological order.
     (map-lschedule-in-topological-order
@@ -627,7 +627,7 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                                 combine-values bumped-value later-d)))))))
     (values max-distance distances)))
 
-(defun lscheduler-calculate-duration (lschedule chip-spec)
+(defun lschedule-calculate-duration (lschedule chip-spec)
   (flet ((duration-bumper (instr value)
            (multiple-value-bind (order address obj)
                (lookup-hardware-address chip-spec instr)
@@ -638,14 +638,14 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                (if duration
                    (+ duration value)
                    value)))))
-    (or (lscheduler-walk-graph lschedule
+    (or (lschedule-walk-graph lschedule
                                :base-value 0
                                :bump-value #'duration-bumper
                                :combine-values #'max)
         0)))
 
-(defun lscheduler-calculate-depth (lschedule)
-  (or (lscheduler-walk-graph lschedule
+(defun lschedule-calculate-depth (lschedule)
+  (or (lschedule-walk-graph lschedule
                              :base-value 0
                              :bump-value (lambda (instr value)
                                            (declare (ignore instr))
@@ -653,12 +653,12 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                              :combine-values #'max)
       0))
 
-(defun lscheduler-calculate-volume (lschedule)
+(defun lschedule-calculate-volume (lschedule)
   "Compute the count of instructions in LSCHEDULE."
-  (+ (length (lscheduler-topmost-instructions lschedule))
-     (hash-table-count (lscheduler-earlier-instrs lschedule))))
+  (+ (length (lschedule-topmost-instructions lschedule))
+     (hash-table-count (lschedule-earlier-instrs lschedule))))
 
-(defun lscheduler-calculate-log-fidelity (lschedule chip-spec)
+(defun lschedule-calculate-log-fidelity (lschedule chip-spec)
   (labels
       ((get-fidelity (instr)
          (labels ((warn-and-skip (instr)
@@ -691,29 +691,29 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
                 (warn-and-skip instr)))
              (expt (log fidelity) 2)))))
     (let ((running-fidelity 0d0))
-      (dolist (instr (lscheduler-first-instrs lschedule))
-        (unless (gethash instr (lscheduler-earlier-instrs lschedule))
+      (dolist (instr (lschedule-first-instrs lschedule))
+        (unless (gethash instr (lschedule-earlier-instrs lschedule))
           (incf running-fidelity (get-fidelity instr))))
       (maphash (lambda (instr val)
                  (declare (ignore val))
                  (incf running-fidelity (get-fidelity instr)))
-               (lscheduler-earlier-instrs lschedule))
+               (lschedule-earlier-instrs lschedule))
       (sqrt running-fidelity))))
 
-(defun lscheduler-calculate-fidelity (lschedule chip-spec)
+(defun lschedule-calculate-fidelity (lschedule chip-spec)
   "Calculate fidelity as the minimum fidelity of the individual instructions.
 
   This relies on the fact that the function $\exp\{-\sqrt{\log(x)^2 + \log(y)^2}\}$ is approximately equal to $\min\{x, y\}$ for $x, y \in (0, 1]$."
   (multiple-value-bind (max-value value-hash)
-      (lscheduler-calculate-log-fidelity lschedule chip-spec)
+      (lschedule-calculate-log-fidelity lschedule chip-spec)
     (values (exp (- max-value)) value-hash)))
 
-(defun lscheduler-all-instructions (lschedule)
+(defun lschedule-all-instructions (lschedule)
   "Return a list of the instructions of LSCHEDULE."
-  (let* ((laters (lscheduler-later-instrs lschedule))
+  (let* ((laters (lschedule-later-instrs lschedule))
          (result-list (a:hash-table-keys laters)))
     ;; Last instrs may not be in laters, so add here.
-    (dolist (instr (lscheduler-last-instrs lschedule))
+    (dolist (instr (lschedule-last-instrs lschedule))
       (unless (gethash instr laters)
         (push instr result-list)))
     result-list))

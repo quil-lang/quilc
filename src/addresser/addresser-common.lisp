@@ -269,19 +269,19 @@ Returns two values: a list of links, and an updated list of rewirings tried."
         ;; is it resourceless?
         ((typep instr 'no-operation)
          ;; if so, discard it and continue.
-         (lscheduler-dequeue-instruction lschedule instr))
+         (lschedule-dequeue-instruction lschedule instr))
 
         ;; is it maximally resourceful?
         ((global-instruction-p instr)
          ;; dequeue the instruction and set the dirty flag
          (chip-schedule-append chip-sched instr)
-         (lscheduler-dequeue-instruction lschedule instr))
+         (lschedule-dequeue-instruction lschedule instr))
 
         ;; is it a pure classical instruction?
         ((local-classical-instruction-p instr)
          ;; dequeue the instruction and set the dirty flag
          (chip-schedule-append chip-sched instr)
-         (lscheduler-dequeue-instruction lschedule instr))
+         (lschedule-dequeue-instruction lschedule instr))
 
         ;; is it a local mixed pure/classical instruction?
         ((or (local-classical-quantum-instruction-p instr)
@@ -294,12 +294,12 @@ Returns two values: a list of links, and an updated list of rewirings tried."
                (values nil nil (list instr)))))
          (chip-schedule-append chip-sched instr)
          ;; dequeue the instruction and set the dirty flag
-         (lscheduler-dequeue-instruction lschedule instr))
+         (lschedule-dequeue-instruction lschedule instr))
 
         ;; is it some other kind of PRAGMA not covered above?
         ((typep instr 'pragma)
          ;; just throw it away.
-         (lscheduler-dequeue-instruction lschedule instr))
+         (lschedule-dequeue-instruction lschedule instr))
 
         ;; otherwise, we don't know what to do
         (t
@@ -335,7 +335,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
          (setf dirty-flag t))
         ;; is it a rewiring pseudoinstruction?
         ((typep instr 'application-force-rewiring)
-         (lscheduler-dequeue-instruction lschedule instr)
+         (lschedule-dequeue-instruction lschedule instr)
          (move-to-expected-rewiring working-l2p
                                     (application-force-rewiring-target instr)
                                     state
@@ -374,7 +374,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
                   (assert compilation-result ()
                           "Failed to apply localizing compilers.")
                   (setf dirty-flag t)
-                  (lscheduler-replace-instruction lschedule instr compilation-result))))))
+                  (lschedule-replace-instruction lschedule instr compilation-result))))))
         ;; is it a many-Q gate?
         ((> (length (application-arguments instr))
             (length (chip-specification-objects chip-spec)))
@@ -394,7 +394,7 @@ Two other values are returned: a list of fully rewired instructions for later sc
          ;; it, so pass it to the chip compiler
          (let ((compilation-result (apply-translation-compilers instr chip-spec nil)))
            (setf dirty-flag t)
-           (lscheduler-replace-instruction lschedule instr compilation-result)))
+           (lschedule-replace-instruction lschedule instr compilation-result)))
         ;; otherwise, we're helpless
         (t nil))
       (values dirty-flag ready-instrs partial-instrs))))
@@ -415,11 +415,11 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
                                 nil)))
 
         ;; if the lschedule is empty, we're done
-        (when (endp (lscheduler-first-instrs lschedule))
+        (when (endp (lschedule-first-instrs lschedule))
           (return-from dequeue-logical-to-physical nil))
 
         ;; otherwise, the lschedule is nonempty, so we try to dequeue instructions
-        (dolist (instr (lscheduler-topmost-instructions lschedule))
+        (dolist (instr (lschedule-topmost-instructions lschedule))
           (multiple-value-bind (dirtied ready partial)
               (if (typep instr 'application)
                   (dequeue-gate-application state instr dry-run-escape)
@@ -499,7 +499,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
 
       ;; threads always need expansion
       (when (typep instr 'application-thread-invocation)
-        (lscheduler-replace-instruction lschedule instr (apply-translation-compilers
+        (lschedule-replace-instruction lschedule instr (apply-translation-compilers
                                                          instr
                                                          chip-spec
                                                          (lookup-hardware-object chip-spec instr)))
@@ -526,7 +526,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
             (rewiring-l2p working-l2p))
            ;; dequeue the instruction so we can push the
            ;; modified instruction onto the schedule.
-           (lscheduler-dequeue-instruction lschedule instr)
+           (lschedule-dequeue-instruction lschedule instr)
            ;; and stack the 2Q gate on top
            (append-instr-to-chip-schedule state rewired-instr))
 
@@ -565,7 +565,7 @@ If DRY-RUN, this returns T as soon as it finds an instruction it can handle."
                                 instr
                                 chip-spec
                                 (lookup-hardware-object chip-spec rewired-instr))))
-             (lscheduler-replace-instruction lschedule instr compiled-seq)))))
+             (lschedule-replace-instruction lschedule instr compiled-seq)))))
       t)))
 
 (defun best-qubit-position (state gates-in-waiting logical)
@@ -671,7 +671,7 @@ Optional arguments:
         (flet ((addresser-FSM ()
                  (loop
                    :with rewirings-tried := nil
-                   :while (lscheduler-first-instrs lschedule)
+                   :while (lschedule-first-instrs lschedule)
                    :do (format-noise "ADDRESSER-FSM: New pass.")
                    :when (dequeue-logical-to-physical state)
                      :do (format-noise "ADDRESSER-FSM: LSCHED changed, retrying.")

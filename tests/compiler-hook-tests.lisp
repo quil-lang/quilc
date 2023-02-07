@@ -554,7 +554,7 @@ MEASURE 1
 PRAGMA INITIAL_REWIRING \"GREEDY\"
 CCNOT 0 1 2")
                                  (quil::build-8Q-chip)))
-         (ls (quil::make-lscheduler)))
+         (ls (quil::make-lschedule)))
     (quil::append-instructions-to-lschedule ls (coerce (quil::parsed-program-executable-code p)
                                                        'list))
     (flet
@@ -566,7 +566,7 @@ CCNOT 0 1 2")
                 (string= "CZ" name))
               (1+ value))
              (t value))))
-      (let ((CZ-depth (quil::lscheduler-walk-graph ls :bump-value #'value-bumper)))
+      (let ((CZ-depth (quil::lschedule-walk-graph ls :bump-value #'value-bumper)))
         (is (>= 7 CZ-depth))))))
 
 (deftest test-resource-carving-basic ()
