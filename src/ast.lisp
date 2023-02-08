@@ -1329,7 +1329,7 @@ This definition does *not* incorporate the operator description (i.e., any opera
 If this slot is not supplied, then the gate is considered *anonymous*. If this is the case, then the GATE slot must be supplied.")
    ;; N.B. See the generic function GATE-APPLICATION-GATE as well.
    (gate :initarg :gate
-         :initform nil
+         ;:initform nil
          :reader %get-gate-application-gate
          :writer %set-gate-application-gate
          :documentation "The actual gate object that is being applied. N.B. After applications are resolved, one can always look at the definition of a gate via GATE-APPLICATION-RESOLUTION. But this slot is reserved for actual *execution*, which may depend on the execution backend and how one wishes to optimize.
@@ -1358,7 +1358,7 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
   ;; See the actual definition of this in gates.lisp.
   (:documentation "Return a gate-like object represented in the application APP.")
   (:method :around ((app gate-application))
-    (a:if-let ((gate (%get-gate-application-gate app)))
+    (a:if-let ((gate (and (slot-boundp app 'gate) (%get-gate-application-gate app))))
       gate
       (%set-gate-application-gate (call-next-method) app))))
 
