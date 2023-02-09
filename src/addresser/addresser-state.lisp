@@ -23,7 +23,7 @@
                  :type (array real (* *)))
    (lschedule :accessor addresser-state-logical-schedule
               :documentation "The logical schedule of not-yet-processed instructions."
-              :type logical-scheduler)
+              :type logical-schedule)
    (chip-sched :accessor addresser-state-chip-schedule
                :documentation "The outgoing schedule of processed instructions."
                :type chip-schedule)
@@ -52,7 +52,7 @@
                          (make-rewiring n-qubits)))))
     (setf (addresser-state-initial-l2p instance) initial-l2p
           (addresser-state-working-l2p instance) (copy-rewiring initial-l2p)
-          (addresser-state-logical-schedule instance) (make-lscheduler)
+          (addresser-state-logical-schedule instance) (make-lschedule)
           (addresser-state-chip-schedule instance) (make-chip-schedule chip-spec)
           (addresser-state-chip-specification instance) chip-spec
           (addresser-state-1q-queues instance) (make-array (chip-spec-n-qubits chip-spec) :initial-element (list)))))
@@ -84,16 +84,16 @@ Returns a hash mapping gates from the logical schedule to numeric values."))
 (defgeneric cost-function (state &key gate-weights instr)
   (:documentation "Generic method for extracting a heuristic value.
 
-STATE is an ADDRESSER-STATE, which in particular carries an LSCHEDULER of gates yet to be scheduled.
+STATE is an ADDRESSER-STATE, which in particular carries an LSCHEDULE of gates yet to be scheduled.
 
-GATE-WEIGHTS is a hash mapping instructions in STATE->LSCHEDULER to (numerical) weights.  These can be used to precompute values across different runs of COST-FUNCTION (e.g., the depth of an instruction).
+GATE-WEIGHTS is a hash mapping instructions in STATE->LSCHEDULE to (numerical) weights.  These can be used to precompute values across different runs of COST-FUNCTION (e.g., the depth of an instruction).
 
 INSTR is the \"active instruction\".
 
 - Neither is specified: COST-FUNCTION will return the \"best possible value\".
 - GATE-WEIGHTS is specified, INSTR is not: COST-FUNCTION will return a heuristic value suitable for comparing different rewirings, based on the future of instructions to be scheduled.
 - INSTR is specified, GATE-WEIGHTS is not: COST-FUNCTION will return a heuristic value suitable for comparing different instructions yet to be scheduled, based on the history of instructions already scheduled.
-- GATE-WEIGHTS and INSTR are both specified: COST-FUNCTION will return a heuristic value suitable for comparing different instructions INSTR to be injected (i.e., INSTR is assumed not to participate in LSCHEDULER).
+- GATE-WEIGHTS and INSTR are both specified: COST-FUNCTION will return a heuristic value suitable for comparing different instructions INSTR to be injected (i.e., INSTR is assumed not to participate in LSCHEDULE).
 "))
 
 (defgeneric build-worst-cost (state)
@@ -170,7 +170,7 @@ INSTR is the \"active instruction\".
   ;; We snag some of the addresser state here, and restore it after the loop.
   (let ((initial-l2p (addresser-state-initial-l2p state))
         (working-l2p (addresser-state-working-l2p state))
-        (lscheduler (addresser-state-logical-schedule state))
+        (lschedule (addresser-state-logical-schedule state))
         (chip-sched (addresser-state-chip-schedule state)))
     (loop :with chip-spec := (addresser-state-chip-specification state)
           :for order-list :across (chip-specification-objects chip-spec)
@@ -187,7 +187,7 @@ INSTR is the \"active instruction\".
                                                   instrs-decomposed)))
                       (setf (addresser-state-initial-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
                             (addresser-state-working-l2p state) (make-rewiring (chip-spec-n-qubits chip-spec))
-                            (addresser-state-logical-schedule state) (make-lscheduler)
+                            (addresser-state-logical-schedule state) (make-lschedule)
                             (addresser-state-chip-schedule state) (make-chip-schedule chip-spec))
                       (append-instructions-to-lschedule (addresser-state-logical-schedule state)
                                                         instrs-compressed)
@@ -195,5 +195,5 @@ INSTR is the \"active instruction\".
     (format-noise "WARM-UP-ADDRESSER-STATE: Done.")
     (setf (addresser-state-initial-l2p state) initial-l2p
           (addresser-state-working-l2p state) working-l2p
-          (addresser-state-logical-schedule state) lscheduler
+          (addresser-state-logical-schedule state) lschedule
           (addresser-state-chip-schedule state) chip-sched)))

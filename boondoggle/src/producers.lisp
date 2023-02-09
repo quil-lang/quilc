@@ -161,9 +161,9 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
         (when (and
                program-depth-limit
                (< program-depth-limit
-                  (let ((lschedule (cl-quil::make-lscheduler)))
+                  (let ((lschedule (cl-quil::make-lschedule)))
                     (cl-quil::append-instructions-to-lschedule lschedule instruction-list)
-                    (cl-quil::lscheduler-calculate-depth lschedule))))
+                    (cl-quil::lschedule-calculate-depth lschedule))))
           (pop instruction-list)
           (return))
         ;; if we built a random gate, store its definition

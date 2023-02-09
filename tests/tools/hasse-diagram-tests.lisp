@@ -21,7 +21,7 @@
 (defparameter *hasse-example-quil-programs*
   ;; each entry should either be a string or a list of strings
   `(
-    ;; From logical-scheduler doc:
+    ;; From logical-schedule doc:
     "X 0; H 3; CNOT 0 1; X 3; CNOT 1 3"
 
     ;; From qvm repo: tests/measurement-tests.lisp:

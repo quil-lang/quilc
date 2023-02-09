@@ -621,7 +621,7 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
   (:documentation "The \"do-nothing\" instruction.")
   ;; The singleton-class is disabled rather than removed here (and elsewhere) as a reminder that
   ;; this is a quick fix. Ideally, we'd like to find a way to preserve the singleton nature of these
-  ;; AST classes, but still work with rewiring comments and the guts of logical-scheduler. See
+  ;; AST classes, but still work with rewiring comments and the guts of logical-schedule. See
   ;; https://github.com/rigetti/quilc/issues/270 for more context.
   #+#:appleby-sufficiently-classy
   (:metaclass singleton-class))
