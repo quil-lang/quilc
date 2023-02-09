@@ -394,9 +394,9 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 
 (defun fidelity-of-straight-quil (instrs chip-spec)
   "Helper routine for calculating the fidelity of a straight line of Quil instructions against the fidelity information associated to CHIP-SPEC."
-  (let ((ls (make-lscheduler)))
+  (let ((ls (make-lschedule)))
     (append-instructions-to-lschedule ls instrs)
-    (lscheduler-calculate-fidelity ls chip-spec)))
+    (lschedule-calculate-fidelity ls chip-spec)))
 
 (defun get-canonical-coords-from-diagonal (d)
   "Extracts \"canonical coordinates\" (c1, c2, c3) from a diagonal matrix D which belong to the Weyl chamber satisfying
@@ -747,8 +747,8 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
            (with-output-to-string (s) (print-instruction instr s)))
           (handler-case
               (let* ((center-circuit (funcall circuit-crafter can))
-                     (ls (append-instructions-to-lschedule (make-lscheduler) center-circuit))
-                     (circuit-cost (or (and chip-spec (lscheduler-calculate-fidelity ls chip-spec))
+                     (ls (append-instructions-to-lschedule (make-lschedule) center-circuit))
+                     (circuit-cost (or (and chip-spec (lschedule-calculate-fidelity ls chip-spec))
                                        1d0))
                      (sandwiched-circuit (append (list left1 left2)
                                                  center-circuit

@@ -183,7 +183,7 @@
              (t
               value))))
     (multiple-value-bind (max-value value-hash)
-        (lscheduler-walk-graph (addresser-state-logical-schedule state)
+        (lschedule-walk-graph (addresser-state-logical-schedule state)
                                :base-value 0
                                :bump-value #'weight-bumper
                                :combine-values #'max)

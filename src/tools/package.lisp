@@ -17,7 +17,7 @@
   ;; hasse-schedule.lisp
   (:export
    #:write-hasse-for-quil
-   #:write-hasse-for-logical-scheduler)
+   #:write-hasse-for-logical-schedule)
 
   ;; circuit-diagram.lisp
   (:export

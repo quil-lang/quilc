@@ -1402,9 +1402,9 @@
   
   ;; logical-schedule.lisp
   #:append-instructions-to-lschedule    ; FUNCTION
-  #:lscheduler-earlier-instrs           ; ACCESSOR
-  #:lscheduler-last-instrs              ; ACCESSOR
-  #:make-lscheduler                     ; FUNCTION
+  #:lschedule-earlier-instrs           ; ACCESSOR
+  #:lschedule-last-instrs              ; ACCESSOR
+  #:make-lschedule                     ; FUNCTION
   )
 
 ;; After all the dust settles, you should be able to see in a REPL:

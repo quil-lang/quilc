@@ -524,7 +524,7 @@ This function will have undefined behavior when PROCESSED-PROGRAM is not protoqu
   (setf (gethash "final_rewiring" statistics)
         (cl-quil::extract-final-exit-rewiring-vector processed-program))
 
-  (let ((lschedule (cl-quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lschedule)))
     (loop :for instr :across (parsed-program-executable-code processed-program)
           :unless (typep instr 'pragma)
             :do (cl-quil::append-instruction-to-lschedule lschedule instr))
@@ -533,7 +533,7 @@ This function will have undefined behavior when PROCESSED-PROGRAM is not protoqu
 
   ;; gate depth, gate volume, duration, and fidelity stats can
   ;; all share an lschedule
-  (let ((lschedule (cl-quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lschedule)))
     (loop :for instr :across (parsed-program-executable-code processed-program)
           :when (and (typep instr 'gate-application)
                      (not (member (cl-quil::application-operator-root-name instr)
@@ -546,20 +546,20 @@ This function will have undefined behavior when PROCESSED-PROGRAM is not protoqu
             :do (cl-quil::append-instruction-to-lschedule lschedule instr))
 
     (setf (gethash "gate_depth" statistics)
-          (cl-quil::lscheduler-calculate-depth lschedule))
+          (cl-quil::lschedule-calculate-depth lschedule))
 
     (setf (gethash "gate_volume" statistics)
-          (cl-quil::lscheduler-calculate-volume lschedule))
+          (cl-quil::lschedule-calculate-volume lschedule))
 
     (setf (gethash "program_duration" statistics)
-          (cl-quil::lscheduler-calculate-duration lschedule chip-specification))
+          (cl-quil::lschedule-calculate-duration lschedule chip-specification))
 
     (setf (gethash "program_fidelity" statistics)
-          (cl-quil::lscheduler-calculate-fidelity lschedule chip-specification))
+          (cl-quil::lschedule-calculate-fidelity lschedule chip-specification))
 
-    (let* ((lscheduler-resources
+    (let* ((lschedule-resources
              (let ((collect (cl-quil::make-null-resource)))
-               (cl-quil::lscheduler-walk-graph
+               (cl-quil::lschedule-walk-graph
                 lschedule
                 :bump-value (lambda (instr value)
                               (setf collect
@@ -570,20 +570,20 @@ This function will have undefined behavior when PROCESSED-PROGRAM is not protoqu
            (unused-qubits
              (loop :for i :below (cl-quil::chip-spec-n-qubits chip-specification)
                    :unless (cl-quil::resources-intersect-p (cl-quil::make-qubit-resource i)
-                                                           lscheduler-resources)
+                                                           lschedule-resources)
                      :collect i)))
       (setf (gethash "unused_qubits" statistics)
             unused-qubits)))
 
   ;; multiq gate depth requires a separate lschedule
-  (let ((lschedule (cl-quil::make-lscheduler)))
+  (let ((lschedule (cl-quil::make-lschedule)))
     (loop :for instr :across (parsed-program-executable-code processed-program)
           :when (and (typep instr 'gate-application)
                      (<= 2 (length (application-arguments instr))))
             :do (cl-quil::append-instruction-to-lschedule lschedule instr)
           :finally
              (setf (gethash "multiqubit_gate_depth" statistics)
-                   (cl-quil::lscheduler-calculate-depth lschedule))))
+                   (cl-quil::lschedule-calculate-depth lschedule))))
 
   statistics)
 
