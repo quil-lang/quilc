@@ -1322,14 +1322,13 @@ Determining this requires the context of the surrounding program."))
                     :reader gate-application-resolution
                     ;; We do this type check in INITIALIZE-INSTANCE.
                     :type gate-definition
-                    :documentation "The resolved definition of a gate. This may be some kind of GATE-DEFINITION, or it may be a gate object directly. In general, this resolution is ultimately a way to interpret what the root name of the APPLICATION-OPERATOR means. This is also the object from which one can produce more optimized representations of the gate application.
+                    :documentation "The resolved definition of a gate. This should be some kind of GATE-DEFINITION. In general, this resolution is ultimately a way to interpret what the root name of the APPLICATION-OPERATOR means. This is also the object from which one can produce more optimized representations of the gate application.
 
 This definition does *not* incorporate the operator description (i.e., any operator modifiers like CONTROLLED).
 
 If this slot is not supplied, then the gate is considered *anonymous*. If this is the case, then the GATE slot must be supplied.")
    ;; N.B. See the generic function GATE-APPLICATION-GATE as well.
    (gate :initarg :gate
-         :initform nil
          :reader %get-gate-application-gate
          :writer %set-gate-application-gate
          :documentation "The actual gate object that is being applied. N.B. After applications are resolved, one can always look at the definition of a gate via GATE-APPLICATION-RESOLUTION. But this slot is reserved for actual *execution*, which may depend on the execution backend and how one wishes to optimize.
@@ -1358,7 +1357,7 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
   ;; See the actual definition of this in gates.lisp.
   (:documentation "Return a gate-like object represented in the application APP.")
   (:method :around ((app gate-application))
-    (a:if-let ((gate (%get-gate-application-gate app)))
+    (a:if-let ((gate (and (slot-boundp app 'gate) (%get-gate-application-gate app))))
       gate
       (%set-gate-application-gate (call-next-method) app))))
 

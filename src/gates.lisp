@@ -46,11 +46,11 @@
                 (check-parameters gate)
                 (apply #'gate-matrix
                        (gate-definition-to-gate (gate-application-resolution gate))
-                       (mapcar #'constant-value (application-parameters gate))))
+                       (mapcar #'constant-value parameters)))
                ((controlled-operator o)
                 (let ((summand (recurse o parameters)))
                   (magicl:direct-sum
-                   (eye (gate-dimension summand) :type 'double-float)
+                   (eye (gate-dimension summand))
                    summand)))
                ((dagger-operator o)
                 (magicl:dagger (recurse o parameters)))
