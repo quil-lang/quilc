@@ -84,7 +84,8 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
   (let ((parsed-program (make-instance 'cl-quil::parsed-program))
         (instruction-list nil)
         (random-gate-count 0))
-    (loop repeat (random program-volume-limit) do
+    
+    (loop :repeat (random program-volume-limit) :do
       ;; generate an instruction
       (let* ((random-gate-flag (< (random 1d0) random-gate-rate))
              (gate-record
@@ -144,11 +145,17 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
                (unless random-gate-flag
                  (mapcar #'random (gate-set-record-parameter-bounds gate-record))))
              (gate-invocation
-               (make-instance 'cl-quil::gate-application
-
-                              :operator (cl-quil:named-operator gate-name)
-                              :arguments (map 'list #'cl-quil:qubit qubit-indices)
-                              :parameters (map 'list #'cl-quil:constant gate-parameters))))
+               (if gate-definition
+                   (make-instance 'cl-quil::gate-application
+                                  :name-resolution gate-definition 
+                                  :operator (cl-quil:named-operator gate-name)
+                                  :arguments (map 'list #'cl-quil:qubit qubit-indices)
+                                  :parameters (map 'list #'cl-quil:constant gate-parameters))
+                   (make-instance 'cl-quil::gate-application
+                                  :gate nil
+                                  :operator (cl-quil:named-operator gate-name)
+                                  :arguments (map 'list #'cl-quil:qubit qubit-indices)
+                                  :parameters (map 'list #'cl-quil:constant gate-parameters)))))
         (push gate-invocation instruction-list)
         ;; check to see if we need to bail because of depth
         (when (and
@@ -162,7 +169,8 @@ PARAMETER-BOUNDS is a list of maximum random values for the gate parameters."
         ;; if we built a random gate, store its definition
         (when random-gate-flag
           (incf random-gate-count)
-          (push gate-definition (cl-quil::parsed-program-gate-definitions parsed-program)))))
+          (push gate-definition (cl-quil::parsed-program-gate-definitions parsed-program))))) ; end loop
+    
     (setf (cl-quil::parsed-program-executable-code parsed-program)
           (make-array (length instruction-list)
                       :initial-contents instruction-list))
