@@ -1152,7 +1152,7 @@ CZ 1 3
 
 # Input
 # Plundered from ../../compiler-hook-test-files/more-commuting-blocks.quil
-# this caused a headache on 2019-01-23, where it revealed that lscheduler-clean-up-last-instrs had a bug in it
+# this caused a headache on 2019-01-23, where it revealed that lschedule-clean-up-last-instrs had a bug in it
 # when confronted with commuting blocks that shared some qubit resource (0, below) as well as instructions
 # before and after it which also used the qubit resource, plus a few other happenstance conditions.
 

@@ -67,9 +67,9 @@
 ;;; list structure peephole-rewriter-node which is used for rewinding the peephole rewriter
 
 (defun calculate-instructions-2q-depth (instructions)
-  (let ((lschedule (make-lscheduler)))
+  (let ((lschedule (make-lschedule)))
     (append-instructions-to-lschedule lschedule instructions)
-    (or (lscheduler-walk-graph lschedule
+    (or (lschedule-walk-graph lschedule
                                :base-value 0
                                :bump-value (lambda (instr value)
                                              (if (and (typep instr 'gate-application)
@@ -81,19 +81,19 @@
 
 (defun calculate-instructions-duration (instructions chip-specification)
   "Calculates the runtime of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
-  (let ((lschedule (make-lscheduler)))
+  (let ((lschedule (make-lschedule)))
     ;; load up the logical schedule
     (append-instructions-to-lschedule lschedule instructions)
     ;; sift through it for durations
-    (lscheduler-calculate-duration lschedule chip-specification)))
+    (lschedule-calculate-duration lschedule chip-specification)))
 
 (defun calculate-instructions-log-fidelity (instructions chip-specification)
   "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
-  (let ((lschedule (make-lscheduler)))
+  (let ((lschedule (make-lschedule)))
     ;; load up the logical schedule
     (append-instructions-to-lschedule lschedule instructions)
     ;; sift through it for fidelities
-    (lscheduler-calculate-log-fidelity lschedule chip-specification)))
+    (lschedule-calculate-log-fidelity lschedule chip-specification)))
 
 (defun calculate-instructions-fidelity (instructions chip-specification)
   "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
@@ -536,14 +536,14 @@ other's."
                         (tr (magicl:trace prod))
                         (trace-fidelity (/ (+ n (abs (* tr tr)))
                                            (+ n (* n n))))
-                        (ls-reduced (make-lscheduler))
-                        (ls-reduced-decompiled (make-lscheduler))
+                        (ls-reduced (make-lschedule))
+                        (ls-reduced-decompiled (make-lschedule))
                         (chip-spec (compilation-context-chip-specification context)))
                    (append-instructions-to-lschedule ls-reduced reduced-instructions)
                    (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert (>= (* trace-fidelity
-                                  (lscheduler-calculate-fidelity ls-reduced-decompiled chip-spec))
-                               (lscheduler-calculate-fidelity ls-reduced chip-spec))
+                                  (lschedule-calculate-fidelity ls-reduced-decompiled chip-spec))
+                               (lschedule-calculate-fidelity ls-reduced chip-spec))
                            ()
                            "During careful checking of instruction compression, ~
                             the recomputed instruction sequence has an ~

@@ -80,7 +80,7 @@
 
     (let* ((l2p (addresser-state-working-l2p state))
            (instr-physical (copy-instance instr))
-           (lschedule (make-lscheduler))
+           (lschedule (make-lschedule))
            (expanded-instructions
              (let ((*compress-carefully* nil))
                (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
@@ -92,7 +92,7 @@
 
       ;; compute time from native ops
       (let ((time (+ naive-start-time
-                     (lscheduler-calculate-duration lschedule chip-spec))))
+                     (lschedule-calculate-duration lschedule chip-spec))))
         ;; if we have more info, use it
         (a:when-let* ((hardware-object (and (rewiring-assigned-for-instruction-qubits-p l2p instr)
                                             (lookup-hardware-object chip-spec instr-physical)))
@@ -195,7 +195,7 @@
            (and (typep instr 'application)
                 (= 2 (length (application-arguments instr))))))
       (multiple-value-bind (max-value value-hash)
-          (lscheduler-walk-graph lschedule
+          (lschedule-walk-graph lschedule
                                  :base-value 0
                                  :bump-value (lambda (instr value)
                                                (if (2q-application-p instr) (1+ value) value))

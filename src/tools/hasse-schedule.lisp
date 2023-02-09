@@ -5,7 +5,7 @@
 (in-package #:cl-quil.tools)
 
 ;;; This file implements utilities for creating a Hasse Diagram for a
-;;; logical-scheduler instance. The resulting diagram indicates the
+;;; logical-schedule instance. The resulting diagram indicates the
 ;;; partial ordering of the instructions. The diagram is in the form
 ;;; of a Graphviz source file, called a "dot file", conventionally
 ;;; named with file type ending ".gv".
@@ -26,16 +26,16 @@
 ;;; The resulting image file can then be shown in various software,
 ;;; such as image viewers, PDF viewers, and web browsers.
 
-(defun write-hasse-dot (logical-scheduler &key stream)
+(defun write-hasse-dot (logical-schedule &key stream)
   (when (null stream)
     (setq stream *standard-output*))
   (format stream "digraph G {~%")
   (format stream "    rankdir=BT;~%")
-  (write-hasse-node-statements logical-scheduler stream)
+  (write-hasse-node-statements logical-schedule stream)
   (format stream "}~%"))
 
-(defun write-hasse-node-statements (logical-scheduler stream)
-  (let ((node-statements (get-hasse-node-statements logical-scheduler)))
+(defun write-hasse-node-statements (logical-schedule stream)
+  (let ((node-statements (get-hasse-node-statements logical-schedule)))
     (dolist (stmt node-statements)
       (format stream "    ~a~%" stmt))))
 
@@ -101,17 +101,17 @@
 (defun hasse-instr-visited-p (instr)
   (gethash instr *hasse-hash-table*))
 
-(defun get-hasse-node-statements (logical-scheduler)
+(defun get-hasse-node-statements (logical-schedule)
   (let* ((*hasse-counter* 1)
          (*hasse-hash-table* (make-hash-table))
          (queue '())
          (result '())
          (earliers-hash-table
-           (cl-quil.si:lscheduler-earlier-instrs logical-scheduler)))
+           (cl-quil.si:lschedule-earlier-instrs logical-schedule)))
     ;; Go through all the last instructions. Any that have no
     ;; earliers go into the graph as singleton nodes. The rest get
     ;; pushed onto the queue of instructions.
-    (loop :for instr :in (cl-quil.si:lscheduler-last-instrs logical-scheduler)
+    (loop :for instr :in (cl-quil.si:lschedule-last-instrs logical-schedule)
           :as earliers := (gethash instr earliers-hash-table)
           :do (cond
                 ((null earliers)
@@ -154,16 +154,16 @@
      *hasse-hash-table*)
     result))
 
-(defun quil-text-to-logical-scheduler (source-text)
+(defun quil-text-to-logical-schedule (source-text)
   "Make a logical scheduler corresponding to SOURCE-TEXT."
-  (quil-parse-to-logical-scheduler (cl-quil:parse-quil source-text)))
+  (quil-parse-to-logical-schedule (cl-quil:parse-quil source-text)))
 
 
-(defun quil-parse-to-logical-scheduler (parse)
+(defun quil-parse-to-logical-schedule (parse)
   "Make a logical scheduler corresponding to PARSE."
   (let* ((instructions-vector (cl-quil:parsed-program-executable-code parse))
          (instructions-list (concatenate 'list instructions-vector))
-         (lsched (cl-quil.si:make-lscheduler)))
+         (lsched (cl-quil.si:make-lschedule)))
     (cl-quil.si:append-instructions-to-lschedule lsched instructions-list)
     lsched))
 
@@ -259,7 +259,7 @@ Output goes to STREAM, which defaults to *standard-output*."
 
 ;;;; Higher-Level Functions
 
-;;; Here the exported functions: write-hasse-for-logical-scheduler and
+;;; Here the exported functions: write-hasse-for-logical-schedule and
 ;;; write-hasse-for-quil. Both put out a Hasse diagram as a Graphviz
 ;;; dot file (.gv). The former takes a logical scheduler (optionally
 ;;; with a program, which may improve the output), while the latter
@@ -287,25 +287,25 @@ In the case of writing to a file, this returns the true name of the
 resulting file a string.  Otherwise, this returns nil."
   (let* ((program-string (program-to-string program))
          (parse (cl-quil:parse program-string))
-         (logical-scheduler (quil-parse-to-logical-scheduler parse)))
-    (write-hasse-for-logical-scheduler
-     logical-scheduler
+         (logical-schedule (quil-parse-to-logical-schedule parse)))
+    (write-hasse-for-logical-schedule
+     logical-schedule
      :program program-string
      :stream stream
      :output-file output-file)))
 
 
-(defun write-hasse-for-logical-scheduler (logical-scheduler
+(defun write-hasse-for-logical-schedule (logical-schedule
                                           &key stream
                                             output-file
                                             program)
-  "Wrote a Hasse diagram for LOGICAL-SCHEDULER to the designated output.
+  "Wrote a Hasse diagram for LOGICAL-SCHEDULE to the designated output.
 
 Details are as for WRITE-HASSE-FOR-QUIL, except that if PROGRAM is
 nil, the program text is not emitted to the DOT file as a comment. See
 above."
   (flet ((emit (stream)
-           (write-hasse-dot logical-scheduler :stream stream)
+           (write-hasse-dot logical-schedule :stream stream)
            (when program
              (write-program-to-graphviz-comment program :stream stream))))
     (if stream

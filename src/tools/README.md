@@ -9,7 +9,7 @@ A short summary of what follows in this README is indicated below.
 | Section | Description |
 | --- | ----------- |
 | Circuit Diagrams | Generate plots of circuit diagrams from Quil code.  |
-| Hasse Schedule | Visualize `logical-scheduler` data. |
+| Hasse Schedule | Visualize `logical-schedule` data. |
 
 ## Circuit Diagrams
 
@@ -66,7 +66,7 @@ The Slime interaction requires two SLIME contribs: `slime-media` and `slime-repl
 
 ## Hasse Schedule
 
-The *Hasse schedule* tool helps you to visualize the *logical-scheduler* data structure, which is used by the addresser to organize and manage resource dependencies between instructions on 'logical' qubits.
+The *Hasse schedule* tool helps you to visualize the *logical-schedule* data structure, which is used by the addresser to organize and manage resource dependencies between instructions on 'logical' qubits.
 
 Quil instructions rely on some mixture of classical (memory regions) and quantum (qubits) resources. In the general case, it is these resource dependencies, rather than the strict linearization of straight line quil, which dictate the sequencing of physical instructions. For example, in the program
 ```
@@ -76,13 +76,13 @@ Quil instructions rely on some mixture of classical (memory regions) and quantum
   X 3          (iv)
   CNOT 1 3     (v)
 ```
-the instructions (iii) and (iv) could have equivalently been transposed. The partial ordering imposed by resource constraints is fully described by a logical-scheduler instance. While one can grasp the logical ordering by inspecting a logical-scheduler instance in Lisp, it is more convenient to grasp if visualized, as with the following Hasse diagram:
+the instructions (iii) and (iv) could have equivalently been transposed. The partial ordering imposed by resource constraints is fully described by a logical-schedule instance. While one can grasp the logical ordering by inspecting a logical-schedule instance in Lisp, it is more convenient to grasp if visualized, as with the following Hasse diagram:
 
 > ![Hasse diagram for the above program](images/e1.png)
 
 where the arrow A ---> B means that A logically follows B.
 
-The Hasse schedule tool implements utilities for creating a Hasse diagram for a quil program or for a logical-scheduler instance or for a parse derived from a quil program. The resulting diagram indicates the partial ordering of the instructions. The diagram is in the form of a GraphViz source file, called a "dot file", conventionally named with file type ending ".gv".
+The Hasse schedule tool implements utilities for creating a Hasse diagram for a quil program or for a logical-schedule instance or for a parse derived from a quil program. The resulting diagram indicates the partial ordering of the instructions. The diagram is in the form of a GraphViz source file, called a "dot file", conventionally named with file type ending ".gv".
 
 The dot file can be readily transformedp into various kinds of image files. Given a file such as "example-1.gv", it can be converted to various viewable formats and then viewed in numerous possible ways. Here are some example command lines that should work on any sort Linux or MacOS with GraphViz installed. (Note that 'dot' is the GraphViz program for drawing directed graphs.)
 
