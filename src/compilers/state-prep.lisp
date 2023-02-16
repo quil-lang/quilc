@@ -7,22 +7,16 @@
 
 (in-package #:cl-quil)
 
-(defclass state-prep-application (gate-application)
+(defclass state-prep-application (pseudo-gate-application)
   ((source-wf :initarg :source-wf
               :accessor state-prep-application-source-wf
               :documentation "Source wavefunction.")
    (target-wf :initarg :target-wf
               :accessor state-prep-application-target-wf
               :documentation "Target wavefunction."))
-  (:default-initargs :operator #.(named-operator "STATE-PREP")
-                     ;; XXX: Hack!
-                     :gate nil)
+  (:default-initargs :operator #.(named-operator "STATE-PREP"))
   (:documentation "A pseudo-instruction representing any state-preparation circuit that carries SOURCE-WF into TARGET-WF."))
 
-;;; XXX: Hack!
-(defmethod gate-matrix ((gate state-prep-application) &rest parameters)
-  (declare (ignore gate parameters))
-  nil)
 
 (defmethod print-instruction-generic ((thing state-prep-application) (s stream))
   (format s "STATE-PREP[(~{~5$~^, ~}) -> (~{~5$~^, ~})] ~{~/cl-quil:instruction-fmt/~^ ~}"

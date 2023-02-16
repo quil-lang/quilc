@@ -1380,6 +1380,18 @@ N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-
     (t
      (assert (slot-boundp app 'gate) (app) "A gate application was made that doesn't have a definition. Please specify either its name resolution or a gate."))))
 
+(defclass pseudo-gate-application (gate-application)
+  ((gate :initform nil))
+  (:documentation "Represents a formal, \"stand-in\", gate-application instruction that will never be associated to an underlying gate."))
+
+(defmethod gate-application-gate ((app pseudo-gate-application))
+  (error "Attempted to return a GATE representation from a PSEUDO-GATE-APPLICATION instance: ~s" app))
+
+(defmethod gate-matrix ((app pseudo-gate-application) &rest params)
+  (declare (ignore params))
+  (warn "Attempted to return a MATRIX representation of a PSEUDO-GATE-APPLICATION instance: ~s" app)
+  nil)
+
 ;;; XXX FIXME TODO: This doesn't actually check that SWAP is the same
 ;;; one as defined in the standard, because there is no notion of a
 ;;; "resolved" environment.

@@ -407,6 +407,8 @@
    #:anonymous-gate-application-p       ; FUNCTION
    #:swap-application-p                 ; FUNCTION
 
+   #:pseudo-gate-application            ; CLASS
+
    #:circuit-application                ; CLASS
    #:circuit-application-definition     ; ACCESSOR
 
@@ -1031,6 +1033,8 @@
 
    #:gate-application                   ; CLASS
    #:gate-application-gate              ; GENERIC, METHOD
+
+   #:pseudo-gate-application            ; CLASS
 
    #:anonymous-gate-application-p       ; FUNCTION
 
