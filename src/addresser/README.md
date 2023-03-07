@@ -21,7 +21,7 @@ The addresser handles gates on > 2 qubits by first translating them with
 
 The main difficulty in addressing is managing the logical to physical rewiring.
 At any given moment, logical qubits 
-- might not have an assigment to a physical qubit (and hence an assignment must
+- might not have an assignment to a physical qubit (and hence an assignment must
   be made), or
 - might be assigned to physical qubits which are not adjacent (in which case
   something must be done in order for a gate involving them to be executed).
