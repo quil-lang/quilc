@@ -82,7 +82,7 @@
     (define (hash a)
       (match (dyadic-simplify a)
         ((Dyadic n k)
-         (combine-hashes (hash n) (hash k))))))
+         (hash:combine-hashes (hash n) (hash k))))))
 
   (declare dyadic-group-function ((Integer -> Integer -> Integer)
                                   -> Dyadic -> Dyadic -> Dyadic))

@@ -152,7 +152,7 @@ When safe-inverse is None, inverse may error."
                     => (Composable (Optional :a) (Optional :b) (Optional :c)))
     (define apply (liftA2 apply)))
 
-  (define-instance ((Identity :a) (Action (Optional :a) (Optional :a))
+  (define-instance ((Composable :a :a :a) (Identity :a) (Action (Optional :a) (Optional :a))
                     => (Identity (Optional :a)))
     (define identity (pure identity)))
 
@@ -240,11 +240,6 @@ Hermitian adjoint, or related involution - often notated †."
   (define-class ((Scalar :m :e) => (Eigen :m :e))
     "An operator with computable lists of eigenvalues."
     (eigenvalues (:m -> (List :e))))
-
-  (define-class ((Action :m :v) (Eigen :m :e) => (EigenLinear :m :v :e))
-    "An operator with computable lists of eigenvectors and eigenvalues."
-    (eigenvectors (:m -> (List :v)))
-    (eigenZip (:m -> (List (Tuple :e :v)))))
 
   (define (dimensions m)
     (Tuple (rows m) (cols m)))

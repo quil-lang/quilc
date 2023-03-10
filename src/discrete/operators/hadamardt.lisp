@@ -28,7 +28,7 @@
                            (Complex 0 (Root2plex 0 (Dyadic 1 1))))))))
 
   (define-instance (Into (Unitary2 RootUnity8 (Cyclotomic8 Dyadic)) (List HadamardT))
-    (define into omega-unitary->ht-sequence x))
+    (define into omega-unitary->ht-sequence))
 
   (declare omega-unitary->ht-sequence
            ((Unitary2 RootUnity8 (Cyclotomic8 Dyadic)) -> (List HadamardT)))
@@ -98,7 +98,7 @@
              (if (unitary-remainder? candidate)
                  (progn
                    (let candidate-hash = (hash candidate))
-                   (if (isNone (hashtable:get table candidate-hash))
+                   (if (none? (hashtable:get table candidate-hash))
                        (progn
                          (hashtable:set! table candidate-hash ht-list)
                          True)
@@ -140,4 +140,4 @@
                      (list:filter gen-table kss))))))))
       (progn
         (gen-table-rec 5 (map (fn (x) (Cons x Nil)) (make-list 0 1 2 3 4 5 6 7)))
-        (the (Hashtable UFix (List HadamardT)) table)))))
+        (the (Hashtable Hash (List HadamardT)) table)))))

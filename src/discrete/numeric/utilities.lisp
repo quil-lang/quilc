@@ -231,7 +231,7 @@ For example if `canonical-factor' is `abs' (*±1) then this is the standard GCD.
        (euclid-div
         (* (numerator a) (denominator b))
         (* (numerator b) (denominator a)))))
-    (define euclid-gcd canonical-gcd))
+    (define (euclid-gcd a b) (canonical-gcd a b)))
 
   (define-instance (Factorable (Complex Integer))
     (define (canonical-factor x)

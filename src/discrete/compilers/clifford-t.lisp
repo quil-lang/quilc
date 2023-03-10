@@ -69,7 +69,7 @@
        (cl:error "No RZ solution was found within ~,2E of an angle ~E "
                  epsilon theta))
       (coalton-library/classes::Optional/Some
-       (dolist (x (coalton-library/optional:fromSome
+       (dolist (x (coalton-library/optional:from-some
                    "Could not descructure SOME." sequence))
          (ecase x
            (OutputGate1/Discrete-H (q:inst "H" () q))

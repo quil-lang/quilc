@@ -59,7 +59,7 @@
 
   (define-instance (Nat :a => Hash (Modulo :a))
     (define (hash n)
-      (modulo->ufix n)))
+      (hash (modulo->ufix n))))
 
   (define-instance (Nat :a => Ord (Modulo :a))
     (define (<=> a b)

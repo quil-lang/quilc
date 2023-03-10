@@ -43,7 +43,7 @@
         ;; Pre-calculate the return value.
         (let natural = (+ 1 (match nat ((S m) (fromNat m)))))
         ((the (:a -> :a -> UFix)
-              (fn (_ _) natural)) nat))))
+              (fn (_x _y) natural)) nat))))
 
   (declare extract-single (Singleton :a => (:c :a) -> :a))
   (define (extract-single _)
