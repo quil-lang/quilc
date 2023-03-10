@@ -180,9 +180,9 @@ Corresponds to Lemma 21 (Selinger, 2014)."
 ;;; Test candidate verification
 
 (define-test prime-mod-solution ()
-  (is (isSome (rz::prime-mod-solution 2 7 7)))
-  (is (isNone (rz::prime-mod-solution 0 10 10)))
-  (is (isSome (rz::prime-mod-solution 0 100 16843))))
+  (is (some? (rz::prime-mod-solution 2 7 7)))
+  (is (none? (rz::prime-mod-solution 0 10 10)))
+  (is (some? (rz::prime-mod-solution 0 100 16843))))
 
 (define-test square-root-of-root2-unit ()
   (is (== (Some (^ (Root2plex -1 1) 4))

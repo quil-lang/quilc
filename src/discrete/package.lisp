@@ -10,6 +10,8 @@
         #:cl-quil.clifford)
   #+sbcl (:import-from #:coalton-library/big-float #:Big-Float)
   (:shadow #:coalton-library/list #:singleton)
+  (:local-nicknames
+   (#:hash #:coalton-library/hash))
   ;; utilities.lisp
   (:export
    #:RealFrac

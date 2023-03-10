@@ -55,9 +55,9 @@
     (define (hash p)
       (match p
         ((Cyclotomic8 a b c d)
-         (combine-hashes
-          (combine-hashes (hash a) (hash b))
-          (combine-hashes (hash c) (hash d)))))))
+         (hash:combine-hashes
+          (hash:combine-hashes (hash a) (hash b))
+          (hash:combine-hashes (hash c) (hash d)))))))
 
   (define-instance ((Num :a) => (Num (Cyclotomic8 :a)))
     (define (+ p q)

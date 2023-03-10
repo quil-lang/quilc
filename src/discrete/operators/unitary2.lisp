@@ -79,7 +79,8 @@
                     (Identity (Unitary2 :a :b)))
     (define identity (%Unitary2 mempty 1 0)))
 
-  (define-instance ((Identity (Unitary2 :a :b)) (Dagger (Unitary2 :a :b)) =>
+  (define-instance ((Monoid :a) (Num :b) (Dagger (Unitary2 :a :b))
+                    (Composable (Unitary2 :a :b) (Unitary2 :a :b) (Unitary2 :a :b)) =>
                     (Inverse (Unitary2 :a :b)))
     (define inverse dagger)
     (define safe-inverse (compose Some inverse)))
@@ -91,7 +92,7 @@
                 (%Unitary2 beta c d))
          (and (== alpha beta) (and (== a c) (== b d)))))))
 
-  (define-instance ((Hash :a) (Hash :b) (Eq (Unitary2 :a :b)) => (Hash (Unitary2 :a :b)))
+  (define-instance ((Hash :a) (Hash :b) (Group :a) (Num :b) => (Hash (Unitary2 :a :b)))
     (define (hash m)
       (match m
         ((%Unitary2 angle a b) (hash (Tuple3 angle a b))))))

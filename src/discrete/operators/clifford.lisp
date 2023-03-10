@@ -42,7 +42,7 @@
 
   (define-instance (Hash (Clifford :n))
     (define (hash c)
-      (lisp UFix (c)
+      (lisp Hash (c)
         (cl-quil.clifford::clifford-hash c))))
 
   (define-instance (Composable (Clifford :n) (Clifford :n) (Clifford :n))

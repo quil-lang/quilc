@@ -23,12 +23,12 @@
                             -> (:a -> (Optional :b))
                             -> :a -> (Optional :b)))
   (define (find-some-until pred-x succ f x)
-    "Searches for until (isSome (F x)) or (PRED-X x)
+    "Searches for until (some? (F x)) or (PRED-X x)
 where x = X, (SUCC X), (SUCC (SUCC X)), ... "
     (if (pred-x x)
         (progn
           (let current = (f x))
-          (if (isSome current)
+          (if (some? current)
               current
               (find-some-until pred-x succ f (succ x))))
         None))

@@ -47,7 +47,7 @@
     (define identity (%SUnitary2 1 0)))
 
   (define-instance ((Dagger :a) (Num :a) => (Inverse (SUnitary2 :a)))
-    (define inverse dagger m)
+    (define inverse dagger)
     (define (safe-inverse m)
       ;; By definition of unitary matrix
       (Some (inverse m))))
