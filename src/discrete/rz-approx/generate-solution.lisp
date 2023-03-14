@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/rz-approx)
+(in-package #:cl-quil.discrete/rz-approx)
+
+(named-readtables:in-readtable coalton:coalton)
 
 ;;; Implements an algorithm for approximating RZ(θ) into a U made up of
 ;;; Clifford+T such that |RZ(θ) - U| is less than or equal to some ɛ. Currently

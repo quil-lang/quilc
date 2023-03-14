@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(in-package #:cl-quil.discrete/numeric)
+
+(named-readtables:in-readtable coalton:coalton)
 
 ;;; Typed modulo arithmetic where every Modulo type has a unique group order.
 
