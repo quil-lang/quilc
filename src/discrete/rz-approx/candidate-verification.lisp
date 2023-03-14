@@ -7,7 +7,9 @@
 ;;; but one could alternativly implement the prime factorization method described in
 ;;; arXiv:1403.2975.
 
-(cl:in-package #:cl-quil.discrete/rz-approx)
+(in-package #:cl-quil.discrete/rz-approx)
+
+(named-readtables:in-readtable coalton:coalton)
 
 (coalton-toplevel
 

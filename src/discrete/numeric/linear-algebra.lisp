@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(in-package #:cl-quil.discrete/numeric)
+
+(named-readtables:in-readtable coalton:coalton)
 
 ;;; Common classes, types, and functions for (linear) algebra code (e.g. group
 ;;; actions, modules/vectors, matrices, (linear) transformations, eigenvalues).

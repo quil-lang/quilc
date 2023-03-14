@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(in-package #:cl-quil.discrete/numeric)
+
+(named-readtables:in-readtable coalton:coalton)
 
 ;;; Defines functions on the type representing the form a + b √2
 

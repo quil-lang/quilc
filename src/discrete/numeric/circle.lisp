@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/numeric)
+(in-package #:cl-quil.discrete/numeric)
+
+(named-readtables:in-readtable coalton:coalton)
 
 ;;; Operations on the complex Circle group and its subgroups
 ;;; (e.g. roots of unity)

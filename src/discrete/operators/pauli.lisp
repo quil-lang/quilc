@@ -2,7 +2,9 @@
 ;;;;
 ;;;; Author: A.J. Nyquist
 
-(cl:in-package #:cl-quil.discrete/operators)
+(in-package #:cl-quil.discrete/operators)
+
+(named-readtables:in-readtable coalton:coalton)
 
 ;;; Wrapper around Quilc's Pauli groups
 
