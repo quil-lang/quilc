@@ -1310,11 +1310,9 @@ Determining this requires the context of the surrounding program."))
 
 (defclass extern-application (application)
   ()
-  (:documentation "Represents an externed operation. An extern is expected to receive its definition late in the compilation process, mostly likely for a specialization of Cl-Quil:BACKEND-COMPILE. 
+  (:documentation "Represents an externed operation. An extern is expected to receive its definition late in the compilation process, mostly likely for a specialization of cl-quil:backend-compile. 
 
-The intent is to allow users to supply definitions to these operations in a form that comports with their compilation target., but to still be able to refer to these operations in their Quil source code.
-
-As such  "))
+The intent is to allow users to supply definitions to these operations in a form that comports with their compilation target., but to still be able to refer to these operations in their Quil source code."))
 
 (declaim (inline gate-application-p))
 (defun gate-application-p (x)
