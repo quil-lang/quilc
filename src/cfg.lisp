@@ -175,6 +175,15 @@ Return the following values:
   (vector-push-extend instr (basic-block-code blk))
   (values blk nil nil))
 
+(defmethod process-instruction (cfg blk (instr extern-application))
+  (declare (ignore cfg))
+  (assert (not (null blk)) (blk))
+  ;; extern applications should be preserved from nativization and optimization
+  (change-class blk 'preserved-block)
+  (vector-push-extend instr (basic-block-code blk))
+  (values blk nil nil))
+
+
 (defmethod process-instruction (cfg blk (instr pragma-preserve-block))
   (if (and
        ;; RESET-BLOCK is treated somewhat specially. If a RESET-BLOCK

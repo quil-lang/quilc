@@ -401,6 +401,8 @@
 
    #:unresolved-application             ; CLASS
 
+   #:extern-application                 ; CLASS
+
    #:gate-application                   ; CLASS
    #:gate-application-gate              ; GENERIC, READER
    #:gate-application-resolution        ; READER

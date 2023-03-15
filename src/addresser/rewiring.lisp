@@ -189,6 +189,13 @@ Returns NIL. This mutates the instruction."
            (mapcar (lambda (q) (qubit (apply-rewiring-l2p rewiring (qubit-index q)
                                                           :assert-wired t)))
                    (application-arguments instr))))
+
+    (extern-application 
+     (setf (application-arguments instr)
+           (mapcar (lambda (q) (qubit (apply-rewiring-l2p rewiring (qubit-index q)
+                                                          :assert-wired t)))
+                   (application-arguments instr))))
+
     (reset-qubit
      (setf (reset-qubit-target instr)
            (qubit (apply-rewiring-l2p rewiring

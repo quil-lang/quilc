@@ -30,6 +30,16 @@ Expected syntax: PRAGMA BLOCK"))
 
 Expected syntax: PRAGMA END_BLOCK"))
 
+(define-pragma "EXTERN" pragma-extern
+  (:documentation "PRAGMA marking an operation as an extern. Its argument is an operator name that either does not have, or will not use, an immediate definition. Extern operations can be referenced in Quil code but are essentially untouched, and immune to the optimizing compiler.
+
+Expected Syntax: PRAGMA EXTERN operation")
+  (:slots externed-name)
+  (:global t)
+  (:words (extern string))
+  (:initialization
+   (setf externed-name extern)))
+
 (define-pragma "ADD-KRAUS" pragma-add-kraus
   (:documentation
    "PRAGMA that introduces a Kraus noise channel on a fixed instruction.

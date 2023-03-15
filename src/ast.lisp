@@ -1302,9 +1302,19 @@ consists of a CONTROLLED-OPERATOR acting on a NAMED-OPERATOR."
 
     * Application is a circuit application.
 
+    * Application is an extern application.
+
     * Application is an invalid application.
 
 Determining this requires the context of the surrounding program."))
+
+(defclass extern-application (application)
+  ()
+  (:documentation "Represents an externed operation. An extern is expected to receive its definition late in the compilation process, mostly likely for a specialization of Cl-Quil:BACKEND-COMPILE. 
+
+The intent is to allow users to supply definitions to these operations in a form that comports with their compilation target., but to still be able to refer to these operations in their Quil source code.
+
+As such  "))
 
 (declaim (inline gate-application-p))
 (defun gate-application-p (x)
@@ -1756,12 +1766,17 @@ For example,
    (executable-program :initarg :executable-code
                        :accessor parsed-program-executable-code
                        :type (vector instruction)
-                       :documentation "A vector of executable Quil instructions."))
+                       :documentation "A vector of executable Quil instructions.")
+   (externed-operations :initarg :externed-operations
+                        :accessor parsed-program-externed-operations
+                        :type hash-table
+                        :documentation "A hash table mapping string NAMEs to generalized booleans, indicating that an operation so named is an extern."))
   (:default-initargs
    :gate-definitions '()
    :circuit-definitions '()
    :memory-definitions '()
-   :executable-code #())
+   :executable-code #()
+   :externed-operations (make-hash-table :test #'equal))
   (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
 (defmethod copy-instance ((parsed-program parsed-program))
@@ -1778,6 +1793,15 @@ For example,
     (setf (parsed-program-executable-code pp)
           (map 'vector #'copy-instance
                (parsed-program-executable-code parsed-program)))
+    (setf (parsed-program-externed-operations pp)
+          (let ((new-table
+                  (make-hash-table :test #'equal))
+                (old-table
+                  (parsed-program-externed-operations pp)))
+            (loop :for key :being :the :hash-key :of old-table
+                    :using (:hash-value value)
+                  :do (setf (gethash key new-table) value))
+            new-table))
     pp))
 
 (defvar *print-parsed-program-text* nil
