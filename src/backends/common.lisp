@@ -54,14 +54,16 @@
 
 (defun list-available-backends ()
   "Return a list of all subclasses of the class named BACKEND"
-  (let ((backends))
+  (let ((backends nil))
     (labels ((add-backends (class)
                (let ((direct
                        (c2mop:class-direct-subclasses class)))
                  (when direct
                    (setf backends (nconc backends direct))
-                   (mapc #'add-backends direct)))))
-      (remove-duplicates (add-backends (find-class 'backend)) :test #'eq))))
+                   (dolist (cl direct)
+                     (add-backends cl))))))
+      (add-backends (find-class 'backend))
+      (remove-duplicates backends :test #'eq))))
 
 (defun find-backend (backend-name)
   "Returns the backend class associated with the string BACKEND-NAME."
