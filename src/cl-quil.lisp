@@ -112,8 +112,8 @@ This also signals ambiguous definitions, which may be handled as needed."
                (gate-definition (push instr gate-defs))
                (circuit-definition (push instr circ-defs))
                (memory-descriptor (push instr memory-defs))
-               (extern-operation 
-                (setf (gethash (extern-operation-name instr) externs) t))
+               (extern 
+                (setf (gethash (extern-name instr) externs) t))
                (t (push instr exec-code)))))
       (mapc #'bin code)
       (make-instance 'parsed-program

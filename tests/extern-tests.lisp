@@ -38,14 +38,14 @@
 
       ;; One of the EXTERN-APPLICATION instances should be a MOO and
       ;; the other should be a CNOT
-      (flet ((extern-named ( name)
+      (flet ((extern-named? ( name)
                (lambda (instr)
                  (and (typep instr 'cl-quil.frontend::extern-application)
                       (equal name (cl-quil.frontend:application-operator-name instr))))))
         (let ((instructions
                 (cl-quil:parsed-program-executable-code compiled)))
-          (is (= 1 (count-if (extern-named "MOO") instructions)))
-          (is (= 1 (count-if (extern-named "CNOT") instructions)))))
+          (is (= 1 (count-if (extern-named? "MOO") instructions)))
+          (is (= 1 (count-if (extern-named? "CNOT") instructions)))))
 
       ;; The extern table should have been duplicated on compiled program
       (let ((pp-externs

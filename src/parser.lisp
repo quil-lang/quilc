@@ -789,7 +789,7 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
 
 (defun parse-extern (tok-lines)
   (match-line ((extern :EXTERN) (op :NAME)) tok-lines
-    (make-instance 'extern-operation :name (token-payload op))))
+    (make-instance 'extern :name (token-payload op))))
 
 (defun parse-parameter-or-expression (toks)
   "Parse a parameter, which may possibly be a compound arithmetic expression. Consumes all tokens given."

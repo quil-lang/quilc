@@ -421,14 +421,19 @@ If no exit rewiring is found, return NIL."
   (:documentation "A directive to include another file in a Quil file."))
 
 
-(defclass extern-operation ()
-  ((name :reader extern-operation-name
+(defclass extern ()
+  ((name :reader extern-name
          :initarg :name
-         :documentation "The Name of the operation being marked as an EXTERN"))
+         :documentation "The name of the operation being marked as an EXTERN"))
   (:documentation "A directive to mark a particular operation as an extern. I.e. an
 operation that does not have a definition. Names marked as EXTERN can
 be parsed as they appear, and are protected from the optimizing
-compiler, similar to the  effect of a PRESERVE_BLOCK pragma."))
+compiler, similar to the  effect of a PRESERVE_BLOCK pragma.
+
+NB: A name marked as an EXTERN will take priority over all other
+names. Meaning if, for example, a DEFCIRCUIT is defined with name
+marked as EXTERN, that circuit will be totally ignored by
+compilation passes."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

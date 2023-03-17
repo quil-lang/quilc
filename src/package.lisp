@@ -401,6 +401,7 @@
 
    #:unresolved-application             ; CLASS
 
+   #:extern                             ; CLASS
    #:extern-application                 ; CLASS
 
    #:gate-application                   ; CLASS
