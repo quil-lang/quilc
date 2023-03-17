@@ -314,13 +314,16 @@ Returns a value list: (processed-program, of type parsed-program
                  (remove-if-not #'global-pragma-instruction-p
                                 (parsed-program-executable-code parsed-program))
                  (parsed-program-executable-code processed-program)))
-          ;; retain the old circuit and gate definitions
+          ;; retain the old circuit, gate, and definitions
           (setf (parsed-program-gate-definitions processed-program)
                 (parsed-program-gate-definitions parsed-program))
           (setf (parsed-program-circuit-definitions processed-program)
                 (parsed-program-circuit-definitions parsed-program))
           (setf (parsed-program-memory-definitions processed-program)
                 (parsed-program-memory-definitions parsed-program))
+          ;; retain the old extern operations table
+          (setf (parsed-program-extern-operations processed-program)
+                (parsed-program-extern-operations parsed-program))
           ;; ... and output the results.
           (values
            processed-program

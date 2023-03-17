@@ -53,4 +53,4 @@
                (:file "linear-reversible-circuit-tests")
                (:file "permutation-tests")
                (:file "sqisw-decomp-tests")
-               (:file "extern-pragma-tests")))
+               (:file "extern-tests")))

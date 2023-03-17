@@ -1804,7 +1804,7 @@ For example,
           (let ((new-table
                   (make-hash-table :test #'equal))
                 (old-table
-                  (parsed-program-extern-operations pp)))
+                  (parsed-program-extern-operations parsed-program)))
             (loop :for key :being :the :hash-key :of old-table
                     :using (:hash-value value)
                   :do (setf (gethash key new-table) value))
