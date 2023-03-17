@@ -1324,9 +1324,9 @@ Determining this requires the context of the surrounding program."))
 
 (defclass extern-application (application)
   ()
-  (:documentation "Represents the application of an extern operation. An extern is expected to receive its definition late in the compilation process, mostly likely for a specialization of cl-quil:backend-compile. 
+  (:documentation "Represents the application of an extern operation. Externs allow the user to bypass the parsing and compilation stages for particular operations that are meant to receive specific definition at the backend compilation stage.
 
-The intent is to allow users to supply definitions to these operations in a form that comports with their compilation target., but to still be able to refer to these initially undefined operations in their Quil source code."))
+Externs are similar to instances of UNRESOLVED-APPLICATION. They are semantically empty from the perspective of the quantum abstract virtual machine, and cannot be simulated or executed."))
 
 (declaim (inline gate-application-p))
 (defun gate-application-p (x)
