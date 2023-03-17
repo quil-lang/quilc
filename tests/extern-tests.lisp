@@ -8,7 +8,7 @@
   ;; We supply Quil with a mixture of "standard" and "totally phony"
   ;; gates.  Here we mark both MOO and CNOT as externed
   (let ((quil
-          "EXTERN MOO; EXTERN CNOT; X 1; Y 2; MOO 1; CNOT 0 2; CZ 1 0")
+          "EXTERN MOO; EXTERN CNOT; X 1; Y 2; MOO 1; X 0; CNOT 0 2; CZ 1 0; Y 0")
         parsed)
     (not-signals error
      (setf parsed (cl-quil:parse quil)))
@@ -38,14 +38,23 @@
 
       ;; One of the EXTERN-APPLICATION instances should be a MOO and
       ;; the other should be a CNOT
-      (flet ((extern-named? ( name)
+      (flet ((extern-named? (name)
                (lambda (instr)
                  (and (typep instr 'cl-quil.frontend::extern-application)
                       (equal name (cl-quil.frontend:application-operator-name instr))))))
         (let ((instructions
                 (cl-quil:parsed-program-executable-code compiled)))
           (is (= 1 (count-if (extern-named? "MOO") instructions)))
-          (is (= 1 (count-if (extern-named? "CNOT") instructions)))))
+          (is (= 1 (count-if (extern-named? "CNOT") instructions)))
+
+          ;; All of the Xs Ys should have been compiled to other gates and
+          ;; should no longer be present in the code
+          (is (zerop
+               (loop :for instr :across instructions
+                     :for name = (and (typep instr 'quil::application)
+                                      (quil::application-operator-name instr))
+                     :when (member name '("X" "Y") :test #'equal)
+                       :count 1)))))
 
       ;; The extern table should have been duplicated on compiled program
       (let ((pp-externs

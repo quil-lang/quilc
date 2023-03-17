@@ -183,11 +183,12 @@ Return the following values:
         (new-blk
           (make-instance 'basic-block)))
     (change-class extern-blk 'preserved-block)
-    (link-blocks blk (unconditional-edge extern-blk))
     (vector-push-extend instr (basic-block-code extern-blk))
+    (link-blocks blk (unconditional-edge extern-blk))
     (link-blocks extern-blk (unconditional-edge new-blk))
     ;; we finish with the old block, return a new empty block, and the
-    ;; extern is isolated in a block linked between these two.
+    ;; extern is isolated in a preserved block linked between these
+    ;; two.
     (values new-blk blk nil)))
 
 
