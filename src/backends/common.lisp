@@ -12,7 +12,7 @@
 (defclass backend ()
   ()
   (:documentation "Every backend must be represented by a subclass of this abstract base class.")
-  ;(:metaclass abstract-class)
+  (:metaclass abstract-class)
   )
 
 (defgeneric backend-name (backend-class)
