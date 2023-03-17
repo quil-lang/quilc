@@ -52,4 +52,5 @@
                (:file "addresser-tests")
                (:file "linear-reversible-circuit-tests")
                (:file "permutation-tests")
-               (:file "sqisw-decomp-tests")))
+               (:file "sqisw-decomp-tests")
+               (:file "extern-tests")))

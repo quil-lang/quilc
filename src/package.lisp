@@ -401,6 +401,9 @@
 
    #:unresolved-application             ; CLASS
 
+   #:extern                             ; CLASS
+   #:extern-application                 ; CLASS
+
    #:gate-application                   ; CLASS
    #:gate-application-gate              ; GENERIC, READER
    #:gate-application-resolution        ; READER
@@ -437,6 +440,7 @@
    #:parsed-program-circuit-definitions     ; READER
    #:parsed-program-memory-definitions      ; READER
    #:parsed-program-executable-code         ; ACCESSOR
+   #:parsed-program-extern-operations       ; ACCESSOR
    #:print-parsed-program                   ; FUNCTION
 
    #:*print-parsed-program-text*        ; PARAMETER

@@ -89,6 +89,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         (circ-defs '())
         (memory-defs '())
         (exec-code '())
+        (externs (make-hash-table :test #'equal))
         ;; The following maps definition signatures to a list of (filename . defn) pairs
         (all-seen-defns (make-hash-table :test 'equalp)))
     (flet ((bin (instr)
@@ -111,12 +112,15 @@ This also signals ambiguous definitions, which may be handled as needed."
                (gate-definition (push instr gate-defs))
                (circuit-definition (push instr circ-defs))
                (memory-descriptor (push instr memory-defs))
+               (extern 
+                (setf (gethash (extern-name instr) externs) t))
                (t (push instr exec-code)))))
       (mapc #'bin code)
       (make-instance 'parsed-program
                      :gate-definitions (nreverse gate-defs)
                      :circuit-definitions (nreverse circ-defs)
                      :memory-definitions (nreverse memory-defs)
+                     :extern-operations externs
                      :executable-code (coerce (nreverse exec-code)
                                               'simple-vector)))))
 

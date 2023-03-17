@@ -421,6 +421,20 @@ If no exit rewiring is found, return NIL."
   (:documentation "A directive to include another file in a Quil file."))
 
 
+(defclass extern ()
+  ((name :reader extern-name
+         :initarg :name
+         :documentation "The name of the operation being marked as an EXTERN"))
+  (:documentation "A directive to mark a particular operation as an extern. I.e. an
+operation that does not have a definition. Names marked as EXTERN can
+be parsed as they appear, and are protected from the optimizing
+compiler, similar to the  effect of a PRESERVE_BLOCK pragma.
+
+NB: A name marked as an EXTERN will take priority over all other
+names. Meaning if, for example, a DEFCIRCUIT is defined with name
+marked as EXTERN, that circuit will be totally ignored by
+compilation passes."))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Gate Definitions
@@ -1302,9 +1316,17 @@ consists of a CONTROLLED-OPERATOR acting on a NAMED-OPERATOR."
 
     * Application is a circuit application.
 
+    * Application is an extern application.
+
     * Application is an invalid application.
 
 Determining this requires the context of the surrounding program."))
+
+(defclass extern-application (application)
+  ()
+  (:documentation "Represents the application of an extern operation. Externs allow the user to bypass the parsing and compilation stages for particular operations that are meant to receive specific definition at the backend compilation stage.
+
+Externs are similar to instances of UNRESOLVED-APPLICATION. They are semantically empty from the perspective of the quantum abstract virtual machine, and cannot be simulated or executed."))
 
 (declaim (inline gate-application-p))
 (defun gate-application-p (x)
@@ -1756,12 +1778,17 @@ For example,
    (executable-program :initarg :executable-code
                        :accessor parsed-program-executable-code
                        :type (vector instruction)
-                       :documentation "A vector of executable Quil instructions."))
+                       :documentation "A vector of executable Quil instructions.")
+   (extern-operations :initarg :extern-operations
+                      :accessor parsed-program-extern-operations
+                      :type hash-table
+                      :documentation "A hash table mapping string NAMEs to generalized booleans, indicating that an operation so named is an extern."))
   (:default-initargs
    :gate-definitions '()
    :circuit-definitions '()
    :memory-definitions '()
-   :executable-code #())
+   :executable-code #()
+   :extern-operations (make-hash-table :test #'equal))
   (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
 (defmethod copy-instance ((parsed-program parsed-program))
@@ -1778,6 +1805,15 @@ For example,
     (setf (parsed-program-executable-code pp)
           (map 'vector #'copy-instance
                (parsed-program-executable-code parsed-program)))
+    (setf (parsed-program-extern-operations pp)
+          (let ((new-table
+                  (make-hash-table :test #'equal))
+                (old-table
+                  (parsed-program-extern-operations parsed-program)))
+            (loop :for key :being :the :hash-key :of old-table
+                    :using (:hash-value value)
+                  :do (setf (gethash key new-table) value))
+            new-table))
     pp))
 
 (defvar *print-parsed-program-text* nil

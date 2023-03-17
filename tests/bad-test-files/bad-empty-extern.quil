@@ -1,0 +1,5 @@
+# "Empty" extern declarations are bad
+
+EXTERN
+
+H 0
