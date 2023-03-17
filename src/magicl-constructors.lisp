@@ -103,3 +103,10 @@ NOTE: When TYPE is not specified the elemnets in LIST are coerced to +DEFAULT-MA
                      nil)))
         (incf (magicl:tref m row col) entry)))
     m))
+
+(defmethod copy-instance ((tensor magicl:abstract-tensor) &key)
+  "Copy a MagiCL tensor, allocating a new array for underlying storage.
+
+No slot-overwrite keyword args are accepted, because the underlying representation of MagiCL matrices should
+be treated as opaque."
+  (magicl:deep-copy-tensor tensor))

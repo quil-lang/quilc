@@ -5,18 +5,84 @@
 
 (in-package #:cl-quil.frontend)
 
-(defgeneric copy-instance (instance)
+(defgeneric copy-instance (instance &key &allow-other-keys)
   (:documentation
    "Create a shallow copy of the object INSTANCE.
-WARNING: The default will work for instances of \"idiomatic\" classes that aren't doing too many crazy things.")
-  (:method ((instance t))
+
+The default will work for instances of \"idiomatic\" subclasses of `standard-object' that aren't doing too
+many crazy things. If you need different behavior, like a deep copy that reallocates some substructure, you
+must define a method yourself.
+
+Subclasses of `structure-object' (i.e. those defined by `defstruct') cannot be generically copied in a
+portable way, as the MOP does not specify operations on `structure-class'. (The SBCL MOP happens to apply to
+`structure-class' in addition to `standard-class', but depending on that fact seems unwise.) If you need to
+`copy-instance' a `structure-object', use `define-copy-struct-instance' to define a specialized method.")
+  (:method ((instance standard-object) &rest slot-overwrites &key &allow-other-keys)
     (let* ((class (class-of instance))
            (copy (allocate-instance class)))
       (dolist (slot (mapcar #'closer-mop:slot-definition-name (closer-mop:class-slots class)))
         (when (slot-boundp instance slot)
           (setf (slot-value copy slot)
                 (slot-value instance slot))))
-      copy)))
+      (apply #'reinitialize-instance copy slot-overwrites))))
+
+(defmacro define-copy-struct-instance ((structure-class
+                                        &key constructor
+                                          (conc-name "" conc-name-p)
+                                          boa-constructor)
+                                       &body slot-names-and-readers)
+  "Define a method on `copy-instance' specialized on STRUCTURE-CLASS.
+
+CONSTRUCTOR, if supplied, should name the constructor function defined by `defstruct'. If the long-form
+`:constructor' argument to `defstruct' is used to define a \"boa-constructor\", you must also supply
+BOA-CONSTRUCTOR as non-NIL.
+
+CONC-NAME, if supplied, should be the same as passed to `defstruct'.
+
+Each of the SLOT-NAMES-AND-READERS should be either a bare symbol, which should match the symbol passed as a
+slot-name to `defstruct', or a list (INITARG READER), where INITARG is a keyword suitable for the constructor
+defined by `defstruct' and READER is the name of a reader function for the slot. If the symbol for is
+supplied, it will be combined with CONC-NAME to produce a reader, and converted into a keyword to produce an
+initarg. If BOA-CONSTRUCTOR is non-NIL and the list form is supplied, the INITARG will be ignored.
+
+If BOA-CONSTRUCTOR is non-NIL, the SLOT-NAMES-AND-READERS must be listed in the same order as they appear in
+the `defstruct' form's `:constructor' arglist."
+  (let* ((conc (if conc-name-p conc-name (format nil "~A-" structure-class)))
+         (instance (gensym "INSTANCE-")))
+    (labels ((format-symbol (format-string &rest format-args)
+               (intern (apply #'format nil format-string format-args)
+                       (symbol-package structure-class)))
+             (reader-name (slot-name)
+               (format-symbol "~A~A" conc slot-name))
+             (make-keyword (slot-name)
+               (if (keywordp slot-name) slot-name
+                   (intern (symbol-name slot-name)
+                           :keyword)))
+             (kwarg-spec (initarg var-name supplied-p)
+               `((,initarg ,var-name) nil ,supplied-p))
+             (boa-constructor-arg (supplied-p new-value reader)
+               `(if ,supplied-p ,new-value
+                    (,reader ,instance))))
+      (let* ((ctor (or constructor
+                       (format-symbol "MAKE-~A" structure-class)))
+
+             (initargs (loop :for slot-spec :in slot-names-and-readers
+                             :if (symbolp slot-spec)
+                               :collect (make-keyword slot-spec)
+                             :else
+                               :collect (make-keyword (first slot-spec))))
+             (readers (loop :for slot-spec :in slot-names-and-readers
+                            :if (symbolp slot-spec)
+                              :collect (reader-name slot-spec)
+                            :else
+                              :collect (second slot-spec)))
+             (slot-args (mapcar #'a:make-gensym initargs))
+             (supplied-p (mapcar #'a:make-gensym initargs))
+             (boa-constructor-args (mapcar #'boa-constructor-arg supplied-p slot-args readers)))
+        `(defmethod copy-instance ((,instance ,structure-class)
+                                   &key ,@(mapcar #'kwarg-spec initargs slot-args supplied-p))
+           (,ctor ,@(if boa-constructor boa-constructor-args
+                        (a:alist-plist (mapcar #'cons initargs boa-constructor-args)))))))))
 
 (defmacro dohash (((key val) hash &optional ret) &body body)
   `(loop :for ,key :being :the :hash-keys :of ,hash

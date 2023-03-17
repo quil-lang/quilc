@@ -52,6 +52,9 @@
   ;; Context token, available for later resolution
   (lexical-context nil :read-only t :type (or null token)))
 
+(define-copy-struct-instance (memory-descriptor)
+  name type length sharing-parent sharing-offset-alist lexical-context)
+
 (defmethod lexical-context ((obj memory-descriptor))
   (memory-descriptor-lexical-context obj))
 
@@ -75,6 +78,9 @@
   ;; The size of this map in bits.
   (size-in-bits nil :read-only t :type unsigned-byte))
 
+(define-copy-struct-instance (memory-alias)
+  name root-memory type length starting-bit size-in-bits)
+
 (defstruct memory-model
   "A fully parsed-out model for the hierarchical memory of a program."
   ;; The alignment, sizeof(REAL), and sizeof(INTEGER), all measured in
@@ -91,6 +97,9 @@
   (roots nil :read-only t :type list)
   ;; A list of MEMORY-ALIAS instances which refer to the roots.
   (aliases nil :read-only t :type list))
+
+(define-copy-struct-instance (memory-model)
+  alignment real-bits integer-bits sizeof names roots aliases)
 
 (defun dividesp (d n)
   "Does D divide N?"

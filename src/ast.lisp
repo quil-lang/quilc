@@ -10,6 +10,10 @@
   "A qubit address."
   (index nil :type unsigned-byte))
 
+(define-copy-struct-instance (qubit :constructor qubit
+                                    :boa-constructor t)
+  index)
+
 (defun qubit= (x y)
   "Do the qubits X and Y have equal indices?"
   (check-type x qubit)
@@ -26,6 +30,10 @@
   "A bare offset into a memory region, used for LOAD and STORE operands."
   (offset nil :read-only t :type integer))
 
+(define-copy-struct-instance (memory-offset :constructor memory-offset
+                                            :boa-constructor t)
+  offset)
+
 (defstruct (memory-ref (:constructor mref (name position &optional descriptor))
                        (:predicate is-mref))
   "A reference into classical memory."
@@ -33,6 +41,10 @@
   (position nil :read-only t :type unsigned-byte)
   ;; The originating memory descriptor. Filled in during analysis.
   (descriptor nil :type (or null memory-descriptor)))
+
+(define-copy-struct-instance (memory-ref :constructor mref
+                                         :boa-constructor t)
+  name position descriptor)
 
 (defun memory-ref= (a b)
   "Do the memory refs A and B represent the same memory ref?"
@@ -61,6 +73,10 @@
   (value nil :type number)
   (value-type quil-real :type quil-type))
 
+(define-copy-struct-instance (constant :constructor constant
+                                       :boa-constructor t)
+  value value-type)
+
 (defun constant= (x y)
   "Do the constants X and Y have equal types and values?"
   (check-type x constant)
@@ -81,6 +97,10 @@
   "A formal parameter. Corresponds to names prepended with `%' in Quil. Represents a numerical value or a classical memory reference."
   (name nil :read-only t :type string))
 
+(define-copy-struct-instance (param :constructor param
+                                    :boa-constructor t)
+  name)
+
 (defun param= (x y)
   "Do parameters X and Y have the same name?"
   (check-type x param)
@@ -92,6 +112,10 @@
                    (:predicate is-formal))
   "A formal argument. Represents a placeholder for a qubit or a memory reference."
   (name nil :read-only t :type string))
+
+(define-copy-struct-instance (formal :constructor formal
+                                     :boa-constructor t)
+  name)
 
 (defun formal= (x y)
   "Do formal arguments X and Y have the same name?"
@@ -121,6 +145,9 @@ EXPRESSION should be an arithetic (Lisp) form which refers to LAMBDA-PARAMS."
   (params nil)
   (lambda-params nil :read-only t)
   (expression nil :read-only t))
+
+(define-copy-struct-instance (delayed-expression :constructor %delayed-expression)
+  params lambda-params expression)
 
 (defun make-delayed-expression (params lambda-params expression)
   "Make a DELAYED-EXPRESSION object initially with parameters PARAMS (probably a list of PARAM objects), lambda parameters LAMBDA-PARAMS, and the form EXPRESSION."
@@ -509,10 +536,8 @@ This replicates some of the behavior of CL-QUIL.CLIFFORD::PAULI, but it extends 
   prefactor
   arguments)
 
-(defmethod copy-instance ((term pauli-term))
-  (make-pauli-term :pauli-word (pauli-term-pauli-word term)
-                   :prefactor (pauli-term-prefactor term)
-                   :arguments (pauli-term-arguments term)))
+(define-copy-struct-instance (pauli-term)
+  pauli-word prefactor arguments)
 
 (defmethod gate-definition-qubits-needed ((gate exp-pauli-sum-gate-definition))
   (length (exp-pauli-sum-gate-definition-arguments gate)))
@@ -1162,6 +1187,22 @@ Each addressing mode will be a vector of symbols:
   (dagger-operator     operator-description)
   (forked-operator     operator-description))
 
+(define-copy-struct-instance (named-operator :constructor named-operator
+                                             :boa-constructor t)
+  (_ named-operator%0))
+
+(define-copy-struct-instance (controlled-operator :constructor controlled-operator
+                                                  :boa-constructor t)
+  (_ controlled-operator%0))
+
+(define-copy-struct-instance (dagger-operator :constructor dagger-operator
+                                              :boa-constructor t)
+  (_ dagger-operator%0))
+
+(define-copy-struct-instance (forked-operator :constructor forked-operator
+                                              :boa-constructor t)
+  (_ forked-operator%0))
+
 (setf (documentation 'named-operator 'function)
       "Describes a gate using a string name, which is later looked up in a table of DEFGATE definitions.  In Quil code, this corresponds to a raw gate name, like ISWAP.")
 (setf (documentation 'controlled-operator 'function)
@@ -1336,22 +1377,43 @@ If this slot is not supplied, then the gate is considered *anonymous*. If this i
 N.B. This slot should not be accessed directly! Consider using GATE-APPLICATION-GATE, or, if you really know what you're doing, %SET-GATE-APPLICATION-GATE."))
   (:documentation "An instruction representing an application of a known gate."))
 
-(defmethod copy-instance ((application gate-application))
-  (if (slot-boundp application 'name-resolution)
-      (make-instance 'gate-application
-                     :operator (copy-instance (application-operator application))
-                     :parameters (mapcar #'copy-instance
-                                         (application-parameters application))
-                     :arguments (mapcar #'copy-instance
-                                        (application-arguments application))
-                     :name-resolution (gate-application-resolution application))
-      (make-instance 'gate-application
-                     :operator (copy-instance (application-operator application))
-                     :parameters (mapcar #'copy-instance
-                                         (application-parameters application))
-                     :arguments (mapcar #'copy-instance
-                                        (application-arguments application))
-                     :gate (copy-instance (gate-application-gate application)))))
+(defmethod copy-instance ((application gate-application)
+                          &key (operator nil operatorp)
+                            (parameters nil parametersp)
+                            (arguments nil argumentsp)
+                            (name-resolution nil name-resolution-p)
+                            (gate nil gatep))
+  "Do a deep copy, and check for errors resulting from inadvisible combos of NAME-RESOLUTION and GATE."
+  (let* ((copy (make-instance 'gate-application
+                              :operator (if operatorp
+                                            operator
+                                            (copy-instance (application-operator application)))
+                              :parameters (if parametersp
+                                              parameters
+                                              (mapcar #'copy-instance (application-parameters application)))
+                              :arguments (if argumentsp
+                                             arguments
+                                             (mapcar #'copy-instance (application-arguments application))))))
+    (cond ((and name-resolution-p gatep)
+           (error "Mutually exclusive options :NAME-RESOLUTION and :GATE in COPY-INSTANCE GATE-APPLICATION"))
+
+          (gatep
+           (%set-gate-application-gate gate copy))
+
+          (name-resolution-p
+           (setf (slot-value copy 'name-resolution)
+                 name-resolution))
+
+          ((slot-boundp application 'name-resolution)
+           (setf (slot-value copy 'name-resolution)
+                 (gate-application-resolution application)))
+
+          ((slot-boundp application 'gate)
+           (%set-gate-application-gate (copy-instance (gate-application-gate application))
+                                       copy))
+
+          (t (error "Neither :NAME-RESOLUTION nor :GATE supplied in COPY-INSTANCE GATE-APPLICATION")))
+    copy))
 
 (defgeneric gate-application-gate (app)
   ;; See the actual definition of this in gates.lisp.
@@ -1764,21 +1826,33 @@ For example,
    :executable-code #())
   (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
-(defmethod copy-instance ((parsed-program parsed-program))
-  (let ((pp (make-instance 'parsed-program)))
-    (setf (parsed-program-gate-definitions pp)
-          (map 'list #'copy-instance
-               (parsed-program-gate-definitions parsed-program)))
-    (setf (parsed-program-circuit-definitions pp)
-          (map 'list #'copy-instance
-               (parsed-program-circuit-definitions parsed-program)))
-    (setf (parsed-program-memory-definitions pp)
-          (map 'list #'copy-instance
-               (parsed-program-memory-definitions parsed-program)))
-    (setf (parsed-program-executable-code pp)
-          (map 'vector #'copy-instance
-               (parsed-program-executable-code parsed-program)))
-    pp))
+(defmethod copy-instance ((parsed-program parsed-program)
+                          &key (gate-definitions nil gate-definitions-p)
+                            (circuit-definitions nil circuit-definitions-p)
+                            (memory-definitions nil memory-definitions-p)
+                            (executable-code nil executable-code-p))
+  "Do a deep copy."
+  (make-instance 'parsed-program
+                 :gate-definitions
+                 (if gate-definitions-p
+                     gate-definitions
+                     (mapcar #'copy-instance
+                             (parsed-program-gate-definitions parsed-program)))
+                 :circuit-definitions
+                 (if circuit-definitions-p
+                     circuit-definitions
+                     (mapcar #'copy-instance
+                             (parsed-program-circuit-definitions parsed-program)))
+                 :memory-definitions
+                 (if memory-definitions-p
+                     memory-definitions
+                     (mapcar #'copy-instance
+                             (parsed-program-memory-definitions parsed-program)))
+                 :executable-code
+                 (if executable-code-p
+                     executable-code
+                     (map 'vector #'copy-instance
+                          (parsed-program-executable-code parsed-program)))))
 
 (defvar *print-parsed-program-text* nil
   "When T, PRINT-OBJECT on a PARSED-PROGRAM will include the program text. Otherwise, only the number of instructions is printed.")
