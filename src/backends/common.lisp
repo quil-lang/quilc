@@ -53,9 +53,17 @@
 
 
 (defun list-available-backends ()
-  ;; This is simpleminded and assumes there isn't some crazy
-  ;; inheritance structure.
-  (mapcar #'class-name (c2mop:class-direct-subclasses (find-class 'backend))))
+  "Return a list of all subclasses of the class named BACKEND"
+  (let ((backends nil))
+    (labels ((add-backends (class)
+               (let ((direct
+                       (c2mop:class-direct-subclasses class)))
+                 (when direct
+                   (setf backends (nconc backends direct))
+                   (dolist (cl direct)
+                     (add-backends cl))))))
+      (add-backends (find-class 'backend))
+      (delete-duplicates backends :test #'eq))))
 
 (defun find-backend (backend-name)
   "Returns the backend class associated with the string BACKEND-NAME."
