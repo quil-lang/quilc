@@ -12,7 +12,8 @@
 (defclass backend ()
   ()
   (:documentation "Every backend must be represented by a subclass of this abstract base class.")
-  (:metaclass abstract-class))
+  ;(:metaclass abstract-class)
+  )
 
 (defgeneric backend-name (backend-class)
   (:documentation "The user-accessible name for BACKEND-CLASS.")
@@ -59,11 +60,11 @@
                (let ((direct
                        (c2mop:class-direct-subclasses class)))
                  (when direct
-                   (setf backends (nconc backends direct))
+                   (setf backends (append backends direct))
                    (dolist (cl direct)
                      (add-backends cl))))))
       (add-backends (find-class 'backend))
-      (delete-duplicates backends :test #'eq))))
+      (mapcar #'class-name (remove-duplicates backends :test #'eq)))))
 
 (defun find-backend (backend-name)
   "Returns the backend class associated with the string BACKEND-NAME."
