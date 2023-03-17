@@ -176,12 +176,19 @@ Return the following values:
   (values blk nil nil))
 
 (defmethod process-instruction (cfg blk (instr extern-application))
-  (declare (ignore cfg))
   (assert (not (null blk)) (blk))
   ;; extern applications should be preserved from nativization and optimization
-  (change-class blk 'preserved-block)
-  (vector-push-extend instr (basic-block-code blk))
-  (values blk nil nil))
+  (let ((extern-blk
+          (find-or-make-block-from-label cfg (label (princ-to-string (gensym "EXTERN-")))))
+        (new-blk
+          (make-instance 'basic-block)))
+    (change-class extern-blk 'preserved-block)
+    (link-blocks blk (unconditional-edge extern-blk))
+    (vector-push-extend instr (basic-block-code extern-blk))
+    (link-blocks extern-blk (unconditional-edge new-blk))
+    ;; we finish with the old block, return a new empty block, and the
+    ;; extern is isolated in a block linked between these two.
+    (values new-blk blk nil)))
 
 
 (defmethod process-instruction (cfg blk (instr pragma-preserve-block))

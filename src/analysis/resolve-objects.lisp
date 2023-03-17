@@ -21,7 +21,7 @@
       (let* ((operator (application-operator instr))
              (addl-qubits (operator-description-additional-qubits operator))
              (name (operator-description-root-name operator))
-             (found-extern (gethash name (parsed-program-externed-operations parsed-program)))
+             (found-extern (gethash name (parsed-program-extern-operations parsed-program)))
              (found-gate-defn (or (find name (parsed-program-gate-definitions parsed-program)
                                         :test #'string=
                                         :key #'gate-definition-name)

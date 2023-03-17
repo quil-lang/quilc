@@ -37,7 +37,7 @@
     :NEG :NOT :AND :IOR :XOR :MOVE :EXCHANGE :CONVERT :ADD :SUB :MUL :DIV
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
-    :DECLARE :SHARING :OFFSET :PRAGMA
+    :DECLARE :SHARING :OFFSET :PRAGMA :EXTERN
     :AS :MATRIX :PERMUTATION :PAULI-SUM :SEQUENCE))
 
 (deftype token-type ()
@@ -148,7 +148,7 @@ Each lexer extension is a function mapping strings to tokens. They are used to h
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM|SEQUENCE"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM|SEQUENCE|EXTERN"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -430,6 +430,10 @@ If the parser does not match, then it should return NIL.")
 
        (let ((*formal-arguments-allowed* t))
          (parse-memory-descriptor tok-lines)))
+
+      ;; Extern Statement
+      ((:EXTERN)
+       (parse-extern tok-lines))
 
       ;; Pragma
       ((:PRAGMA)
@@ -782,6 +786,10 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                               (reverse processed-modifiers)
                               (application-operator app)))
                        (return (values app rest-lines)))))))
+
+(defun parse-extern (tok-lines)
+  (match-line ((extern :EXTERN) (op :NAME)) tok-lines
+    (make-instance 'extern-operation :name (token-payload op))))
 
 (defun parse-parameter-or-expression (toks)
   "Parse a parameter, which may possibly be a compound arithmetic expression. Consumes all tokens given."

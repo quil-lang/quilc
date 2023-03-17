@@ -112,14 +112,15 @@ This also signals ambiguous definitions, which may be handled as needed."
                (gate-definition (push instr gate-defs))
                (circuit-definition (push instr circ-defs))
                (memory-descriptor (push instr memory-defs))
-               (pragma-extern (setf (gethash (slot-value instr 'externed-name) externs) t))
+               (extern-operation 
+                (setf (gethash (extern-operation-name instr) externs) t))
                (t (push instr exec-code)))))
       (mapc #'bin code)
       (make-instance 'parsed-program
                      :gate-definitions (nreverse gate-defs)
                      :circuit-definitions (nreverse circ-defs)
                      :memory-definitions (nreverse memory-defs)
-                     :externed-operations externs
+                     :extern-operations externs
                      :executable-code (coerce (nreverse exec-code)
                                               'simple-vector)))))
 

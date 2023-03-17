@@ -421,6 +421,15 @@ If no exit rewiring is found, return NIL."
   (:documentation "A directive to include another file in a Quil file."))
 
 
+(defclass extern-operation ()
+  ((name :reader extern-operation-name
+         :initarg :name
+         :documentation "The Name of the operation being marked as an EXTERN"))
+  (:documentation "A directive to mark a particular operation as an extern. I.e. an
+operation that does not have a definition. Names marked as EXTERN can
+be parsed as they appear, and are protected from the optimizing
+compiler, similar to the  effect of a PRESERVE_BLOCK pragma."))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Gate Definitions
@@ -1310,9 +1319,9 @@ Determining this requires the context of the surrounding program."))
 
 (defclass extern-application (application)
   ()
-  (:documentation "Represents an externed operation. An extern is expected to receive its definition late in the compilation process, mostly likely for a specialization of cl-quil:backend-compile. 
+  (:documentation "Represents the application of an extern operation. An extern is expected to receive its definition late in the compilation process, mostly likely for a specialization of cl-quil:backend-compile. 
 
-The intent is to allow users to supply definitions to these operations in a form that comports with their compilation target., but to still be able to refer to these operations in their Quil source code."))
+The intent is to allow users to supply definitions to these operations in a form that comports with their compilation target., but to still be able to refer to these initially undefined operations in their Quil source code."))
 
 (declaim (inline gate-application-p))
 (defun gate-application-p (x)
@@ -1765,16 +1774,16 @@ For example,
                        :accessor parsed-program-executable-code
                        :type (vector instruction)
                        :documentation "A vector of executable Quil instructions.")
-   (externed-operations :initarg :externed-operations
-                        :accessor parsed-program-externed-operations
-                        :type hash-table
-                        :documentation "A hash table mapping string NAMEs to generalized booleans, indicating that an operation so named is an extern."))
+   (extern-operations :initarg :extern-operations
+                      :accessor parsed-program-extern-operations
+                      :type hash-table
+                      :documentation "A hash table mapping string NAMEs to generalized booleans, indicating that an operation so named is an extern."))
   (:default-initargs
    :gate-definitions '()
    :circuit-definitions '()
    :memory-definitions '()
    :executable-code #()
-   :externed-operations (make-hash-table :test #'equal))
+   :extern-operations (make-hash-table :test #'equal))
   (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
 
 (defmethod copy-instance ((parsed-program parsed-program))
@@ -1791,11 +1800,11 @@ For example,
     (setf (parsed-program-executable-code pp)
           (map 'vector #'copy-instance
                (parsed-program-executable-code parsed-program)))
-    (setf (parsed-program-externed-operations pp)
+    (setf (parsed-program-extern-operations pp)
           (let ((new-table
                   (make-hash-table :test #'equal))
                 (old-table
-                  (parsed-program-externed-operations pp)))
+                  (parsed-program-extern-operations pp)))
             (loop :for key :being :the :hash-key :of old-table
                     :using (:hash-value value)
                   :do (setf (gethash key new-table) value))
