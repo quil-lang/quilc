@@ -63,7 +63,7 @@
                    (dolist (cl direct)
                      (add-backends cl))))))
       (add-backends (find-class 'backend))
-      (remove-duplicates backends :test #'eq))))
+      (delete-duplicates backends :test #'eq))))
 
 (defun find-backend (backend-name)
   "Returns the backend class associated with the string BACKEND-NAME."
