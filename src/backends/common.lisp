@@ -59,11 +59,11 @@
                (let ((direct
                        (c2mop:class-direct-subclasses class)))
                  (when direct
-                   (setf backends (nconc backends direct))
+                   (setf backends (append backends direct))
                    (dolist (cl direct)
                      (add-backends cl))))))
       (add-backends (find-class 'backend))
-      (delete-duplicates backends :test #'eq))))
+      (mapcar #'class-name (remove-duplicates backends :test #'eq)))))
 
 (defun find-backend (backend-name)
   "Returns the backend class associated with the string BACKEND-NAME."
