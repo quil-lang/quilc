@@ -36,7 +36,7 @@
              (count-if (a:rcurry 'typep 'cl-quil.frontend:extern-application)
                        (cl-quil::parsed-program-executable-code parsed))))
 
-      ;; One of the EXTERN-APPLICATION insances should be a MOO and
+      ;; One of the EXTERN-APPLICATION instances should be a MOO and
       ;; the other should be a CNOT
       (flet ((extern-named ( name)
                (lambda (instr)
