@@ -23,7 +23,11 @@
     (flet ((print-definitions (defns)
              (dolist (defn defns)
                (print-instruction defn stream)
-               (terpri stream))))
+               (terpri stream)))
+           (print-externs (externs)
+             (loop :for name :being :the :hash-keys :of externs
+                   :do (print-instruction (make-instance 'extern :name name) stream)
+                       (fresh-line stream))))
       
       ;; Ensure that any non-standard gates in the program are defined
       ;; TODO: handle non-simple gates
@@ -32,6 +36,7 @@
                       (loop :for k :being :the :hash-key :of **default-gate-definitions**
                             :collect k)))
             (defgates (parsed-program-gate-definitions pp))
+            (externs (parsed-program-extern-operations pp))
             (simple-gates (map 'list
                                #'gate-application-gate
                                (remove-if-not (lambda (inst)
@@ -44,7 +49,7 @@
           (unless (member (slot-value gate 'name) defined-gate-names)
             (push (make-instance 'static-gate-definition :name (slot-value gate 'name) :entries (coerce (slot-value (simple-gate-matrix gate) 'magicl::storage) 'list)) defgates)))
         
-
+        (print-externs externs)
         (print-definitions (parsed-program-memory-definitions pp))
 
         ;; instructions and single-line definitions (e.g. DECLARE) do
