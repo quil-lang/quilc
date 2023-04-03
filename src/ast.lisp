@@ -1657,6 +1657,9 @@ For example,
     (format stream "MEASURE ~/cl-quil:instruction-fmt/"
             (measurement-qubit instr)))
 
+  (:method ((instr extern) (stream stream))
+    (format stream "EXTERN ~A" (extern-name instr)))
+
   (:method ((instr application) (stream stream))
     (print-operator-description (application-operator instr) stream)
     (format stream "~@[(~{~/cl-quil:instruction-fmt/~^, ~})~]~{ ~/cl-quil:instruction-fmt/~}"
