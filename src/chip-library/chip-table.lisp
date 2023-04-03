@@ -41,3 +41,5 @@ returns nil if not found."
 (install-chip-builder "16QMUX" 'q::build-16QMUX-chip)
 (install-chip-builder "bristlecone" 'q::build-bristlecone-chip)
 (install-chip-builder "ibmqx5" 'q::build-ibm-qx5)
+(install-chip-builder "linear" (lambda (nQ) (q::build-nq-linear-chip nQ)))
+(install-chip-builder "fully-connected" (lambda (nQ) (q::build-nq-fully-connected-chip nQ)))
