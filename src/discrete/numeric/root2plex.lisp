@@ -94,7 +94,7 @@
       (negate (floor (negate x)))))
 
   (define-instance ((Num :a) => (Linear (Root2plex :a) :a))
-    (define (.* s v)
+    (define (s* s v)
       (match v
         ((Root2plex a b)
          (Root2plex (* s a) (* s b))))))

@@ -151,10 +151,10 @@ to Corrolary 19 (arXiv:1212.6253v2)."
         ;; Base case finds an a + b√2 with an even a-term
         (match (interval-solution
                 ;; [x_0 / √2, x_1 / √2]
-                (*. x-set (Root2plex 0 (exact/ 1 2)))
+                (*s x-set (Root2plex 0 (exact/ 1 2)))
                 ;; [-y_1 / √2, -y_0 / √2]
-                (.* (the (Root2plex Fraction) -1)
-                    (*. y-set (Root2plex 0 (exact/ 1 2)))))
+                (s* (the (Root2plex Fraction) -1)
+                    (*s y-set (Root2plex 0 (exact/ 1 2)))))
           ;; Give a + b √2
           ;; Return (2 * b) + a √2
           ((Root2plex a b) (Root2plex (* 2 b) a)))
@@ -238,7 +238,7 @@ rotation of the original vector U. That is:
     (let u-a = (- (norm u) l))
     ;; (sin (arccos x)) = √(1 - x²)
     (let u-b = (sqrt (- 1 (^ u-a 2))))
-    (Tuple (.* u-a u) (.* u-b u-orth)))
+    (Tuple (s* u-a u) (s* u-b u-orth)))
 
   (declare j-sub-interval (Fraction -> (Interval Fraction) -> Integer
                                     -> (Interval Fraction)))
@@ -378,8 +378,8 @@ Lemma 17 and this function corresponds to Theorem 22 in (arXiv:1212.6253v2)."
       (let x0 = (parallelogram-segment lin delta-x beta-hat))
       (let alpha-interval =
         (if negate-x?
-            (.* scale (Interval (- x0 (into l-rational)) x0))
-            (.* scale (Interval x0 (+ x0 (into l-rational))))))
+            (s* scale (Interval (- x0 (into l-rational)) x0))
+            (s* scale (Interval x0 (+ x0 (into l-rational))))))
       (let a-odd? = (odd? (root2-real-part beta)))
       (let alpha = (rescaled-interval-solution
                     (not a-odd?) alpha-interval conj-interval))

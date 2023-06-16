@@ -147,7 +147,8 @@ half of Algorithm 23 (arXiv:1212.6253v2)."
                 (into x)))))
        (find-candidate attempts epsilon theta n))))
 
-  (monomorphize)
+  ;; TODO: monomorphize was here but it won't compile as of Fri Jun 16 10:32:29 PDT 2023
+  ;; (monomorphize)
   (declare generate-maform-output-with-double
            (Integer -> Integer -> Double-Float -> Double-float -> (Optional (List OutputGate1))))
   (define (generate-maform-output-with-double candidate-attempts prime-attempts epsilon theta)
@@ -219,4 +220,8 @@ See `generate-solution' for information about EPSILON and THETA."
                                      (map into ma)))))))))
     (same-type theta
                (global-phase-invariant-distance
-                m1 (map cyclotomic8->complex m2)))))
+                m1 (map cyclotomic8->complex m2))))
+
+
+
+)
