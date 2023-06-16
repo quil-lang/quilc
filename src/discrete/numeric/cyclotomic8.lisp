@@ -188,9 +188,9 @@
               (fraction->reciprocable (to-fraction x)))
             y)
       ((Cyclotomic8 a b c d)
-       (+ (+ (.* a (cis (/ (* 3 pi) 4)))
-             (.* b (cis (/ pi 2))))
-          (+ (.* c (cis (/ pi 4)))
+       (+ (+ (s* a (cis (/ (* 3 pi) 4)))
+             (s* b (cis (/ pi 2))))
+          (+ (s* c (cis (/ pi 4)))
              (complex d 0))))))
 
   (define-instance ((Complex :a)

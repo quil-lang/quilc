@@ -24,31 +24,31 @@ For example an N x N matrix has degree N."
     (degree (:a -> Integer)))
 
   (define-class ((Scalar :v :s) => (Linear :v :s))
-    "Defines scalar multiplication where (.* x (+ v u)) = (+ (.* x u) (.* x v))"
-    (.* (:s -> :v -> :v)))
+    "Defines scalar multiplication where (s* x (+ v u)) = (+ (s* x u) (s* x v))"
+    (s* (:s -> :v -> :v)))
 
-  (declare *. ((Linear :v :e) (Num :e) => (:v -> :e -> :v)))
-  (define (*. v s) (.* s v))
+  (declare *s ((Linear :v :e) (Num :e) => (:v -> :e -> :v)))
+  (define (*s v s) (s* s v))
 
-  (declare ./ ((Linear :v :e) (Reciprocable :e)
+  (declare s/ ((Linear :v :e) (Reciprocable :e)
                => (:e -> :v -> :v)))
-  (define (./ s v) (.* (/ 1 s) v))
+  (define (s/ s v) (s* (/ 1 s) v))
 
-  (declare /. ((Linear :v :e) (Reciprocable :e)
+  (declare /s ((Linear :v :e) (Reciprocable :e)
                => (:v -> :e  -> :v)))
-  (define (/. v s) (./ s v))
+  (define (/s v s) (s/ s v))
 
   (define-class ((Linear :v :e) => (Inner :v :e))
     "An (indefinite) inner product that should satisfy:
     - (<.> x y) = (<.> y x)
-    - (<.> z (+ (.* a x) (.* b y))) = (+ (*. (<.> z x) a) (*. (<.> z y) b)) "
+    - (<.> z (+ (s* a x) (s* b y))) = (+ (*s (<.> z x) a) (*s (<.> z y) b)) "
     (<.> (:v -> :v -> :e)))
 
   ;; Note that normed spaces are a superset of definite inner product spaces.
   (define-class ((Linear :v :e) => (Normed :v :e))
     "A (indefinite) normed space that should satisify
     - (norm (+ x y)) <= (+ (norm x) (norm y))
-    - (norm (.* s x)) = (* |s| (norm x))"
+    - (norm (s* s x)) = (* |s| (norm x))"
     (norm (:v -> :e)))
 
   (declare square-norm ((Inner :v :e) => (:v -> :e)))
@@ -263,7 +263,7 @@ Hermitian adjoint, or related involution - often notated †."
 
   (define-instance ((Complex :e) (Num :e) (Num (Complex :e))
                     => (Linear (Complex :e) :e))
-    (define (.* s v)
+    (define (s* s v)
       (complex (* s (real-part v)) (* s (imag-part v)))))
 
   (define-instance ((Linear (Complex :e) :e) (Complex :e)

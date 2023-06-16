@@ -54,7 +54,7 @@
       (Interval (fromInt a) (fromInt a))))
 
   (define-instance ((Ord :r) (Num :r) => (Linear (Interval :r) :r))
-    (define (.* a i)
+    (define (s* a i)
       (match i
         ((Interval l r)
          (if (>= a 0)

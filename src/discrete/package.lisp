@@ -33,8 +33,10 @@
    )
   ;; linear-algebra.lisp
   (:export
-   #:.*
-   #:*.
+   #:s*
+   #:*s
+   #:/s
+   #:s/
    #:Inner
    #:<.>
    #:square-norm
