@@ -26,5 +26,9 @@
    (("compile_protoquil" compile-protoquil) quil-program ((program quil-program) (chip-spec chip-specification)))
    (("build_nq_linear_chip" cl-quil::build-nq-linear-chip) chip-specification ((n :int)))
    (("chip_spec_from_isa_descriptor" quilc::lookup-isa-descriptor-for-name) chip-specification ((descriptor :string)))
-   (("print_chip_spec" cl-quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))))
+   (("print_chip_spec" cl-quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))
+   (("parse_chip_spec_isa_json" cl-quil::qpu-hash-table-to-chip-specification) chip-specification ((isa-json :string)))
+   (("program_string" program-to-string) :string ((program quil-program)))))
 
+(defun program-to-string (program)
+  (cl-quil.frontend:print-parsed-program program s))

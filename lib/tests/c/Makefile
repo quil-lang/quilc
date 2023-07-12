@@ -12,7 +12,7 @@ endif
 all: $(TEST_SRCS:.c=)
 
 %: %.c
-	gcc $(CCFLAGS) $< -o $@
+	gcc $< -o $@ $(CCFLAGS)
 
 clean:
 	rm -f $(TEST_SRCS:.c=)
