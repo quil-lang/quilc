@@ -36,7 +36,7 @@
   (let* ((num-qubits (num-qubits c))
          (num-points (clifford-perm-degree num-qubits))
          (rep (perm::iota-vector (1+ num-points))))
-    (dotimes (i num-points (perm::%make-perm :rep rep))
+    (dotimes (i num-points (perm::%make-perm rep))
       ;; The 2*(2 + i) and x/2 - 2 are to convert in/out from integers
       ;; which keep track of +-i/I and which don't.
       (let* ((p (integer-pauli (%adjoin-details i) num-qubits))
