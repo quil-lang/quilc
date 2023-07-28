@@ -23,6 +23,6 @@ if __name__ == '__main__':
         die('unable to compile program')
 
     libquilc.quilc_print_program(processed_program);
-    libquilc.quilc_release_handle(program)
-    libquilc.quilc_release_handle(processed_program)
-    libquilc.quilc_release_handle(chip_spec)
+    libquilc.lisp_release_handle(program)
+    libquilc.lisp_release_handle(processed_program)
+    libquilc.lisp_release_handle(chip_spec)
