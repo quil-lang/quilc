@@ -1,5 +1,7 @@
 (in-package #:libquilc)
 
+(defvar *last-error* "")
+
 (sbcl-librarian:define-handle-type quil-program "quil_program")
 (sbcl-librarian:define-handle-type chip-specification "chip_specification")
 
@@ -8,7 +10,7 @@
   ("ERROR_FAIL" 1))
 (sbcl-librarian:define-error-map error-map error-type 0
   ((t (lambda (condition)
-        (declare (ignore condition))
+        (setf *last-error* (format nil "~a" condition))
         (return-from error-map 1)))))
 
 (defun compile-protoquil (parsed-program chip-specification)
@@ -28,7 +30,14 @@
    (("chip_spec_from_isa_descriptor" quilc::lookup-isa-descriptor-for-name) chip-specification ((descriptor :string)))
    (("print_chip_spec" cl-quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))
    (("parse_chip_spec_isa_json" cl-quil::qpu-hash-table-to-chip-specification) chip-specification ((isa-json :string)))
-   (("program_string" program-to-string) :string ((program quil-program)))))
+   (("program_string" program-to-string) :string ((program quil-program)))
+   (("error" quilc-last-error) :string ())))
 
 (defun program-to-string (program)
   (cl-quil.frontend:print-parsed-program program s))
+
+(defun quilc-last-error ()
+  "Returns the most recent error raised by quilc. The error is then cleared."
+  (let ((last-error *last-error*))
+    (setf *last-error* "")
+    last-error))
