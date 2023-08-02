@@ -1,7 +1,7 @@
 FROM ubuntu:20.04 as dev
 
 # Build variables
-ARG QUICKLISP_VERSION=2022-04-01
+ARG QUICKLISP_VERSION=2023-06-18
 ARG QUICKLISP_URL=http://beta.quicklisp.org/dist/quicklisp/${QUICKLISP_VERSION}/distinfo.txt
 
 # Dependencies
