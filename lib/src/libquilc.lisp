@@ -29,15 +29,19 @@
    (("build_nq_linear_chip" cl-quil::build-nq-linear-chip) chip-specification ((n :int)))
    (("chip_spec_from_isa_descriptor" quilc::lookup-isa-descriptor-for-name) chip-specification ((descriptor :string)))
    (("print_chip_spec" cl-quil::debug-print-chip-spec) :void ((chip-spec chip-specification)))
-   (("parse_chip_spec_isa_json" cl-quil::qpu-hash-table-to-chip-specification) chip-specification ((isa-json :string)))
+   (("parse_chip_spec_isa_json" parse-chip-spec-isa-json) chip-specification ((isa-json :string)))
    (("program_string" program-to-string) :string ((program quil-program)))
    (("error" quilc-last-error) :string ())))
 
 (defun program-to-string (program)
-  (cl-quil.frontend:print-parsed-program program s))
+  (with-output-to-string (s)
+    (cl-quil.frontend:print-parsed-program program s)))
 
 (defun quilc-last-error ()
   "Returns the most recent error raised by quilc. The error is then cleared."
   (let ((last-error *last-error*))
     (setf *last-error* "")
     last-error))
+
+(defun parse-chip-spec-isa-json (isa-json)
+  (cl-quil::qpu-hash-table-to-chip-specification (yason:parse isa-json)))
