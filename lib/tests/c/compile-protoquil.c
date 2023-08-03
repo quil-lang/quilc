@@ -27,7 +27,16 @@ int main(int argc, char **argv) {
   if (quilc_compile_protoquil(program, chip_spec, &processed_program) != ERROR_SUCCESS)
     die("unable to compile program");
 
-  quilc_print_program(processed_program);
+  int compiled_program_length = 0;
+  if (quilc_program_length(processed_program, &compiled_program_length) != ERROR_SUCCESS)
+    die("unable to get program length");
+
+  char* program_string = malloc(compiled_program_length*sizeof(char));
+  if (quilc_program_string(processed_program, &program_string) != ERROR_SUCCESS)
+    die("unable to get program string");
+
+  printf("%s\n", program_string);
+
   lisp_release_handle(program);
   lisp_release_handle(processed_program);
   lisp_release_handle(chip_spec);

@@ -1,0 +1,6 @@
+libquilc.so-*
+libquilc.dylib-*
+libquilc.py
+libquilc.c
+libquilc.h
+libquilc.core
