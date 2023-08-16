@@ -52,6 +52,5 @@ RUN make dump-version-info install-test-deps
 RUN git clean -fdx && make ${build_target} install && ldconfig
 
 EXPOSE 5555
-EXPOSE 6000
 
 ENTRYPOINT ["./quilc"]

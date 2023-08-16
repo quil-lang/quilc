@@ -220,9 +220,9 @@ you would like to change the port of the server to PORT, you can alter the comma
 docker run --rm -it -p PORT:PORT rigetti/quilc -R -p PORT
 ```
 
-Ports 5555 and 6000 are exposed using the EXPOSE directive in the `rigetti/quilc` image, so
-you can additionally use the `-P` option to automatically bind these container ports to randomly
-assigned host ports. You can then inspect the mapping using `docker port CONTAINER [PORT]`.
+Port 5555 is exposed using the EXPOSE directive in the `rigetti/quilc` image, so
+you can additionally use the `-P` option to automatically bind this container port to a randomly
+assigned host port. You can then inspect the mapping using `docker port CONTAINER [PORT]`.
 
 ## Release Process
 
