@@ -4,7 +4,7 @@
 
 (asdf:defsystem #:cl-quil
   :description "A parser and optimizing compiler for the Quantum Instruction Language (Quil)."
-  :author "Robert Smith, Eric Peterson, Rigetti Computing, and Quil-Lang contributors"
+  :author "Robert Smith, Eric Peterson, Rigetti Computing, HRL Laboratories, and Quil-Lang contributors"
   :license "Apache License 2.0 (See LICENSE.txt)"
   :version (:read-file-form "VERSION.txt")
   :pathname "src/"
@@ -137,7 +137,7 @@
                (:file "gates")
                (:file "build-gate")
                (:file "with-inst")
-               (:file "transformable-mixin") 
+               (:file "transformable-mixin")
                (:module "clifford"
                 :serial t
                 :components ((:file "qubit-algebra")
@@ -381,8 +381,8 @@
   :pathname "src/smt/"
   :serial t
   :components ((:file "package")
-	       (:file "solver")
-	       (:file "constraint-addresser")
+               (:file "solver")
+               (:file "constraint-addresser")
                (:file "segment-2q")
                (:file "tan-cong")))
 
@@ -397,3 +397,32 @@
   :serial t
   :components ((:file "smt-tests")))
 
+(asdf:defsystem #:cl-quil/match
+  :description "An implementation of the pattern matcher by Iten et al."
+  :author "Brennen Hill, HRL Laboratories"
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/match-tests)))
+  :pathname "src/match/"
+  :serial t
+  :components ((:file "package")
+               (:file "macros")
+               (:file "gate")
+               (:file "data-structures")
+               (:file "forward-match")
+               (:file "backward-match")
+               (:file "pattern-match")
+               (:file "pattern-replace")
+               (:file "test-gate")
+               (:file "print")))
+
+(asdf:defsystem #:cl-quil/match-tests
+  :description "Tests for cl-quil/match"
+  :author "Brennen Hill, HRL Laboratories"
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil/match #:fiasco)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.match-tests
+                                           '#:run-match-tests))
+  :pathname "tests/"
+  :serial t
+  :components ((:file "match-tests")))
