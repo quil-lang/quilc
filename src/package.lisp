@@ -733,6 +733,12 @@
    #:simplify-individual-instructions   ; TRANSFORM
    )
 
+
+  ;; analysis/process-protoquil.lisp
+  (:export
+   #:process-protoquil                  ; TRANSFORM
+   )
+
   (:shadow
    #:pi)
   )
