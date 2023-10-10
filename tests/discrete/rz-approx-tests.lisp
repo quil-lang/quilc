@@ -79,10 +79,10 @@
                           (Interval 0 (Root2plex
                                        (^^ 10 -200) 0)))
 
-  (test-interval-solution (Interval (*. xy (best-approx -2.42))
-                                    (*. root2 (best-approx 2.33)))
-                          (Interval (*. root2 (best-approx -2.2))
-                                    (*. xy (best-approx 2.4)))))
+  (test-interval-solution (Interval (*s xy (best-approx -2.42))
+                                    (*s root2 (best-approx 2.33)))
+                          (Interval (*s root2 (best-approx -2.2))
+                                    (*s xy (best-approx 2.4)))))
 
 (define-test j-sub-intervals ()
   (let epsilon = 0.05)
@@ -127,7 +127,7 @@ Corresponds to Lemma 21 (Selinger, 2014)."
     (let alpha = (real-part u))
     (let beta  = (imag-part u))
     (let z = (exp (complex 0 (/ theta -2))))
-    (let u-hat = (*. (complex (map (fn (x) (exact/ x 1)) alpha)
+    (let u-hat = (*s (complex (map (fn (x) (exact/ x 1)) alpha)
                               (map (fn (x) (exact/ x 1)) beta))
                      (^^ (the (Root2plex Fraction) root2) (negate k))))
     (let u-hat-float = (complex

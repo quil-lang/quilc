@@ -113,7 +113,6 @@
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
                #:optima
-
                #+sbcl #:sb-rotate-byte
                )
   :pathname "src/"
