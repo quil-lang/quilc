@@ -116,24 +116,18 @@ Comes in two flavors:
   "Binary operator that safely applies to possibly mixed arguments of NUMBER / DELAYED-EXPRESSION objects. Returns a NUMBER when possible, and a DELAYED-EXPRESSION otherwise."
   (flet ((decompose (arg)
            "Returns a values tuple: PARAMS LAMBDA-PARAMS EXPRESSION DELAYEDP"
-           (optima:match arg
-             ((delayed-expression (params arg-params)
-                                  (lambda-params arg-lambda-params)
-                                  (expression arg-expression))
-              (values
-               arg-params
-               arg-lambda-params
-               arg-expression
-               t))
-             ((memory-ref)
-              (values
-               nil
-               nil
-               arg
-               t))
-             ((constant (value val))
-              (values nil nil val nil))
-             (_
+           (typecase arg
+             (delayed-expression
+              (with-slots (params lambda-params expression) arg
+                (values params lambda-params expression t)))
+
+             (memory-ref
+              (values nil nil arg t))
+
+             (constant
+              (values nil nil (constant-value arg) nil))
+
+             (t
               (values nil nil arg nil)))))
     (multiple-value-bind (params-1 lambda-params-1 expression-1 delayedp-1) (decompose arg1)
       (multiple-value-bind (params-2 lambda-params-2 expression-2 delayedp-2) (decompose arg2)

@@ -19,7 +19,6 @@
                #:uiop
                #:split-sequence
                #:closer-mop
-               #:optima
                #:cl-algebraic-data-type
                #:global-vars
                #:trivial-garbage        ; weak hash tables
@@ -112,7 +111,6 @@
                #:magicl/ext-lapack      ; for gate fusion
                #:global-vars            ; Static globals
                #:salza2                 ; God table compression
-               #:optima
                #+sbcl #:sb-rotate-byte
                )
   :pathname "src/"
