@@ -11,8 +11,8 @@
   (:nicknames #:quilt)
   (:use #:cl
         #:cl-quil.frontend
-        #:abstract-classes
-        #:singleton-classes)
+        #:org.tfeb.hax.abstract-classes
+        #:org.tfeb.hax.singleton-classes)
   ;; We define a number of methods on generic functions from
   ;; CL-QUIL. We import these here, as well as other internal symbols
   ;; that we want to get our hands on.
