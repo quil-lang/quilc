@@ -27,8 +27,8 @@
 (defpackage #:cl-quil.frontend
   (:use #:cl
         #:parse-float
-        #:abstract-classes
-        #:singleton-classes)
+        #:org.tfeb.hax.abstract-classes
+        #:org.tfeb.hax.singleton-classes)
   (:local-nicknames (#:a #:alexandria))
   ;; frontend-options.lisp
   (:export
@@ -741,7 +741,7 @@
   (:use #:cl
         #:cl-quil.resource
         #:cl-quil.frontend
-        #:abstract-classes)
+        #:org.tfeb.hax.abstract-classes)
   (:local-nicknames (#:a #:alexandria))
   
   ;; options.lisp
