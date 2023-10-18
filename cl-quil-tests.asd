@@ -40,7 +40,7 @@
                (:file "cfg-tests")
                (:file "defcircuit-tests")
                (:file "compilation-tests")
-               ;(:file "clifford-tests")
+               (:file "clifford-tests")
                (:file "translator-tests")
                (:file "rewrite-tests")
                (:file "state-prep-tests")
