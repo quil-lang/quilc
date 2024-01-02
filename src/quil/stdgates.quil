@@ -28,107 +28,77 @@ DEFGATE H:
 
 ## Cartesian Rotation Gates
 
-DEFGATE RX(%theta):
-    cos(%theta/2),    -i*sin(%theta/2)
-    -i*sin(%theta/2), cos(%theta/2)
+DEFGATE RX(%theta) p AS PAULI-SUM:
+    X(%theta/2) p
 
-DEFGATE RY(%theta):
-    cos(%theta/2), -sin(%theta/2)
-    sin(%theta/2), cos(%theta/2)
+DEFGATE RY(%theta) p AS PAULI-SUM:
+    Y(%theta/2) p
 
-DEFGATE RZ(%theta):
-    cis(-%theta/2), 0
-    0,              cis(%theta/2)
+DEFGATE RZ(%theta) p AS PAULI-SUM:
+    Z(%theta/2) p
 
 
 ## Controlled-NOT Variants
 
-DEFGATE CNOT:
-    1, 0, 0, 0
-    0, 1, 0, 0
-    0, 0, 0, 1
-    0, 0, 1, 0
+DEFGATE CNOT p q AS SEQUENCE:
+    CONTROLLED X p q
 
 # Also known as the Toffoli gate.
-DEFGATE CCNOT:
-    1, 0, 0, 0, 0, 0, 0, 0
-    0, 1, 0, 0, 0, 0, 0, 0
-    0, 0, 1, 0, 0, 0, 0, 0
-    0, 0, 0, 1, 0, 0, 0, 0
-    0, 0, 0, 0, 1, 0, 0, 0
-    0, 0, 0, 0, 0, 1, 0, 0
-    0, 0, 0, 0, 0, 0, 0, 1
-    0, 0, 0, 0, 0, 0, 1, 0
-
+DEFGATE CCNOT p q r AS SEQUENCE:
+    CONTROLLED CONTROLLED X p q r
 
 ## Phase Gates
 
+# Equivalent to RZ(pi/2) up to global phase
 DEFGATE S:
     1, 0
     0, i
 
+# Equivalent to RZ(pi/4) up to global phase
 DEFGATE T:
     1, 0
     0, cis(pi/4)
 
+# Equivalent to RZ(%alpha) up to global phase
 DEFGATE PHASE(%alpha):
     1, 0
     0, cis(%alpha)
 
-DEFGATE CPHASE00(%alpha):
-    cis(%alpha), 0, 0, 0
-    0,           1, 0, 0
-    0,           0, 1, 0
-    0,           0, 0, 1
+DEFGATE CPHASE(%alpha) p q AS SEQUENCE:
+    CONTROLLED PHASE(%alpha) p q
 
-DEFGATE CPHASE01(%alpha):
-    1, 0,           0, 0
-    0, cis(%alpha), 0, 0
-    0, 0,           1, 0
-    0, 0,           0, 1
+DEFGATE CPHASE00(%alpha) p q AS SEQUENCE:
+    X p
+    X q
+    CONTROLLED PHASE(%alpha) p q
+    X p
+    X q
 
-DEFGATE CPHASE10(%alpha):
-    1, 0, 0,           0
-    0, 1, 0,           0
-    0, 0, cis(%alpha), 0
-    0, 0, 0,           1
+DEFGATE CPHASE01(%alpha) p q AS SEQUENCE:
+    X p
+    CONTROLLED PHASE(%alpha) p q
+    X p
 
-DEFGATE CPHASE(%alpha):
-    1, 0, 0, 0
-    0, 1, 0, 0
-    0, 0, 1, 0
-    0, 0, 0, cis(%alpha)
+DEFGATE CPHASE10(%alpha) p q AS SEQUENCE:
+    X q
+    CONTROLLED PHASE(%alpha) p q
+    X q
 
-DEFGATE CZ:
-    1, 0, 0,  0
-    0, 1, 0,  0
-    0, 0, 1,  0
-    0, 0, 0, -1
+DEFGATE CZ p q AS SEQUENCE:
+    CONTROLLED Z p q
 
 ## Swap Gates
 
-DEFGATE SWAP:
-    1, 0, 0, 0
-    0, 0, 1, 0
-    0, 1, 0, 0
-    0, 0, 0, 1
+DEFGATE SWAP AS PERMUTATION:
+    0, 2, 1, 3
 
 # Also known as the Fredkin gate.
-DEFGATE CSWAP:
-    1, 0, 0, 0, 0, 0, 0, 0
-    0, 1, 0, 0, 0, 0, 0, 0
-    0, 0, 1, 0, 0, 0, 0, 0
-    0, 0, 0, 1, 0, 0, 0, 0
-    0, 0, 0, 0, 1, 0, 0, 0
-    0, 0, 0, 0, 0, 0, 1, 0
-    0, 0, 0, 0, 0, 1, 0, 0
-    0, 0, 0, 0, 0, 0, 0, 1
+DEFGATE CSWAP p q r AS SEQUENCE:
+    CONTROLLED SWAP p q r
 
-DEFGATE ISWAP:
-    1, 0, 0, 0
-    0, 0, i, 0
-    0, i, 0, 0
-    0, 0, 0, 1
+DEFGATE ISWAP p q AS PAULI-SUM:
+    XX(pi/4) p q
+    YY(pi/4) p q
 
 DEFGATE SQISWAP:
     1, 0,         0,         0
@@ -159,11 +129,10 @@ DEFGATE XY(%theta):
     0, i*sin(%theta/2), cos(%theta/2),   0
     0, 0,               0,               1
 
-DEFGATE CAN(%alpha, %beta, %gamma):
-    (cis((%alpha+%beta-%gamma)/2)+cis((%alpha-%beta+%gamma)/2))/2, 0, 0, (cis((%alpha-%beta+%gamma)/2)-cis((%alpha+%beta-%gamma)/2))/2
-    0, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, 0
-    0, (cis((%alpha+%beta+%gamma)/(-2))-cis((%beta+%gamma-%alpha)/2))/2, (cis((%alpha+%beta+%gamma)/(-2))+cis((%beta+%gamma-%alpha)/2))/2, 0
-    (cis((%alpha-%beta+%gamma)/2)-cis((%alpha+%beta-%gamma)/2))/2, 0, 0, (cis((%alpha+%beta-%gamma)/2)+cis((%alpha-%beta+%gamma)/2))/2
+DEFGATE CAN(%alpha, %beta, %gamma) p q AS PAULI-SUM:
+    XX(%alpha/2) p q
+    YY(%beta/2) p q
+    ZZ(%gamma/2) p q
 
 DEFGATE BLOCH(%alpha, %beta, %gamma) q AS PAULI-SUM:
     X(%alpha) q
