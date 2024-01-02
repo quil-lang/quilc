@@ -1,0 +1,12 @@
+# Input
+DEFGATE SQRTSWAP p q AS PAULI-SUM:
+    XX(pi/8) p q
+    YY(pi/8) p q
+    ZZ(pi/8) p q
+# Output
+DEFGATE SQRTSWAP p q AS PAULI-SUM:
+    XX(pi/8) p q
+    YY(pi/8) p q
+    ZZ(pi/8) p q
+
+

@@ -1738,7 +1738,7 @@ For example,
         (format stream "    ~a(" pauli-word)
         (typecase prefactor
           (number
-           (format stream "~a" prefactor))
+           (format-real prefactor stream))
           ((or symbol cons)
            (print-instruction (make-delayed-expression nil nil prefactor) stream)))
         (format stream ")")
