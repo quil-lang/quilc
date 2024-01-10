@@ -1,0 +1,7 @@
+# zero-length vector
+
+DECLARE r BIT[0]
+
+I 0
+
+MEASURE 0 r[0]
