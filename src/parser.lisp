@@ -1301,7 +1301,10 @@ If REQUIRE-INDENT is T, a parse error is signalled if entries are not properly i
       (:aref
        (let ((top-token (pop line)))
          (setf type (parse-quil-type (car (token-payload top-token))))
-         (setf length (cdr (token-payload top-token))))))
+         (let ((vector-length (cdr (token-payload top-token))))
+           (when (= 0 vector-length)
+             (quil-parse-error "Expected non-zero-length vector in DECLARE."))
+           (setf length vector-length)))))
 
     ;; Check for SHARING
     (unless (endp line)
