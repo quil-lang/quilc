@@ -226,7 +226,7 @@ Return the following values:
   ;; is the current block non-empty?
   (unless (zerop (length (basic-block-code blk)))
     ;; build a new block with an unconditional edge coming from the old one
-    (let ((new-blk (find-or-make-block-from-label cfg (label (princ-to-string (gensym "RESET-"))))))
+    (let ((new-blk (make-instance 'basic-block :name (gensym "RESET-"))))
       (link-blocks blk
                    (unconditional-edge new-blk))
       (setf blk new-blk)))
@@ -415,9 +415,15 @@ Return the following values:
         (let ((blk (pop dirty)))
           (when (= 1 (num-edges-in blk))
             (let ((parent (first (parents-without-self blk))))
-              ;; Check each merging condition until one has been reached, which then applies a specific operation to merge the blocks.
+              ;; Check each merging condition until one has been
+              ;; reached, which then applies a specific operation to
+              ;; merge the blocks.
               (cond
-                ;; Condition 1) Extended self-loops can be merged into smaller self loops if there is only 1 edge incoming (excluding self loops, 1 child, if the child is the same block as the parent, and if there is no code within the block
+                ;; Condition 1) Extended self-loops can be merged into
+                ;; smaller self loops if there is only 1 edge incoming
+                ;; (excluding self loops, 1 child, if the child is the
+                ;; same block as the parent, and if there is no code
+                ;; within the block
                 ((and
                   (= 1 (length (children blk)))
                   (eq parent (first (children blk)))
@@ -453,27 +459,36 @@ Return the following values:
                  ;; Add the parent to the node list
                  (add-dirty-block parent))
 
-                ;; Condition 2) Paths can be contracted when a block has one parent, that parent has one outgoing edge, and neither are the exit or entry block. There is
-                ;; also the extra condition that and edge cannot be contracted if doing so would cause previously isolated code to be possibly run within a loop.
-                ((and (or (empty-block-p blk)
-                          (not (> (length (children parent)) 1)))
-                      (or (empty-block-p parent)
-                          (not (find blk (incoming blk))))
-                      (= 1 (length (children parent)))
-                      (or (and (typep parent 'preserved-block)
-                               (typep blk 'preserved-block))
-                          (and (not (typep parent 'preserved-block))
-                               (not (typep blk 'preserved-block))))
-                      (or (typep blk 'reset-block)
-                          (not (basic-block-out-rewiring parent))
-                          (not (basic-block-in-rewiring blk))
-                          (equalp (basic-block-out-rewiring parent)
-                                  (basic-block-in-rewiring blk))))
-
+                ;; Condition 2) Paths can be contracted when a block
+                ;; has one parent, that parent has one outgoing edge,
+                ;; and neither are the exit or entry block. There is
+                ;; also the extra condition that and edge cannot be
+                ;; contracted if doing so would cause previously
+                ;; isolated code to be possibly run within a loop.
+                ((and
+                  (or (empty-block-p parent)
+                      (not (find blk (incoming blk))))
+                  (= 1 (length (children parent)))
+                  (or (not (labeled blk))
+                      (and (= 1 (length (incoming blk)))
+                           (adt:match outgoing-edge (outgoing parent)
+                             (unconditional-edge t)
+                             (_ nil))))
+                  (or (and (typep parent 'preserved-block)
+                           (typep blk 'preserved-block))
+                      (and (not (typep parent 'preserved-block))
+                           (not (typep blk 'preserved-block))))
+                  (or (typep blk 'reset-block)
+                      (not (basic-block-out-rewiring parent))
+                      (not (basic-block-in-rewiring blk))
+                      (equalp (basic-block-out-rewiring parent)
+                              (basic-block-in-rewiring blk))))
+                 
                  ;; The conditions are met to sequentially merge these blocks
                  (let ((new-blk (merge-sequentially parent blk)))
                    ;; After getting a merged block, update the CFG
                    ;; Update the references of affected blocks within the cfg
+
                    (dolist (child (children new-blk))
                      (setf (incoming child)
                            (substitute new-blk blk (incoming child))))
@@ -581,7 +596,7 @@ Return the following values:
   (let* ((code (parsed-program-executable-code pp))
          (entry (make-instance 'basic-block :name (gensym "ENTRY-BLK-") :outgoing terminating-edge))
          (cfg (make-instance 'cfg :entry-point entry
-                                  :blocks (list entry))))
+                             :blocks (list entry))))
     (flet ((next (current-block)
              (or current-block (make-instance 'basic-block))))
       (loop :with finished-block := nil
