@@ -117,6 +117,27 @@ Expected syntax: PRAGMA INITIAL_REWIRING [NAIVE|PARTIAL|GREEDY|RANDOM]")
   (:display-string
    (prin1-to-string (symbol-name rewiring-type))))
 
+
+(define-pragma "REWIRING_SEARCH" pragma-rewiring-search
+  (:documentation "PRAGMA denoting the search strategy to be used for selecting the
+SWAPs that bring a logical-to-physical rewiring to a target rewiring.
+
+Compilation resource requirements may vary according to the rewiring search type used. 
+
+Expected syntax: PRAGMA REWIRING_SEARCH [\"A*\"|\"GREEDY-QUBIT\"|\"GREEDY-PATH\"]")
+  (:global t)
+  (:slots (swap-search-type cl-quil::addresser-search-type))
+  (:freeform-string rewiring-swap-search-type-string)
+  (:initialization
+   (setf swap-search-type
+         (cond ((string= rewiring-swap-search-type-string "A*") ':a*)
+               ((string= rewiring-swap-search-type-string "GREEDY_QUBIT") ':greedy-qubit)
+               ((string= rewiring-swap-search-type-string "GREEDY_PATH") ':greedy-path)
+               (t
+                (error "Invalid PRAGMA REWIRING_SEARCH: ~A" rewiring-swap-search-type-string)))))
+  (:display-string
+   (prin1-to-string (symbol-name swap-search-type))))
+
 (defun parsed-program-has-pragma-p (parsed-program &optional (pragma-type 'pragma))
   "Return T if PARSED-PROGRAM's executable code contains any pragma. Optionally use PRAGMA-TYPE to restrict to a particular pragma type."
   (some (a:rcurry #'typep pragma-type)
