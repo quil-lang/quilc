@@ -157,6 +157,35 @@
                    (quil::print-code-list (quil::basic-block-code merged-blk) out))
                  (format nil "X 0~%Y 0~%Z 0~%")))))
 
+
+
+
+(defun test-contract-paths-with-loops (src)
+  (let* ((p (quil::parse-quil src))
+         (cfg (cl-quil::program-cfg p :dce t :simplify t))
+         (blocks (quil::cfg-blocks cfg)))
+    ;; test that every label that appears in a conditional or
+    ;; unconditional edge points to a block that remains in the
+    ;; simplified CFG
+    (flet ((labeled-block-exists-p (blk)
+             (or (not (quil::labeled blk))
+                 (find (gethash (quil::label-name (quil::labeled blk)) (quil::label-table cfg))
+                       blocks))))
+      (is (every (lambda (blk)
+                   (adt:match quil::outgoing-edge (quil::outgoing blk)
+                     ((quil::conditional-edge _ thenblk elseblk)
+                      (and (labeled-block-exists-p thenblk)
+                           (labeled-block-exists-p elseblk)))
+                     ((quil::unconditional-edge tgtblk)
+                      (labeled-block-exists-p tgtblk))
+                     (_ t)))
+                 blocks)))))
+
+(deftest test-path-contractions-with-loops ()
+  (test-contract-paths-with-loops "DECLARE ro BIT;DECLARE shot_count INTEGER[1];LABEL @START;SUB shot_count[0] 1;JUMP-UNLESS @END shot_count[0];JUMP @START;LABEL @END")
+  (test-contract-paths-with-loops "LABEL @START-LOOP;CCNOT 0 1 2;JUMP @START-LOOP"))
+
+
 (deftest test-block-fusion-empty-single-unconditional-self-loop ()
   "Tests the operation of block fusion when the CFG has an unconditional self-loop with a single empty block."
   (let* ((p (quil::parse-quil "LABEL @START;H 0;JUMP @LOOPER;LABEL @LOOPER;JUMP @START"))
@@ -211,3 +240,4 @@ This is a regression test for https://github.com/rigetti/quilc/issues/244"
   (let* ((program (parse "RESET; PRAGMA PRESERVE_BLOCK; X 0; PRAGMA END_PRESERVE_BLOCK"))
          (cfg (quil::program-cfg program)))
     (is (typep (quil::entry-point cfg) 'quil::reset-block))))
+
