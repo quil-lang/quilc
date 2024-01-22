@@ -102,6 +102,15 @@ Returns a list of link indices, along with an updated list of rewirings tried.")
 (defvar *addresser-rewiring-swap-search-type* ':a*
   "The type of swap search the addresser should use when doing move-to-rewiring.")
 
+
+(defun prog-rewiring-search-algorithm (parsed-prog)
+  "Return a value of type CL-QUIL::ADDRESSER-SEARCH-TYPE. If PARSED-PROG
+includes a REWIRING_SEARCH pragma, respect it. Otherwise return the
+value of *ADDRESSER-REWIRING-SWAP-SEARCH-TYPE*"
+  (a:if-let (pragma (prog-find-top-pragma parsed-prog 'pragma-rewiring-search))
+    (pragma-swap-search-type pragma)
+    *addresser-rewiring-swap-search-type*))
+
 ;;; A pseudoinstruction class used to send directives to the addresser
 (defclass application-force-rewiring (application)
   ((target-rewiring :initarg :target
@@ -638,6 +647,7 @@ Optional arguments:
    If INITIAL-REWIRING is not provided this option has no effect.
 ")
   (:method (state instrs &key (initial-rewiring nil) (use-free-swaps nil))
+    (declare (ignorable initial-rewiring))
     (format-noise "DO-GREEDY-ADDRESSING: entrance.")
     (with-slots (chip-spec lschedule working-l2p chip-sched initial-l2p) state
       (let ((*addresser-use-free-swaps* (or use-free-swaps initial-l2p)))

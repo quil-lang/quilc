@@ -26,9 +26,12 @@
                       chip-specification
                       &key
                         (protoquil nil)
-                        (rewiring-type (prog-initial-rewiring-heuristic parsed-program chip-specification))
+                        (rewiring-type
+                         (prog-initial-rewiring-heuristic parsed-program chip-specification))
                         (transforms *standard-pre-compilation-transforms*)
-                        (destructive nil))
+                        (destructive nil)
+                        (*addresser-rewiring-swap-search-type*
+                         (prog-rewiring-search-algorithm parsed-program)))
   "Runs a full compiler pass on a parsed-program object.
 
 Arguments:

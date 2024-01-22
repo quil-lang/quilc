@@ -509,6 +509,9 @@
    #:pragma-initial-rewiring            ; CLASS
    #:pragma-initial-rewiring-rewiring   ; ACCESSOR
 
+   #:pragma-rewiring-search             ; CLASS
+   #:pragma-swap-search-type            ; ACCESSOR
+
    #:pragma-rewiring
    #:pragma-rewiring-type               ; FUNCTION
    )
