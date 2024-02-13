@@ -394,9 +394,7 @@ One can show (cf., e.g., the formulas in arXiv:0205035 with U = M2, E(rho) = V r
 
 (defun fidelity-of-straight-quil (instrs chip-spec)
   "Helper routine for calculating the fidelity of a straight line of Quil instructions against the fidelity information associated to CHIP-SPEC."
-  (let ((ls (make-lschedule)))
-    (append-instructions-to-lschedule ls instrs)
-    (lschedule-calculate-fidelity ls chip-spec)))
+  (calculate-instructions-fidelity instrs chip-spec))
 
 (defun get-canonical-coords-from-diagonal (d)
   "Extracts \"canonical coordinates\" (c1, c2, c3) from a diagonal matrix D which belong to the Weyl chamber satisfying
@@ -732,10 +730,10 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
 
   ;; extract matrix, canonical decomposition
   (destructuring-bind (left1 left2 can right1 right2) (canonical-decomposition instr)
-    (let ((q1 (qubit-index (first (application-arguments instr))))
-          (q0 (qubit-index (second (application-arguments instr))))
+    (let ((q1              (qubit-index (first (application-arguments instr))))
+          (q0              (qubit-index (second (application-arguments instr))))
           (candidate-pairs nil)
-          (chip-spec (compilation-context-chip-specification context)))
+          (chip-spec       (compilation-context-chip-specification context)))
 
       ;; now we manufacture a bunch of candidate circuits
       (dolist (circuit-crafter crafters)
@@ -746,22 +744,22 @@ NOTE: This routine degenerates to an optimal 2Q compiler when *ENABLE-APPROXIMAT
            circuit-crafter
            (with-output-to-string (s) (print-instruction instr s)))
           (handler-case
-              (let* ((center-circuit (funcall circuit-crafter can))
-                     (ls (append-instructions-to-lschedule (make-lschedule) center-circuit))
-                     (circuit-cost (or (and chip-spec (lschedule-calculate-fidelity ls chip-spec))
-                                       1d0))
+              (let* ((center-circuit     (funcall circuit-crafter can))
+                     (circuit-cost       (or (and chip-spec (calculate-instructions-fidelity center-circuit chip-spec))
+                                             1d0))
                      (sandwiched-circuit (append (list left1 left2)
                                                  center-circuit
                                                  (list right1 right2)))
-                     (m (make-matrix-from-quil sandwiched-circuit
-                                               :relabeling (standard-qubit-relabeler `(,q1 ,q0)))))
-                (let ((infidelity (fidelity-coord-distance
-                                   (mapcar #'constant-value (application-parameters can))
-                                   (get-canonical-coords-from-diagonal
-                                    (nth-value 1 (orthogonal-decomposition m))))))
-                  (format-noise " for infidelity ~A." infidelity)
-                  (push (cons (* circuit-cost (- 1 infidelity)) sandwiched-circuit)
-                        candidate-pairs)))
+                     (m                  (make-matrix-from-quil sandwiched-circuit
+                                                                :relabeling (standard-qubit-relabeler `(,q1 ,q0))))
+                     (infidelity         (fidelity-coord-distance
+                                          (mapcar #'constant-value (application-parameters can))
+                                          (get-canonical-coords-from-diagonal
+                                           (nth-value 1 (orthogonal-decomposition m))))))
+                (format-noise " for infidelity ~A." infidelity)
+                (push (cons (* circuit-cost (- 1 infidelity))
+                            sandwiched-circuit)
+                      candidate-pairs))
             (compiler-does-not-apply () nil))))
 
       ;; now vomit the results

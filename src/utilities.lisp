@@ -91,7 +91,7 @@ appropriate method of comparison."
   (check-type program parsed-program)
   (check-type chip chip-specification)
   (calculate-instructions-fidelity
-   (coerce (parsed-program-executable-code program) 'list)
+   (parsed-program-executable-code program)
    chip))
 
 (defun prog-find-top-pragma (parsed-prog pragma)
