@@ -351,7 +351,8 @@
                       (funcall compile)))
   :pathname "src/tools/"
   :serial t
-  :components ((:file "package")
+  :components ((:file "unicode-diagram")
+               (:file "package")
                (:file "hasse-schedule")
                (:file "circuit-diagram")))
 

@@ -11,6 +11,7 @@
 (defpackage #:cl-quil.tools
   (:nicknames #:tools)
   (:use #:cl)
+  (:import-from #:cl-quil.tools.unicode-diagram #:print-program-diagram)
   #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
 
@@ -22,4 +23,7 @@
   ;; circuit-diagram.lisp
   (:export
    #:plot-circuit)
-  )
+
+  ;; unicode-digram.lisp
+  (:export
+   #:print-program-diagram))
