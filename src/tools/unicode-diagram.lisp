@@ -444,14 +444,16 @@ instances."
   (loop
     :with centers := (loop :for col :in columns :collect (column-middle col))
     :for figure :across row
+    :for namewidth := (length (figure-name figure))
     :when (figure-boxed? figure)
       :do (multiple-value-bind (left right) (box-bounds figure columns gap)
             (clear-line line :from left :below right)
             (setf (elt line left) (vertical)
                   (elt line right) (vertical))
             (replace line (figure-name figure)
-                     :start1 (- (+ left (floor (- right left) 2))
-                                (floor (length (figure-name figure)) 2))))))
+                     :start1 (- (+ left (mod (1+ namewidth) 2) ; even namewidths need an offset
+                                   (floor (- right left) 2))
+                                (floor namewidth 2))))))
 
 (defun write-row-content (columns row line)
   "The row content line is drawn."
