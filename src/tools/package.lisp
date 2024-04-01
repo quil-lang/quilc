@@ -11,7 +11,11 @@
 (defpackage #:cl-quil.tools
   (:nicknames #:tools)
   (:use #:cl)
-  (:import-from #:cl-quil.tools.unicode-diagram #:print-program-diagram)
+  (:import-from #:cl-quil.tools.unicode-diagram
+                #:print-program-diagram
+                #:make-charmap
+                #:+ascii-charmap+
+                #:+box-drawings-charmap+)
   #+(or sbcl ecl ccl)
   (:local-nicknames (:a :alexandria))
 
@@ -26,4 +30,7 @@
 
   ;; unicode-digram.lisp
   (:export
-   #:print-program-diagram))
+   #:print-program-diagram
+   #:make-charmap
+   #:+ascii-charmap+
+   #:+box-drawings-charmap+))
