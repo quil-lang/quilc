@@ -27,8 +27,7 @@
 (defpackage #:cl-quil.frontend
   (:use #:cl
         #:parse-float
-        #:org.tfeb.hax.abstract-classes
-        #:org.tfeb.hax.singleton-classes)
+        #:clos-encounters)
   (:local-nicknames (#:a #:alexandria))
   ;; frontend-options.lisp
   (:export
@@ -744,7 +743,7 @@
   (:use #:cl
         #:cl-quil.resource
         #:cl-quil.frontend
-        #:org.tfeb.hax.abstract-classes)
+        #:clos-encounters)
   (:local-nicknames (#:a #:alexandria))
   
   ;; options.lisp
