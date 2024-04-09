@@ -13,8 +13,7 @@
                (:version #:magicl/core "0.10.0")
                #:qvm
                #:cl-grnm                ; nelder-mead implementation
-               #:org.tfeb.hax.abstract-classes
-               #:org.tfeb.hax.singleton-classes
+               #:clos-encounters
                #:yason                  ; JSON generation
                #:uiop
                #:split-sequence
@@ -101,8 +100,7 @@
                #:yacc                   ; Arithmetic parsing
                #:alexandria             ; Utilities
                #:parse-float            ; Float parsing
-               #:org.tfeb.hax.abstract-classes
-               #:org.tfeb.hax.singleton-classes
+               #:clos-encounters
                #:split-sequence
                #:cl-algebraic-data-type
                #:cl-permutation
