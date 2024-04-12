@@ -283,6 +283,9 @@ An instruction is unitary if it is of type APPLICATION, whether that be INSTR it
   (:method ((instr pragma) param-value arg-value)
     instr)
 
+  (:method ((instr call) param-value arg-value)
+    instr)
+
   (:method ((instr unary-classical-instruction) param-value arg-value)
     (let ((addr (classical-target instr)))
       (if (not (is-formal addr))

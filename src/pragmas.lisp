@@ -138,6 +138,119 @@ Expected syntax: PRAGMA REWIRING_SEARCH [\"A*\"|\"GREEDY-QUBIT\"|\"GREEDY-PATH\"
   (:display-string
    (prin1-to-string (symbol-name swap-search-type))))
 
+
+(define-pragma "NON_VOLATILE" pragma-non-volatile
+  (:documentation "PRAGMA indicating that declared memory can be assumed to be non-volatile - it will not be modified outside of the Quil program in which it is declared.
+
+Expected syntax: PRAGMA NON_VOLATILE identifier")
+  (:global t)
+  (:slots (memory-name cl-quil::memory-name))
+  (:words (name string))
+  (:initialization
+   (setf memory-name (cl-quil::memory-name name)))
+  (:display-string
+   (princ-to-string (cl-quil::memory-name-region-name memory-name))))
+
+
+(defun tokenize-extern-signature (input)
+  (let ((pos 0)) 
+    (labels ((peek () (if (< pos (length input)) (elt input pos) nil))
+             (next () (prog1 (peek) (incf pos)))
+             (skip-whitespace ()
+               (loop :for c := (peek)
+                     :while (and c (eq #\Space c))
+                     :do (incf pos)))
+             (next-token ()
+               (skip-whitespace)
+               (a:if-let (next-char (next))
+                 (case next-char
+                   (#\( ':LEFT-PAREN)
+                   (#\) ':RIGHT-PAREN)
+                   (#\: ':COLON)
+                   (#\, ':COMMA)
+                   (#\[ ':LEFT-BRACKET)
+                   (#\] ':RIGHT-BRACKET)
+                   (otherwise
+                    (let ((token 
+                            (with-output-to-string (token)
+                              (princ next-char token)
+                              (loop :for c := (next)
+                                    :while c
+                                    :until (find c "[]():, ")
+                                    :do (write-char c token)
+                                    :finally (when c (decf pos))))))
+                      (cond ((equal "mut" token)
+                             ':MUT)
+                            ((every
+                              (load-time-value
+                               (a:conjoin (complement #'alpha-char-p) #'alphanumericp)
+                               t)
+                              token)
+                             (values ':INT (parse-integer token)))
+                            (t
+                             (values ':WORD token))))))
+                 nil)))
+      #'next-token)))
+
+(yacc:define-parser *extern-signature-grammar*
+  (:start-symbol signature)
+  (:terminals (:LEFT-PAREN :RIGHT-PAREN
+               :LEFT-BRACKET :RIGHT-BRACKET
+               :COMMA :COLON :MUT :INT :WORD))
+
+  (signature
+   (:WORD :LEFT-PAREN paramlist :RIGHT-PAREN
+          (lambda (&rest args) (list :value-type (first args) :param-types (third args))))
+   (:LEFT-PAREN paramlist :RIGHT-PAREN
+                (lambda (&rest args) (list :param-types (second args)))))
+
+  (paramlist
+   (param :COMMA paramlist
+          (lambda (p i0 ps) (declare (ignore i0))
+            (cons p ps)))
+   (param (lambda (p) (list p))))
+  
+  (param
+   (:WORD :COLON :MUT type
+          (lambda (var i0 mut type) (declare (ignore i0 mut)) (list* var ':mut type)))
+   (:WORD :COLON type
+          (lambda (var i0 type) (declare (ignore i0)) (cons var type))))
+
+  (type
+   (:WORD)
+   (:WORD :LEFT-BRACKET :RIGHT-BRACKET
+          (lambda (word rb lb)
+            (declare (ignore rb lb))
+            (list (string-to-quil-type word) '*)))
+   (:WORD :LEFT-BRACKET :INT :RIGHT-BRACKET
+          (lambda (word rb size lb)
+            (declare (ignore rb lb))
+            (list (string-to-quil-type word) size)))))
+
+(define-pragma "EXTERN" pragma-extern-signature
+  (:documentation "PRAGMA declaring the function signature of an extern.
+
+Expected syntax: PRAGMA EXTERN extern-name \"TYPE? \( (var : mut? TYPE)+ \)")
+  (:global t)
+  (:slots extern-name value-type param-types)
+  (:words name)
+  (:freeform-string function-signature-string)
+  (:initialization
+   (handler-case (let ((parsed (yacc:parse-with-lexer
+                                (tokenize-extern-signature function-signature-string)
+                                *extern-signature-grammar*)))
+                   (setf extern-name name)
+                   (setf value-type (getf parsed :value-type))
+                   (setf param-types (getf parsed :param-types)))
+     (yacc:yacc-parse-error (err)
+       (warn "Syntax error while parsing PRAGMA EXTERN: ~s~%    Error: ~a"
+             function-signature-string
+             (princ-to-string err)))
+     (error (err)
+       (warn "Error while parsing PRAGMA EXTERN: ~s~%   Error: ~a"
+             function-signature-string
+             (princ-to-string err))))))
+
 (defun parsed-program-has-pragma-p (parsed-program &optional (pragma-type 'pragma))
   "Return T if PARSED-PROGRAM's executable code contains any pragma. Optionally use PRAGMA-TYPE to restrict to a particular pragma type."
   (some (a:rcurry #'typep pragma-type)

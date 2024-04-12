@@ -394,8 +394,7 @@
     (quil-parse-error "EOF reached when waveform definition expected."))
 
   ;; Get the parameter and body lines
-  (let (name
-        sample-rate)
+  (let (name)
     (destructuring-bind (parameter-line &rest body-lines) tok-lines
       (destructuring-bind (op . params-args) parameter-line
         ;; Check that we are dealing with a DEFWAVEFORM.
@@ -414,14 +413,16 @@
         (setf name (quil:token-payload (pop params-args)))
 
         (multiple-value-bind (params rest-line) (parse-parameters params-args)
-
-          (setf sample-rate (parse-sample-rate (butlast rest-line)))
-
+          
           ;; Check for colon and incise it.
           (let ((maybe-colon (last rest-line)))
             (when (or (null maybe-colon)
                       (not (eq ':COLON (quil:token-type (first maybe-colon)))))
               (quil-parse-error "Expected a colon terminating the first line of DEFWAVEFORM.")))
+
+          (when (butlast rest-line)
+            (quil-parse-error "Unexpected tokens ~s before colon on first line of DEFWAVEFORM."
+                              (butlast rest-line)))
 
           (let ((*arithmetic-parameters* nil)
                 (*segment-encountered* nil))
@@ -447,7 +448,7 @@
                               :collect (gensym (concatenate 'string (param-name p) "-UNUSED"))
                             :else
                               :collect (second found-p))))
-                (values (make-waveform-definition name param-symbols parsed-entries sample-rate :context op)
+                (values (make-waveform-definition name param-symbols parsed-entries :context op)
                         rest-lines)))))))))
 
 ;;; Calibration Definitions
