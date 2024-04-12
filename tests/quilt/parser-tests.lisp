@@ -42,23 +42,6 @@
   (signals quil::quil-parse-error
     (parse-quil "DEFFRAME 0 \"foo\"")))
 
-(deftest test-quilt-defwaveform-sample-rate ()
-  (signals quil-parse-error
-    (parse-quilt "
-DEFWAVEFORM foo:
-    1.0, 1.0, 1.0, 1.0"))
-  (signals quil-parse-error
-    (parse-quilt "
-DEFWAVEFORM foo 4+2*i:
-    1.0, 1.0, 1.0, 1.0"))
-  (let ((pp (parse-quilt "
-DEFWAVEFORM foo 4.0:
-    1.0, 1.0, 1.0, 1.0")))
-    (is (= 4.0
-           (constant-value
-            (waveform-definition-sample-rate
-             (first (parsed-program-waveform-definitions pp))))))))
-
 (defun prints-as (expected obj &key (accessor #'quil:parsed-program-executable-code))
   "Checks whether OBJ prints as the EXPECTED string. If OBJ is a string, parses OBJ and then checks that the first instruction prints as EXPECTED."
   (typecase obj
@@ -86,7 +69,7 @@ DEFFRAME 0 \"rf\"
 DEFFRAME 0 \"zz\"
 DEFFRAME 0 1 \"foo\"
 DECLARE iq REAL[2]
-DEFWAVEFORM wf 1.0:
+DEFWAVEFORM wf:
     1.0, 1.0, 1.0
 ")
         (instrs (list
@@ -123,6 +106,7 @@ DEFWAVEFORM wf 1.0:
 (deftest test-parse-and-print-quilt-definitions ()
   (let ((boilerplate "~%DEFFRAME 0 \"rx\"") ; tacked on at end
         (frame-defns (list
+                      "DEFFRAME \"xy\"" 
                       "DEFFRAME 0 1 \"xy\""
                       "DEFFRAME 0 1 \"xy\":~%    SAMPLE-RATE: 1.0~%"
                       "DEFFRAME 0 1 \"xy\":~%    SAMPLE-RATE: 1.0~%    INITIAL-FREQUENCY: 1.0~%"
@@ -130,13 +114,13 @@ DEFWAVEFORM wf 1.0:
                       "DEFFRAME 0 1 \"xy\":~%    HARDWARE-OBJECT: \"q0_q1_xy\"~%"
                       "DEFFRAME 0 1 \"xy\":~%    SAMPLE-RATE: 1.0~%    DIRECTION: \"tx\"~%"))
         (waveform-defns (list
-                         "DEFWAVEFORM foo 1.0:~%    1.0~%"
-                         "DEFWAVEFORM foo 1.0:~%    1.0+1.0i, 1.0+1.0i~%"
+                         "DEFWAVEFORM foo:~%    1.0~%"
+                         "DEFWAVEFORM foo:~%    1.0+1.0i, 1.0+1.0i~%"
                          ;; case sensitivity
-                         "DEFWAVEFORM FOO 1.0:~%    1.0~%"
+                         "DEFWAVEFORM FOO:~%    1.0~%"
                          ;; parametric waveform def
                          ;; this is a bit too dependent on how arithmetic expressions are printed...
-                         "DEFWAVEFORM foo(%theta) 1.0:~%    (%theta*(1.0))~%"
+                         "DEFWAVEFORM foo(%theta):~%    (%theta*(1.0))~%"
                          ))
         (calibration-defns (list        ; just sticking delays in here to have something nontrivial to print
                             "DEFCAL FOO 0:~%    DELAY 0 1.0~%    NOP~%"
@@ -168,10 +152,10 @@ DEFWAVEFORM wf 1.0:
                 (signature "DEFFRAME 0 \"foo\"")))
     (is (not (equalp (signature "DEFFRAME 0 \"foo\"")
                      (signature "DEFFRAME 0 \"Foo\""))))
-    (is (equalp (signature "DEFWAVEFORM foo 1.0:~%    1.0, 1.0")
-                (signature "DEFWAVEFORM foo 1.0:~%    1.0, 1.0")))
-    (is (not (equalp (signature "DEFWAVEFORM foo 1.0:~%    1.0, 1.0")
-                     (signature "DEFWAVEFORM Foo 1.0:~%    1.0, 1.0"))))
+    (is (equalp (signature "DEFWAVEFORM foo:~%    1.0, 1.0")
+                (signature "DEFWAVEFORM foo:~%    1.0, 1.0")))
+    (is (not (equalp (signature "DEFWAVEFORM foo:~%    1.0, 1.0")
+                     (signature "DEFWAVEFORM Foo:~%    1.0, 1.0"))))
     (is (equalp (signature "DEFCAL RX(%theta) q:~%    NOP")
                 (signature "DEFCAL RX(%theta) q:~%    NOP")))
     (is (equalp (signature "DEFCAL RX(0) 0:~%    NOP")

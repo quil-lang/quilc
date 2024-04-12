@@ -1,6 +1,0 @@
-# Bad extern with multiple args
-
-EXTERN CNOT FOO
-
-CNOT 1 0
-FOO 0

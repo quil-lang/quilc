@@ -1,0 +1,6 @@
+# Bad stub with multiple args
+
+STUB CNOT FOO
+
+CNOT 1 0
+FOO 0

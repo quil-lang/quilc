@@ -21,7 +21,7 @@
       (let* ((operator (application-operator instr))
              (addl-qubits (operator-description-additional-qubits operator))
              (name (operator-description-root-name operator))
-             (found-extern (gethash name (parsed-program-extern-operations parsed-program)))
+             (found-stub (gethash name (parsed-program-stub-operations parsed-program)))
              (found-gate-defn (or (find name (parsed-program-gate-definitions parsed-program)
                                         :test #'string=
                                         :key #'gate-definition-name)
@@ -30,9 +30,9 @@
                                     :test #'string=
                                     :key #'circuit-definition-name)))
         (cond
-          ;; externs take priority over defined operators
-          (found-extern
-           (change-class instr 'extern-application))
+          ;; stubs take priority over defined operators
+          (found-stub
+           (change-class instr 'stub-application))
 
           ;; Gate application
           (found-gate-defn

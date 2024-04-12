@@ -27,6 +27,10 @@
            (print-externs (externs)
              (loop :for name :being :the :hash-keys :of externs
                    :do (print-instruction (make-instance 'extern :name name) stream)
+                       (fresh-line stream)))
+           (print-stubs (stubs)
+             (loop :for name :being :the :hash-keys :of stubs
+                   :do (print-instruction (make-instance 'stub :name name) stream)
                        (fresh-line stream))))
       
       ;; Ensure that any non-standard gates in the program are defined
@@ -36,7 +40,8 @@
                       (loop :for k :being :the :hash-key :of **default-gate-definitions**
                             :collect k)))
             (defgates (parsed-program-gate-definitions pp))
-            (externs (parsed-program-extern-operations pp))
+            (stubs (parsed-program-stub-operations pp))
+            (externs (parsed-program-extern-declarations pp))
             (simple-gates (map 'list
                                #'gate-application-gate
                                (remove-if-not (lambda (inst)
@@ -50,6 +55,7 @@
             (push (make-instance 'static-gate-definition :name (slot-value gate 'name) :entries (coerce (slot-value (simple-gate-matrix gate) 'magicl::storage) 'list)) defgates)))
         
         (print-externs externs)
+        (print-stubs stubs)
         (print-definitions (parsed-program-memory-definitions pp))
 
         ;; instructions and single-line definitions (e.g. DECLARE) do
