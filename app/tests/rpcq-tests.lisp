@@ -54,8 +54,8 @@
                          "0-1" (make-hash-table))))
              (specs (plist-isa-subtable
                      "1Q" (plist-isa-subtable
-                           "0" (plist-isa-subtable "f1QRB" 0.98)
-                           "1" (plist-isa-subtable "f1QRB" 0.98))
+                           "0" (plist-isa-subtable "f1QRB" 0.98d0)
+                           "1" (plist-isa-subtable "f1QRB" 0.98d0))
                      "2Q" (plist-isa-subtable
                            "0-1" (make-hash-table))))
              (target-device (make-instance 'rpcq::|TargetDevice|
@@ -90,8 +90,8 @@
                          "0-1" (make-hash-table))))
              (specs (plist-isa-subtable
                      "1Q" (plist-isa-subtable
-                           "0" (plist-isa-subtable "f1QRB" 0.98)
-                           "1" (plist-isa-subtable "f1QRB" 0.98))
+                           "0" (plist-isa-subtable "f1QRB" 0.98d0)
+                           "1" (plist-isa-subtable "f1QRB" 0.98d0))
                      "2Q" (plist-isa-subtable
                            "0-1" (make-hash-table))))
              (target-device (make-instance 'rpcq::|TargetDevice|

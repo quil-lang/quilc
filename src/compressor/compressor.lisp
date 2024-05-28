@@ -87,17 +87,14 @@
     ;; sift through it for durations
     (lschedule-calculate-duration lschedule chip-specification)))
 
-(defun calculate-instructions-log-fidelity (instructions chip-specification)
-  "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
-  (let ((lschedule (make-lschedule)))
-    ;; load up the logical schedule
-    (append-instructions-to-lschedule lschedule instructions)
-    ;; sift through it for fidelities
-    (lschedule-calculate-log-fidelity lschedule chip-specification)))
 
 (defun calculate-instructions-fidelity (instructions chip-specification)
-  "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
-  (exp (- (calculate-instructions-log-fidelity instructions chip-specification))))
+  "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources).
+
+The fidelity returned is a real (double-float) number in the interval [0.0, 1.0]"
+  (flet ((instr-fidelity (instr)
+           (get-instruction-fidelity instr chip-specification))) 
+    (reduce #'min instructions :key #'instr-fidelity :initial-value 1.0d0)))
 
 (defun find-noncommuting-instructions (node)
   "Return at most *REWRITING-PEEPHOLE-SIZE* of the earliest instructions below NODE,
@@ -536,14 +533,10 @@ other's."
                         (tr (magicl:trace prod))
                         (trace-fidelity (/ (+ n (abs (* tr tr)))
                                            (+ n (* n n))))
-                        (ls-reduced (make-lschedule))
-                        (ls-reduced-decompiled (make-lschedule))
                         (chip-spec (compilation-context-chip-specification context)))
-                   (append-instructions-to-lschedule ls-reduced reduced-instructions)
-                   (append-instructions-to-lschedule ls-reduced-decompiled reduced-decompiled-instructions)
                    (assert (>= (* trace-fidelity
-                                  (lschedule-calculate-fidelity ls-reduced-decompiled chip-spec))
-                               (lschedule-calculate-fidelity ls-reduced chip-spec))
+                                  (calculate-instructions-fidelity reduced-decompiled-instructions chip-spec))
+                               (calculate-instructions-fidelity reduced-instructions chip-spec))
                            ()
                            "During careful checking of instruction compression, ~
                             the recomputed instruction sequence has an ~
