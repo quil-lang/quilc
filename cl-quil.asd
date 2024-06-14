@@ -159,7 +159,8 @@
                              (:file "fusion")
                              (:file "simplify-arithmetic")
                              (:file "validate-sequence-gate")
-                             (:file "simplification-grab-bag")))
+                             (:file "simplification-grab-bag")
+                             (:file "process-protoquil")))
                (:file "print-program")
                (:file "initialize-standard-gates")))
 

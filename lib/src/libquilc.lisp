@@ -14,7 +14,9 @@
         (return-from error-map 1)))))
 
 (defun compile-protoquil (parsed-program chip-specification)
-  (compiler-hook parsed-program chip-specification :protoquil t))
+  (let ((compiled-program (compiler-hook parsed-program chip-specification :protoquil t)))
+    (cl-quil.frontend::transform 'cl-quil.frontend::process-protoquil compiled-program)
+    compiled-program))
 
 (sbcl-librarian:define-api quilc (:error-map error-map
                                   :function-prefix "quilc_")
