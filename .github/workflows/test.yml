@@ -21,6 +21,7 @@ jobs:
           mkdir -p ${HOME}/quicklisp/local-projects
           git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
           git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/qvm.git
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/clos-encounters.git
           make quicklisp
           sudo make install-test-deps
           make test-cl-quil
@@ -37,6 +38,7 @@ jobs:
           mkdir -p ${HOME}/quicklisp/local-projects
           git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
           git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/qvm.git
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/clos-encounters.git
           make quicklisp
           sudo make install-test-deps
           make test-quilc
@@ -53,6 +55,7 @@ jobs:
           mkdir -p ${HOME}/quicklisp/local-projects
           git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/magicl.git
           git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/qvm.git
+          git -C ${HOME}/quicklisp/local-projects clone https://github.com/quil-lang/clos-encounters.git
           make quicklisp
           sudo make install-test-deps
           make test-quilt
