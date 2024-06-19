@@ -31,6 +31,9 @@
              hash
              (qubit-index qubit))))))
 
+(defun frame-sample-rate (frame)
+  (frame-definition-sample-rate (frame-name-resolution frame)))
+
 (defmethod print-instruction-generic ((thing frame) (stream stream))
   (format stream "~{~/cl-quil:instruction-fmt/ ~}\"~A\""
           (frame-qubits thing)
@@ -214,6 +217,11 @@
           (raw-capture-duration instr)
           (raw-capture-memory-ref instr)))
 
+(defgeneric pulse-op-frame (op)
+  (:method ((op raw-capture)) (raw-capture-frame op))
+  (:method ((op capture)) (capture-frame op))
+  (:method ((op pulse)) (pulse-frame op)))
+
 ;;; Timing Control and Synchronization
 
 (defclass delay (instruction)
@@ -336,10 +344,6 @@
             :reader waveform-definition-entries
             :type list
             :documentation "The raw IQ values of the waveform being defined.")
-   (sample-rate :initarg :sample-rate
-                :reader waveform-definition-sample-rate
-                :type constant
-                :documentation "The sample rate for which the waveform is applicable.")
    (context :initarg :context
             :type lexical-context
             :accessor lexical-context
@@ -359,7 +363,7 @@
                :documentation "A list of symbol parameter names."))
   (:documentation "A waveform definition that has named parameters."))
 
-(defun make-waveform-definition (name parameters entries sample-rate &key context)
+(defun make-waveform-definition (name parameters entries &key context)
   (check-type name string)
   (check-type parameters symbol-list)
   (if (not (endp parameters))
@@ -367,21 +371,18 @@
         :name name
         :parameters parameters
         :entries entries
-        :sample-rate sample-rate
         :context context)
       (make-instance 'static-waveform-definition
         :name name
         :entries entries
-        :sample-rate sample-rate
         :context context)))
 
 (defmethod print-instruction-generic ((defn waveform-definition) (stream stream))
-  (format stream "DEFWAVEFORM ~A~@[(~{%~A~^, ~})~] ~/cl-quil:instruction-fmt/:"
+  (format stream "DEFWAVEFORM ~A~@[(~{%~A~^, ~})~]:"
           (waveform-definition-name defn)
           (if (typep defn 'static-waveform-definition)
               '()
-              (waveform-definition-parameters defn))
-          (waveform-definition-sample-rate defn))
+              (waveform-definition-parameters defn)))
   (format stream "~%    ~{~A~^, ~}"
           (mapcar (lambda (z)
                     (with-output-to-string (s)
