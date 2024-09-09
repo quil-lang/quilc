@@ -37,7 +37,7 @@
     :NEG :NOT :AND :IOR :XOR :MOVE :EXCHANGE :CONVERT :ADD :SUB :MUL :DIV
     :LOAD :STORE :EQ :GT :GE :LT :LE :DEFGATE :DEFCIRCUIT :RESET
     :HALT :WAIT :LABEL :NOP :CONTROLLED :DAGGER :FORKED
-    :DECLARE :SHARING :OFFSET :PRAGMA :EXTERN
+    :DECLARE :SHARING :OFFSET :PRAGMA :STUB :EXTERN :CALL
     :AS :MATRIX :PERMUTATION :PAULI-SUM :SEQUENCE))
 
 (deftype token-type ()
@@ -148,7 +148,7 @@ Each lexer extension is a function mapping strings to tokens. They are used to h
    (return (tok ':CONTROLLED)))
   ((eager #.(string #\OCR_FORK))
    (return (tok ':FORKED)))
-  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM|SEQUENCE|EXTERN"
+  ("INCLUDE|DEFCIRCUIT|DEFGATE|MEASURE|LABEL|WAIT|NOP|HALT|RESET|JUMP\\-WHEN|JUMP\\-UNLESS|JUMP|PRAGMA|NOT|AND|IOR|MOVE|EXCHANGE|SHARING|DECLARE|OFFSET|XOR|NEG|LOAD|STORE|CONVERT|ADD|SUB|MUL|DIV|EQ|GT|GE|LT|LE|CONTROLLED|DAGGER|FORKED|AS|MATRIX|PERMUTATION|PAULI-SUM|SEQUENCE|STUB|EXTERN|CALL"
    (return (tok (intern $@ :keyword))))
   ((eager "(?<NAME>{{IDENT}})\\[(?<OFFSET>{{INT}})\\]")
    (assert (not (null $NAME)))
@@ -431,13 +431,21 @@ If the parser does not match, then it should return NIL.")
        (let ((*formal-arguments-allowed* t))
          (parse-memory-descriptor tok-lines)))
 
-      ;; Extern Statement
-      ((:EXTERN)
-       (parse-extern tok-lines))
+      ;; Stub Declaration
+      ((:STUB)
+       (parse-stub tok-lines))
+
+      ;; Call Instruction
+      ((:CALL)
+       (parse-call tok-lines))
 
       ;; Pragma
       ((:PRAGMA)
        (parse-pragma tok-lines))
+
+      ;; Extern Declaration
+      ((:EXTERN)
+       (parse-extern tok-lines))
 
       ;; Measurement
       ((:MEASURE)
@@ -734,18 +742,22 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
 ;;                                   Robert (& Eric)
 (defvar *arithmetic-parameters*)
 (setf (documentation '*arithmetic-parameters* 'variable)
-      "A special variable to detect and collect the parameters found in an arithmetic expression when parsing. An alist mapping formal parameters to generated symbols.")
+      "A special variable to detect and collect the parameters found in an
+arithmetic expression when parsing. An alist mapping formal parameters
+to generated symbols.")
 
 (defvar *segment-encountered*)
 (setf (documentation '*segment-encountered* 'variable)
-      "A special variable to detect the presence of a segment address found in an arithmetic expression when parsing.  A simple boolean.")
+      "A special variable to detect the presence of a segment address found
+in an arithmetic expression when parsing.  A simple boolean.")
 
 (defvar *memory-region-names*)
 (setf (documentation '*memory-region-names* 'variable)
       "A special variable to collect the names of declared memory regions.")
 
 (defvar *shadowing-formals* nil
-  "A special variable which indicates formal parameters (as a list of FORMAL objects) which shadow memory names.")
+  "A special variable which indicates formal parameters (as a list of
+FORMAL objects) which shadow memory names.")
 
 (defun gate-modifier-token-p (tok)
   (member (token-type tok) '(:CONTROLLED :DAGGER :FORKED)))
@@ -787,9 +799,14 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                               (application-operator app)))
                        (return (values app rest-lines)))))))
 
+(defun parse-stub (tok-lines)
+  (match-line ((stub :STUB) (op :NAME)) tok-lines
+    (make-instance 'stub :name (token-payload op))))
+
 (defun parse-extern (tok-lines)
-  (match-line ((extern :EXTERN) (op :NAME)) tok-lines
-    (make-instance 'extern :name (token-payload op))))
+  (match-line ((extern :EXTERN) (fn :NAME)) tok-lines
+    (push (token-payload fn) *names-declared-extern*)
+    (make-instance 'extern :name (token-payload fn))))
 
 (defun parse-parameter-or-expression (toks)
   "Parse a parameter, which may possibly be a compound arithmetic expression. Consumes all tokens given."
@@ -819,20 +836,61 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
             (t
              (quil-parse-error "Formal parameters found in a place they're not allowed.")))))))
 
+(defun parse-call (tok-lines)
+  "Parse a CALL instruction"
+  (match-line ((instr :CALL) (func :NAME) &rest rest-toks) tok-lines
+    (let ((fname (token-payload func)))
+      (unless (declared-extern-p fname)
+        (quil-parse-error "Cannot call unknown extern ~s" fname))
+      (unless rest-toks
+        (quil-parse-error "Called externs require at least one argument."))
+      (make-instance 'call
+        :extern (make-instance 'extern :name fname)
+        :arguments (parse-extern-arguments rest-toks)))))
+
+(defun check-memory-region-name (name &key (ensure-valid t))
+  (when (and ensure-valid
+             (not (find name *memory-region-names* :test #'string=)))
+       (quil-parse-error "Bad memory region name \"~A\"~@[ in ~A~]. This is probably due to either:
+    * a missing DECLARE for this memory,
+    * a misspelling of the memory reference, or
+    * a misspelling of the DECLAREd memory."
+                         name
+                         *parse-context*)))
+
+(defun parse-extern-arguments (toks)
+  (flet ((parse-extern-arg (tok)
+           (with-slots (type payload) tok 
+             (case type
+               ((:NAME)
+                (check-memory-region-name payload)
+                (mref payload 0))
+               ((:COMPLEX)
+                payload)
+               ((:INTEGER)
+                (constant payload quil-integer))
+               ((:AREF)
+                (check-memory-region-name (car payload))
+                (mref (car payload) (cdr payload)))
+               (otherwise
+                (disappointing-token-error tok "an extern argument"))))))
+    (mapcar #'parse-extern-arg toks)))
+
+
 (defun parse-application (tok-lines)
   "Parse a gate or circuit application out of the lines of tokens TOK-LINES, returning an UNRESOLVED-APPLICATION."
   (match-line ((op :NAME) &rest rest-toks) tok-lines
     (if (endp rest-toks)
         (make-instance 'unresolved-application
-                       :operator (named-operator (token-payload op)))
+          :operator (named-operator (token-payload op)))
         (multiple-value-bind (params args)
             (parse-parameters rest-toks :allow-expressions t)
 
           ;; Parse out the rest of the arguments and return.
           (make-instance 'unresolved-application
-                         :operator (named-operator (token-payload op))
-                         :parameters params
-                         :arguments (mapcar #'parse-argument args))))))
+            :operator (named-operator (token-payload op))
+            :parameters params
+            :arguments (mapcar #'parse-argument args))))))
 
 (defun parse-measurement (tok-lines)
   "Parse a measurement out of the lines of tokens TOK-LINES."
@@ -844,25 +902,64 @@ If ENSURE-VALID is T (default), then a memory reference such as 'foo[0]' will re
                          :qubit qubit
                          :address (parse-memory-or-formal-token address-tok))))))
 
+;; When numerical expressions appear in gate-application parameter
+;; positions, they are, whenever possible, evaluated to literal
+;; numeric values.  We would like for this to work with extern
+;; functions in the same way it works for sin, cos, etc. The Quil spec
+;; is stringent about what kinds of externs are permitted into
+;; arithmetic expressions (pure functions only), and requires that the
+;; function signature be known. We choose check for this at parse
+;; time. Doing so allows for numeric extern functions to evaluate
+;; their arguments during parsing, just as sin, cos, etc currently do.
+(defun process-pragma-extern-signature (pragma)
+  "If the PRAGMA is a signature of a function that does not mutate
+arguments and that has a return type, then push its name into
+*EXPRESSION-EXTERNS*.  Otherwise remove its name from that list."
+  (with-slots (extern-name value-type param-types) pragma
+    (cond ((and value-type (loop :for param :in param-types :never (find :mut param)))
+           (pushnew extern-name *expression-externs* :test #'equal))
+          (t
+           (setf *expression-externs* (delete extern-name *expression-externs* :test #'equal))))))
+
+
 (defun parse-pragma (tok-lines)
   "Parse a PRAGMA out of the lines of tokens TOK-LINES."
-  (match-line ((op :PRAGMA) (word-tok :NAME) &rest word-toks) tok-lines
-    (multiple-value-bind (words non-words)
-        (take-until (lambda (tok) (not (member (token-type tok) '(:NAME :INTEGER)))) (cons word-tok word-toks))
-      (setf words (mapcar #'token-payload words))
+  (match-line ((op :PRAGMA) word &rest word-toks) tok-lines
+    (let ((first-payload
+            ;; In general, pragmas' names are not meant to specially
+            ;; handled. However, we need to handle EXTERN as a special
+            ;; case because the Quil Spec requires that the pragma be
+            ;; called 'EXTERN', and it just so happens that 'EXTERN'
+            ;; is a quil syntax keyword, used to declare extern
+            ;; procedures.  The tokenizer will see the string "EXTERN"
+            ;; and produce the token ':EXTERN, which is not a token of
+            ;; type ':NAME as is normally required by parse-pragma.
+            (case (token-type word)
+              (:EXTERN "EXTERN")        
+              (:NAME (token-payload word))
+              (otherwise
+               (quil-parse-error "Expected PRAGMA expected :NAME or :EXTERN token.")))))
+      (let ((pragma 
+              (multiple-value-bind (words non-words)
+                  (take-until (lambda (tok) (not (member (token-type tok) '(:NAME :INTEGER)))) word-toks)
+                (setf words (cons first-payload (mapcar #'token-payload words)))
+                (cond
+                  ((null non-words)
+                   (make-pragma words))
 
-      (cond
-        ((null non-words)
-         (make-pragma words))
+                  ((endp (cdr non-words))
+                   (let ((last-tok (first non-words)))
+                     (unless (eql ':STRING (token-type last-tok))
+                       (disappointing-token-error last-tok "a terminating string"))
+                     (make-pragma words (token-payload last-tok))))
 
-        ((endp (cdr non-words))
-         (let ((last-tok (first non-words)))
-           (unless (eql ':STRING (token-type last-tok))
-             (disappointing-token-error last-tok "a terminating string"))
-           (make-pragma words (token-payload last-tok))))
+                  (t
+                   (quil-parse-error "Unexpected tokens near the end of a PRAGMA."))))))
 
-        (t
-         (quil-parse-error "Unexpected tokens near the end of a PRAGMA."))))))
+        (when (typep pragma 'pragma-extern-signature)
+          (process-pragma-extern-signature pragma))
+
+        pragma))))
 
 (defun parse-include (tok-lines)
   "Parse an INCLUDE out of the lines of tokens TOK-LINES."
@@ -1569,10 +1666,28 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
 
     ;; Parse out the parameters.
     (let ((entries
-            (split-sequence:split-sequence-if
-             (lambda (tok)
-               (eq ':COMMA (token-type tok)))
-             found-params))
+            ;; splitting on unnested commas
+            (loop
+              :with paren-nesting := 0
+              :with collecting := nil
+              :with entries := nil
+              :for tok :in found-params
+              :for type := (token-type tok)
+              :do (cond ((eq ':RIGHT-PAREN type)
+                         (decf paren-nesting)
+                         (push tok collecting))
+                        ((eq ':LEFT-PAREN type)
+                         (incf paren-nesting)
+                         (push tok collecting))
+                        ((and (eq ':COMMA type) (zerop paren-nesting))
+                         (push (nreverse collecting) entries)
+                         (setf collecting nil))
+                        (t
+                         (push tok collecting)))
+              :finally
+                 (when collecting
+                   (push (nreverse collecting) entries)
+                   (return (nreverse entries)))))
           (parse-op
             (if allow-expressions
                 #'parse-parameter-or-expression
@@ -1613,18 +1728,50 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
                   (token-payload tok))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (a:define-constant +quil<->lisp-functions+
-      '(("SIN"  . cl:sin)
-        ("COS"  . cl:cos)
-        ("SQRT" . cl:sqrt)
-        ("EXP"  . cl:exp)
-        ("CIS"  . cl:cis))
+  (defvar *names-declared-extern*)
+  (setf (documentation '*names-declared-extern* 'variable)
+        "A special variable that collects the names of functions declared
+extern so that they can be recognized as valid function names during
+expression and CALL application parsing.")
+
+  (defvar *expression-externs*)
+  (setf (documentation '*expression-externs* 'variable)
+        "Names of externs that are permitted to appear in expressions.")
+
+  (defvar *quil<->lisp-functions* nil)
+  (setf (documentation '*quil<->lisp-functions* 'variable)
+        "An association list forming a bijection between string names of
+functions and the Lisp symbol whose function value implements the
+named function. The string names may may appear in both CALL
+instructions and in Quil's numerical expressions.")
+
+  (a:define-constant +builtin-externs+
+      '("SIN" "COS" "SQRT" "EXP" "CIS")
     :test #'equal
     :documentation
-    "Functions usable from within Quil, and their associated Lisp function symbols.")
+    "Functions that are declared extern by default.")
 
-  ;;; If you add a new arithmetic operator to +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ or
-  ;;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+, you must also add it to *ARITHMETIC-GRAMMAR*, below.
+  (defun register-classical-function (name symbol)
+    "Register a string NAME for use in Quil CALL instructions and
+numerical expressions to be associated with SYMBOL, which should
+name a Lisp function. "
+    (declare (type string name)
+             (type symbol symbol))
+    (let ((extant (assoc name *quil<->lisp-functions* :test #'string-equal)))
+      (cond (extant
+             (setf (cdr extant) symbol))
+            (t
+             (setf *quil<->lisp-functions*
+                   (acons name symbol *quil<->lisp-functions*))))))
+
+  (register-classical-function "SIN" 'cl:sin)
+  (register-classical-function "COS" 'cl:cos)
+  (register-classical-function "SQRT" 'cl:sqrt)
+  (register-classical-function "EXP" 'cl:exp)
+  (register-classical-function "CIS" 'cl:cis)
+
+;;; If you add a new arithmetic operator to +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ or
+;;; +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+, you must also add it to *ARITHMETIC-GRAMMAR*, below.
   (a:define-constant +quil<->lisp-prefix-arithmetic-operators+
       '(("-" . cl:-))
     :test #'equal
@@ -1651,38 +1798,38 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
     (a:when-let ((found (assoc quil-string alist :test #'string-equal)))
       (cdr found)))
 
-  ;;; The following functions handle conversion between Quil's arithmetic operators/functions and
-  ;;; the corresponding lisp symbols (fbound to lisp functions) that are used in CL-QUIL for
-  ;;; evaluating Quil's arithmetic expressions. The mapping from lisp->Quil and Quil->lisp is
-  ;;; determined by the above tables, namely: +QUIL<->LISP-FUNCTIONS+,
-  ;;; +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+, and +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+.
-  ;;;
-  ;;; For example, the Quil infix operator "/" in an expression like "pi/8" maps to the Common Lisp
-  ;;; symbol CL:/ and vice versa. Likewise for the prefix operator "-" in "-%theta" which maps to
-  ;;; CL:-.
-  ;;;
-  ;;; The purpose of the following functions is to provide a layer of abstraction around the
-  ;;; conversion to/from Quil<->lisp and to act as a single source of truth for such conversions.
-  ;;;
-  ;;; Here is a glossary of the terms used in the following function names:
-  ;;;
-  ;;; lisp-symbol:
-  ;;;     a SYMBOL which is fbound to a lisp function appropriate for evaluating the corresponding
-  ;;;     Quil function or arithmetic operator.
-  ;;;
-  ;;; quil-function:
-  ;;;     a STRING that denotes a Quil arithmetic function. For example "SIN", "COS", "EXP", etc.
-  ;;;     See the table +QUIL<->LISP-FUNCTIONS+ for the list of valid functions.
-  ;;;
-  ;;; quil-prefix-operator:
-  ;;;     a STRING that denotes a Quil prefix (unary) arithmetic operator. For example, the "-" in
-  ;;;     the expression "-pi/2". See the table +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ for the
-  ;;;     list of valid prefix operators.
-  ;;;
-  ;;; quil-infix-operator:
-  ;;;     a STRING that denotes a Quil infix (binary) arithmetic operator. For example, the "-" in
-  ;;;     the expression "COS(%x) - i * SIN(%x)". See +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+ for
-  ;;;     the list of valid infix operators.
+;;; The following functions handle conversion between Quil's arithmetic operators/functions and
+;;; the corresponding lisp symbols (fbound to lisp functions) that are used in CL-QUIL for
+;;; evaluating Quil's arithmetic expressions. The mapping from lisp->Quil and Quil->lisp is
+;;; determined by the above tables, namely: *QUIL<->LISP-FUNCTIONS*,
+;;; +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+, and +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+.
+;;;
+;;; For example, the Quil infix operator "/" in an expression like "pi/8" maps to the Common Lisp
+;;; symbol CL:/ and vice versa. Likewise for the prefix operator "-" in "-%theta" which maps to
+;;; CL:-.
+;;;
+;;; The purpose of the following functions is to provide a layer of abstraction around the
+;;; conversion to/from Quil<->lisp and to act as a single source of truth for such conversions.
+;;;
+;;; Here is a glossary of the terms used in the following function names:
+;;;
+;;; lisp-symbol:
+;;;     a SYMBOL which is fbound to a lisp function appropriate for evaluating the corresponding
+;;;     Quil function or arithmetic operator.
+;;;
+;;; quil-function:
+;;;     a STRING that denotes a Quil arithmetic function. For example "SIN", "COS", "EXP", etc.
+;;;     See the table *QUIL<->LISP-FUNCTIONS* for the list of valid functions.
+;;;
+;;; quil-prefix-operator:
+;;;     a STRING that denotes a Quil prefix (unary) arithmetic operator. For example, the "-" in
+;;;     the expression "-pi/2". See the table +QUIL<->LISP-PREFIX-ARITHMETIC-OPERATORS+ for the
+;;;     list of valid prefix operators.
+;;;
+;;; quil-infix-operator:
+;;;     a STRING that denotes a Quil infix (binary) arithmetic operator. For example, the "-" in
+;;;     the expression "COS(%x) - i * SIN(%x)". See +QUIL<->LISP-INFIX-ARITHMETIC-OPERATORS+ for
+;;;     the list of valid infix operators.
 
   (defun lisp-symbol->quil-prefix-operator (symbol)
     (%lisp->quil symbol +quil<->lisp-prefix-arithmetic-operators+))
@@ -1697,10 +1844,10 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
     (%quil->lisp quil-infix-operator +quil<->lisp-infix-arithmetic-operators+))
 
   (defun lisp-symbol->quil-function (symbol)
-    (%lisp->quil symbol +quil<->lisp-functions+))
+    (%lisp->quil symbol *quil<->lisp-functions*))
 
   (defun quil-function->lisp-symbol (quil-function)
-    (%quil->lisp quil-function +quil<->lisp-functions+))
+    (%quil->lisp quil-function *quil<->lisp-functions*))
 
   (defun lisp-symbol->quil-function-or-prefix-operator (symbol)
     (or (lisp-symbol->quil-function symbol)
@@ -1716,10 +1863,29 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
       (declare (ignore i0))
       (list head a b)))
 
-  (defun validate-function (func-name)
-    "Return the lisp symbol that corresponds to the Quil function named FUNC-NAME, or signal a QUIL-PARSE-ERROR if FUNC-NAME is invalid."
+  (defun declared-extern-p (name)
+    "Checks that a function has been declared extern."
+    (find name *names-declared-extern* :test #'string-equal))
+
+  (defun allowed-in-expression-p (name)
+    "Checks that an function name is declared extern has a known type that
+is permitted to appear in extern expressions."
+    (and (declared-extern-p name)
+         (find name *expression-externs* :test #'string-equal)))
+
+  (defun validate-expression-function (func-name)
+    "Return the lisp symbol that corresponds to the Quil function named
+     FUNC-NAME, or signal a QUIL-PARSE-ERROR if FUNC-NAME is invalid."
+    (unless (declared-extern-p func-name)
+      (error "No function called ~a has been declared." func-name))
+
+    (unless (allowed-in-expression-p func-name)
+      (error "No type has been declared for ~a. Functions appearing in expressions
+must be known to return a value and to not mutate their arguments." func-name))
+
     (or (quil-function->lisp-symbol func-name)
-        (quil-parse-error "Invalid function name: ~A." func-name)))
+        (error "The function ~a has not been registered with the compiler, we cannot
+evaluate calls to it within expressions." func-name)))
 
   (defun find-or-make-parameter-symbol (param)
     (let ((found (assoc (param-name param)
@@ -1743,7 +1909,7 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
 
 (yacc:define-parser *arithmetic-grammar*
   (:start-symbol expr)
-  (:terminals (:LEFT-PAREN :RIGHT-PAREN
+  (:terminals (:LEFT-PAREN :RIGHT-PAREN :COMMA
                :NAME :PARAMETER :INTEGER :COMPLEX
                :PLUS :MINUS :TIMES :DIVIDE :EXPT :AREF))
   (:precedence ((:right :EXPT) (:left :TIMES :DIVIDE) (:left :PLUS :MINUS)))
@@ -1758,16 +1924,23 @@ When ALLOW-EXPRESSIONS is set, we allow for general arithmetic expressions in a 
    (expr :EXPT expr (binary (quil-infix-operator->lisp-symbol "^")))
    term)
 
+  (expr-list
+   (expr :COMMA expr-list
+         (lambda (e i1 es)
+           (declare (ignore i1))
+           (cons e es)))
+      (expr #'list))
+  
   (term
    (:MINUS expr
            (lambda (i0 x)
              (declare (ignore i0))
              (list (quil-prefix-operator->lisp-symbol "-") x)))
-   (:NAME :LEFT-PAREN expr :RIGHT-PAREN
-          (lambda (f i0 x i1)
+   (:NAME :LEFT-PAREN expr-list :RIGHT-PAREN
+          (lambda (f i0 xs i1)
             (declare (ignore i0 i1))
-            (let ((f (validate-function f)))
-              (list f x))))
+            (let ((f (validate-expression-function f)))
+              (cons f xs))))
    (:LEFT-PAREN expr :RIGHT-PAREN
                 (lambda (i0 x i1)
                   (declare (ignore i0 i1))

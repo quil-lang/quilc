@@ -140,7 +140,6 @@
    #:waveform-definition-name           ; READER
    #:waveform-definition-entries        ; READER
    #:waveform-definition-parameters     ; READER
-   #:waveform-definition-sample-rate    ; READER
 
    #:calibration-definition             ; ABSTRACT CLASS
    #:gate-calibration-definition        ; CLASS

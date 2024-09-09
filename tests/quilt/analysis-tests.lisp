@@ -41,7 +41,7 @@ FOO(1.0) 0"
 (deftest test-quilt-name-resolution ()
   (let ((pp (parse-quilt "
 DEFFRAME 0 \"xy\"
-DEFWAVEFORM foo 1.0:
+DEFWAVEFORM foo:
     1.0, 1.0, 1.0
 
 DEFCAL X q:
@@ -64,9 +64,10 @@ PULSE 0 \"xy\" foo")))
 
 (deftest test-quilt-duration ()
   (let ((pp (parse-quilt "
-DEFFRAME 0 \"xy\"
+DEFFRAME 0 \"xy\":
+    SAMPLE-RATE: 2.0
 
-DEFWAVEFORM foo 2.0:
+DEFWAVEFORM foo:
     1.0, 1.0, 1.0, 1.0
 
 PULSE 0 \"xy\" gaussian(duration: 1.0, fwhm: 0.5, t0: 0.5)

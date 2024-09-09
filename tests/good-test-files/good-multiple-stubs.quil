@@ -1,0 +1,13 @@
+# Multiple stubs some of which are "standard" gates
+
+STUB CNOT
+STUB NOGATE
+STUB NOTAGATE
+
+H 0
+CNOT 1 0
+NOTAGATE 0 1
+CZ 1 0
+NOGATE 0
+CNOT 0 1
+X 0

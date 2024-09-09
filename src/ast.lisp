@@ -421,19 +421,26 @@ If no exit rewiring is found, return NIL."
   (:documentation "A directive to include another file in a Quil file."))
 
 
-(defclass extern ()
-  ((name :reader extern-name
+(defclass stub ()
+  ((name :reader stub-name
          :initarg :name
-         :documentation "The name of the operation being marked as an EXTERN"))
-  (:documentation "A directive to mark a particular operation as an extern. I.e. an
-operation that does not have a definition. Names marked as EXTERN can
+         :documentation "The name of the operation being marked as a stub"))
+  (:documentation "A directive to mark a particular operation as a stub. I.e. an
+operation that does not have a definition. Names marked as STUB can
 be parsed as they appear, and are protected from the optimizing
 compiler, similar to the  effect of a PRESERVE_BLOCK pragma.
 
-NB: A name marked as an EXTERN will take priority over all other
+NB: A name marked as a stub will take priority over all other
 names. Meaning if, for example, a DEFCIRCUIT is defined with name
-marked as EXTERN, that circuit will be totally ignored by
+marked as STUB, that circuit will be totally ignored by
 compilation passes."))
+
+(defclass extern ()
+  ((name :reader extern-name
+         :initarg :name
+         :documentation "The name of the function."))
+  (:documentation "A procedure that operates on classical memory and values, declared to
+be available in the underlying system."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1115,6 +1122,26 @@ Each addressing mode will be a vector of symbols:
   (bit real    real)
   (bit real    immediate))
 
+
+(defclass call (classical-instruction)
+  ((extern
+    :initarg :extern
+    :reader call-extern
+    :type extern
+    :documentation "The extern to be called.")
+   (arguments
+    :initarg :arguments
+    :reader call-arguments
+    :documentation "A list of memory refs and constant values"))
+  (:documentation "A call to an EXTERN function."))
+
+(defmethod mnemonic ((call call))
+  (declare (ignore call))
+  (values "CALL" 'call))
+
+(defmethod arguments ((call call))
+  (coerce (cons (call-extern call) (call-arguments call)) 'vector))
+
 (defclass jump (instruction)
   ((label :initarg :label
           :accessor jump-label))
@@ -1316,17 +1343,17 @@ consists of a CONTROLLED-OPERATOR acting on a NAMED-OPERATOR."
 
     * Application is a circuit application.
 
-    * Application is an extern application.
+    * Application is a stub application.
 
     * Application is an invalid application.
 
 Determining this requires the context of the surrounding program."))
 
-(defclass extern-application (application)
+(defclass stub-application (application)
   ()
-  (:documentation "Represents the application of an extern operation. Externs allow the user to bypass the parsing and compilation stages for particular operations that are meant to receive specific definition at the backend compilation stage.
+  (:documentation "Represents the application of a stub operation. Stubs allow the user to bypass the parsing and compilation stages for particular operations that are meant to receive specific definition at the backend compilation stage.
 
-Externs are similar to instances of UNRESOLVED-APPLICATION. They are semantically empty from the perspective of the quantum abstract virtual machine, and cannot be simulated or executed."))
+Stubs are similar to instances of UNRESOLVED-APPLICATION. They are semantically empty from the perspective of the quantum abstract virtual machine, and cannot be simulated or executed."))
 
 (declaim (inline gate-application-p))
 (defun gate-application-p (x)
@@ -1568,15 +1595,17 @@ For example,
                   (cond
                     ((eql 'mref (first expr))
                      (format stream "~A[~A]" (second expr) (third expr)))
-                    ((= (length expr) 3)
+                    ((and (= (length expr) 3)
+                          (lisp-symbol->quil-infix-operator (first expr)))
                      (format stream "(~A~A~A)"
                              (print-delayed-expression (second expr) nil)
                              (lisp-symbol->quil-infix-operator (first expr))
                              (print-delayed-expression (third expr) nil)))
-                    ((= (length expr) 2)
-                     (format stream "~A(~A)"
+                    (t
+                     (format stream "~A(~{~A~^,~})"
                              (lisp-symbol->quil-function-or-prefix-operator (first expr))
-                             (print-delayed-expression (second expr) nil)))))
+                             (loop :for ex :in (rest expr)
+                                   :collect (print-delayed-expression ex nil))))))
                  (number
                   (format stream "(~/cl-quil:complex-fmt/)" expr))
                  (symbol
@@ -1657,8 +1686,16 @@ For example,
     (format stream "MEASURE ~/cl-quil:instruction-fmt/"
             (measurement-qubit instr)))
 
+  (:method ((instr stub) (stream stream))
+    (format stream "STUB ~A" (stub-name instr)))
+
   (:method ((instr extern) (stream stream))
     (format stream "EXTERN ~A" (extern-name instr)))
+
+  (:method ((instr call) (stream stream))
+    (format stream "CALL ~A ~{~/cl-quil:instruction-fmt/~^ ~}"
+            (extern-name (call-extern instr))
+            (call-arguments instr)))
 
   (:method ((instr application) (stream stream))
     (print-operator-description (application-operator instr) stream)
@@ -1766,33 +1803,46 @@ For example,
 ;;; simply a list of AST objects.
 
 (defclass parsed-program (transformable)
-  ((gate-definitions :initarg :gate-definitions
-                     :accessor parsed-program-gate-definitions
-                     :type list
-                     :documentation "The gate definitions introduced by DEFGATE.")
-   (circuit-definitions :initarg :circuit-definitions
-                        :accessor parsed-program-circuit-definitions
-                        :type list
-                        :documentation "The circuit definitions introduced by DEFCIRCUIT.")
-   (memory-definitions :initarg :memory-definitions
-                       :accessor parsed-program-memory-definitions
-                       :type list
-                       :documentation "The memory definitions introduced by DECLARE.")
-   (executable-program :initarg :executable-code
-                       :accessor parsed-program-executable-code
-                       :type (vector instruction)
-                       :documentation "A vector of executable Quil instructions.")
-   (extern-operations :initarg :extern-operations
-                      :accessor parsed-program-extern-operations
-                      :type hash-table
-                      :documentation "A hash table mapping string NAMEs to generalized booleans, indicating that an operation so named is an extern."))
+  ((gate-definitions
+    :initarg :gate-definitions
+    :accessor parsed-program-gate-definitions
+    :type list
+    :documentation "The gate definitions introduced by DEFGATE.")
+   (circuit-definitions
+    :initarg :circuit-definitions
+    :accessor parsed-program-circuit-definitions
+    :type list
+    :documentation "The circuit definitions introduced by DEFCIRCUIT.")
+   (memory-definitions
+    :initarg :memory-definitions
+    :accessor parsed-program-memory-definitions
+    :type list
+    :documentation "The memory definitions introduced by DECLARE.")
+   (executable-program
+    :initarg :executable-code
+    :accessor parsed-program-executable-code
+    :type (vector instruction)
+    :documentation "A vector of executable Quil instructions.")
+   (extern-declarations
+    :initarg :extern-declarations
+    :accessor parsed-program-extern-declarations
+    :type hash-table
+    :documentation "A hash table mapping string to booleans.")
+   (stub-operations
+    :initarg :stub-operations
+    :accessor parsed-program-stub-operations
+    :type hash-table
+    :documentation "A hash table mapping string names to booleans."))
   (:default-initargs
    :gate-definitions '()
    :circuit-definitions '()
    :memory-definitions '()
    :executable-code #()
-   :extern-operations (make-hash-table :test #'equal))
-  (:documentation "A representation of a parsed Quil program, in which instructions have been duly sorted into their various categories (e.g. definitions vs executable code), and internal references have been resolved."))
+   :extern-declarations (make-hash-table :test #'equal)
+   :stub-operations (make-hash-table :test #'equal))
+  (:documentation "A representation of a parsed Quil program, in which instructions have
+been duly sorted into their various categories (e.g. definitions vs
+executable code), and internal references have been resolved."))
 
 (defmethod copy-instance ((parsed-program parsed-program))
   (let ((pp (make-instance 'parsed-program)))
@@ -1808,15 +1858,10 @@ For example,
     (setf (parsed-program-executable-code pp)
           (map 'vector #'copy-instance
                (parsed-program-executable-code parsed-program)))
-    (setf (parsed-program-extern-operations pp)
-          (let ((new-table
-                  (make-hash-table :test #'equal))
-                (old-table
-                  (parsed-program-extern-operations parsed-program)))
-            (loop :for key :being :the :hash-key :of old-table
-                    :using (:hash-value value)
-                  :do (setf (gethash key new-table) value))
-            new-table))
+    (setf (parsed-program-stub-operations pp)
+          (a:copy-hash-table (parsed-program-stub-operations parsed-program)))
+    (setf (parsed-program-extern-declarations pp)
+          (a:copy-hash-table (parsed-program-extern-declarations parsed-program)))
     pp))
 
 (defvar *print-parsed-program-text* nil

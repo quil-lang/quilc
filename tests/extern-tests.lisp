@@ -4,69 +4,85 @@
 
 (in-package #:cl-quil-tests)
 
-(deftest test-externs ()
-  ;; We supply Quil with a mixture of "standard" and "totally phony"
-  ;; gates.  Here we mark both MOO and CNOT as externed
-  (let ((quil
-          "EXTERN MOO; EXTERN CNOT; X 1; Y 2; MOO 1; X 0; CNOT 0 2; CZ 1 0; Y 0")
-        parsed)
+(defun rando (realcell) (setf (aref realcell 0) (random 1.0)))
+
+;; you can give functions a name for use in Quil programs
+(cl-quil::register-classical-function "randomize" 'rando)
+
+(deftest test-extern-and-call ()
+  (let (parsed
+        compiled
+        (quil
+          "
+EXTERN randomize
+DECLARE x REAL
+RX(x) 0
+CALL randomize x
+CPHASE(pi*x/2) 0 1"))
+
+    ;; we can parse programs like the above without error
     (not-signals error
-     (setf parsed (cl-quil:parse quil)))
-    ;; there should be two externs in the extern-operators
-    (let ((table
-            (cl-quil.frontend::parsed-program-extern-operations parsed))) 
-      (is (gethash "CNOT" table))
-      (is (gethash "MOO" table)))
-    ;; there should be two instances of extern-applications
-    (is (= 2
-           (count-if (a:rcurry 'typep 'cl-quil.frontend:extern-application)
-                     (cl-quil::parsed-program-executable-code parsed))))
-    (let ((chip
-            (cl-quil::build-8q-chip))
-          compiled)
-      ;; we should be able to compile programs with extern-applications in them
-      (not-signals error
-        (setf compiled
-              (cl-quil::compiler-hook
-               parsed
-               chip)))
-      ;; There should still be two instances of extern-application,
-      ;; which may have been rewired but not otherwise altered.
-      (is (= 2
-             (count-if (a:rcurry 'typep 'cl-quil.frontend:extern-application)
-                       (cl-quil::parsed-program-executable-code parsed))))
+      (setf parsed (parse-quil quil)))
 
-      ;; One of the EXTERN-APPLICATION instances should be a MOO and
-      ;; the other should be a CNOT
-      (flet ((extern-named? (name)
-               (lambda (instr)
-                 (and (typep instr 'cl-quil.frontend::extern-application)
-                      (equal name (cl-quil.frontend:application-operator-name instr))))))
-        (let ((instructions
-                (cl-quil:parsed-program-executable-code compiled)))
-          (is (= 1 (count-if (extern-named? "MOO") instructions)))
-          (is (= 1 (count-if (extern-named? "CNOT") instructions)))
+    ;; an can compile such programs 
+    (not-signals error
+      (setf compiled (cl-quil::compiler-hook parsed (cl-quil:build-8q-chip))))
 
-          ;; All of the Xs Ys should have been compiled to other gates and
-          ;; should no longer be present in the code
-          (is (zerop
-               (loop :for instr :across instructions
-                     :for name = (and (typep instr 'quil::application)
-                                      (quil::application-operator-name instr))
-                     :when (member name '("X" "Y") :test #'equal)
-                       :count 1)))))
+    ;; we want to ensure that the call to randomize happens after the
+    ;; first instruction to reference x and before any other
+    ;; instruction that references x.
+    (flet ((is-dexpr (e) (cl-quil.frontend::delayed-expression-p e)))
+      (let* ((instrs
+               (parsed-program-executable-code compiled))
+             (pos-rx
+               (position-if (lambda (instr)
+                              (and (typep instr 'application)
+                                   (find-if #'is-dexpr (application-parameters instr))))
+                            instrs))
+             (pos-call
+               (position-if (lambda (instr) (typep instr 'cl-quil.frontend::call))
+                            instrs))
+             (pos-ref-after-rx
+               (and pos-rx
+                    (position-if (lambda (instr)
+                                   (and (typep instr 'application)
+                                        (find-if #'is-dexpr (application-parameters instr))))
+                                 instrs
+                                 :start (1+ pos-rx)))))
+        (is (and pos-rx pos-call pos-ref-after-rx
+                 (< pos-rx pos-call pos-ref-after-rx)))))))
 
-      ;; The extern table should have been duplicated on compiled program
-      (let ((pp-externs
-              (cl-quil.frontend:parsed-program-extern-operations parsed))
-            (comp-externs
-              (cl-quil.frontend:parsed-program-extern-operations compiled)))
+(defun add2 (x y) (+ x y))
+(cl-quil::register-classical-function "add2" 'add2)
 
-        (is (= (hash-table-count pp-externs)
-               (hash-table-count comp-externs))) 
-        ;; And they should contain the same members
-        (loop :for key :being :the :hash-keys :of pp-externs
-              :do (is (gethash key comp-externs)))
-        (loop :for key :being :the :hash-keys :of comp-externs
-              :do (is (gethash key pp-externs)))))))
+(deftest test-extern-in-expressions ()
+  (let (parsed rx)
+    ;; parsing works
+    (not-signals error
+      (setf parsed (parse-quil "
+EXTERN add2;
+PRAGMA EXTERN add2 \"REAL (x:REAL, y:REAL)\";
+RX(add2(3,pi)/4) 0")))
+
+    ;; because the expression involved no memory references, it is
+    ;; actually evaluated
+    (setf rx (elt (parsed-program-executable-code parsed)
+                   (1- (length (parsed-program-executable-code parsed)))))
+    
+    (is (is-constant
+         (elt (application-parameters rx) 0)))
+
+    ;; but this one will involve memory refs, and so will involve a delayed expression
+    (setf parsed (parse-quil "
+EXTERN add2;
+PRAGMA EXTERN add2 \"REAL (x:REAL, y:REAL)\";
+DECLARE x REAL;
+RX(add2(x,pi)/4) 0"))
+    (setf rx (elt (parsed-program-executable-code parsed)
+                  (1- (length (parsed-program-executable-code parsed)))))
+    (is (cl-quil.frontend::delayed-expression-p
+         (elt (application-parameters rx) 0)))))
+
+
+
 

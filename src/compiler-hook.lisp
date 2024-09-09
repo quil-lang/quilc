@@ -324,11 +324,16 @@ Returns a value list: (processed-program, of type parsed-program
                 (parsed-program-circuit-definitions parsed-program))
           (setf (parsed-program-memory-definitions processed-program)
                 (parsed-program-memory-definitions parsed-program))
-          ;; retain the old extern operations table
-          (setf (parsed-program-extern-operations processed-program)
-                (parsed-program-extern-operations parsed-program))
+          ;; retain the old stub operations table
+          (setf (parsed-program-stub-operations processed-program)
+                (parsed-program-stub-operations parsed-program))
           ;; ... and output the results.
+          (setf (cl-quil.frontend::parsed-program-extern-declarations processed-program)
+                (cl-quil.frontend::parsed-program-extern-declarations parsed-program))
+
           (values
            processed-program
            topological-swaps
            unpreserved-duration))))))
+
+
