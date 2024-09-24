@@ -120,7 +120,7 @@
 
   (define-type (MaybeFormal :t)
     "A wrapper type representing a value which may in some contexts be
-represented by a formal name."
+     represented by a formal name."
     (Actual :t)
     (Formal String))
 
@@ -183,9 +183,9 @@ represented by a formal name."
   (define (offset-amount (MemOffset _ amount)) amount)
 
   (define-type (PauliTerm :num)
-    (PauliTerm String ; pauli word, string of pauli gate names X,Y,Z,I
-               :num   ; prefactor
-               (List String)))          ; arguments
+    (PauliTerm String              ; pauli word, string of pauli gate names X,Y,Z,I
+               :num                ; prefactor
+               (List String)))     ; arguments
 
   (define (pauli-term-word (PauliTerm word _ _)) word)
   (define (pauli-term-prefactor (PauliTerm _ pf _)) pf)
@@ -264,8 +264,6 @@ represented by a formal name."
     
     (Measure (MaybeFormal Ufix) (MaybeFormal Ref))
     (MeasureDiscard (MaybeFormal Ufix)))
-
-
   ;; end module
   )
 
