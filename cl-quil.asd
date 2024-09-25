@@ -237,6 +237,42 @@
                (:file "calibration-tests")
                (:file "analysis-tests")))
 
+(asdf:defsystem "cl-quil/coalton"
+  :description "Coalton integration in `cl-quil`."
+  :author "Yarin Heffes"
+  :license "Apache License 2.0"
+  :depends-on ("cl-quil"
+               "coalton")
+  :pathname "src/coalton"
+  :serial t
+  :components ((:file "coalton-quil")))
+
+(asdf:defsystem "cl-quil/foust"
+  :description "???"
+  :author "Yarin Heffes"
+  :license "Apache License 2.0"
+  :depends-on ("coalton"
+               "cl-quil/coalton")
+  :pathname "src/foust/"
+  :serial t
+  :components ((:file "sign")
+               (:file "angle")
+               (:file "pauli-operator")
+               (:file "pauli")
+               (:file "frame")
+               (:file "assignments")
+               (:file "node")
+               (:file "gate")
+               (:file "circuit")
+               (:file "graph")
+               (:file "cost")
+               (:file "reduce")
+               (:file "optimize")
+               (:file "compile")
+               (:file "foust")
+               (:file "foust-quil"))
+  :in-order-to ((test-op (test-op "cl-quil-tests/foust-tests"))))
+
 (asdf:defsystem #:cl-quil/discrete
   :description "Extensions to CL-QUIL to allow compilation to a discrete gate set."
   :license "Apache License 2.0 (See LICENSE.txt)"
@@ -247,7 +283,7 @@
                #:parse-float
                #:coalton
                #:coalton/library/big-float)
-  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil/discrete-tests)))
+  :in-order-to ((asdf:test-op (asdf:test-op #:cl-quil-tests/discrete-tests)))
   :around-compile (lambda (compile)
                     (let (#+sbcl (sb-ext:*derive-function-types* t))
                       (funcall compile)))
@@ -288,20 +324,6 @@
                (:module "compilers"
                 :serial t
                 :components ((:file "clifford-t")))))
-
-(asdf:defsystem #:cl-quil/discrete-tests
-  :description "Test suite for cl-quil/discrete."
-  :license "Apache License 2.0 (See LICENSE.txt)"
-  :depends-on (#:cl-quil/discrete #:coalton #:coalton/testing #:fiasco)
-  :perform (asdf:test-op (o s)
-                         (uiop:symbol-call ':cl-quil.discrete-tests
-                                           '#:run-discrete-tests))
-  :pathname "tests/discrete/"
-  :serial t
-  :components ((:file "package")
-               (:file "suite")
-               (:file "rz-approx-tests")
-               (:file "compilation-tests")))
 
 (asdf:defsystem #:cl-quil/quilec
   :description "Quantum error correction toolkit."
