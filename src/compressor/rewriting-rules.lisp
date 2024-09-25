@@ -7,6 +7,14 @@
 
 ;;; rewriting rules in general
 
+(define-compiler dagger-s-to-rz
+    ((_ (#.(dagger-operator (named-operator "S")) () q)))
+  (inst "RZ" (list (/ pi -2)) q))
+
+(define-compiler dagger-t-to-rz
+    ((_ (#.(dagger-operator (named-operator "T")) () q)))
+  (inst "RZ" (list (/ pi -4)) q))
+
 (define-compiler eliminate-identities
     ((x ("I" () _)))
   "Eliminate I gates."
