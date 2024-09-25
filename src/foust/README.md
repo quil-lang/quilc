@@ -47,13 +47,13 @@ where $`\mathbf{P}_1`$ and $`\mathbf{P}_2`$ are elements of the subgroup of Herm
 All gates which are Clifford gates will be expressed by Foust in terms of Clifford Frames [1]. Clifford Frames are also called stabilizer tableaus or sometimes Pauli tableaus, and they arise from the fact that the Clifford group is the normalizer of the Pauli group, and also of the subgroup of Hermitian Paulis. Equivalently,
 
 ```math
-\mathbf{U}^\dag\mathbf{P}\mathbf{U}=\mathbf{P}',
+\mathbf{U}^\dagger\mathbf{P}\mathbf{U}=\mathbf{P}',
 ```
 
 where $`\mathbf{U}`$ is an element of the Clifford group and $`\mathbf{P}`$ and $`\mathbf{P}'`$ are Hermitian Paulis. Since the Hermitian Paulis are spanned by the set of single-qubit Pauli operators $`\{Z_i, X_i\mid0\le i < n\}`$, then every member $`\mathbf{U}`$ of the Clifford group is uniquely determined by the map,
 
 ```math
-i\mapsto\left(\mathbf{U}^\dag Z_i\mathbf{U},\mathbf{U}^\dag X_i\mathbf{U}\right),
+i\mapsto\left(\mathbf{U}^\dagger Z_i\mathbf{U},\mathbf{U}^\dagger X_i\mathbf{U}\right),
 ```
 where, once again, $`n`$ describes the number of qubits spanned by the relevant Hilbert space. This map encodes the effect of "pushing" a Clifford operator past a Pauli operator. I.e., if a Clifford operator appears upstream by a Pauli operator, e.g., $`\mathbf{P}\mathbf{U}`$, then the map above describes how to transform $`\mathbf{P}\to\mathbf{P}'`$ such that $`\mathbf{P}\mathbf{U}=\mathbf{U}\mathbf{P}'`$. Foust likes to push Clifford operators downstream, and, therefore, this representation is ideal for efficiency.
 
@@ -63,27 +63,27 @@ Foust will interpret all elements of a circuit as one of six elements [1]. These
 
 Single axis rotations are defined in terms of a single Hermitian Pauli as,
 
-$$\operatorname{Rot}\left(\mathbf{P},\theta\right)=\exp\left(-i\frac{\theta}{2}\mathbf{P}\right).$$
+$$\mathrm{Rot}\left(\mathbf{P},\theta\right)=\exp\left(-i\frac{\theta}{2}\mathbf{P}\right).$$
 
 Bi-axial rotations are defined in terms of a pair of anti-commuting Hermitian Paulis as,
-$$\operatorname{Rot}_2\left(\mathbf{P},\mathbf{Q},\theta,\varphi\right)=\exp\left(-i\frac{\theta}{2}\left(\cos(\varphi)\mathbf{P}+\sin(\varphi)\mathbf{Q}\right)\right).$$
+$$\mathrm{Rot}_2\left(\mathbf{P},\mathbf{Q},\theta,\varphi\right)=\exp\left(-i\frac{\theta}{2}\left(\cos(\varphi)\mathbf{P}+\sin(\varphi)\mathbf{Q}\right)\right).$$
 
 Measurements are defined in terms of a single Hermitian Pauli as 
-$$\operatorname{Meas}\left(\mathbf{P}\rightarrow c\right),$$ 
+$$\mathrm{Meas}\left(\mathbf{P}\rightarrow c\right),$$ 
 collapsing a quantum state to the $`+1`$ or $`-1`$ eigenstate of the operator $`\mathbf{P}`$ and storing $`0`$ or $`1`$ in the classical variable $`c`$, respectively.
 
 Preparations are defined in terms of a pair of anti-commuting Hermitian Paulis as,
-$$\operatorname{Prep}\left(\mathbf{P},\mathbf{Q}\right),$$ 
+$$\mathrm{Prep}\left(\mathbf{P},\mathbf{Q}\right),$$ 
 equivalent to the sequence,
-$$\operatorname{Meas}\left(\mathbf{P}\rightarrow c\right);\text{ if } c=1\text{, then apply }\operatorname{Rot}\left(\mathbf{P},\pi\right);\text{ discard }c.$$
+$$\mathrm{Meas}\left(\mathbf{P}\rightarrow c\right);\text{ if } c=1\text{, then apply }\mathrm{Rot}\left(\mathbf{P},\pi\right);\text{ discard }c.$$
 
 Frames have already been described, and classical assignments are nothing more than a series of classical instructions, manipulating the stored values of classical binary variables.
 
 ### Two-Qubit Entangling Gates (TQEs)
 
-The Clifford gates in a Fousted circuit include arbitary single-qubit Clifford gates, of which there are twenty-four, and two-qubit entangling gates. These two-qubit entangling gates (TQEs) are extensions of the gates of the same name presented in [1], extended with insights from [3] to generalize to arbitrary architectures. TQEs, as presented in [1], are generalized $`\operatorname{CNOT}`$ gates, defined by two non-identity Pauli operators, $`P_i`$ and $`P_j`$. A TQE is interpretted accordingly as the operation $`P_j`$ controlled on the qubits being in a negative eigenstate of the operator $`P_i`$, and, symmetrically, as the operation $`P_i`$ controlled on the qubits being in a negative eigenstate of the operator $`P_j`$. Accordingly, the gate $`\operatorname{CNOT}_{ij}`$ is equivalent to to the gate $`\operatorname{TQE}Z_iX_j`$. Altogether, there are nine TQEs of this form.
+The Clifford gates in a Fousted circuit include arbitary single-qubit Clifford gates, of which there are twenty-four, and two-qubit entangling gates. These two-qubit entangling gates (TQEs) are extensions of the gates of the same name presented in [1], extended with insights from [3] to generalize to arbitrary architectures. TQEs, as presented in [1], are generalized $`\mathrm{CNOT}`$ gates, defined by two non-identity Pauli operators, $`P_i`$ and $`P_j`$. A TQE is interpretted accordingly as the operation $`P_j`$ controlled on the qubits being in a negative eigenstate of the operator $`P_i`$, and, symmetrically, as the operation $`P_i`$ controlled on the qubits being in a negative eigenstate of the operator $`P_j`$. Accordingly, the gate $`\mathrm{CNOT}_{ij}`$ is equivalent to to the gate $`\mathrm{TQE}Z_iX_j`$. Altogether, there are nine TQEs of this form.
 
-Foust extends this notion of TQEs with a boolean, `True` or `False`, answering the question "then swap?" There are eighteen TQEs of this form. Any two-qubit Clifford gate capable of producing entanglement is conjugable to one of these eighteen gates by at most two single-qubit Clifford gates [3]. This extension is necessary for Foust to optimize to architectures which perform $`\operatorname{ISWAP}`$ operations, or similar operations, which are not trivially conjugable to other entangling gates including $`\operatorname{CNOT}`$ and $`\operatorname{CZ}`$ gates.
+Foust extends this notion of TQEs with a boolean, `True` or `False`, answering the question "then swap?" There are eighteen TQEs of this form. Any two-qubit Clifford gate capable of producing entanglement is conjugable to one of these eighteen gates by at most two single-qubit Clifford gates [3]. This extension is necessary for Foust to optimize to architectures which perform $`\mathrm{ISWAP}`$ operations, or similar operations, which are not trivially conjugable to other entangling gates including $`\mathrm{CNOT}`$ and $`\mathrm{CZ}`$ gates.
 
 ### Foust Graphs
 
@@ -105,8 +105,8 @@ Very simply, all free elements are processed, and then the cheapest element rema
 To run benchmarks, execute the following commands (assuming all dependencies have been installed):
 
 ``` lisp
-> (asdf:load-system "cl-quil-benchmarking/foust")
-> (cl-quil-benchmarking.foust:cl-foust-benchmark-qasm-suite)
+(asdf:load-system "cl-quil-benchmarking/foust")
+(cl-quil-benchmarking.foust:cl-foust-benchmark-qasm-suite)
 ```
 
 The following benchmark was generated on a MacBook Pro, 2020, with a 2.3 GHz Quad-Core Intel Core i7 processor and 16 GB 3744 MHz of memory. It was completed on September 24, 2024, with SBCL, and with Coalton compiled in Release mode. The `timeout` for each of the five steps per file was set to two minutes.
