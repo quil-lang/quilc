@@ -54,3 +54,27 @@
                (:file "permutation-tests")
                (:file "sqisw-decomp-tests")
                (:file "extern-tests")))
+
+(asdf:defsystem "cl-quil-tests/foust-tests"
+  :depends-on ("coalton/testing"
+               "fiasco"
+               "cl-quil/foust")
+  :license "Apache License 2.0"
+  :pathname "tests/foust"
+  :serial t
+  :components ((:file "tests"))
+  :perform (test-op (o s) (symbol-call '#:cl-quil-tests/foust-tests '#:run-tests)))
+
+(asdf:defsystem "cl-quil-tests/discrete-tests"
+  :description "Test suite for cl-quil/discrete."
+  :license "Apache License 2.0 (See LICENSE.txt)"
+  :depends-on (#:cl-quil/discrete #:coalton #:coalton/testing #:fiasco)
+  :perform (asdf:test-op (o s)
+                         (uiop:symbol-call ':cl-quil.discrete-tests
+                                           '#:run-discrete-tests))
+  :pathname "tests/discrete/"
+  :serial t
+  :components ((:file "package")
+               (:file "suite")
+               (:file "rz-approx-tests")
+               (:file "compilation-tests")))

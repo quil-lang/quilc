@@ -18,3 +18,16 @@
                (:file "quilc-perf")
                (:file "quilc-mon-prof")
                (:file "suite")))
+
+(asdf:defsystem "cl-quil-benchmarking/foust"
+  :depends-on ("coalton"
+               "cl-quil/coalton"
+               "cl-quil/foust"
+               "bordeaux-threads"
+               "trivial-garbage")
+  :author "Yarin Heffes"
+  :description "A benchmark for Foust."
+  :license "Apache License 2.0"
+  :pathname "benchmarking/foust/"
+  :serial t
+  :components ((:file "foust-benchmarking")))
