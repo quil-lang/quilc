@@ -1,9 +1,11 @@
 (defpackage #:quil/ast/classical
   (:use #:coalton)
   (:shadow #:And)
+  (:local-nicknames
+   (#:mem #:quil/ast/memory))
   (:export
    #:Arg
-   #:Ref
+   #:Mem
    #:Const
    #:Operation
    #:Not
@@ -31,10 +33,11 @@
 (named-readtables:in-readtable coalton:coalton)
 
 (coalton-toplevel
+
   (define-type (Arg :num)
-    (Ref String Ufix)
+    (Mem mem:Ref)
     (Const :num))
-  
+
   (define-type (Operation :arg)
     ;; Unary
     (Not :arg)
