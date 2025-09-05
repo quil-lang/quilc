@@ -143,7 +143,42 @@ DEFGATE PSWAP(%theta):
     0, cis(%theta), 0,           0
     0, 0,           0,           1
 
-# Lesser-known standard gates
+## 2-Qubit Pauli rotation gates
+
+DEFGATE RZZ(%phi):
+    cis(-%phi/2), 0,             0,             0
+    0,              cis(%phi/2), 0,             0
+    0,              0,             cis(%phi/2), 0
+    0,              0,             0,             cis(-%phi/2)
+
+DEFGATE RXX(%phi):
+    cos(%phi/2),    0,              0,              -i*sin(%phi/2)
+    0,              cos(%phi/2),    -i*sin(%phi/2), 0
+    0,              -i*sin(%phi/2), cos(%phi/2),    0
+    -i*sin(%phi/2), 0,              0,              cos(%phi/2)
+
+DEFGATE RYY(%phi):
+    cos(%phi/2),    0,              0,              i*sin(%phi/2)
+    0,              cos(%phi/2),    -i*sin(%phi/2), 0
+    0,              -i*sin(%phi/2), cos(%phi/2),    0
+    i*sin(%phi/2), 0,              0,              cos(%phi/2)
+
+## Fermionic Simulation gates
+
+DEFGATE FSIM(%theta, %phi):
+    1, 0,               0,               0
+    0, cos(%theta/2),   i*sin(%theta/2), 0
+    0, i*sin(%theta/2), cos(%theta/2),   0
+    0, 0,               0,               cis(%phi)
+
+DEFGATE PHASEDFSIM(%theta, %zeta, %chi, %gamma, %phi):
+    1, 0,                                       0,                                       0
+    0, cis(-%gamma - %zeta)*cos(%theta/2),  i*cis(%chi - %gamma)*sin(%theta/2), 0
+    0, i*cis(-%gamma - %chi)*sin(%theta/2), cis(%zeta - %gamma)*cos(%theta/2),  0
+    0, 0,                                       0,                                       cis(%phi - 2*%gamma)
+
+## Lesser-known standard gates
+
 DEFGATE PISWAP(%theta):
     1, 0,               0,               0
     0, cos(%theta/2),   i*sin(%theta/2), 0
