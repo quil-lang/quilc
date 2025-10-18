@@ -163,6 +163,20 @@
                (:file "print-program")
                (:file "initialize-standard-gates")))
 
+(asdf:defsystem #:cl-quil/coalton/ast
+  :description "Coalton implementation src/cl-quil/ast.lisp and related types" 
+  :depends-on (#:cl-quil #:coalton)
+  :pathname "src/coalton/ast/"
+  :serial t
+  :components ((:file "memory")
+               (:file "expression")
+               (:file "classical")
+               (:file "gate")
+               (:file "macro")
+               (:file "unresolved")
+               (:file "native")))
+
+
 (asdf:defsystem #:cl-quil/chip-library
   :description "Holds definitions for various chip ISAs."
   :license "Apache License 2.0 (See LICENSE.txt)"
