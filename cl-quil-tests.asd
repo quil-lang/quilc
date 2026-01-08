@@ -53,6 +53,7 @@
                (:file "linear-reversible-circuit-tests")
                (:file "permutation-tests")
                (:file "sqisw-decomp-tests")
+               (:file "stub-tests")
                (:file "extern-tests")))
 
 (asdf:defsystem "cl-quil-tests/foust-tests"

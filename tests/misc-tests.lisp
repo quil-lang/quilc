@@ -193,7 +193,7 @@
       (is (eq lisp-symbol (cl-quil.frontend::quil-infix-operator->lisp-symbol quil-string)))
       (is (string= quil-string (cl-quil.frontend::lisp-symbol->quil-infix-operator lisp-symbol)))))
 
-  (loop :for (quil-string . lisp-symbol) :in cl-quil.frontend::+quil<->lisp-functions+ :do
+  (loop :for (quil-string . lisp-symbol) :in cl-quil.frontend::*quil<->lisp-functions* :do
     (progn
       (is (cl-quil.frontend::valid-quil-function-or-operator-p lisp-symbol))
       (is (eq lisp-symbol (cl-quil.frontend::quil-function->lisp-symbol quil-string)))

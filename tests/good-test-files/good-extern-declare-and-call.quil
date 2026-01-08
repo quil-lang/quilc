@@ -1,0 +1,8 @@
+# Basic use of extern and call
+
+EXTERN foo
+DECLARE x INTEGER
+X 0
+CALL foo x 10
+CNOT 1 2
+

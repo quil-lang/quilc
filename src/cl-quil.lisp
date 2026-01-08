@@ -89,6 +89,7 @@ This also signals ambiguous definitions, which may be handled as needed."
         (circ-defs '())
         (memory-defs '())
         (exec-code '())
+        (stubs (make-hash-table :test #'equal))
         (externs (make-hash-table :test #'equal))
         ;; The following maps definition signatures to a list of (filename . defn) pairs
         (all-seen-defns (make-hash-table :test 'equalp)))
@@ -112,7 +113,9 @@ This also signals ambiguous definitions, which may be handled as needed."
                (gate-definition (push instr gate-defs))
                (circuit-definition (push instr circ-defs))
                (memory-descriptor (push instr memory-defs))
-               (extern 
+               (stub 
+                (setf (gethash (stub-name instr) stubs) t))
+               (extern
                 (setf (gethash (extern-name instr) externs) t))
                (t (push instr exec-code)))))
       (mapc #'bin code)
@@ -120,7 +123,8 @@ This also signals ambiguous definitions, which may be handled as needed."
                      :gate-definitions (nreverse gate-defs)
                      :circuit-definitions (nreverse circ-defs)
                      :memory-definitions (nreverse memory-defs)
-                     :extern-operations externs
+                     :stub-operations stubs
+                     :extern-declarations externs
                      :executable-code (coerce (nreverse exec-code)
                                               'simple-vector)))))
 
@@ -219,6 +223,8 @@ In the presence of multiple definitions with a common signature, a signal is rai
   "Parse a string STRING into a list of raw Quil syntax objects."
   (check-type string string)
   (let* ((*memory-region-names* nil)
+         (*names-declared-extern* +builtin-externs+)
+         (*expression-externs* +builtin-externs+)
          (tok-lines (tokenize string)))
     (loop :with parsed-program := nil
           :until (endp tok-lines) :do

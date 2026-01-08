@@ -1,8 +1,0 @@
-# Basic Use of EXTERN
-
-EXTERN PHONY
-
-Y 0
-PHONY 1 0
-H 0
-X 0

@@ -190,7 +190,7 @@ Returns NIL. This mutates the instruction."
                                                           :assert-wired t)))
                    (application-arguments instr))))
 
-    (extern-application 
+    (stub-application 
      (setf (application-arguments instr)
            (mapcar (lambda (q) (qubit (apply-rewiring-l2p rewiring (qubit-index q)
                                                           :assert-wired t)))

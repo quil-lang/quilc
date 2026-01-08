@@ -32,14 +32,15 @@
                 (capture (capture-waveform instr)))))
     (waveform-ref-name-resolution wf-ref)))
 
-(defun waveform-active-duration (wf-or-wf-defn)
+(defun waveform-active-duration (wf-or-wf-defn frame)
   "Get the active duration of the waveform or waveform definition, in seconds.
-If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
+If WF-OR-WF-DEFN is a waveform definition, then FRAME's
+SAMPLE-RATE (Hz) must be non-null. "
   (etypecase wf-or-wf-defn
     (standard-waveform (constant-value (waveform-duration wf-or-wf-defn)))
     (waveform-definition
      (/ (length (waveform-definition-entries wf-or-wf-defn))
-        (constant-value (waveform-definition-sample-rate wf-or-wf-defn))))))
+        (constant-value (frame-sample-rate frame))))))
 
 (defparameter *quilt-seemingly-instantenous-duration* 0.0d0
   "A numerical value representing the duration of seemingly instantenous operations, in seconds. This might be zero, and it might not be!")
@@ -48,7 +49,7 @@ If WF-OR-WF-DEFN is a waveform definition, SAMPLE-RATE (Hz) must be non-null. "
   "Get the duration of the specified Quilt instruction INSTR if it is well defined, or NIL otherwise."
   (typecase instr
     ((or pulse capture)
-     (waveform-active-duration (resolved-waveform instr)))
+     (waveform-active-duration (resolved-waveform instr) (pulse-op-frame instr)))
     (delay
       (constant-value (delay-duration instr)))
     (raw-capture

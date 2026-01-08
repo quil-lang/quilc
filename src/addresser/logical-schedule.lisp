@@ -118,6 +118,13 @@
                 (address-resources (classical-right-operand inst))
                 (address-resources (classical-target inst)))))
 
+(defmethod instruction-resources ((inst call))
+  (loop :with union := (address-resources nil)
+        :for arg :in (cl-quil.frontend::call-arguments inst)
+        :when (typep arg 'memory-ref)
+          :do (setf union (resource-union union (address-resources arg)))
+        :finally (return union)))
+
 (defmethod instruction-resources ((inst measurement))
   (qubit-resources (measurement-qubit inst)))
 
@@ -152,7 +159,8 @@
 (defun local-classical-instruction-p (instr)
   (or (typep instr 'unary-classical-instruction)
       (typep instr 'binary-classical-instruction)
-      (typep instr 'trinary-classical-instruction)))
+      (typep instr 'trinary-classical-instruction)
+      (typep instr 'call)))
 
 (defun local-classical-quantum-instruction-p (instr)
   (or (typep instr 'measure)))

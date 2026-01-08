@@ -233,6 +233,12 @@
       (when (typep right-mref 'memory-ref)
         (enforce-mref-bounds right-mref (find-descriptor-for-mref right-mref memory-regions)))))
 
+  (:method ((instr call) memory-regions)
+    (loop :for arg :in (call-arguments instr)
+          :when (typep arg 'memory-ref)
+            :do (enforce-mref-bounds arg (find-descriptor-for-mref arg memory-regions))))
+
+
   ;; NEG needs to be INT or REAL
   (:method ((instr classical-negate) memory-regions)
     (check-mref (classical-target instr))
