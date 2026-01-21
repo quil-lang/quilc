@@ -29,8 +29,8 @@
 ;;;
 ;;; where the arrow A ---> B means that A logically follows B.
 ;;;
-;;; The logical scheduler (defined below) holds a set of instructions and their
-;;; resource dependencies. In particular, it maintain a list of 'first' or 'top'
+;;; The logical schedule (defined below) holds a set of instructions and their
+;;; resource dependencies. In particular, it maintains a list of 'first' or 'top'
 ;;; instructions (corresponding to the right fringe of the above diagram, i.e. X
 ;;; 0 and H 3), a set of 'last' or 'bottom' instructions (corresponding to the
 ;;; left fringe, i.e. CNOT 1 3), as well as hash tables storing information on
@@ -169,22 +169,26 @@
                          (instruction-resources instr2)))
 
 ;;;
-;;; the core logical scheduler class and some of its utilities
+;;; the core logical schedule class and some of its utilities
 ;;;
 
 (defclass logical-schedule ()
-  ((first-instrs :initform nil
-                 :accessor lschedule-first-instrs
-                 :documentation "List of the instructions appearing at the \"top\" of a logical scheduler.  Excepting COMMUTING_BLOCKS threads, these instructions are guaranteed to occupy disjoint collections of resources.")
-   (last-instrs :initform nil
-                :accessor lschedule-last-instrs
-                :documentation "List of the instructions appearing at the \"bottom\" of a logical scheduler.  These are sorted topologically ascending: earlier items in the list come logically after deeper items in the list.")
-   (later-instrs :initform (make-instr-hash-table)
-                 :accessor lschedule-later-instrs
-                 :documentation "Hash table mapping instruction to a list of instructions after it.")
-   (earlier-instrs :initform (make-instr-hash-table)
-                   :accessor lschedule-earlier-instrs
-                   :documentation "Hash table mapping instruction to a list of instructions before it."))
+  ((first-instrs
+    :initform nil
+    :accessor lschedule-first-instrs
+    :documentation "List of the instructions appearing at the \"top\" of a logical schedule.  Excepting COMMUTING_BLOCKS threads, these instructions are guaranteed to occupy disjoint collections of resources.")
+   (last-instrs
+    :initform nil
+    :accessor lschedule-last-instrs
+    :documentation "List of the instructions appearing at the \"bottom\" of a logical schedule.  These are sorted topologically ascending: earlier items in the list come logically after deeper items in the list.")
+   (later-instrs
+    :initform (make-instr-hash-table)
+    :accessor lschedule-later-instrs
+    :documentation "Hash table mapping instruction to a list of instructions after it.")
+   (earlier-instrs
+    :initform (make-instr-hash-table)
+    :accessor lschedule-earlier-instrs
+    :documentation "Hash table mapping instruction to a list of instructions before it."))
   (:documentation "Data structure used to track the logical precedence of instructions in a straight-line Quil program."))
 
 (defun make-instr-hash-table (&optional size)
@@ -658,55 +662,15 @@ Returns the reduction of all bumped values by COMBINE-VALUES, and a hash table m
   (+ (length (lschedule-topmost-instructions lschedule))
      (hash-table-count (lschedule-earlier-instrs lschedule))))
 
-(defun lschedule-calculate-log-fidelity (lschedule chip-spec)
-  (labels
-      ((get-fidelity (instr)
-         (labels ((warn-and-skip (instr)
-                    (format-noise "Unknown fidelity for ~/cl-quil::instruction-fmt/. Skipping." instr)
-                    (return-from get-fidelity 0d0)))
-           (let (fidelity)
-             (typecase instr
-               (measurement
-                (let* ((qubit-index (qubit-index (measurement-qubit instr)))
-                       (qubit-obj (chip-spec-nth-qubit chip-spec qubit-index))
-                       (specs-obj (gethash (make-measure-binding :qubit qubit-index :target '_)
-                                           (hardware-object-gate-information qubit-obj)))
-                       (measure-fidelity (and specs-obj (gate-record-fidelity specs-obj))))
-                  (unless specs-obj
-                    (warn-and-skip instr))
-                  (setf fidelity measure-fidelity)))
-               (application
-                (let ((obj (lookup-hardware-object chip-spec instr)))
-                  (unless obj
-                    (warn-and-skip instr))
-                  (let ((specs-hash (hardware-object-gate-information obj)))
-                    (unless specs-hash (warn-and-skip instr))
-                    (when (> (hash-table-count specs-hash) 0)
-                      (let ((binding (binding-from-instr instr)))
-                        (dohash ((key val) specs-hash)
-                          (when (binding-subsumes-p key binding)
-                            (setf fidelity (gate-record-fidelity val))))))
-                    (unless fidelity (warn-and-skip instr)))))
-               (otherwise
-                (warn-and-skip instr)))
-             (expt (log fidelity) 2)))))
-    (let ((running-fidelity 0d0))
-      (dolist (instr (lschedule-first-instrs lschedule))
-        (unless (gethash instr (lschedule-earlier-instrs lschedule))
-          (incf running-fidelity (get-fidelity instr))))
-      (maphash (lambda (instr val)
-                 (declare (ignore val))
-                 (incf running-fidelity (get-fidelity instr)))
-               (lschedule-earlier-instrs lschedule))
-      (sqrt running-fidelity))))
 
 (defun lschedule-calculate-fidelity (lschedule chip-spec)
-  "Calculate fidelity as the minimum fidelity of the individual instructions.
-
-  This relies on the fact that the function $\exp\{-\sqrt{\log(x)^2 + \log(y)^2}\}$ is approximately equal to $\min\{x, y\}$ for $x, y \in (0, 1]$."
-  (multiple-value-bind (max-value value-hash)
-      (lschedule-calculate-log-fidelity lschedule chip-spec)
-    (values (exp (- max-value)) value-hash)))
+  "Calculate fidelity as the minimum fidelity of the individual instructions."
+  (let ((min-fidelity 1.0d0)) 
+    (declare (dynamic-extent min-fidelity))
+    (flet ((minimize-fidelity (instr)
+             (setf min-fidelity (min min-fidelity (get-instruction-fidelity instr chip-spec)))))
+      (map-lschedule-in-topological-order lschedule #'minimize-fidelity))
+    min-fidelity))
 
 (defun lschedule-all-instructions (lschedule)
   "Return a list of the instructions of LSCHEDULE."

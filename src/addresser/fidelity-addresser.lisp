@@ -26,6 +26,13 @@
 (defmethod cost-flatten ((cost fidelity-cost))
   (fidelity-cost-value cost))
 
+(defun calculate-instructions-log-fidelity (instructions chip-specification)
+  "Calculates the fidelity of a sequence of native INSTRUCTIONS on a chip with architecture governed by CHIP-SPECIFICATION (and with assumed perfect parallelization across resources)."
+  (flet ((log-squared-fidelity (instr)
+           (expt (log (get-instruction-fidelity instr chip-specification))
+                 2)))
+    (reduce #'+ instructions :key #'log-squared-fidelity :initial-value 0.0d0)))
+
 (defun application-fidelity-cost (state instr)
   "Compute the fidelity cost of INSTR, with respect to the provided addresser state."
   ;; calculate log-infidelity coming from INSTR, using recombination:
@@ -40,9 +47,6 @@
              (when (rewiring-assigned-for-instruction-qubits-p l2p instr)
                (rewire-l2p-instruction l2p instr-copy))
              (expand-to-native-instructions (list instr-copy) chip-spec))))
-    ;; (when (= 1 (length (application-arguments instr)))
-    ;;   (setf instruction-expansion (append instruction-expansion (list (make-instance 'measure-discard :qubit (qubit (apply-rewiring-l2p l2p (qubit-index (first (application-arguments instr))))))))))
-
     ;; compute the naive cost
     (let ((instr-cost (calculate-instructions-log-fidelity instruction-expansion chip-spec)))
       ;; then, see if there's a non-naive cost available
@@ -75,9 +79,8 @@
     (flet ((1q-cost (gate physical-qubit)
              (a:when-let* ((chip-spec (addresser-state-chip-specification state))
                            (hardware-object (lookup-hardware-object chip-spec gate))
-                           (instrs (expand-to-native-instructions (list gate) chip-spec))
                            (rewired-instrs
-                            (loop :for instr :in instrs
+                            (loop :for instr :in (expand-to-native-instructions (list gate) chip-spec)
                                   :for rewired-instr := (copy-instance instr)
                                   :do (setf (application-arguments rewired-instr)
                                             (mapcar (constantly (qubit physical-qubit))

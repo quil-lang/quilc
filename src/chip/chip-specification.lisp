@@ -809,3 +809,40 @@ Compilers are listed in descending precedence.")
       (adjoin-hardware-object (build-qubit j :type '(:RZ :X/2 :MEASURE)) chip-spec))
     (warm-hardware-objects chip-spec)
     chip-spec))
+
+(declaim (inline warn-and-return-perfect-fidelity))
+(defun warn-and-return-perfect-fidelity (instr)
+  (format-noise "Unknown fidelity for ~/cl-quil::instruction-fmt/. Assuming 1.0d0." instr)
+  1.0d0)
+
+(defun get-instruction-fidelity (instr chip-spec)
+  "Return the double-float fidelity value associated with object INSTR
+on CHIP-SPEC. If no case for on INSTR is matched, the default is
+perfect fidelity (i.e. 1.0)."
+  (declare (values double-float))
+  (typecase instr
+    (measurement
+     (let* ((qubit-index (qubit-index (measurement-qubit instr)))
+            (qubit-obj (chip-spec-nth-qubit chip-spec qubit-index))
+            (specs-obj (gethash (make-measure-binding :qubit qubit-index :target '_)
+                                (hardware-object-gate-information qubit-obj))))
+       (if specs-obj
+           (gate-record-fidelity specs-obj)
+           (warn-and-return-perfect-fidelity instr))))
+
+    (application
+     (let (fidelity)
+       (a:when-let* ((obj        (lookup-hardware-object chip-spec instr))
+                     (specs-hash (hardware-object-gate-information obj))
+                     (binding    (and (plusp (hash-table-count specs-hash))
+                                      (binding-from-instr instr))))
+         (dohash ((key val) specs-hash)
+           (when (binding-subsumes-p key binding)
+             (setf fidelity (gate-record-fidelity val))
+             (setf binding  key))))
+       (or fidelity (warn-and-return-perfect-fidelity instr))))
+
+    (t
+     (warn-and-return-perfect-fidelity instr))))
+
+
